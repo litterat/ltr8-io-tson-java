@@ -12,7 +12,6 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
@@ -123,7 +122,7 @@ class RecordTemplateTest {
         assertTrue(compiled.schema().applicationOf(minted).isEmpty(), "a minted expansion records no application");
         TypeRef source = compiled.schema().applicationOf("tb").orElseThrow();
         assertEquals("box", source.name());
-        assertEquals(List.of(new TypeArgument.Ref(TypeRef.of("text"))), source.arguments());
+        assertEquals(List.of(TypeRef.of("text")), source.arguments());
     }
 
     /**
@@ -192,47 +191,6 @@ class RecordTemplateTest {
         assertEquals(TypeRef.of("text"), fieldOf(compiled, "text_box", "v").type(), "T := text");
     }
 
-    /** A value parameter binds the literal it was applied with, and the route is gone once bound (§5.10). */
-    @Test
-    void aValueParameterBindsTheAppliedLiteral() {
-        TsonCompiledSchema compiled = compile("""
-                  retry => <N> { attempts?: int32 ~ N }
-                  holder => { r: retry<3> }""");
-
-        RecordField attempts = fieldOf(compiled, fieldType(compiled, "holder", "r"), "attempts");
-        assertEquals("3", attempts.value().orElseThrow().text());
-        assertEquals("defaulted", attempts.describe(), "a routed default stays a default");
-    }
-
-    /**
-     * <b>One field, both parameter kinds</b> -- {@code <T, N> { first: T ~ N }} puts a type parameter in the
-     * field's type and a value parameter in its default. This is the shape a labelled open vocabulary needed
-     * {@code value_param} for, and a held body needs nothing: {@code T} and {@code N} are two tokens in a
-     * wire record, and which one is a type is decided by <em>where it stands</em>, not by a channel it was
-     * written on. Substitution is the same rewrite for both.
-     *
-     * <p>The converse spelling is the check that the positions really are load-bearing: applied backwards,
-     * the literal lands in the type slot and resolves to nothing.
-     */
-    @Test
-    void oneFieldMayCarryATypeParameterAndAValueParameterAtOnce() {
-        TsonCompiledSchema compiled = compile("""
-                  test1 => <T, N> { first?: T ~ N }
-                  holder => { d: test1<int32, 10> }""");
-
-        RecordField first = fieldOf(compiled, fieldType(compiled, "holder", "d"), "first");
-        assertEquals(TypeRef.of("int32"), first.type(), "T stood in the type slot");
-        assertEquals("10", first.value().orElseThrow().text(), "N stood in the value slot");
-        assertEquals("defaulted", first.describe(), "~ is a default, and stays one");
-
-        SchemaValidationException swapped = assertThrows(SchemaValidationException.class,
-                () -> compile("""
-                          test1 => <T, N> { first?: T ~ N }
-                          holder => { d: test1<10, int32> }"""));
-        assertTrue(swapped.getMessage().contains("'10': U+0031 at index 0 cannot start an identifier"),
-                swapped.getMessage());
-    }
-
     /** An inner application closes before the outer one names it, so nesting needs no special case. */
     @Test
     void anApplicationMayBeAnArgumentToAnother() {
@@ -249,16 +207,13 @@ class RecordTemplateTest {
     /**
      * Every position that can write an application resolves its arguments the same way -- a field, a
      * declaration body, and a refinement source all share one resolver. Pinned because they did not: a
-     * value or nested-application argument resolved at a declaration position and was rejected at a field
-     * position, so `box<3>` and `box<box<text>>` worked in one place and not the other.
+     * nested-application argument resolved at a declaration position and was rejected at a field position.
      */
     @Test
     void aDeclarationPositionApplicationTakesTheSameArgumentFormsAsAFieldOne() {
         TsonCompiledSchema compiled = compile("""
                   box     => <T> { v: T }
-                  counted => <N> { n?: int32 ~ N }
-                  nested  => box<box<text>>
-                  three   => counted<3>""");
+                  nested  => box<box<text>>""");
 
         // The outer application is the declaration itself (#15); only the inner `box<text>`, which no
         // declaration names, is still minted.
@@ -266,7 +221,6 @@ class RecordTemplateTest {
                 () -> "the inner box is minted, the outer is `nested`: " + instantiationsOf(compiled, "box"));
         assertEquals(instantiationsOf(compiled, "box").get(0), fieldOf(compiled, "nested", "v").typeRef().name(),
                 "the outer's field names the inner entry");
-        assertEquals("3", fieldOf(compiled, "three", "n").value().orElseThrow().text());
     }
 
     /**
@@ -374,47 +328,29 @@ class RecordTemplateTest {
     @Test
     void anOpenFormClosedByAnApplicationReadsRealData() {
         TsonCompiledSchema compiled = compile("""
-                  tags   => <N> { xs: [text; N] }
-                  holder => { t: tags<2> }""");
+                  tags   => <T> { xs: [T; 2] }
+                  holder => { t: tags<text> }""");
 
         assertNotNull(compiled.get("holder")
                 .read(TestDocuments.document("{ t: { xs: [ \"a\" \"b\" ] } }")));
         assertTrue(assertThrows(ReadException.class, () -> compiled.get("holder")
                 .read(TestDocuments.document("{ t: { xs: [ \"a\" ] } }"))).getMessage().contains("2"),
-                "the bound the parameter supplied is the one that is enforced");
+                "the bound the open form states is the one that is enforced");
     }
 
     /**
-     * §8.2's deferred value-level check, at the one place D7 gives it a home. {@code <N> [text; N]} is a fine
-     * declaration -- {@code N} could be anything -- and {@code <"two">} is where it stops being one, because
-     * substitution is what finally hands {@code min_items} something to read.
+     * §8.2's deferred check, at the one place D7 gives it a home. {@code <K> !meta.namespace { key_type: K … }} is a
+     * fine declaration -- {@code K} could name an identifier family -- and {@code keyed<int32>} is where it stops
+     * being one, because substitution is what finally hands {@code key_type} something to judge.
      */
     @Test
     void anArgumentTheSlotCannotTakeIsReportedAtTheApplication() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
-                          tags   => <N> { xs: [text; N] }
-                          holder => { t: tags<"two"> }"""));
+                          keyed  => <K> !meta.namespace { key_type: K  value_type: text }
+                          holder => { t: keyed<int32> }"""));
 
-        assertTrue(thrown.getMessage().contains("not a valid integer"), thrown.getMessage());
-    }
-
-    /**
-     * A parameter passed through as an <em>argument</em> keeps the channel it was applied on. An argument
-     * list is the one position where a type and a value are equally at home, so the value {@code N} carries
-     * reaches the open synthetic's own {@code min_items} rather than being rejected as a type.
-     */
-    @Test
-    void aValueParameterReachesAnOpenSyntheticThroughTheApplication() {
-        TsonCompiledSchema compiled = compile("""
-                  tags   => <N> { xs: [text; N] }
-                  holder => { t: tags<2> }""");
-
-        ArrayBody closed = (ArrayBody) compiled.schema().entries()
-                .get(fieldType(compiled, fieldType(compiled, "holder", "t"), "xs"));
-
-        assertEquals(Optional.of(2L), closed.minItems());
-        assertEquals(Optional.of(2L), closed.maxItems());
+        assertTrue(thrown.getMessage().contains("int32"), thrown.getMessage());
     }
 
     /** A declaration's own body is the construction, not a reference to a lifted one -- unchanged by R2. */
@@ -520,36 +456,16 @@ class RecordTemplateTest {
     }
 
     /**
-     * A literal applied where the template uses the parameter as a <b>type</b> is a kind error: {@code T} is the
-     * field's {@code type_param}, so its argument names a type, and {@code 3} is no name -- refused where the
-     * argument is substituted for the label, at the application (§5.10).
+     * An argument is a type, written as a reference, so a literal is no argument: {@code box<3>} is refused where
+     * it is written, by the grammar (§5.10, §12.1).
      */
     @Test
-    void applyingAValueWhereTheBodyUsesAParameterAsATypeIsAnError() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+    void aLiteralArgumentIsRefusedWhereItIsWritten() {
+        io.ltr8.tson.base.ParseException thrown = assertThrows(io.ltr8.tson.base.ParseException.class,
                 () -> compile("""
                           box => <T> { v: T }
                           holder => { b: box<3> }"""));
-        assertTrue(thrown.getMessage().contains("'box<...>' binds the type parameter 'T' to '3', which is no type -- "
-                + "'3': U+0033 at index 0 cannot start an identifier"), thrown.getMessage());
-    }
-
-    /**
-     * <b>The converse is caught at the application.</b> A type name applied where the body routes the parameter
-     * into a field's <em>value</em> binds {@code N}, whose recorded type is the field's own {@code int32}
-     * ({@code meta.template_param.type}, §5.10), so {@code text} is refused as an argument that is not an
-     * {@code int32} value -- at {@code retry<text>}, before substitution puts it in the {@code value} slot where
-     * §5.2's value conformance would otherwise be the first rule to see it.
-     */
-    @Test
-    void applyingATypeWhereTheBodyRoutesAValueIsCaughtAtTheApplication() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> compile("""
-                          retry => <N> { attempts?: int32 ~ N }
-                          holder => { r: retry<text> }"""));
-
-        assertTrue(thrown.getMessage().contains("'retry<...>' binds 'N' to 'text'"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("not a value of int32"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'3' is no type argument"), thrown.getMessage());
     }
 
     /**
@@ -653,11 +569,11 @@ class RecordTemplateTest {
     @Test
     void aParameterisedAliasMayNameAnOpenInstanceTemplate() {
         TsonCompiledSchema compiled = compile("""
-                  rows   => <T, N> [T; N]
-                  triple => <T> rows<T, 3>
+                  rows   => <T> [T; 3]
+                  triple => <T> rows<T>
                   holder => { r: triple<int32> }""");
 
-        // `triple` itself mints nothing, and neither does `rows<int32, 3>`, the open instance one hop in: the
+        // `triple` itself mints nothing, and neither does `rows<int32>`, the open instance one hop in: the
         // field names the closed array synthetic that closing it produced, the application being its expansion.
         String synthetic = fieldType(compiled, "holder", "r");
         ArrayBody array = assertInstanceOf(ArrayBody.class,

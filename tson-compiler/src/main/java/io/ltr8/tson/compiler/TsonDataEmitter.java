@@ -304,9 +304,8 @@ public final class TsonDataEmitter {
     /**
      * Writes {@code reference} unquoted ([TSON-DATA] §7.4): its qualified name, and where it
      * carries arguments an adjacent {@code <}, each argument separated by one space, and {@code >} -- the canonical
-     * text, {@code map<text list<int32>>}. A value argument keeps its token form, a quoted one escaped as {@link
-     * #quotedString} escapes. The caller is responsible for the head and every reference argument being qualified
-     * names, which is what a {@code TypeRef} read from either grammar holds.
+     * text, {@code map<text list<int32>>}, each argument a reference in turn. The caller is responsible for the head
+     * and every argument being qualified names, which is what a {@code TypeRef} read from either grammar holds.
      */
     public TsonDataEmitter reference(io.ltr8.tson.schema.meta.TypeRef reference) {
         startCoreValue();
@@ -343,16 +342,7 @@ public final class TsonDataEmitter {
             if (i > 0) {
                 emit(' ');
             }
-            switch (reference.arguments().get(i)) {
-                case io.ltr8.tson.schema.meta.TypeArgument.Ref nested -> emitReference(nested.ref());
-                case io.ltr8.tson.schema.meta.TypeArgument.Value value -> {
-                    if (value.value().form() == io.ltr8.tson.schema.meta.Token.Form.UNQUOTED) {
-                        emit(value.value().text());
-                    } else {
-                        emitQuoted(value.value().text());
-                    }
-                }
-            }
+            emitReference(reference.arguments().get(i));
         }
         emit('>');
     }

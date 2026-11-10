@@ -43,7 +43,6 @@ import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
-import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.unicode.RegexType;
@@ -682,47 +681,22 @@ class DefinitionResolverTest {
     }
 
     /**
-     * A parameter routed into a field's value is the field's <b>{@code value_param}</b>. §5.10's shadowing rule
-     * tells it from a literal where it is written: inside a template an unquoted token that resolves into {@code
-     * parameters} is a parameter, and the label records which it was.
-     *
-     * <p>The field is FIXED where it is declared, as its literal spelling would be: the role is the modifier's,
-     * and only the value waits for an application. Closing substitutes the value and changes no fact -- {@code
-     * ValueParamFixedFieldTest} pins both ends ([TSON-SCHEMA] §5.7).
-     *
-     * <p><b>The pin also makes the field this template's selector</b>, which is the derivation and not an
-     * extra claim: one value per application is one value per member, so the base dispatches on
-     * {@code [value]} with no {@code =?} written (§5.2, §5.10).
+     * A field's value is never a parameter, whatever the field's type ([TSON-SCHEMA] §5.10): a pin on a field typed
+     * {@code meta.type_ref} is refused with every other parameter at a value, naming the slot. §5.10's shadowing rule
+     * is what says the token is the parameter: inside a template an unquoted token that resolves into {@code
+     * parameters} is one.
      */
     @Test
-    void aParametricFixedValueRidesTheValueSlotOfAFixedField() {
-        RecordTemplateBody sized = assertInstanceOf(RecordTemplateBody.class,
-                resolveSnippet("sized => <T> { value: meta.type_ref = T }"));
-        RecordTemplateField value = sized.fields().get("value");
+    void aParameterPinnedAtAFieldsValueIsRefused() {
+        SchemaValidationException pinned = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippet("sized => <T> { value: meta.type_ref = T  other: T }"));
+        SchemaValidationException defaulted = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippet("retry_policy => <T, N> { t: T  attempts?: integer ~ N }"));
 
-        assertEquals(List.of("T"), OpenEntry.parameterNames(sized));
-        assertEquals(Optional.of(TypeRef.of("meta.type_ref")), value.type());
-        assertEquals(Optional.of("T"), value.valueParam());
-        assertEquals(FieldRole.FIXED, value.role());
-        assertFalse(value.optional());
-        assertEquals(List.of("value"), sized.discriminators());
-        assertEquals(Optional.of(RecordExtensionType.ABSTRACT), FamilySelectors.extensionOf(sized));
-    }
-
-    /**
-     * {@code ~ P} is an optional DEFAULT exactly as a literal default is (§5.10), and stays one through
-     * materialisation: data may still override a default where it may not override a fixed value.
-     */
-    @Test
-    void aParametricDefaultValueIsPromotedToRequiredDefault() {
-        RecordTemplateBody retry = assertInstanceOf(RecordTemplateBody.class,
-                resolveSnippet("retry_policy => <N> { attempts?: integer ~ N }"));
-        RecordTemplateField attempts = retry.fields().get("attempts");
-
-        assertEquals(Optional.of(TypeRef.of("integer")), attempts.type());
-        assertTrue(attempts.optional());
-        assertEquals(FieldRole.DEFAULT, attempts.role());
-        assertEquals(Optional.of("N"), attempts.valueParam());
+        assertTrue(pinned.getMessage().contains("parameter 'T' stands at meta.record_field.value"),
+                pinned.getMessage());
+        assertTrue(defaulted.getMessage().contains("parameter 'N' stands at meta.record_field.value"),
+                defaulted.getMessage());
     }
 
     // ── Tightening (§5.7), via composition bodies: array, map ─────────────
@@ -1918,25 +1892,15 @@ class DefinitionResolverTest {
     }
 
     /**
-     * A parametric {@code = P} pins the field where it is written, as a literal would ([TSON-SCHEMA] §5.7).
-     * Its type slot is elided, so it inherits the source's type -- here {@code integer}, the source being
-     * {@code bound?: integer} -- and the template holds the flattened field with the parameter as its {@code
-     * value_param}.
+     * A pin restating an inherited field is a field's value, so a parameter there is refused, naming the slot
+     * ([TSON-SCHEMA] §5.10): the modifier-only entry elides the type, and its value is no parameter either way.
      */
     @Test
-    void aParametricPinOnAnInheritedOptionalFieldIsRequiredAndFixed() {
-        Map<String, Top> entries = resolveAll("""
+    void aParameterPinnedOnAnInheritedFieldIsRefused() {
+        assertRefused("""
                 base => { bound?: integer }
                 bounded => <MIN> base ^ { bound: = MIN }
-                """);
-
-        RecordTemplateBody open = assertInstanceOf(RecordTemplateBody.class, entries.get("bounded"));
-        RecordTemplateField bound = open.fields().get("bound");
-        assertEquals(Optional.of(TypeRef.of("integer")), bound.type(), "the type came from the source");
-        assertEquals(Optional.of("MIN"), bound.valueParam(), "the parameter is the field's value parameter");
-        // The name is unmarked, so the inherited optional did not survive; the pin is the modifier's.
-        assertFalse(bound.optional());
-        assertEquals(FieldRole.FIXED, bound.role());
+                """, "parameter 'MIN' stands at the value of field 'bound'");
     }
 
     // ── Restating a group member (§5.11) ──────────────────────────────────

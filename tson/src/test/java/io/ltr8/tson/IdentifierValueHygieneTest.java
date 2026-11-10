@@ -183,8 +183,7 @@ class IdentifierValueHygieneTest {
 
     /**
      * A record template's literal value is every application's, so it is judged once, at the template, against the
-     * template's own declaration -- applied or not. A value parameter is no literal of the template's and is judged
-     * where an application writes its argument.
+     * template's own declaration -- applied or not.
      */
     @Test
     void aRecordTemplatesIdentifierTypedValueIsAName() {
@@ -192,9 +191,6 @@ class IdentifierValueHygieneTest {
                 "acct => <T> { kind: slug = a\u0132b  v: T }")));
         assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, refused.code());
         assertEquals(Optional.of("/acct"), refused.schemaPointer());
-
-        assertEquals(List.of(), tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
-                "acct => <T, K> { kind: slug = K  v: T }")));
     }
 
     private static String schemaWith(String declaration) {

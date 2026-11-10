@@ -50,7 +50,7 @@ class SiblingRefTest {
         assertInstanceOf(NameRef.class, TypeRef.of("kind"));
         assertInstanceOf(NameRef.class, TypeRef.of("kind", List.of()));
         assertInstanceOf(ApplicationRef.class,
-                TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("text")))));
+                TypeRef.of("box", List.of(TypeRef.of("text"))));
         Reference written = TypeRef.of("kind!");
         assertInstanceOf(NameRef.class, written, "a name spelled with the mark is still a name the factory was given");
     }
@@ -71,7 +71,7 @@ class SiblingRefTest {
     @Test
     void aSiblingWritesNoParameterAndNoTypeReferenceOfATemplate() {
         RecordTemplateField payload = new RecordTemplateField(Optional.of(SiblingRef.of("kind")), Optional.empty(),
-                false, false, FieldRole.FREE, Optional.empty(), Optional.empty(), null, null);
+                false, false, FieldRole.FREE, Optional.empty(), null, null);
         assertEquals(Optional.empty(), payload.parameterInType(List.of("kind", "T")));
         assertEquals(RecordField.required(SiblingRef.of("kind")), payload.closed());
     }

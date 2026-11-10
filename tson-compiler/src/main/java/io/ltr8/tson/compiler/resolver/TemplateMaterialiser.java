@@ -2,9 +2,6 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.atom.AtomParsers;
-import io.ltr8.tson.atom.AtomType;
-import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -22,9 +19,7 @@ import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Alias;
-import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TemplateParam;
@@ -119,12 +114,6 @@ final class TemplateMaterialiser {
      * there the moment it is published.
      */
     private final Map<String, TsonSchema.EntryFacts> facts;
-
-    /** The constructor an entry's value applies, through the schema's facts and then its own class. */
-    private final Function<String, Optional<String>> localConstructors;
-
-    /** The same, of an imported entry. */
-    private final Function<String, Optional<String>> importedConstructors;
 
     /** §8.2's freshness MUST over the names this class mints -- see {@link MintedNames}. */
     private final MintedNames minted = new MintedNames();
@@ -257,57 +246,38 @@ final class TemplateMaterialiser {
      */
     private final Set<String> generated;
 
-    /**
-     * Each template's parameter kinds ([TSON-SCHEMA] §5.10), by entry name then parameter name -- what lets
-     * an argument be classified by the parameter it binds rather than by the shape of the token that spells
-     * it. Empty until {@code SchemaResolver} has inferred them, which it cannot do before every declaration
-     * has resolved; an application closed on demand before that point classifies as it always did.
-     */
-    private Map<String, Map<String, ParameterTypes.Kind>> parameterKinds = Map.of();
-
-    /**
-     * The same question answered one template at a time, for an application closed before the batch pass
-     * could run -- a composition supertype or a refinement source, both of which close during resolution's
-     * own driving loop. Memoised because a template is typically applied more than once.
-     */
-    private final Map<String, Map<String, ParameterTypes.Kind>> kindsOnDemand = new LinkedHashMap<>();
-
     /** Whether a name is the kernel's own, for telling a constructor from a family member. */
     private final Predicate<String> kernel;
 
-    /** The imported entries, where a constructor and the type its slot declares are read from. */
+    /** The imported entries, where an argument's or a bound's name is read when the schema does not hold it. */
     private final Function<String, Top> importedTypes;
 
     /** The local declaration resolution is inside, or {@code null} -- who an early check answers to. */
     private final Supplier<String> resolving;
 
     /**
-     * The argument checks {@link #byParameterKind} ran before the parameters were stamped, replayed by
+     * The argument checks {@link #checkArguments} ran before the parameters were stamped, replayed by
      * {@link #recheckEarly} once they are. An application closed during resolution -- a declaration naming it,
      * a composition operand, a refinement source, or an argument nested in one -- meets a local template whose
      * parameters carry no written or inherited bound yet, so its check passes vacuously until then.
      */
     private final Set<EarlyCheck> early = new LinkedHashSet<>();
 
-    /** Whether {@link #parameterKinds(Map)} has run, after which every check sees stamped parameters. */
+    /** Whether {@link #parametersStamped} has run, after which every check sees stamped parameters. */
     private boolean stamped;
 
-    private record EarlyCheck(String declaration, String head, List<TypeArgument> arguments) {
+    private record EarlyCheck(String declaration, String head, List<TypeRef> arguments) {
     }
 
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, Top> publish,
                          ConstructionReader constructionReader, Set<String> generated,
                          Function<String, Top> importedTypes, Supplier<String> resolving,
                          Map<String, TsonSchema.EntryFacts> facts, Map<String, TypeRef> applications,
-                         Function<String, Optional<String>> localConstructors,
-                         Function<String, Optional<String>> importedConstructors,
                          Predicate<String> kernel) {
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.facts = Objects.requireNonNull(facts, "facts");
         this.applications = Objects.requireNonNull(applications, "applications");
-        this.localConstructors = Objects.requireNonNull(localConstructors, "localConstructors");
-        this.importedConstructors = Objects.requireNonNull(importedConstructors, "importedConstructors");
         this.publish = Objects.requireNonNull(publish, "publish");
         this.constructionReader = Objects.requireNonNull(constructionReader, "constructionReader");
         this.generated = Objects.requireNonNull(generated, "generated");
@@ -315,12 +285,8 @@ final class TemplateMaterialiser {
         this.resolving = Objects.requireNonNull(resolving, "resolving");
     }
 
-    /**
-     * The inferred kinds, once {@code SchemaResolver} has them -- see {@link #parameterKinds}. The parameters
-     * are stamped by then, so from here on a check sees them.
-     */
-    void parameterKinds(Map<String, Map<String, ParameterTypes.Kind>> kinds) {
-        this.parameterKinds = kinds;
+    /** Called once {@code SchemaResolver} has stamped the parameters' bounds: from here on a check sees them. */
+    void parametersStamped() {
         this.stamped = true;
     }
 
@@ -338,7 +304,7 @@ final class TemplateMaterialiser {
                 continue;
             }
             try {
-                classified(check.head(), template, OpenEntry.parameterNames(template), check.arguments());
+                checkBounds(check.head(), template, check.arguments());
             } catch (SchemaValidationException e) {
                 refused.add(check.declaration());
                 reporter.accept(check.declaration(), e);
@@ -430,18 +396,15 @@ final class TemplateMaterialiser {
         // before anything is derived from the list. `close` does this for a minted entry; without it here,
         // `by_alias => box<user_id>` and `by_target => box<uuid>` would record two applications for one type,
         // and the name, the ownership key and the recorded application would each disagree with the minted path.
-        List<TypeArgument> classified =
-                byParameterKind(head, template, parameters, application.arguments());
-        List<TypeArgument> arguments = new ArrayList<>();
-        for (TypeArgument argument : classified) {
-            arguments.add(argument instanceof TypeArgument.Ref nested
-                    ? new TypeArgument.Ref(dereferenced(close(nested.ref())))
-                    : argument);
+        checkArguments(head, template, application.arguments());
+        List<TypeRef> arguments = new ArrayList<>();
+        for (TypeRef argument : application.arguments()) {
+            arguments.add(dereferenced(close(argument)));
         }
         ownedBy.put(DerivedName.canonicalApplication(head, arguments), declaredName);
         heads.add(head);
         try {
-            Map<String, TypeArgument> bindings = bind(parameters, arguments);
+            Map<String, TypeRef> bindings = bind(parameters, arguments);
             note(declaredName, constructor);
             Top closed = template instanceof RecordTemplateBody record
                     ? closeRecordTemplate(head, record, bindings)
@@ -471,11 +434,9 @@ final class TemplateMaterialiser {
         if (constructed != null) {
             return TypeRef.of(constructed);
         }
-        List<TypeArgument> arguments = new ArrayList<>();
-        for (TypeArgument argument : ref.arguments()) {
-            arguments.add(argument instanceof TypeArgument.Ref nested
-                    ? new TypeArgument.Ref(dereferenced(close(nested.ref())))
-                    : argument);
+        List<TypeRef> arguments = new ArrayList<>();
+        for (TypeRef argument : ref.arguments()) {
+            arguments.add(dereferenced(close(argument)));
         }
         String entry = instantiate(templateHead(ref.name()), arguments, ref);
         // A generated head's application is an open synthetic closing its own intermediate form: nobody wrote it.
@@ -575,7 +536,7 @@ final class TemplateMaterialiser {
      * when the head names nothing in scope -- that is {@code TsonSchemaLinker}'s verdict to give as an
      * unresolved reference, not this pass's to guess at.
      */
-    private String instantiate(String head, List<TypeArgument> arguments, TypeRef written) {
+    private String instantiate(String head, List<TypeRef> arguments, TypeRef written) {
         Top template = namespace.definition(head);
         if (template == null) {
             return null; // unresolved head -- the linker's verdict, not this pass's
@@ -591,7 +552,7 @@ final class TemplateMaterialiser {
                     + " type argument" + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but "
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
-        arguments = byParameterKind(head, template, parameters, arguments);
+        checkArguments(head, template, arguments);
         String owner = ownedBy.get(DerivedName.canonicalApplication(head, arguments));
         if (owner != null) {
             // A declaration owns this application's entry (§8.2), so there is nothing
@@ -727,7 +688,7 @@ final class TemplateMaterialiser {
      * name, against the declaration that wrote it. A constructor -- a record IS-A the kernel's {@code top} -- is
      * no member of anything.
      */
-    private void refuseMintedMember(String head, List<TypeArgument> arguments, Top closed) {
+    private void refuseMintedMember(String head, List<TypeRef> arguments, Top closed) {
         if (!(closed instanceof RecordBody record) || EntryKind.isConstructor(head, record, kernel)) {
             return;
         }
@@ -738,10 +699,8 @@ final class TemplateMaterialiser {
         if (onto.isEmpty()) {
             return;
         }
-        String written = head + arguments.stream().map(argument -> switch (argument) {
-            case TypeArgument.Ref ref -> ref.ref().name();
-            case TypeArgument.Value value -> value.value().text();
-        }).collect(java.util.stream.Collectors.joining(", ", "<", ">"));
+        String written = head + arguments.stream().map(TypeRef::name)
+                .collect(java.util.stream.Collectors.joining(", ", "<", ">"));
         String base = onto.stream()
                 .filter(member -> onto.stream().noneMatch(other -> !other.equals(member)
                         && TypeChain.supertypesOf(namespace.definition(other)).contains(member)))
@@ -767,8 +726,8 @@ final class TemplateMaterialiser {
     }
 
     /** Each parameter of the applied signature against the argument applied for it, in order. */
-    private static Map<String, TypeArgument> bind(List<String> parameters, List<TypeArgument> arguments) {
-        Map<String, TypeArgument> bindings = new LinkedHashMap<>();
+    private static Map<String, TypeRef> bind(List<String> parameters, List<TypeRef> arguments) {
+        Map<String, TypeRef> bindings = new LinkedHashMap<>();
         for (int i = 0; i < parameters.size(); i++) {
             bindings.put(parameters.get(i), arguments.get(i));
         }
@@ -790,14 +749,13 @@ final class TemplateMaterialiser {
      * content cannot be written without a name: {@link #instantiate} then keeps an alias entry under the
      * application-derived name, which the knot was tied on.
      */
-    private String closeHeldTemplate(String head, Top template, HeldBody open,
-            Map<String, TypeArgument> bindings) {
+    private String closeHeldTemplate(String head, Top template, HeldBody open, Map<String, TypeRef> bindings) {
         String target = open.application().typeRef().orElseThrow();
         Closed closed = closeHeld(head, template, open, bindings);
         // Named before the entry is built and from the wire slots as written, which is what keeps one type on
         // one entry: the desugar phase lifts innermost-first, so a form it writes already names the entry its
         // inner form became, and a form closed here has to agree with it or `[[pixel; 3]; 3]` written out and
-        // `grid<pixel, 3>` closed would be two entries for one type.
+        // `grid<pixel>` closed would be two entries for one type.
         List<RecordValue.Field> fields =
                 closed.wire() instanceof RecordValue record ? record.fields() : List.of();
         String formName = DerivedName.ofBinding(target, fields);
@@ -827,8 +785,7 @@ final class TemplateMaterialiser {
      * nothing ever defines. {@link #close} checks {@code aliasClosing} before reaching here and reports the
      * cycle instead.
      */
-    private String closeHeldAlias(String head, Top template, HeldBody open,
-            Map<String, TypeArgument> bindings) {
+    private String closeHeldAlias(String head, Top template, HeldBody open, Map<String, TypeRef> bindings) {
         CoreValue substituted = WireForm.substitute(open.application().coreValue(), head,
                 OpenEntry.parameterNames(template), bindings);
         CoreValue closed = closeApplications(substituted);
@@ -858,7 +815,7 @@ final class TemplateMaterialiser {
      * template's being no member's.
      */
     private RecordBody closeRecordTemplate(String head, RecordTemplateBody template,
-                                           Map<String, TypeArgument> bindings) {
+                                           Map<String, TypeRef> bindings) {
         AnnotatedMap<String, RecordField> substituted = RecordTemplateSubstitution.closed(head, template, bindings);
         AnnotatedMap<String, RecordField> fields = new AnnotatedMap<>();
         substituted.forEach((name, field) -> fields.put(name,
@@ -892,32 +849,14 @@ final class TemplateMaterialiser {
 
     /**
      * {@code reference} as {@code @meta.application} states it: as written, a nested application unreduced and itself
-     * stated this way, each argument a value where its parameter binds one, and a bare name followed through its
-     * alias chain, since §8.2 compares arguments after alias flattening.
+     * stated this way, and a bare name followed through its alias chain, since §8.2 compares arguments after alias
+     * flattening.
      */
     private TypeRef asWritten(TypeRef reference) {
         if (reference.arguments().isEmpty()) {
             return plain(dereferenced(reference));
         }
-        String head = templateHead(reference.name());
-        Top template = namespace.definition(head);
-        List<String> parameters = template == null ? List.of() : OpenEntry.parameterNames(template);
-        Map<String, ParameterTypes.Kind> kinds = parameters.isEmpty() ? null
-                : Optional.ofNullable(parameterKinds.get(head)).orElseGet(() -> kindsOnDemand
-                        .computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, importedTypes)));
-        List<TypeArgument> arguments = new ArrayList<>(reference.arguments().size());
-        for (int i = 0; i < reference.arguments().size(); i++) {
-            TypeArgument argument = reference.arguments().get(i);
-            boolean value = kinds != null && parameters.size() == reference.arguments().size()
-                    && kinds.get(parameters.get(i)) == ParameterTypes.Kind.VALUE;
-            arguments.add(switch (argument) {
-                case TypeArgument.Ref ref when value && ref.ref().arguments().isEmpty() ->
-                        new TypeArgument.Value(new Token(ref.ref().name(), Token.Form.UNQUOTED));
-                case TypeArgument.Ref ref -> new TypeArgument.Ref(asWritten(ref.ref()));
-                case TypeArgument.Value literal -> literal;
-            });
-        }
-        return TypeRef.of(reference.name(), arguments);
+        return TypeRef.of(reference.name(), reference.arguments().stream().map(this::asWritten).toList());
     }
 
     /** {@code reference} with nothing but its name and arguments: no annotations, no closure. */
@@ -936,8 +875,7 @@ final class TemplateMaterialiser {
     }
 
     /** A held body substituted, its inner applications closed, and read back through its constructor. */
-    private Closed closeHeld(String head, Top template, HeldBody open,
-            Map<String, TypeArgument> bindings) {
+    private Closed closeHeld(String head, Top template, HeldBody open, Map<String, TypeRef> bindings) {
         String target = open.application().typeRef().orElseThrow();
         // One walk covers all three cases: a parameter in a slot, a parameter inside an application a slot
         // holds (`tree<p0>` becoming `tree<text>`), and a parameter inside a collection are all the same
@@ -949,8 +887,8 @@ final class TemplateMaterialiser {
         try {
             return new Closed(wire, constructionReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
         } catch (ReadException e) {
-            // The bindings a template defers are checked here and nowhere else (§8.2): `<T, N> [T; N]` is a
-            // fine declaration, and `vector<text, "two">` is where it stops being one.
+            // What a template defers to its constructor is checked here and nowhere else (§8.2): an argument
+            // whose type the slot's own vocabulary refuses, such as a key type that is no identifier family.
             throw DefinitionResolver.payloadFailure("'" + head + "<...>' substitutes into a body that",
                     "'" + head + "<...>' substitutes into a body that is not valid data for '" + target
                             + "', the constructor's own constraint vocabulary -- " + e.getMessage(), e);
@@ -1029,83 +967,38 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * The arguments reclassified by the kind of the parameter each binds ([TSON-SCHEMA] §5.10).
+     * §5.10's call-site check: each argument must name a type that IS-A the bound of the parameter it binds
+     * ({@link #checkBounds}), a verdict at the application rather than inside the substituted body.
      *
-     * <p>§12.1 decides an argument's channel by the shape of the token that spells it, so an unquoted
-     * non-numeric argument always arrives as a reference. That is the right default with nothing else known,
-     * but §5.10 says an argument is "read by the position it lands in" -- and once the parameter's kind is
-     * inferred, the position is known before substitution rather than after. An argument binding a
-     * <b>value</b> parameter becomes the token it always was: {@code e<c>} against
-     * {@code e => <M> !enum {{ members: [a b M] }}} records {@code value: c}, so nothing downstream asks the
-     * namespace for a type called {@code c}.
+     * <p>A check run before the parameters were stamped -- an application closed during resolution, while the
+     * template's bounds are not yet known -- is recorded and replayed by {@link #recheckEarly}.
      *
-     * <p>Only a bare reference converts. One carrying arguments is an application, which no value parameter
-     * could bind (§5.10 confines value parameters to scalars), and is left for the position to refuse.
-     *
-     * <p><b>Then each argument is checked against the parameter it binds</b> ({@link #checkArguments}), which is
-     * what makes a wrong argument a verdict at the application rather than inside the substituted body.
-     *
-     * <p><b>Shared with the operand path</b>, through {@link ApplicationCloser#byParameterKind}: a
-     * composition operand absorbs by value and mints nothing, so it never reaches this pass and would
-     * otherwise keep §12.1's token-shape reading of every argument.
+     * <p><b>Shared with the operand path</b>, through {@link ApplicationCloser#checkArguments}: a composition operand
+     * absorbs by value and mints nothing, so it never reaches this pass.
      */
-    List<TypeArgument> byParameterKind(String head, Top template,
-                                                List<String> parameters, List<TypeArgument> arguments) {
-        List<TypeArgument> classified = classified(head, template, parameters, arguments);
+    void checkArguments(String head, Top template, List<TypeRef> arguments) {
+        checkBounds(head, template, arguments);
         String declaration = resolving.get();
         if (!stamped && declaration != null) {
             early.add(new EarlyCheck(declaration, head, List.copyOf(arguments)));
         }
-        return classified;
-    }
-
-    private List<TypeArgument> classified(String head, Top template,
-                                          List<String> parameters, List<TypeArgument> arguments) {
-        Map<String, ParameterTypes.Kind> kinds = parameterKinds.get(head);
-        if (kinds == null) {
-            kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterTypes.inferOne(template, importedTypes));
-        }
-        if (kinds == null || kinds.isEmpty()) {
-            checkArguments(head, template, arguments);
-            return arguments;
-        }
-        List<TypeArgument> bound = new ArrayList<>(arguments.size());
-        for (int i = 0; i < arguments.size(); i++) {
-            bound.add(arguments.get(i) instanceof TypeArgument.Ref ref && ref.ref().arguments().isEmpty()
-                    && kinds.get(parameters.get(i)) == ParameterTypes.Kind.VALUE
-                            ? new TypeArgument.Value(new Token(ref.ref().name(), Token.Form.UNQUOTED))
-                            : arguments.get(i));
-        }
-        checkArguments(head, template, bound);
-        return bound;
     }
 
     /**
-     * Each argument against the parameter it binds ({@code meta.template_param}, [TSON-SCHEMA] §5.10): a type argument
-     * must name a type that IS-A the parameter's {@code bound}, and a value argument must be a value of the
-     * parameter's {@code type} -- or of the type an earlier parameter's argument names, where the type is that
-     * parameter.
-     *
-     * <p>An argument this cannot judge is left for the position to refuse after substitution, as every argument
-     * was before: an application as an argument (its entry is not closed yet), a name nothing declares (the
-     * linker's verdict), and a parameter whose type has no scalar reading.
+     * Each argument against the bound of the parameter it binds ({@code meta.template_param}, [TSON-SCHEMA] §5.10).
+     * An argument this cannot judge is left for the position to refuse after substitution: an application as an
+     * argument (its entry is not closed yet), and a name nothing declares (the linker's verdict).
      */
-    private void checkArguments(String head, Top template, List<TypeArgument> arguments) {
+    private void checkBounds(String head, Top template, List<TypeRef> arguments) {
         List<TemplateParam> parameters = OpenEntry.parameters(template);
         if (!OpenEntry.isOpen(template) || parameters.size() != arguments.size()) {
             return;
         }
         for (int i = 0; i < arguments.size(); i++) {
             TemplateParam parameter = parameters.get(i);
-            TypeArgument argument = arguments.get(i);
-            if (parameter.isTypeParameter()) {
-                if (parameter.bound().isPresent() && argument instanceof TypeArgument.Ref ref
-                        && ref.ref().arguments().isEmpty()) {
-                    checkBound(head, parameter, ref.ref().name(), parameter.bound().get().name());
-                }
-            } else if (argument instanceof TypeArgument.Value value) {
-                checkValue(head, parameter, value.value().text(), valueType(parameters, arguments, parameter),
-                        ParameterTypes.readsInStructure(template, namespace::definition));
+            TypeRef argument = arguments.get(i);
+            if (parameter.bound().isPresent() && argument.arguments().isEmpty()) {
+                checkBound(head, parameter, argument.name(), parameter.bound().get().name());
             }
         }
     }
@@ -1124,46 +1017,6 @@ final class TemplateMaterialiser {
             throw new SchemaValidationException("'" + head + "<...>' binds '" + parameter.name() + "' to '"
                     + argument + "', which is not a type that IS-A " + bound + " -- '" + head + "' declares '"
                     + parameter.name() + ": " + bound + "' (§5.10)");
-        }
-    }
-
-    /** The type a value parameter's argument is read as, following a type that names an earlier parameter. */
-    private static String valueType(List<TemplateParam> parameters, List<TypeArgument> arguments,
-                                    TemplateParam parameter) {
-        String type = parameter.type().name();
-        for (int i = 0; i < parameters.size(); i++) {
-            if (parameters.get(i).name().equals(type)) {
-                return arguments.get(i) instanceof TypeArgument.Ref ref && ref.ref().arguments().isEmpty()
-                        ? ref.ref().name() : null;
-            }
-        }
-        return type;
-    }
-
-    /**
-     * {@code argument} as a value of {@code type}, read among the imported entries where the template applies a
-     * constructor ({@link ParameterTypes#readsInStructure}) -- the constructor's reader reads the argument, and its
-     * slot's type is in its declaring schema's closure -- and in the schema's namespace otherwise.
-     */
-    private void checkValue(String head, TemplateParam parameter, String argument, String type, boolean structural) {
-        if (type == null) {
-            return;
-        }
-        Function<String, Top> resolve = structural ? importedTypes : this::lookup;
-        String terminal = AliasChain.terminal(type, resolve::apply);
-        Top definition = resolve.apply(terminal);
-        // An enum's argument is matched in its name type's form, which an import may hold.
-        Optional<AtomType<?>> parser = definition == null ? Optional.empty() : AtomParsers.forType(definition,
-                NameType.form(definition, (structural ? importedConstructors : localConstructors).apply(terminal),
-                        namespace::definition, importedTypes));
-        if (parser.isEmpty()) {
-            return; // no scalar reading -- the substituted body's own position judges it
-        }
-        try {
-            parser.get().read(argument);
-        } catch (AtomTypeException e) {
-            throw new SchemaValidationException("'" + head + "<...>' binds '" + parameter.name() + "' to '"
-                    + argument + "', which is not a value of " + type + ": " + e.getMessage() + " (§5.10)");
         }
     }
 

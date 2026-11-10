@@ -29,8 +29,7 @@ import java.util.stream.Stream;
  * A value the entry's constructor wrote resolves where that constructor is declared, whose closure is in the schema's
  * -- so {@code !enum [A B]} names the kernel's {@code meta.identifier}, and a record that says nothing the kernel's {@code
  * meta.field_name}, names no schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own
- * namespace first. Shared by the linker's enum and field name checks and by materialisation, which checks a template's
- * value argument of an enum type before linking has run.
+ * namespace first. Shared by the linker's enum and field name checks.
  *
  * <p><b>What may stand there is the slot's kind's to say</b> ([TSON-SCHEMA] §4.2). The kernel types both slots
  * {@code meta.identifier_ref}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that

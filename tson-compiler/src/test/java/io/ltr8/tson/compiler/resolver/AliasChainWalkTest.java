@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.unicode.TextType;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -33,7 +32,7 @@ class AliasChainWalkTest {
         map.put("text", TextType.UNCONSTRAINED);
         map.put("hop", alias(TypeRef.of("text")));
         map.put("alias", alias(TypeRef.of("hop")));
-        map.put("applied", alias(TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
+        map.put("applied", alias(TypeRef.of("box", List.of(TypeRef.of("text")))));
         map.put("loop_a", alias(TypeRef.of("loop_b")));
         map.put("loop_b", alias(TypeRef.of("loop_a")));
         return map;

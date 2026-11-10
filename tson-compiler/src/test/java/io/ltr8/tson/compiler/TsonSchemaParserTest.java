@@ -26,7 +26,6 @@ import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
-import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -317,7 +316,7 @@ class TsonSchemaParserTest {
         StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
         assertEquals(List.of("T"), structural.typeParams());
         RefinedDef refined = assertInstanceOf(RefinedDef.class, structural.body());
-        assertEquals(new ApplicationRef("array", List.of(new TypeArg.Ref(new NameRef("T")))), refined.target());
+        assertEquals(new ApplicationRef("array", List.of(new NameRef("T"))), refined.target());
     }
 
     @Test
@@ -381,7 +380,7 @@ class TsonSchemaParserTest {
     @Test
     void aGenericKeyIsStillAMap() {
         MapExpr map = mapOf("index => { pair<text> => integer }");
-        assertEquals(new ApplicationRef("pair", List.of(new TypeArg.Ref(new NameRef("text")))), map.keyType());
+        assertEquals(new ApplicationRef("pair", List.of(new NameRef("text"))), map.keyType());
     }
 
     /** {@code map-value = container-def / type-ref}, so the declaration-level tier nests inside a map value. */
@@ -510,7 +509,7 @@ class TsonSchemaParserTest {
         TypeDef def = declOf("translations => map<text, text>").typeDef();
         ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
         assertEquals(new ApplicationRef("map", List.of(
-                new TypeArg.Ref(new NameRef("text")), new TypeArg.Ref(new NameRef("text")))), ref.ref());
+                new NameRef("text"), new NameRef("text"))), ref.ref());
     }
 
     // ── Field marks (§5.2) ────────────────────────────────────────────────
@@ -896,7 +895,7 @@ class TsonSchemaParserTest {
                 !schema {
                   priority => !integer ^ { min: 1  max: 5 }
                   status   => !enum [OPEN ACTIVE DONE]
-                  flagged  => <T, N> { entry: T  priority?: priority ~ N }
+                  flagged  => <T> { entry: T  priority?: priority }
                   task => {
                     id:       uuid
                     title:    non_empty_text
@@ -904,7 +903,7 @@ class TsonSchemaParserTest {
                     status?:  status ~ OPEN
                     due?:     date?
                     tags?:    [text]?
-                    history?: [flagged<status, 2>]?
+                    history?: [flagged<status>]?
                   }
                 }""");
         Map<String, SchemaMap.Declaration> decls = doc.body().declarations();
@@ -913,7 +912,7 @@ class TsonSchemaParserTest {
         assertInstanceOf(Instance.class, decls.get("status").typeDef());
 
         StructuralTypeDef flagged = assertInstanceOf(StructuralTypeDef.class, decls.get("flagged").typeDef());
-        assertEquals(List.of("T", "N"), flagged.typeParams());
+        assertEquals(List.of("T"), flagged.typeParams());
 
         StructuralTypeDef task = assertInstanceOf(StructuralTypeDef.class, decls.get("task").typeDef());
         RecordDef taskBody = assertInstanceOf(RecordDef.class, task.body());
@@ -924,7 +923,18 @@ class TsonSchemaParserTest {
         ArrayExpr historyArray = assertInstanceOf(ArrayExpr.class, history.type().get().typeRef());
         ApplicationRef flaggedApplication = assertInstanceOf(ApplicationRef.class, historyArray.elementType().typeRef());
         assertEquals("flagged", flaggedApplication.name());
-        assertEquals(2, flaggedApplication.args().size());
+        assertEquals(1, flaggedApplication.args().size());
+    }
+
+    /** An argument is a type, written as a reference: a quoted or numeric token is no argument (§5.10, §12.1). */
+    @Test
+    void aLiteralTokenIsNoTypeArgument() {
+        for (String argument : List.of("2", "0xFF", "\"dog\"")) {
+            ParseException refused = assertThrows(ParseException.class, () -> parse("""
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
+                    !schema { x => box<%s> }""".formatted(argument)));
+            assertTrue(refused.getMessage().contains("is no type argument"), refused.getMessage());
+        }
     }
 
     // ── Real spec fixtures parse end-to-end (grammar layer only) ─────────
@@ -1208,7 +1218,7 @@ class TsonSchemaParserTest {
                 fieldTypeOf("cell => { v: [ kind! ] }", "v")).elementType().typeRef());
         assertEquals(new SiblingRef("kind"), assertInstanceOf(ChoiceExpr.class,
                 fieldTypeOf("cell => { v: ( kind! | text ) }", "v")).variants().getFirst());
-        assertEquals(new TypeArg.Ref(new SiblingRef("kind")), assertInstanceOf(ApplicationRef.class,
+        assertEquals(new SiblingRef("kind"), assertInstanceOf(ApplicationRef.class,
                 fieldTypeOf("cell => { v: box< kind! > }", "v")).args().getFirst());
         assertEquals(new SiblingRef("kind"),
                 assertInstanceOf(ReferenceTypeDef.class, declOf("x => kind!").typeDef()).ref());

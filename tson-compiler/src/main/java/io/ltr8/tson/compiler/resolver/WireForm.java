@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -22,7 +21,6 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -78,9 +76,6 @@ final class WireForm {
 
     /** {@code meta.record_template_field.type_param}: a parameter standing for a field's whole type. */
     static final String TYPE_PARAM = "type_param";
-
-    /** {@code meta.record_template_field.value_param}: a parameter standing for a field's whole value. */
-    static final String VALUE_PARAM = "value_param";
 
     static final String ALIAS = KernelNames.of("alias");
 
@@ -338,25 +333,18 @@ final class WireForm {
     static List<String> namesIn(TypeRef application) {
         List<String> names = new ArrayList<>();
         names.add(application.name());
-        for (TypeArgument argument : application.arguments()) {
-            if (argument instanceof TypeArgument.Ref ref) {
-                names.addAll(namesIn(ref.ref()));
-            }
+        for (TypeRef argument : application.arguments()) {
+            names.addAll(namesIn(argument));
         }
         return names;
     }
 
     /** {@code application} with each argument that is a bare name in {@code renames} renamed, at any depth. */
     static TypeRef renamedArguments(TypeRef application, Map<String, String> renames) {
-        List<TypeArgument> arguments = new ArrayList<>(application.arguments().size());
-        for (TypeArgument argument : application.arguments()) {
-            arguments.add(switch (argument) {
-                case TypeArgument.Ref ref when ref.ref().arguments().isEmpty()
-                        && renames.containsKey(ref.ref().name()) ->
-                        new TypeArgument.Ref(TypeRef.of(renames.get(ref.ref().name())));
-                case TypeArgument.Ref ref -> new TypeArgument.Ref(renamedArguments(ref.ref(), renames));
-                case TypeArgument.Value value -> value;
-            });
+        List<TypeRef> arguments = new ArrayList<>(application.arguments().size());
+        for (TypeRef argument : application.arguments()) {
+            arguments.add(argument.arguments().isEmpty() && renames.containsKey(argument.name())
+                    ? TypeRef.of(renames.get(argument.name())) : renamedArguments(argument, renames));
         }
         return TypeRef.of(application.name(), arguments, application.annotations());
     }
@@ -370,11 +358,11 @@ final class WireForm {
 
     /**
      * The held body with every token naming one of the template's parameters replaced by the argument applied
-     * for it -- at any depth, in a value slot, a type slot, an argument list, or inside a collection alike.
+     * for it -- at any depth, in a type slot, an argument list, or inside a collection alike.
      *
      * <p><b>A held token needs no channel label, and that is the whole economy of holding.</b> A typed open
-     * vocabulary has to record which kind of thing each slot was bound to, because a bare token in a value
-     * slot is a literal and nothing else; here the body is uninterpreted until this substitution finishes, so
+     * vocabulary has to record which slots hold a parameter; here the body is uninterpreted until this
+     * substitution finishes, so
      * §8.1's shadowing rule decides it -- a token that resolves into {@code parameters} is a parameter, and
      * anything else is what it looks like. Inside an application ({@link #applicationIn}) an argument naming a
      * parameter is rewritten the same way, and the application written again through {@link #refValue}.
@@ -383,15 +371,15 @@ final class WireForm {
      * {@code DefinitionResolver} substitutes an operand's held body with the arguments an enclosing
      * declaration wrote, which may be that declaration's own parameters -- the result is a held body still
      * carrying them, absorbed as fields and closed when the enclosing declaration is. Nothing here has to
-     * know: a binding is a {@link TypeArgument} either way, and this walk never asks whether the token it
+     * know: a binding is a reference either way, and this walk never asks whether the token it
      * writes is concrete.
      */
     static CoreValue substitute(CoreValue value, String head, List<String> parameters,
-            Map<String, TypeArgument> bindings) {
+            Map<String, TypeRef> bindings) {
         return switch (value) {
             case TokenValue token when token.form() == TokenForm.UNQUOTED
                     && parameters.contains(token.text()) ->
-                    argumentValue(argumentFor(token.text(), head, bindings));
+                    refValue(argumentFor(token.text(), head, bindings));
             case ReferenceValue(TypeRef reference) ->
                     refValue(substituted(reference, head, parameters, bindings));
             case ArrayValue array -> new ArrayValue(array.elements().stream()
@@ -419,7 +407,7 @@ final class WireForm {
 
     /** One field of a held record, its value substituted. */
     private static RecordValue.Field substituteField(RecordValue.Field field, String head,
-            List<String> parameters, Map<String, TypeArgument> bindings) {
+            List<String> parameters, Map<String, TypeRef> bindings) {
         return new RecordValue.Field(field.name(),
                 rewritten(field.value(), substitute(field.value().coreValue(), head, parameters, bindings)));
     }
@@ -429,22 +417,18 @@ final class WireForm {
      * head is never a parameter: {@code T<text>} applies one, which is no form §12.1 has.
      */
     static TypeRef substituted(TypeRef application, String head, List<String> parameters,
-                               Map<String, TypeArgument> bindings) {
-        List<TypeArgument> arguments = new ArrayList<>(application.arguments().size());
-        for (TypeArgument argument : application.arguments()) {
-            arguments.add(switch (argument) {
-                case TypeArgument.Ref ref when ref.ref().arguments().isEmpty()
-                        && parameters.contains(ref.ref().name()) -> argumentFor(ref.ref().name(), head, bindings);
-                case TypeArgument.Ref ref when !ref.ref().arguments().isEmpty() ->
-                        new TypeArgument.Ref(substituted(ref.ref(), head, parameters, bindings));
-                default -> argument;
-            });
+                               Map<String, TypeRef> bindings) {
+        List<TypeRef> arguments = new ArrayList<>(application.arguments().size());
+        for (TypeRef argument : application.arguments()) {
+            arguments.add(argument.arguments().isEmpty()
+                    ? parameters.contains(argument.name()) ? argumentFor(argument.name(), head, bindings) : argument
+                    : substituted(argument, head, parameters, bindings));
         }
         return TypeRef.of(application.name(), arguments, application.annotations());
     }
 
-    private static TypeArgument argumentFor(String parameter, String head, Map<String, TypeArgument> bindings) {
-        TypeArgument argument = bindings.get(parameter);
+    private static TypeRef argumentFor(String parameter, String head, Map<String, TypeRef> bindings) {
+        TypeRef argument = bindings.get(parameter);
         if (argument == null) {
             // A parameter of an enclosing template, still open: this application is not the one that closes
             // it. Nothing today reaches here -- an application is closed only once every argument is concrete
@@ -456,35 +440,12 @@ final class WireForm {
         return argument;
     }
 
-    /**
-     * One argument in the held spelling, standing where the parameter it binds stood.
-     *
-     * <p>A <b>literal</b> is its own token. A <b>reference</b> goes through {@link #refValue}, which spells a
-     * no-argument one as a bare token and one carrying arguments as a {@link ReferenceValue}. Writing the head alone
-     * would be the shorter code and is wrong: {@code box<inner<T>>} would put {@code inner} where {@code inner<T>}
-     * belongs and drop the argument list with no diagnostic.
-     *
-     * <p><b>Reusing the desugarer's producer is the requirement, not the convenience.</b> Two spellings of
-     * one form are two entries for one type, an entry name deriving from what is written -- so the phase that
-     * substitutes and the phase that lifts have to agree down to how a reference is spelled. Sharing the
-     * function is what makes that true by construction.
-     *
-     * <p>Every slot a parameter can occupy as a type takes either spelling: a field's {@code type}, an {@code
-     * element_type}, a {@code variants}/{@code elements} entry, an application's argument. The one position that
-     * would not is an application's <em>head</em>, and a parameter cannot stand there: {@code T<text>} applies a
-     * parameter, which is no form §12.1 has.
+    /*
+     * An argument stands where its parameter stood in the held spelling, through refValue: a no-argument reference as a
+     * bare token, one carrying arguments as a ReferenceValue, so box<inner<T>> keeps inner<T> whole. Reusing the
+     * desugarer's producer is the requirement, not the convenience: two spellings of one form are two entries for one
+     * type, an entry name deriving from what is written.
      */
-    private static CoreValue argumentValue(TypeArgument argument) {
-        return switch (argument) {
-            case TypeArgument.Ref reference -> refValue(reference.ref());
-            case TypeArgument.Value value -> new TokenValue(value.value().text(),
-                    switch (value.value().form()) {
-                        case UNQUOTED -> TokenForm.UNQUOTED;
-                        case SINGLE_LINE_QUOTED -> TokenForm.SINGLE_LINE_QUOTED;
-                        case MULTI_LINE_QUOTED -> TokenForm.MULTI_LINE_QUOTED;
-                    });
-        };
-    }
 
     /** The same data value carrying a rewritten core value -- annotations and type-ref kept as written. */
     static DataValue rewritten(DataValue original, CoreValue rewritten) {

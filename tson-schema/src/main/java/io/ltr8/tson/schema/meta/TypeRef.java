@@ -10,7 +10,8 @@ import java.util.Optional;
  * field's type delivers, in a tree read and a bound one alike ([TSON-SCHEMA] §4.2). It is a {@link NameRef} or an
  * {@link ApplicationRef}, and {@link #of(String, List, Annotations, Closure)} decides which. {@code name} is the qualified
  * name, its {@link #segments} joined by {@code .}; {@code arguments} is the argument list, empty for a name, so
- * {@code result<T>} is the application {@code result} with arguments {@code [Ref(T)]} ([TSON-SCHEMA] §4.2).
+ * {@code result<T>} is the application {@code result} with arguments {@code [T]} ([TSON-SCHEMA] §4.2). An argument is
+ * itself a reference, a name or an application, and never a literal token ([TSON-SCHEMA] §5.10).
  *
  * <p><b>A reference is data grammar</b> ([TSON-DATA] §7.4): {@code geo.address<T>} is a qualified name, an adjacent
  * {@code <}, arguments and {@code >}, written unquoted wherever a value stands, and a reference without arguments is
@@ -52,7 +53,7 @@ public sealed interface TypeRef extends Reference permits NameRef, ApplicationRe
     String name();
 
     /** The argument list: empty for a {@link NameRef}, never empty for an {@link ApplicationRef}. */
-    List<TypeArgument> arguments();
+    List<TypeRef> arguments();
 
     /** The closure the reference was read under, {@link Closure#NONE} where none is known; no part of its identity. */
     Closure closure();
@@ -73,19 +74,19 @@ public sealed interface TypeRef extends Reference permits NameRef, ApplicationRe
      * arguments} is empty, an {@link ApplicationRef} otherwise. {@code null} arguments are no arguments: absent and
      * empty are one state, and there is no spelling of an empty argument list.
      */
-    static TypeRef of(String name, List<TypeArgument> arguments, Annotations annotations, Closure closure) {
+    static TypeRef of(String name, List<TypeRef> arguments, Annotations annotations, Closure closure) {
         return arguments == null || arguments.isEmpty()
                 ? new NameRef(name, annotations, closure)
                 : new ApplicationRef(name, arguments, annotations, closure);
     }
 
     /** The reference {@code name} with {@code arguments}, naming nothing. */
-    static TypeRef of(String name, List<TypeArgument> arguments, Annotations annotations) {
+    static TypeRef of(String name, List<TypeRef> arguments, Annotations annotations) {
         return of(name, arguments, annotations, Closure.NONE);
     }
 
     /** The reference {@code name} with {@code arguments}, unannotated and naming nothing. */
-    static TypeRef of(String name, List<TypeArgument> arguments) {
+    static TypeRef of(String name, List<TypeRef> arguments) {
         return of(name, arguments, Annotations.empty(), Closure.NONE);
     }
 
@@ -101,11 +102,11 @@ public sealed interface TypeRef extends Reference permits NameRef, ApplicationRe
 
     /**
      * The canonical text: the head, then, where there are arguments, {@code <}, each argument's {@link
-     * TypeArgument#text} separated by one space, and {@code >}. What resolved output writes, unquoted.
+     * #text} separated by one space, and {@code >}. What resolved output writes, unquoted.
      */
     @Override
     default String text() {
-        List<TypeArgument> arguments = arguments();
+        List<TypeRef> arguments = arguments();
         if (arguments.isEmpty()) {
             return name();
         }

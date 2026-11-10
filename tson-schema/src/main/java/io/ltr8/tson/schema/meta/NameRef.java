@@ -22,7 +22,7 @@ public record NameRef(String name, Annotations annotations, TypeRef.Closure clos
 
     /** Always empty: a name carries no arguments. */
     @Override
-    public List<TypeArgument> arguments() {
+    public List<TypeRef> arguments() {
         return List.of();
     }
 

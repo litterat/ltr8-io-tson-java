@@ -29,7 +29,6 @@ import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.SiblingRef;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -281,8 +280,8 @@ public final class DataClassObjectWriter {
         if (!ReferenceGrammar.isQualifiedName(reference.name())) {
             return false;
         }
-        for (TypeArgument argument : reference.arguments()) {
-            if (argument instanceof TypeArgument.Ref nested && !qualified(nested.ref())) {
+        for (TypeRef argument : reference.arguments()) {
+            if (!qualified(argument)) {
                 return false;
             }
         }

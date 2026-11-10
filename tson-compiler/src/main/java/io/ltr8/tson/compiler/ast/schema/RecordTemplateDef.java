@@ -7,8 +7,8 @@ import java.util.List;
 /**
  * A record template as {@code SchemaDesugarer} normalises it ([TSON-SCHEMA] §5.2, §5.10): the declaration's
  * parameters and the {@code !meta.record_template { … }} payload its body denotes, each field labelled where the
- * parameters are in scope -- a bare parameter name in a field's type is its {@code type_param}, an unquoted parameter
- * token in its value its {@code value_param} -- and the parameters stated last, each provisionally a type parameter.
+ * parameters are in scope -- a bare parameter name in a field's type is its {@code type_param} -- and the parameters
+ * stated last, each unbounded until the schema has resolved.
  *
  * <p><b>The one variant no parser builds.</b> Both spellings of a record template reach it -- the sugar body {@code
  * <T> { x: T }} and the explicit {@code <T> !meta.record { … }} -- and nothing an author writes does: a written

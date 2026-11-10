@@ -246,8 +246,6 @@ class DependentFieldTest {
         String meta = "!!import:\"https://tson.io/2026/40/m/meta.tn\"\n";
         assertEquals(List.of(), tson.validate(meta + "!meta.record_template_field { type: integer  optional: true  "
                 + "role: DEFAULT  value: 5 }"));
-        assertEquals(List.of(), tson.validate(meta + "!meta.record_template_field { type_param: T  optional: true  "
-                + "role: DEFAULT  value_param: V }"));
         assertEquals(Optional.of("/value"), only(tson.validate(meta + "!meta.record_template_field { type: boolean  "
                 + "optional: true  role: DEFAULT  value: 5 }")).path());
         Diagnostic literal = only(tson.validate(meta + "!meta.record_template_field { type_param: T  optional: true  "

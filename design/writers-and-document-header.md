@@ -20,8 +20,8 @@ keeps the rest of the document. Current form only; history lives in git.
   ([TSON-SCHEMA] §5.2) admits `"@id"`, which written bare would not lex back.
 - A reference is written unquoted, as data grammar ([TSON-DATA] §7.4):
   `TsonDataEmitter.reference(TypeRef)` writes the qualified name and, where it carries arguments, an adjacent `<`,
-  the arguments one space apart and `>`, the canonical text `map<text list<int32>>`, a value argument keeping its
-  token form. `TsonDataEmitter.reference(SiblingRef)` writes `kind!` ([TSON-DATA] §7.4), and
+  the arguments one space apart and `>`, the canonical text `map<text list<int32>>`, each argument a reference.
+  `TsonDataEmitter.reference(SiblingRef)` writes `kind!` ([TSON-DATA] §7.4), and
   `reference(Reference)` picks between the two. A sibling's `!` must be followed by whitespace ([TSON-DATA] §7.5),
   which the emitter always supplies: a space separates every element, a map's arrow and a non-empty scope's closing
   delimiter, and ends an annotation's value. `AstWriter` writes a `ReferenceValue` through it, `TreeValueWriter` a

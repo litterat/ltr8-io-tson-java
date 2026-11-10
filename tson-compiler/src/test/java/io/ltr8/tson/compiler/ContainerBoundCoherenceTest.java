@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -80,67 +79,6 @@ class ContainerBoundCoherenceTest {
             assertTrue(refused(declaration).getMessage().contains("min_items 5 is above max_items 3"),
                     declaration);
         }
-    }
-
-    /**
-     * <b>And the third spelling: bounds that were parameters when the template was written.</b> §8.2 puts
-     * this at materialisation -- "runs the value-level checks that open bounds deferred: family coherence
-     * rules whose operands were parameters" -- because there is nothing to compare until an application
-     * supplies both. The template itself is fine and stays fine; what is refused is the application.
-     *
-     * <p><b>No name leads the message</b>, and that is the rule rather than an omission: the only entries
-     * reaching this check are ones resolution never produced, whose names are content-derived
-     * ({@code numeric_integer_type_10_3_0794a6fb}) and appear nowhere in the author's file. The diagnostic's own
-     * location names the declaration that wrote the application, which is the line they can edit.
-     */
-    @Test
-    void boundsThatOnlyBecomeConcreteAtMaterialisationAreJudgedToo() {
-        SchemaValidationException thrown = refused("""
-                  sized => <MIN, MAX> !meta.array { element_type: text  min_items: MIN  max_items: MAX }
-                  bad   => { b: sized<10, 3> }""");
-
-        assertTrue(thrown.getMessage().contains("min_items 10 is above max_items 3"), thrown.getMessage());
-        // A derived name is <form>_<operands>_<hash8>; nothing shaped like one may reach an author.
-        assertFalse(thrown.getMessage().matches("(?s).*\\b\\w+_[0-9a-f]{8}\\b.*"),
-                "no content-derived entry name: " + thrown.getMessage());
-    }
-
-    /**
-     * <b>§8.2's "and their kin" needs no enumeration.</b> An atom's bounds can be parametric too -- through
-     * the {@code *_type} constructor spelling, since §12.1 refuses a parameterized {@code ^} refinement --
-     * and the rule that closes over them is the family's own, the same one that judges the literal body. So
-     * every family's coherence rule reaches materialisation together, and a family gaining a rule later
-     * arrives here for free.
-     */
-    @Test
-    void everyFamilysOwnCoherenceRuleReachesMaterialisationToo() {
-        assertTrue(refused("""
-                  b => <N> !numeric.integer_type { min: N  max: 3 }
-                  r => { x: b<10> }""").getMessage().contains("min 10 is above max 3"));
-
-        assertTrue(refused("""
-                  b => <N> !unicode.text_type { min_length: N  max_length: 3 }
-                  r => { x: b<10> }""").getMessage().contains("min_length 10 is above max_length 3"));
-
-        assertTrue(refused("""
-                  b => <N> !net.cidr4_type { min_prefix: N  max_prefix: 8 }
-                  r => { x: b<40> }""").getMessage().contains("min_prefix 40 is above max_prefix 8"));
-    }
-
-    /** And a coherent application of each still closes -- the rule fires on the bounds, not on being parametric. */
-    @Test
-    void aCoherentParametricAtomApplicationIsUntouched() {
-        assertNotNull(compile("""
-                  b => <N> !numeric.integer_type { min: N  max: 30 }
-                  r => { x: b<10> }"""));
-    }
-
-    /** A template with an incoherent application is not itself broken: another application of it still closes. */
-    @Test
-    void aCoherentApplicationOfTheSameTemplateIsUntouched() {
-        assertNotNull(compile("""
-                  sized => <MIN, MAX> !meta.array { element_type: text  min_items: MIN  max_items: MAX }
-                  ok    => { a: sized<1, 5> }"""));
     }
 
     /**

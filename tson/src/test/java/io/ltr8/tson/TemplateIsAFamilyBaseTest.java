@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -71,9 +70,9 @@ class TemplateIsAFamilyBaseTest {
     private static final String SEALED_FAMILY = """
               dog_type => { breed: text }
               cat_type => { indoor: boolean }
-              pet      => <T, V> { type?: text = T  value: V }
-              dogpet   => pet<"dog", dog_type>
-              catpet   => pet<"cat", cat_type>
+              pet      => <V> { type: text =?  value: V }
+              dogpet   => pet<dog_type> & { type?: = "dog" }
+              catpet   => pet<cat_type> & { type?: = "cat" }
               holder   => { p: pet }
             """;
 
@@ -88,9 +87,9 @@ class TemplateIsAFamilyBaseTest {
     void aMarkedTemplateIsIndexedUnderItsBase() {
         TsonLinkedSchema schema = linked("f1", """
                   pet_base => abstract { type: text =? }
-                  pet      => <T, V> pet_base & { type?: = T  value: V }
+                  pet      => <V> pet_base & { value: V }
                   dog_type => { breed: text }
-                  dogpet   => pet<"dog", dog_type>
+                  dogpet   => pet<dog_type> & { type?: = "dog" }
                 """);
 
         List<String> members = TypeChain.subtypesOf(schema.schema().entries().get("pet_base"));
@@ -109,19 +108,22 @@ class TemplateIsAFamilyBaseTest {
 
     // ── Gap 2: abstract on a template is a claim with a subject ───────────
 
-    /** The shape the design exists for: the pin is a parameter, so the field is the selector by derivation. */
+    /**
+     * The shape the design exists for: the base states the selector with {@code =?}, and each member pins it where
+     * the application is declared (§5.10).
+     */
     @Test
-    void aParametricPinMakesATemplateAFamilyBase() {
+    void aSelectorMakesATemplateAFamilyBase() {
         assertEquals(List.of(), load("f3", """
                   dog_type => { breed: text }
-                  pet      => abstract <T, V> { type?: text = T  value: V }
-                  dogpet   => pet<"dog", dog_type>
+                  pet      => abstract <V> { type: text =?  value: V }
+                  dogpet   => pet<dog_type> & { type?: = "dog" }
                 """));
     }
 
     /**
-     * No parametric pin and no {@code =?} is no family: the base is ABSTRACT, its members are selected by the
-     * tag, and nothing here is refused for having nothing to dispatch on.
+     * No {@code =?} is no family: the base is ABSTRACT, its members are selected by the tag, and nothing here is
+     * refused for having nothing to dispatch on.
      */
     @Test
     void aTemplateWithNoSelectorIsMerelyAbstract() {
@@ -136,7 +138,7 @@ class TemplateIsAFamilyBaseTest {
     @Test
     void finalIsStillRefusedOnATemplate() {
         assertTrue(!load("f5", """
-                  pet => final <T> { type?: text = T }
+                  pet => final <T> { value: T }
                 """).isEmpty());
     }
 
@@ -213,25 +215,23 @@ class TemplateIsAFamilyBaseTest {
 
     /**
      * A field type naming none of the base's parameters means the same in every application, so the base names
-     * the entry its members do -- and the selector a base position reads is that entry, not an application.
+     * the entry its members do, not an application.
      */
     @Test
-    void aSelectorTypedByAnApplicationIsTheEntryEveryMemberNames() {
+    void aClosedApplicationInABaseIsTheEntryEveryMemberNames() {
         String declarations = """
-                  capped => <M> !numeric.integer_type { max: M }
-                  pet     => <N> { kind: capped<9> = N  name: text }
-                  cat     => pet<3>
-                  dog     => pet<4>
+                  box     => <T> { v: T }
+                  pet     => <V> { kind: text =?  tag: box<text>  name: V }
+                  cat     => pet<text> & { kind?: = "cat" }
+                  dog     => pet<text> & { kind?: = "dog" }
                   holder  => { p: pet }
                 """;
         TsonLinkedSchema schema = linked("f13", declarations);
 
-        String closed = fieldType(schema, "cat", "kind");
-        assertEquals(closed, fieldType(schema, "pet", "kind"), "the base names the member's entry");
-        assertEquals(closed,
-                ((RecordTemplateBody) schema.schema().entries().get("pet")).parameters().getFirst().type().name(),
-                "and N's derived type is that entry too");
-        assertEquals(List.of(), read("f14", declarations, "!holder { p: { kind: 4  name: \"rex\" } }"));
+        String closed = fieldType(schema, "cat", "tag");
+        assertEquals(closed, fieldType(schema, "pet", "tag"), "the base names the member's entry");
+        assertEquals(List.of(), read("f14", declarations,
+                "!holder { p: { kind: \"dog\"  tag: { v: \"t\" }  name: \"rex\" } }"));
     }
 
     /**
@@ -242,8 +242,8 @@ class TemplateIsAFamilyBaseTest {
     void aLiftedFormInABaseNamesTheEntryTheSchemaPublishes() {
         TsonLinkedSchema schema = linked("f15", """
                   box    => <T> { v: T }
-                  pet    => <N> { kind: text = N  tags: [box<text>] }
-                  cat    => pet<"cat">
+                  pet    => <V> { kind: text =?  tags: [box<text>]  name: V }
+                  cat    => pet<text> & { kind?: = "cat" }
                 """);
 
         String tags = fieldType(schema, "pet", "tags");
@@ -255,7 +255,7 @@ class TemplateIsAFamilyBaseTest {
     @Test
     void aFamilyWithNoMemberStillNamesItsSelector() {
         List<Diagnostic> problems = read("f16", """
-                  pet    => <N> { kind: text = N  name: text }
+                  pet    => <V> { kind: text =?  name: V }
                   holder => { p: pet }
                 """, "!holder { p: { kind: cat  name: x } }");
 

@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +44,7 @@ class QualifiedNameSegmentsTest {
 
     @Test
     void aReferenceWithArgumentsIsNoName() {
-        TypeRef applied = TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))));
+        TypeRef applied = TypeRef.of("box", List.of(TypeRef.of("text")));
         assertThrows(SchemaValidationException.class, () -> ValuesByName.segments("'x' at /m", applied));
     }
 }

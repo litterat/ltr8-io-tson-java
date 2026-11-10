@@ -52,10 +52,10 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
   in its name, every other position gets the shared reader back unchanged and allocates nothing
   (`AllocationHarnessTest` is the guard).
     - **An application nothing declares is named by the application that closed to it.** It is its expansion
-      (§5.10): the position names the synthetic directly, so `e: b<10>` over `b => <N> !numeric.integer_type { min: N
-      max: 100 }` reads an atom instance no author named, which carries no `@meta.application`. Its
+      (§5.10): the position names the synthetic directly, so `e: pair_of<int32>` over `pair_of => <T> [T; 1..2]`
+      reads an array no author named, which carries no `@meta.application`. Its
       `TsonSchema.EntryFacts.closes` does record the application, so `EntryDisplayName` shows a synthetic with
-      none by `closes().getFirst().text()`: `'b<10>': '5' is less than the minimum 10`, `unknown field 'nope'
+      none by `closes().getFirst().text()`: `'pair_of<int32>': …`, `unknown field 'nope'
       on 'bx<int32>'`, `'set<text>' requires unique elements`, never the entry's content-derived key. One with
       neither an application nor a sugar spelling leads with no name at all — the family's own sentence, located
       by the diagnostic's position. An expansion that names its own application keeps an instantiation entry (an

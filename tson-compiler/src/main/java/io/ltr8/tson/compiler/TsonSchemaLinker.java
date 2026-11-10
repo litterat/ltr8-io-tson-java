@@ -70,8 +70,6 @@ import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TemplateParam;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -95,7 +93,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- pass 2, which a schema
@@ -343,8 +340,7 @@ public final class TsonSchemaLinker {
                             merged::get, structure)
                     .orElse(IdentifierGrammar.PROFILE);
             checkScope(receiver, schema, name, position, names, noun, identifiers, profile);
-            // A template's literal values are every application's, so they are judged here, once; a value parameter
-            // is an argument's, judged where the application writes it.
+            // A template's literal values are every application's, so they are judged here, once.
             switch (body) {
                 case RecordBody record -> checkFieldValues(receiver, schema, name, position,
                         record.fields().entrySet().stream()
@@ -1334,7 +1330,7 @@ public final class TsonSchemaLinker {
             // cannot be settled until substitution supplies the arguments, so type-kind validation and
             // inhabitance apply to it at materialisation instead, where the whole body resolves at once.
             // Checking it here by substituting stand-in arguments would report errors on templates that are
-            // correct for every argument anyone passes (`<N> !integer ^ { min: N max: 3 }`).
+            // correct for every argument anyone passes.
             //
             // Arity is the exception, and it is decidable: it asks how many parameters the *referenced*
             // entry declares, which no argument changes. See checkHeldArity for why that has to be asked
@@ -1644,10 +1640,8 @@ public final class TsonSchemaLinker {
 
     private static void collectNames(TypeRef ref, Set<String> into) {
         into.add(ref.name());
-        for (TypeArgument argument : ref.arguments()) {
-            if (argument instanceof TypeArgument.Ref nested) {
-                collectNames(nested.ref(), into);
-            }
+        for (TypeRef argument : ref.arguments()) {
+            collectNames(argument, into);
         }
     }
 
@@ -1667,9 +1661,7 @@ public final class TsonSchemaLinker {
      * that sees them all exactly once however they were produced. A declared body was already asked at
      * resolution, beside its own constructor's vocabulary check -- and one that failed there is replaced by a
      * placeholder and never reaches this, so nothing is reported twice. What is left for this to catch is
-     * exactly the set resolution never produced: {@code sized<10, 3>} over an array template, and
-     * {@code b<10>} over {@code <N> !numeric.integer_type { min: N max: 3 }}, whose bounds were parameters until an
-     * application supplied them.
+     * exactly the set resolution never produced: the forms an application closes to.
      */
     private static void checkCoherent(Top body) {
         List<String> violations = switch (body) {
@@ -1966,29 +1958,9 @@ public final class TsonSchemaLinker {
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is no type a value "
                     + "can have -- a slot typed 'meta.type_ref' holds the name of an entry whose value is of 'type'");
         }
-        for (TypeRef nested : typeArguments(ref, namespace)) {
+        for (TypeRef nested : ref.arguments()) {
             validateTypeRef(nested, namespace, constructors, subject, trail);
         }
-    }
-
-    /**
-     * The arguments of {@code application} that bind a type: each reference at a type parameter of its head, or
-     * every reference where the head's parameters are not in reach. An argument is a reference or a token and is
-     * typed where it lands (§5.10), so {@code names<red>} at a value parameter is the token {@code red}, judged
-     * against the parameter's type when the application closes and never as a type's name.
-     */
-    private static List<TypeRef> typeArguments(TypeRef application, Map<String, Top> namespace) {
-        Top head = namespace.get(application.name());
-        List<TemplateParam> parameters = head == null ? List.of() : OpenEntry.parameters(head);
-        boolean judged = parameters.size() == application.arguments().size();
-        List<TypeRef> types = new ArrayList<>();
-        for (int i = 0; i < application.arguments().size(); i++) {
-            if (application.arguments().get(i) instanceof TypeArgument.Ref nested
-                    && (!judged || parameters.get(i).isTypeParameter())) {
-                types.add(nested.ref());
-            }
-        }
-        return types;
     }
 
     /**
@@ -2013,61 +1985,10 @@ public final class TsonSchemaLinker {
             Map<String, Top> namespace, List<String> ownParameters) {
         for (TypeRef application : HeldBody.applicationsOf(held)) {
             checkArity(application, namespace, ownParameters, "'" + entryName + "'");
-            checkOpenLiterals(entryName, application, namespace, ownParameters);
-            for (TypeRef nested : typeArguments(application, namespace)) {
+            for (TypeRef nested : application.arguments()) {
                 checkArity(nested, namespace, ownParameters, "'" + entryName + "'");
-                checkOpenLiterals(entryName, nested, namespace, ownParameters);
             }
         }
-    }
-
-    /**
-     * A literal needs a closed type ([TSON-SCHEMA] §5.10), and an open entry's application can give it one that is
-     * not: {@code pin2 => <T, P> { a?: T = P }} reads {@code P}'s argument as a value of {@code T}'s, so in {@code
-     * <X> { f: pin2<X, 3> }} the literal {@code 3} is a value of {@code X}, a type no application has fixed yet.
-     * Refused at the declaration that wrote the application, naming the argument -- the same verdict an operand
-     * applied the same way gets where it is substituted ({@code RecordTemplateSubstitution}).
-     */
-    private static void checkOpenLiterals(String entryName, TypeRef application, Map<String, Top> namespace,
-                                          List<String> ownParameters) {
-        Top head = namespace.get(AliasChain.terminal(application.name(), namespace));
-        List<TemplateParam> parameters = head == null ? List.of() : OpenEntry.parameters(head);
-        if (parameters.size() != application.arguments().size()) {
-            return; // arity is checkArity's
-        }
-        List<String> names = parameters.stream().map(TemplateParam::name).toList();
-        for (int i = 0; i < parameters.size(); i++) {
-            TemplateParam parameter = parameters.get(i);
-            int typedBy = names.indexOf(parameter.type().name());
-            if (parameter.isTypeParameter() || typedBy < 0) {
-                continue;
-            }
-            Optional<String> open = switch (application.arguments().get(typedBy)) {
-                case TypeArgument.Ref ref -> OpenEntry.parameterIn(ref.ref(), ownParameters);
-                case TypeArgument.Value value -> Optional.of(value.value().text()).filter(ownParameters::contains);
-            };
-            Optional<String> literal = switch (application.arguments().get(i)) {
-                case TypeArgument.Ref ref -> ref.ref().arguments().isEmpty()
-                        && !ownParameters.contains(ref.ref().name()) ? Optional.of(ref.ref().name()) : Optional.empty();
-                case TypeArgument.Value value -> value.value().form() == Token.Form.UNQUOTED
-                        && ownParameters.contains(value.value().text()) ? Optional.empty()
-                        : Optional.of(value.value().text());
-            };
-            if (open.isPresent() && literal.isPresent()) {
-                throw new SchemaValidationException("'" + entryName + "': '" + spelled(application) + "' binds '"
-                        + parameter.name() + "' to the literal '" + literal.get() + "', whose type is '" + open.get()
-                        + "', still open here -- a literal needs a closed type: pass a parameter for '"
-                        + parameter.name() + "' too, or close '" + open.get() + "' (§5.10)");
-            }
-        }
-    }
-
-    /** An application as the schema spells it, for a message. */
-    private static String spelled(TypeRef application) {
-        return application.name() + application.arguments().stream().map(argument -> switch (argument) {
-            case TypeArgument.Ref ref -> spelled(ref.ref());
-            case TypeArgument.Value value -> value.value().text();
-        }).collect(java.util.stream.Collectors.joining(", ", "<", ">")).replace("<>", "");
     }
 
     /**

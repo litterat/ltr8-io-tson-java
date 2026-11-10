@@ -27,7 +27,6 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
 import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
-import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.SchemaPositions;
@@ -51,7 +50,6 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Type;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.AnnotatedMap;
@@ -605,33 +603,32 @@ final class DefinitionResolver {
 
     /**
      * One field as resolution builds it: a field's four facts and a label where one of the declaration's own
-     * parameters stands for the whole type or value. Classified once, where it is built: an entry this declaration
-     * writes labels a bare parameter name in its type slot and an unquoted parameter token in its value slot ({@link
-     * #written}, §5.10's shadowing rule over the source spelling); a closed source's field arrives as it is ({@link
-     * #of(RecordField)}), and an open operand's substituted on the model ({@link #of(RecordTemplateField)}), neither
-     * relabelled. A closed declaration's fields are never labelled, so {@link #closed} is total for them; a template's
-     * become {@link RecordTemplateField}s ({@link #template}).
+     * parameters stands for the whole type. Classified once, where it is built: an entry this declaration writes
+     * labels a bare parameter name in its type slot ({@link #written}, §5.10's shadowing rule over the source
+     * spelling); a closed source's field arrives as it is ({@link #of(RecordField)}), and an open operand's substituted
+     * on the model ({@link #of(RecordTemplateField)}), neither relabelled. A closed declaration's fields are never
+     * labelled, so {@link #closed} is total for them; a template's become {@link RecordTemplateField}s ({@link
+     * #template}).
      */
     private record BuiltField(Optional<io.ltr8.tson.schema.meta.Reference> type, Optional<String> typeParam,
                               boolean optional, boolean voidable, FieldRole role, Optional<Token> value,
-                              Optional<String> valueParam, Annotations annotations, Optional<SourcePosition> position) {
+                              Annotations annotations, Optional<SourcePosition> position) {
 
         /** A closed source's field: its facts as they are, labelling nothing. */
         static BuiltField of(RecordField field) {
             return new BuiltField(Optional.of(field.type()), Optional.empty(), field.optional(), field.voidable(),
-                    field.role(), field.value(), Optional.empty(), field.annotations(), field.position());
+                    field.role(), field.value(), field.annotations(), field.position());
         }
 
         /** An open operand's field, substituted with the absorbing declaration's parameters as its arguments. */
         static BuiltField of(RecordTemplateField field) {
             return new BuiltField(field.type(), field.typeParam(), field.optional(), field.voidable(), field.role(),
-                    field.value(), field.valueParam(), field.annotations(), field.position());
+                    field.value(), field.annotations(), field.position());
         }
 
         /**
          * A field this declaration writes, classified against its own {@code parameters} by its source spelling
-         * (§5.10): a type that is a bare parameter name is its {@code type_param}, an unquoted value token that is one
-         * its {@code value_param}, and anything else its {@code type} or {@code value}.
+         * (§5.10): a type that is a bare parameter name is its {@code type_param}, and anything else its {@code type}.
          */
         static BuiltField written(io.ltr8.tson.schema.meta.Reference type, List<String> parameters,
                 boolean optional, boolean voidable, FieldRole role, Optional<Token> value, Annotations annotations,
@@ -640,54 +637,43 @@ final class DefinitionResolver {
                     && named.arguments().isEmpty() && parameters.contains(named.name())
                     ? Optional.of(named.name()) : Optional.empty();
             return new BuiltField(whole.isPresent() ? Optional.empty() : Optional.of(type), whole, optional, voidable,
-                    role, Optional.empty(), Optional.empty(), annotations, position).valued(value, parameters);
+                    role, value, annotations, position);
         }
 
         /**
          * This field restated by a modifier-only entry that elides its type: the type and its label kept, the facts
-         * and the value the entry's own, the value classified as {@link #written} classifies one.
+         * and the value the entry's own.
          */
-        BuiltField restated(List<String> parameters, boolean optional, boolean voidable, FieldRole role,
-                            Optional<Token> value, Optional<SourcePosition> position) {
-            return new BuiltField(type, typeParam, optional, voidable, role, Optional.empty(), Optional.empty(),
-                    Annotations.empty(), position).valued(value, parameters);
-        }
-
-        /** This field with {@code value} as the declaration wrote it: a parameter's token is its {@code value_param}. */
-        private BuiltField valued(Optional<Token> value, List<String> parameters) {
-            Optional<String> parameter = value
-                    .filter(token -> token.form() == Token.Form.UNQUOTED && parameters.contains(token.text()))
-                    .map(Token::text);
-            return new BuiltField(type, typeParam, optional, voidable, role,
-                    parameter.isPresent() ? Optional.empty() : value, parameter, annotations, position);
+        BuiltField restated(boolean optional, boolean voidable, FieldRole role, Optional<Token> value,
+                            Optional<SourcePosition> position) {
+            return new BuiltField(type, typeParam, optional, voidable, role, value, Annotations.empty(), position);
         }
 
         /** The record field a closed declaration holds; it never labels one, having no parameter to label. */
         RecordField closed() {
-            if (typeParam.isPresent() || valueParam.isPresent()) {
+            if (typeParam.isPresent()) {
                 throw new IllegalStateException("a closed declaration's field names the parameter '"
-                        + typeParam.or(() -> valueParam).orElseThrow() + "'");
+                        + typeParam.orElseThrow() + "'");
             }
             return new RecordField(type.orElseThrow(), optional, voidable, role, value, annotations, position);
         }
 
         /** The record template field a template holds. */
         RecordTemplateField template() {
-            return new RecordTemplateField(type, typeParam, optional, voidable, role, value, valueParam, annotations,
-                    position);
+            return new RecordTemplateField(type, typeParam, optional, voidable, role, value, annotations, position);
         }
 
         BuiltField withFacts(boolean optional, boolean voidable, FieldRole role) {
-            return new BuiltField(type, typeParam, optional, voidable, role, value, valueParam, annotations, position);
+            return new BuiltField(type, typeParam, optional, voidable, role, value, annotations, position);
         }
 
         BuiltField withAnnotations(Annotations annotations) {
-            return new BuiltField(type, typeParam, optional, voidable, role, value, valueParam, annotations, position);
+            return new BuiltField(type, typeParam, optional, voidable, role, value, annotations, position);
         }
 
         /** What a document that never writes the field yields, asked of a plain field ({@link RecordField#omitted}). */
         RecordField.Omitted omitted() {
-            return RecordField.omitted(optional, value.isPresent() || valueParam.isPresent(), false);
+            return RecordField.omitted(optional, value.isPresent(), false);
         }
 
         /** These facts in a diagnostic's words ({@link RecordField#describe}). */
@@ -974,10 +960,10 @@ final class DefinitionResolver {
     }
 
     /**
-     * {@code <T, N> !meta.array { element_type: T  min_items: N }} -- the open counterpart of {@link
+     * {@code <T> !meta.array { element_type: T  min_items: 1 }} -- the open counterpart of {@link
      * #resolveInstance}. The target resolves the same way and must be a constructor for the same reason; what
      * differs is that the payload is <b>not read through that constructor's reader at all</b>. At least one
-     * binding stands for a parameter and no parameter is an {@code integer}, so the body is held as written
+     * binding stands for a parameter, a reference to a type nothing declares, so the body is held as written
      * ({@link HeldBody}) and bound once, at materialisation, when substitution has left no parameter in it.
      *
      * <p><b>Holding is what removes the collection boundary.</b> A typed open vocabulary has to spell a
@@ -1066,10 +1052,9 @@ final class DefinitionResolver {
     }
 
     /**
-     * A literal {@code value} needs a closed type ([TSON-SCHEMA] §5.10): what a literal token
-     * means is decided by the type it is read as, and a field typed by a parameter, whole ({@code w?: T ~ 5}) or as
-     * an argument ({@code w?: box<T> ~ 5}), has a different type in every application. Such a field takes a value parameter
-     * or no value; a field of a closed type takes either.
+     * A literal {@code value} needs a closed type ([TSON-SCHEMA] §5.10): what a literal token means is decided by the
+     * type it is read as, and a field typed by a parameter, whole ({@code w?: T ~ 5}) or as an argument ({@code w?:
+     * box<T> ~ 5}), has a different type in every application. Such a field takes no value.
      */
     private static void refuseLiteralOnOpenType(RecordTemplateBody template) {
         template.fields().forEach((name, field) -> {
@@ -1084,7 +1069,7 @@ final class DefinitionResolver {
      * {@link #refuseLiteralOnOpenType}'s rule over the payload not yet bound, for a field whose whole type is a
      * parameter: read against {@code record_template_field} its literal {@code value}, typed {@code type!}, has no
      * sibling, which is the same verdict in words that say nothing of the parameter. So it is refused for where it
-     * stands before the reader is asked, as {@link ParameterTypes#checkSlots} refuses a parameter in a scalar slot.
+     * stands before the reader is asked, as {@link ParameterTypes#checkSlots} refuses a parameter at a value.
      */
     private static void refuseLiteralOnParameter(DataValue payload) {
         if (!(payload.coreValue() instanceof RecordValue bindings)) {
@@ -1116,15 +1101,14 @@ final class DefinitionResolver {
     private static SchemaValidationException literalOnOpenType(String field, String parameter, String literal) {
         return new SchemaValidationException("field '" + field + "' is typed by the parameter '" + parameter
                 + "' and carries the literal value '" + literal + "' -- a literal needs a closed type, and this "
-                + "field's type differs in every application. Supply the value as a parameter too, or write none "
-                + "(§5.10)");
+                + "field's type differs in every application. Write no value here, and state it where the "
+                + "application is declared: 'name => template<argument> & { " + field + "?: = value }' (§5.10)");
     }
 
     /**
      * A family base's selector may not be typed by one of its parameters, directly ({@code kind: K =?}) or as an
      * argument ({@code kind: bounded<M> = N}): a position typed by the base reads the selector before it knows
-     * which member it has, so a type that varies per application is one it cannot read. The <em>pin</em>
-     * varying is the whole point, and does (§5.10).
+     * which member it has, so a type that varies per application is one it cannot read (§5.10).
      */
     private static RecordTemplateBody refuseParameterTypedSelector(RecordTemplateBody open) {
         for (String name : open.discriminators()) {
@@ -1137,16 +1121,15 @@ final class DefinitionResolver {
                 throw new SchemaValidationException("discriminator field '" + name + "' is " + typed
                         + parameter.get() + "', and a position typed by this template reads a discriminator "
                         + "before it knows which member it has -- so its type cannot vary per application "
-                        + "(§5.10). The value it is pinned to is what an argument supplies; its type is the "
-                        + "base's own");
+                        + "(§5.10)");
             }
         }
         return open;
     }
 
-    /** Every parameter provisionally a type parameter: its type is derived once the schema has resolved. */
+    /** Every parameter unbounded: a written or inherited bound is stamped once the schema has resolved. */
     private static List<TemplateParam> typeParameters(List<String> parameters) {
-        return parameters.stream().map(TemplateParam::typeParameter).toList();
+        return parameters.stream().map(TemplateParam::new).toList();
     }
 
     /** §5.10's two declaration-time questions about a held binding record -- see {@link #resolveInstanceTemplate}. */
@@ -1529,10 +1512,10 @@ final class DefinitionResolver {
      * what makes the entry a template is exactly that list, and the open form is the application itself.
      */
     private Top resolveTemplateApplication(String name, ApplicationRef generic, List<String> parameters) {
-        List<TypeArgument> arguments = new ArrayList<>();
-        for (TypeArg arg : generic.args()) {
+        List<io.ltr8.tson.schema.meta.TypeRef> arguments = new ArrayList<>();
+        for (TypeExpr arg : generic.args()) {
             try {
-                arguments.add(typeArgument(arg));
+                arguments.add(resolveTypeRef(arg));
             } catch (UnsupportedOperationException e) {
                 throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
             }
@@ -1596,26 +1579,6 @@ final class DefinitionResolver {
                 : HeldBody.held(parameters, WireForm.heldReference(target));
     }
 
-    /**
-     * One argument of an application as the {@link TypeArgument} it denotes: a literal keeps its own token
-     * form, and a reference resolves through {@link #resolveTypeRef}, so an argument may itself be an
-     * application ({@code box<box<text>>}). §12.1 defers the reference/literal classification to this layer,
-     * and the grammar has already made it -- a quoted or numeric token parsed as a {@link TypeArg.Value}.
-     */
-    private TypeArgument typeArgument(TypeArg arg) {
-        if (arg instanceof TypeArg.Value value) {
-            return new TypeArgument.Value(new Token(value.value().text(), tokenForm(value.value().form())));
-        }
-        return new TypeArgument.Ref(resolveTypeRef(((TypeArg.Ref) arg).ref()));
-    }
-
-    private static Token.Form tokenForm(TokenForm form) {
-        return switch (form) {
-            case UNQUOTED -> Token.Form.UNQUOTED;
-            case SINGLE_LINE_QUOTED -> Token.Form.SINGLE_LINE_QUOTED;
-            case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
-        };
-    }
 
     // ── Composition (§5.8) and subtraction (§5.9) ─────────────────────────
 
@@ -1686,10 +1649,9 @@ final class DefinitionResolver {
                 // SchemaResolver into the edge to the entry `result<text>` denotes.
                 // A removal revokes IS-A for every parent (§5.9), so nothing is kept.
                 if (construction.removal().isEmpty()) {
-                    // Closed: the arguments go in as §5.10 classifies them, since this channel is validated
-                    // and a value argument left as a reference is looked up as a type. Open: they stay as
-                    // written, the argument being this declaration's own parameter and materialisation being
-                    // what classifies it when an application closes.
+                    // Closed: the arguments go in as the operand read them, since this channel is validated.
+                    // Open: they stay as written, the argument being this declaration's own parameter, substituted
+                    // when an application closes.
                     directSupertypes.add(io.ltr8.tson.schema.meta.TypeRef.of(generic.name(),
                             namesOwnParameter(generic, parameters)
                                     ? typeArguments(name, generic)
@@ -2135,8 +2097,8 @@ final class DefinitionResolver {
      * schema's, and §5.10's shadowing rule classifies what the template writes, never what it absorbs; so a field
      * absorbed with {@code two<V, T>}, its {@code T} an enum member, would become an application of this template's
      * {@code T}, a different type in every application and none of them the source's. A literal {@code value} needs
-     * no rule: the {@code value}/{@code value_param} labels already tell it from a parameter. A name spelled like a
-     * schema entry is refused at the parameter list itself, the shadowing rule's other half.
+     * no rule, a field's value never being a parameter. A name spelled like a schema entry is refused at the parameter
+     * list itself, the shadowing rule's other half.
      *
      * <p><b>It judges what the source holds when it is absorbed.</b> A closed source of this schema has not been
      * materialised yet, so its fields still write their applications; an imported one has, so each closed application
@@ -2158,21 +2120,15 @@ final class DefinitionResolver {
                 })));
     }
 
-    /** The first of {@code parameters} an argument writes, as a name or an unquoted token, at any depth. */
-    private static Optional<String> spelledIn(TypeArgument argument, List<String> parameters, List<String> excluded) {
-        return switch (argument) {
-            case TypeArgument.Ref ref -> {
-                String head = ref.ref().name();
-                if (parameters.contains(head) && !excluded.contains(head)) {
-                    yield Optional.of(head);
-                }
-                yield ref.ref().arguments().stream().map(nested -> spelledIn(nested, parameters, excluded))
-                        .flatMap(Optional::stream).findFirst();
-            }
-            case TypeArgument.Value value -> Optional.of(value.value()).filter(token -> token.form()
-                    == Token.Form.UNQUOTED && parameters.contains(token.text()) && !excluded.contains(token.text()))
-                    .map(Token::text);
-        };
+    /** The first of {@code parameters} an argument writes as a name, at any depth. */
+    private static Optional<String> spelledIn(io.ltr8.tson.schema.meta.TypeRef argument, List<String> parameters,
+                                              List<String> excluded) {
+        String head = argument.name();
+        if (parameters.contains(head) && !excluded.contains(head)) {
+            return Optional.of(head);
+        }
+        return argument.arguments().stream().map(nested -> spelledIn(nested, parameters, excluded))
+                .flatMap(Optional::stream).findFirst();
     }
 
     /**
@@ -2234,9 +2190,9 @@ final class DefinitionResolver {
      * unresolved reference -- a wrong verdict on a schema that is not wrong.
      */
     private static boolean namesOwnParameter(ApplicationRef application, List<String> typeParams) {
-        return application.args().stream().anyMatch(arg -> arg instanceof TypeArg.Ref(TypeExpr ref)
-                && (ref instanceof NameRef simple && typeParams.contains(simple.name())
-                        || ref instanceof ApplicationRef nested && namesOwnParameter(nested, typeParams)));
+        return application.args().stream().anyMatch(ref -> ref instanceof NameRef simple
+                && typeParams.contains(simple.name())
+                || ref instanceof ApplicationRef nested && namesOwnParameter(nested, typeParams));
     }
 
     /**
@@ -2250,7 +2206,7 @@ final class DefinitionResolver {
      * so its field set is known while the application is open: substituting its parameters with the arguments
      * <em>as written</em> on the model ({@link RecordTemplateSubstitution}) is the substitution closing performs,
      * and an argument that is one of the absorbing declaration's own parameters lands as that declaration's label
-     * again -- {@code type_param} or {@code value_param} -- so the result is the absorbing template's fields as they
+     * again -- its {@code type_param} -- so the result is the absorbing template's fields as they
      * are, and a closed declaration's as closed fields.
      *
      * <p><b>Inner applications are deliberately left unclosed.</b> {@code closeApplications} is
@@ -2286,22 +2242,17 @@ final class DefinitionResolver {
                     + templateParameters.size() + " type parameter(s) and is applied to "
                     + application.args().size() + " (§5.10)");
         }
-        List<TypeArgument> arguments = new ArrayList<>();
-        for (TypeArg arg : application.args()) {
-            // An argument that is itself an application needs no special case: substitution writes a bound
-            // reference as a reference value when it carries arguments, so `box<inner<T>>` keeps `inner<T>`
-            // whole and the absorbing declaration's own materialisation closes it.
-            arguments.add(typeArgument(arg));
+        // An argument that is itself an application needs no special case: substitution writes a bound reference
+        // as a reference value when it carries arguments, so `box<inner<T>>` keeps `inner<T>` whole and the
+        // absorbing declaration's own materialisation closes it.
+        List<io.ltr8.tson.schema.meta.TypeRef> arguments = typeArguments(name, application);
+        // §5.10's bound check, which an operand absorbed by value would otherwise never get.
+        if (applicationCloser != null) {
+            applicationCloser.checkArguments(head, template, arguments);
         }
-        // §5.10's argument kinds, which an operand absorbed by value would otherwise never get: §12.1 reads
-        // an argument's channel off the token that spells it, so an unquoted `red` is a reference until the
-        // parameter's kind says otherwise. A resolver built without a materialiser keeps §12.1's reading --
-        // the open case never needed the inference, its arguments being parameters.
-        List<TypeArgument> classified = applicationCloser == null ? arguments
-                : applicationCloser.byParameterKind(head, template, templateParameters, arguments);
-        Map<String, TypeArgument> bindings = new LinkedHashMap<>();
+        Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings = new LinkedHashMap<>();
         for (int i = 0; i < templateParameters.size(); i++) {
-            bindings.put(templateParameters.get(i), classified.get(i));
+            bindings.put(templateParameters.get(i), arguments.get(i));
         }
         if (!(template instanceof RecordTemplateBody record)) {
             // A held template rather than a record template -- `<T> [T]` has elements, not fields, so there
@@ -2329,19 +2280,16 @@ final class DefinitionResolver {
                     .forEach((field, open) -> fields.put(field, BuiltField.of(open)));
         }
         return new OpenOperand(Ancestry.ofTemplate(head, namespaceDefinitions), fields, record.groups(),
-                record.nameType(), classified);
+                record.nameType(), arguments);
     }
 
     /**
      * What an operand hands its absorber: the ancestors it can still be indexed under, its fields, and its
-     * arguments as §5.10 classifies them.
-     *
-     * <p>The arguments matter to the caller because a closed operand is <b>kept</b> in the chain as written
-     * until {@code SchemaResolver} folds it, and the linker validates that channel: an argument left on
-     * §12.1's token-shape reading sends it looking for a type called {@code red}.
+     * arguments, which a closed operand keeps in the chain as written until {@code SchemaResolver} folds it.
      */
     private record OpenOperand(List<String> ancestors, SequencedMap<String, BuiltField> fields,
-                               List<FieldGroup> groups, Optional<String> nameType, List<TypeArgument> arguments) {
+                               List<FieldGroup> groups, Optional<String> nameType,
+                               List<io.ltr8.tson.schema.meta.TypeRef> arguments) {
     }
 
     /**
@@ -2367,10 +2315,10 @@ final class DefinitionResolver {
         return applicationCloser.closeApplication(resolved);
     }
 
-    private List<TypeArgument> typeArguments(String name, ApplicationRef application) {
-        List<TypeArgument> args = new ArrayList<>();
-        for (TypeArg arg : application.args()) {
-            args.add(typeArgument(arg));
+    private List<io.ltr8.tson.schema.meta.TypeRef> typeArguments(String name, ApplicationRef application) {
+        List<io.ltr8.tson.schema.meta.TypeRef> args = new ArrayList<>();
+        for (TypeExpr arg : application.args()) {
+            args.add(resolveTypeRef(arg));
         }
         return args;
     }
@@ -2595,16 +2543,11 @@ final class DefinitionResolver {
     }
 
     /**
-     * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2, §5.10) is the field's {@code
-     * value} where it is a literal and its {@code value_param} where it is one of this declaration's own
-     * {@code parameters} -- told apart once, here, by §5.10's shadowing rule over the source spelling: an
-     * unquoted token is a parameter exactly when its text names one ({@link BuiltField#written}). A bare parameter
-     * name in the type slot is likewise the field's {@code type_param}.
-     *
-     * <p><b>The role is the modifier's, whatever stands in {@code value}.</b> {@code =} gives FIXED and
-     * {@code ~} DEFAULT, a parameter as a literal does ([TSON-SCHEMA] §5.7): the parameter is the value an
-     * application will supply, and closing substitutes it without changing a fact. Whether omission reaches the
-     * value is the name's {@code ?}, which {@link FieldModifiers} reads beside it.
+     * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2) is the field's {@code value}, a
+     * literal. A field's value is never a parameter ([TSON-SCHEMA] §5.10): an unquoted token naming one of this
+     * declaration's own {@code parameters} -- §5.10's shadowing rule over the source spelling -- is refused here,
+     * naming the slot ({@link ParameterTypes#atValue}). A bare parameter name in the type slot is the field's {@code
+     * type_param} ({@link BuiltField#written}).
      *
      * <p>{@code inherited}, supplied only from {@link #resolveTighteningField}, is the field this entry
      * tightens. Two things are read off it: its <b>type</b>, when {@code field.type()} is elided ({@code
@@ -2689,17 +2632,19 @@ final class DefinitionResolver {
                 ? field.type().get().voidable()
                 : inherited.map(BuiltField::voidable).orElse(false);
 
-        // The role is the modifier's whatever stands in the value -- a literal, or this declaration's own
-        // parameter, which labels it (§5.10's shadowing rule over the source spelling).
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), field.omittable(), voidable, field.modifier());
         Optional<Token> value = resolved.value().map(DefinitionResolver::toMetaToken);
+        value.filter(token -> token.form() == Token.Form.UNQUOTED && parameters.contains(token.text()))
+                .ifPresent(token -> {
+                    throw ParameterTypes.atValue(token.text(), field.name());
+                });
         if (field.type().isPresent()) {
             return BuiltField.written(resolveFieldType(field.type().get().typeRef()), parameters, resolved.optional(),
                     resolved.voidable(), resolved.role(), value, Annotations.empty(), positions.of(field));
         }
         // An elided type is the inherited field's, a parameter it carries and what its names mean included.
-        return inherited.get().restated(parameters, resolved.optional(), resolved.voidable(), resolved.role(), value,
+        return inherited.get().restated(resolved.optional(), resolved.voidable(), resolved.role(), value,
                 positions.of(field));
     }
 
@@ -2839,9 +2784,9 @@ final class DefinitionResolver {
         return switch (ref) {
             case NameRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
             case ApplicationRef generic -> {
-                List<TypeArgument> args = new ArrayList<>();
-                for (TypeArg arg : generic.args()) {
-                    args.add(typeArgument(arg));
+                List<io.ltr8.tson.schema.meta.TypeRef> args = new ArrayList<>();
+                for (TypeExpr arg : generic.args()) {
+                    args.add(resolveTypeRef(arg));
                 }
                 yield io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), args);
             }

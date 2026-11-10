@@ -205,18 +205,6 @@ class TypeInhabitanceTest {
     }
 
     /**
-     * A bound still held by a parameter counts as possibly-empty: {@code <N> [vec<N>; N]} could be applied
-     * with {@code 0}, and refusing it would reject a template on the strength of an argument nobody has
-     * supplied. The closure that does supply one is judged on its own.
-     */
-    @Test
-    void aParameterBoundIsNotYetAFloor() {
-        assertNotNull(compile("""
-                  vec => <N> { kids: [vec<N>; N] }
-                  use => { v: vec<0> }"""));
-    }
-
-    /**
      * An unresolved reference is <b>not</b> reported as uninhabited on top of being unresolved: one defect,
      * one diagnostic, in the words that name it.
      */

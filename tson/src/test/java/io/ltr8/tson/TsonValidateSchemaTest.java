@@ -200,26 +200,6 @@ class TsonValidateSchemaTest {
         assertEquals(Optional.of("/box"), problems.getFirst().schemaPointer());
     }
 
-    /**
-     * <b>The converse, and the reason the offending name decides this rather than the entry.</b> A name the
-     * <em>applier</em> wrote is the applier's mistake, so this stays exactly where it was written: no held
-     * body mentions {@code 3}, and nothing is retargeted. Blaming the template would send the author to
-     * {@code box => <T> { v: T }} to look for a {@code 3} that is not there.
-     *
-     * <p>The literal case is refused for a sharper reason than the typo in {@link
-     * #anUnresolvedArgumentStaysWithTheApplier}: {@code 3} is not an unresolved <em>name</em>, it is not a
-     * name at all, and {@code T} is the field's {@code type_param}, so it is refused where the argument is
-     * substituted for the label rather than later at reference resolution. The verdict is the same and the
-     * explanation is better — "an identifier never begins with a digit or a sign" is actionable where "unresolved
-     * reference '3'" implies an author could go and declare one.
-     */
-    @Test
-    void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
-        assertStaysWithTheApplier("box<3>",
-                "'box<...>' binds the type parameter 'T' to '3', which is no type -- '3': U+0033 at index 0 cannot "
-                        + "start an identifier -- an identifier never begins with a digit or a sign (§5.10)");
-    }
-
     /** The same rule for a name that is a name: {@code some_typo} is the applier's typo, not the template's. */
     @Test
     void anUnresolvedArgumentStaysWithTheApplier() {

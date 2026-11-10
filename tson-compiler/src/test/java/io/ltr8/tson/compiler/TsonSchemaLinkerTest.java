@@ -19,7 +19,6 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.unicode.TextType;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -37,8 +36,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -137,7 +134,7 @@ class TsonSchemaLinkerTest {
         entries.put("token", textEntry());
         entries.put("set", emptyRecord());
         entries.put("container", RecordBody.of(RecordBody.fieldMap(Map.entry("members",
-                RecordField.required(TypeRef.of("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
+                RecordField.required(TypeRef.of("set", List.of(TypeRef.of("token"))))))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
@@ -166,9 +163,9 @@ class TsonSchemaLinkerTest {
     private static Top recordTemplate(String parameter, String field) {
         AnnotatedMap<String, RecordTemplateField> fields = new AnnotatedMap<>();
         fields.put(field, new RecordTemplateField(Optional.empty(), Optional.of(parameter), false, false,
-                FieldRole.FREE, Optional.empty(), Optional.empty(), null, null));
+                FieldRole.FREE, Optional.empty(), null, null));
         return new RecordTemplateBody(null, fields, null, RecordExtensionType.OPEN, null, Optional.empty(),
-                List.of(TemplateParam.typeParameter(parameter)));
+                List.of(new TemplateParam(parameter)));
     }
 
     /**
@@ -189,7 +186,7 @@ class TsonSchemaLinkerTest {
         entries.put("token", textEntry());
         entries.put("other",
                 recordTemplate("U", "v"));
-        TypeRef otherOfToken = TypeRef.of("other", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
+        TypeRef otherOfToken = TypeRef.of("other", List.of(TypeRef.of("token")));
         entries.put("generic", RecordBody.of(RecordBody.fieldMap()));
 
         AnnotatedMap<String, Top> annotated = AnnotatedMap.of(entries)

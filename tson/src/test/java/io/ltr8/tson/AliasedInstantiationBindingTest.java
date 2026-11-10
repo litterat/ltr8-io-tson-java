@@ -40,13 +40,13 @@ class AliasedInstantiationBindingTest {
             !!import:"%s"
             !schema {
               msg    => abstract { kind: text =? }
-              msg_of => <T, V> msg & { kind?: = T  body: V }
+              msg_of => <V> msg & { body: V }
 
               ping_body => { seq: int32 }
               pong_body => { seq: int32  latency: int32 }
 
-              ping => msg_of<"ping", ping_body>
-              pong => msg_of<"pong", [pong_body]>
+              ping => msg_of<ping_body> & { kind?: = "ping" }
+              pong => msg_of<[pong_body]> & { kind?: = "pong" }
 
               channel => { m: msg }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);

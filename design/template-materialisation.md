@@ -9,7 +9,7 @@ derived — and the static check that runs before any of it.
 - The pass order in `SchemaResolver` is fixed: the driving loop resolves every declaration, then
   `TemplateRegularity.check`, then parameter stamping and `recheckEarly`, then `materialise`, then `familyBaseEdges`,
   `appliedParentEdges` and `closeChains`, then the synthetic merge. Every step reads what the one before it settled.
-- A template that fails the regularity check, or whose parameter kinds cannot be inferred, is replaced with the
+- A template that fails the regularity check, or whose parameters stand where none may, is replaced with the
   error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
   application's head resolves). The depth guard stays as a backstop for a hole in the check.
 - The pass runs over the **resolved** form. In a record template it closes only the field types that name none of
@@ -33,8 +33,8 @@ derived — and the static check that runs before any of it.
   shares with the materialiser, in its reduced form (each argument closed to the entry it names), which §8.2's
   identity and the applied-parent fold key on. The entry's key carries it as `@meta.application` **as written**
   (`asWritten`, `writtenApplications`): nested arguments unreduced and each stated the same way,
-  `@meta.application:pair<box<text> int32>`, a bare-name argument followed through its alias chain (§8.2), and an
-  argument at a value parameter a value token. An expansion carries no `@meta.application`.
+  `@meta.application:pair<box<text> int32>`, a bare-name argument followed through its alias chain (§8.2). An
+  expansion carries no `@meta.application`.
 - Every application the pass closes, an expansion's included, is recorded against the entry it closed to
   (`closedApplications`, as met; a generated head's own intermediate form skipped), and `SchemaResolver` stores the
   list on that entry as `TsonSchema.EntryFacts.closes`: held in memory, never written. It is what a message names a
@@ -76,7 +76,7 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   purely syntactic.
 - **An open body closes only what names none of its parameters.** `chain<T>` inside `chain` awaits substitution;
   closing it would mint an entry per level keyed on the literal parameter name. A field type that names no
-  parameter at any depth (`kind: bounded<9>`, `tags: [box<text>]`) means the same in every application, so it is
+  parameter at any depth (`tag: box<text>`, `tags: [box<text>]`) means the same in every application, so it is
   closed in place and the base names the entry each member names — which is what `FamilySelectors` reads a
   selector's type from, and what keeps the synthetic merge's renames reaching the base.
 - **A minted entry's identity is its content** (§8.2): its name derives from its binding record, so two `box<text>`
@@ -118,12 +118,12 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
   and never nests, so nothing reaching this pass should run away; the guard exists so a hole in `TemplateRegularity`
   ends as a diagnosis named for the outermost head rather than a `StackOverflowError`, which the exception policy
   cannot classify.
-- **Substitution changes no field fact.** A routed `= P` is FIXED where it is written and `~ P` DEFAULT, `optional`
-  as the name was marked (§5.7), so `response<order, 201>` lands on exactly what the literal `status?: int32 = 201`
-  lands on: the template's `value_param: S` becomes the member's `value: 201`, `type_param` becomes `type`, and
-  every member field is a closed `meta.record_field`, substituted on the model (`closeRecordTemplate`) with nothing
-  written out or read back. What closing changes is the record-level selector list: the member names none, its pins
-  being in place, and an ABSTRACT base that dispatches on members closes to OPEN (`closedExtension`).
+- **Substitution changes no field fact.** A field's value is never a parameter (§5.10), so `type_param` becoming
+  `type` is the whole of it: every member field is a closed `meta.record_field`, substituted on the model
+  (`closeRecordTemplate`) with nothing written out or read back. A value that differs per application is pinned where
+  the application is declared (`created => response<order> & { status?: = 201 }`), by composition. What closing changes
+  is the record-level selector list: the member names none, and an ABSTRACT base that dispatches on members closes to
+  OPEN (`closedExtension`).
 - **A closed record is minted with no subtypes.** `subtypes` is linking's, derived over the closed namespace. Taking
   the template's list would hand each instantiation the whole family and, for a template imported already linked,
   itself — and an entry shaped by *which* schema closed it is not a function of its form, so two schemas closing one
@@ -131,20 +131,11 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
 - **An application whose head names nothing in scope is left whole, arguments and all.** The verdict is the linker's,
   as an unresolved reference; a head stripped of its arguments would instead be faulted for supplying none, the
   opposite of what the author wrote (`'box<some_typo>' field 'v' has an unresolved reference 'some_typo'`).
-- **Kind checking.** Arity is checked first, against the template's own `parameters`. Each argument is then
-  classified by the kind of the parameter it binds and checked against it (`byParameterKind`, `checkArguments`;
-  `design/held-template-bodies.md` has the rule): a type argument must IS-A the parameter's bound, a value argument
-  must be a value of the parameter's `type`. The two misapplications §5.10's argument-kind rule names land as
-  follows, and `RecordTemplateTest` pins both:
-  - **A literal applied where the body uses the parameter as a type** (`box<3>`) passes the argument check — a type
-    parameter's check reads only a reference — and is refused after substitution, where the body is read against
-    the kernel's vocabulary: `meta.record_field.type` is a `meta.type_ref`, whose names are identifiers, so `'3': U+0033 at
-    index 0 cannot start an identifier`. That is sharper than an unresolved reference, which would imply a type called
-    `3` could be declared.
-  - **A type name applied where the body routes the parameter into a field's value** (`retry<text>` over
-    `<N> { attempts?: int32 ~ N }`) is refused at the application: `N`'s recorded type is the field's `int32`, so
-    `text` is no value of it. A value written literally in that slot (`int32 ~ text`) is §5.2's value conformance,
-    `TsonSchemaLinker.checkFieldValue` (`FieldValueConformanceTest`).
+- **Argument checking.** Arity is checked first, against the template's own `parameters`. Each argument is then
+  checked against the parameter it binds (`checkArguments`; `design/held-template-bodies.md` has the rule): it must
+  name a type that IS-A the parameter's bound. A literal argument (`box<3>`) never reaches here: an argument is a
+  reference, and the grammar refuses a literal token where it is written (`TsonSchemaParser`, `ReferenceGrammar`,
+  `TsonDataStream`).
 - **Failures report per entry**, through the receiver resolution uses, so two bad applications in one schema are
   both reported against their own declarations.
 
@@ -160,9 +151,8 @@ resolves, before the batch pass runs. They are handled differently.
   (`RecordTemplateSubstitution.closed`); the fields are absorbed, the operand contributes its template's
   ancestors (`Ancestry.ofTemplate`) and not its own name, and the application is kept in the declaration's
   `parents`, arguments and all. Minting an entry for it would give a form nothing names an entry with one subtype
-  and no referent. The arguments still need §5.10's kinds, which closing would have given them, so `openOperand`
-  calls `ApplicationCloser.byParameterKind`; without it `t<red>` against `t => <M> { a: st ~ M }` writes a type
-  reference into a value slot.
+  and no referent. The arguments still need §5.10's bound check, which closing would have given them, so
+  `openOperand` calls `ApplicationCloser.checkArguments`.
   - **Open** (`vip => <T> customer & box<T>`): the held body writes `box<T>` as a parent, and it closes with
     everything else when `vip` does. Closing builds the chain from those parents (`Ancestry.chainOf`, in
     `closeRecordTemplate`), the fold turns `box<text>` into the edge to the entry that application denotes, and
@@ -170,7 +160,7 @@ resolves, before the batch pass runs. They are handled differently.
     are expected, the same entry the hand-written `customer & box<text>` reaches. The parent is carried as a
     reference rather than as the head name §5.8 describes because the edge is to `box<text>` and not to
     `box<int32>`. `OpenOperandCompositionTest` pins it.
-  - **Closed, on a declaration with no parameters** (`dog => pet<"dog"> & { breed: text }`): nothing later closes
+  - **Closed, on a declaration with no parameters** (`dog => pet<text> & { pet_type?: = "dog" }`): nothing later closes
     the declaration, so the edge to the family base is stated where the composition resolves. A record template is
     a family base (`OpenEntry.isFamilyBase`, a `RecordTemplateBody`), ABSTRACT by construction (§5.10), so `dog`
     lands in `pet.subtypes` and a position typed `pet` dispatches to it. The application in the chain is folded

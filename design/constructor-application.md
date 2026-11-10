@@ -108,14 +108,11 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   composes `meta.type` (`c => meta.product & { … }`), the instance would be a type, whose body must be one of the schema
   model's, and it is refused as `NOT_IMPLEMENTED` (`unmodelledType`): a gap, since a generic body for such an instance is
   open work.
-- **A constructor's parameters are confined to no channel**, which is §4.2's own rule: "an argument is
-  substituted as a token and read by the position it lands in, so a slot typed `meta.type_ref` takes a type where
-  an atom-typed slot takes a value". Nothing is checked at the declaration, and each channel is decided where
-  the argument lands. A parameter routed into a *vocabulary slot* typed `meta.type_ref` — `my_set => <T> array ^ {
-  element_type: = T }` — pins the element type when it closes, `meta.type_ref` being an atom whose value is a type's
-  name, so §5.2 admits the fixed value and judges it a member where it is written; the value-routed form
-  (`max_items: = N`, an atom-typed
-  slot) closes normally. A parameter standing as a *field type* or a *variant* closes into a working type
+- **A parameter is a type, wherever the template's body applies a constructor** (§5.10): it stands at a slot that
+  names a type, or as an argument of an application, and anywhere else is refused at the declaration, naming the slot
+  (`design/held-template-bodies.md`). A pin is a field's value, so a refinement template pinning a slot to its
+  parameter — `my_set => <T> array ^ { element_type?: = T }`, `meta.type_ref`-typed or not — is refused with every other
+  parameter at a value. A parameter standing as a *field type* or a *variant* closes into a working type
   rather than a tolerated one: `ctor_box => <T> base & { value: T }` with `flagged => ctor_box<boolean>`
   materialises, compiles, accepts `{ value: true }` and rejects `{ value: banana }` with a `TYPE_MISMATCH` at
   `/value`, and the variant channel behaves the same
@@ -144,8 +141,9 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   wrote them, not dereferenced, as the sugar forms write theirs. Nothing is owned: a use site names the content-keyed
   entry whatever a declaration elsewhere constructs, as `[text]` does.
 - **The sugar decides where an argument lands and nothing else.** The arity (`requireArity`, also the linker's
-  `checkArity` over a held reference such as `meta.array<T>` in a record template) and an argument that is a literal
-  are refused here; an argument a slot's `of` refuses is refused at link as the braced form's is; a required field no
+  `checkArity` over a held reference such as `meta.array<T>` in a record template) is refused here; a literal
+  argument (`meta.array<3>`) never arrives, the grammar refusing it where it is written (§5.10); an argument a slot's
+  `of` refuses is refused at link as the braced form's is; a required field no
   slot fills leaves the construction incomplete and the constructor's reader refuses it. A refined constructor's
   instance is its own kind and is not normalised to its source's: `nonempty_type<uuid>` and `[uuid; 1..]` are two
   entries. `ConstructionSugarTest` pins all of it.

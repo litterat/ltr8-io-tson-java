@@ -214,6 +214,5 @@ only onto a record descriptor (`requireRecord`), so without this reader a sealed
   the read: a member whose component is a `schema.meta.Token` gets `RawTokenParser` instead of its field's reader,
   by the component's own Java type. The factory refuses to build at all if two
   group members share a slot type and disagree, since the resolver is keyed by type name and could not serve
-  both. (A value argument of an application never comes this way: the reference grammar keeps its token,
-  and `NumericIdentity` applies §4.3's equivalence to it, `design/desugaring-open-forms-and-templates.md`.)
+  both.
 - **Bind mode only.** Tree mode reads into `TsonValue` and has no Java shape to satisfy.

@@ -53,7 +53,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aRecordTemplateMayBeNamedAtAFieldPosition() {
         assertEquals(List.of(), validate("t1", """
-                  pet    => <T, V> { type?: text = T  value: V }
+                  pet    => <V> { value: V }
                   holder => { p: pet }
                 """));
     }
@@ -62,7 +62,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aRecordTemplateMayBeNamedAtAnElementPosition() {
         assertEquals(List.of(), validate("t2", """
-                  pet    => <T, V> { type?: text = T  value: V }
+                  pet    => <V> { value: V }
                   kennel => { pets: [pet] }
                 """));
     }
@@ -71,7 +71,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aSealedRecordTemplateMayBeNamedToo() {
         assertEquals(List.of(), validate("t3", """
-                  pet    => <T, V> { type?: text = T  value: V }
+                  pet    => <V> { type: text =?  value: V }
                   holder => { p: pet }
                 """));
     }
@@ -89,7 +89,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aConstructorApplicationTemplateIsStillRefused() {
         assertTrue(refusal("t5", """
-                  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
+                  vector => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }
                   holder => { p: vector }
                 """).contains("a template is not a type until it is applied"));
     }
@@ -108,7 +108,7 @@ class TemplateAtATypePositionTest {
     @Test
     void aWrongArgumentCountIsStillRefused() {
         assertTrue(refusal("t7", """
-                  pet    => <T, V> { type?: text = T  value: V }
+                  pet    => <T, V> { type: T  value: V }
                   holder => { p: pet<text> }
                 """).contains("takes 2 type arguments"));
     }

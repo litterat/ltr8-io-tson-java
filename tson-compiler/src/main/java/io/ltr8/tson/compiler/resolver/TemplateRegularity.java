@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -97,7 +96,7 @@ final class TemplateRegularity {
     }
 
     /** One application written inside a template body: the head it applies and the arguments it applies to. */
-    private record Application(String head, List<TypeArgument> arguments) {
+    private record Application(String head, List<TypeRef> arguments) {
     }
 
     /**
@@ -110,9 +109,8 @@ final class TemplateRegularity {
             return null;
         }
         for (int i = 0; i < parameters.size(); i++) {
-            TypeArgument argument = application.arguments().get(i);
-            if (argument instanceof TypeArgument.Ref ref && ref.ref().arguments().isEmpty()
-                    && ref.ref().name().equals(parameters.get(i))) {
+            TypeRef argument = application.arguments().get(i);
+            if (argument.arguments().isEmpty() && argument.name().equals(parameters.get(i))) {
                 continue;
             }
             return "'" + name + "' applies '" + application.head() + "' recursively but does not pass '"
@@ -124,13 +122,10 @@ final class TemplateRegularity {
         return null;
     }
 
-    private static String shown(TypeArgument argument) {
-        return switch (argument) {
-            case TypeArgument.Ref ref -> ref.ref().arguments().isEmpty()
-                    ? "'" + ref.ref().name() + "'"
-                    : "the application '" + ref.ref().name() + "<...>'";
-            case TypeArgument.Value value -> "the literal '" + value.value().text() + "'";
-        };
+    private static String shown(TypeRef argument) {
+        return argument.arguments().isEmpty()
+                ? "'" + argument.name() + "'"
+                : "the application '" + argument.name() + "<...>'";
     }
 
     /** Whether {@code from} reaches {@code target} by applying templates, {@code from == target} included. */
@@ -171,10 +166,8 @@ final class TemplateRegularity {
         if (!ref.arguments().isEmpty()) {
             found.add(new Application(ref.name(), ref.arguments()));
         }
-        for (TypeArgument argument : ref.arguments()) {
-            if (argument instanceof TypeArgument.Ref nested) {
-                collect(nested.ref(), found);
-            }
+        for (TypeRef argument : ref.arguments()) {
+            collect(argument, found);
         }
     }
 }

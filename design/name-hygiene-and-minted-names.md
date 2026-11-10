@@ -47,7 +47,7 @@ stands alone — but it is the schema's own copy of a value a read judges: a def
 omits the field, so a value the reader would refuse if written must not be one it injects
 (`design/name-hygiene-read-path.md`). A record template's literal values are judged the same way, once, at the
 template, applied or not: they are every application's, and judged only on a minted member they would be reported
-against a content-derived name. A `value_param` is no literal of the template's.
+against a content-derived name.
 
 **A value entry and an annotation value are judged where they are read, not in the walk.** A value entry's payload (`!api { …
 }`, a map keyed by names) binds to the consumer's own classes or is held as a tree

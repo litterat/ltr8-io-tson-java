@@ -67,22 +67,20 @@ public final class TreeValueWriter {
     }
 
     /**
-     * A schemaless reference as the reference it was read from: a string argument that is a qualified name a
-     * reference, any other a quoted token, and every other value its text, unquoted.
+     * A schemaless reference as the reference it was read from: each argument a nested application or a string that
+     * is a qualified name. Anything else is no argument ([TSON-SCHEMA] §5.10), and a tree holding one cannot be
+     * written as a reference.
      */
     private static io.ltr8.tson.schema.meta.TypeRef reference(TsonApplicationReference reference) {
-        List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new java.util.ArrayList<>();
+        List<io.ltr8.tson.schema.meta.TypeRef> arguments = new java.util.ArrayList<>();
         for (TsonValue argument : reference.arguments()) {
             arguments.add(switch (argument) {
-                case TsonApplicationReference nested -> new io.ltr8.tson.schema.meta.TypeArgument.Ref(reference(nested));
+                case TsonApplicationReference nested -> reference(nested);
                 case TsonAtom atom when atom.value() instanceof String text
                         && io.ltr8.tson.atom.ReferenceGrammar.isQualifiedName(text) ->
-                        new io.ltr8.tson.schema.meta.TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(text));
-                case TsonAtom atom when atom.value() instanceof String text ->
-                        new io.ltr8.tson.schema.meta.TypeArgument.Value(new io.ltr8.tson.schema.meta.Token(text,
-                                io.ltr8.tson.schema.meta.Token.Form.SINGLE_LINE_QUOTED));
-                default -> new io.ltr8.tson.schema.meta.TypeArgument.Value(new io.ltr8.tson.schema.meta.Token(
-                        String.valueOf(argument), io.ltr8.tson.schema.meta.Token.Form.UNQUOTED));
+                        io.ltr8.tson.schema.meta.TypeRef.of(text);
+                default -> throw new IllegalArgumentException("'" + argument + "' is no argument of the reference '"
+                        + reference.name() + "<...>': an argument is a reference, a qualified name or an application");
             });
         }
         return io.ltr8.tson.schema.meta.TypeRef.of(reference.name(), arguments);

@@ -5,13 +5,10 @@ import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.LinkedHashMap;
@@ -110,10 +107,7 @@ final class SyntheticMerge {
     }
 
     private static TypeRef renamed(TypeRef ref, Map<String, String> renames) {
-        List<TypeArgument> arguments = ref.arguments().stream()
-                .map(argument -> argument instanceof TypeArgument.Ref nested
-                        ? (TypeArgument) new TypeArgument.Ref(renamed(nested.ref(), renames)) : argument)
-                .toList();
+        List<TypeRef> arguments = ref.arguments().stream().map(argument -> renamed(argument, renames)).toList();
         return TypeRef.of(renames.getOrDefault(ref.name(), ref.name()), arguments, ref.annotations());
     }
 

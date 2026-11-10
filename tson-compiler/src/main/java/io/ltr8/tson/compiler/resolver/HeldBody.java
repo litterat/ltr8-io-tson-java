@@ -10,20 +10,16 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
-import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -79,9 +75,9 @@ public final class HeldBody {
             throw new IllegalStateException("a record template is a record_template, never held text "
                     + "(§5.10): " + parameters);
         }
-        // Every parameter starts as a type parameter: its type is derived from the body once the whole schema has
+        // Every parameter starts unbounded: a written or inherited bound is stamped once the whole schema has
         // resolved (ParameterTypes), which a held body is built well before.
-        return new TemplateBody(parameters.stream().map(TemplateParam::typeParameter).toList(),
+        return new TemplateBody(parameters.stream().map(TemplateParam::new).toList(),
                 WRITER.toTson(application));
     }
 
@@ -115,10 +111,7 @@ public final class HeldBody {
             return of(heldOf(open)).names();
         }
         Set<String> names = new LinkedHashSet<>();
-        template.fields().values().forEach(field -> {
-            field.typeParam().ifPresent(names::add);
-            field.valueParam().ifPresent(names::add);
-        });
+        template.fields().values().forEach(field -> field.typeParam().ifPresent(names::add));
         template.references().forEach(reference -> collect(reference, names));
         return names;
     }
@@ -231,16 +224,11 @@ public final class HeldBody {
         }
     }
 
-    /** An application's head and every name its arguments write, at any depth, an unquoted value token included. */
+    /** An application's head and every name its arguments write, at any depth. */
     private static void collect(TypeRef application, Set<String> into) {
         into.add(application.name());
-        for (TypeArgument argument : application.arguments()) {
-            switch (argument) {
-                case TypeArgument.Ref ref -> collect(ref.ref(), into);
-                case TypeArgument.Value value when value.value().form() == Token.Form.UNQUOTED ->
-                        into.add(value.value().text());
-                case TypeArgument.Value ignored -> { }
-            }
+        for (TypeRef argument : application.arguments()) {
+            collect(argument, into);
         }
     }
 }

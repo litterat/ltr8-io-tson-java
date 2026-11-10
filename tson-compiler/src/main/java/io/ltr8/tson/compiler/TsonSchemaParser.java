@@ -35,7 +35,6 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
-import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.lexer.Token;
@@ -843,7 +842,7 @@ public final class TsonSchemaParser extends TsonDataParser {
                         + "<...>' with no whitespace before '<'");
             }
             advance();
-            List<TypeArg> args = parseTypeArgs();
+            List<TypeExpr> args = parseTypeArgs();
             expect(TokenType.GREATER_THAN, "a type argument list's closing '>'");
             return new ApplicationRef(name, args);
         }
@@ -956,8 +955,8 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
     }
 
-    private List<TypeArg> parseTypeArgs() {
-        List<TypeArg> args = new ArrayList<>();
+    private List<TypeExpr> parseTypeArgs() {
+        List<TypeExpr> args = new ArrayList<>();
         args.add(parseTypeArg());
         while (consumeSeparatorOrCloseCheck(TokenType.GREATER_THAN)) {
             args.add(parseTypeArg());
@@ -966,40 +965,32 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * {@code type-arg = type-ref / value-literal} (§12.1, §5.10). A quoted token or a numeric
-     * unquoted token is unambiguously a {@link TypeArg.Value}; any other unquoted token parses as
-     * a {@link TypeArg.Ref} -- §12.1's own prose says this classification is deliberately deferred
-     * to the semantic layer ("settled against the applied signature's parameter kinds... not by
-     * the grammar"), so a bare enum-member-shaped argument parses as a type reference here and is
-     * reclassified later, exactly as the spec describes.
+     * {@code type-arg = type-ref} (§12.1, §5.10): an argument is a type, so a quoted or numeric token, which names
+     * none, is refused here rather than read as a value.
      */
-    private TypeArg parseTypeArg() {
+    private TypeExpr parseTypeArg() {
         Token t = peek();
-        if (t.type() == TokenType.SINGLE_LINE_STRING || t.type() == TokenType.MULTI_LINE_STRING) {
-            advance();
-            TokenForm form = t.type() == TokenType.SINGLE_LINE_STRING ? TokenForm.SINGLE_LINE_QUOTED : TokenForm.MULTI_LINE_QUOTED;
-            return new TypeArg.Value(recordPosition(new TokenValue(t.text(), form), t.start()));
+        if (t.type() == TokenType.SINGLE_LINE_STRING || t.type() == TokenType.MULTI_LINE_STRING
+                || (t.type() == TokenType.UNQUOTED && NumberGrammar.tryParse(t.text()).isPresent())) {
+            throw parseError("'" + t.text() + "' is no type argument: an argument is a type, written as a "
+                    + "reference -- a name or an application -- and never a literal token (§5.10)");
         }
         if (t.type() == TokenType.UNQUOTED) {
-            if (NumberGrammar.tryParse(t.text()).isPresent()) {
-                advance();
-                return new TypeArg.Value(recordPosition(new TokenValue(t.text(), TokenForm.UNQUOTED), t.start()));
-            }
-            return new TypeArg.Ref(parseTypeRefHead());
+            return parseTypeRefHead();
         }
         if (t.type() == TokenType.LPAREN) {
-            return new TypeArg.Ref(parseChoiceRef());
+            return parseChoiceRef();
         }
         if (t.type() == TokenType.LBRACKET) {
-            return new TypeArg.Ref(parseBracket());
+            return parseBracket();
         }
         if (t.type() == TokenType.LBRACE) {
-            return new TypeArg.Ref(parseMap());
+            return parseMap();
         }
         if (t.type() == TokenType.VOID) {
             throw parseError("the void sentinel '_' is not valid in a type argument position (§7.6)");
         }
-        throw mismatch("a type argument (a type reference or a scalar value)");
+        throw mismatch("a type argument (a type reference)");
     }
 
     // ── Declaration-Level Container Forms (§5.3, §12.1) ──────────────────

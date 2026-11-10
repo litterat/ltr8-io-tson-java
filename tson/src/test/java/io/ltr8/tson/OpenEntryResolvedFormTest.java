@@ -17,7 +17,6 @@ import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
-import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -105,18 +104,13 @@ class OpenEntryResolvedFormTest {
     // ── What §5.10's own example does, with a held body as text ──────
 
     /**
-     * <b>§5.10's {@code vector} example validates in §8.1's own prescribed form.</b> The declaration is
+     * <b>A held body validates in §8.1's own prescribed form.</b> The declaration is
      *
-     * <pre>{@code vector => <T, N> !array { element_type: T  min_items: N  max_items: N }}</pre>
+     * <pre>{@code vector => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }}</pre>
      *
-     * and §5.10 introduces value parameters with precisely this shape -- "a parameter in a value slot
-     * ({@code min_items: N}) ... is a token like any other". Its resolved body is a {@code !template} whose
-     * {@code template} field is the application as written, so there is no value slot for {@code N} to fail
-     * against and the entry's value is a {@code top} like any other.
-     *
-     * <p>Read as the {@code !array} it names, the body would fail with two {@code ATOM_CONSTRAINT_VIOLATION}s
-     * -- {@code N} is not a {@code numeric.count} -- which is the case §8.1 names when it says a body
-     * carrying a parameter in a value slot "is not a value of any constructor's record shape".
+     * and its resolved body is a {@code !template} whose {@code template} field is the application as written, so
+     * the parameter in its type slot is never read against {@code array}'s vocabulary and the entry's value is a
+     * {@code top} like any other.
      *
      * <p>The document is hand-authored in §8.1's form rather than produced by this library's writer,
      * deliberately: the claim under test is about the <em>spec's</em> prescribed serialization, and routing
@@ -124,16 +118,16 @@ class OpenEntryResolvedFormTest {
      * verdict.
      */
     @Test
-    void anOpenEntryWithAValueParameterValidates() {
+    void anOpenEntryWithAHeldBodyValidates() {
         assertEquals(List.of(), ResolvedForm.validateResolved(tson(), """
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   vector => !meta.template {
-                    parameters: [ { name: T  type: meta.type_ref } { name: N  type: numeric.count } ]
-                    template: "!meta.array { element_type: T  min_items: N  max_items: N }"
+                    parameters: [ { name: T } ]
+                    template: "!meta.array { element_type: T  min_items: 3  max_items: 3 }"
                   }
                 }
-                """), "a value parameter has no slot to fail against once the body is held as text");
+                """), "a parameter has no slot to fail against once the body is held as text");
     }
 
     /**
@@ -149,7 +143,7 @@ class OpenEntryResolvedFormTest {
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   e => !meta.template {
-                    parameters: [ { name: M  type: text } ]
+                    parameters: [ { name: M } ]
                     template: "!enum { members: [a b M] }"
                   }
                 }
@@ -161,7 +155,7 @@ class OpenEntryResolvedFormTest {
         TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e"));
         assertEquals("!enum { members: [a b M] }", e.template(),
                 "the application as written -- no third enum member spelled 'M'");
-        assertEquals(List.of(new TemplateParam("M", TypeRef.of("text"))), e.parameters());
+        assertEquals(List.of(new TemplateParam("M")), e.parameters());
     }
 
     // ── The biconditional an entry's parameters rest on ─────────────────
@@ -185,9 +179,9 @@ class OpenEntryResolvedFormTest {
                   uuid_pair      => <B> pair<text, B>
                   boxes          => <T> [T]
                   text_keyed_map => <V> {text => V}
-                  vec            => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
+                  vec            => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }
                   composed       => <T> base & { value: T }
-                  holder         => { p: pair<text, int32>  q: vec<int32, 3> }
+                  holder         => { p: pair<text, int32>  q: vec<int32> }
                 }
                 """);
         List<String> ids = List.of(TsonBundledSchemas.META_ID, TsonBundledSchemas.NUMERIC_ID,

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=1037233d2a53e8938ce0e5b50af594d81035a6f047045eba4c5544e28e1bc026"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=c4da841fb83e459dd90e5443d0e73fb46800644ab1c91b97ac3ca15b26a58532"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -444,31 +444,21 @@
     }
 
     @doc:"""
-      One parameter of an open entry: its name, and the type an argument for it
-      is read as — the declared type of the slot it stands in, in the vocabulary
-      of the constructor the held body applies. It is derived from the body and
-      never required of the author: a type slot gives `meta.type_ref`; a scalar
-      slot of the applied constructor gives that slot's declared type
-      (`min_items: N` gives `numeric.count`); a routed default or
-      fixed value gives the field's own declared type (`w?: int32 ~ N` gives
-      `int32`); and a parameter passed to another template takes that template's
-      recorded type for the position, with `meta.type_ref` where nothing
-      grounds it. A parameter is a type parameter exactly when its `type` is
-      `meta.type_ref`. A `type` may name an earlier parameter of the same
-      template, where a routed default's field is typed by one.
+      One parameter of an open entry: its name, and the bound an argument's
+      type must IS-A. A parameter is a type: it stands only at a slot typed
+      `meta.type_ref` or a refinement of it — in a record, a field's type — or
+      as an argument of an application there or in a parent, and an argument
+      for it is a reference, a name or an application. A parameter anywhere
+      else (a facet, a field's default or fixed value, an enum member, a size
+      bound) is a resolver error at the declaration, naming the slot.
 
-      A declaration may narrow what it derives by writing a type after the name,
-      `<T: text, N: int8>`, read by the kind the positions give. On a value
-      parameter it narrows `type` itself and must IS-A the derived type. On a
-      type parameter it is `bound`: an argument must name a type that IS-A it.
-      `bound` is present only where `type` is `meta.type_ref`, and a parameter
+      A declaration writes a bound after the name, `<T: text>`. A parameter
       passed to another template inherits that template's bound for the
       position, so an unannotated parameter is bounded as narrowly as its uses
-      require.
+      require, and a written bound must IS-A every bound it inherits.
       """
     template_param => {
       name:   meta.param_name
-      type:   meta.type_ref
       bound?: meta.type_ref
     }
 
@@ -482,10 +472,9 @@
 
       The text is how a held body is written in resolved output; a processor
       holds the parsed form, which this vocabulary cannot represent. A held body
-      is not a value of this vocabulary: a parameter stands wherever a token
-      stands — `min_items: N` as readily as `element_type: T` — so a body
-      carrying one is not typed by any constructor's own record shape until it
-      closes.
+      is not a value of this vocabulary: a parameter stands where a type is
+      named — `element_type: T`, `variants: [T error]` — and a body carrying
+      one is not typed by any constructor's own record shape until it closes.
 
       An open entry's value is this, built by a constructor IS-A `top`. What is
       compared is the parsed form and never the text: an open
@@ -686,40 +675,29 @@
 
     @doc:"""
       A field of a record template: a record field's four facts, where the type
-      and the value may each be a parameter of the enclosing template, and the
-      label says which. `type_param` names a parameter standing for the whole
-      type, `value_param` one standing for the whole value; `type` and `value`
-      are as on a record field. A parameter may also stand as an argument of an
-      application in `type`, `list<T>`, recognised there because its text
-      resolves into the template's `parameters` ([TSON-SCHEMA] §5.10's
+      may be a parameter of the enclosing template, and the label says which.
+      `type_param` names a parameter standing for the whole type; `type` and
+      `value` are as on a record field. A parameter may also stand as an
+      argument of an application in `type`, `list<T>`, recognised there because
+      its text resolves into the template's `parameters` ([TSON-SCHEMA] §5.10's
       shadowing rule). An application substitutes every parameter away, and
       each of its fields is then a `meta.record_field`: `type_param` becomes
-      `type` and `value_param` becomes `value`, carrying the argument, and no
-      other fact changes.
+      `type`, carrying the argument, and no other fact changes.
 
-      A literal `value` needs a closed type, so a field whose type is a
-      parameter, or an application over one, takes `value_param` or nothing.
-      A field of a closed type takes either. `value` is typed `type!`, as on a
-      record field: beside `type_param`, with `type` absent, it has no type to
-      be read against and is refused where it is read.
-
-      A parametric modifier takes the facts its literal spelling takes
-      ([TSON-SCHEMA] §5.7): `w?: T ~ P` is an optional DEFAULT field and
-      `w?: T = P` an optional FIXED one, `w: T = P` is a FIXED field that is not
-      optional, and `w: T ~ P` is refused.
-
-      A field the template's `discriminators` names may be FIXED to a parameter,
-      optional or not as its name is marked (`type?: text = T`): each
-      application supplies its pin, and the base reads the field required with
-      that pin dropped. Its type is never a parameter, so the base reads it
-      without an application.
+      A field's value is never a parameter. A literal `value` needs a closed
+      type, so a field whose type is a parameter, or an application over one,
+      takes no value: a value that differs per application is written where
+      the application is declared, `created => response<order> & { status?: =
+      201 }`. `value` is typed `type!`, as on a record field: beside
+      `type_param`, with `type` absent, it has no type to be read against and
+      is refused where it is read.
       """
     record_template_field => {
       ( type: meta.field_type_ref | type_param: meta.param_name )
       optional?: boolean ~ false
       voidable?: boolean ~ false
       role?:     meta.field_role ~ FREE
-      ( value: type! | value_param: meta.param_name )?
+      value?:    type!
     }
 
     @doc:"""
@@ -785,10 +763,10 @@
       reads against the member's closed record. That is why it is its own
       constructor and not a record with an optional list of parameters.
 
-      A parameter stands only in a field's `type_param` or `value_param`, or as
-      an argument of an application in a field's `type` or in a parent; the
-      rest of the template is what every application shares. Its type and bound are derived
-      from where it stands, as `meta.template_param` says.
+      A parameter stands only in a field's `type_param`, or as an argument of
+      an application in a field's `type` or in a parent; the rest of the
+      template is what every application shares. Its bound is written or
+      inherited, as `meta.template_param` says.
 
       `extension` states how each application is realised, the template's own
       being ABSTRACT whatever it says, so `result => abstract <T> { ... }` makes
@@ -822,9 +800,9 @@
       required field, and a closed application carries the bound reference as
       the field's value (`!meta.array { element_type: person }`), its binding
       record being ordinary data of this vocabulary. Inside a held template body
-      ([TSON-SCHEMA] §5.10) any slot — type, scalar, or collection — may hold a
-      parameter token, substituted away before the body is read against this
-      vocabulary. `voidable` says whether an element may be void, spelled
+      ([TSON-SCHEMA] §5.10) a type slot may hold a parameter, substituted away
+      before the body is read against this vocabulary; a parameter at any other
+      slot is refused. `voidable` says whether an element may be void, spelled
       `[T?]`.
 
       `ordered` says whether order is part of a container's value: true for an
@@ -1044,13 +1022,12 @@
       A value may carry an argument list, `geo.address<T>`: after its qualified
       name, an adjacent `<`, one or more arguments, and `>`. It is data grammar
       ([TSON-DATA] §7.4), written unquoted wherever a value stands. An argument
-      is a reference or a token, positional against the head's parameters, and
-      typed where it lands: a type argument is judged as the parameter's `bound`
-      says, and a value argument is a token of the parameter's type
-      ([TSON-SCHEMA] §5.10). The canonical text has no whitespace but one space
-      between arguments: `pair<text integer>`, `maxint<10>`. Identity is the
-      parsed form ([TSON-SCHEMA] §8.2), so whitespace inside an argument list is
-      free. Every application denotes an entry: a closed one lifts to the entry
+      is a reference, a name or an application, positional against the head's
+      parameters, and judged as the parameter's `bound` says ([TSON-SCHEMA]
+      §5.10); a token that is no reference is no argument. The canonical text
+      has no whitespace but one space between arguments: `pair<text integer>`,
+      `box<pair<text integer>>`. Identity is the parsed form ([TSON-SCHEMA]
+      §8.2), so whitespace inside an argument list is free. Every application denotes an entry: a closed one lifts to the entry
       it denotes and is named bare where it stands ([TSON-SCHEMA] §5.3), so a
       value carries arguments only where an application is still open, in a
       record template's `parents` and field types, in held text, and in the

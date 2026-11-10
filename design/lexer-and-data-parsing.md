@@ -183,13 +183,13 @@ Key points:
   `TokenValue` text as boolean/number/string (base type resolution,
   `design/base-types-and-atom-vocabulary.md`). These are intentional gaps, not omissions.
 - **A reference is data grammar** ([TSON-DATA] §7.4): `reference = qualified-name "<" ws
-  type-args ws ">"`, each `type-arg` a reference or a token, a qualified name being a reference and any other token,
-  a number or a quoted token, a value argument. The lexer is unchanged, `<` and `>` lexing as single-character
-  special tokens, so `map<text list<int32>>` arrives as eight tokens and `>>` is two. `TsonDataStream` assembles one
-  whole (`opensArguments`, `referenceArguments`) into a single `ReferenceEvent` holding the parsed `TypeRef`, the
-  arguments classified as the grammar reads them, and `TsonDataParser` reduces it to a `ReferenceValue`; a qualified
-  name with no argument list stays a `TokenEvent`.
-  - **One event, not a container.** An argument is a reference or a token, never a structure, so a reference is
+  type-args ws ">"`, each `type-arg` a reference, a qualified name or an application; any other token, a number or a
+  quoted token, is no argument and is refused where it is read ([TSON-SCHEMA] §5.10). The lexer is unchanged, `<`
+  and `>` lexing as single-character special tokens, so `map<text list<int32>>` arrives as eight tokens and `>>` is
+  two. `TsonDataStream` assembles one whole (`opensArguments`, `referenceArguments`) into a single `ReferenceEvent`
+  holding the parsed `TypeRef`, the arguments references in turn, and `TsonDataParser` reduces it to a
+  `ReferenceValue`; a qualified name with no argument list stays a `TokenEvent`.
+  - **One event, not a container.** An argument is a reference, never a structure, so a reference is
     small; delivering it whole keeps every reader, skip (`EventSkip`, a leaf) and replay treating it as the one value
     it is. A reader at a reference-typed position rolls a `ReferenceEvent` or a name token into one `TypeRef`; at any
     other typed position a `ReferenceEvent` is a type mismatch.
@@ -212,9 +212,9 @@ Key points:
     chained projection, and `"kind"!` is refused because a quoted token is never a reference. A multi-line token's
     end is past its closing line's terminator, so a `!` opening the next line is a prefix and never marks it.
   - **Never an argument, never a tag.** `box<kind! >` is refused by the position rule (a sibling stands only at a
-    record field's type, [TSON-SCHEMA] §5.2) as the argument list is read, `TypeArgument.Ref` holding a type
-    reference; `!int32!` is refused by `parseTypeRefName`, a tag naming a type. Anywhere else a core value stands the
-    grammar admits one, and where it may stand is the reader's to judge: a slot reader whose component is a
+    record field's type, [TSON-SCHEMA] §5.2) as the argument list is read, an argument being a type reference;
+    `!int32!` is refused by `parseTypeRefName`, a tag naming a type. Anywhere else a core value stands the grammar
+    admits one, and where it may stand is the reader's to judge: a slot reader whose component is a
     `TypeRef` refuses it, and the reference atom's parser refuses it at a field typed by a type reference.
   - **A schemaless read keeps it** as a `TsonSiblingReference`, the field and the mark (`design/tree-model.md`).
 - **§3.2's three type-expression forms are refused by name, not by the separation rule.** Array brackets,
