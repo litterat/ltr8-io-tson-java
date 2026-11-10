@@ -252,21 +252,19 @@ final class TemplateMaterialiser {
     /** The imported entries, where an argument's or a bound's name is read when the schema does not hold it. */
     private final Function<String, Top> importedTypes;
 
-    /** The local declaration resolution is inside, or {@code null} -- who an early check answers to. */
+    /** The local declaration being made ready, or {@code null} once every one is -- who a deferred check answers to. */
     private final Supplier<String> resolving;
 
     /**
-     * The argument checks {@link #checkArguments} ran before the parameters were stamped, replayed by
-     * {@link #recheckEarly} once they are. An application closed during resolution -- a declaration naming it,
-     * a composition operand, a refinement source, or an argument nested in one -- meets a local template whose
-     * parameters carry no written or inherited bound yet, so its check passes vacuously until then.
+     * The argument checks {@link #checkArguments} deferred while declarations were being made ready, run by
+     * {@link #checkDeferred} once every one is. An application closed during resolution -- a declaration naming
+     * it, a composition operand, a refinement source, or an argument nested in one -- is judged by its arguments'
+     * chains, and an argument is a name at a type position, which orders nothing ([TSON-SCHEMA] §3.4.1): judging it
+     * then would make the declaration wait on its argument.
      */
-    private final Set<EarlyCheck> early = new LinkedHashSet<>();
+    private final Set<DeferredCheck> deferred = new LinkedHashSet<>();
 
-    /** Whether {@link #parametersStamped} has run, after which every check sees stamped parameters. */
-    private boolean stamped;
-
-    private record EarlyCheck(String declaration, String head, List<TypeRef> arguments) {
+    private record DeferredCheck(String declaration, String head, List<TypeRef> arguments) {
     }
 
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, Top> publish,
@@ -285,20 +283,15 @@ final class TemplateMaterialiser {
         this.resolving = Objects.requireNonNull(resolving, "resolving");
     }
 
-    /** Called once {@code SchemaResolver} has stamped the parameters' bounds: from here on a check sees them. */
-    void parametersStamped() {
-        this.stamped = true;
-    }
-
     /**
-     * Replays every argument check that ran before the parameters were stamped, against the stamped template,
-     * reporting a failure against the declaration whose resolution closed the application. One verdict per
-     * declaration, as resolution itself gives: {@code boxed<boxed<int32>>} fails on its inner argument, and the
-     * outer one -- whose argument is that inner entry -- is not judged a second time.
+     * Runs every argument check deferred while declarations were being made ready, reporting a failure against the
+     * declaration whose resolution closed the application. One verdict per declaration, as resolution itself gives:
+     * {@code boxed<boxed<int32>>} fails on its inner argument, and the outer one -- whose argument is that inner
+     * entry -- is not judged a second time.
      */
-    void recheckEarly(BiConsumer<String, SchemaValidationException> reporter) {
+    void checkDeferred(BiConsumer<String, SchemaValidationException> reporter) {
         Set<String> refused = new LinkedHashSet<>();
-        for (EarlyCheck check : early) {
+        for (DeferredCheck check : deferred) {
             Top template = namespace.definition(check.head());
             if (refused.contains(check.declaration()) || !OpenEntry.isOpen(template)) {
                 continue;
@@ -310,7 +303,7 @@ final class TemplateMaterialiser {
                 reporter.accept(check.declaration(), e);
             }
         }
-        early.clear();
+        deferred.clear();
     }
 
     /**
@@ -970,18 +963,19 @@ final class TemplateMaterialiser {
      * §5.10's call-site check: each argument must name a type that IS-A the bound of the parameter it binds
      * ({@link #checkBounds}), a verdict at the application rather than inside the substituted body.
      *
-     * <p>A check run before the parameters were stamped -- an application closed during resolution, while the
-     * template's bounds are not yet known -- is recorded and replayed by {@link #recheckEarly}.
+     * <p>A check asked for while a declaration is being made ready -- an application closed during resolution -- is
+     * deferred to {@link #checkDeferred}, so judging an argument never makes the declaration wait on it.
      *
      * <p><b>Shared with the operand path</b>, through {@link ApplicationCloser#checkArguments}: a composition operand
      * absorbs by value and mints nothing, so it never reaches this pass.
      */
     void checkArguments(String head, Top template, List<TypeRef> arguments) {
-        checkBounds(head, template, arguments);
         String declaration = resolving.get();
-        if (!stamped && declaration != null) {
-            early.add(new EarlyCheck(declaration, head, List.copyOf(arguments)));
+        if (declaration != null) {
+            deferred.add(new DeferredCheck(declaration, head, List.copyOf(arguments)));
+            return;
         }
+        checkBounds(head, template, arguments);
     }
 
     /**

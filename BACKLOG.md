@@ -109,15 +109,12 @@ spec-required case:
   `product` or `sum` directly stays refused: it is a type of a new form, which a processor backs with readers and
   writers of its own.
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
-  so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest verifies rather than
-  recomputes what an author may have written into a derived fact: a recorded `meta.template_param.type` or `bound`
-  must be IS-A the type the held body derives, since a written narrowing lives nowhere else; it also re-runs the
+  so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest re-runs the
   family checks (no member minted at a use site) over the ingested map and its closure, the §5.11 group
   declaration rules over every `meta.field_group`, and every kind-typed slot's name against its kind, which a resolved
   form's read checks for grammar alone ([TSON-SCHEMA] §4.2, `TsonReadContext.readsSchemaNames`). A resolved
   form is read today only where a caller says it is one (`TsonDataParser.parseResolvedForm`, a reader's
   `readAs(text, "schema")`), with nothing verified.
-  `ParameterTypes` already derives the type to check against.
 - [ ] **An application is not yet unified with an imported library's entry for it** ([TSON-SCHEMA] §8.1, §8.2). A
   library declaring `int_box => box<int32>` writes `@meta.application:"box<int32>"` on that
   key, and a schema importing it that writes `box<int32>` still closes the application to an entry of its own rather

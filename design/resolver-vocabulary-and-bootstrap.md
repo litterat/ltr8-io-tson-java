@@ -356,9 +356,9 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   how many compiles run, never the output (`theBootstrapIsTheSameInAnyOrder`): an instance whose read reaches an
   entry not yet ready (`net.scheme_name` reaching `unicode.identifier_base` and `unicode.normalization`) forces another
   compile. Its output's nested map `meta` is derived from the members, so the order test compares its names.
-- **Parameter types are derived after every entry is ready**, through `ParameterTypes.inferAll` as `SchemaResolver`
-  derives a schema's, so `meta.ref` carries `T: meta.type_ref`, a type parameter, as their ordinary
-  resolution does.
+- **Parameters are checked after every entry is ready**, through `ParameterTypes.check` as `SchemaResolver` checks a
+  schema's; a failure is a broken kernel. A kernel parameter carries the bound its declaration writes, and none of
+  the kernel's templates writes one.
 - **The partial link is contained.** It passes over a reference to a pending name, and an entry's walk stops at its
   first one, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed by
   (`TsonCompiledVocabularyRegistry.loadVocabulary` links and compiles the output into the stand-in).

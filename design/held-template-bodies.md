@@ -48,8 +48,8 @@ closing. Current form only; history lives in git.
   there is no argument to collide with and nothing to refuse. With every argument a reference, a name an absorbed
   argument writes is a namespace entry, so the first rule already refuses a parameter spelled like it; the second
   stays as the statement of why.
-- `HeldBody.held` is the only way a `TemplateBody` is minted, and every parameter starts unbounded; `ParameterTypes`
-  stamps the written or inherited bounds later.
+- `HeldBody.held` is the only way a `TemplateBody` is minted, its parameters by name; the bounds a declaration
+  writes are put on where it resolves (`DefinitionResolver.withBounds`), for either shape. A bound is never inferred.
 - A held tree is a working value: built per call, never cached or stored on the entry. Callers outside `resolver`
   ask it `names()` and `applications()` only, never for the `DataValue`.
 - Substitution is one rule at every depth (`WireForm.substitute`): an **unquoted** token whose text is one of the
@@ -67,8 +67,8 @@ closing. Current form only; history lives in git.
   holding a sibling reference (`kind!`, at a record template field's type) is no application: every walk that
   rewrites one matches `ReferenceValue(TypeRef applied)`, and a sibling falls through as written. A quoted token is
   never a reference, so a held body's text literal `pattern: "box<T>"` stays text.
-- Parameters are checked and stamped twice: before materialisation (feeding the call-site bound check) and after
-  everything has closed (stamping minted open entries). The second pass reports nothing.
+- Parameters are checked once per declaration, after every declaration is ready and before anything closes
+  (`ParameterTypes.check`); nothing is stamped on them afterwards.
 
 Related: `design/template-materialisation.md` (the closing pass: identity, declared applications, the expansion
 rule, on-demand closing, kind, regularity), `design/desugaring-open-forms-and-templates.md` (how sugar and aliases are
@@ -217,9 +217,9 @@ admitted is the declared type of the slot it stands in, read from the constructo
 `array.element_type` is `meta.type_ref`, `array.min_items` `numeric.count`, `enum.members` a set of `text`. A slot
 names a type when its declared type is `meta.type_ref` or a reference type refining it (`meta.identifier_ref`, so
 `namespace.key_type` takes one); a reference naming values (`meta.ref<method>`) names none. §4.2 types every slot that
-names a type that way, so a schema's own constructors are judged by the same walk. A record template is read off the
-model (`ParameterTypes.walk`): its labels need no check, and an argument of an application in a field's type or a parent
-is deferred to the head's parameter, for its bound.
+names a type that way, so a schema's own constructors are judged by the same walk, which also yields the applications
+written at those slots. A record template is read off the model (`RecordTemplateBody.references`): its labels need no
+check, and its applications are those in a field's type or a parent.
 
 - **One refusal.** A parameter at any slot that names no type is refused at the declaration, naming the slot as
   `constructor.field` (`parameter 'N' stands at meta.array.min_items`, `… at a key of meta.record.fields`). In a record
@@ -229,24 +229,35 @@ is deferred to the head's parameter, for its bound.
   slot typed `meta.type_ref` (`<T> meta.array ^ { element_type?: = T }`) included. A size bound naming a parameter is
   refused by the desugarer (`SchemaDesugarer.refuseParameterBound`), before the lift renames it. A payload in §5.6's
   positional form (`!enum [a b M]`) is walked as the one unmarked field it binds, so its member is refused too.
-- **Stamped twice.** A held body is built before anything can be checked. `SchemaResolver` runs
-  `ParameterTypes.inferAll` once every declaration has resolved and nothing has closed, checking each declared template
-  and stamping its bounds; and again after materialisation and the merge, over every local open entry, declared and
-  minted, with a reporter that discards — its failures are the first pass's, already reported.
-- **Bounds are written or inherited, by a fixed point.** A declaration writes one after the name (`<T: text>`,
-  `SchemaMap.Declaration.parameterTypes`); it must resolve in the schema's namespace and name a type (`requireType`:
-  `<T: unicode.text_type>` names a constructor, IS-A `top`, which no argument can IS-A). A parameter passed to another
-  template inherits that template's bound for the position (`rebox => <T> boxed<T>` inherits `boxed`'s), so an
-  unannotated parameter is bounded as narrowly as its uses require; inherited bounds unordered by IS-A are refused, and
-  a written bound must IS-A every inherited one. A parameter passed to another template says nothing until that
-  template's bound is known, and two templates may wait on each other, so the bounds settle by a fixed point; what it
-  leaves ungrounded is unbounded. An imported template is taken as recorded, since its held body does not carry what
-  its author wrote.
+- **Checked once, at the declaration.** A declaration's written bounds are on its parameters from the moment it
+  resolves (`DefinitionResolver.withBounds`, from `SchemaMap.Declaration.parameterTypes`). `SchemaResolver` runs
+  `ParameterTypes.check` once every declaration is ready and nothing has closed: where each parameter stands, and each
+  bound below. A refused template is condemned to a placeholder, as an irregular one is. The kernel's bootstrap runs
+  the same check, a failure there being a broken kernel.
+- **A bound is written, never inherited.** One is written after the name (`<T: text>`); it must resolve in the schema's
+  namespace and name a type (`requireType`: `<T: unicode.text_type>` names a constructor, IS-A `top`, which no argument
+  can IS-A). A parameter passed as an argument to a bounded parameter of another template must itself be written with a
+  bound that IS-A that one (`Callees.requireBound`): `rebox => <T> { b: boxed<T> }` over `boxed => <T: text> { v: T }`
+  is refused at `rebox`, naming `boxed`'s `T: text`, and `<T: int32>` is refused for not being IS-A `text`. This holds
+  wherever the parameter is an argument: a field's type, a nested application, an applied parent, an alias template's
+  target, a held construction's type slot. Each declaration is judged against the bounds its callees *wrote*, so no
+  order among templates is needed and nothing iterates. An imported template's recorded bound is what its author
+  wrote, and binds the same way.
+  - **A lifted form is looked through.** An open synthetic's parameters are the lift's (`p0`), which no author wrote and
+    which carry no bound, and one synthetic serves every template writing the same form, so it cannot carry any one
+    declaration's bound. `[boxed<T>]` lifts to an open synthetic applied to `T`, which holds `boxed<p0>`: the check
+    maps the synthetic's parameters to the arguments it was given and judges the applications it holds at the
+    declaration that wrote the form. A synthetic is never a callee, and is not itself checked for passing a parameter
+    on.
+  - **A constructor's slot needs no bound.** A head that is not open (construction sugar, `meta.namespace<K text>`) has
+    no parameters to bound, and its slot judges the argument that arrives when the record is applied.
 - **The call-site check** (`TemplateMaterialiser.checkArguments`): each argument must name a type that IS-A its
   parameter's bound, following alias chains. An application as an argument, or an unresolved name, falls to the
   substituted body.
-  - **An application closed during resolution is checked twice.** A declaration naming one (`held => boxed<int32>`), a
-    composition operand, a refinement source and an argument nested in any of them close in the driving loop, before
-    anything is stamped, so their first check sees no bound. The materialiser records each check that ran then, with
-    the declaration whose resolution ran it, and `recheckEarly` replays them once the parameters are stamped — one
-    verdict per declaration, none for a declaration that already failed.
+  - **An application closed during resolution is checked once every declaration is ready.** A declaration naming one
+    (`held => boxed<int32>`), a composition operand, a refinement source and an argument nested in any of them close
+    in the driving loop. Judging an argument reads its chain, and an argument is a name at a type position, which
+    orders nothing (§3.4.1): checking it then would make the declaration wait on it, and `a => boxed<b> & { … }`
+    beside `b => boxed<a> & { … }` would become a wait cycle. So the materialiser defers each such check, with the
+    declaration whose resolution ran it, and `checkDeferred` runs them after `ParameterTypes.check` — one verdict per
+    declaration, none for a declaration that already failed or a template already condemned.

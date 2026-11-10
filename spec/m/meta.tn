@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=c4da841fb83e459dd90e5443d0e73fb46800644ab1c91b97ac3ca15b26a58532"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=bf9b0f69c58bd4d80acdd469f3ebf81a65c51334f2d40258f2351f9ea5030c13"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -452,10 +452,10 @@
       else (a facet, a field's default or fixed value, an enum member, a size
       bound) is a resolver error at the declaration, naming the slot.
 
-      A declaration writes a bound after the name, `<T: text>`. A parameter
-      passed to another template inherits that template's bound for the
-      position, so an unannotated parameter is bounded as narrowly as its uses
-      require, and a written bound must IS-A every bound it inherits.
+      The bound is what the declaration writes after the name, `<T: text>`,
+      and is otherwise absent: nothing about a parameter is inferred, so it is
+      known in full at its declaration. A parameter passed as an argument to a
+      parameter that has a bound is written with a bound that IS-A it.
       """
     template_param => {
       name:   meta.param_name
@@ -765,8 +765,8 @@
 
       A parameter stands only in a field's `type_param`, or as an argument of
       an application in a field's `type` or in a parent; the rest of the
-      template is what every application shares. Its bound is written or
-      inherited, as `meta.template_param` says.
+      template is what every application shares. Its bound is written, as
+      `meta.template_param` says.
 
       `extension` states how each application is realised, the template's own
       being ABSTRACT whatever it says, so `result => abstract <T> { ... }` makes

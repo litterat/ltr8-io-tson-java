@@ -7,7 +7,7 @@ derived — and the static check that runs before any of it.
 **Invariants**
 
 - The pass order in `SchemaResolver` is fixed: the driving loop resolves every declaration, then
-  `TemplateRegularity.check`, then parameter stamping and `recheckEarly`, then `materialise`, then `familyBaseEdges`,
+  `TemplateRegularity.check`, then `ParameterTypes.check` and `checkDeferred`, then `materialise`, then `familyBaseEdges`,
   `appliedParentEdges` and `closeChains`, then the synthetic merge. Every step reads what the one before it settled.
 - A template that fails the regularity check, or whose parameters stand where none may, is replaced with the
   error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
@@ -152,7 +152,8 @@ resolves, before the batch pass runs. They are handled differently.
   ancestors (`Ancestry.ofTemplate`) and not its own name, and the application is kept in the declaration's
   `parents`, arguments and all. Minting an entry for it would give a form nothing names an entry with one subtype
   and no referent. The arguments still need §5.10's bound check, which closing would have given them, so
-  `openOperand` calls `ApplicationCloser.checkArguments`.
+  `openOperand` calls `ApplicationCloser.checkArguments`, deferred like every check asked for during resolution
+  (`design/held-template-bodies.md`, "The call-site check").
   - **Open** (`vip => <T> customer & box<T>`): the held body writes `box<T>` as a parent, and it closes with
     everything else when `vip` does. Closing builds the chain from those parents (`Ancestry.chainOf`, in
     `closeRecordTemplate`), the fold turns `box<text>` into the edge to the entry that application denotes, and

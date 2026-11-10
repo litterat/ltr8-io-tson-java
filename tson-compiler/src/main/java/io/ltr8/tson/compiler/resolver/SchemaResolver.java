@@ -468,29 +468,26 @@ public final class SchemaResolver {
         // different halves: `materialise` walks `resolvedLocals`, while the application's head is looked up
         // through the getter over `namespace`.
         condemn(irregular, resolvedLocals, namespace);
-        // §5.10's parameters, before anything closes: where each stands is checked (a parameter is a type, so it
-        // stands only where a type is named), and each is stamped with its written or inherited bound, so an
-        // application can check its arguments against them as it closes. Here because it needs every
-        // declaration resolved (a slot's declared type comes from the constructor's own vocabulary, and a bound
-        // is inherited from the template a parameter is passed to) and nothing yet closed.
-        Set<String> unkinded = new LinkedHashSet<>();
-        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written =
-                writtenParameterTypes(declarations, resolver, problems);
-        Map<String, Map<String, TemplateParam>> declaredParameters = ParameterTypes.inferAll(namespace,
-                declarations.keySet(), written, heads::definition,
+        // §5.10's parameters, before anything closes, each declaration once: where each parameter stands (a
+        // parameter is a type, so it stands only where a type is named), that a written bound names a type, and
+        // that a parameter passed to a bounded parameter is written with a bound IS-A it. Here because a slot's
+        // declared type comes from the constructor's own vocabulary and a callee's bound from its declaration, both
+        // ready only now. A refused template is condemned on the same terms as an irregular one: the verdict is in,
+        // and closing an application of it only reports the consequence against whichever entry applied it.
+        Set<String> refusedParameters = ParameterTypes.check(namespace, declarations.keySet(),
+                name -> generated.contains(name) || facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).synthetic(),
+                heads::definition,
                 (name, error) -> {
                     if (!problems.collecting()) {
                         throw error;
                     }
-                    unkinded.add(name);
                     problems.report(declarations.get(name), "'" + name + "': " + error.getMessage(), error);
                 });
-        stampParameters(declaredParameters, List.of(resolvedLocals, namespace));
-        materialiser.parametersStamped();
-        // An application closed during the driving loop was checked against parameters carrying no bound yet,
-        // so its check runs again now that they are stamped (§5.10) -- before anything else closes.
-        // A declaration that already failed has its verdict, so a replayed check is not a second one.
-        materialiser.recheckEarly((name, error) -> {
+        condemn(refusedParameters, resolvedLocals, namespace);
+        // The bound checks of the applications closed while declarations were being made ready, which an argument
+        // could not order (§3.4.1), run now that every argument is ready -- before anything else closes. A
+        // declaration that already failed has its verdict, so a check is not a second one.
+        materialiser.checkDeferred((name, error) -> {
             if (!problems.collecting()) {
                 throw error;
             }
@@ -498,10 +495,6 @@ public final class SchemaResolver {
                 problems.report(declarations.get(name), error);
             }
         });
-        // Condemned on the same terms as an irregular template: the verdict is in, and closing an application
-        // of a template whose parameters stand where none may only reports the consequence -- the substituted
-        // body failing its constructor's vocabulary -- against whichever entry happened to apply it.
-        condemn(unkinded, resolvedLocals, namespace);
 
         Map<String, Top> instantiations = materialiser.materialise(resolvedLocals,
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
@@ -538,15 +531,6 @@ public final class SchemaResolver {
             });
             republish(namespace, resolvedLocals, instantiations);
         }
-
-        // §5.10's parameters, recorded on every open entry this schema produced -- the materialiser mints open
-        // entries of its own, which is why this runs once everything has closed as well as before. A failure was
-        // reported by the first pass against the declaration that wrote it; one here is the same verdict, and
-        // the entry keeps what it had.
-        Set<String> local = new LinkedHashSet<>(resolvedLocals.keySet());
-        local.addAll(instantiations.keySet());
-        stampParameters(ParameterTypes.inferAll(namespace, local, written, heads::definition,
-                (name, error) -> { }), List.of(resolvedLocals, instantiations, namespace));
 
         // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
         // §3.3.3 cannot reach), and this loop runs outside the memoized getter that catches those -- so it
@@ -880,45 +864,6 @@ public final class SchemaResolver {
         }
         return chain.size() == type.supertypes().size() ? definition
                 : TypeChain.withChain(definition, type.chain().withSupertypes(List.copyOf(chain)));
-    }
-
-    /**
-     * What each declaration's parameter list wrote after a name ({@code <T: text>}), as the type-refs resolution
-     * uses, keyed by declaration then parameter.
-     */
-    private static Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> writtenParameterTypes(
-            Map<String, SchemaMap.Declaration> declarations, DefinitionResolver resolver, Problems problems) {
-        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written = new LinkedHashMap<>();
-        declarations.forEach((name, declaration) -> {
-            Map<String, io.ltr8.tson.schema.meta.TypeRef> types = new LinkedHashMap<>();
-            declaration.parameterTypes().forEach((parameter, ref) -> {
-                try {
-                    types.put(parameter, resolver.parameterType(parameter, ref));
-                } catch (SchemaValidationException e) {
-                    if (!problems.collecting()) {
-                        throw e;
-                    }
-                    problems.report(declaration, e);
-                }
-            });
-            if (!types.isEmpty()) {
-                written.put(name, types);
-            }
-        });
-        return written;
-    }
-
-    /**
-     * Stamps each local open entry's parameters ({@link ParameterTypes}) -- the entries {@code local} names -- in
-     * {@code resolvedLocals}, {@code instantiations} and {@code namespace} alike, so every view of an entry
-     * agrees.
-     */
-    private static void stampParameters(Map<String, Map<String, TemplateParam>> parameters,
-                                        List<Map<String, Top>> views) {
-        for (Map<String, Top> view : views) {
-            view.replaceAll((name, definition) -> parameters.containsKey(name)
-                    ? OpenEntry.withParameters(definition, parameters.get(name)) : definition);
-        }
     }
 
     /**

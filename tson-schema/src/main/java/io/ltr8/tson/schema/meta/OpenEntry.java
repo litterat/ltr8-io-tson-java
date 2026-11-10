@@ -67,7 +67,7 @@ public final class OpenEntry {
 
     /**
      * {@code value} with each parameter replaced by {@code settled}'s entry for it, where there is one -- how a
-     * parameter's inherited bound is stamped. A closed entry is returned as it is.
+     * declaration's written bounds are put on its parameters. A closed entry is returned as it is.
      */
     public static Top withParameters(Top value, Map<String, TemplateParam> settled) {
         return switch (value) {

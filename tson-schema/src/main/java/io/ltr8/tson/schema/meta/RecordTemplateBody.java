@@ -130,7 +130,7 @@ public record RecordTemplateBody(TypeChain chain, AnnotatedMap<String, RecordTem
         return new RecordTemplateBody(chain, fields, groups, extension, discriminators, nameType, parameters);
     }
 
-    /** This template with {@code parameters} replaced -- how a parameter's inherited bound is stamped. */
+    /** This template with {@code parameters} replaced -- how a declaration's written bounds are put on. */
     public RecordTemplateBody withParameters(List<TemplateParam> parameters) {
         return new RecordTemplateBody(chain, fields, groups, extension, discriminators, nameType, parameters);
     }

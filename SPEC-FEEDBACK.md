@@ -139,8 +139,21 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   differs per application is written where the application is declared,
   `created => response<order> & { status?: = 201 }`. Still as in Revision 39: a parameter at a construction's type
   slot (`<T> !meta.array { element_type: T }`), which the kernel's `set`, `meta.ref` and `tuple1` are until the
-  kernel moves, and bounds inherited by a fixed point. The rule that a parameter may not be spelled like a name an
-  absorbed field type writes no longer refuses anything the shadowing rule does not: every such name is an entry.
+  kernel moves. The rule that a parameter may not be spelled like a name an absorbed field type writes no longer
+  refuses anything the shadowing rule does not: every such name is an entry.
+- *§5.10, bounds: written, never inherited.* A parameter's bound is what its declaration writes, `<T: text>`, and is
+  otherwise absent; nothing about a parameter is inferred from its uses, so a parameter is known in full at its
+  declaration and no fixed point runs across templates. A parameter passed as an argument to a bounded parameter of
+  another template is written with a bound that IS-A that one, wherever it is an argument: a field type, an
+  application nested in one or inside container sugar (`[boxed<T>]`), an applied parent, an alias template's
+  target, a held construction's type slot. With `boxed => <T: text> { v: T }`, `rebox => <T: text> { b: boxed<T> }`
+  and `<T: non_empty_text>` resolve, `rebox => <T> { b: boxed<T> }` is a resolver error at `rebox` naming `boxed`'s
+  `T: text`, and `<T: int32>` stays refused. An imported template's recorded bound binds the same way, being the
+  one its author wrote. A parameter passed to a constructor's slot (`<K> { m: meta.namespace<K text> }`) needs no
+  bound: the slot judges the argument that arrives when the record is applied. A closed argument is judged against
+  the written bound as before; one in an application closed while declarations are still being made ready is judged
+  once every declaration is, since an argument is a name at a type position and orders nothing (§3.4.1), and is
+  reported at the declaration that wrote it.
 - *§4.2, an application in a data document: running.* In a data document a value at a reference-typed slot is a
   name. One carrying an argument list is a validation error whether or not the schema's closure closed that
   application, in both encodings: a constraint violation of the reference atom, whose message gives the remedy, the
@@ -173,4 +186,9 @@ type, or as an argument of an application there or in a parent. A parameter anyw
 declaration, naming the slot"; replace §5.7's "Open modifiers" with the rule that a value differing per application
 is written where the application is declared; delete §8.2's "Value arguments compare as values"; end §5.3's size
 bound at a decimal integer; make §12.1's and [TSON-DATA] §7.4's `type-arg` a reference; and rewrite §1.6's worked
-example, whose `flagged<status, 2>` carries a value argument. The text for the other steps follows as each lands.
+example, whose `flagged<status, 2>` carries a value argument. For bounds: replace §5.10's "A bound is inherited"
+paragraph with "**A bound is written.** A parameter passed as an argument to a parameter that has a bound MUST be
+written with a bound that IS-A it: `rebox => <T: text> boxed<T>`. `rebox => <T> boxed<T>` is a resolver error at
+`rebox`. No bound is inferred, so a parameter is known in full at its declaration", and delete the paragraph on an
+argument to another template settling by a fixed point and the "derived, never required of the author" framing of
+the parameter paragraph. The text for the other steps follows as each lands.

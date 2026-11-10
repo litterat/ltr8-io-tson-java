@@ -94,7 +94,7 @@ argument of an application is a parameter recognised by its text.
   (§5.10), and a head that is neither takes no arguments.
 - A slot that names the type of a value is typed `meta.type_ref` (`meta.tuple_element.element_type`,
   `meta.array.element_type`, `meta.map.key_type` and `value_type`,
-  `meta.namespace.value_type`, `meta.choice.variants`, `meta.template_param.type` and `bound`, `meta.alias.target`,
+  `meta.namespace.value_type`, `meta.choice.variants`, `meta.template_param.bound`, `meta.alias.target`,
   `meta.type_chain.parents`, and the `application` annotation), and so are `meta.reference_type.of` and the
   `meta.type_chain.supertypes` and `subtypes` indexes. Its value is a type's name, its path from the root, or, where an
   application is still open, a reference with arguments. `meta.type_name`, one identifier, is the schema map's key type and
@@ -125,8 +125,8 @@ argument of an application is a parameter recognised by its text.
 - `meta.top` is a member of `meta.type_ref`, `meta.ref<meta.product>` and `meta.ref<meta.record>`: a fresh abstract record
   IS-A nothing holds a value of `meta.record` by the one predicate. `EntryKind.isConstructor` answers a different question,
   applicability, and counts `meta.top` by name and origin.
-- A type parameter is one whose `type` is `meta.type_ref` (`TemplateParam.TYPE_REF`); a parameter standing at a
-  `meta.type_ref` slot is a type parameter (`ParameterTypes.typePosition`).
+- Every parameter is a type parameter, recording its name and the bound it is written with (`TemplateParam`); one
+  stands only at a slot naming a type or as an argument (`ParameterTypes`).
 - A kind-typed slot whose host component is a `TypeRef` reads through `TypeNameSlotReader`: a bare token through the
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the
   slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A `ReferenceEvent` is an application,
@@ -238,7 +238,7 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 | `meta.type_chain.parents`, `application` | reference, `meta.type_ref`, with arguments where open | namespace | a constructor or a record type for an operand; an open entry, a constructor or a parameter for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
 | `meta.type_chain.supertypes`, `subtypes` | index, `meta.type_ref` | — | — | link |
 | `meta.alias.target` | reference, `meta.type_ref` | namespace | any entry, type or constructor, by resolution; arguments only in an open alias's held text | `validateTypeRef` |
-| `meta.template_param.type`, `bound` | reference | namespace | `meta.type_ref`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
+| `meta.template_param.bound` | reference | namespace | `meta.type_ref`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
 | `meta.template.template` | parameters and applications as parsed | `parameters`, then namespace | §5.10's shadowing rule | `HeldBody` |
 | `meta.record_field.type`, `meta.record_template_field.type` | reference, or a sibling reference | namespace; enclosing `fields` for a sibling | `meta.field_type_ref`; a sibling by §5.2's rules | `validateTypeRef`, `DependentFields` |
 | `meta.tuple_element.element_type`, `meta.array.element_type`, `meta.map.key_type`, `meta.map.value_type`, `meta.namespace.value_type`, `meta.choice.variants` | reference | namespace | `meta.type_ref`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
