@@ -10,7 +10,6 @@ import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * Two imports' entries under one name that are one synthetic ([TSON-SCHEMA] §8.2): the rule both import merges apply,
@@ -61,19 +60,6 @@ public final class ImportedSynthetics {
                     + "the form alone): " + incumbent + " and " + arriving);
         }
         return true;
-    }
-
-    /**
-     * The facts of one synthetic reached through two imports: the incumbent's, with every application either side
-     * closed to it ({@link TsonSchema.EntryFacts#closes}). A form one document lifts directly and another reaches by
-     * closing a template's open synthetic closes different applications, and the importer resolves each of them.
-     */
-    public static TsonSchema.EntryFacts unified(TsonSchema.EntryFacts incumbent, TsonSchema.EntryFacts arriving) {
-        if (incumbent.closes().containsAll(arriving.closes())) {
-            return incumbent;
-        }
-        return incumbent.withCloses(Stream.concat(incumbent.closes().stream(), arriving.closes().stream())
-                .distinct().toList());
     }
 
     /**

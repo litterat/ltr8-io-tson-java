@@ -96,7 +96,7 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
 - **A dependent field is read against the type its sibling's value names** ([TSON-SCHEMA] §5.2;
   `DependentFieldReader`, built by `FieldReaders.declared` for a field typed `kind!`). It is `DeclaredReader`'s
   dispatch with the tag taken from the sibling: the named entry's reader, in the mode the schema compiled in, reads
-  the value, an application resolving through the sibling's reference (`ReferenceBody.entryOf`). The type is known
+  the value. The type is known
   when the reader reaches the field in one of three ways, and only the third orders the document:
   - **a pinned sibling**: the pin types the field wherever the sibling is written, or whether it is;
   - **a discriminator**: member dispatch selects a member before any field is read, and each member pins it;
@@ -115,15 +115,16 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   `Token` component's slot answers to it (`record_template_field.value` beside `type_param`). `RecordReader` is the same
   rule in JSON.
 
-  A sibling naming no type a value can be read against — a sibling reference, a template, an application the
-  closure does not hold — is refused at the sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and
-  the value is skipped unjudged; a sibling whose own read reported leaves the value skipped and nothing more. What a
-  sibling's value names is one rule, `DependentFieldReader.typeNamed`, which a value's name walked through a dependent
-  field asks too (`ValuesByName`). **In a schema document the value is held as written**, whatever its form, as the
-  schemaless tree (`SchemalessTreeReader.preserving()`, waiting on nothing, so `record_field` waits on no
-  entry for it), in either order of the fields, and so wherever names resolve in the document being read
-  (`readsSchemaNames`, a resolved form read as data among them): the type its sibling names is one of that document's
-  namespace, which the governing layer's readers do not hold. The record reader captures the value's events before reading it
+  A sibling naming no type a value can be read against — a sibling reference, a template, an application, which
+  names no entry where a value stands (§4.2) and which the sibling's own read refuses first — is refused at the
+  sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and the value is skipped unjudged; a
+  sibling whose own read reported leaves the value skipped and nothing more. What a sibling's value names is one
+  rule, `DependentFieldReader.typeNamed`, which a value's name walked through a dependent field asks too
+  (`ValuesByName`). **In a schema document the value is held as written**, whatever its form, as the schemaless tree
+  (`SchemalessTreeReader.preserving()`, waiting on nothing, so `record_field` waits on no entry for it), in either
+  order of the fields, and so wherever names resolve in the document being read (`readsSchemaNames`, a resolved form
+  read as data among them): the type its sibling names is one of that document's namespace, which the governing
+  layer's readers do not hold. The record reader captures the value's events before reading it
   (`TsonReadContext.asWritten`, a lookahead) for every field typed `kind!`, whatever reads it, a `Token` component's
   reader included, and once the record is read hands each to the read's sink with what its sibling holds
   (`RecordAbstractReader.Held`, `TsonReadContext.heldAsWritten`); the linker judges a value entry's

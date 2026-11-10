@@ -261,8 +261,6 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     throw new IllegalStateException("'" + displayName + "': dependent field '" + fields.get(i).name()
                             + "' names no field '" + dependent.sibling() + "'; the linker refuses one");
                 }
-                fields.set(i, new CompiledField(fields.get(i).name(), fields.get(i).schema(),
-                        dependent.forRecord(body)));
                 siblingOf[i] = at;
                 typesADependent[at] = true;
                 dependents = true;
@@ -745,8 +743,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 } else {
                     holds = null;
                 }
-                CompiledField declared = record.fields.get(sibling);
-                at[i].heldAsWritten(record.fields.get(i).name(), declared.name(), declared.schema(), holds,
+                at[i].heldAsWritten(record.fields.get(i).name(), record.fields.get(sibling).name(), holds,
                         written.get(i));
             }
         }

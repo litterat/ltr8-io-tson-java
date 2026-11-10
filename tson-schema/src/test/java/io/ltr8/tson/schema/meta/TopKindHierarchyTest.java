@@ -69,7 +69,7 @@ class TopKindHierarchyTest {
     @Test
     void aReferenceIsItsOf() {
         ReferenceBody linked = ReferenceBody.of("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of(),
-                Map.of(), Map.of(), List.of("stock_id", "customer_id"));
+                List.of("stock_id", "customer_id"));
 
         assertEquals(ReferenceBody.of("uuid_type"), linked);
         assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
@@ -87,20 +87,19 @@ class TopKindHierarchyTest {
     }
 
     /**
-     * An application resolves by the identity [TSON-SCHEMA] §8.2 gives it: each argument past its alias chain, a
-     * nested one first to the entry it closed to. Over {@code user_id => uuid} and {@code uid => user_id}, {@code
-     * box<user_id>} is {@code box<uuid>} and {@code box<box<uid>>} is {@code box<box<uuid>>}; a name that is no alias
-     * is compared as itself.
+     * A reference read in data is a name ([TSON-SCHEMA] §4.2): it finds the entry its name names in the closure the
+     * reference was linked over, and an application, which names no entry there, finds nothing.
      */
     @Test
-    void anApplicationIsResolvedPastItsArgumentsAliases() {
-        ReferenceBody linked = ReferenceBody.of("type").linked(true, List.of("boxed", "nested"),
-                Map.of(box(TypeRef.of("uuid")), "boxed", box(TypeRef.of("boxed")), "nested"),
-                Map.of("user_id", "uuid", "uid", "uuid"), Map.of(), List.of());
+    void aReadReferenceFindsTheEntryItsNameNames() {
+        Top boxed = new Alias(TypeRef.of("text"));
+        TypeRef.Closure closure = ReferenceBody.of("type").linked(true, List.of("boxed"), Map.of("boxed", boxed),
+                List.of("boxed")).closure();
 
-        assertEquals(Optional.of("boxed"), linked.entryOf(box(TypeRef.of("user_id"))));
-        assertEquals(Optional.of("nested"), linked.entryOf(box(box(TypeRef.of("uid")))));
-        assertEquals(Optional.empty(), linked.entryOf(box(TypeRef.of("order_id"))));
+        assertEquals(Optional.of(boxed), closure.referentOf(TypeRef.of("boxed")));
+        assertEquals(Optional.empty(), closure.referentOf(TypeRef.of("nowhere")));
+        assertEquals(Optional.empty(), closure.referentOf(box(TypeRef.of("text"))));
+        assertEquals(Optional.empty(), ReferenceBody.of("type").closure().referentOf(TypeRef.of("boxed")));
     }
 
     private static TypeRef box(TypeRef argument) {

@@ -295,7 +295,7 @@ The same walk judges two more names, so one rule decides what a value's name rea
 A value entry's payload is read by the governing layer's readers, and the type a dependent field's sibling names
 (`kind: server`) is one of the reading schema's namespace, which those readers do not hold. So the read holds the value
 as written, whatever its form, and the record reader hands its events, with what the sibling holds in that instance
-(pin, written value or default) and the sibling's declaration, to the read's sink (`TsonReadContext.heldAsWritten`,
+(pin, written value or default) and the sibling's name, to the read's sink (`TsonReadContext.heldAsWritten`,
 `TsonSchema.HeldValue`). The resolver keeps them for value entries only (`TsonSchema.heldValues`); a construction's,
 the kernel's `record_field.value` among them, is judged as a default or pin by `checkFieldValue`.
 

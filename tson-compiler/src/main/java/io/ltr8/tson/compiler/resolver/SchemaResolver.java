@@ -632,7 +632,7 @@ public final class SchemaResolver {
             }
         }
         // Every application closed to an entry of this schema, an expansion's included, kept with the entry's facts
-        // for a data read to resolve an application by structural identity (TsonSchema.EntryFacts.closes).
+        // for a message to name an expansion by the application that closed to it (TsonSchema.EntryFacts.closes).
         Map<String, List<io.ltr8.tson.schema.meta.TypeRef>> closes = new LinkedHashMap<>();
         materialiser.closedApplications().forEach((application, entry) -> closes
                 .computeIfAbsent(mergedNames.getOrDefault(entry, entry), ignored -> new ArrayList<>())
@@ -1363,7 +1363,6 @@ public final class SchemaResolver {
                                     + "one of them, or a version of each that agrees on where '" + name
                                     + "' is declared");
                         }
-                        facts.put(name, ImportedSynthetics.unified(facts.get(name), arriving));
                     }
                     continue;
                 }

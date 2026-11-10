@@ -576,26 +576,24 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A kind may hold an applied type, judged through the entry the closure closed it to: {@code unique =>
-     * set<text>} is a type, and no type built with {@code uuid_type} ([TSON-SCHEMA] §4.2, §7.4). TSON writes the
-     * reference unquoted, as data grammar; JSON, having no unquoted form, writes the same text as a string.
+     * A kind names a declared application by its entry, and a data document's reference is a name, so an application
+     * is refused whether or not the schema closes it ([TSON-SCHEMA] §4.2): {@code unique => set<text>} is named
+     * {@code unique}, and {@code set<text>}, {@code set<label>} and {@code set<int32>} are each refused, on one code at
+     * one pointer. TSON writes the reference unquoted, as data grammar; JSON, having no unquoted form, writes the same
+     * text as a string, and the two are one rule ([TSON-JSON] §5.6).
      */
     @Test
-    void anApplicationAtAKindIsJudgedThroughItsEntryByBoth() {
-        bothAccept("typed", "{ t: set< text > }", """
-                {"t": "set<text>"}""");
+    void anApplicationAtAKindIsRefusedByBoth() {
+        bothAccept("typed", "{ t: unique }", """
+                {"t": "unique"}""");
+        for (String application : List.of("set< text >", "set<label>", "set<int32>")) {
+            sameVerdict("typed", "{ t: " + application + " }", """
+                    {"t": "%s"}""".formatted(application));
+            assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/t")),
+                    tson("typed", "{ t: " + application + " }"), application);
+        }
         sameVerdict("ided", "{ id: set<text> }", """
                 {"id": "set<text>"}""");
-    }
-
-    /**
-     * An argument is compared past its alias chain ([TSON-SCHEMA] §8.2): over {@code label => text}, {@code set<label>}
-     * is {@code set<text>}, which the schema closes as {@code unique}, in either encoding.
-     */
-    @Test
-    void anAliasedArgumentAtAKindIsJudgedThroughItsEntryByBoth() {
-        bothAccept("typed", "{ t: set<label> }", """
-                {"t": "set<label>"}""");
     }
 
     /**

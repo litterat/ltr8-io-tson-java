@@ -10,12 +10,10 @@ is why they are the linker's. Current form only; history lives in git.
   or IS-A it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling,
   which is one, `meta.ref<T>`: `meta.ref<meta.record>` holds type names, and `meta.ref<api>`, over a type that is no
   constructor, names values (`ValuesByName`, `design/references.md`).
-- Every reference's derived `index` (`Index(namesTypes, members, applications, aliases, entries, shown, values)`: the
-  members sorted; the entry each application the closure closed denotes, every `@meta.application` and every entry's
-  `TsonSchema.EntryFacts.closes`, expansions included; each alias entry to the end of its chain, which a data
-  application's arguments are compared past (§8.2); the final namespace's entries, which a reference read in data
-  names through `ReferenceBody.closure()`; and the members as a message shows them, a minted one by its application
-  through `EntryDisplayName.authored`, one with no spelling left out) is recomputed for **every** reference in the
+- Every reference's derived `index` (`Index(namesTypes, members, entries, shown, values)`: the members sorted; the
+  final namespace's entries, which a name read in data finds through `ReferenceBody.closure()`; and the members as a
+  message lists them, the names an author writes, a minted entry, `@meta.synthetic`, left out, since data names no
+  application and never a name nobody wrote) is recomputed for **every** reference in the
   closure, imports included (`TsonSchemaLinker.computeKinds`), and never trusted from a body. It is `@Unbound` and
   never written: a resolved form states `!meta.reference_type { of: … }` alone, and a written `members:` is refused as an
   unknown field.
@@ -109,19 +107,20 @@ that names values gets `namesTypes` false and no members.
   the kernel's `enum => meta.enum_type ^ { name_type?: = meta.identifier }` is a member at the kernel's link, a schema's pin
   of its own `text_identifier` at that schema's, and a pin of a text family is refused where it is written.
 - **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers.forRead`'s
-  `KindParser`, an `AtomTypeParser<TypeRef>`): a name token, a reference with arguments, or a JSON string holding
-  either, read into the `TypeRef` it is and naming a member of the linked index, an application through the entry it
-  denotes (`design/references.md`). A name without arguments is judged as one name, its path from the root
+  `TypeNameRefParser`, an `AtomTypeParser<Reference>`): a name token, or a JSON string holding one, read into the
+  `TypeRef` it is and naming a member of the linked index. In a data document a reference is a name, so a reference
+  with arguments, unquoted in text or in a JSON string, is refused whether or not the closure closes it
+  (`design/references.md`). A name is judged as one name, its path from the root
   (`geo.address`), each segment read into its normalization form as `meta.type_name` reads an identifier. The value is the
   `TypeRef`, carrying the closure its `referent()` resolves in, in a tree read as in a bind; a `String` host receives
   its canonical text. That is every data document's reading, whatever it imports: a data document importing only temporal.tn
   that writes `!meta.record_field { type: int32 }` is refused, `int32` being numeric.tn's. In a **schema document** a name
   resolves in the schema being resolved, which the reading closure does not hold, so the reader checks the grammar alone
-  (`AtomParsers.inSchemaDocument`, `KindParser.namesOnly`) and `AtomTypeReader` records the name for that schema's link
-  to judge. A schema document is a construction's or a value entry's payload, which the resolver reads
-  (`TsonReadContext.readsSchemaDocument`), or a value of the kernel's `meta.schema` read as data, a resolved form
-  (`readsSchemaNames`, set by the reader `TsonSchemaCompiler` builds for the kernel's `meta.schema` entry), whose names
-  ingest judges. That is what lets a resolved form naming a user's own name type read back.
+  (`AtomParsers.inSchemaDocument`, `TypeNameRefParser.namesOnly`), an application included, and `AtomTypeReader`
+  records the name for that schema's link to judge. A schema document is a construction's or a value entry's
+  payload, which the resolver reads (`TsonReadContext.readsSchemaDocument`), or a value of the kernel's `meta.schema`
+  read as data, a resolved form (`readsSchemaNames`, set by the reader `TsonSchemaCompiler` builds for the kernel's
+  `meta.schema` entry), whose names ingest judges. That is what lets a resolved form naming a user's own name type read back.
 
 ## What a name type is (`NameType`)
 

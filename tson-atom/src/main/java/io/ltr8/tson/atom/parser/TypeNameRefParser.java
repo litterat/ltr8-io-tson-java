@@ -15,19 +15,20 @@ import java.util.Optional;
 
 /**
  * Parses and validates against a reference that names types -- an instance of the kernel's {@code reference}
- * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, {@code meta.ref<record>}. A value is a type's name or an
- * application, read by {@link ReferenceGrammar} into the {@link TypeRef} it is, and then judged a member: the entry it
- * denotes must be one of the reference's linked members. The value is the reference, never a value of the type it
- * names; a reader rolls a name token or a reference's tree into the one text this reads.
+ * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, {@code meta.ref<record>}. A value is read by {@link
+ * ReferenceGrammar} into the {@link Reference} it is, and then judged a member: the name must be one of the
+ * reference's linked members. The value is the reference, never a value of the type it names; a reader rolls a name
+ * token or a reference's tree into the one text this reads.
  *
  * <p><b>The value finds what it names.</b> A reference read here carries the closure the members were computed over
- * ({@link ReferenceBody#closure}), so {@link TypeRef#referent} answers with the entry it denotes.
+ * ({@link ReferenceBody#closure}), so {@link TypeRef#referent} answers with the entry it names.
  *
- * <p><b>An application is judged through the entry it denotes</b>, resolved bottom-up, level by level, against the
- * applications the closure closed ({@link ReferenceBody#entryOf}). A schema loads only when every application in it
- * closes, so data never creates one: an application nothing in the closure closed names no type and is refused, as a
- * name no member is. A type's name is its path from the root, {@code order} or {@code geo.address} for a member of a
- * schema map nested as an entry, and is judged as one name.
+ * <p><b>In a data document a reference is a name</b> ([TSON-SCHEMA] §4.2). An application, a reference carrying an
+ * argument list ({@code set<text>}), is refused as a constraint the value breaks, whether or not the schema closes it:
+ * the author names the entry the schema declares for it ({@code names => set<text>}, then {@code names}). The grammar
+ * still reads one, so the refusal is a validation error and not a parse error. A type's name is its path from the
+ * root, {@code order} or {@code geo.address} for a member of a schema map nested as an entry, and is judged as one
+ * name.
  *
  * <p><b>Membership is judged where the names resolve.</b> A kind's members are the names of the reading
  * document's closure, so a name a data document writes is a member or refused here, as an enum refuses a label it
@@ -78,15 +79,16 @@ public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) imple
         if (!judgesMembers) {
             return reference;
         }
-        TypeRef read = reference;
-        String entry = kind.entryOf(read).orElseThrow(() -> new AtomValidationException("'" + read.text()
-                + "' names no type this schema closes -- an application in data names the entry the schema closed "
-                + "it to, and nothing in this closure applies it; one of " + kind.shownMembers(),
-                "one of (" + String.join(", ", kind.shownMembers()) + ")"));
-        if (kind.memberNames().contains(entry)) {
+        if (!reference.arguments().isEmpty()) {
+            // A position rule, as the sibling reference's above: the value is well formed, and data names an entry.
+            throw new AtomValidationException("'" + reference.text() + "' is an application, and in a data document a "
+                    + "reference is a name ([TSON-SCHEMA] §4.2) -- name the entry the schema declares for it "
+                    + "(order_page => page<order>, then order_page); one of " + kind.shownMembers(),
+                    "one of (" + String.join(", ", kind.shownMembers()) + ")");
+        }
+        if (kind.memberNames().contains(reference.name())) {
             return reference.withClosure(kind.closure());
         }
-        // An application is named as written, never by the entry minted for it.
         throw new AtomValidationException("'" + reference.text() + "' is not a member of this kind -- expected the "
                 + "name of a type whose value IS-A '" + kind.of().text() + "', one of " + kind.shownMembers(),
                 "one of (" + String.join(", ", kind.shownMembers()) + ")");

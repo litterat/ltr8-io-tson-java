@@ -58,24 +58,18 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling")
 
     /**
      * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are types,
-     * and the members where it does -- the names of the closure the slot admits, sorted -- with the entry each application
-     * the closure closed denotes, an expansion's included, so a value written as an application is judged through the entry
-     * it names, each alias entry of the closure to the entry at the end of its chain, which an argument written as an alias
-     * is followed to ({@link #entryOf}), and the closure's entries, which a reference read here names ({@link #closure}).
-     * {@code shown} is the members as a message names them: a minted entry by the application that closed to it, as written,
-     * and one with no spelling left out. {@code values}, for a reference that names values, is what a qualified name reaches
-     * in that closure ({@link Values}); empty for one that names types, and for a link of a resolution in progress, whose
-     * pending entries hold no value yet.
+     * and the members where it does -- the names of the closure the slot admits, sorted -- with the closure's entries,
+     * which a name read here finds its referent in ({@link #closure}). {@code shown} is the members as a message lists
+     * them: the names an author writes, a minted entry, which no author named, left out. {@code values}, for a reference
+     * that names values, is what a qualified name reaches in that closure ({@link Values}); empty for one that names
+     * types, and for a link of a resolution in progress, whose pending entries hold no value yet.
      */
-    public record Index(boolean namesTypes, List<String> members, Map<TypeRef, String> applications,
-                        Map<String, String> aliases, Map<String, Top> entries, List<String> shown,
+    public record Index(boolean namesTypes, List<String> members, Map<String, Top> entries, List<String> shown,
                         @Unbound Optional<Values> values) {
 
         public Index {
             members = List.copyOf(members);
             shown = List.copyOf(shown);
-            applications = Map.copyOf(applications);
-            aliases = Map.copyOf(aliases);
             Objects.requireNonNull(entries, "entries");
             Objects.requireNonNull(values, "values");
         }
@@ -132,25 +126,17 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling")
         return new ReferenceBody(chain, of, allowSibling, index);
     }
 
-    /**
-     * This reference with its derived index: {@code namesTypes}, the members sorted, the closure's applications, its
-     * alias entries each to the end of its chain, and its entries.
-     */
-    public ReferenceBody linked(boolean namesTypes, List<String> members, Map<TypeRef, String> applications,
-                                Map<String, String> aliases, Map<String, Top> entries, List<String> shown) {
-        return linked(namesTypes, members, applications, aliases, entries, shown, Optional.empty());
+    /** This reference with its derived index: {@code namesTypes}, the members sorted, its entries and the shown names. */
+    public ReferenceBody linked(boolean namesTypes, List<String> members, Map<String, Top> entries,
+                                List<String> shown) {
+        return linked(namesTypes, members, entries, shown, Optional.empty());
     }
 
-    /**
-     * {@link #linked(boolean, List, Map, Map, Map, List)} with what a name this reference holds reaches ({@link
-     * Values}).
-     */
-    public ReferenceBody linked(boolean namesTypes, List<String> members, Map<TypeRef, String> applications,
-                                Map<String, String> aliases, Map<String, Top> entries, List<String> shown,
-                                Optional<Values> values) {
+    /** {@link #linked(boolean, List, Map, List)} with what a name this reference holds reaches ({@link Values}). */
+    public ReferenceBody linked(boolean namesTypes, List<String> members, Map<String, Top> entries,
+                                List<String> shown, Optional<Values> values) {
         return new ReferenceBody(chain, of, allowSibling, Optional.of(new Index(namesTypes,
-                members.stream().sorted().toList(), applications, aliases, entries, shown.stream().sorted().toList(),
-                values)));
+                members.stream().sorted().toList(), entries, shown.stream().sorted().toList(), values)));
     }
 
     /**
@@ -174,57 +160,20 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling")
         return index.map(Index::members).orElse(List.of());
     }
 
-    /** The members as a message names them -- a minted one by its application ({@link Index#shown}). */
+    /** The members as a message lists them: the names an author writes ({@link Index#shown}). */
     public List<String> shownMembers() {
         return index.map(Index::shown).orElse(List.of());
     }
 
     /**
-     * The entry {@code reference} denotes in the closure this reference was linked over: a name is its own entry, and
-     * an application resolves bottom-up by structural identity ([TSON-SCHEMA] §8.2) -- each argument that is itself an
-     * application first, to the entry the closure closed it to, then the application over those entries, against
-     * the applications the closure closed. Each argument is compared after following its alias chain, as §8.2
-     * compares an application's arguments, so over {@code user_id => uuid} the data reference {@code box<user_id>}
-     * denotes what {@code box<uuid>} does: the key resolution recorded for every application it closed. Empty where
-     * nothing in the closure closed it.
-     */
-    public Optional<String> entryOf(TypeRef reference) {
-        if (index.isEmpty()) {
-            return Optional.empty();
-        }
-        if (reference.arguments().isEmpty()) {
-            return Optional.of(reference.name());
-        }
-        Map<TypeRef, String> applications = index.get().applications();
-        String direct = applications.get(reference);
-        if (direct != null) {
-            return Optional.of(direct);
-        }
-        List<TypeArgument> closed = new ArrayList<>(reference.arguments().size());
-        for (TypeArgument argument : reference.arguments()) {
-            if (argument instanceof TypeArgument.Ref nested) {
-                Optional<String> inner = nested.ref().arguments().isEmpty()
-                        ? Optional.of(nested.ref().name()) : entryOf(nested.ref());
-                if (inner.isEmpty()) {
-                    return Optional.empty();
-                }
-                closed.add(new TypeArgument.Ref(TypeRef.of(index.get().aliases().getOrDefault(inner.get(),
-                        inner.get()))));
-            } else {
-                closed.add(argument);
-            }
-        }
-        return Optional.ofNullable(applications.get(TypeRef.of(reference.name(), closed)));
-    }
-
-    /**
-     * The closure a reference read against this one finds its referent in ({@link TypeRef#referent}): the value of
-     * the entry it denotes ({@link #entryOf}), over the entries the linker indexed. {@link TypeRef.Closure#NONE}
-     * where this reference is not linked.
+     * The closure a reference read against this one finds its referent in ({@link TypeRef#referent}): the value of the
+     * entry its name names, over the entries the linker indexed. Data holds a reference as a name ([TSON-SCHEMA] §4.2),
+     * so one carrying arguments names nothing here. {@link TypeRef.Closure#NONE} where this reference is not linked.
      */
     public TypeRef.Closure closure() {
-        return index.<TypeRef.Closure>map(found -> reference -> entryOf(reference)
-                .map(found.entries()::get).map(Object.class::cast)).orElse(TypeRef.Closure.NONE);
+        return index.<TypeRef.Closure>map(found -> reference -> reference.arguments().isEmpty()
+                ? Optional.<Object>ofNullable(found.entries().get(reference.name())) : Optional.empty())
+                .orElse(TypeRef.Closure.NONE);
     }
 
     /**

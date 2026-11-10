@@ -29,8 +29,8 @@ import java.util.List;
  * slot it fills ({@code [meta.ref<record>]} fills {@code element_type} with {@code meta.ref<record>}), which the
  * resolver closes afterwards and judges the name that replaces it. In a value body
  * ({@link TsonReadContext#readsValueBody()}) nothing lifts or mints, so an application is refused and the alias
- * spelling named ([TSON-SCHEMA] §5.6). In a data document the kind's reader judges an application through the entry the
- * closure closed it to, and refuses one nothing in the closure closed. A quoted token is never a reference.
+ * spelling named ([TSON-SCHEMA] §5.6). In a data document a reference is a name ([TSON-SCHEMA] §4.2): the kind's reader
+ * refuses an application, whether or not the schema closes it. A quoted token is never a reference.
  *
  * <p><b>The component's class states the position rule</b> ([TSON-SCHEMA] §5.2), as the reference's {@code
  * allow_sibling} states it in tree mode: a sibling reference ({@code kind!}) stands only at a record field's type, the
@@ -76,7 +76,7 @@ final class TypeNameSlotReader implements TsonTypeReader<Reference> {
         }
         if (ctx.peek() instanceof ReferenceEvent reference) {
             if (!ctx.readsSchemaNames()) {
-                // A data document: the kind's reader judges the application through the entry it denotes.
+                // A data document: the kind's reader refuses the application, as the encodings share that rule.
                 return withAnnotations(kind.read(ctx), annotations);
             }
             if (!ctx.readsValueBody()) {
@@ -90,7 +90,8 @@ final class TypeNameSlotReader implements TsonTypeReader<Reference> {
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a type's name, found " + found
                 + " -- a position typed by a kind holds the name of a type, one bare token"
                 + (ctx.readsValueBody() ? "; to name an application here, declare an alias for it (order_box => "
-                        + "box<order>) and write its name" : ", or an application (box<order>)"),
+                        + "box<order>) and write its name" : ctx.readsSchemaNames() ? ", or an application (box<order>)"
+                        : ""),
                 "a type's name", found);
         EventSkip.annotationsAndTypeRef(ctx);
         EventSkip.coreValue(ctx);

@@ -8,10 +8,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -31,7 +28,7 @@ import java.util.function.Function;
  *
  * <p><b>The sibling's value names a type a value can be read against</b>, or the value is not read: a sibling
  * reference names a field and no type, a template is no type until it is applied and reading never starts a
- * materialisation, and an application the closure does not hold names nothing. Each is refused naming the sibling,
+ * materialisation, and an application names no entry. Each is refused naming the sibling,
  * since that is the value the author has to change; the dependent value is skipped unjudged. The rule is {@link
  * #typeNamed}, which a value's qualified name going on through a dependent field is judged by too ({@code
  * ValuesByName}).
@@ -60,64 +57,29 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
     /** What a schema document holds the value as: the schemaless tree, its type-refs kept as written. */
     private static final SchemalessTreeReader HELD = SchemalessTreeReader.preserving();
 
-    /**
-     * The reference typing the sibling, past its alias hops, which an application the sibling's value writes is
-     * resolved through to the entry it denotes ({@link ReferenceBody#entryOf}); null until {@link #forRecord}.
-     */
-    private final ReferenceBody siblingType;
-
     DependentFieldReader(String field, String sibling, TsonTypeReaderResolver readers, ValueReaderContext context) {
-        this(field, sibling, readers, context, null);
-    }
-
-    private DependentFieldReader(String field, String sibling, TsonTypeReaderResolver readers,
-                                 ValueReaderContext context, ReferenceBody siblingType) {
         this.field = field;
         this.sibling = sibling;
         this.readers = readers;
         this.context = context;
-        this.siblingType = siblingType;
-    }
-
-    /** This reader within {@code record}, its sibling's reference found -- what the record reader holds. */
-    DependentFieldReader forRecord(RecordBody record) {
-        RecordField declared = record.fields().get(sibling);
-        if (declared == null || context == null) {
-            return this;
-        }
-        return new DependentFieldReader(field, sibling, readers, context,
-                siblingType(declared, context.schema().entries()::get));
-    }
-
-    /**
-     * The reference typing the sibling {@code declared}, past its alias hops in {@code entries}: what an application
-     * the sibling's value writes resolves through ({@link #typeNamed}). Null where the sibling is typed by no
-     * reference, which the linker refuses.
-     */
-    public static ReferenceBody siblingType(RecordField declared, Function<String, ? extends Top> entries) {
-        if (!(declared.type() instanceof TypeRef type)) {
-            return null;
-        }
-        return entries.apply(AliasChain.terminal(type.name(), entries)) instanceof ReferenceBody reference
-                ? reference : null;
     }
 
     /**
      * What a sibling holding {@code named} types its dependent field by: the entry a value is read against, or why
-     * there is none. {@code siblingType} resolves an application ({@link #siblingType}), and {@code entries} is the
-     * namespace the entry is found in, null where none is known and the entry is taken as named.
+     * there is none. {@code entries} is the namespace the entry is found in, null where none is known and the entry is
+     * taken as named. A value holds a reference as a name ([TSON-SCHEMA] §4.2), so an application names no entry: the
+     * sibling's own read refuses one first, and this answers the same where a held value is judged.
      */
-    public static TypeNamed typeNamed(Reference named, ReferenceBody siblingType,
-                                      Function<String, ? extends Top> entries) {
+    public static TypeNamed typeNamed(Reference named, Function<String, ? extends Top> entries) {
         return switch (named) {
             case SiblingRef reference -> new TypeNamed.None("the sibling reference '" + reference.text()
                     + "', which names a field and no type");
             case TypeRef reference -> {
-                String entry = reference.arguments().isEmpty() ? reference.name()
-                        : siblingType == null ? null : siblingType.entryOf(reference).orElse(null);
-                if (entry == null) {
-                    yield new TypeNamed.None("'" + reference.text() + "', which names no type this schema closes");
+                if (!reference.arguments().isEmpty()) {
+                    yield new TypeNamed.None("'" + reference.text() + "', an application, where a value names the "
+                            + "entry declared for one");
                 }
+                String entry = reference.name();
                 Top body = entries == null ? null : entries.apply(AliasChain.terminal(entry, entries));
                 if (entries != null && body == null) {
                     yield new TypeNamed.None("'" + reference.text() + "', which names no type of this schema");
@@ -170,7 +132,7 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
             TsonReadContext.skipUnjudged(ctx);
             return null;
         }
-        return switch (typeNamed(named, siblingType, context == null ? null : context.schema().entries()::get)) {
+        return switch (typeNamed(named, context == null ? null : context.schema().entries()::get)) {
             case TypeNamed.Entry entry -> readers.resolve(entry.name()).read(ctx);
             case TypeNamed.None none -> {
                 siblingCtx.report(rules.siblingNamesNoType(sibling, field, none.held(), named.text()));
