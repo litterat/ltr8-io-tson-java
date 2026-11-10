@@ -64,7 +64,7 @@ class MetaKernelSchemaRegistryTest {
         // member set is not among them: `meta.enum_set` is a declaration the fixture writes, since `set` has no sugar
         // of its own, and nor is `record.fields`, the fixture's own ordered `field_map`.
         Set<String> expectedHeads = Set.of("array_array_text_1", "array_text_1",
-                "array_type_ref", "array_template_param", "array_template_param_1", "array_field_group");
+                "array_type_ref", "array_param_1", "array_field_group");
         Set<String> syntheticNames = new HashSet<>(linked.schema().entries().keySet());
         syntheticNames.removeIf(name -> expectedHeads.stream().noneMatch(head -> name.startsWith(head + "_")));
         assertEquals(expectedHeads.size(), syntheticNames.size(), syntheticNames.toString());
@@ -114,8 +114,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.imports(), linked.schema().imports());
-        assertEquals(94, raw.entries().size());
-        assertEquals(94, linked.schema().entries().size());
+        assertEquals(87, raw.entries().size());
+        assertEquals(87, linked.schema().entries().size());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));
@@ -145,7 +145,7 @@ class MetaKernelSchemaRegistryTest {
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(94, registered.schema().entries().size());
+        assertEquals(87, registered.schema().entries().size());
         assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }

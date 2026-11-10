@@ -35,7 +35,7 @@ class SyntheticEntryNamingTest {
             !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               order => { id: text }
-              paged => <T> { items: [T; 1..] }
+              paged => <T> { items: [T] }
               order_response => paged<order>
               tag_list => [text; 1..2]
               holder => {
@@ -146,7 +146,7 @@ class SyntheticEntryNamingTest {
      */
     @Test
     void thePointerRootsAtTheNameTheReadEnteredThrough() {
-        Diagnostic problem = onlyDiagnostic("!order_response { items: [] }");
+        Diagnostic problem = onlyDiagnostic("!order_response { items: 3 }");
 
         assertEquals(Optional.of("/order_response/items"), problem.schemaPointer());
     }
@@ -158,11 +158,11 @@ class SyntheticEntryNamingTest {
      */
     @Test
     void aTemplateDerivedProblemStillNamesALineTheAuthorCanOpen() {
-        assertTrue(onlyDiagnostic("!order_response { items: [] }").schemaPosition().isPresent(),
+        assertTrue(onlyDiagnostic("!order_response { items: 3 }").schemaPosition().isPresent(),
                 "the alias's own declaration");
         assertTrue(onlyDiagnostic("!holder { tags: [\"a\"]  inline: [{ id: \"1\" } { id: \"2\" }]  "
                         + "ix: { \"k\" => { id: \"1\" } }  pair: [\"a\" 1]  pick: \"x\"  "
-                        + "page: { items: [] } }")
+                        + "page: { items: 3 } }")
                         .schemaPosition().isPresent(),
                 "the enclosing record's own declaration");
     }

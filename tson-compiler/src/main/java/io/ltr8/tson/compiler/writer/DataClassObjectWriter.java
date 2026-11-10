@@ -44,7 +44,7 @@ import java.util.Map;
  *
  * <p>Two callers need exactly that. {@code TsonObjectWriter} puts a document around it, and the schema
  * resolver writes a wire record and immediately parses it back -- {@code DefinitionResolver}'s atom
- * refinement merge and {@code HeldBody}'s held template body -- where a header would be content the parse
+ * refinement merge and {@code WireForm}'s annotation values -- where a header would be content the parse
  * would then have to strip. That second caller is also why this is not simply {@code TsonObjectWriter}'s
  * private half: a resolver reaching for the facade would make the engine's own module depend on the front
  * door built over it.
@@ -134,11 +134,10 @@ public final class DataClassObjectWriter {
      * #writeUnion}, naming the member it dispatched to -- has to place it between the annotations and the
      * core. Without somewhere to hand it in, such a caller must emit the annotations, the type-ref and the
      * core itself, which means reproducing everything above them: the bridge unwrap, the annotated box, the
-     * parsed-value case. Reproducing part of it is the failure that shape invites, and it is not hypothetical
-     * -- a held template body unwrapped by a caller's own copy of the bridge step reaches {@link #writeCore}
-     * as an ordinary record and renders {@code !recordvalue { fields: [ ... ] }}, the description the branch
-     * below exists to prevent. With the seam there is nothing to reproduce, and a branch added here is seen by
-     * every caller.
+     * parsed-value case. Reproducing part of it is the failure that shape invites: a parsed value unwrapped by a
+     * caller's own copy of the bridge step reaches {@link #writeCore} as an ordinary record and renders {@code
+     * !recordvalue { fields: [ ... ] }}, the description the branch below exists to prevent. With the seam there is
+     * nothing to reproduce, and a branch added here is seen by every caller.
      */
     private void write(Object value, DataClass dataClass, TsonDataEmitter writer, String typeRef)
             throws DataBindException {
@@ -214,10 +213,9 @@ public final class DataClassObjectWriter {
                 // written as the syntax it is (AstWriter). The rule is about the AST rather than about the one
                 // body that holds one, so anything carrying a parsed value writes correctly.
                 //
-                // Asked *after* the bridge, so an `@Transparent` wrapper over a parsed value reaches it: a
-                // held template body is exactly that, and unwrapping into the ordinary record path instead
-                // would write the description this branch exists to prevent. No other bridge produces one, so
-                // nothing else observes the order.
+                // Asked *after* the bridge, so an `@Transparent` wrapper over a parsed value reaches it:
+                // unwrapping into the ordinary record path instead would write the description this branch
+                // exists to prevent.
                 //
                 // A type-ref here is written rather than dropped, so that a caller offering one against a
                 // value that already carries its own head meets the emitter's at-most-one refusal instead of

@@ -17,7 +17,8 @@ import java.util.List;
  * {@code head_arg_arg_hash}, "a readable head plus a structural hash".
  *
  * <p><b>Two families, not one.</b> A <em>binding record</em> names a closed form -- what a sugar form lifts
- * to, and what closing an open synthetic produces -- and is rendered with its fields under their own names.
+ * to, what a construction builds, and the record an open record's application closes to -- and is rendered with
+ * its fields under their own names.
  * An <em>application</em> names an instantiation and is rendered positionally. The two are deliberately
  * separate functions over separate shapes; merging them would be merging two questions that happen to share
  * a spelling, and they reuse the same tag letters in different roles.

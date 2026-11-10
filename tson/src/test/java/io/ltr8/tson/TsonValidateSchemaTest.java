@@ -62,19 +62,19 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * <b>A parameter inside a collection-valued slot is ordinary</b> (§5.10). An open entry's body is held,
-     * uninterpreted until materialisation substitutes, so a parameter in {@code variants} or {@code elements}
-     * is a token inside an array and the phase that would have had to classify it does not run --
-     * "collection-valued slots are parameterizable", with {@code result => <T> ( T | error )} as the
-     * spec's own example and this test's flagship case.
+     * <b>A parameter inside a collection-valued slot is refused</b> (§5.10): a choice's variants and a tuple's
+     * elements are a list, not reference fields, so a choice or a tuple over a parameter is no reference -- as a
+     * template's whole body, or inside an open record. Each is one diagnostic against the declaration.
      */
     @ParameterizedTest
     @ValueSource(strings = {
-            "{ result => <T> ( T | error )  use => result<text>  error => { code: text } }",  // §5.4 variants
-            "{ box => <T> { v: (T | text) }  use => box<int32> }",                            // ... nested
-            "{ pair => <T> [T, text]  use => pair<int32> }"})                                 // tuple elements
-    void aParameterInACollectionSlotIsOrdinary(String body) {
-        assertEquals(List.of(), check(body));
+            "{ result => <T> ( T | error )  error => { code: text } }",  // §5.4 variants, as the body
+            "{ box => <T> { v: (T | text) } }",                           // ... inside an open record
+            "{ pair => <T> [T, text] }"})                                 // tuple elements
+    void aParameterInACollectionSlotIsRefused(String body) {
+        List<Diagnostic> problems = check(body);
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
     }
 
     /**
@@ -128,25 +128,13 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * Every template shape holds its body, so every one of them defers the same way -- and the trail inside
-     * the message ({@code field 'w'}, {@code element[1]}, {@code variant[1]}) transfers to the declaration
-     * unchanged, a closed body being the template's own with its parameters replaced.
-     *
-     * <p>The <b>alias</b> case is the one that decides how this is implemented. {@code half<text>} composes
-     * to {@code pair<no_such_type, text>} and mints an instantiation of {@code pair} -- so walking a derived
-     * entry's derivation lands on {@code pair}, which is faultless. The offending <em>name</em> is the evidence
-     * instead: {@code half} is the held body that mentions it.
+     * A closed form an open record lifts is reported against the open record that wrote it, and named by the form,
+     * as a lift inside a closed record is.
      */
     @Test
-    void anOpenTupleTemplateIsBlamedForItsOwnHeldText() {
-        assertBlamed("boxes => <T> [T, no_such_type]", "/boxes",
-                "'boxes' element[1] has an unresolved reference 'no_such_type'");
-    }
-
-    @Test
-    void anOpenChoiceTemplateIsBlamedForItsOwnHeldText() {
-        assertBlamed("result => <T> ( T | no_such_type )", "/result",
-                "'result' variant[1] has an unresolved reference 'no_such_type'");
+    void anOpenRecordHoldingAContainerIsBlamedForItsOwnText() {
+        assertBlamed("boxes => <T> { t: T  bad: [no_such_type] }", "/boxes",
+                "'[no_such_type]' element_type has an unresolved reference 'no_such_type'");
     }
 
     @Test
@@ -231,10 +219,8 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * A closed declaration's own typo is never handed to a template, however the name reads there. {@code
-     * TemplateBody#names()} cannot tell a type reference from a field name, so a template with a field called
-     * {@code no_such_type} matches the name -- and must not be blamed, because the failing entry here is the
-     * author's own declaration and already carries the line they wrote.
+     * A closed declaration's own typo is never handed to a template, however the name reads there: the failing entry
+     * here is the author's own declaration and already carries the line they wrote.
      */
     @Test
     void aClosedDeclarationKeepsItsOwnTypoEvenWhenATemplateNamesIt() {

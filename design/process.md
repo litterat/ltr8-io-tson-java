@@ -42,7 +42,7 @@ document is a cache — so §13.2 is re-stamped by hand and is the one that sile
 
 The bundled schemas are the kernel's own statement of its shape. What the resolver derives rather than reads
 from them — an entry's kind through `EntryKind.of`, a choice's disjointness, a template's parameters — is in
-`design/schema-resolution.md` and `design/held-template-bodies.md`.
+`design/schema-resolution.md` and `design/open-records.md`.
 
 **Changing a bundled schema means re-stamping every digest downstream of it, bottom-up**, moving the matching `*-resolved.tn`
 entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the published values.

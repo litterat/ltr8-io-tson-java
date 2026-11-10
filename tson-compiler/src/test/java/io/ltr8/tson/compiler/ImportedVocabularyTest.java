@@ -278,44 +278,20 @@ class ImportedVocabularyTest {
     }
 
     /**
-     * <b>A declared application mints no name, so §8.2's hygiene walk has nothing to judge.</b> {@code getOrder =>
-     * fetch<search_request>} <em>is</em> the entry the application denotes (§8.2), its facts recording the
-     * application -- so the author's punctuation ({@code "/x"}) and the author's Cyrillic never reach a derived name,
-     * because no name is derived. The schema loads.
-     *
-     * <p><b>What still mints, and is still judged, is a name nobody wrote</b>: a sugar lift, or an
-     * application some <em>use site</em> closes. {@code InternalName} keeps its rule for those -- admitted
-     * ASCII spliced, other ASCII truncated beside a hash, anything else the hash alone -- and this schema
-     * has one, {@code search_response}'s own {@code [text]}. So the claim below is the stronger one: every name in
-     * the schema is ASCII, and none carries the author's text.
+     * <b>A template over a value is refused</b> ([TSON-SCHEMA] §5.10): a template's body is a record body, and {@code
+     * !operations { … }} is a value of the type {@code operations}, no type. The remedy is one value per
+     * instantiation, which the message names.
      */
     @Test
-    void aDeclaredApplicationMintsNoNameForNameHygieneToJudge() {
-        for (String path : new String[] {"/x", "путь"}) {
-            String label = "minted" + Math.abs(path.hashCode());
-            TsonLinkedSchema resolved = assertDoesNotThrow(() -> linked(label, """
-                    fetch    => <T> !operations {
-                        get => { path: "%s"  method: "GET"  request: T  response: T }
-                      }
-                    getOrder => fetch<search_request>""".formatted(path)),
-                    () -> "a declared application mints nothing, so no name of its own can be refused");
+    void aTemplateOverAValueIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> linked("over-value", """
+                fetch    => <T> !operations {
+                    get => { path: "/x"  method: "GET"  request: T  response: T }
+                  }
+                getOrder => fetch<search_request>"""));
 
-            assertEquals(EntryKind.VALUE, resolved.kindOf("getOrder"), "the declaration is the value it denotes");
-            assertEquals("fetch", resolved.schema().applicationOf("getOrder").orElseThrow().name(),
-                    "and records the application, which is what §8.2 keys its identity on");
-
-            String own = CanonicalIdentity.canonicalize("https://example.test/api-" + label + ".tn");
-            resolved.schema().entries().forEach((name, definition) -> {
-                if (!resolved.originOf(name).equals(own)) {
-                    return;
-                }
-                assertFalse(name.contains(path),
-                        () -> "no entry name carries the author's own text: '" + name + "'");
-                assertTrue(name.chars().allMatch(character -> character < 0x80),
-                        () -> "§8.2: every name here is ASCII, which is what lets the walk judge it: '"
-                                + name + "'");
-            });
-        }
+        assertTrue(thrown.getMessage().contains("is a value of the type 'operations'")
+                && thrown.getMessage().contains("one value per instantiation"), thrown.getMessage());
     }
 
     /** A name at a kind-typed slot is recorded by the read and judged at link: one resolving to nothing is an error. */

@@ -8,38 +8,32 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
-import io.ltr8.tson.schema.meta.RecordTemplateField;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueEntry;
-
 import java.util.List;
 import java.util.Optional;
-
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §5.10's two kinds of template: a record template is a {@code record_template}, whose fields label a
- * parameter standing for a whole type, and every other template is a held body; neither is a type. What is pinned
- * here is where the template must not be mistaken for a closed record.
+ * [TSON-SCHEMA] §5.10's template is an open record: a {@code meta.record} carrying {@code parameters}, each standing
+ * at a field's type or as an argument of an application there or in a parent. What is pinned here is the open
+ * record's shape, where it must not be mistaken for a closed record, and the bodies that are refused for being no
+ * record.
  */
-class RecordTemplateShapeTest {
+class OpenRecordShapeTest {
 
-    private static final String ID = "https://example.test/record-template-shape.tn";
+    private static final String ID = "https://example.test/open-record-shape.tn";
 
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
-                !!id:"https://example.test/record-template-shape.tn"
+                !!id:"https://example.test/open-record-shape.tn"
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
@@ -63,38 +57,35 @@ class RecordTemplateShapeTest {
         return List.copyOf(problems.diagnostics());
     }
 
-    /** A record body with parameters is a record template; a container body is held text. */
-    @Test
-    void aRecordTemplateIsItsOwnShapeAndAContainerTemplateIsHeld() {
-        TsonCompiledSchema compiled = compile("""
-                  box   => <T> { v: T }
-                  boxes => <T> [T]
-                """);
+    private static RecordBody open(TsonCompiledSchema compiled, String name) {
+        RecordBody record = assertInstanceOf(RecordBody.class, compiled.schema().entries().get(name));
+        assertTrue(record.isOpen(), name + " is an open record");
+        return record;
+    }
 
-        RecordTemplateBody box = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("box"));
+    /** A record body with parameters is an open record, a {@code meta.record} carrying them. */
+    @Test
+    void aTemplateIsARecordCarryingParameters() {
+        RecordBody box = open(compile("  box => <T> { v: T }"), "box");
+
         assertEquals(List.of("T"), box.parameterNames());
         assertTrue(OpenEntry.isOpen(box));
-        assertInstanceOf(TemplateBody.class, compiled.schema().entries().get("boxes"));
+        assertEquals(ParamRef.of("T"), box.fields().get("v").type());
     }
 
     /**
-     * A parameter standing for a whole type is labelled; one standing as an argument stays in {@code type},
-     * recognised by §5.10's shadowing rule; a literal on a closed type stays a literal.
+     * A parameter is a reference value: whole at a field's type, or as an argument there, and no label says which. A
+     * container over a parameter is the reference it spells, {@code [T]} the application {@code meta.array<T>}, held
+     * as written; a literal on a closed type stays a literal.
      */
     @Test
-    void aWholeParameterIsLabelledAndAnArgumentIsNot() {
-        TsonCompiledSchema compiled = compile("""
-                  pair => <T> { a: T  b: [T]  d?: text ~ "x" }
-                """);
+    void aParameterIsAReferenceWholeOrAsAnArgument() {
+        RecordBody pair = open(compile("  pair => <T> { a: T  b: [T]  c: {text => T}  d?: text ~ \"x\" }"), "pair");
 
-        RecordTemplateBody pair = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("pair"));
-        RecordTemplateField a = pair.fields().get("a");
-        assertEquals(Optional.of("T"), a.typeParam());
-        assertEquals(Optional.empty(), a.type());
-        RecordTemplateField b = pair.fields().get("b");
-        assertEquals(Optional.empty(), b.typeParam());
-        assertTrue(OpenEntry.parameterIn(RecordField.typeRef(b.type().orElseThrow()), pair.parameterNames()).isPresent(),
-                "the parameter rides an argument of the type: " + b.type());
+        assertEquals(ParamRef.of("T"), pair.fields().get("a").type());
+        assertEquals(TypeRef.of("meta.array", List.of(ParamRef.of("T"))), pair.fields().get("b").type());
+        assertEquals(TypeRef.of("meta.map", List.of(TypeRef.of("text"), ParamRef.of("T"))),
+                pair.fields().get("c").type());
         assertEquals(Optional.of("x"), pair.fields().get("d").value().map(Token::text));
     }
 
@@ -117,28 +108,74 @@ class RecordTemplateShapeTest {
                   bad  => <T> base & { status?: = T  extra: T }
                 """)).getMessage();
 
-        assertTrue(fresh.contains("parameter 'N' stands at meta.record_field.value"), fresh);
+        assertTrue(fresh.contains("parameter 'N' stands at the value of field 'attempts'"), fresh);
         assertTrue(explicit.contains("parameter 'N' stands at meta.record_field.value"), explicit);
         assertTrue(pinned.contains("parameter 'T' stands at the value of field 'element_type'"), pinned);
         assertTrue(composed.contains("parameter 'T' stands at the value of field 'status'"), composed);
     }
 
+    /** A size bound is a count and never a parameter (§5.10), refused naming the slot. */
+    @Test
+    void aParameterAtASizeBoundIsRefused() {
+        String bound = assertThrows(SchemaValidationException.class,
+                () -> compile("  grid => <T, N> { cells: [text; N]  t: T }")).getMessage();
+
+        assertTrue(bound.contains("parameter 'N' stands at a size bound (meta.array.min_items)"), bound);
+    }
+
     /**
-     * A parameter is a type, so one standing at a facet, a size bound or an enum member is refused at the declaration,
-     * naming the slot (§5.10).
+     * A template's body is a record body (§5.10): before a container constructor, a container sugar form, a choice, a
+     * tuple, a value, or a bare reference, a parameter list is refused at the declaration with what to write instead.
      */
     @Test
-    void aParameterAtAScalarSlotIsRefused() {
-        String facet = assertThrows(SchemaValidationException.class,
-                () -> compile("  vec => <N> !meta.array { element_type: text  min_items: N }")).getMessage();
-        String bound = assertThrows(SchemaValidationException.class,
-                () -> compile("  grid => <T, N> { cells: [T; N] }")).getMessage();
-        String member = assertThrows(SchemaValidationException.class,
-                () -> compile("  names => <M> !enum [a b M]")).getMessage();
+    void aTemplateBodyThatIsNoRecordIsRefused() {
+        String constructor = assertThrows(SchemaValidationException.class,
+                () -> compile("  rows => <T> !meta.array { element_type: T  min_items: 1 }")).getMessage();
+        String sugar = assertThrows(SchemaValidationException.class,
+                () -> compile("  rows => <T> [T]")).getMessage();
+        String choice = assertThrows(SchemaValidationException.class,
+                () -> compile("  result => <T> ( T | text )")).getMessage();
+        String tuple = assertThrows(SchemaValidationException.class,
+                () -> compile("  pair => <A, B> [A, B]")).getMessage();
+        String alias = assertThrows(SchemaValidationException.class, () -> compile("""
+                  pair      => <A, B> { a: A  b: B }
+                  uuid_pair => <B> pair<uuid, B>
+                """)).getMessage();
+        String value = assertThrows(SchemaValidationException.class, () -> compile("""
+                  api    => { get: meta.type_ref }
+                  orders => <T> !api { get: T }
+                """)).getMessage();
 
-        assertTrue(facet.contains("parameter 'N' stands at meta.array.min_items"), facet);
-        assertTrue(bound.contains("parameter 'N' stands at a size bound (meta.array.min_items)"), bound);
-        assertTrue(member.contains("parameter 'M' stands at enum.members"), member);
+        assertTrue(constructor.contains("a template's body is a record body")
+                && constructor.contains("declare a refined constructor"), constructor);
+        assertTrue(sugar.contains("'[T]' is an array") && sugar.contains("meta.array<T>"), sugar);
+        assertTrue(choice.contains("is a choice") && choice.contains("field group"), choice);
+        assertTrue(tuple.contains("is a tuple"), tuple);
+        assertTrue(alias.contains("alias template"), alias);
+        assertTrue(value.contains("is a value of the type 'api'") && value.contains("one value per instantiation"),
+                value);
+    }
+
+    /**
+     * Inside an open record a form over a parameter is admitted only where it is a reference (§5.10): a size or a
+     * {@code ?} element, a choice and a tuple over a parameter are refused, naming the form.
+     */
+    @Test
+    void aFormOverAParameterThatIsNoReferenceIsRefused() {
+        String sized = assertThrows(SchemaValidationException.class,
+                () -> compile("  page => <T> { items: [T; 1..] }")).getMessage();
+        String voidable = assertThrows(SchemaValidationException.class,
+                () -> compile("  page => <T> { items: [T?] }")).getMessage();
+        String choice = assertThrows(SchemaValidationException.class,
+                () -> compile("  page => <T> { body: ( T | text ) }")).getMessage();
+        String tuple = assertThrows(SchemaValidationException.class,
+                () -> compile("  page => <T> { at: [T, text] }")).getMessage();
+
+        assertTrue(sized.contains("'[T; 1..]' stands over the parameter 'T' and is no reference"), sized);
+        assertTrue(voidable.contains("'[T?]' stands over the parameter 'T'"), voidable);
+        assertTrue(choice.contains("'( T | text )' stands over the parameter 'T'")
+                && choice.contains("field group"), choice);
+        assertTrue(tuple.contains("'[T, text]' stands over the parameter 'T'"), tuple);
     }
 
     /** An argument is a type, written as a reference: a literal token is no argument (§5.10). */
@@ -158,9 +195,8 @@ class RecordTemplateShapeTest {
     }
 
     /**
-     * A field taken from a closed source is never relabelled: its literal {@code T} is the base's value, though the
-     * template absorbing it declares a parameter spelled {@code T}. Only what the template itself writes is
-     * classified by the shadowing rule (§5.10).
+     * A field taken from a closed source keeps its literal {@code T}, the base's value, though the template absorbing
+     * it declares a parameter spelled {@code T}: a field's value is never a parameter.
      */
     @Test
     void anInheritedLiteralSpelledLikeAParameterStaysALiteral() {
@@ -170,9 +206,9 @@ class RecordTemplateShapeTest {
                   fam  => <T> base & { v: T }
                 """);
 
-        RecordTemplateBody fam = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("fam"));
+        RecordBody fam = open(compiled, "fam");
         assertEquals(Optional.of("T"), fam.fields().get("kind").value().map(Token::text));
-        assertEquals(Optional.of("T"), fam.fields().get("v").typeParam());
+        assertEquals(ParamRef.of("T"), fam.fields().get("v").type());
     }
 
     /**
@@ -192,11 +228,11 @@ class RecordTemplateShapeTest {
     }
 
     /**
-     * An operand's arguments land where the operand's labels stand: reordered, the absorbing template's own parameters
-     * land as its labels in the operand's order, and a closed argument lands as a type (§5.10).
+     * An operand's arguments land where its parameters stand: reordered, the absorbing template's own parameters land
+     * as its parameters in the operand's order, and a closed argument lands as a type (§5.10).
      */
     @Test
-    void anOperandsArgumentsLandAtItsLabels() {
+    void anOperandsArgumentsLandWhereItsParametersStand() {
         TsonCompiledSchema compiled = compile("""
                   pair  => <A, B> { first: A  second: B }
                   swap  => <A, B> pair<B, A> & { tag: text }
@@ -204,18 +240,17 @@ class RecordTemplateShapeTest {
                   swapped => swap<int32, text>
                 """);
 
-        RecordTemplateBody swap = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("swap"));
-        assertEquals(Optional.of("B"), swap.fields().get("first").typeParam());
-        assertEquals(Optional.of("A"), swap.fields().get("second").typeParam());
-        RecordTemplateBody wrap = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("wrap"));
-        assertEquals(Optional.of(TypeRef.of("text")), wrap.fields().get("second").type());
+        RecordBody swap = open(compiled, "swap");
+        assertEquals(ParamRef.of("B"), swap.fields().get("first").type());
+        assertEquals(ParamRef.of("A"), swap.fields().get("second").type());
+        assertEquals(TypeRef.of("text"), open(compiled, "wrap").fields().get("second").type());
 
         RecordBody swapped = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("swapped"));
         assertEquals(TypeRef.of("text"), swapped.fields().get("first").type());
         assertEquals(TypeRef.of("int32"), swapped.fields().get("second").type());
     }
 
-    /** A member keeps an inherited literal spelled like its template's parameter: substitution reaches labels only. */
+    /** A member keeps an inherited literal spelled like its template's parameter: substitution reaches references. */
     @Test
     void aClosedMemberKeepsAnInheritedLiteralSpelledLikeAParameter() {
         TsonCompiledSchema compiled = compile("""
@@ -243,6 +278,8 @@ class RecordTemplateShapeTest {
                   u4   => t4<int32>
                 """);
 
+        assertEquals(TypeRef.of("two", List.of(ParamRef.of("X"), TypeRef.of("text"))),
+                open(compiled, "t4").fields().get("z").type());
         RecordBody u4 = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("u4"));
         assertEquals(TypeRef.of("int32"), u4.fields().get("x").type());
         assertEquals(List.of(), read(compiled, "u4", "{ z: { a: 1  b: \"t\" }  x: 2 }"));
@@ -250,7 +287,7 @@ class RecordTemplateShapeTest {
 
     /**
      * A parameter spelled like an entry the schema's namespace holds -- a type or a value entry, its own or an
-     * import's -- is refused at the declaration (§5.10's shadowing rule), a record template and a held template alike.
+     * import's -- is refused at the declaration (§5.10's shadowing rule).
      */
     @Test
     void aParameterShadowingASchemaEntryIsRefused() {
@@ -259,15 +296,10 @@ class RecordTemplateShapeTest {
                   base => { f: T }
                   t2   => <T> base & { x: T }
                 """)).getMessage();
-        String held = assertThrows(SchemaValidationException.class, () -> compile("""
-                  T  => { q: int32 }
-                  ts => <T> [T]
-                """)).getMessage();
         String imported = assertThrows(SchemaValidationException.class,
                 () -> compile("  boxed => <text> { v: text }")).getMessage();
 
         assertTrue(record.contains("'t2': parameter 'T' shadows the entry 'T' this schema's namespace holds"), record);
-        assertTrue(held.contains("'ts': parameter 'T' shadows the entry 'T'"), held);
         assertTrue(imported.contains("'boxed': parameter 'text' shadows the entry 'text'"), imported);
 
         String point = """
@@ -281,12 +313,12 @@ class RecordTemplateShapeTest {
     }
 
     /**
-     * A positional field written with a parameter is labelled as its {@code type} would be: {@code item => T}, {@code
-     * item => { type: T }} and the sugar {@code item: T} are one template, and an application closes {@code item} to
-     * its argument.
+     * The explicit spelling is read against {@code record}'s own vocabulary as the sugar is: {@code item => T}, {@code
+     * item => { type: T }} and {@code item: T} are one open record, and an application closes {@code item} to its
+     * argument.
      */
     @Test
-    void aPositionalFieldWrittenWithAParameterIsItsTypeParameter() {
+    void theExplicitSpellingIsTheSameOpenRecord() {
         TsonCompiledSchema compiled = compile("""
                   box   => <T> !meta.record { fields: { item => T } }
                   spelt => <T> !meta.record { fields: { item => { type: T } } }
@@ -294,10 +326,10 @@ class RecordTemplateShapeTest {
                   held  => box<int32>
                 """);
 
-        RecordTemplateBody box = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("box"));
-        assertEquals(Optional.of("T"), box.fields().get("item").typeParam());
-        assertEquals(box.fields(), ((RecordTemplateBody) compiled.schema().entries().get("spelt")).fields());
-        assertEquals(box.fields(), ((RecordTemplateBody) compiled.schema().entries().get("sugar")).fields());
+        RecordBody box = open(compiled, "box");
+        assertEquals(ParamRef.of("T"), box.fields().get("item").type());
+        assertEquals(box.fields(), open(compiled, "spelt").fields());
+        assertEquals(box.fields(), open(compiled, "sugar").fields());
         RecordBody held = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("held"));
         assertEquals(TypeRef.of("int32"), held.fields().get("item").type());
     }
@@ -317,27 +349,17 @@ class RecordTemplateShapeTest {
         assertTrue(argument.contains("typed by the parameter 'T' and carries the literal value 'x'"), argument);
     }
 
-    /** A record template's body that is no valid record is refused in the author's terms -- a record, as written. */
+    /** Parameters are written before the body, never as a binding of a construction of {@code record} (§5.10). */
     @Test
-    void anInvalidTemplateBodyIsRefusedAsTheRecordWritten() {
-        String refused = assertThrows(SchemaValidationException.class,
-                () -> compile("  box => <T> { @doc:{ a: 1 } v: T }")).getMessage();
-
-        assertTrue(refused.contains("'box': the body is not valid data for 'meta.record'"), refused);
-        assertFalse(refused.contains("record_template"), refused);
-    }
-
-    /** {@code record_template} is resolver vocabulary, as {@code template} is: no source declaration applies it (§8.1). */
-    @Test
-    void aRecordTemplateConstructionIsRefused() {
+    void writtenParametersAreRefused() {
         String refused = assertThrows(SchemaValidationException.class, () -> compile("""
-                  sneaky => !meta.record_template {
-                    fields: { v => !meta.record_template_field { type_param: T } }
+                  sneaky => !meta.record {
+                    fields: { v => { type: T } }
                     parameters: [{ name: T }]
                   }
                 """)).getMessage();
 
-        assertTrue(refused.contains("is resolver vocabulary -- the body of a record template"), refused);
+        assertTrue(refused.contains("states 'parameters', which a construction never writes"), refused);
     }
 
     /** An operand is flattened into the declaration, so a template there needs its arguments. */
@@ -358,9 +380,9 @@ class RecordTemplateShapeTest {
     }
 
     /**
-     * A record template that composes a member-dispatched base may pin the selector itself, and is no member: a
-     * template is no type. Its declared application is, reaching the base through the template's written parent, so
-     * a value pinned {@code "dog"} reads as {@code dogs}.
+     * An open record that composes a member-dispatched base may pin the selector itself, and is no member: a template
+     * is no type. Its declared application is, reaching the base through the template's written parent, so a value
+     * pinned {@code "dog"} reads as {@code dogs}.
      */
     @Test
     void anOpenSubtypeIsNoMemberOfTheFamilyItComposes() {
@@ -373,5 +395,23 @@ class RecordTemplateShapeTest {
 
         assertEquals(List.of(), read(compiled, "owner",
                 "{ pet: { type: \"dog\"  name: \"rex\"  tricks: \"sit\" } }"));
+    }
+
+    /**
+     * A container over a parameter, held as the application it spells, closes when the record is applied: the field
+     * of {@code page<uuid>} names the entry {@code [uuid]} lifts to, and reads as an array of it.
+     */
+    @Test
+    void aHeldContainerClosesToTheEntryItsSugarLiftsTo() {
+        TsonCompiledSchema compiled = compile("""
+                  page  => <T> { items: [T] }
+                  pages => page<int32>
+                  plain => { items: [int32] }
+                """);
+
+        RecordBody pages = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("pages"));
+        RecordBody plain = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("plain"));
+        assertEquals(plain.fields().get("items").type(), pages.fields().get("items").type());
+        assertEquals(List.of(), read(compiled, "pages", "{ items: [1 2 3] }"));
     }
 }

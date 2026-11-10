@@ -10,9 +10,8 @@ check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extensi
 - Inhabitance is a least fixed point over the entry graph: exact, total and two-valued, with no third answer.
 - Every local entry is judged, referenced or not; imported entries are skipped, having been judged when their own
   schema linked.
-- An open entry (a held template, a `TemplateBody`, or a record template, a `RecordTemplateBody`) is inhabited by
-  fiat; the entries materialisation mints from it are judged like any other, so a template nobody applies is judged
-  nowhere.
+- An open record (a template, a `RecordBody` with `parameters`) is inhabited by fiat; the entries materialisation mints
+  from it are judged like any other, so a template nobody applies is judged nowhere.
 - An unresolved reference is inhabited by fiat, and the check runs after `validateEntry`, so one defect is reported
   once.
 - A kind is inhabited exactly when it has a member; a value entry and every atom are inhabited here. An atom whose
@@ -55,7 +54,7 @@ the schema, at a line the data's author does not control. The diagnostic spells 
 - **Every local entry is judged, referenced or not**, on the footing of a declared type parameter the body never uses
   (§5.10). So an uninhabited *variant* is rejected even where the choice around it still works. Repeating the verdict
   for imported entries would report one defect once per importer.
-- **An open entry is not walked.** Its parameters mean nothing until an application supplies them, so it is inhabited
+- **An open record is not walked.** Its parameters mean nothing until an application supplies them, so it is inhabited
   here, and the closure materialisation mints is an ordinary entry in the map by the time linking runs, judged like
   any other. §8's own `tree` fixture is caught the moment anything applies it, and a template nobody applies is judged
   nowhere, the same answer §5.10's deferred checking gives everywhere else. `TypeInhabitanceTest` pins both halves.

@@ -112,7 +112,7 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   dependent field once the record closes (`RecordDiagnostics.writtenWithoutItsSibling`,
   `RecordAbstractReader.refuseAbsentSiblings`), in tree and bind mode and in a schema document, which holds the value
   as written and refuses it all the same: the check runs over every field typed `kind!`, whatever reads it, so a bound
-  `Token` component's slot answers to it (`record_template_field.value` beside `type_param`). `RecordReader` is the same
+  `Token` component's slot answers to it (`record_field.value`). `RecordReader` is the same
   rule in JSON.
 
   A sibling naming no type a value can be read against — a sibling reference, a template, an application, which

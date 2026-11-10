@@ -12,7 +12,7 @@ The schema grammar itself is in `design/schema-grammar.md`.
   materialisation closes; everything closed is an entry referenced by a bare name, so `DefinitionResolver` only ever
   sees a bare reference or `!C value` at a use site.
 - The phase is purely syntactic and consults no other schema: the sugar table is fixed, its targets the kernel's
-  `meta.array`, `meta.map`, `meta.tuple`, `meta.choice` and `meta.alias` whatever a document imports, so the kernel's
+  `meta.array`, `meta.map`, `meta.tuple` and `meta.choice` whatever a document imports, so the kernel's
   bootstrap needs no special case, and every closure holds every target.
 - An injected name derives from the resolved binding record, never the spelling and never the AST's own `toString` or
   `hashCode`; `SchemaDesugarerTest` pins two derived names to exact strings.
@@ -26,8 +26,8 @@ The schema grammar itself is in `design/schema-grammar.md`.
   naming the slot (`siblingsAtFieldTypesOnly`, [TSON-SCHEMA] §5.2); at a field's type it passes through as written.
 
 Related: `design/schema-grammar.md` (the parser producing the AST this rewrites),
-`design/desugaring-open-forms-and-templates.md` (open lifts, parameterised aliases, record templates),
-`design/template-materialisation.md` (materialisation), `design/held-template-bodies.md` (the synthetic merge),
+`design/desugaring-open-forms-and-templates.md` (forms over a parameter, template bodies refused),
+`design/template-materialisation.md` (materialisation, the synthetic merge), `design/open-records.md`,
 `design/schema-side-diagnostics.md`.
 
 ## Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
@@ -39,9 +39,9 @@ the phase refuses it where it is written, as a `SchemaValidationException` whose
 an alias target (`x => kind!`), a refinement source, a composition operand, an array's element type, a map's key or
 value type, a tuple element, a choice variant, a template argument. A group member is a field of the record and takes
 one as a field does. A construction's payload is data, read against its constructor, whose slot readers state the same
-rule (`design/schema-resolution.md`). At a field's type the reference is carried as written: `typeRef` returns it, a
-record template's field writes it into the payload as a `ReferenceValue` holding the sibling, and
-`DefinitionResolver.resolveFieldType` hands `BuiltField` the model's `SiblingRef`.
+rule (`design/schema-resolution.md`). At a field's type the reference is carried as written, in a closed and an open
+record alike: `typeRef` returns it, and `DefinitionResolver.resolveFieldType` hands `BuiltField` the model's
+`SiblingRef`.
 
 An AST→AST rewrite between parsing and resolution. Every sugar form — `[T]` and the sized forms, `[T, U]`,
 `{K => V}` (§5.3), `(A | B)` (§5.4) — becomes the `!C value` construction it denotes: at declaration position
@@ -59,12 +59,10 @@ template application — `meta.map` holds `key_type`/`value_type` as ordinary fi
 construction sugar filling them, which lands on the entry `{K => V}` lifts to — and §5.3 states one lift rule,
 every sugar form lifting at desugar, a concrete form to a closed synthetic entry. `ResolvedFixtureTest` asserts the resolved fixtures and this output agree entry for entry.
 
-**The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — a template application,
-whose arguments are what materialisation substitutes. Everything closed is an entry, referenced by a bare
-name. Its counterpart at the body is a held body present ⟹ open entry, and together the two make the closed-entry
-rule checkable structurally, with no vocabulary needed to read a reference. One direction only: a partial
-application (`<B> pair<uuid, B>`) is a template that holds nothing, keeping the reference with arguments it
-already resolves to.
+**The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — an application, of an open
+record or of a constructor, which materialisation closes. Everything closed is an entry, referenced by a bare
+name. Its counterpart at the body is `parameters` present ⟹ open record, and together the two make the closed-entry
+rule checkable structurally, with no vocabulary needed to read a reference.
 
 The alternative — inline sugar riding as a structural reference rather than as an injected entry, with the
 compiler building readers from those refs — is **deliberately not implemented**. Four arguments stand for it
@@ -114,8 +112,8 @@ rebuilt and called a cache.
   its head and arguments intact. `checkTemplateApplication` refuses exactly one thing: a local head declaring *no*
   parameters whose body says it is no constructor — a fresh record, a construction, an atom refinement — the author's
   error. A composition, refinement or alias may be a constructor and passes. A head this document neither declares
-  nor imports is the linker's unresolved reference, and a template whose body writes a container sugar form over one
-  of its own parameters lifts open (`design/desugaring-open-forms-and-templates.md`).
+  nor imports is the linker's unresolved reference, and a container sugar form over one of the enclosing template's
+  own parameters is the reference it spells, or refused (`design/desugaring-open-forms-and-templates.md`).
 - **Identity is the resolved binding record, not the spelling.** The injected name is
   `head_value_value_hash`, derived from the record the form desugars to, so `[T; 3]` and `[T; 3..3]` land on
   the same entry and any two structurally identical forms anywhere in the document collapse to one

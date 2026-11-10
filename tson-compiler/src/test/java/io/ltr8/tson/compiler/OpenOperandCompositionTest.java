@@ -275,7 +275,7 @@ class OpenOperandCompositionTest {
     }
 
     /**
-     * An open operand with elements rather than fields gets the verdict its closed spelling gets, one phase
+     * A constructor applied to a parameter at an operand gets the verdict its closed spelling gets, one phase
      * earlier: there is nothing for {@code &} to compose with.
      */
     @Test
@@ -283,8 +283,7 @@ class OpenOperandCompositionTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           customer => { id: text }
-                          list     => <T> [T]
-                          vip      => <T> customer & list<T>
+                          vip      => <T> customer & meta.array<T>
                           use      => vip<text>
                         """));
 

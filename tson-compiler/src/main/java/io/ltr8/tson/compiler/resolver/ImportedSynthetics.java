@@ -3,8 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TemplateParam;
+
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 
@@ -89,8 +88,7 @@ public final class ImportedSynthetics {
         Top bare = TypeChain.withoutChain(value);
         return switch (bare) {
             case ChoiceBody choice -> new ChoiceBody(choice.chain(), choice.variants(), Optional.empty());
-            case TemplateBody template -> List.of(template.parameters().stream().map(TemplateParam::name).toList(),
-                    template.template().replaceAll("\\s+", " ").strip());
+
             default -> bare;
         };
     }

@@ -243,21 +243,6 @@ class DependentFieldTest {
                 + "optional: true  role: DEFAULT  value: \"nope\" } } }").contains("is not a value of that type"));
     }
 
-    /** A template field's {@code value} is the same dependent field, its sibling a member of a field group. */
-    @Test
-    void theKernelsTemplateFieldValueIsReadAgainstItsType() {
-        Tson tson = Tson.standard();
-        String meta = "!!import:\"https://tson.io/2026/40/m/meta.tn\"\n";
-        assertEquals(List.of(), tson.validate(meta + "!meta.record_template_field { type: integer  optional: true  "
-                + "role: DEFAULT  value: 5 }"));
-        assertEquals(Optional.of("/value"), only(tson.validate(meta + "!meta.record_template_field { type: boolean  "
-                + "optional: true  role: DEFAULT  value: 5 }")).path());
-        Diagnostic literal = only(tson.validate(meta + "!meta.record_template_field { type_param: T  optional: true  "
-                + "role: DEFAULT  value: 5 }"));
-        assertEquals(Optional.of("/value"), literal.path());
-        assertTrue(literal.message().contains("is written without 'type'"), literal.message());
-    }
-
     /** What a template's literal is judged by, and its refusals on an open type, are §5.10's as written. */
     @Test
     void aTemplateLiteralNeedsAClosedType() {

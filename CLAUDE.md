@@ -19,9 +19,9 @@ Forty-odd notes, each under ~25 KB and opening with its invariants. Pick by the 
 | Area | Notes (`design/…`) |
 |---|---|
 | **Lexing and data parsing** | `lexer-and-data-parsing.md` (lexer, Tier 2 stream, Tier 3 AST) · `base-types-and-atom-vocabulary.md` (§4 resolution, `tson-atom`) |
-| **Schema grammar, desugaring** | `schema-grammar.md` (`TsonSchemaParser`) · `schema-grammar-and-desugaring.md` (`SchemaDesugarer`, sugar table, lifts) · `desugaring-open-forms-and-templates.md` |
+| **Schema grammar, desugaring** | `schema-grammar.md` (`TsonSchemaParser`) · `schema-grammar-and-desugaring.md` (`SchemaDesugarer`, sugar table, lifts) · `desugaring-open-forms-and-templates.md` (forms over a parameter, template bodies refused) |
 | **Resolution** | `references.md` (the forms a name takes, an application's argument list; which slot is typed `meta.type_ref` or a key) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.synthetic`, meta-kernel bootstrap) |
-| **Templates (§5.10)** | `held-template-bodies.md` (`TemplateBody`, parameter kinds) · `template-materialisation.md` (`TemplateMaterialiser`, `SyntheticMerge`, regularity) |
+| **Templates (§5.10)** | `open-records.md` (an open record, `Param`, `ParamRef`, bounds) · `template-materialisation.md` (`TemplateMaterialiser`, `SyntheticMerge`, regularity) |
 | **Linking** | `linking-and-compilation.md` (registry, identity, import merge, link order, values by name) · `kinds-and-name-types.md` (`KindMembers`, `name_type`) · `inhabitance-and-record-extension.md` · `choice-disjointness.md` · `namespace-types-and-value-entries.md` (namespace types, value entries, `ValueEntry`) · `name-hygiene-and-minted-names.md` (`checkNames`, `InternalName`) |
 | **Compilation** | `class2-compilation.md` (`TsonSchemaCompiler`, `CompiledReaders`, `ErrorReader`, untagged choices) · `compiled-registries.md` (the two registries, concurrency) |
 | **Reading** | `readers-and-diagnostics.md` (`TsonReadContext`, the read rules, tree/bind asymmetry) · `record-dispatch.md` · `declared-positions.md` (§7.8) · `reader-naming-and-schema-location.md` · `name-hygiene-read-path.md` |

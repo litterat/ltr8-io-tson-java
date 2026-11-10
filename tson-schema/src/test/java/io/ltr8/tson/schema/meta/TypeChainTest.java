@@ -4,11 +4,13 @@ import io.ltr8.tson.schema.numeric.IntegerType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -69,8 +71,7 @@ class TypeChainTest {
     void aConstructorIsWhatIsATheKernelsTopAndTheKernelsTopItself() {
         RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
                 .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
-        RecordTemplateBody templated = emptyTemplate(
-                        List.of(new TemplateParam("T")))
+        RecordBody templated = emptyTemplate(List.of(new Param("T")))
                 .withSupertypes(List.of("meta.namespace", "meta.top"));
 
         assertTrue(EntryKind.isConstructor("numeric.integer_type", constructor, n -> true));
@@ -81,10 +82,9 @@ class TypeChainTest {
     }
 
     @Test
-    void aRecordTemplateCarriesAChainAsAnyTypeDoes() {
-        RecordTemplateBody pet = emptyTemplate(
-                List.of(new TemplateParam("T")));
-        RecordTemplateBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
+    void anOpenRecordCarriesAChainAsAnyTypeDoes() {
+        RecordBody pet = emptyTemplate(List.of(new Param("T")));
+        RecordBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
                 .withSubtypes(List.of("dog")));
 
         assertEquals(List.of("animal"), TypeChain.supertypesOf(placed));
@@ -93,8 +93,26 @@ class TypeChainTest {
         assertEquals(placed.parameterNames(), pet.parameterNames());
     }
 
-    private static RecordTemplateBody emptyTemplate(List<TemplateParam> parameters) {
-        return new RecordTemplateBody(TypeChain.EMPTY, new io.ltr8.annotation.AnnotatedMap<>(), List.of(),
-                RecordExtensionType.OPEN, List.of(), Optional.empty(), parameters);
+    @Test
+    void anOpenRecordHoldsItsParametersAsParameterReferencesAndAClosedOneRefusesThem() {
+        RecordBody open = new RecordBody(TypeChain.EMPTY.withParents(List.of(TypeRef.of("base",
+                List.of(TypeRef.of("T"))))), List.of(new Param("T")), RecordBody.fieldMap(
+                Map.entry("v", RecordField.required(TypeRef.of("T"))),
+                Map.entry("w", RecordField.required(TypeRef.of("box", List.of(TypeRef.of("T"))))),
+                Map.entry("x", RecordField.required(TypeRef.of("text")))),
+                List.of(), RecordExtensionType.OPEN, List.of(), Optional.empty());
+
+        assertTrue(open.isOpen());
+        assertEquals(ParamRef.of("T"), open.fields().get("v").type());
+        assertEquals(TypeRef.of("box", List.of(ParamRef.of("T"))), open.fields().get("w").type());
+        assertEquals(TypeRef.of("text"), open.fields().get("x").type());
+        assertEquals(List.of(TypeRef.of("base", List.of(ParamRef.of("T")))), open.parents());
+        assertThrows(IllegalArgumentException.class, () -> RecordBody.of(RecordBody.fieldMap(
+                Map.entry("v", RecordField.required(ParamRef.of("T"))))), "a closed record holds no parameter");
+    }
+
+    private static RecordBody emptyTemplate(List<Param> parameters) {
+        return new RecordBody(TypeChain.EMPTY, parameters, new io.ltr8.annotation.AnnotatedMap<>(), List.of(),
+                RecordExtensionType.OPEN, List.of(), Optional.empty());
     }
 }

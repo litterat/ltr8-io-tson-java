@@ -41,7 +41,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   through others: `getDescriptor` hands a re-entrant call a deferred supplier and each holder keeps it in a
   final `Memoized`, so laziness is confined to the cyclic edge and every other component still resolves
   eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` →
-  `DataValue`), which is what lets a held template body be written at all. **A generic record is described at its
+  `DataValue`), which is what lets a value carrying a parsed AST be written at all. **A generic record is described at its
   arguments**: a component's declared type has the class's type parameters replaced by the arguments it is
   described at (`TypeArguments`, `DefaultRecordBinder.resolveRecord(context, class, parameterizedType)`), so
   `Namespace<RecordField>` binds `entries` as a map of `RecordField`; a type variable left in place has no

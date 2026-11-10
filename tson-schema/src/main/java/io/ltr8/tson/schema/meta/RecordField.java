@@ -25,13 +25,13 @@ import java.util.Optional;
  * omission reaches.
  *
  * <p><b>{@code type} is a {@link Reference}</b>: a type reference, or a sibling reference ({@code kind!}) naming the
- * field of the same record whose value chooses the type ([TSON-SCHEMA] §5.2) -- the one slot besides a template
- * field's that may hold one. A field so typed is a <em>dependent field</em>: each instance's value is read against the
- * type that instance's sibling names. {@link #namedType()} is the type reference where there is one.
+ * field of the same record whose value chooses the type ([TSON-SCHEMA] §5.2) -- the one slot that may hold one. A
+ * field so typed is a <em>dependent field</em>: each instance's value is read against the type that instance's sibling
+ * names. {@link #namedType()} is the type reference where there is one.
  *
- * <p><b>A record field is closed</b>: its {@code type} names no parameter and its {@code value} is a literal, never a
- * parameter. A field that may carry one is a {@code meta.record_template_field}, which only a record template holds,
- * and an application turns each of those into one of these.
+ * <p><b>In an open record {@code type} may be a parameter</b> ({@link ParamRef}), whole or among an application's
+ * arguments, and no label says which: a parameter is a reference value. An application substitutes it away, so a
+ * closed record's fields name none. {@code value} is a literal and never a parameter.
  *
  * <p><b>A field never says it is a discriminator.</b> Which fields a sealed family dispatches on is the
  * enclosing record's own statement ({@code record.discriminators}), because §5.8 flattens a base's fields
@@ -119,7 +119,7 @@ public record RecordField(Reference type, boolean optional, boolean voidable, Fi
         return typeRef(type);
     }
 
-    /** A record field's or a record template field's {@code type} as the type it names -- see {@link #typeRef()}. */
+    /** A record field's {@code type} as the type it names -- see {@link #typeRef()}. */
     public static TypeRef typeRef(Reference type) {
         return switch (type) {
             case TypeRef reference -> reference;

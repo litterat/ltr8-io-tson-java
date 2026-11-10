@@ -103,16 +103,15 @@ materialization, no validation (those are the resolver's/linker's jobs).
   the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution
   derives rather than shaping the type-def, and the declaration survives every desugar rewrite of its type-def.
 - **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
-  [type-params] "!" qualified-name ws core-value`) -- `vector => <T> !meta.array { element_type: T  min_items: 3 }`.
+  [type-params] "!" qualified-name ws core-value`) -- `box => <T> !meta.record { fields: { v => T } }`.
   §12.1 has one production for both, and its own note says so: "`!` opens an `instance`, with or without a
   preceding `<…>`". `Instance` carries
   the parameter list, and `parseTypeDef` reads that list *before* dispatching on `!` -- one token then
   decides.
-  - **The payload is a `core-value`, and nothing narrower.** An open entry's body is held rather than read
-    against its constructor's vocabulary until materialisation substitutes, so there is no per-slot quotation
-    to constrain it and a collection payload is as ordinary as a scalar one: `<T> !meta.choice { variants:
-    [T error] }` parses and resolves, which is §5.10's "collection-valued slots are parameterizable". The
-    kernel declares no `template_argument` or `instance_template` for a quotation to need.
+  - **The payload is a `core-value`, and nothing narrower.** Which head a parameter list may precede is the
+    resolver's question, not the grammar's: §5.10 admits `!meta.record` alone (an open record's explicit spelling),
+    and `DefinitionResolver.openInstance` refuses any other head with the remedy in the message
+    (`design/open-records.md`).
   - **An application is data too**: `!meta.array { element_type: box<text> }` is a `core-value`, the reference
     production being [TSON-DATA] §7.4's, and it is what the sugar `[box<text>]` expands
     to. What a payload cannot spell is sugar: `[text]` in a payload is a data array, never the array type, so a

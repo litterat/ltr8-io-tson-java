@@ -51,7 +51,7 @@ class ImportedSyntheticTest {
                     !!import:"https://tson.io/2026/40/m/meta.tn"
                     !schema {
                       shaped => { either: (text | integer)  pairs: {text => integer}  tags: [text] }
-                      held   => <T> { items: [T]  either: (T | text) }
+                      held   => <T> { items: [T]  either: (text | integer) }
                     }""");
 
     private static Tson tson() {
@@ -84,7 +84,7 @@ class ImportedSyntheticTest {
     }
 
     /**
-     * A form one library lifts directly and another reaches by closing a template's open synthetic is one entry
+     * A form one library lifts directly and another constructs by closing a template's held {@code [T]} is one entry
      * too, and a schema that writes the form itself, or closes the template again, reuses the imported entry.
      */
     @Test
@@ -191,7 +191,7 @@ class ImportedSyntheticTest {
                 !!import:"https://example.test/shapes.tn"
                 !schema {
                   more  => { either: (text | integer)  pairs: {text => integer}  tags: [text] }
-                  again => <U> { items: [U]  either: (U | text) }
+                  again => <U> { items: [U]  either: (text | integer) }
                 }"""));
     }
 }

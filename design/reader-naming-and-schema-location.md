@@ -51,9 +51,10 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
   reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only
   in its name, every other position gets the shared reader back unchanged and allocates nothing
   (`AllocationHarnessTest` is the guard).
-    - **An application nothing declares is named by the application that closed to it.** It is its expansion
-      (§5.10): the position names the synthetic directly, so `e: pair_of<int32>` over `pair_of => <T> [T; 1..2]`
-      reads an array no author named, which carries no `@meta.application`. Its
+    - **An application nothing declares is named by the application that closed to it.** It is its expansion or
+      its construction (§5.10, §5.3): the position names the synthetic directly, so `e: pair_of<int32>` over the
+      refined constructor `pair_of => meta.array ^ { min_items?: = 1  max_items?: = 2 }` reads an array no author named,
+      which carries no `@meta.application`. Its
       `TsonSchema.EntryFacts.closes` does record the application, so `EntryDisplayName` shows a synthetic with
       none by `closes().getFirst().text()`: `'pair_of<int32>': …`, `unknown field 'nope'
       on 'bx<int32>'`, `'set<text>' requires unique elements`, never the entry's content-derived key. One with

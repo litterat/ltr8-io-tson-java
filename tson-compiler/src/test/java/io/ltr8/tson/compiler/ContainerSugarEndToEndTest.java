@@ -143,21 +143,22 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>The open case, which failed worse than the closed one.</b> With the variant refused, the choice was
-     * never lifted, so holding {@code w}'s body handed the un-lifted {@code ChoiceExpr} to the producer that
-     * spells a reference -- a {@code ClassCastException} out of the resolver, where the two shapes it
-     * accepts are {@code NameRef} and {@code ApplicationRef}. Lifting the choice is what keeps that producer's
-     * input to the two shapes it documents.
+     * <b>Over a parameter, a choice is refused</b> ([TSON-SCHEMA] §5.10): a template's body is a record body, and
+     * inside one a choice over a parameter is no reference -- an untagged sum over a parameter cannot be judged
+     * disjoint until it is applied. A closed choice holding an application is admitted, above.
      */
     @Test
-    void anApplicationIsAChoiceVariantInsideATemplateToo() {
-        TsonCompiledSchema compiled = compile("""
+    void aChoiceOverAParameterIsRefused() {
+        SchemaValidationException body = assertThrows(SchemaValidationException.class, () -> compile("""
                   box => <T> { v: T }
-                  w   => <T> ( box<T> | int32 )
-                  u   => w<text>""");
+                  w   => <T> ( box<T> | int32 )"""));
+        SchemaValidationException field = assertThrows(SchemaValidationException.class, () -> compile("""
+                  box => <T> { v: T }
+                  w   => <T> { c: ( box<T> | int32 ) }"""));
 
-        ChoiceBody choice = assertInstanceOf(ChoiceBody.class, bodyOf(compiled, "u"));
-        assertTrue(choice.variants().getFirst().name().startsWith("record_v_text_"), choice::toString);
+        assertTrue(body.getMessage().contains("a template's body is a record body"), body.getMessage());
+        assertTrue(field.getMessage().contains("stands over the parameter 'T' and is no reference"),
+                field.getMessage());
     }
 
     /**
@@ -509,24 +510,17 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>Collection-valued slots are parameterizable</b> (§5.10). A held body is not read against the
-     * constructor's vocabulary at all until materialisation substitutes, so a parameter inside {@code
-     * choice}'s {@code variants} -- or {@code tuple}'s {@code elements} -- is a token inside an array and
-     * the form lifts like any other.
+     * <b>A collection-valued slot holds no parameter</b> (§5.10): a choice's variants and a tuple's elements are a
+     * list, not reference fields, so a choice or a tuple over a parameter is no reference and is refused at the
+     * declaration, naming the form.
      */
     @Test
-    void aParameterInsideACollectionValuedSlotLiftsLikeAnyOther() {
+    void aParameterInsideACollectionValuedSlotIsRefused() {
         for (String body : List.of("(T | text)", "[T, text]")) {
-            TsonCompiledSchema compiled = assertDoesNotThrow(
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                     () -> compile("  odd => <T> { v: %s }\n  use => odd<int32>".formatted(body)), body);
-
-            // The closure is a real body of the constructor the sugar names, not a deferred anything -- and
-            // it is `use` itself, a declaration naming an application being that instantiation (#15).
-            RecordBody closed = assertInstanceOf(RecordBody.class,
-                    compiled.schema().entries().get("use"), body);
-            Top variant = compiled.schema().entries().get(closed.fields().values().iterator().next().typeRef().name());
-            assertTrue(variant instanceof ChoiceBody || variant instanceof TupleBody,
-                    () -> body + " closed to " + variant);
+            assertTrue(thrown.getMessage().contains("stands over the parameter 'T' and is no reference"),
+                    thrown.getMessage());
         }
     }
 

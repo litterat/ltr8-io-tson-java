@@ -24,11 +24,9 @@ import io.ltr8.tson.compiler.ast.TokenValue;
  * wrote, including the choices a value no longer remembers -- which token was quoted, what a record's field
  * order was -- so this puts them back rather than deciding them again.
  *
- * <p><b>Why anything needs it.</b> A held template body is an AST: §5.10's open form is the application the
- * author wrote, kept unread until materialisation substitutes its parameters away. Bound like an ordinary
+ * <p><b>Why anything needs it.</b> A value may carry a parsed AST, source the author wrote. Bound like an ordinary
  * object it writes as a description of the AST -- {@code !recordvalue { fields: [ ... ] } } -- which is a
- * faithful rendering of the wrong thing. Written as syntax it is {@code !meta.choice { variants: [ T error ] }},
- * which is what the author wrote and what reads back.
+ * faithful rendering of the wrong thing. Written as syntax it is what the author wrote, and what reads back.
  *
  * <p>Package visible: the AST is {@code tson-compiler}'s own model of source, and writing one is this
  * package's business rather than a service offered to consumers.

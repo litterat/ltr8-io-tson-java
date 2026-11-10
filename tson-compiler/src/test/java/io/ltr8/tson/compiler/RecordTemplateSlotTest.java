@@ -66,7 +66,7 @@ class RecordTemplateSlotTest {
                   ok_text => ok<text>
                 """,
                 """
-                  vec => <T> { items: [T; 3] }
+                  vec => <T> { items: [T] }
                   v3 => vec<text>
                 """);
         for (String declarations : admitted) {
@@ -78,7 +78,7 @@ class RecordTemplateSlotTest {
     @Test
     void aParameterAnywhereElseInARecordBodyIsRefusedAtTheDeclaration() {
         Map<String, String> refused = Map.of(
-                "  pinned => <N> { w?: int32 ~ N }", "parameter 'N' stands at meta.record_field.value",
+                "  pinned => <N> { w?: int32 ~ N }", "parameter 'N' stands at the value of field 'w'",
                 "  keyed => <K> { K: text }", "parameter 'K' stands at a key of meta.record.fields",
                 "  grouped => <A> { ( A: text | b: text ) }", "parameter 'A' stands at a key of meta.record.fields",
                 "  maybe => <B> !meta.record { fields: { v => { type: text  optional: B } } }",
@@ -101,9 +101,9 @@ class RecordTemplateSlotTest {
         });
     }
 
-    /** The confinement is every template's: another constructor's scalar slot takes no parameter either. */
+    /** Another constructor takes no parameter at all: a template's body is a record body (§5.10). */
     @Test
-    void aParameterAtAnotherConstructorsScalarSlotIsRefused() {
+    void aParameterListBeforeAnotherConstructorIsRefused() {
         String voidable = rejected("""
                   pair => <V> !meta.tuple { elements: [{ element_type: text  voidable: V } { element_type: int32 }] }
                 """);
@@ -111,8 +111,8 @@ class RecordTemplateSlotTest {
                   capped => <N> !meta.array { element_type: text  min_items: N }
                 """);
 
-        assertTrue(voidable.contains("parameter 'V' stands at") && voidable.contains(".voidable"), voidable);
-        assertTrue(capped.contains("parameter 'N' stands at meta.array.min_items"), capped);
+        assertTrue(voidable.contains("a template's body is a record body"), voidable);
+        assertTrue(capped.contains("a template's body is a record body"), capped);
     }
 
     /** A parameter has no fields until the template is applied, so neither operator has a body to flatten. */

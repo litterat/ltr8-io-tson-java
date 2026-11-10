@@ -174,14 +174,14 @@ class OperandFollowsAliasChainTest {
     }
 
     /**
-     * The same body test refuses an instantiation that is <em>not</em> a record: {@code vector<text>}
+     * The same body test refuses a construction, which is <em>not</em> a record: {@code vector<text>}
      * closes to an {@code !array}, which has elements rather than fields. This is what keeps §4.3's
      * "finished" idea intact where it was always doing the work.
      */
     @Test
     void aCompositionThroughAnAliasToANonRecordInstantiationIsRefused() {
         assertTrue(refusal("ofc9", """
-                  vector => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }
+                  vector => meta.array ^ { min_items?: = 3  max_items?: = 3 }
                   triple => vector<text>
                   sub    => triple & { extra: text }
                 """).contains("has no fields to contribute"));

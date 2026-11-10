@@ -38,7 +38,7 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
-- [ ] **A literal under a closed type in a record template is judged only when the template closes**
+- [ ] **A literal under a closed type in an open record is judged only when the template closes**
   ([TSON-SCHEMA] §5.10). `t => <T> { a: T  n?: int8 ~ 500 }` loads, the default held until an application closes the
   field; the type is closed, so its verdict cannot vary by application and §5.10 judges it at the declaration, as
   §5.2 judges any default or pin. Judge a literal whose field type mentions no parameter when the template is
@@ -50,20 +50,16 @@ spec-required case:
   entry for the same application (`design/template-materialisation.md`, "Operands and on-demand closing"). Unify the
   on-demand closing with a later declaration that owns the application, and add `schema/valid` vectors in both orders
   with one expected output.
-- [ ] **A template named bare inside a held body is not refused** ([TSON-SCHEMA] §5.10). No position names a template
-  bare, and the linker refuses one everywhere a reference is a value of the model, a record template's own fields and
-  parents included (`TsonSchemaLinker.checkArity`). A held body (`TemplateBody`, a template over any constructor but
-  `record`) is text, and its tokens are field names, literals and references alike, so only its applications are
-  checked: `wrap => <T> [ ( T | box ) ]` over `box => <T> { v: T }` loads until something applies `wrap`. It goes
-  when held bodies do, a template body becoming a record body; refuse it there and add a `schema/invalid` vector.
-- [ ] **An alias of a template cannot be applied** ([TSON-SCHEMA] §8.3). `design/resolver-vocabulary-and-bootstrap.md`
-  says an application through an alias of a template applies the template (`TemplateMaterialiser.templateHead`), but
-  `r => ref_of<order>` over `ref_of => meta.ref` is refused ("'ref_of' declares no type parameters"), and so are
-  `bx<text>` over `bx => box` (a record template) and `vv<text>` over `vv => vec` (a held one); no test or vector
-  covers the case. Once it closes, a data reference written with the alias head (`bx<uuid>`) must find the entry
-  `box<uuid>` closed to: `ReferenceBody.entryOf` follows the arguments' alias chains but not the head's, and
-  `TemplateMaterialiser.close` records a use site under its written head only. Add a `schema/valid` and a
-  `validate/valid` vector.
+- [ ] **An open record's own references are judged only where it is applied** ([TSON-SCHEMA] §5.10, §3.3). An open
+  record is read at its declaration, and a name its fields or parents write that is neither one of its parameters nor
+  an entry is an unresolved reference there; the linker checks only arity over an open record
+  (`TsonSchemaLinker.checkOpenArity`), so `box => <T> { v: T  w: no_such_type }` gets its verdict at each application,
+  retargeted to `box` (`heldDeclarationNaming`), and none while nothing applies it. Judge the references that are no
+  `ParamRef` with `validateTypeRef` at the declaration, and add a `schema/invalid` vector for the unapplied case.
+- [ ] **An application through an alias is untested** ([TSON-SCHEMA] §8.3). An application through an alias of an
+  open record applies the open record (`TemplateMaterialiser.templateHead`: `bx<text>` over `bx => box` closes to the
+  record `box<text>` closes to), and one through an alias of a constructor constructs (`ref_of<order>` over `ref_of =>
+  meta.ref`); no test or vector pins either. Add a `schema/valid` vector for each, with the expected resolved form.
 - [ ] **A nested or aliased application across imports is untested at the IS-A edge fold.** An imported schema's
   `@meta.application` is the application as written, nested arguments unreduced (`pair<box<text> int32>`), and
   reaches the importer's edge fold in that form, where the fold expects the reduced one. Add a link vector with a nested and
@@ -80,7 +76,7 @@ spec-required case:
   ("field 'r' is typed by the application 'meta.ref<meta.record>' written inline …"): the reader compiled from the
   entries ready so far (`SchemaResolver.readySoFar`) meets the field still typed by the application, whose minted entry
   materialisation makes only after every declaration is ready, and reads it with an `UnclosedApplicationReader`. Naming
-  the application (`records => meta.ref<meta.record>`, `holder => { r: records }`) reads. A record template applied
+  the application (`records => meta.ref<meta.record>`, `holder => { r: records }`) reads. An open record applied
   inline (`{ b: box<text> }`) is the same gap, and so is a value of a map or namespace type whose `value_type` is
   `box<text>`. Make the application wait in the order, as a named one does -- close it on demand
   (`TemplateMaterialiser.closeApplication`) and type the ready copy's field by the minted name -- and add a
@@ -153,10 +149,6 @@ spec-required case:
   §5.7's rules, are not judged either: its chain is empty. The resolver holds the inherited field
   (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a deferred judgement there, or the inherited
   fields carried to link, would close all three without reporting a case the link already judges twice.
-- [ ] **Remove `DefinitionResolver.refuseAbsorbedSpelling`** ([TSON-SCHEMA] §5.10). With every argument a reference,
-  a name an absorbed field's argument writes is a namespace entry, so the shadowing rule
-  (`SchemaResolver.OnDemand.refuseShadowingParameters`) already refuses a parameter spelled like it; delete the rule,
-  its message and the second invariant in `design/held-template-bodies.md` that states it.
 
 - [ ] **A dependent field whose sibling names an unbound type fails each read, not the bind-mode compile.** With
   `payload: kind!` and `kind` admitting a type no class binds, a document naming that type throws
@@ -206,11 +198,7 @@ spec-required case:
   members merged. The schema body is a map "in syntax and in semantics" (§2.1), so the repeated key is a duplicate
   (a resolver error); §2.2.3's union of a nested map is across the documents of a closure, each contributing by
   declaring the map once. Add a `schema/invalid` vector.
-- [ ] **A template that applies itself forever loads while nothing applies it** ([TSON-SCHEMA] §5.10).
-  `loop => <T> loop<T>` resolves; §5.10 says what is wrong with that declaration is that it applies itself forever and
-  denotes no type, and that is what its diagnostic names — a fact of the declaration, not of an application. Refuse
-  an alias template whose target chain returns to itself with no constructor between, at the declaration, and add a
-  `schema/invalid` vector.
+
 - [ ] **A loop of aliases is reported as unproductive recursion** ([TSON-SCHEMA] §3.4.1 rule 4, §8.3). `a => b`
   beside `b => a` is refused with §5.10.1's message ("can never be satisfied by any document … nothing in that chain
   can be left out"); §3.4.1 says a loop of aliases is not a wait cycle and §8.3 refuses it as an alias chain with no
@@ -512,11 +500,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `members` at an enum-typed component; if it refuses, decide whether the binder maps a member set as it maps an
   enum's members, and pin the answer in a bind-mode test.
 
-- [ ] **A one-position tuple is named in a diagnostic in array spelling.** `only: meta.tuple1<text>` given `[]` reports
-  `'[text]' has 1 positions, found only 0 elements`: `meta.tuple1<text>` expands to a tuple no author named, and
-  `EntryDisplayName` renders a one-element `TupleBody` as `[text]`, which is the array. Render no name for it, as a set
-  gets none (`EntryDisplayName.authored`), and let `TupleDiagnostics` state the rule alone where it has no name, as
-  `ArrayDiagnostics` does.
 
 - [ ] **A map key's pointer step is the key's Java rendering.** `MapAbstractReader.readInto` replaces the `?`
   placeholder for any key that is not a single token with `ValueIdentity.nameOf(key)` or `String.valueOf(key)`, so
@@ -529,8 +512,9 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   a compound key keeps `?` until it has a pointer form. The JSON encoding writes such a map as pairs and reports
   `/grid/0/1`, so the two encodings disagree about the step too.
 
-- [ ] **A tuple refused a scalar prints the event record.** `only: meta.tuple1<text>` given `a` reports `expected a
-  tuple (array-shaped) for '[text]', found TokenEvent[text=a, form=UNQUOTED, position=…]`: `TypeRefCheck.describe`
+- [ ] **A tuple refused a scalar prints the event record.** `only: one_text` over `one_text => !meta.tuple [{
+  element_type: text }]` given `a` reports `expected a tuple (array-shaped) for 'one_text', found TokenEvent[text=a,
+  form=UNQUOTED, position=…]`: `TypeRefCheck.describe`
   names a record, map, array, `{}` and `_` and falls back to `String.valueOf` for anything else, so a scalar token
   arrives as its `toString`. It has 18 callers, all exposed the same way, and a constructor body's reference-typed slot
   given a quoted token (`!meta.array { element_type: "text" }`) prints it the same way through another path; a scalar

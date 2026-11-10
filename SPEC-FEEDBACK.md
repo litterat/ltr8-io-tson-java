@@ -128,7 +128,7 @@ record, or a template named bare at a position.
 What follows from them: no value parameters, no derived bounds, no template named as a type, no template over a body
 that is not a record, and no `meta.template` or `meta.record_template`.
 
-**What is running** on the Revision 40 proposal branch, step by step. Everything not listed is Revision 39's.
+**What is running** on the Revision 40 proposal branch, step by step; every step of the proposal runs.
 
 - *§5.10, value parameters: gone.* A parameter is a type. It stands at a slot typed `meta.type_ref` or a refinement
   of it, or as an argument of an application; anywhere else is a resolver error at the declaration, naming the slot:
@@ -137,16 +137,14 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   argument list is a grammar error, in a schema document and in data (`maxint<10>`, `box<"x">`).
   `meta.template_param` is `{ name, bound? }` and `meta.record_template_field` has no `value_param`. A value that
   differs per application is written where the application is declared,
-  `created => response<order> & { status?: = 201 }`. Still as in Revision 39: a parameter at a construction's type
-  slot (`<T> !meta.array { element_type: T }`), which the kernel's `set`, `meta.ref` and `tuple1` are until the
-  kernel moves. The rule that a parameter may not be spelled like a name an absorbed field type writes no longer
-  refuses anything the shadowing rule does not: every such name is an entry.
+  `created => response<order> & { status?: = 201 }`. A parameter spelled like a name an absorbed field's type
+  writes is refused by the shadowing rule alone, every such name being an entry, and has no rule of its own.
 - *§5.10, bounds: written, never inherited.* A parameter's bound is what its declaration writes, `<T: text>`, and is
   otherwise absent; nothing about a parameter is inferred from its uses, so a parameter is known in full at its
   declaration and no fixed point runs across templates. A parameter passed as an argument to a bounded parameter of
   another template is written with a bound that IS-A that one, wherever it is an argument: a field type, an
-  application nested in one or inside container sugar (`[boxed<T>]`), an applied parent, an alias template's
-  target, a held construction's type slot. With `boxed => <T: text> { v: T }`, `rebox => <T: text> { b: boxed<T> }`
+  application nested in one or inside container sugar (`[boxed<T>]`, the reference `meta.array<boxed<T>>`), an
+  applied parent. With `boxed => <T: text> { v: T }`, `rebox => <T: text> { b: boxed<T> }`
   and `<T: non_empty_text>` resolve, `rebox => <T> { b: boxed<T> }` is a resolver error at `rebox` naming `boxed`'s
   `T: text`, and `<T: int32>` stays refused. An imported template's recorded bound binds the same way, being the
   one its author wrote. A parameter passed to a constructor's slot (`<K> { m: meta.namespace<K text> }`) needs no
@@ -171,7 +169,8 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   incomplete (`meta.enum_type<meta.identifier>`, with `members` unwritten) are refused. Three points the rule leaves
   open are settled as built: a field with a default is no argument slot; a use-site construction names its
   content-keyed entry and never a declaration of the same construction; and an argument is not followed through an
-  alias, which is the sugar forms' identity. The kernel's `set` and `meta.ref` are still templates.
+  alias, which is the sugar forms' identity. An open record is applied by substitution and never constructed,
+  whatever its chain reaches.
 - *§5.10, a template as a type: gone.* No position names a template bare: not a field, element, map key or value,
   tuple position, choice variant or argument, not a slot typed by a reference over types, and not an operand of `&`
   or `^`. A template named inside its own record body is refused too. Each is a resolver error at the declaration
@@ -183,8 +182,31 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   dispatching over the declarations composing it; a selector makes a template's applications abstract as it makes a
   record so. `final` on a template is a resolver error. A family is declared with records: an abstract base, a
   template composing it, and members composing an application that pin the selector. A use-site application whose
-  template composes a declared type is still refused as an unnameable member. Still as in Revision 39:
-  `meta.record_template` is its own constructor.
+  template composes a declared type is still refused as an unnameable member.
+- *§5.10, a template is an open record: running.* `meta.record` carries `parameters?: [meta.param; 1..]`, each
+  `{ name, bound? }`; a record with parameters is open, a template, and the kernel declares no other template
+  constructor and no template: `template`, `template_param`, `record_template`, `record_template_field`,
+  `record_template_field_map`, `tuple1` and `voidable_tuple1` are gone, `meta.ref` is the refined constructor
+  `meta.reference_type ^ { allow_sibling?: = false }` and the root's `set` an alias of `meta.set_type`, so
+  `meta.ref<X>` and `set<text>` are constructions and carry no `@meta.application`. An open record is read at its
+  declaration against `record`'s own vocabulary: a parameter is a reference value, written as its name and looked up
+  in the record's `parameters` before the namespace, standing at a field's `type` or among an application's
+  arguments there or in a parent, and a field's value, a field's name and the record's `name_type` take none. Its
+  resolved form is `!meta.record { parameters: [ !meta.param { name: T } ] … type: T … }`; an application substitutes
+  the parameters away, computes the chain from the substituted parents and closes to a `!meta.record` without
+  `parameters`. A template's body is a record body -- braces, a composition or a refinement, the explicit
+  `<T> !meta.record { … }` among them -- and a parameter list before anything else is a resolver error at the
+  declaration naming the remedy: before a container constructor or container sugar (`<T> !meta.array { … }`, `<T> [T]`),
+  the application at the use site or a refined constructor applied; before a choice or a tuple, a discriminated
+  record family or a field group; before a value (`<T> !api { … }`), one value per instantiation; before a bare
+  reference (`<B> pair<uuid, B>`, `<T> T`), no alias template. Inside an open record a form over a parameter is
+  admitted only where it is a reference: `[T]` and `{K => V}` are the references `meta.array<T>` and `meta.map<K V>`,
+  held as written until the record is applied and then constructed; `[T; 1..]`, `[T?]`, `{K => V; ..10}`, a choice and
+  a tuple over a parameter are each a resolver error at the declaration naming the form, a choice's pointing at field
+  groups. Nothing is lifted for a form over a parameter, so there are no open synthetic entries. Writing `parameters`
+  as a binding of a construction of `record` is a resolver error: parameters are the list before the body. The
+  kernel measures 81 entries, one wait cycle of 25 holding `meta.record`, a closure of 69 with `meta.param` and
+  `meta.param_name` in it, and six synthetic entries.
 
 **Resolution proposed.** In §4.2, replace "and in a data document an application at a reference-typed slot names the
 entry the closure closed it to … a schema closing every application it holds before it loads" with "and in a data
@@ -213,5 +235,39 @@ template's written parents' — each closed parent, and for an applied parent th
 never the template's own name. `abstract` and the selectors on a template are each application's `extension` and
 `discriminators`, a selector making the application abstract as it makes a record so; `final` on a template is a
 resolver error", and delete the family/abbreviation split in ¶952, ¶1001's "a family base is reached by a position",
-the record-template half of ¶1003 and of §8.1 ¶1457, and §4.2's `kind<record_template>`. The text for the other
-steps follows as each lands.
+the record-template half of ¶1003 and of §8.1 ¶1457, and §4.2's `kind<record_template>`.
+
+For a template as an open record, replace ¶954, ¶958 and ¶1003 with: "**An open record is a record with
+parameters.** `<T, U: bound>` before a record body -- braces, a composition or a refinement -- declares its
+parameters, each a name standing at a field's type, or as an argument of an application there or in a parent, and
+nowhere else: a field's value is never a parameter. There a parameter is a reference value: inside an open record a
+reference is a name, an application, a sibling reference or one of the record's parameters, looked up before the
+namespace (the shadowing rule). The slot judges the argument that arrives there when the record is applied. So the
+body is read at the declaration against `record`'s own vocabulary. A reference names an open record only as the head
+of an application (§5.10, "A template is not a type"); only `record` carries parameters. **At a reference slot of a
+schema document, `H<args>` is a reference.** Resolving it substitutes where `H` is an open record -- binding the names
+it writes and filling the slots they mark -- and constructs where `H` is a constructor (§5.3). It supplies every
+argument, so there is no partial application, and `void` is an argument like any type. In a data document a
+reference is a name, and an application is a validation error (§4.2). With every argument closed it resolves at
+once, to the declaration that names it or its expansion (§8.2); with a parameter among its arguments it is held as
+written until the open record holding it is applied. The result is a value of the body's constructor and a type. Its
+IS-A edges are a substituted record's parents, or none for a construction; the head is never one. An argument is
+judged against the parameter's written bound, or for a constructor's field against the slot's `of`. **No other form
+holds a parameter.** Inside an open record, a sugar form over a parameter is the reference its construction is
+written as (`[T]` is `meta.array<T>`, `{K => V}` is `meta.map<K V>`). Any other form over a parameter is a resolver
+error at the declaration. Container sugar carrying a size or a `?` -- `[T; 1..]`, `[T?]` -- sets a field no argument
+list carries, so §5.3's freedom of position for those forms stops at a parameter. A choice or a tuple -- `( T | error
+)`, `[T, text]` -- is not written as a reference over reference fields, and an untagged sum over a parameter cannot be
+judged disjoint until it is applied (§5.4). A labelled alternative inside the record is a field group: `( body: T |
+problem: problem )`." Replace ¶1017-1024 with: "**No alias templates.** A template's body is a record body; a body
+that is a bare reference -- `<B> pair<uuid, B>`, `<T> T` -- is a resolver error. A use site writes the application it
+means." Then delete ¶986 ("Declaration-time checking splits …") with its stand-in-value prohibition, most of ¶988
+("Where a deferred diagnostic lands"), the example block at ¶994-997, §8.2 ¶1535's "parsed held body" and its
+identity clause for open synthetic entries, §5.3's open half of the lift rule, every mention of `meta.template` in
+§8.1, and narrow §12.1's `type-def` alternative `[type-params] type-expr` to a record body; and in §13.1 and the
+kernel's companion text replace `template`, `template_param`, `record_template`, `record_template_field`,
+`record_template_field_map`, `tuple1` and `voidable_tuple1` with `record.parameters` and `param`, `meta.ref` with the
+refined constructor and the root's `set` with an alias of `meta.set_type`. The spec's own examples that need a record
+body move to one: `result => <T> ( T | error )` becomes a discriminated family (`result_of => <T> result & { value?: T
+}`), and §5.10.1's and §8.2's `nested => <T> ( T | [nested<T>] )` becomes a record, `nested => <T> { value?: T  more?:
+[nested<T>] }`.

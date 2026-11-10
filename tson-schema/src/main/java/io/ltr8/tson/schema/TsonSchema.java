@@ -26,8 +26,8 @@ import java.util.Optional;
  * SchemaMap.declarations}' own ordering guarantee.
  *
  * <p><b>An entry is its value</b> ([TSON-SCHEMA] §8.1): a name maps to the body it resolves to -- a {@code
- * RecordBody}, an atom family's instance, an {@code Alias}, a {@code TemplateBody}, a {@code ValueEntry} -- and a
- * type body, a record template's included, carries its own IS-A chain ({@code Type.chain}). The entry's kind is
+ * RecordBody} (an open record's included), an atom family's instance, an {@code Alias}, a {@code ValueEntry} -- and a
+ * type body carries its own IS-A chain ({@code Type.chain}). The entry's kind is
  * its value's ({@code EntryKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
  *
  * <p><b>A schema map nested as an entry keys its members under their paths</b> ({@link SchemaPaths}): {@code
@@ -342,8 +342,8 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
 
     /**
      * The application {@code name} is the instantiation of ([TSON-SCHEMA] §8.2): the {@code @meta.application} its key
-     * carries, which the resolver writes wherever an entry closes one -- a record template's member, a namespace
-     * entry, the alias a template's application closes to. Empty for an entry that closes none.
+     * carries, which the resolver writes on the entry an open record's application closes to, a declared one or one
+     * whose expansion names itself. Empty for an entry that closes none, a construction among them.
      */
     public Optional<TypeRef> applicationOf(String name) {
         return applicationOf(entries.getAnnotations(name));

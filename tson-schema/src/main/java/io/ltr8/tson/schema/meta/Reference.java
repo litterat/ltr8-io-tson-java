@@ -3,14 +3,16 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Annotations;
 
 /**
- * What the kernel's {@code reference} atom reads to, as written: a name, an application or a sibling reference. A
- * {@link TypeRef} (a {@link NameRef} or an {@link ApplicationRef}) names a type; a {@link SiblingRef}, {@code kind!},
- * names a field of the enclosing record whose value chooses the type.
+ * What the kernel's {@code reference} atom reads to, as written: a name, an application, a parameter or a sibling
+ * reference. A {@link TypeRef} (a {@link NameRef}, an {@link ApplicationRef}, or inside an open record a {@link
+ * ParamRef}) names a type; a {@link SiblingRef}, {@code kind!}, names a field of the enclosing record whose value
+ * chooses the type.
  *
- * <p><b>A sibling reference stands only at a record field's type</b> ([TSON-SCHEMA] §5.2, proposed): {@link
- * RecordField#type} and {@link RecordTemplateField#type} are typed {@code Reference}, and every other slot holding a
- * reference -- an alias target, an element, key or value type, a choice variant, a tuple element, a parent, a
- * template argument -- is typed {@link TypeRef}, so the position rule is the Java type.
+ * <p><b>A sibling reference stands only at a record field's type</b> ([TSON-SCHEMA] §5.2): {@link RecordField#type}
+ * is typed {@code Reference}, and every other slot holding a reference -- an alias target, an element, key or value
+ * type, a choice variant, a tuple element, a parent, an argument -- is typed {@link TypeRef}, so the position rule is
+ * the Java type. A parameter stands at a record field's type and as an argument, and is a {@link TypeRef} for the
+ * second.
  *
  * <p><b>Identity</b> is the variant and its components, {@code annotations} excluded: {@code kind}, {@code kind<T>}
  * and {@code kind!} are three references.

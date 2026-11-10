@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.unicode.IdentifierType;
-import io.ltr8.tson.schema.meta.RecordHead;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
@@ -38,14 +38,14 @@ final class FieldNames {
 
     /**
      * The definition {@code record}'s field names are read by, where its field name type is not the kernel's
-     * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#nameTypes} carries to its readers. A record
-     * template's too: no reader reads a value against it, and its member dispatch matches the selectors' keys in
+     * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#nameTypes} carries to its readers. An open
+     * record's too: no reader reads a value against it, and its member dispatch matches the selectors' keys in
      * the form its members read them. Empty for the default, which every reader applies without being told, and
      * for a type that resolves to nothing.
      */
     static Optional<Top> readBy(Top record, Map<String, Top> merged,
                                            Function<String, Top> structure) {
-        if (RecordHead.of(record).flatMap(RecordHead::nameType).isEmpty()) {
+        if (!(record instanceof RecordBody body) || body.nameType().isEmpty()) {
             return Optional.empty();
         }
         return NameType.of(record, Optional.empty(), merged::get, structure).map(NameType.Resolved::definition);
@@ -57,20 +57,21 @@ final class FieldNames {
         List<EnumLabels.Violation> violations = new ArrayList<>();
         for (String name : localNames) {
             Top definition = merged.get(name);
-            // A template's field names are each application's, so they are judged once, here.
-            RecordHead.of(definition).flatMap(head -> check(name, definition, head, merged, structure))
-                    .ifPresent(violations::add);
+            // An open record's field names are each application's, so they are judged once, here.
+            if (definition instanceof RecordBody record) {
+                check(name, definition, record, merged, structure).ifPresent(violations::add);
+            }
         }
         return List.copyOf(violations);
     }
 
-    private static Optional<EnumLabels.Violation> check(String name, Top definition, RecordHead body,
+    private static Optional<EnumLabels.Violation> check(String name, Top definition, RecordBody body,
                                                         Map<String, Top> merged,
                                                         Function<String, Top> structure) {
         Optional<NameType.Resolved> resolved = NameType.of(definition, Optional.empty(), merged::get, structure);
         if (resolved.isEmpty() && body.nameType().isEmpty()) {
             // The default where no kernel is in scope to resolve it: the identifier grammar it stands for.
-            for (String field : body.fieldNames()) {
+            for (String field : body.fields().keySet()) {
                 Optional<String> violation = io.ltr8.tson.atom.IdentifierGrammar.validate(field);
                 if (violation.isPresent()) {
                     return Optional.of(new EnumLabels.Violation(name, "'" + name + "': field name '" + field
@@ -106,7 +107,7 @@ final class FieldNames {
         boolean identifier = NameType.isIdentifier(type, structure);
         String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameTypeName() + "'";
         Map<Object, String> seen = new HashMap<>();
-        for (String field : body.fieldNames()) {
+        for (String field : body.fields().keySet()) {
             Optional<EnumLabels.Violation> problem = read(name, ofType, parser.get(), field);
             if (problem.isPresent()) {
                 return problem;

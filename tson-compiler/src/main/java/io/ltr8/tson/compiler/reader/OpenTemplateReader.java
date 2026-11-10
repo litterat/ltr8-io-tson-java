@@ -9,14 +9,14 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import java.util.List;
 
 /**
- * The reader every template compiles to -- an open entry, a record template or a held body, which is a template
- * rather than a type ([TSON-SCHEMA] §5.10). Reports the author's mistake and skips the value, exactly like any
+ * The reader every template compiles to -- an open record, which is a template rather than a type ([TSON-SCHEMA]
+ * §5.10). Reports the author's mistake and skips the value, exactly like any
  * other reader that finds the data isn't what the schema admits.
  *
  * <p><b>Reaching this is always a data error, never a schema one.</b> A schema referring to a template
  * without applying it is rejected far earlier, when the schema is linked ({@code TsonSchemaLinker}'s own
  * arity rule), so no field, element or supertype can route here. What is left is a <em>data</em> type-ref
- * naming the template directly -- {@code !rows [ ... ]} against {@code rows => <T> [T]} -- at the document root
+ * naming the template directly -- {@code !page { ... }} against {@code page => <T> { items: [T] }} -- at the root
  * or anywhere a type-ref selects a reader. It is among the likeliest author mistakes: a template is the natural
  * thing to name for "a list of orders".
  *

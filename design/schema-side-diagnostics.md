@@ -98,22 +98,19 @@ distinction. They rethrow the original untouched (the linker re-states only an `
   Left in place, an application of one runs to `MAX_CLOSING_DEPTH` and reports the same defect again, against
   whichever entry applied it, with a 64-link chain of synthetic names. **The depth guard does not stand down**: it
   guards a hole in the static check, not a template the check already condemned.
-- **A defect a held body deferred is reported against the declaration whose text wrote it**
+- **A defect an open record deferred is reported against the declaration whose text wrote it**
   (`TsonSchemaLinker.heldDeclarationNaming`). A template's references cannot be settled until an application supplies
   arguments, so the verdict arrives on the entry materialisation minted, and the walk to a positioned entry
   (`reportedAgainst`) finds the *applier*: `box => <T> { v: T  w: no_such_type }` would be reported against
   `holder => { b: box<text> }`, a line that is not wrong, once per applier. Deferred checking is survivable only if the
   author is sent to the line they can edit.
   - **The offending name is the evidence, not the entry.** A derived entry's provenance cannot answer this: a sugar
-    lift records only the constructor it applies, and an alias composes its argument into someone else's application
-    (`half => <B> pair<no_such_type, B>` closes to a `pair` instantiation, and `pair` is faultless). Asking which held
-    body *mentions the name* (`HeldBody.names()`) reaches `half` directly — and reaches nothing when the name came from
-    the argument list, so `box<some_typo>` keeps its verdict at the application, where that mistake is.
+    lift records only the constructor it applies. Asking which open record *mentions the name* among its references
+    (`OpenEntry.names`) reaches the template directly -- and reaches nothing when the name came from the argument
+    list, so `box<some_typo>` keeps its verdict at the application, where that mistake is.
   - **Both filters are load-bearing.** Only a *derived* entry (no position of its own) is retargeted, or a closed
     declaration's own typo would be blamed on any template that names it; and only an authored open declaration
-    (`OpenEntry.isOpen`) is a candidate. `HeldBody.names()` cannot tell a type reference from a field name, so it is
-    asked only about a name already known to resolve to nothing; a field of that name misleads no worse than naming
-    the applier does.
+    (`OpenEntry.isOpen`) is a candidate.
   - **The subject moves with the location**, which is why `UnresolvedReference` carries the sentence in parts
     (subject, trail, name): `'box<text>' field 'w'` states the mistake against an application that is itself correct.
     It is linker-internal and re-stated as a `SchemaValidationException` — not a subclass of it, since that type is

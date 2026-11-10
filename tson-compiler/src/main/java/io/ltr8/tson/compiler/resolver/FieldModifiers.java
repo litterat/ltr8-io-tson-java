@@ -15,11 +15,9 @@ import java.util.Optional;
  * marks one to one, and what this table adds is the spellings it refuses. It consults nothing but the marks
  * the author wrote, which is why it can be answered before a field's type is known.
  *
- * <p><b>Two phases ask it.</b> {@link SchemaDesugarer} asks when it rewrites a record template's body into
- * the {@code !meta.record_template { fields: { ... } }} §5.2 says it denotes, and writes the answer as wire fields;
- * {@code DefinitionResolver} asks when it resolves a closed record body, and writes the answer into a
- * {@code RecordField}. One table, so the spellings and the errors around them cannot drift apart between a
- * template and the closed record beside it.
+ * <p>{@code DefinitionResolver} asks it when it resolves a record body, open or closed, and writes the answer into a
+ * {@code RecordField}, so the spellings and the errors around them are one table for a template and the closed
+ * record beside it.
  */
 final class FieldModifiers {
 

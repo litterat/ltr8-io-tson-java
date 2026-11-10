@@ -24,7 +24,7 @@ import java.util.Optional;
 /**
  * [TSON-SCHEMA] §5.2's rules for a dependent field, {@code v?: kind!}, checked at the declaration against the
  * flattened record: a field whose type is a sibling reference, read per instance against the type its sibling's
- * value names. The linker asks {@link #check} of every closed record, so a record template's member is judged once its
+ * value names. The linker asks {@link #check} of every closed record, so an open record's member is judged once its
  * application closes it.
  *
  * <ul>
@@ -41,7 +41,7 @@ import java.util.Optional;
  *       A sibling that is optional with no default, or voidable, is refused, as is a member beside a required
  *       dependent field.</li>
  *   <li><b>A sibling's default or pin names a type a value can be read against</b>: a template, which no value is read
- *       against until it is applied, is refused, a record template among them, and so is a sibling reference. That it
+ *       against until it is applied, is refused, and so is a sibling reference. That it
  *       is a member of the sibling's reference is the field-value check's ({@code TsonSchemaLinker}).</li>
  *   <li><b>A dependent field is never voidable and carries no default or pin</b>: its type is not fixed at its
  *       declaration, so neither is the type a value of it would be read against.</li>
@@ -130,8 +130,8 @@ final class DependentFields {
     }
 
     /**
-     * A sibling's default or pin names a type a value can be read against. A template is refused, a record template
-     * among them: a template is no type (§5.10), and reading never starts a materialisation.
+     * A sibling's default or pin names a type a value can be read against. A template is refused: a template is no
+     * type (§5.10), and reading never starts a materialisation.
      */
     private static void checkSiblingValue(String about, RecordField field, Token value, Map<String, Top> namespace) {
         String noun = field.role() == FieldRole.FIXED ? "pin" : "default";

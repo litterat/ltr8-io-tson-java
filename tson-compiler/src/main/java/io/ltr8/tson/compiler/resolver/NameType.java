@@ -4,7 +4,7 @@ import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.RecordHead;
+
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.unicode.IdentifierType;
@@ -12,7 +12,7 @@ import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
 import io.ltr8.tson.schema.unicode.TextFamily;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -56,15 +56,15 @@ public final class NameType {
     /**
      * {@code entry}'s name type, given the constructor its value applies (an enum's decides whether its {@code
      * name_type} is the constructor's pin), and two lookups, the schema's own namespace and the one holding the
-     * constructor -- the same namespace, from the linker. Empty for a body that is neither an enum nor a record or
-     * record template, and for a {@code name_type} that resolves in neither namespace.
+     * constructor -- the same namespace, from the linker. Empty for a body that is neither an enum nor a record, open
+     * or closed, and for a {@code name_type} that resolves in neither namespace.
      */
     public static Optional<Resolved> of(Top entry, Optional<String> constructor, Function<String, Top> local,
                                         Function<String, Top> structure) {
         if (entry instanceof EnumBody body) {
             return ofEnum(constructor, body, local, structure);
         }
-        return RecordHead.of(entry).flatMap(head -> ofRecord(head.nameType(), local, structure));
+        return entry instanceof RecordBody record ? ofRecord(record.nameType(), local, structure) : Optional.empty();
     }
 
     /**
@@ -99,24 +99,15 @@ public final class NameType {
 
     /**
      * The kind {@code entry}'s {@code name_type} slot is typed by: the {@code name_type} field of the constructor
-     * {@code entry}'s value applies -- through a constructor template's held body to the constructor it applies
-     * -- read in {@code structure} first, then {@code local}; the linker hands both the schema's one namespace.
-     * Empty where no such constructor or kind is in reach.
+     * {@code entry}'s value applies -- read in {@code structure} first, then {@code local}; the linker hands both the
+     * schema's one namespace. Empty where no such constructor or kind is in reach.
      */
     private static Optional<ReferenceBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
                                                Function<String, Top> structure) {
         Function<String, Top> constructors = fallingBackTo(structure, local);
         Optional<String> head = constructor.or(() -> Optional.of(TsonSchema.constructorOf(entry)));
-        Set<String> seen = new HashSet<>();
-        while (head.isPresent() && seen.add(head.get())) {
-            Top found = constructors.apply(AliasChain.terminal(head.get(), constructors));
-            if (found instanceof TemplateBody held) {
-                head = HeldBody.of(held).application().typeRef();
-                continue;
-            }
-            return slotKindOf(found, constructors);
-        }
-        return Optional.empty();
+        return head.flatMap(name -> slotKindOf(constructors.apply(AliasChain.terminal(name, constructors)),
+                constructors));
     }
 
     private static Optional<ReferenceBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
@@ -221,25 +212,14 @@ public final class NameType {
     }
 
     /**
-     * Whether {@code name_type} is the value the enum's {@code constructor} pins -- through a template's held body
-     * to the constructor it applies, where the name given is a template's.
+     * Whether {@code name_type} is the value the enum's {@code constructor} pins.
      */
     private static boolean pinned(Optional<String> constructor, EnumBody body, Function<String, Top> lookup) {
-        Optional<String> head = constructor;
-        Set<String> seen = new HashSet<>();
-        while (head.isPresent() && seen.add(head.get())) {
-            Top applied = lookup.apply(head.get());
-            if (applied instanceof TemplateBody held) {
-                head = HeldBody.of(held).application().typeRef();
-                continue;
-            }
-            return applied instanceof RecordBody record
-                    && Optional.ofNullable(record.fields().get(NAME_TYPE))
-                            .filter(field -> field.role() == FieldRole.FIXED)
-                            .flatMap(RecordField::value)
-                            .filter(value -> value.text().equals(body.nameType())).isPresent();
-        }
-        return false;
+        return constructor.map(lookup).filter(RecordBody.class::isInstance).map(RecordBody.class::cast)
+                .flatMap(record -> Optional.ofNullable(record.fields().get(NAME_TYPE)))
+                .filter(field -> field.role() == FieldRole.FIXED)
+                .flatMap(RecordField::value)
+                .filter(value -> value.text().equals(body.nameType())).isPresent();
     }
 
     private static Function<String, Top> fallingBackTo(Function<String, Top> primary,

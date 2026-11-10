@@ -39,7 +39,7 @@ class BootstrapReferencesTest {
     void aUseSiteNamesWhatWasWrittenOnTheBootstrapRouteToo() {
         TsonSchema kernel = KernelBootstrapResolver.kernelSchema();
 
-        RecordField name = field(kernel.entries().get("meta.template_param"), "name");
+        RecordField name = field(kernel.entries().get("meta.param"), "name");
         assertEquals("meta.param_name", name.typeRef().name());
         assertTrue(name.type().annotations().isEmpty(), "nothing records where it points");
     }

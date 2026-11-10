@@ -12,7 +12,6 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.ConstructionSugar;
-import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.compiler.resolver.ImportedSynthetics;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.NameType;
@@ -22,7 +21,6 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.ConfusableNames;
-import io.ltr8.tson.schema.meta.RecordHead;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
@@ -55,11 +53,9 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.numeric.RationalType;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.Alias;
@@ -120,9 +116,9 @@ import java.util.function.Predicate;
  * bind the constructor generically and so cover every shape, rather than the per-shape assemblers a
  * linker-side materialization would need -- and the resolver's {@code TemplateMaterialiser} closes every
  * template application into an entry. What survives into an entry the linker sees is therefore a bare name in
- * every position except one: an open entry's own body, which legitimately references its own parameters ({@code
- * array<T>}) and is checked only for what no argument changes -- the arity of the applications it writes, and a
- * literal argument whose type it leaves open ({@link #checkHeldArity}) -- never resolved against the schema. A
+ * every position except one: an open record's own fields and parents, which legitimately reference its own
+ * parameters ({@code box<T>}) and are checked only for what no argument changes -- the arity of the references it
+ * writes ({@link #checkOpenArity}) -- never resolved against the schema. A
  * closed entry holds no parameter, so every name it holds resolves in the schema's own namespace or is unresolved.
  *
  * <p><b>One namespace per schema (Part 2 §2.2.3, §3.3).</b> The namespace a schema is checked
@@ -328,33 +324,25 @@ public final class TsonSchemaLinker {
             // namespace check above has already reported them. A check here could never fire.
             // An enum whose members its own type refused has had its verdict: judging those members as names
             // too would report the one mistake twice.
-            Optional<RecordHead> head = RecordHead.of(body);
             List<String> names = refusedEnums.contains(name) ? List.of() : switch (body) {
                 case EnumBody enumBody -> List.copyOf(enumBody.members());
-                default -> head.<List<String>>map(record -> List.copyOf(record.fieldNames())).orElse(List.of());
+                case RecordBody record -> List.copyOf(record.fields().keySet());
+                default -> List.of();
             };
-            String noun = head.isPresent() ? "field names" : "members";
+            String noun = body instanceof RecordBody ? "field names" : "members";
             // An enum's members and a record's field names are names of its name type, an identifier family, and
             // are judged under that type's profile, whose added characters are its own.
             IdentifierProfile profile = NameType.profile(definition, constructorOf(name, definition, facts),
                             merged::get, structure)
                     .orElse(IdentifierGrammar.PROFILE);
             checkScope(receiver, schema, name, position, names, noun, identifiers, profile);
-            // A template's literal values are every application's, so they are judged here, once.
-            switch (body) {
-                case RecordBody record -> checkFieldValues(receiver, schema, name, position,
+            // An open record's literal values are every application's, so they are judged here, once.
+            if (body instanceof RecordBody record) {
+                checkFieldValues(receiver, schema, name, position,
                         record.fields().entrySet().stream()
                                 .filter(f -> f.getValue().value().isPresent() && f.getValue().sibling().isEmpty())
                                 .map(f -> new FieldValue(f.getKey(), f.getValue().typeRef(), f.getValue().role(),
                                         f.getValue().value().get())).toList(), merged, identifiers);
-                case RecordTemplateBody template -> checkFieldValues(receiver, schema, name, position,
-                        template.fields().entrySet().stream()
-                                .filter(f -> f.getValue().value().isPresent()
-                                        && f.getValue().type().orElse(null) instanceof TypeRef)
-                                .map(f -> new FieldValue(f.getKey(), RecordField.typeRef(f.getValue().type().get()),
-                                        f.getValue().role(), f.getValue().value().get())).toList(), merged,
-                                identifiers);
-                default -> { }
             }
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
@@ -415,7 +403,7 @@ public final class TsonSchemaLinker {
         }
     }
 
-    /** One field's literal value, with the type it is a value of -- a record's, or a record template's. */
+    /** One field's literal value, with the type it is a value of. */
     private record FieldValue(String name, TypeRef type, FieldRole role, Token value) {
     }
 
@@ -513,7 +501,7 @@ public final class TsonSchemaLinker {
      * references, which lead back to the author, rather than a lifted form's constructor, which leads away.
      *
      * <p><b>This answers "who reached it", which is the right question only when the defect is in what the
-     * author reached it <em>with</em>.</b> A defect a held body deferred is not: it is in the template's own
+     * author reached it <em>with</em>.</b> A defect an open record deferred is not: it is in the template's own
      * text, and every applier reaches that equally. {@link #heldDeclarationNaming} answers that one from the
      * offending name and runs first; this is the fallback, and stays the whole answer for a sugar lift, for
      * an argument the applier wrote, and for every defect no template deferred.
@@ -538,7 +526,7 @@ public final class TsonSchemaLinker {
     /**
      * A reference resolving to nothing, carried in <b>parts</b> rather than as a finished sentence.
      *
-     * <p>A held body defers every question about what its references resolve to, so an unresolved one
+     * <p>An open record defers every question about what its references resolve to, so an unresolved one
      * surfaces on the entry materialisation minted -- {@code box<int32>} -- when the name was written in the
      * template's own text. The two statements of that one fact differ in the subject alone, so the subject
      * is supplied at the point the fact is stated rather than baked in at the point it is discovered.
@@ -581,27 +569,21 @@ public final class TsonSchemaLinker {
      * The declaration a <b>deferred</b> defect belongs to: the open declaration whose body wrote the name, when
      * the entry that failed is one this resolver derived.
      *
-     * <p><b>Holding is what makes this necessary.</b> A closed declaration's references are checked where the
-     * author wrote them. A template's are not -- nothing about them can be settled until an application
+     * <p><b>Deferral is what makes this necessary.</b> A closed declaration's references are checked where the
+     * author wrote them. An open record's are not -- nothing about them can be settled until an application
      * supplies arguments -- so {@code box => <T> { v: T  w: no_such_type }} gets no verdict at its own
      * declaration and one verdict per applier instead, each against a line that is not wrong and does not
-     * contain the name. Deferred checking is what holding buys, and it is survivable only if the author is
-     * sent to the line they can edit.
+     * contain the name. Deferred checking is survivable only if the author is sent to the line they can edit.
      *
      * <p><b>The offending name is the evidence, not the entry.</b> Walking back the derived entry's derivation
-     * cannot answer this: a sugar lift's constructor is no author's, and an alias
-     * composes its argument into someone else's application ({@code half => <B> pair<no_such_type, B>}
-     * closes to a {@code pair} instantiation, and {@code pair} is not at fault). Asking instead which held
-     * body <em>mentions the name</em> reaches {@code half} directly, and reaches nothing at all when the
-     * name came from an argument the applier wrote -- {@code box<3>} and {@code box<some_typo>} keep their
-     * existing verdict at the application, which is where those two mistakes are.
+     * cannot answer this: a sugar lift's constructor is no author's. Asking instead which open record <em>mentions
+     * the name</em> reaches the template directly, and reaches nothing at all when the name came from an argument the
+     * applier wrote -- {@code box<some_typo>} keeps its existing verdict at the application, which is where that
+     * mistake is.
      *
      * <p><b>Both filters are load-bearing.</b> Only a derived entry is retargeted, or a closed declaration's
-     * own typo would be blamed on any template that happens to name it; and only a {@link TemplateBody}
-     * declaration is a candidate, since a defect no held body deferred is already located correctly.
-     * {@link TemplateBody#names()} cannot tell a type reference from a field name, which is why it is asked
-     * only about a name already known to resolve to nothing -- a field of that name is then the one
-     * remaining way to mislead it, and it misleads no worse than naming the applier does.
+     * own typo would be blamed on any template that happens to name it; and only an open record is a candidate, since
+     * a defect no open record deferred is already located correctly.
      *
      * @return the declaration to blame, or {@code null} to leave the failure where it surfaced
      */
@@ -612,7 +594,7 @@ public final class TsonSchemaLinker {
         }
         for (Map.Entry<String, Top> candidate : entries.entrySet()) {
             if (at(facts, candidate.getKey()).isPresent() && OpenEntry.isOpen(candidate.getValue())
-                    && HeldBody.namesOf(candidate.getValue()).contains(name)) {
+                    && OpenEntry.names(candidate.getValue()).contains(name)) {
                 return candidate.getKey();
             }
         }
@@ -780,7 +762,7 @@ public final class TsonSchemaLinker {
                     continue; // a declaration not yet ready: judged when the whole schema links
                 }
                 String author = heldDeclarationNaming(e.name(), entry.getKey(), merged, facts);
-                if (author == null) { // the applier's own text, or a name no held body wrote: blame the entry
+                if (author == null) { // the applier's own text, or a name no open record wrote: blame the entry
                     reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged, facts), facts,
                             e.getMessage(), e);
                     continue;
@@ -1328,16 +1310,15 @@ public final class TsonSchemaLinker {
                                       Function<String, Optional<String>> constructors, Function<String, String> shown,
                                       ValuesByName byName) {
         if (OpenEntry.isOpen(body)) {
-            // A held body is opaque to everything that needs to know what a reference *resolves to*: that
-            // cannot be settled until substitution supplies the arguments, so type-kind validation and
-            // inhabitance apply to it at materialisation instead, where the whole body resolves at once.
-            // Checking it here by substituting stand-in arguments would report errors on templates that are
-            // correct for every argument anyone passes.
+            // An open record's references are judged by what they resolve to once substitution supplies the
+            // arguments, so type-kind validation and inhabitance apply to its applications instead, where the whole
+            // record resolves at once. Checking it here by substituting stand-in arguments would report errors on
+            // templates that are correct for every argument anyone passes.
             //
             // Arity is the exception, and it is decidable: it asks how many parameters the *referenced*
-            // entry declares, which no argument changes. See checkHeldArity for why that has to be asked
+            // entry declares, which no argument changes. See checkOpenArity for why that has to be asked
             // here rather than left to an application that may never happen.
-            checkHeldArity(entryName, body, namespace, OpenEntry.parameterNames(body));
+            checkOpenArity(entryName, (RecordBody) body, namespace, OpenEntry.parameterNames(body));
             return;
         }
         checkCoherent(body);
@@ -1432,8 +1413,6 @@ public final class TsonSchemaLinker {
                 });
                 checkReferenceNarrows(entryName, reference, namespace);
             }
-            case TemplateBody ignored -> { } // open, answered above
-            case RecordTemplateBody ignored -> { } // open, answered above
             case VoidType ignored -> {
             }
             case IdentifierType ignored -> {
@@ -1605,9 +1584,8 @@ public final class TsonSchemaLinker {
     /** Every name an entry's body mentions, for {@link #checkOpenEntryUsesEveryParameter}. */
     private static void collectBodyNames(Top body, Set<String> into) {
         if (OpenEntry.isOpen(body)) {
-            // The one question an open body answers without being resolved: a held body's tokens, the same rule
-            // substitution follows when it decides what to rewrite, or a record template's labels and references.
-            into.addAll(HeldBody.namesOf(body));
+            // The one question an open record answers without being resolved: the names its references write.
+            into.addAll(OpenEntry.names(body));
             return;
         }
         switch (body) {
@@ -1632,8 +1610,6 @@ public final class TsonSchemaLinker {
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Alias alias -> collectNames(alias.target(), into);
-            case TemplateBody ignored -> { } // open, answered above
-            case RecordTemplateBody ignored -> { } // open, answered above
             case Atom ignored -> { } // an atom body names no type
             case DeclaredType ignored -> { } // its variants are the closure's, named by no field
             case ValueEntry ignored -> { } // a value names no type of its own
@@ -1671,7 +1647,6 @@ public final class TsonSchemaLinker {
             case Product product -> product.coherenceCheck();
             case Sum sum -> sum.coherenceCheck();
             case Alias ignored -> List.of();
-            case TemplateBody ignored -> List.of();
             case ValueEntry ignored -> List.of();
         };
         if (!violations.isEmpty()) {
@@ -1794,7 +1769,7 @@ public final class TsonSchemaLinker {
      * against one declaration is already reported with the declaration's own name and line.
      *
      * <p><b>Atoms and enums only, and the rest is refused.</b> A field typed by a record, container or choice
-     * carries no value ({@link #notAScalarType}). Only a closed record reaches here: a record template's member is
+     * carries no value ({@link #notAScalarType}). Only a closed record reaches here: an open record's member is
      * checked once materialisation has substituted its arguments, against the argument it was closed with.
      *
      * <p><b>A reference's value is a name.</b> At a reference over a constructor it is judged a member ({@link
@@ -1927,7 +1902,7 @@ public final class TsonSchemaLinker {
      * One reference validated. The entry it sits in is passed as {@code subject} and the path within that
      * entry as {@code trail} ({@code " field 'w'"}, {@code " element[1]"}) rather than pre-joined, because
      * {@link UnresolvedReference} has to be able to re-state itself against a different subject: a defect a
-     * held body deferred surfaces on the entry materialisation minted and belongs to the declaration whose
+     * open record deferred surfaces on the entry materialisation minted and belongs to the declaration whose
      * text wrote it, and only the subject differs between the two statements of it.
      *
      * <p>A slot typed {@code meta.type_ref} holds the name of a type a value can have: resolved, then judged a member of
@@ -1965,37 +1940,21 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * §5.10's arity rule over the <b>applications</b> a held body writes -- {@code chain => <T> { tail:
+     * §5.10's arity rule over the references an open record writes -- {@code chain => <T> { tail:
      * chain<T, T>? }} applies two arguments to a one-parameter template, and nothing ever closes that
      * application, so deferring the check would let the template ship with the mistake in it.
      *
      * <p><b>It can be answered without substituting</b>, which is why it belongs here at all: arity compares
      * the argument count written against the parameter count the referenced entry declares, and neither
-     * number depends on what the arguments resolve to -- the only thing holding withholds.
+     * number depends on what the arguments resolve to.
      *
-     * <p><b>A record template's every reference, bare ones included</b>: its field types and parents are references
-     * of the model, so a template named bare there is refused at the template's own declaration (§5.10). <b>A held
-     * body's applications only.</b> The rule's other half -- a template named without being applied -- is not
-     * decidable against held text: its tokens are field names, states, literals and type references alike, so
-     * "this token names a template" rejects a correct schema whose field happens to be called {@code box} beside
-     * a template of that name. So that half runs where the reference is unambiguous, on the entry
-     * materialisation mints.
+     * <p><b>An open record's every reference, bare ones included</b>: its field types and parents are references of
+     * the model, so a template named bare there is refused at the template's own declaration (§5.10).
      */
-    private static void checkHeldArity(String entryName, Top held,
+    private static void checkOpenArity(String entryName, RecordBody open,
             Map<String, Top> namespace, List<String> ownParameters) {
-        if (held instanceof RecordTemplateBody template) {
-            // A record template's references are values of the model, so a bare one is told from a field name and
-            // judged too: a template named bare inside a template is no type there either (§5.10).
-            template.references().forEach(reference ->
-                    checkArityThroughout(reference, namespace, ownParameters, "'" + entryName + "'"));
-            return;
-        }
-        for (TypeRef application : HeldBody.applicationsOf(held)) {
-            checkArity(application, namespace, ownParameters, "'" + entryName + "'");
-            for (TypeRef nested : application.arguments()) {
-                checkArity(nested, namespace, ownParameters, "'" + entryName + "'");
-            }
-        }
+        open.references().forEach(reference ->
+                checkArityThroughout(reference, namespace, ownParameters, "'" + entryName + "'"));
     }
 
     /** {@link #checkArity} over {@code ref} and every argument it carries, at any depth. */

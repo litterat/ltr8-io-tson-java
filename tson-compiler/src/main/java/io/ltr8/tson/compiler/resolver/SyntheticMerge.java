@@ -22,18 +22,13 @@ import java.util.Set;
  *
  * <p>Both channels name a form by the same function of the same thing -- the binding record with every inner
  * form already reduced to its entry name. {@code TemplateMaterialiser} always satisfies that, closing
- * applications before it names. {@code SchemaDesugarer} satisfies it for a nested <em>sugar</em> form,
- * lifting innermost-first so the inner entry exists by the time the outer is named, and cannot satisfy it for
+ * applications before it names a construction. {@code SchemaDesugarer} satisfies it for a nested <em>sugar</em>
+ * form, lifting innermost-first so the inner entry exists by the time the outer is named, and cannot satisfy it for
  * a nested <em>application</em>: {@code box<text>} has no entry until materialisation. So a form lifted
  * eagerly with an application in a slot is named from an unreduced record, and {@code [box<text>]} written
- * directly lands apart from {@code [box<T>]} closed with {@code T := text}. §8.2 states that split as the
- * reason the pass is mandatory:
- *
- * <blockquote>The merge pass is required, not an optimisation: a closed lift hashes its binding record at
- * desugar, before its inner applications are rewritten to entry names, while an open lift hashes the closed
- * record at materialisation, so without a pass that re-derives every synthetic's identity from its resolved
- * record, {@code [box<text>]} written directly and {@code [box<T>]} closed with {@code T := text} land on two
- * entries for one type.</blockquote>
+ * directly would land apart from {@code [box<T>]} inside an open record -- the reference {@code meta.array<box<T>>}
+ * -- constructed when the record is applied with {@code T := text}, two entries for one type. Re-deriving every
+ * lifted form's name from its resolved record once materialisation has run is what keeps them one.
  *
  * <p><b>The closed-record name wins, never the eager one.</b> It is a function of the resolved form alone,
  * so two schemas reaching one form by different spellings agree on it -- §8.2's determinism SHOULD, and what
@@ -54,17 +49,14 @@ final class SyntheticMerge {
      * that name. Empty -- the ordinary case -- when no lifted form held an application.
      *
      * <p>{@code declarations} is the <em>desugared</em> document's, so a lifted name's declaration is the
-     * {@code !C value} construction the phase injected and its binding record is recoverable from it. Open
-     * synthetics are skipped: §8.2 gives them their own identity rule (structural equality of the held body
-     * up to consistent renaming of parameters), and their bodies are held rather than closed.
+     * {@code !C value} construction the phase injected and its binding record is recoverable from it.
      */
     static Map<String, String> renames(Map<String, SchemaMap.Declaration> declarations, Set<String> generated,
                                         TemplateMaterialiser materialiser) {
         Map<String, String> renames = new LinkedHashMap<>();
         for (String name : generated) {
             SchemaMap.Declaration declaration = declarations.get(name);
-            if (!(declaration != null && declaration.typeDef() instanceof Instance instance)
-                    || !instance.typeParams().isEmpty()) {
+            if (!(declaration != null && declaration.typeDef() instanceof Instance instance)) {
                 continue;
             }
             String head = instance.value().typeRef().orElse(null);

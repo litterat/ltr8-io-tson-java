@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/40/m/temporal.tn?sha256=634a3043920d5cb631061e0aac7e9c919519dc715fad25b91df3857fe95760dd"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=7c50b455e3f76f831acebdaf951546dd432706b51f15e37a59129f7b3defd4ca"
+!!id:"https://tson.io/2026/40/m/temporal.tn?sha256=8614b61a6d981979a7181a85b485a25933fe458c3622a19b87e55a75f00bc7c8"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=3180cd8428499d15765007ccd83cf3e760aeca73306622d0670f7abffb900b45"
 @doc:"""
   TSON temporal — the temporal type library (2026 Revision 40 draft).
 
