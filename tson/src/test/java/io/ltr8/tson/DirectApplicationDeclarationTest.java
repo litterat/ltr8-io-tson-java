@@ -113,7 +113,8 @@ class DirectApplicationDeclarationTest {
      * <b>Two declarations of one application are two entries</b>, exactly as {@code a => { v: text }} and
      * {@code b => { v: text }} are two entries with one structure. Nothing dedupes them and nothing is
      * privileged: §8.2 gives each its name as its identity, and a rule that cares about the duplication --
-     * §5.2's pin distinctness over a family's members -- catches it downstream on its own terms.
+     * §5.2's pin distinctness over a family's members -- catches it downstream on its own terms. Neither is IS-A
+     * the template (§5.10).
      */
     @Test
     void twoDeclarationsOfOneApplicationAreTwoEntries() {
@@ -127,8 +128,8 @@ class DirectApplicationDeclarationTest {
         assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("by"), n -> true));
         assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().name());
         assertEquals("box", linked.schema().applicationOf("by").orElseThrow().name());
-        assertEquals(java.util.List.of("bx", "by"), TypeChain.subtypesOf(linked.schema().entries().get("box")),
-                "both are members of the template they close");
+        assertEquals(java.util.List.of(), TypeChain.subtypesOf(linked.schema().entries().get("box")),
+                "a template is no type, and indexes neither");
     }
 
     // ── What it buys a family: the member is named, not hashed ───────────
@@ -136,13 +137,17 @@ class DirectApplicationDeclarationTest {
     private static final String FAMILY = """
               dog_type => { breed: text }
               cat_type => { indoor: boolean }
-              pet      => <V> { value: V }
-              dogs     => pet<dog_type>
-              cats     => pet<cat_type>
+              pet      => abstract { }
+              pet_of   => <V> pet & { value: V }
+              dogs     => pet_of<dog_type>
+              cats     => pet_of<cat_type>
               holder   => { p: pet }
             """;
 
-    /** The base indexes the names the author wrote, so a refusal can list names an author can write. */
+    /**
+     * The base -- the record the template composes -- indexes the names the author wrote, so a refusal can list
+     * names an author can write.
+     */
     @Test
     void theFamilyBaseIndexesTheDeclaredMemberNames() {
         TsonLinkedSchema linked = resolve("dad6", FAMILY);
@@ -153,7 +158,7 @@ class DirectApplicationDeclarationTest {
 
     /** And the tag a document writes is that name -- the whole point of the change. */
     @Test
-    void anAbstractTemplateBaseDispatchesOnTheDeclaredName() {
+    void anAbstractBaseDispatchesOnTheDeclaredName() {
         Tson tson = Tson.standard();
         tson.resolve(schema("dad7", FAMILY));
 

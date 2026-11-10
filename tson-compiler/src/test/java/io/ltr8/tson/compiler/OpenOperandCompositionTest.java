@@ -57,13 +57,9 @@ class OpenOperandCompositionTest {
      * that are really there. An application some other position names is still minted by that
      * position, §8.2 keying identity on the application, so both land on one entry.
      *
-     * <p><b>{@code box<text>} is still no type to be IS-A; {@code box} is.</b> A record-bodied template is a
-     * family base (§5.10), deriving ABSTRACT where no discriminator survives, so a
-     * value can stand at it and be a value of one of its members. The edge therefore runs from the member to
-     * the base itself -- which is what indexes {@code c} under {@code box.subtypes} and lets a position typed
-     * {@code box} dispatch to it. The application in between still never becomes an entry, and a declaration
-     * taking parameters of its own states no such edge here: it is held, and each instantiation mints its own
-     * as it closes.
+     * <p><b>Neither {@code box<text>} nor {@code box} is a type to be IS-A here.</b> A template is no type (§5.10),
+     * so no edge runs to it; nothing names {@code box<text>}, so no entry is minted and no edge runs to one either.
+     * What {@code c} IS-A is what {@code box}'s written parents reach: {@code base}.
      */
     @Test
     void aClosedApplicationAtAnOperandMintsNothing() {
@@ -78,8 +74,8 @@ class OpenOperandCompositionTest {
                         + compiled.schema().entries().keySet());
 
         Top c = compiled.schema().entries().get("c");
-        assertEquals(List.of("base", "box"), TypeChain.supertypesOf(c),
-                "the ancestors arrive by value, and the edge runs to the family base the operand applies");
+        assertEquals(List.of("base"), TypeChain.supertypesOf(c),
+                "the ancestors arrive by value, and no edge runs to the template the operand applies");
         assertEquals(List.of("tag", "item", "extra"),
                 ((RecordBody) c).fields().keySet().stream().toList(),
                 "the operand's fields flatten in, left to right, with the body's own appended");

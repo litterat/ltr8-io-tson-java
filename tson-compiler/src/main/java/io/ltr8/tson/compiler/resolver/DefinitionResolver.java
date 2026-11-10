@@ -376,21 +376,13 @@ final class DefinitionResolver {
      * is also what makes the rule that extensibility is never inherited fall out rather than need stating --
      * a composition's body is built OPEN from its operands and the mark, if any, is this declaration's own.
      *
-     * <p><b>A template takes {@code abstract} and refuses {@code final}.</b> {@code abstract} constrains the
-     * marked type alone -- no direct instances, true of every instantiation identically -- so it is stated in
-     * the held body and closing carries it through: every application of {@code result} mints an abstract
-     * entry, and the family it is abstract over is the one the closed applications of its subtype templates
-     * join (§5.8, {@code SubtypeTemplateFamilyTest}). {@code final} is a claim about <em>other</em>
-     * declarations -- that nothing composes onto it -- and
-     * a template has no set for such a claim to range over: {@code subtypes} indexes entries, an instantiation
-     * entry exists only where some schema wrote that application, so the claim's subject would be assembled
-     * from whichever applications happen to have been written and a new one elsewhere would silently change
-     * it. That is a schema error (§5.2).
-     *
-     * <p><b>On a record template the mark is the instantiation's</b>, set on the template's own {@code extension}:
-     * the base is ABSTRACT by construction (§5.10), so the field is free to say how each application is realised,
-     * and a second-level base is spelled {@code result => abstract <T> { … }}. Its {@code discriminators} are the
-     * base's, so the selector rule above is a closed record's alone.
+     * <p><b>On a record template the mark and the selectors are each application's</b> (§5.10): the template is
+     * no type, and closing carries its {@code extension} and {@code discriminators} to the record each application
+     * denotes, so {@code result => abstract <T> { ok: boolean =? }} makes {@code result<text>} an abstract base over
+     * the declarations composing it, and a selector makes a template ABSTRACT as it makes a record so. {@code
+     * final} is refused on a template: a template is applied to be composed, each member of a family composing an
+     * application of it, and the mark would forbid that of every application. A final type is a declaration of the
+     * application, marked as itself.
      *
      * <p>A mark on anything else is the author's error, an open one named by the constructor its held body
      * applies: {@code TemplateBody} is the Java shape of every other open form alike and would name none of them.
@@ -398,7 +390,14 @@ final class DefinitionResolver {
     private Top withExtension(SchemaMap.Declaration declaration, Top resolved) {
         Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.mark());
         boolean open = OpenEntry.isOpen(resolved);
-        boolean selectors = !open && resolved instanceof RecordBody body && !body.discriminators().isEmpty();
+        if (open && extension.orElse(null) == RecordExtensionType.FINAL) {
+            throw new SchemaValidationException("'" + declaration.name() + "': 'final' is refused on a template"
+                    + " -- a template is applied to be composed, each member of a family composing an application"
+                    + " of it, and the mark would forbid that of every application. Declare the application and mark"
+                    + " that declaration instead ([TSON-SCHEMA] §5.2, §5.10)");
+        }
+        boolean selectors = resolved instanceof RecordBody body && !body.discriminators().isEmpty()
+                || resolved instanceof RecordTemplateBody template && !template.discriminators().isEmpty();
         if (selectors) {
             // A selector says the members pin it, so the record is the base they are selected from and has
             // no values of its own -- ABSTRACT, derived. `abstract` beside it asserts what the body already
@@ -414,16 +413,6 @@ final class DefinitionResolver {
             return resolved;
         }
         if (open) {
-            if (extension.get() == RecordExtensionType.FINAL) {
-                // FINAL forbids anything composing onto the marked type, and every application of a template
-                // is a subtype of it by construction -- so the claim is false of a template before an author
-                // writes a second declaration. ABSTRACT has a subject: `subtypes` holds the template's own
-                // instantiations (§5.10).
-                throw new SchemaValidationException("'" + declaration.name() + "': 'final' forbids anything "
-                        + "composing onto this type, and every application of a template is a subtype of it by "
-                        + "construction -- so the claim is false of '" + declaration.name() + "' whatever else "
-                        + "the schema says. Mark a closed declaration instead ([TSON-SCHEMA] §5.2, §5.10)");
-            }
             if (!(resolved instanceof RecordTemplateBody template)) {
                 String head = HeldBody.of((io.ltr8.tson.schema.meta.TemplateBody) resolved).application().typeRef()
                         .orElse("?");
@@ -1123,9 +1112,10 @@ final class DefinitionResolver {
     }
 
     /**
-     * A family base's selector may not be typed by one of its parameters, directly ({@code kind: K =?}) or as an
-     * argument ({@code kind: bounded<M> = N}): a position typed by the base reads the selector before it knows
-     * which member it has, so a type that varies per application is one it cannot read (§5.10).
+     * A template's selector may not be typed by one of its parameters, directly ({@code kind: K =?}) or as an
+     * argument ({@code kind: bounded<M> =?}): each application is a family base carrying the selector, and its
+     * members pin it in the declarations composing the application, so a selector whose type varies per application
+     * is no selector a family can be written against (§5.2, §5.10).
      */
     private static RecordTemplateBody refuseParameterTypedSelector(RecordTemplateBody open) {
         for (String name : open.discriminators()) {
@@ -1649,19 +1639,9 @@ final class DefinitionResolver {
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
                 }
-                // A *family base* -- a record template -- is the one head that is itself a type (§5.10), so a
-                // value can stand at it and be a value of one of its members. Where this declaration takes no
-                // parameters of its own it is closed already, so there is no later materialisation to close the
-                // application kept in the chain and mint the edge the way an open operand's gets one. So the
-                // edge is stated here, and to the base itself rather than to an instantiation nothing mints:
-                // `dog => pet<"dog"> & { … }` IS-A `pet` (§5.8), which puts `dog` in `pet.subtypes` and lets a
-                // `pet` position dispatch.
-                if (parameters.isEmpty()
-                        && OpenEntry.isFamilyBase(namespaceDefinitions.definition(generic.name()))) {
-                    addIfAbsent(transitiveSupertypes, seenTransitive, generic.name());
-                }
                 // The application itself goes into the chain, arguments and all. It names no entry yet, and an
-                // applied parent reaches the entry its arguments name, never its head (§5.8): a template keeps it in
+                // applied parent reaches the entry its arguments name, never its head (§5.8, §5.10: a template is
+                // no type, so nothing is IS-A one): a template keeps it in
                 // `parents`, substituted when each application closes, and a closed declaration's is folded by
                 // SchemaResolver into the edge to the entry `result<text>` denotes.
                 // A removal revokes IS-A for every parent (§5.9), so nothing is kept.
@@ -2171,16 +2151,16 @@ final class DefinitionResolver {
 
     /**
      * A template named at an operand with no arguments: {@code &} and {@code ^} read the operand's fields, and a
-     * template's are its applications', each with its parameters bound (§5.8, §5.10). A record template is a type a
-     * position may name, but an operand is no position -- it is flattened into this declaration.
+     * template's are its applications', each with its parameters bound (§5.8, §5.10). A template is no type, so
+     * nothing names one bare, an operand included.
      */
     private static void refuseUnappliedTemplate(String name, String operand, Top definition, String position,
                                                 String operator) {
         if (OpenEntry.isOpen(definition)) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' is a template "
                     + "and is applied to no arguments -- '" + operator + "' takes the fields of a record, and a "
-                    + "template has fields once its parameters are bound. Write '" + operand + "<...>' (§5.8, "
-                    + "§5.10)");
+                    + "template is not a type: it has fields once its parameters are bound. Write '" + operand
+                    + "<...>' with its arguments, or name the record its applications compose (§5.8, §5.10)");
         }
     }
 
@@ -2214,10 +2194,11 @@ final class DefinitionResolver {
 
     /**
      * What an applied operand contributes to the declaration absorbing it: a field set, its groups and name type,
-     * and the operand's own supertypes. Not an edge to the operand's head -- an applied parent reaches the entry its
-     * arguments name, never its head (§5.8), except the one edge a closed declaration states to a family base
-     * itself. Its <em>ancestors</em> are types, and the fields arriving here came with them, so a declaration
-     * composing {@code box&lt;T&gt;} stands where {@code box}'s own {@code base} is expected.
+     * and the operand's own supertypes. Never an edge to the operand's head -- a template is no type (§5.10), and an
+     * applied parent reaches the entry its arguments name (§5.8). Its <em>ancestors</em> are types, and the fields
+     * arriving here came with them, so a declaration composing {@code box&lt;T&gt;} stands where {@code box}'s own
+     * {@code base} is expected: {@code dog => pet_of<dog_type> & { … }} over {@code pet_of => <T> pet & { … }} IS-A
+     * {@code pet}.
      *
      * <p><b>Absorbing needs no closure, which is the whole of why this works.</b> The operand is a record template,
      * so its field set is known while the application is open: substituting its parameters with the arguments

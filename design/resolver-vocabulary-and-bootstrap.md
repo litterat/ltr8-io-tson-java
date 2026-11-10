@@ -232,8 +232,8 @@ annotation is: there is no author to resolve against, and the value is fixed.
   type — a record template's member, a value entry (`order_api => orders<order>` over `orders => <T> !interface {
   get => { response: T } }`), the `Alias` a non-record template's application closes to — which is why it is no
   field of `meta.type_chain`. The materialiser records
-  each application in a map it shares with `SchemaResolver` (the applied-parent fold and the family-base edges key on
-  it, an import's read off its keys), and `SchemaResolver` writes it where it attaches `@meta.synthetic`;
+  each application in a map it shares with `SchemaResolver` (the applied-parent fold keys on it, an import's read off
+  its keys), and `SchemaResolver` writes it where it attaches `@meta.synthetic`;
   `TsonSchema.applicationOf` is the one accessor. **Unlike `@meta.synthetic` it is read as stated on ingest**, not
   recomputed: it is the one fact the entry's value does not state, and what an imported schema's instantiations unify
   by. An author writing it is a resolver error (`DefinitionResolver.refuseWrittenApplication`), as writing `chain` is.

@@ -499,7 +499,6 @@ public final class SchemaResolver {
         Map<String, Top> instantiations = materialiser.materialise(resolvedLocals,
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
         republish(namespace, resolvedLocals, instantiations);
-        familyBaseEdges(namespace, resolvedLocals, generated, applications);
         appliedParentEdges(namespace, resolvedLocals, instantiations, applications,
                 materialiser.expansionsByApplication(), materialiser.syntheticNames());
         closeChains(namespace, resolvedLocals, instantiations);
@@ -749,42 +748,6 @@ public final class SchemaResolver {
             if (!changed) {
                 return;
             }
-        }
-    }
-
-    /**
-     * §5.10's membership: a <b>declared</b> application of a family base -- {@code bt => box<int32>} over
-     * {@code box => <T> { v: T }} -- is a member, so its chain names the template (§8.2's entry shape) and the
-     * linker's inverse makes it one of {@code box}'s members. An application minted at a use site ({@code k:
-     * box<text>}) is not: it is a type, read where it was written, with no edge to the base, so it is never a
-     * candidate at a position typed {@code box} and never needs the name nobody can write. A family's members
-     * are exactly the applications some declaration names -- §5.2's "a family member is declared", kept by
-     * leaving the minted one out rather than by refusing the schema.
-     *
-     * <p>A lifted synthetic is never a member either: it was named by no declaration, which is the whole test.
-     */
-    private static void familyBaseEdges(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                        Set<String> generated,
-                                        Map<String, io.ltr8.tson.schema.meta.TypeRef> applications) {
-        for (Map.Entry<String, Top> entry : resolvedLocals.entrySet()) {
-            if (!(entry.getValue() instanceof Type member)) {
-                continue;
-            }
-            String head = Optional.ofNullable(applications.get(entry.getKey()))
-                    .filter(application -> !application.arguments().isEmpty())
-                    .map(io.ltr8.tson.schema.meta.TypeRef::name).orElse(null);
-            if (head == null || generated.contains(entry.getKey()) || member.supertypes().contains(head)) {
-                continue;
-            }
-            if (!OpenEntry.isFamilyBase(namespace.get(head))) {
-                continue;
-            }
-            List<String> chain = new ArrayList<>(member.supertypes());
-            chain.add(head);
-            chain.addAll(TypeChain.supertypesOf(namespace.get(head)));
-            Top joined = member.withSupertypes(chain.stream().distinct().toList());
-            entry.setValue(joined);
-            namespace.put(entry.getKey(), joined);
         }
     }
 

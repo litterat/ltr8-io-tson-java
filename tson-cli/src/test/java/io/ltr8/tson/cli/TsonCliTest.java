@@ -234,10 +234,8 @@ class TsonCliTest {
      * exit 1 and a diagnostic naming the route. It used to reach an ErrorReader and exit 70 under "this is a
      * bug in tson", the worst answer in the whole surface for one of the likeliest mistakes.
      *
-     * <p><b>The exit code is what this pins.</b> A record-bodied template is a family base
-     * (§5.10), so the message is the one an abstract base gives -- name the member --
-     * rather than "a template is not a type". Either wording is a verdict on the document, which is the
-     * distinction the code rides on.
+     * <p><b>The exit code is what this pins</b>, and the message names the route: a template is not a type
+     * (§5.10), so the document names the declaration of its application.
      */
     @Test
     void dataNamingATemplateIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
@@ -259,8 +257,8 @@ class TsonCliTest {
         String out = captureStdout(() ->
                 assertEquals(1, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
 
-        assertTrue(out.contains("'paged' selects nothing"), out);
-        assertTrue(out.contains("orders_page"), out);
+        assertTrue(out.contains("'paged' is a template"), out);
+        assertTrue(out.contains("a template is not a type"), out);
     }
 
     @Test

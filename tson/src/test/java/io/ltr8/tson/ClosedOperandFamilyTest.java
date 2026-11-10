@@ -10,18 +10,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A <b>closed application at a composition operand</b> -- {@code dog => pet<text> & { pet_type?: = "dog" … }},
+ * A <b>closed application at a composition operand</b> -- {@code dog => pet_of<text> & { pet_type?: = "dog" … }},
  * where the argument is a closed type rather than the declaring declaration's own parameter (§5.10).
  *
  * <p><b>The member is the author's own declaration and nothing is minted for the operand.</b> §5.8 absorbs
  * the operand's fields, the member pins the selector where it is declared, and what outlives the substitution is
- * that {@code dog} IS-A {@code pet}. An entry for {@code pet<text>} would be a derivation step wearing an entry's
- * clothes -- nothing names it, and the member a document actually writes is {@code dog}.
+ * that {@code dog} IS-A what {@code pet_of}'s written parents reach: {@code pet}, the abstract record the family is
+ * declared with. A template is no type, so no edge runs to {@code pet_of}, and an entry for {@code pet_of<text>}
+ * would be a derivation step wearing an entry's clothes -- nothing names it.
  *
- * <p><b>So the edge is to the family base itself</b>, which is a participant in IS-A because its held body
- * carries {@code extension} (§5.10 as #13 corrects it). That is what puts {@code dog} in {@code pet.subtypes}
- * and makes a {@code pet} position dispatch -- by the discriminators where the base is SEALED, by a tag where
- * it is ABSTRACT.
+ * <p>That is what puts {@code dog} in {@code pet.subtypes} and makes a {@code pet} position dispatch -- by the
+ * discriminators where the base states them, by a tag where it states none.
  *
  * <p>The sibling shape, where the argument is the declaration's own parameter ({@code ok => <T> result<T> &
  * { … }}), is {@code SubtypeTemplateFamilyTest}'s: that operand stays open, the declaration is held, and each
@@ -30,16 +29,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ClosedOperandFamilyTest {
 
     private static final String SEALED = """
-              pet    => <T> { pet_type: text =?  name: T }
-              dog    => pet<text> & { pet_type?: = "dog"  breed: text }
-              cat    => pet<text> & { pet_type?: = "cat"  indoor: boolean }
+              pet    => abstract { pet_type: text =? }
+              pet_of => <T> pet & { name: T }
+              dog    => pet_of<text> & { pet_type?: = "dog"  breed: text }
+              cat    => pet_of<text> & { pet_type?: = "cat"  indoor: boolean }
               holder => { p: pet }
             """;
 
     private static final String ABSTRACT = """
-              pet    => abstract <T> { name: T }
-              dog    => pet<text> & { breed: text }
-              cat    => pet<text> & { indoor: boolean }
+              pet    => abstract { }
+              pet_of => <T> pet & { name: T }
+              dog    => pet_of<text> & { breed: text }
+              cat    => pet_of<text> & { indoor: boolean }
               holder => { p: pet }
             """;
 
@@ -69,13 +70,13 @@ class ClosedOperandFamilyTest {
                 () -> "dog IS-A pet: " + TypeChain.supertypesOf(linked.schema().entries().get("dog")));
     }
 
-    /** The operand mints nothing: the only entries are the four the author wrote. */
+    /** The operand mints nothing: no record is minted for {@code pet_of<text>}. */
     @Test
     void theOperandMintsNoEntryOfItsOwn() {
         TsonLinkedSchema linked = Tson.standard().resolve(schema("cof2", SEALED));
 
         assertEquals(java.util.List.of(), linked.schema().entries().keySet().stream()
-                        .filter(name -> name.startsWith("pet_")).toList(),
+                        .filter(name -> name.startsWith("record_")).toList(),
                 "an entry for the application would be a derivation step wearing an entry's clothes");
     }
 

@@ -14,9 +14,8 @@ choices. Current form only; history lives in git.
   record's defaults and pins) goes to `CompiledReaders.afterEveryReader` and runs in `settle`, once, after the walk.
 - `ErrorReader` reports `NOT_IMPLEMENTED` and skips the value. Two causes are deliberately not reported that way: a
   `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile.
-- An open entry never reaches a factory: a record template (`RecordTemplateBody`, a family base) compiles to an
-  `AbstractTemplateReader`, which takes that type and nothing else, and a held template (`TemplateBody`) to an
-  `OpenTemplateReader`. A value entry (`ValueEntry`) never
+- An open entry never reaches a factory: a template, a record template (`RecordTemplateBody`) or a held one
+  (`TemplateBody`), is no type (§5.10) and compiles to an `OpenTemplateReader`. A value entry (`ValueEntry`) never
   reaches one either: it compiles to a `ValueEntryReader`, which refuses a data tag naming it as `TYPE_MISMATCH`.
 - A namespace type compiles through the `map` factory with the map `NamespaceBody.read()` states; the kernel's
   `meta.schema` entry's reader marks its read as a schema document's (`readsSchemaNames`), so a resolved form read as data
@@ -94,16 +93,13 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
       first read.
   - A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and propagates
     uncaught.
-- **An open entry never reaches a factory, and which of two readers it becomes is decided by its Java type.**
-  `TsonSchemaCompiler.build` asks before any factory is consulted. A `RecordTemplateBody` is a **family base**
-  and becomes an `AbstractTemplateReader`, which dispatches to one of its members by tag or by the
-  discriminators exactly as a closed abstract or sealed record does; no record reader is ever built for it, and
-  none can be, a record reader taking a `RecordBody`. A `TemplateBody` becomes an `OpenTemplateReader`: a
-  template with no such dispatch is not a type (§5.10), so there is nothing a value could validate against.
+- **An open entry never reaches a factory.** `TsonSchemaCompiler.build` asks `OpenEntry.isOpen` before any factory
+  is consulted, and a template of either shape becomes an `OpenTemplateReader`: a template is not a type (§5.10), so
+  there is nothing a value could validate against, and no record reader can be built for a record template, a record
+  reader taking a `RecordBody`. A family declared through a template is read at its base, a record.
 - **`OpenTemplateReader` reports `TYPE_MISMATCH` against the data and skips the value**, like any other
   reader finding data the schema does not admit. Reaching it is **always** a data error: a *schema* naming
-  such a template without applying it is rejected at link time (`checkArity`'s zero-argument case, which
-  exempts only a family base), so no field,
+  any template without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
   element or supertype routes here — only a data type-ref naming the template, `!paged` against `paged =>
   <T> { … }`, which §5.10 makes an ordinary resolver error rather than anything exceptional. Refusing the
   whole entry is what makes the verdict right: built, a parameterised body would either

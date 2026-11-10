@@ -174,11 +174,11 @@ Both are decidable at link and neither depends on anyone applying a template.
 
 - **Arity, over every reference** (`checkArity`): a reference supplies exactly as many arguments as the entry it names
   declares parameters. Too many, too few, and **none at all**: a template named bare otherwise links and compiles and
-  fails at read time against a document with nothing wrong with it. The exception is a **family base**
-  (`OpenEntry.isFamilyBase`, a record template), which may be named bare (`use => { u: box }`): a value there is a
-  value of one of its members, the parameters eliminated by dispatch. A template with a held body has no dispatch
-  and is refused bare. A type parameter written with arguments (`T<text>`) is refused: §5.10 admits no head
-  abstraction.
+  fails at read time against a document with nothing wrong with it. A template is not a type (§5.10), so a bare
+  template is refused at every position -- a field, element, map key or value, tuple position, choice variant or
+  argument -- a record template included, the message naming the remedy: the application, or the abstract record a
+  family's applications compose. An operand is `DefinitionResolver.refuseUnappliedTemplate`'s, one phase earlier. A
+  type parameter written with arguments (`T<text>`) is refused: §5.10 admits no head abstraction.
 - **Parameter usage** (`checkOpenEntryUsesEveryParameter`): an open entry references every parameter it declares, so
   `box => <T> { v: text }` is refused. The converse needs no check: at a closed entry a token in a value slot *is* a
   literal, and a parameter reference is already an unresolved one.

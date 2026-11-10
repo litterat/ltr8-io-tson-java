@@ -518,15 +518,19 @@ class FieldNameTypeTest {
                 "!holder { p: { KIND: \"dog\"  name: \"Rex\"  Breed: \"corgi\" } }"));
     }
 
-    /** A record template base's selector is found in its name form too, which its members take from it. */
+    /**
+     * A selector is found in its name form at a base that is a template's application too, which takes the
+     * template's name type, as its members do.
+     */
     @Test
-    void aSelectorIsMatchedInATemplateBasesNameForm() {
+    void aSelectorIsMatchedInATemplateApplicationsNameForm() {
         String family = schema("folded-template-family", """
                   folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }
                   base => !meta.record { name_type: folded  extension: ABSTRACT  fields: {} }
                   pet => <B> base & { kind: text =?  name: text  extra?: B }
+                  pet_text => pet<text>
                   dog => pet<text> & { kind?: = "dog" }
-                  holder => { p: pet }
+                  holder => { p: pet_text }
                 """);
         assertEquals(List.of(), read(family, "folded-template-family", "!holder { p: { KIND: \"dog\"  name: \"Rex\" } }"));
     }

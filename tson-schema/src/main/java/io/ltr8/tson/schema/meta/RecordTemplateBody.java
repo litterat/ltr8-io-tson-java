@@ -17,27 +17,25 @@ import java.util.function.UnaryOperator;
 
 /**
  * The kernel's {@code record_template} constructor's vocabulary, resolved ([TSON-SCHEMA] §5.10, §8.1):
- * a record body over {@link #parameters}, whose fields are {@link RecordTemplateField}s and
- * may carry them. Each application
- * substitutes its arguments for the parameters and closes to a {@link RecordBody}, its member.
+ * a record body over {@link #parameters}, whose fields are {@link RecordTemplateField}s and may carry them. Each
+ * application substitutes its arguments for the parameters and closes to a {@link RecordBody}.
  *
- * <p><b>A family base.</b> A type a position may name, ABSTRACT by construction, a value there being a value of one
- * of its members, each IS-A it. It takes part in IS-A as any abstract parent does, and nothing reads or writes a
- * value against it, so no reader or writer is built for it: a reader at a position it types dispatches to a member
- * and reads against the member's closed record. That is why it is its own Java type and not a record with an
- * optional list of parameters -- code that builds a record reader takes a {@link RecordBody} and cannot be handed a
- * template.
+ * <p><b>Not a type.</b> No position names a template bare (§5.10): only an application of it is a type, a value of
+ * which is read against the closed record the application denotes. So nothing reads or writes a value against a
+ * template and no reader or writer is built for one, and it is its own Java type: code that builds a record reader
+ * takes a {@link RecordBody} and cannot be handed a template. An application's IS-A edges are those its written
+ * parents reach, never the template itself.
  *
  * <p><b>A parameter stands in two places</b>: a field's {@code type_param}, or an argument of an application in a
  * field's {@code type} or in a parent ({@code <T> result<T> & { ... }}). The rest of the template is what every
  * application shares. A field's value is never a parameter, a literal {@code value} needs a closed type, and every field
- * {@link #discriminators} names is typed by no parameter, so the base reads each one without an application; both
+ * {@link #discriminators} names is typed by no parameter, so a selector means the same in every application; both
  * are the author's rules, refused where the declaration resolves. What this value refuses itself is a label naming
  * no parameter it declares.
  *
- * <p>{@link #extension} is each application's, the template's own being ABSTRACT whatever it says; {@link #groups}
- * and {@link #nameType} are each application's, unchanged by substitution; {@link #discriminators} is the family's.
- * The chain keeps the parents as written, and {@link #fields} is flattened, as a record's is.
+ * <p>{@link #extension}, {@link #discriminators}, {@link #groups} and {@link #nameType} are each application's,
+ * unchanged by substitution: an abstract template's application is an abstract record, the base of the declarations
+ * that compose it. The chain keeps the parents as written, and {@link #fields} is flattened, as a record's is.
  */
 @Typename(name = "meta.record_template")
 public record RecordTemplateBody(TypeChain chain, AnnotatedMap<String, RecordTemplateField> fields,
@@ -72,8 +70,7 @@ public record RecordTemplateBody(TypeChain chain, AnnotatedMap<String, RecordTem
     }
 
     /**
-     * What this template states at the record level ({@link RecordHead}): each application's, but for the family's
-     * {@code discriminators}.
+     * What this template states at the record level ({@link RecordHead}): each application's.
      */
     public RecordHead head() {
         return new RecordHead(nameType, Collections.unmodifiableSet(fields.keySet()), discriminators, groups, extension);

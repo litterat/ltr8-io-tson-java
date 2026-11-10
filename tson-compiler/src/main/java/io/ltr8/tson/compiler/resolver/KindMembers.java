@@ -34,15 +34,15 @@ import java.util.function.Function;
  *
  * <p><b>Membership of a type name is one walk</b> over resolved entries, never over spellings. From an entry, alias
  * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, a template
- * over another constructor (a {@code template} body, which is no type) and a value entry are no type's name. For every
+ * (a record template or a held body, neither a type, §5.10) and a value entry are no type's name. For every
  * other entry the type of its value -- the tag resolved output writes, {@code !meta.record}, {@code
  * !unicode.identifier_type}, {@code !meta.namespace} -- is followed, through a constructor template's held body to the
  * constructor it applies, until a constructor is reached, and the entry is a member when that constructor is {@code of} or
- * has {@code of} among its supertypes. A record template is built with {@code record}, so a reference over {@code record}
- * holds it. So does the kernel's {@code top}, a fresh abstract record IS-A nothing. So does a constructor whose declaration
- * is a record, {@code uuid_type => atom & { … }}: its value is a record whose instances are declarations, and nothing in the
- * predicate sets it apart -- {@link io.ltr8.tson.schema.meta.EntryKind#isConstructor} answers for applicability, a
- * different question, and is not consulted here.
+ * has {@code of} among its supertypes. A reference over {@code record} holds the kernel's {@code top}, a fresh
+ * abstract record IS-A nothing, and a constructor whose declaration is a record, {@code uuid_type => atom & { … }}:
+ * its value is a record whose instances are declarations, and nothing in the predicate sets it apart -- {@link
+ * io.ltr8.tson.schema.meta.EntryKind#isConstructor} answers for applicability, a different question, and is not
+ * consulted here.
  *
  * <p><b>A reference is a member of itself where the walk says so.</b> {@code meta.type_ref} is built with {@code
  * reference}, which IS-A {@code type}, so it is one of the names it holds. Nothing loops: membership reads
@@ -103,7 +103,7 @@ public final class KindMembers {
     public static boolean isMember(Top type, String head, String of, Function<String, Top> local,
                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
-        if (type == null || type instanceof TemplateBody || type instanceof Alias || type instanceof ValueEntry) {
+        if (type == null || OpenEntry.isOpen(type) || type instanceof Alias || type instanceof ValueEntry) {
             return false;
         }
         String constructorOf = AliasChain.terminal(of, constructors);

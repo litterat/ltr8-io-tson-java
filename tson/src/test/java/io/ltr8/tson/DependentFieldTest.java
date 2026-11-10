@@ -218,11 +218,15 @@ class DependentFieldTest {
                 .contains("is written without 'kind'"));
     }
 
+    /**
+     * A sibling naming no readable type is refused at the sibling. A template is no type (§5.10), so a reference
+     * over types holds none, and naming one is refused whether or not the dependent field is written.
+     */
     @Test
     void aSiblingNamingNoReadableTypeIsRefusedAtTheSibling() {
         assertEquals(Optional.of("/kind"), only(validate("!cell { kind: box  v: { item: 5 } }")).path());
         assertEquals(Optional.of("/kind"), only(validate("!cell { kind: kind!  v: 5 }")).path());
-        assertEquals(List.of(), validate("!cell { kind: box }"));
+        assertEquals(Optional.of("/kind"), only(validate("!cell { kind: box }")).path());
     }
 
     // ── The kernel's own dependent field, and the facet ───────────────────

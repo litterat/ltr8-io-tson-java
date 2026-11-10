@@ -81,10 +81,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private final String pinned;
 
     /**
-     * <b>The selectors arrive already chosen, from either kind of base</b> ({@code FamilySelectors}), each
-     * read off the base's own fields: a family base's selector is pinned to a parameter, which the derivation
-     * drops, so its field is handed over as the selector a closed base declares. Taking the fields rather than
-     * a {@code RecordBody} is what keeps the choice of "which fields select" in that one derivation.
+     * <b>The selectors arrive already chosen</b> ({@code FamilySelectors}), each read off the base's own fields.
+     * Taking the fields rather than a {@code RecordBody} is what keeps the choice of "which fields select" in that
+     * one derivation.
      */
     RecordMemberDispatchReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
                                 Set<String> subtypes, ValueReaderContext context,
@@ -94,7 +93,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.readerFor = readerFor;
         this.selectors = selectorFields.entrySet().stream()
                 .map(field -> selectorOf(field.getKey(), field.getValue(), entries, context.linked())).toList();
-        // The family's members compose the base, so they share its name type, a template base's included.
+        // The family's members compose the base, so they share its name type.
         this.nameForm = selfNames.stream().map(context.linked()::nameForm)
                 .filter(form -> form != io.ltr8.unicode.Normalization.NFC).findFirst()
                 .orElse(io.ltr8.unicode.Normalization.NFC);
@@ -103,7 +102,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            // Only a record is a member: a record template IS-A the base is none, its applications are.
+            // Only a record is a member, and a subtype index holds no template (§5.10).
             if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }

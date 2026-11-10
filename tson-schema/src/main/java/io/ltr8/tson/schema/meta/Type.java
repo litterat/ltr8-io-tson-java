@@ -9,8 +9,9 @@ import java.util.List;
  * and {@link Namespace} do not, as their kernel entries compose with {@code top} directly. So a body describes a
  * type exactly when it is an {@code instanceof Type}, and every type body carries its chain ({@link TypeChain}).
  *
- * <p><b>Every question about what an entry IS-A asks this</b>, so a record template -- the ABSTRACT family base
- * its members are IS-A, and IS-A its own parents -- is answered the same way a closed type is. {@link Namespace},
+ * <p><b>Every question about what an entry IS-A asks this.</b> A record template carries a chain too, recording
+ * what its written parents reach, which each application inherits; the template itself is no type (§5.10) and is
+ * in no {@code subtypes} index. {@link Namespace},
  * {@link Alias} and {@link TemplateBody} carry no chain: a value, a hop and an abbreviation have no IS-A.
  *
  * <p>Every body record carries {@code chain} as its first component, mirroring the constructor's flattened

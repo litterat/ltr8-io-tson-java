@@ -118,12 +118,11 @@ class KindMembersTest {
     }
 
     /**
-     * A template over another constructor is no type and no member. A record template is a type, the family base
-     * its applications are IS-A (§5.10), built with {@code record_template}: a kind of {@code record} holds its
-     * applications and not it, and a kind of {@code record_template} holds it.
+     * A template is no type and no member (§5.10), a record template included: a kind of {@code record} holds its
+     * applications and not it, and a kind of {@code record_template} holds nothing, so it is refused as uninhabited.
      */
     @Test
-    void anInstantiationIsAMemberOfItsConstructorsKindAndARecordTemplateOfItsOwn() {
+    void anInstantiationIsAMemberOfItsConstructorsKindAndATemplateOfNone() {
         TsonLinkedSchema linked = link("""
                 {
                   tags  => set<text>
@@ -131,7 +130,6 @@ class KindMembersTest {
                   boxed => <T> { v: T }
                   box_t => boxed<text>
                   recs  => !meta.reference_type { of: meta.record }
-                  tmpls => !meta.reference_type { of: meta.record_template }
                 }
                 """);
 
@@ -140,8 +138,13 @@ class KindMembersTest {
         assertTrue(sets.containsAll(List.of("tags", "meta.enum_set")) && !sets.contains("set"), sets.toString());
         List<String> recs = kind(linked, "recs").memberNames();
         assertTrue(recs.contains("box_t") && !recs.contains("boxed"), recs.toString());
-        List<String> templates = kind(linked, "tmpls").memberNames();
-        assertTrue(templates.contains("boxed") && !templates.contains("box_t"), templates.toString());
+        SchemaValidationException empty = assertThrows(SchemaValidationException.class, () -> link("""
+                {
+                  boxed => <T> { v: T }
+                  tmpls => !meta.reference_type { of: meta.record_template }
+                }
+                """));
+        assertTrue(empty.getMessage().contains("'tmpls' can never be satisfied"), empty.getMessage());
     }
 
     @Test
