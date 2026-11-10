@@ -532,15 +532,19 @@ class ContainerSugarEndToEndTest {
 
     /**
      * A container constructor's own name at an application head resolves -- the kernel's {@code meta.map} is in
-     * every closure reaching core -- and is refused as what it is: a constructor, closed, taking no type arguments.
-     * An author writing {@code meta.map<text, text>} is told to drop the arguments, and the sugar
-     * {@code {text => text}} is the spelling.
+     * every closure reaching core -- and constructs ([TSON-SCHEMA] §5.3's construction sugar): {@code
+     * meta.map<text, text>} is {@code !meta.map { key_type: text  value_type: text }}, the construction the sugar
+     * {@code {text => text}} is spelled for, and both name one entry.
      */
     @Test
-    void aContainerConstructorsNameAtAHeadTakesNoArguments() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> compile("  holder => { entries: meta.map<text, text> }"));
+    void aContainerConstructorsNameAtAHeadConstructs() {
+        TsonCompiledSchema compiled = compile("  holder => { entries: meta.map<text, text>  sugar: {text => text} }");
 
-        assertTrue(thrown.getMessage().contains("'meta.map' declares no type parameters"), thrown.getMessage());
+        RecordBody holder = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("holder"));
+        String entries = holder.fields().get("entries").typeRef().name();
+        assertEquals(holder.fields().get("sugar").typeRef().name(), entries);
+        MapBody map = assertInstanceOf(MapBody.class, compiled.schema().entries().get(entries));
+        assertEquals("text", map.keyType().name());
+        assertEquals("text", map.valueType().name());
     }
 }

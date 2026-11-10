@@ -88,11 +88,12 @@ import java.util.function.UnaryOperator;
  * holding one has the inner form injected under its own derived name and becomes a bare reference to it.
  * The enclosing container then routes a plain name like any other, at any depth. See {@link #elementRef}.
  *
- * <p><b>An application is a user template, and it passes through.</b> {@code name&lt;args&gt;} resolves its
- * head in the schema's namespace -- parameters, then locals, then imports -- so it can only ever be a §5.10
- * template application, and {@code TemplateMaterialiser} closes it over the
- * <em>resolved</em> form one phase later. What is checked here is the one thing an AST alone decides: a head
- * this document declares with no parameters takes no arguments at all. See {@link #checkTemplateApplication}.
+ * <p><b>An application passes through.</b> {@code name&lt;args&gt;} resolves its head in the schema's
+ * namespace -- parameters, then locals, then imports -- and is a §5.10 template application or, over a
+ * constructor, construction sugar (§5.3); {@code TemplateMaterialiser} closes either over the <em>resolved</em>
+ * form one phase later. What is checked here is the one thing an AST alone decides: a head this document
+ * declares with no parameters, and with a body no constructor has, takes no arguments at all. See {@link
+ * #checkTemplateApplication}.
  *
  * <p><b>Structural sharing.</b> Every method returns its input unchanged when nothing beneath it changed, so
  * a document with no sugar comes back as the same object graph. Source positions live in identity-keyed side
@@ -600,7 +601,10 @@ final class SchemaDesugarer {
      *
      * <p>A head this document neither declares nor imports is left alone -- the reference is simply
      * unresolved, which is {@code TsonSchemaLinker}'s verdict to deliver. A local head that declares no
-     * parameters is an ordinary author error: nothing there takes type arguments.
+     * parameters is an author error where its body says it is no constructor: a fresh record IS-A nothing, and
+     * a construction or atom refinement carries an empty chain (§4.1), so nothing there takes arguments. A
+     * composition, a refinement or an alias may be a constructor, which construction sugar applies (§5.3), and
+     * only resolution can tell, so each passes through.
      */
     private void checkTemplateApplication(String head) {
         SchemaMap.Declaration declaration = local.get(head);
@@ -608,7 +612,12 @@ final class SchemaDesugarer {
             return;
         }
         List<String> parameters = typeParams(declaration.typeDef());
-        if (parameters.isEmpty()) {
+        boolean mayConstruct = switch (declaration.typeDef()) {
+            case StructuralTypeDef structural -> !(structural.body() instanceof RecordDef);
+            case ReferenceTypeDef ignored -> true;
+            default -> false;
+        };
+        if (parameters.isEmpty() && !mayConstruct) {
             throw new SchemaValidationException("'" + head + "' declares no type parameters, so '"
                     + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
                     + "argument list");

@@ -16,6 +16,10 @@ derived — and the static check that runs before any of it.
   its parameters (`RecordTemplateField.parameterInType`, applied in `MetaRefs`); a held body maps nothing.
 - An application's arguments are dereferenced before it is closed, and only a reference is dereferenced — a
   refinement and a fresh instance keep their own applications.
+- `close` asks first whether the head, past its alias hops, is a constructor (`construction`,
+  `design/constructor-application.md`): construction sugar builds the binding record the braced form writes, its
+  arguments as written and not dereferenced, and names the content-keyed synthetic `[T]` and `{K => V}` land on. It
+  mints no instantiation entry, records no `@meta.application` and owns nothing; only `closedApplications` hears of it.
 - A declaration naming an application **is** that entry (`closeApplicationInto`): no internal name is derived or
   claimed and nothing is published beside it; `ownedBy`, keyed on the canonical application, is what a use site
   reuses.

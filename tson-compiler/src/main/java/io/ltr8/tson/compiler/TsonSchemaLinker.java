@@ -11,6 +11,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.Normalization;
+import io.ltr8.tson.compiler.resolver.ConstructionSugar;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.compiler.resolver.ImportedSynthetics;
 import io.ltr8.tson.compiler.resolver.KindMembers;
@@ -2112,6 +2113,17 @@ public final class TsonSchemaLinker {
         int declared = parameters.size();
         int supplied = ref.arguments().size();
         if (declared == supplied) {
+            return;
+        }
+        String head = AliasChain.terminal(ref.name(), namespace);
+        if (supplied > 0 && ConstructionSugar.constructs(head, referenced)) {
+            // Construction sugar (§5.3): one argument per argument slot of the constructor.
+            try {
+                ConstructionSugar.requireArity(ref.name(),
+                        ConstructionSugar.slots((RecordBody) referenced, namespace::get), supplied);
+            } catch (SchemaValidationException e) {
+                throw new SchemaValidationException(context + ": " + e.getMessage());
+            }
             return;
         }
         if (declared == 0) {

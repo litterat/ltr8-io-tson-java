@@ -136,8 +136,22 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   resolved form being read as one because its reader is told so. The lookup of an application in data against the
   closure's applications is gone, and a refusal's list of admitted names leaves out minted entries. [TSON-JSON]
   §1.6, §5 and §5.6 are edited to match. Left as it was: data may still write a minted entry's internal name.
+- *§5.3, construction sugar: running.* At a type position of a schema document, `C<a1 … an>` where `C` resolves
+  through aliases to a constructor, a closed record IS-A `meta.type`, is the construction `!C { f1: a1 … fn: an }`
+  over `C`'s required fields typed by a reference naming types, in declaration order. `meta.array<text>` is the entry
+  `[text]` is, and `meta.map<text int32>` the entry `{text => int32}` is. A declared `x => meta.array<text>` is that
+  construction and carries no `@meta.application`. A refined constructor applied, `nonempty_type<uuid>` over
+  `nonempty_type => meta.array ^ { min_items?: = 1 }`, is an entry of its own and not the one `[uuid; 1..]` is. A
+  wrong argument count, an argument the field's `of` refuses (`meta.namespace<int32 text>`) and a construction left
+  incomplete (`meta.enum_type<meta.identifier>`, with `members` unwritten) are refused. Three points the rule leaves
+  open are settled as built: a field with a default is no argument slot; a use-site construction names its
+  content-keyed entry and never a declaration of the same construction; and an argument is not followed through an
+  alias, which is the sugar forms' identity. The kernel's `set` and `meta.ref` are still templates.
 
 **Resolution proposed.** In §4.2, replace "and in a data document an application at a reference-typed slot names the
 entry the closure closed it to … a schema closing every application it holds before it loads" with "and in a data
-document a reference is a name: an application is a validation error". The text for the other steps follows as each
-lands.
+document a reference is a name: an application is a validation error". To §5.3's sugar table add "`C<a1 … an>`,
+`C` a constructor: `!C { f1: a1 … fn: an }`, its required fields typed by a reference naming types and not pinned by
+its chain, in declaration order", saying whether a field with a default is one of them; in §5.6 say the positional,
+braced and applied spellings of one construction are one entry; and in §8.2 scope the clause comparing an
+application's arguments past their aliases to substitutions. The text for the other steps follows as each lands.

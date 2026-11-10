@@ -10,7 +10,7 @@ before editing — each opens with its invariants.
 | `base/`, `atom/` | `base-types-and-atom-vocabulary.md` |
 | `TsonSchemaParser`, `ast/schema/` | `schema-grammar.md` |
 | `resolver/SchemaDesugarer` | `schema-grammar-and-desugaring.md`, `desugaring-open-forms-and-templates.md` |
-| `resolver/DefinitionResolver`, `SchemaResolver` | `schema-resolution.md`, `constructor-application.md`, `atom-refinement-and-coherence.md` |
+| `resolver/DefinitionResolver`, `SchemaResolver`, `ConstructionSugar` | `schema-resolution.md`, `constructor-application.md`, `atom-refinement-and-coherence.md` |
 | `resolver/WireForm`, `MetaRefs`, `DerivedName`, `KernelBootstrapResolver` | `resolver-vocabulary-and-bootstrap.md` |
 | `resolver/TemplateMaterialiser`, `SyntheticMerge`, `ParameterTypes`, `HeldBody` | `held-template-bodies.md`, `template-materialisation.md` |
 | `TsonSchemaLinker`, `ChoiceDisjointness`, `ValuesByName` | `linking-and-compilation.md`, `choice-disjointness.md`, `name-hygiene-and-minted-names.md` |
