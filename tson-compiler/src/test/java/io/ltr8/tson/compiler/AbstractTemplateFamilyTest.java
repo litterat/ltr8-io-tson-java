@@ -24,17 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * { payload: T }} makes every instantiation abstract, so a value at a {@code result<text>} position is a
  * value of one of that instantiation's own subtypes and must name which.
  *
- * <p><b>Why this mark can be carried where {@code final} cannot.</b> {@code abstract} constrains the marked
- * type alone -- it has no direct instances -- which is true of every instantiation identically, so closing an
- * abstract template yields an abstract entry and nothing has to be recomputed. {@code final} is a claim over a
- * <em>set of subtypes</em>, and a template has none: an instantiation entry exists only where some schema
- * wrote that application, so the claim's subject would be assembled from whichever applications a closure
- * happens to contain (§5.2).
- *
- * <p><b>The mark travels as text, because the body does.</b> §5.10 holds an open entry's body as the
- * application written out, so the mark is stated <em>in</em> that text ({@code extension: ABSTRACT}) rather
- * than beside it, and materialisation reads it back through the {@code record} constructor's own reader like
- * every other member. Nothing in the closing path knows about it.
+ * <p><b>The mark is each application's {@code extension}.</b> A template is no type, so {@code abstract} on one
+ * says nothing of the template itself: closing carries it, with the template's selectors, to the record each
+ * application denotes. {@code final} is refused on a template, which is applied to be composed (§5.2, §5.10).
  *
  * <p><b>The family it is abstract over is the one {@code SubtypeTemplateFamilyTest} builds</b>: a subtype
  * template's closed application gets an IS-A edge to its base's instantiation at the same argument, so
@@ -209,12 +201,12 @@ class AbstractTemplateFamilyTest {
      * author writes anything else.
      */
     @Test
-    void aTemplateMayBeSealedButNeverFinal() {
+    void aTemplateMayStateASelectorButNeverBeFinal() {
         assertNotNull(compile("      box => abstract <T> { kind: text =?  v: T }\n"),
                 "abstract states the fact the derivation reaches anyway");
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("      box => final <T> { kind: text =?  v: T }\n"));
-        assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("is refused on a template"), thrown.getMessage());
     }
 }

@@ -506,11 +506,9 @@ class RecordTemplateTest {
     }
 
     // ── A template named as a data value's own type ──────────────────────
-    //    A *record-bodied* template is a family base (§5.10), so naming it in data is
-    //    refused the way naming any abstract base is: the value has to say which member it is. Naming a
-    //    template with no family -- a container, a reference, a constructor application -- is still refused
-    //    by OpenTemplateReader, which says a template is not a type until it is applied. Either way it is
-    //    the author's error and an ordinary data diagnostic, never a gap in this library.
+    //    A template is not a type (§5.10), a record template included, so naming one in data is refused by
+    //    OpenTemplateReader, whose message names the route: declare the application and name that. It is the
+    //    author's error and an ordinary data diagnostic, never a gap in this library.
 
     /**
      * A <b>parameterised alias</b> (§5.10 partial application): a declaration whose whole body is an
@@ -649,12 +647,12 @@ class RecordTemplateTest {
         assertNull(value);
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
         Diagnostic problem = problems.diagnostics().get(0);
-        // The name resolves -- to a family base, which has no direct instances, so the value has to name the
-        // member it is. Refused for the same reason an untagged value at any abstract record is.
+        // The name resolves -- to a template, which is no type, so the message names the route: declare the
+        // application and write that name.
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
-        assertTrue(problem.message().contains("'paged' selects nothing"), problem.message());
-        assertTrue(problem.message().contains("orders_page"),
-                "the route out of it names the member a document can write: " + problem.message());
+        assertTrue(problem.message().contains("'paged' is a template"), problem.message());
+        assertTrue(problem.message().contains("'my_type => paged<...>'"),
+                "the route out of it is a declaration of the application: " + problem.message());
         // The applied form is a type and still reads, which is what the message points at.
         assertNotNull(compiled.get("orders_page")
                 .read(TestDocuments.document("{ items: [ { id: \"a\" } ] }")));
@@ -662,10 +660,10 @@ class RecordTemplateTest {
 
     /**
      * The same for a template whose body needs no lifting at all: {@code box}'s field type is the parameter
-     * itself, and the base is refused as selecting nothing before any reader for {@code T} is reached.
+     * itself, and the template is refused before any reader for {@code T} is reached.
      *
-     * <p><b>And the member is accepted</b>, which is the other half of the rule: {@code !box} names the base
-     * and selects nothing, {@code !int_box} names a member and reads.
+     * <p><b>And the declared application reads</b>, which is the other half of the rule: {@code !box} names a
+     * template and is refused, {@code int_box} is a type.
      */
     @Test
     void aTemplateWhoseFieldIsTheParameterIsRefusedButItsMemberReads() {
@@ -677,11 +675,11 @@ class RecordTemplateTest {
         compiled.get("box").read(TestDocuments.document("!box { v: 1 }", problems));
 
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
-        assertTrue(problems.diagnostics().get(0).message().contains("'box' selects nothing"),
+        assertTrue(problems.diagnostics().get(0).message().contains("'box' is a template"),
                 problems.diagnostics().get(0).message());
 
-        assertEquals(List.of(), collect(compiled, "box", "!int_box { v: 1 }"),
-                "the member a document can name reads at the base's own position");
+        assertEquals(List.of(), collect(compiled, "int_box", "{ v: 1 }"),
+                "the declared application is a type and reads");
     }
 
     /** A fail-fast read throws the read exception every other data problem throws -- never a library fault. */
@@ -694,7 +692,7 @@ class RecordTemplateTest {
         ReadException thrown = assertThrows(ReadException.class,
                 () -> compiled.get("box").read(TestDocuments.document("!box { v: 1 }")));
 
-        assertTrue(thrown.getMessage().contains("selects nothing"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("a template is not a type"), thrown.getMessage());
     }
 
     /** Every diagnostic one document collects at {@code rootType}. */

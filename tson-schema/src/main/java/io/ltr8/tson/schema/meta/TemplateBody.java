@@ -36,9 +36,9 @@ import java.util.Objects;
  * could not be done at all without inverting the dependency this package deliberately keeps.
  *
  * <p><b>Composes {@code top} alone</b>: it is not a type, its open form denotes nothing, and naming it at a type
- * position is an error. A record template is not one of these -- it is a {@link RecordTemplateBody}, a family base
- * ({@link OpenEntry}) -- so every held body applies some other
- * constructor, and an application of it is its expansion, with whatever chain the expansion's own body gives.
+ * position is an error. A record template is not one of these -- it is a {@link RecordTemplateBody} ({@link
+ * OpenEntry}) -- so every held body applies some other constructor, and an application of it is its expansion,
+ * with whatever chain the expansion's own body gives.
  */
 @Typename(name = "meta.template")
 public record TemplateBody(List<TemplateParam> parameters, String template) implements Top {

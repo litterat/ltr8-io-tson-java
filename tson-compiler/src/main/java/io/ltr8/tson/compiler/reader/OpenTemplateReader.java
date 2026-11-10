@@ -9,10 +9,9 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import java.util.List;
 
 /**
- * The reader a <b>held</b> template compiles to -- an open entry over any constructor but {@code record}, so it is a
- * template rather than a type ([TSON-SCHEMA] §5.10). A record template is a family base with a dispatch of its own
- * ({@link AbstractTemplateReader}). Reports the author's mistake
- * and skips the value, exactly like any other reader that finds the data isn't what the schema admits.
+ * The reader every template compiles to -- an open entry, a record template or a held body, which is a template
+ * rather than a type ([TSON-SCHEMA] §5.10). Reports the author's mistake and skips the value, exactly like any
+ * other reader that finds the data isn't what the schema admits.
  *
  * <p><b>Reaching this is always a data error, never a schema one.</b> A schema referring to a template
  * without applying it is rejected far earlier, when the schema is linked ({@code TsonSchemaLinker}'s own
@@ -60,7 +59,7 @@ public final class OpenTemplateReader implements TsonTypeReader<Object> {
     private String message() {
         return "'" + name + "' is a template taking " + parameters.size() + " type argument"
                 + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", and a template is not a type "
-                + "until it is applied (§5.10) -- a data type-ref carries no arguments, so name the "
+                + "(§5.10) -- a data type-ref carries no arguments, so name the "
                 + "application in the schema ('my_type => " + name + "<...>') and write '!my_type' here";
     }
 }

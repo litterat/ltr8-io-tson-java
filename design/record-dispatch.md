@@ -18,10 +18,10 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
 - `UNKNOWN_TYPE_REF` means the written name denotes nothing; a name that resolves and is not admissible, or a required
   selector that is absent, is `TYPE_MISMATCH`.
 - The pin table is keyed by `ValueIdentity`, and the selector scan is a `lookingAhead` that rewinds.
-- A member is a `RecordBody`, so a record template IS-A a base is no member of it, even where it pins the selector:
-  it has no values, and its applications are the members. Both member dispatchers take only `RecordBody` subtypes,
-  which passes a template by type rather than by a check, so a pin only the template states selects nothing and the
-  refusal offers only pins a document could write (`CrossEncodingParityTest`).
+- A base is a record, and a template is no type (§5.10): no position is typed by one, and a template composing a
+  base is in no `subtypes` index, so a pin only the template states selects nothing and the refusal offers only pins
+  a document could write (`CrossEncodingParityTest`). A family whose base is an abstract template's application is
+  read at the closed record that application denotes, which carries the template's selectors.
 - A discriminator may be a dependent field's sibling (`slot => abstract { kind: meta.type_ref =?  v?: kind! }`,
   [TSON-SCHEMA] §5.2): the selector scan finds it before any field is read, wherever the document writes it, and the
   member it selects pins it, so the member's record reader reads the dependent field against the pin. Nothing here
@@ -40,7 +40,7 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 
 `record.extension` ([TSON-SCHEMA] §5.2) decides how a position typed by a record is read, and it is decided
 **once, when the schema compiles** — `RecordDispatch.over` decorates whichever mode's record factory is in
-play, so no family-base position reaches it.
+play.
 
 - **OPEN and FINAL** are the mode's own reader, unchanged. They read identically; the difference is which
   names a tag may carry, and a FINAL record's subtype set is empty by construction rather than by a check.
@@ -49,8 +49,8 @@ play, so no family-base position reaches it.
   resolved output's `myapi => !api { … }` is read at the schema map's `declared` position, whose reader delivers a
   `Namespace` (`DeclaredReader`, `design/declared-positions.md`, `design/namespace-types-and-value-entries.md`).
 - **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up. Their
-  keys are matched in the base's name form (`TsonLinkedSchema.nameForm`), a record template base's included: its
-  members take its name type, and `FieldNames.readBy` records the template's as it records a record's.
+  keys are matched in the base's name form (`TsonLinkedSchema.nameForm`): its members take its name type, and an
+  application of a template takes the template's.
 
 **One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming
 it, so the member's own reader takes the whole data-value and does with it whatever that mode does everywhere
@@ -71,10 +71,10 @@ said which member this is.
 **Both compare a written tag against a name and every alias whose chain ends at it**
 (`Subsumption.admitting`), §7.2 comparing "after following both alias chains to their terminal entries":
 the base's own set, which decides the `tagNamesTheBase` refusal, and each
-member's, which decides selection. Skipping it is not a lost nicety but a family nothing can name — a family
-whose base is a **template** has a minted entry for the base and for every member, and §8.2 makes a minted
-name non-normative, so an alias is the only spelling either end has. The dispatchers apply it on the same
-terms as the concrete record readers, or a subtype-template family would read in one encoding and be
+member's, which decides selection. Skipping it is not a lost nicety: a family whose base is an **abstract
+template's application** has a minted base where no declaration names the application, and §8.2 makes a minted
+name non-normative, so an alias is the only spelling a tag naming it has. The dispatchers apply it on the same
+terms as the concrete record readers, or such a family would read in one encoding and be
 refused in the other — the same schema, the same document, two answers. `CrossEncodingParityTest` carries both
 ends of it. A resolved form's root reads as a value of `meta.schema` by the same rule and no other: its tag, `!schema`,
 names the kernel root's `schema`, an alias of `meta.schema`.
@@ -96,7 +96,8 @@ at the value too.
 written name *denotes nothing* — the schemaless reader's own check (`TypeRefCheck`) and an annotation naming
 no type the governing schema declares (`AnnotationCapture`) — two classes, and the only ones that report it. Everything
 where a name resolves and is merely not admissible is `TYPE_MISMATCH`: §7.2 subsumption, a choice's variant
-membership, a union's member test, a type-ref naming a template. So is a position where a **required**
+membership, a union's member test, a type-ref naming a template (`OpenTemplateReader`, which every template, record
+or held, compiles to). So is a position where a **required**
 selector is absent, since no type is established either way — which is what the family readers already gave
 `tagRequired`, and what makes "a required tag is missing" need no member of its own. The distinction is what
 a consumer routes on: one says *correct the name*, the other says *this name means nothing here*. It also

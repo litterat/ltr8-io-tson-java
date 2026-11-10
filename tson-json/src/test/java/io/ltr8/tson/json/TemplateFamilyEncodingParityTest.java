@@ -19,17 +19,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * <b>A template family base dispatches the same way in both encodings</b> ([TSON-JSON] §9.4, and
- * [TSON-SCHEMA] §5.10): a record-bodied template carries {@code extension}, so a value at a position typed
- * by it is a value of one of its instantiations, selected by the discriminators where the base is SEALED and
- * by a tag where it is ABSTRACT.
+ * <b>A family declared through a template dispatches the same way in both encodings</b> ([TSON-JSON] §9.4, and
+ * [TSON-SCHEMA] §5.10). A template is no type, so a family's base is a record: an abstract record a template
+ * composes, its members reaching it through the template's written parent, or an abstract template's application,
+ * which is an abstract record carrying the template's selector. A value at the base's position is a value of one
+ * of its members, selected by the discriminators where the base states them and by a tag where it states none.
  *
  * <p><b>Why this sits beside {@link CrossEncodingParityTest} rather than inside it.</b> That test compares one
- * schema, held statically, which is what lets it be terse; a family base's two marks and the tag cases need a
- * schema each. What is shared is the comparison itself -- the code, the data pointer, the machine-readable
- * {@code expected} and the prose -- because §9.4 makes one vocabulary across both encodings an obligation, and
- * two dispatchers written separately ({@code AbstractTemplateReader} in the text stack, {@code
- * DispatchTagReader} here) are exactly the pair that can agree by having been copied and then drift.
+ * schema, held statically, which is what lets it be terse; the family's shapes and the tag cases need a schema
+ * each. What is shared is the comparison itself -- the code, the data pointer, the machine-readable {@code
+ * expected} and the prose -- because §9.4 makes one vocabulary across both encodings an obligation, and two
+ * dispatchers written separately ({@code RecordTagDispatchReader} in the text stack, {@code DispatchTagReader}
+ * here) are exactly the pair that can agree by having been copied and then drift.
  *
  * <p><b>The tag an ABSTRACT base admits is a declared member's name and nothing else.</b> A pin <em>value</em>
  * is not a type however much it reads like one, and the base's own name selects nothing -- the two cases that
@@ -44,26 +45,37 @@ class TemplateFamilyEncodingParityTest {
             !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
-    /** The template itself is the base, SEALED by the surviving discriminator -- dispatch by the pin. */
+    /** An abstract record states the selector, a template composes it, and each member pins it -- by the pin. */
     private static final String SEALED = HEADER.formatted("tsealed") + """
             {
               dog_type => { breed: text }
               cat_type => { indoor: boolean }
-              pet      => <V> { type: text =?  value: V }
-              dogpet   => pet<dog_type> & { type?: = "dog" }
-              catpet   => pet<cat_type> & { type?: = "cat" }
+              pet      => abstract { type: text =? }
+              pet_of   => <V> pet & { value: V }
+              dogpet   => pet_of<dog_type> & { type?: = "dog" }
+              catpet   => pet_of<cat_type> & { type?: = "cat" }
               holder   => { p: pet }
             }""";
 
-    /** The template itself is the base, ABSTRACT for want of a discriminator -- dispatch by tag. */
+    /** The base states no selector, and each member declares an application of the template -- by tag. */
     private static final String ABSTRACT = HEADER.formatted("tabstract") + """
             {
               dog_type => { breed: text }
               cat_type => { indoor: boolean }
-              pet      => <V> { value: V }
-              dogpet   => pet<dog_type>
-              catpet   => pet<cat_type>
+              pet      => abstract { }
+              pet_of   => <V> pet & { value: V }
+              dogpet   => pet_of<dog_type>
+              catpet   => pet_of<cat_type>
               holder   => { p: pet }
+            }""";
+
+    /** The base is an abstract template's application, carrying its selector -- by the pin. */
+    private static final String APPLIED = HEADER.formatted("tapplied") + """
+            {
+              pet      => abstract <V> { type: text =?  value: V }
+              dogpet   => pet<text> & { type?: = "dog"  breed: text }
+              catpet   => pet<text> & { type?: = "cat"  indoor: boolean }
+              holder   => { p: pet<text> }
             }""";
 
     /** A rule as both encodings must state it: which rule, where in the data, the constraint, and the prose. */
@@ -125,7 +137,7 @@ class TemplateFamilyEncodingParityTest {
     // ── SEALED: the pin selects, and no tag is written ───────────────────
 
     @Test
-    void aSealedTemplateBaseDispatchesOnItsPinInBoth() {
+    void aSealedBaseThroughATemplateDispatchesOnItsPinInBoth() {
         bothAccept(SEALED, "holder",
                 "!holder { p: { type: \"dog\"  value: { breed: lab } } }",
                 "{\"p\":{\"type\":\"dog\",\"value\":{\"breed\":\"lab\"}}}");
@@ -138,10 +150,26 @@ class TemplateFamilyEncodingParityTest {
                 "{\"p\":{\"type\":\"cat\",\"value\":{\"indoor\":true}}}");
     }
 
+    /** The base is an abstract template's application, and its members are the declarations composing it. */
+    @Test
+    void anAbstractTemplatesApplicationDispatchesOnItsPinInBoth() {
+        bothAccept(APPLIED, "holder",
+                "!holder { p: { type: \"cat\"  value: x  indoor: true } }",
+                "{\"p\":{\"type\":\"cat\",\"value\":\"x\",\"indoor\":true}}");
+    }
+
+    /** A pin no member states selects nothing at the application's position, in both encodings alike. */
+    @Test
+    void aPinNoMemberOfTheApplicationStatesIsOneRuleInBoth() {
+        sameRule(APPLIED, "holder",
+                "!holder { p: { type: \"bird\"  value: x } }",
+                "{\"p\":{\"type\":\"bird\",\"value\":\"x\"}}");
+    }
+
     // ── ABSTRACT: a tag selects, and only a member's name is one ─────────
 
     @Test
-    void anAbstractTemplateBaseDispatchesOnTheMemberTagInBoth() {
+    void anAbstractBaseThroughATemplateDispatchesOnTheMemberTagInBoth() {
         bothAccept(ABSTRACT, "holder",
                 "!holder { p: !dogpet { value: { breed: lab } } }",
                 "{\"p\":{\"$type\":\"dogpet\",\"value\":{\"breed\":\"lab\"}}}");
@@ -161,7 +189,7 @@ class TemplateFamilyEncodingParityTest {
 
     /** ABSTRACT has no direct instances, so the tag is not optional the way a SEALED base's is. */
     @Test
-    void anAbstractTemplateBaseRequiresItsTagInBoth() {
+    void anAbstractBaseThroughATemplateRequiresItsTagInBoth() {
         sameRule(ABSTRACT, "holder",
                 "!holder { p: { value: { breed: lab } } }",
                 "{\"p\":{\"value\":{\"breed\":\"lab\"}}}");
@@ -169,7 +197,7 @@ class TemplateFamilyEncodingParityTest {
 
     /** And the base's own name selects nothing: it is the family, not a member of it. */
     @Test
-    void aTagNamingTheTemplateBaseItselfIsOneRuleInBoth() {
+    void aTagNamingTheBaseItselfIsOneRuleInBoth() {
         sameRule(ABSTRACT, "holder",
                 "!holder { p: !pet { value: { breed: lab } } }",
                 "{\"p\":{\"$type\":\"pet\",\"value\":{\"breed\":\"lab\"}}}");

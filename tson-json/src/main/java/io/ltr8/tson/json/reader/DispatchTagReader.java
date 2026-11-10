@@ -24,7 +24,7 @@ import java.util.Set;
  *   <li><b>An OPEN record with subtypes</b> -- untagged, the value is the record itself and goes to its
  *       own concrete reader ({@link #untagged}); a tag restating the record goes there too, and one naming a
  *       subtype goes to that subtype.</li>
- *   <li><b>An ABSTRACT base</b>, closed or a family-base template -- there are no direct instances, so the
+ *   <li><b>An ABSTRACT base</b> -- there are no direct instances, so the
  *       tag is REQUIRED and the base itself is not admissible. The failure lands before the object's shape
  *       is consulted, which is the same refusal TSON text gives a missing {@code !variant}.</li>
  * </ul>

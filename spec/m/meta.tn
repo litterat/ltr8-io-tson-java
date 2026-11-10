@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=bf9b0f69c58bd4d80acdd469f3ebf81a65c51334f2d40258f2351f9ea5030c13"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=7c50b455e3f76f831acebdaf951546dd432706b51f15e37a59129f7b3defd4ca"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -378,8 +378,11 @@
       application. `supertypes` is the closed chain: every entry this one IS-A,
       complete to a fixed point through applied parents ([TSON-SCHEMA] §5.8),
       each a name without arguments, sorted, and empty for a fresh record, an
-      instance and a subtracted record alike. `subtypes` is the inverse, over
-      the entries of this map only ([TSON-SCHEMA] §3.3.4).
+      instance and a subtracted record alike. A template's chain records what
+      its written parents reach, which is each application's, and never names
+      a template: an application is not IS-A its template. `subtypes` is the
+      inverse, over the entries of this map only ([TSON-SCHEMA] §3.3.4), and
+      holds no template, a template being no type ([TSON-SCHEMA] §5.10).
       """
     type_chain => {
       parents?:    [meta.type_ref]
@@ -753,29 +756,30 @@
       A record template ([TSON-SCHEMA] §5.10): a record body over `parameters`,
       whose fields are `meta.record_template_field`s and may carry them. Each
       application substitutes its arguments for the parameters and closes to a
-      `meta.record`, its member.
+      `meta.record`.
 
-      A record template is a **family base**: a type a position may name,
-      ABSTRACT by construction, a value there being a value of one of its
-      members, each IS-A it. It takes part in IS-A as any abstract parent does,
-      and nothing reads or writes a value against it, so no reader or writer is
-      built for it: a reader at a position it types dispatches to a member and
-      reads against the member's closed record. That is why it is its own
-      constructor and not a record with an optional list of parameters.
+      A template is not a type: no position names one bare, and only an
+      application of one is a type, read against the closed record it denotes.
+      Nothing reads or writes a value against a template. A family is declared
+      with records: an abstract record states the selectors, a template
+      composes it, and each member composes an application and pins them.
 
       A parameter stands only in a field's `type_param`, or as an argument of
       an application in a field's `type` or in a parent; the rest of the
       template is what every application shares. Its bound is written, as
       `meta.template_param` says.
 
-      `extension` states how each application is realised, the template's own
-      being ABSTRACT whatever it says, so `result => abstract <T> { ... }` makes
-      `result<text>` abstract over its own members. `discriminators` is the
-      family's, as on an ABSTRACT record, and every field it names is typed by
-      no parameter, so the base reads each one without an application. `groups`
-      and `name_type` are each application's, unchanged by substitution.
+      `extension`, `discriminators`, `groups` and `name_type` are each
+      application's, unchanged by substitution: `result => abstract <T> { ... }`
+      makes `result<text>` an abstract record, the base of the declarations
+      that compose it, and a selector makes each application ABSTRACT as it
+      makes a record so. `final` is refused on a template. Every field
+      `discriminators` names is typed by no parameter, so a selector means the
+      same in every application.
 
-      Its chain is `type`'s. A parent may still be open —
+      Its chain is `type`'s, and an application's IS-A edges are its written
+      parents': each closed parent, and the entry an applied parent denotes,
+      never the template itself. A parent may still be open —
       `<T> result<T> & { ... }` — and it is substituted and closed with every
       other reference the template holds, so `ok<text>` reaches an IS-A edge to
       `result<text>` and not to `result<int32>`. `fields` is flattened, as a
@@ -1000,10 +1004,9 @@
       holds a type's name, which takes part in structural identity
       ([TSON-SCHEMA] §8.2). A record written in braces is built with `record`,
       and so is `top` itself and a constructor whose declaration is a record, so
-      `meta.ref<meta.record>` holds all of them; a record template is built with
-      `record_template` and is not among them. A template over another
-      constructor is no type, and an application of one is the type it expands
-      to. Where `of` is any other type, the values it admits
+      `meta.ref<meta.record>` holds all of them. A template, a record template
+      or one over another constructor, is no type and no reference holds it;
+      an application of one is the type it closes to. Where `of` is any other type, the values it admits
       are values, and a slot holds a value's qualified name: the first segment
       resolves in the writer's namespace and names an entry, and each further
       segment selects a key of a namespace value or a field of a record value.

@@ -526,7 +526,7 @@ class DefinitionResolverTest {
     /**
      * A record template is a {@code record_template}: {@code { first: A  second: B }} with its parameters stated,
      * each field labelled with the parameter that types it. Its own {@code extension} is each application's, OPEN
-     * unless marked; the base is ABSTRACT by construction, with no discriminator in sight (§5.10).
+     * unless marked, and it is no family base: a template is no type (§5.10).
      */
     @Test
     void resolvesAFreshRecordTemplateAsARecordTemplate() {
@@ -537,7 +537,7 @@ class DefinitionResolverTest {
         assertEquals(Optional.of("A"), pair.fields().get("first").typeParam());
         assertEquals(Optional.of("B"), pair.fields().get("second").typeParam());
         assertEquals(RecordExtensionType.OPEN, pair.extension(), "each application's");
-        assertEquals(Optional.of(RecordExtensionType.ABSTRACT), FamilySelectors.extensionOf(pair), "the base's");
+        assertEquals(Optional.empty(), FamilySelectors.extensionOf(pair), "no base");
     }
 
     /** A <b>closed</b> record still resolves at its declaration -- only an open body is held. */
@@ -2427,9 +2427,8 @@ class DefinitionResolverTest {
 
 
     /**
-     * <b>A record template is a family base, and a selector makes it a member-dispatched one</b> (§5.10): the
-     * template takes part in IS-A, {@code subtypes} holds its own instantiations, and {@code
-     * RecordExtension} judges the selector against the fields the way it does for a closed record.
+     * <b>A selector on a record template is each application's</b> (§5.10): it makes the template ABSTRACT as it
+     * makes a record so, and each application closes to an abstract record dispatching on it.
      */
     @Test
     void aTemplateMayBeSealed() {
@@ -2438,15 +2437,13 @@ class DefinitionResolverTest {
 
         RecordTemplateBody open = assertInstanceOf(RecordTemplateBody.class, box);
         assertEquals(List.of("T"), open.parameterNames());
-        // The base is ABSTRACT by construction; its own `extension` is each application's (§5.10).
-        assertEquals(Optional.of(RecordExtensionType.ABSTRACT), FamilySelectors.extensionOf(box));
+        assertEquals(RecordExtensionType.ABSTRACT, open.extension(), "derived from the selector, each application's");
         assertEquals(List.of("kind"), open.discriminators());
     }
 
     /**
-     * <b>{@code final} still cannot hold of a template.</b> It forbids anything composing onto the marked
-     * type, and every application of a template is a subtype of it by construction -- so the claim is false
-     * of the declaration before an author writes a second one.
+     * <b>{@code final} is refused on a template.</b> A template is applied to be composed, each member of a family
+     * composing an application of it, and the mark would forbid that of every application.
      */
     @Test
     void aTemplateCannotBeFinal() {
@@ -2454,7 +2451,7 @@ class DefinitionResolverTest {
                 () -> resolveSnippetsAgainstMetaKernel(
                         "box => final <T> { kind: text =?  v: T }"));
 
-        assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("is refused on a template"), thrown.getMessage());
     }
 
     /**

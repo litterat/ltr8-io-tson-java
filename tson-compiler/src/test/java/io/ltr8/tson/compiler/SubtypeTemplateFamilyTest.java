@@ -85,11 +85,10 @@ class SubtypeTemplateFamilyTest {
         assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "err_of")),
                 TypeChain.subtypesOf(compiled.schema().entries().get(base)),
                 () -> base + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(base)));
-        // Each is also a declared member of its own template's family (§8.2's entry shape), and the chain is
-        // complete: IS-A result_of, which is a member of result's family, so IS-A result too.
-        assertEquals(List.of("ok", "result", base),
+        // Neither is IS-A a template (§5.10): each is IS-A the entry its applied parent denotes, and nothing else.
+        assertEquals(List.of(base),
                 TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))));
-        assertEquals(List.of("err", "result", base),
+        assertEquals(List.of(base),
                 TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "err_of"))));
     }
 
@@ -97,8 +96,8 @@ class SubtypeTemplateFamilyTest {
      * <b>An applied parent reaches the entry its arguments name, never its head</b> ([TSON-SCHEMA] §5.8's
      * "Parameterized references", §8.1's derived indexes: "{@code ok<text>} indexes {@code result<text>}, never a
      * head name"). So the template {@code ok} is IS-A nothing of {@code result}'s, and {@code ok<text>} reaches
-     * {@code result} only through a declaration naming {@code result<text>}: with none, it is a member of {@code
-     * ok}'s family alone.
+     * {@code result<text>} only where an entry for that application exists: with none, it is IS-A nothing, and no
+     * template is IS-A or indexes anything (§5.10).
      */
     @Test
     void anAppliedParentReachesTheEntryItsArgumentsNameAndNeverTheHead() {
@@ -110,19 +109,18 @@ class SubtypeTemplateFamilyTest {
 
         assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get("ok")),
                 "the template is IS-A no head name");
-        assertEquals(List.of("ok"), TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
-                "no declaration names result<text>, so its application reaches no member of result's family");
+        assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
+                "nothing names result<text>, and a template is no type, so ok_of is IS-A nothing");
         assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get("result")));
     }
 
     /**
-     * <b>A family-base template is IS-A its parents, and so are its instantiations</b> ([TSON-SCHEMA] §4.1). A
-     * record template carries a chain: it holds {@code base} as written and as reached, which puts the
-     * template in {@code base.subtypes} as any record composing {@code base} is, and every instantiation closing
-     * from it completes the same parents into a chain naming {@code base}.
+     * <b>A template's applications are IS-A its written parents</b> ([TSON-SCHEMA] §5.8, §5.10). A record template
+     * carries a chain, holding {@code base} as written and as reached, and every application closing from it
+     * completes the same parents into a chain naming {@code base}. The template itself is no type and in no index.
      */
     @Test
-    void aFamilyBaseTemplatesInstantiationsAreIndexedUnderItsBase() {
+    void aTemplatesApplicationsAreIndexedUnderItsParent() {
         TsonCompiledSchema compiled = compile("""
                   base     => { x: int32 }
                   box      => <V> base & { item: V }
@@ -132,8 +130,8 @@ class SubtypeTemplateFamilyTest {
 
         assertTrue(TypeChain.subtypesOf(baseEntry).contains(target(compiled, "box_text")),
                 () -> "the instantiation is indexed: " + TypeChain.subtypesOf(baseEntry));
-        assertTrue(TypeChain.subtypesOf(baseEntry).contains("box"),
-                () -> "the template is IS-A its parent too: " + TypeChain.subtypesOf(baseEntry));
+        assertFalse(TypeChain.subtypesOf(baseEntry).contains("box"),
+                () -> "the template is no type, and in no index: " + TypeChain.subtypesOf(baseEntry));
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(compiled.schema().entries().get("box")),
                 "the record template keeps its parent as written, which closing completes");
     }
@@ -171,7 +169,7 @@ class SubtypeTemplateFamilyTest {
                   great_of  => great<text>
                 """);
 
-        assertEquals(List.of("great", "ok", target(compiled, "ok_of"), "result", target(compiled, "result_of")),
+        assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "result_of")),
                 TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "great_of"))),
                 "the direct parent, then the chain it already carried, complete");
         assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get(target(compiled, "result_of")))
@@ -189,9 +187,9 @@ class SubtypeTemplateFamilyTest {
                   ok_of     => ok<text>
                 """);
 
-        assertEquals(List.of("ok", "result", target(compiled, "result_of"), "tagged"),
+        assertEquals(List.of(target(compiled, "result_of"), "tagged"),
                 TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
-                "tagged arrives with the template's own chain; the instantiation is minted here");
+                "tagged arrives with the template's own chain, beside the entry the applied parent denotes");
     }
 
     /**
@@ -211,8 +209,8 @@ class SubtypeTemplateFamilyTest {
 
         assertEquals(List.of("payload"), ((RecordBody) compiled.schema().entries().get(thin)).fields()
                 .keySet().stream().toList(), "the subtraction really ran");
-        // Not IS-A result: the only edge is to thin, whose declared member thin_of is (§8.2's entry shape).
-        assertEquals(List.of("thin"), ((RecordBody) compiled.schema().entries().get(thin)).supertypes(),
+        // Not IS-A result<text>, and not IS-A thin either, a template being no type (§5.10).
+        assertEquals(List.of(), ((RecordBody) compiled.schema().entries().get(thin)).supertypes(),
                 "contract: broken, and no application left in the chain to close into an edge");
         assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get(target(compiled, "result_of"))));
     }

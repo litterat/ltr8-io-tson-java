@@ -16,9 +16,9 @@ import java.util.function.UnaryOperator;
  * carried instead ({@link TreeAtomReader}) and changes nothing about what was parsed or refused, and bind mode
  * leaves it bare for a record to bind to a component.
  *
- * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), a
- * family-base template's, the choice's ({@link DispatchChoiceReader}) and a declared position's ({@link
- * DispatchDeclaredReader}) select a reader and build nothing,
+ * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), the
+ * choice's ({@link DispatchChoiceReader}) and a declared position's ({@link DispatchDeclaredReader}) select a
+ * reader and build nothing, and a template's refusal builds nothing either,
  * so every mode registers the same ones. So does a concrete record's loop ({@link RecordReader}); what is the
  * mode's own is the factory that builds it and the {@link RecordBuilder} it hands its slots to.
  *
@@ -62,7 +62,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry atoms() {
         Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
         factories.put("meta.template", DispatchFactories.TEMPLATE);
-        factories.put("meta.record_template", DispatchFactories.RECORD_TEMPLATE);
+        factories.put("meta.record_template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -86,7 +86,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("meta.choice", DispatchChoiceReader.FACTORY);
         factories.put("meta.declared_type", DispatchDeclaredReader.FACTORY);
         factories.put("meta.template", DispatchFactories.TEMPLATE);
-        factories.put("meta.record_template", DispatchFactories.RECORD_TEMPLATE);
+        factories.put("meta.record_template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -110,7 +110,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("meta.choice", DispatchChoiceReader.FACTORY);
         factories.put("meta.declared_type", DispatchDeclaredReader.FACTORY);
         factories.put("meta.template", DispatchFactories.TEMPLATE);
-        factories.put("meta.record_template", DispatchFactories.RECORD_TEMPLATE);
+        factories.put("meta.record_template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 

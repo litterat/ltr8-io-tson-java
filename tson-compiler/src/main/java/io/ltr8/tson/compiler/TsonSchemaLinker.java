@@ -1076,15 +1076,17 @@ public final class TsonSchemaLinker {
      * imported schema, examined on its own, correctly doesn't know about it. {@link #withAddedSubtypes} unions
      * with whatever subtypes the target already had rather than replacing them.
      *
-     * <p><b>Every type is credited, and nothing else</b> ({@link Type}): a family base -- a record template, the
-     * ABSTRACT base its members are IS-A -- among them. Both sides are asked of the chain,
-     * so a record template IS-A its own parents as any record is. An alias is a hop, and a held template an
-     * abbreviation, neither a type of its own.
+     * <p><b>Every type is credited, and nothing else</b> ({@link Type}). An alias is a hop, and a template is no
+     * type (§5.10): its chain records what its written parents reach, which each application inherits, but the
+     * template itself is in no index, so no position typed by its parent can reach an open record.
      */
     private static Map<String, Top> computeSubtypes(Map<String, Top> merged, Set<String> localNames) {
         Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
         for (String localName : localNames) {
             Top local = merged.get(localName);
+            if (OpenEntry.isOpen(local)) {
+                continue;
+            }
             for (String supertype : TypeChain.supertypesOf(local)) {
                 if (merged.get(supertype) instanceof Type) {
                     newSubtypesByName.computeIfAbsent(supertype, ignored -> new LinkedHashSet<>()).add(localName);
@@ -1713,10 +1715,9 @@ public final class TsonSchemaLinker {
      * resolve in.
      *
      * <p><b>Judged against the nearest closed record on the chain.</b> A supertype another supertype lists was judged
-     * when that one linked, so only the minimal ones are asked, and the diagnostic names the source the author wrote. A
-     * supertype that is still open -- the family base an applied operand reaches -- has parameter-typed fields and is
-     * skipped; an applied operand is judged through the closed entry its application denotes, where one exists. A
-     * field typed by an application not yet closed, or by a name no entry holds, is the reference checks' to report.
+     * when that one linked, so only the minimal ones are asked, and the diagnostic names the source the author wrote.
+     * An applied operand is judged through the closed entry its application denotes, where one exists. A field typed
+     * by an application not yet closed, or by a name no entry holds, is the reference checks' to report.
      */
     private static void checkRestatedFieldTypes(String entryName, RecordBody record, Map<String, Top> namespace,
                                                 Function<String, String> shown) {
@@ -1972,23 +1973,36 @@ public final class TsonSchemaLinker {
      * the argument count written against the parameter count the referenced entry declares, and neither
      * number depends on what the arguments resolve to -- the only thing holding withholds.
      *
-     * <p><b>Applications only, never bare names.</b> The rule's other half -- a template named without being
-     * applied -- is not decidable against a held body: its tokens are field names, states, literals and type
-     * references alike, so "this token names a template" rejects a correct schema whose field happens to be
-     * called {@code box} beside a template of that name. An application is a distinguishable shape in the
-     * wire tree; a bare name is not. So that half runs where the reference is unambiguous, on the entry
-     * materialisation mints -- and an unapplied template gets no verdict, which is the open form's own
-     * position rather than a shortfall (§5.10: "an unapplied template is checked no further and receives no
-     * verdict").
+     * <p><b>A record template's every reference, bare ones included</b>: its field types and parents are references
+     * of the model, so a template named bare there is refused at the template's own declaration (§5.10). <b>A held
+     * body's applications only.</b> The rule's other half -- a template named without being applied -- is not
+     * decidable against held text: its tokens are field names, states, literals and type references alike, so
+     * "this token names a template" rejects a correct schema whose field happens to be called {@code box} beside
+     * a template of that name. So that half runs where the reference is unambiguous, on the entry
+     * materialisation mints.
      */
     private static void checkHeldArity(String entryName, Top held,
             Map<String, Top> namespace, List<String> ownParameters) {
+        if (held instanceof RecordTemplateBody template) {
+            // A record template's references are values of the model, so a bare one is told from a field name and
+            // judged too: a template named bare inside a template is no type there either (§5.10).
+            template.references().forEach(reference ->
+                    checkArityThroughout(reference, namespace, ownParameters, "'" + entryName + "'"));
+            return;
+        }
         for (TypeRef application : HeldBody.applicationsOf(held)) {
             checkArity(application, namespace, ownParameters, "'" + entryName + "'");
             for (TypeRef nested : application.arguments()) {
                 checkArity(nested, namespace, ownParameters, "'" + entryName + "'");
             }
         }
+    }
+
+    /** {@link #checkArity} over {@code ref} and every argument it carries, at any depth. */
+    private static void checkArityThroughout(TypeRef ref, Map<String, Top> namespace, List<String> ownParameters,
+                                             String context) {
+        checkArity(ref, namespace, ownParameters, context);
+        ref.arguments().forEach(argument -> checkArityThroughout(argument, namespace, ownParameters, context));
     }
 
     /**
@@ -2053,18 +2067,10 @@ public final class TsonSchemaLinker {
                     + "none (§5.10); drop the argument list");
         }
         if (supplied == 0) {
-            if (OpenEntry.isFamilyBase(referenced)) {
-                // A record template is a family base, and naming it here names that base
-                // (§5.10). Nothing is ever read *against* it: a value at the position
-                // is a value of some member, selected by a tag or by the discriminators, and every member is
-                // a closed entry -- so the existential is eliminated by dispatch rather than by inferring
-                // arguments from the payload, which is what makes naming `box` here still an error.
-                return;
-            }
             throw new SchemaValidationException(context + ": '" + ref.name() + "' is a template taking "
                     + declared + " type argument" + (declared == 1 ? "" : "s") + " " + parameters
-                    + ", and a template is not a type until it is applied -- write '" + ref.name()
-                    + "<...>' with its arguments (§5.10)");
+                    + ", and a template is not a type -- write '" + ref.name() + "<...>' with its arguments, or, "
+                    + "for any member of a family, name the abstract record its applications compose (§5.10)");
         }
         throw new SchemaValidationException(context + ": '" + ref.name() + "' takes " + declared
                 + " type argument" + (declared == 1 ? "" : "s") + " " + parameters + ", but "

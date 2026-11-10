@@ -10,7 +10,6 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.ReferenceBody;
@@ -59,7 +58,8 @@ import java.util.function.Predicate;
  * something a read reports, a tag names (§6.1.5) and a binding maps, all by name. An application at a use site
  * has only a minted name, which nothing may write (§8.2), so a member it produced could be selected and never
  * named. It is refused, and the author declares it: {@code dogs => dog_of<text>}. A minted entry that joins no
- * family -- an array, a set, a choice, an application of a family's base -- is untouched, and two schemas
+ * family as a member -- an array, a set, a choice, an application composing no declared type, a family base
+ * minted for an abstract template's application -- is untouched, and two schemas
  * minting one such form hold two entries that are the same type in every way a value can tell.
  */
 final class RecordExtension {
@@ -103,15 +103,17 @@ final class RecordExtension {
                         + "'my_name => " + shownName + "' -- and use that name in place of the application"));
                 continue;
             }
-            RecordBody record = def == null ? null : familyBodyOf(def);
-            if (record != null) {
+            if (def instanceof RecordBody record) {
                 checkDeclaration(name, def, record, merged, facts, violations);
+            } else if (OpenEntry.isOpen(def)) {
+                // Every application of a template IS-A what its written parents reach, so a template composing a
+                // final record is refused at its own declaration, whether or not anything applies it.
+                checkNothingComposesOntoFinal(name, def, merged, facts, violations);
             }
         }
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             Top def = entry.getValue();
-            RecordBody base = familyBodyOf(def);
-            if (base != null && FamilySelectors.dispatchesOnMembers(def)) {
+            if (def instanceof RecordBody && FamilySelectors.dispatchesOnMembers(def)) {
                 checkFamily(entry.getKey(), def, merged, facts, applications, localNames, origins, enumForms, violations);
             }
         }
@@ -154,16 +156,12 @@ final class RecordExtension {
         checkNothingComposesOntoFinal(name, def, merged, facts, violations);
 
         // The *names* this declaration states, never fields resolved from its members: which fields a family
-        // dispatches on is the base's own statement (§5.2), and a template nobody has applied yet has no
-        // members to resolve against -- asking for fields here refused a correct marked template for having
-        // no instantiations. It needs no inherited-selector exemption either: a member states no discriminators
-        // of its own, where the per-field mark had to be cleared at each one to say the same thing.
+        // dispatches on is the base's own statement (§5.2). It needs no inherited-selector exemption either: a
+        // member states no discriminators of its own.
         List<String> declared = FamilySelectors.namesOf(def);
         if (declared.isEmpty() || record.extension() != RecordExtensionType.ABSTRACT) {
             return;
         }
-        // Each is checked as the base reads it: a template's selector is FIXED to its parameter where it is
-        // written, and the base dispatches on it with the pin dropped.
         SequencedMap<String, RecordField> selectors = FamilySelectors.of(def);
         for (String selector : declared) {
             RecordField field = selectors.get(selector);
@@ -231,8 +229,6 @@ final class RecordExtension {
             Map<String, Normalization> enumForms, List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
-        // Each is checked as the base reads it: a template's selector is FIXED to its parameter where it is
-        // written, and the base dispatches on it with the pin dropped.
         SequencedMap<String, RecordField> selectors = FamilySelectors.of(def);
         if (selectors.isEmpty() || selectors.values().stream().anyMatch(f -> parserFor(f, merged, facts).isEmpty())) {
             return; // already reported against the base, and a pin has nothing to be read at
@@ -240,8 +236,8 @@ final class RecordExtension {
         Map<List<Object>, String> seen = new LinkedHashMap<>();
         for (String subtype : new LinkedHashSet<>(TypeChain.subtypesOf(def))) {
             Top sub = merged.get(subtype);
-            // Only a record is a member: a record template IS-A the base is not one, its applications are. An
-            // undeclared member is refused on its own, and judging its pins too would report one mistake twice.
+            // Only a record is a member. An undeclared member is refused on its own, and judging its pins too
+            // would report one mistake twice.
             if (!(sub instanceof RecordBody record)
                     || isUndeclaredMember(subtype, sub, facts, applications,
                     name -> TsonBundledSchemas.isKernel(origins.get(name)))) {
@@ -355,34 +351,6 @@ final class RecordExtension {
             return AtomParsers.inSchemaDocument(reference);
         }
         return AtomParsers.forType(target, enumForms.getOrDefault(terminal, Normalization.NONE));
-    }
-
-    /**
-     * The record body whose family rules this entry is subject to, or {@code null} where it has none.
-     *
-     * <p><b>A record template is a family base and is judged as one</b> (§5.10). Its own fields may still
-     * carry its parameters, so the body checked here is assembled from the facts it states as a base: ABSTRACT,
-     * the {@code discriminators} it names, and each selector at the type the base declares it, which names no
-     * parameter. Skipping it would accept a template family with no family check at all: no rule that every
-     * member pins every selector, and no rule that the pins are pairwise distinct. An unchecked family is worse
-     * than a refused one.
-     *
-     * <p><b>The selector derivation is the reader's own</b> ({@code FamilySelectors}), so the check and the
-     * dispatch cannot disagree about which fields a family is selected by -- a check that passed a family
-     * the read could not place is the defect one derivation per consumer produces.
-     *
-     * <p>A held template has none: it is no type until applied (§5.10), nothing can stand at it, and its
-     * instantiations are judged as the closed records they are.
-     */
-    private static RecordBody familyBodyOf(Top def) {
-        return switch (def) {
-            case RecordBody record -> record;
-            // The selectors come from `FamilySelectors`, the one derivation both encodings read.
-            case RecordTemplateBody template -> new RecordBody(RecordBody.fieldMap(FamilySelectors.of(template)),
-                    List.of(), FamilySelectors.extensionOf(template).orElseThrow(), template.discriminators(),
-                    java.util.Optional.empty());
-            case null, default -> null;
-        };
     }
 
     /** The colliding pin, named the way an author reads it: one value, or the tuple the selectors form. */

@@ -7,14 +7,14 @@ import java.util.Optional;
 /**
  * An open entry ([TSON-SCHEMA] §5.10): one whose value declares parameters, and so is not closed until an
  * application substitutes them away. Every question a phase asks of an entry because it is open -- whether it is,
- * what it binds, whether it is a family base -- is answered here, so which kernel shape carries an open entry is
- * decided in one place and not at each phase that asks.
+ * what it binds -- is answered here, so which kernel shape carries an open entry is decided in one place and not at
+ * each phase that asks.
  *
- * <p><b>Two shapes carry one.</b> A record template ({@link RecordTemplateBody}) is a <b>family base</b>: the one
- * open entry that is itself a type, ABSTRACT by construction, which a position may name, a value there being a value
- * of one of its declared members. Every other open entry is a {@link TemplateBody}, whose held body denotes nothing
- * until it is applied. Both are their own Java types, so a phase that wants one asks with a pattern and a phase that
- * builds readers or writers from a {@link RecordBody} never meets either.
+ * <p><b>Two shapes carry one, and neither is a type</b> (§5.10): no position names an open entry bare, and only an
+ * application of one is a type. A record template is a {@link RecordTemplateBody}; every other open entry is a
+ * {@link TemplateBody}, whose held body denotes nothing until it is applied. Both are their own Java types, so a
+ * phase that wants one asks with a pattern and a phase that builds readers or writers from a {@link RecordBody}
+ * never meets either.
  */
 public final class OpenEntry {
 
@@ -41,11 +41,6 @@ public final class OpenEntry {
      */
     public static List<String> parameterNames(Top value) {
         return parameters(value).stream().map(TemplateParam::name).toList();
-    }
-
-    /** Whether {@code value} is a family base: a record template. */
-    public static boolean isFamilyBase(Top value) {
-        return value instanceof RecordTemplateBody;
     }
 
     /**

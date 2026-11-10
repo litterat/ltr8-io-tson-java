@@ -131,8 +131,7 @@ final class DependentFields {
 
     /**
      * A sibling's default or pin names a type a value can be read against. A template is refused, a record template
-     * among them although the kernel makes it a family base: its members are its applications, which are not values of
-     * the sibling's type until applied, and reading never starts a materialisation.
+     * among them: a template is no type (§5.10), and reading never starts a materialisation.
      */
     private static void checkSiblingValue(String about, RecordField field, Token value, Map<String, Top> namespace) {
         String noun = field.role() == FieldRole.FIXED ? "pin" : "default";

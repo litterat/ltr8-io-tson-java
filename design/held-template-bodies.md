@@ -1,7 +1,7 @@
 # Held template bodies
 
 What an open entry's body is, and how each shape of it closes. A **record template** is a `meta.record_template`
-(`schema.meta.RecordTemplateBody`, a family base); every other open entry is a **held body**, text carried by the
+(`schema.meta.RecordTemplateBody`); every other open entry is a **held body**, text carried by the
 kernel's `meta.template` constructor (`schema.meta.TemplateBody`), whose held tree (`HeldBody`) is what substitution
 rewrites. A record template is substituted on the model instead (`RecordTemplateSubstitution`). This note also owns
 §5.10's parameters -- where one may stand, and its bound (`ParameterTypes`) -- and §8.2's synthetic merge as it meets
@@ -9,7 +9,7 @@ closing. Current form only; history lives in git.
 
 **Invariants**
 
-- Whether an entry is open, what it binds and whether it is a family base are `schema.meta.OpenEntry`'s questions. The
+- Whether an entry is open and what it binds are `schema.meta.OpenEntry`'s questions; neither shape is a type (§5.10). The
   two open shapes are two Java types, so a phase that wants one asks with a pattern (`TsonSchemaCompiler.build`, the
   JSON factories by `@Typename`, `TemplateMaterialiser.instantiate`), and code that builds a reader or writer from a
   `RecordBody` can never be handed a template.
@@ -111,11 +111,9 @@ its base), and an application nothing declares is its expansion.
   Either way `checked` refuses a selector typed by a parameter (`refuseParameterTypedSelector`) and a literal value on a
   field typed by one (`refuseLiteralOnOpenType`: a literal needs a closed type). An error placeholder for
   an open declaration is an empty record template (`SchemaResolver.unresolved`), so it closes like any record template.
-  - **Why its own constructor and not a record with optional `parameters`.** A record is what readers and writers are
-    built for, and a template is never read or written against: a position it types dispatches to a member. As one
-    Java type the two could only be told apart by a runtime check at every reader, writer and dispatcher; as two, the
-    dispatchers' "a template IS-A the base is no member" is the `instanceof RecordBody` they already make, and the
-    compiler's choice between `AbstractTemplateReader` and a record reader is a pattern. In source,
+  - **Its own Java type.** A record is what readers and writers are built for, and a template is never read or written
+    against, being no type; as one Java type the two could only be told apart by a runtime check at every reader and
+    writer, and as two a reader factory taking a `RecordBody` cannot be handed a template. In source,
     `!meta.record_template` is resolver vocabulary like `!meta.template`, and a construction applying it is refused
     (`requireAuthorable`). The desugarer's own `!meta.record_template` payload is a `RecordTemplateDef`, the one
     `TypeDef` no parser builds, so the type tells it from an author's `Instance` and the refusal needs no exception.
@@ -147,13 +145,13 @@ holds.
 - **A record template** (`closeRecordTemplate`): its fields and parents substituted on the model
   (`RecordTemplateSubstitution`) — a `type_param` takes its argument as its type, and a parameter in an application's
   arguments is replaced where it stands — then each field closed to a `RecordField`, the
-  applications in its type closed in field order, and taken as a member: no `discriminators`, its pins being in place,
-  member dispatch not travelling (`closedExtension`), its chain completed from the substituted parents
-  (`Ancestry.chainOf`). Parents are substituted and not closed: an operand denotes no entry (§8.2). A member's field
-  carries no source position. Whether an argument names a type that IS-A the parameter's bound is
-  `checkArguments`'; a literal argument (`box<3>`) never reaches here, the grammar having refused it. A minted
-  member is named from its binding record as every closed form is (`WireForm.recordWire`, `DerivedName.ofBinding`),
-  so its identity is the closed record's content and does not depend on how it was closed.
+  applications in its type closed in field order, the template's `extension`, `discriminators`, groups and name type
+  kept as written -- an abstract template's application is an abstract record -- and its chain completed from the
+  substituted parents (`Ancestry.chainOf`). Parents are substituted and not closed: an operand denotes no entry
+  (§8.2). A closed application's field carries no source position. Whether an argument names a type that IS-A the
+  parameter's bound is `checkArguments`'; a literal argument (`box<3>`) never reaches here, the grammar having refused
+  it. A minted member is named from its binding record as every closed form is (`WireForm.recordWire`,
+  `DerivedName.ofBinding`), so its identity is the closed record's content and does not depend on how it was closed.
 
 - **Anything but `meta.record` or `meta.alias`** (`closeHeldTemplate`, via `closeHeld`): the substituted wire is bound
   through **the constructor's own compiled reader**, the one a written `!meta.array { … }` binds through, so the result is

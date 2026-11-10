@@ -50,13 +50,12 @@ spec-required case:
   entry for the same application (`design/template-materialisation.md`, "Operands and on-demand closing"). Unify the
   on-demand closing with a later declaration that owns the application, and add `schema/valid` vectors in both orders
   with one expected output.
-- [ ] **A template's applied parent earns no edge to the parent's head** ([TSON-SCHEMA] §5.8, §8.1; Revision 39
-  change log #20). Under the expansion rule, `ok_of => ok<text>` over `ok => <T> result<T> & { note: text }` is IS-A
-  `result` as well as `result<text>`, as its hand-written expansion is, and joins `result`'s family, its own pins or
-  arguments supplying the outer family's discriminators. Today its supertypes are `[ok]`, plus `result<text>` only
-  where a declaration names it (`SubtypeTemplateFamilyTest`). Add the head edge to a declared member's chain, update
-  §8.1's derived indexes, and add `link/valid` and `class2/validate` vectors reading `ok_of` at a position typed
-  `result`.
+- [ ] **A template named bare inside a held body is not refused** ([TSON-SCHEMA] §5.10). No position names a template
+  bare, and the linker refuses one everywhere a reference is a value of the model, a record template's own fields and
+  parents included (`TsonSchemaLinker.checkArity`). A held body (`TemplateBody`, a template over any constructor but
+  `record`) is text, and its tokens are field names, literals and references alike, so only its applications are
+  checked: `wrap => <T> [ ( T | box ) ]` over `box => <T> { v: T }` loads until something applies `wrap`. It goes
+  when held bodies do, a template body becoming a record body; refuse it there and add a `schema/invalid` vector.
 - [ ] **An alias of a template cannot be applied** ([TSON-SCHEMA] §8.3). `design/resolver-vocabulary-and-bootstrap.md`
   says an application through an alias of a template applies the template (`TemplateMaterialiser.templateHead`), but
   `r => ref_of<order>` over `ref_of => meta.ref` is refused ("'ref_of' declares no type parameters"), and so are
@@ -190,18 +189,6 @@ spec-required case:
   needs
   the annotating document's annotation scope beside the reader's own (`AnnotationTypes`), consulted where the reader's
   misses ([TSON-SCHEMA] §3.3.3, §9).
-
-- [ ] **The family-base seam is spread across about twelve classes.** Give a family base one view -- selectors,
-  extension, discriminators, name type, members, the record-level ones read off `RecordHead` -- that every
-  dispatcher, `RecordExtension` and both encodings' `ValueReaderContext` take, and one IS-A edge rule in `Ancestry`
-  in place of the three that add the edge to a base (`DefinitionResolver.resolveComposition`,
-  `SchemaResolver.familyBaseEdges`, `Ancestry.ofTemplate`). The text side's two dispatch choosers (`RecordDispatch`
-  and `AbstractTemplateReader`) become one, as the JSON side's is.
-
-- [ ] **A record template base's discriminator rules cannot fire.** `RecordExtension.familyBodyOf` builds the base
-  with no groups, and `FamilySelectors.selector` makes every selector required, not voidable and FREE, so a template
-  whose selector is a group member, voidable or optional-and-unpinned passes the checks a closed base fails.
-  Check them on the template's own fields, and add `link/invalid` vectors.
 
 - [ ] **A restatement that changes a pin is accepted** ([TSON-SCHEMA] §5.7, §5.2). With `base => { pet_type: text =
   "pet"  name: text }`, `dog => base & { pet_type: = "dog" }` loads; §5.7's restatement "MUST NOT change a pin", and a

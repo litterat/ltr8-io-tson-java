@@ -110,10 +110,20 @@ class CrossEncodingParityTest {
               outcome_of => outcome<text>
               won_of     => won<text>
               ledger     => { o: outcome<text> }
-              box        => <T> { v: T }
+              boxed      => abstract { }
+              box        => <T> boxed & { v: T }
               int_box    => box<int32>
               text_box   => box<text>
-              crate      => { b: box }
+              crate      => { b: boxed }
+              pbase      => abstract { pk: text =?  name: text }
+              pbase_of   => <T> pbase & { pet: T }
+              pdog       => pbase_of<text> & { pk?: = "dog" }
+              pcat       => pbase_of<int32> & { pk?: = "cat" }
+              pen        => { p: pbase }
+              tpet       => abstract <B> { tk: text =?  extra?: B }
+              tdog       => tpet<text> & { tk?: = "dog"  breed: text }
+              tcat       => tpet<text> & { tk?: = "cat"  indoor: boolean }
+              tpen       => { t: tpet<text> }
               local_box  => { v: meta.declared }
               fragment   => { ( include: text | name?: text  type?: text ) }
               endpoint   => { ( host: text  port: int32 | socket: text )? }
@@ -454,10 +464,9 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A record template IS-A a sealed base is no member of it, though it pins the selector: it has no values,
-     * and its applications are the members. So {@code pending}'s {@code "wait"} selects nothing, and the
-     * refusal offers only the pins a document could write -- never a route to the template, whose own reader
-     * would refuse for want of a subtype, naming a type the position never offered.
+     * A template composing a sealed base is no member of it, though it pins the selector: a template is no type
+     * (§5.10), and only a declaration composing one of its applications is a member. So {@code pending}'s {@code
+     * "wait"} selects nothing, and the refusal offers only the pins a document could write.
      */
     @Test
     void aRecordTemplateUnderASealedBaseIsNoMemberInBoth() {
@@ -468,11 +477,10 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * The same family over a <b>template</b>: {@code outcome<text>} is abstract and {@code won<text>} is its
-     * one member. Every entry in it is minted, and §8.2 makes a minted name non-normative -- so the alias is
-     * the only name either document has for the member, and both encodings have to flatten it (§7.2's "after
-     * alias flattening of both"). TSON text did not, and the two stacks disagreed about every value in
-     * such a family.
+     * A family whose base is an <b>abstract template's application</b>: {@code abstract} on {@code outcome} is
+     * each application's, so {@code outcome<text>} is abstract and {@code won<text>}, which composes it, is its
+     * one member. Both are named by declarations, and a tag naming a declaration is compared past its alias hops in
+     * both encodings (§7.2's "after alias flattening of both").
      */
     @Test
     void anAliasOfATemplateFamilyMemberSelectsItInBoth() {
@@ -498,38 +506,61 @@ class CrossEncodingParityTest {
                 {"o": {"code": "c", "prize": "p"}}""");
     }
 
-    // ── A bare template at a type position ──────────────────────────────
-    //    `crate => { b: box }` names the template itself, which is the family base its instantiations close
-    //    from (§5.10). The base is ABSTRACT by derivation -- a record body with no
-    //    discriminator -- so the tag is the selector in both encodings, and every member is minted, so an
-    //    alias is the only name either document has for one.
+    // ── A family declared through a template ──────────────────────────────
+    //    A template is no type (§5.10), so `crate => { b: boxed }` names the abstract record `box` composes, and
+    //    each declared application of `box` is a member through that written parent. The base states no
+    //    selector, so the tag is the selector in both encodings.
 
-    /** A member named by its alias reads at the template's own position, in both encodings. */
+    /** A declared application reads at the base's position, in both encodings. */
     @Test
-    void aMemberOfABareTemplateBaseReadsInBoth() {
+    void aMemberThroughATemplatesParentReadsInBoth() {
         bothAccept("crate", "{ b: !int_box { v: 1 } }", """
                 {"b": {"$type": "int_box", "v": 1}}""");
     }
 
     /** And the other member, which is what makes the dispatch a dispatch rather than a single admission. */
     @Test
-    void theOtherMemberOfABareTemplateBaseReadsInBoth() {
+    void theOtherMemberThroughATemplatesParentReadsInBoth() {
         bothAccept("crate", "{ b: !text_box { v: \"x\" } }", """
                 {"b": {"$type": "text_box", "v": "x"}}""");
     }
 
     /** Untagged selects nothing: the base has no direct instances, so both encodings require the tag. */
     @Test
-    void aBareTemplateBaseRequiresItsTagInBoth() {
+    void aBaseOfTemplateApplicationsRequiresItsTagInBoth() {
         sameRule("crate", "{ b: { v: 1 } }", """
                 {"b": {"v": 1}}""");
     }
 
     /** A tag naming the base itself selects nothing either, which is the other end of the same set. */
     @Test
-    void aTagNamingTheBareTemplateBaseSelectsNothingInBoth() {
-        sameRule("crate", "{ b: !box { v: 1 } }", """
-                {"b": {"$type": "box", "v": 1}}""");
+    void aTagNamingTheBaseOfTemplateApplicationsSelectsNothingInBoth() {
+        sameRule("crate", "{ b: !boxed { v: 1 } }", """
+                {"b": {"$type": "boxed", "v": 1}}""");
+    }
+
+    /**
+     * A member composing a template's application and pinning the selector there reaches the base through the
+     * template's written parent (§5.8, §5.10), and is selected by its pin in both encodings.
+     */
+    @Test
+    void aMemberComposingAnApplicationIsSelectedByItsPinInBoth() {
+        bothAccept("pen", "{ p: { pk: cat  name: Tom  pet: 3 } }", """
+                {"p": {"pk": "cat", "name": "Tom", "pet": 3}}""");
+        sameRule("pen", "{ p: { pk: bird  name: Tom  pet: 3 } }", """
+                {"p": {"pk": "bird", "name": "Tom", "pet": 3}}""");
+    }
+
+    /**
+     * An abstract template's application is an abstract record carrying the template's selector (§5.10), so a
+     * position typed {@code tpet<text>} dispatches over the declarations composing it, in both encodings.
+     */
+    @Test
+    void anAbstractTemplatesApplicationDispatchesOverItsMembersInBoth() {
+        bothAccept("tpen", "{ t: { tk: cat  indoor: true } }", """
+                {"t": {"tk": "cat", "indoor": true}}""");
+        sameRule("tpen", "{ t: { tk: bird  indoor: true } }", """
+                {"t": {"tk": "bird", "indoor": true}}""");
     }
 
     // ── §8.5 declared positions: the value names its own type ────────────────
@@ -663,7 +694,8 @@ class CrossEncodingParityTest {
                 {"kind": "tmpl", "v": {"item": 5}}""");
         assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/v")),
                 tson("cell", "{ v: 5  kind: int32 }"));
-        assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/kind")),
+        // A template is no type (§5.10), so the reference over types refuses it before the dependent field is read.
+        assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/kind")),
                 tson("cell", "{ kind: tmpl  v: { item: 5 } }"));
     }
 

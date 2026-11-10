@@ -1,8 +1,8 @@
 # Schema resolution
 
 The resolution phase: turning grammar-layer declarations into resolved `schema.meta` values, an entry being its
-value — the two resolvers, declaration annotations, definition marks, record templates as family bases, field
-facts and refinement, groups, subtraction, and the exception boundary.
+value — the two resolvers, declaration annotations, definition marks, record templates and the IS-A edges of their
+applications, field facts and refinement, groups, subtraction, and the exception boundary.
 
 **Invariants**
 
@@ -49,8 +49,8 @@ facts and refinement, groups, subtraction, and the exception boundary.
 - `subtypes` is linking's throughout: no resolved entry, minted or declared, carries any.
 - A kind and a constructor are judged by where `top` and the base kinds are defined, never by their spelling: the
   resolver's `kernel` predicates, `EntryKind.of(value, kernel)` and `TsonLinkedSchema.isKernel`.
-- An application of a family base minted at a use site is a member of nothing; only a declared one gains the edge to
-  its base (`SchemaResolver.familyBaseEdges`).
+- No entry is IS-A a template (§5.10): an application's edges are its template's written parents'. A use-site
+  application whose chain would name a declared type is refused when it is minted (`refuseMintedMember`).
 - Subtraction runs last and empties the chain (every supertype goes); nothing is kept in its place.
 - **A dependent field's rules are the link's, over the flattened record** (`DependentFields`, [TSON-SCHEMA] §5.2): the
   sibling declared before it, typed by a reference to types, there to read whenever it is, its pin or default no template;
@@ -163,55 +163,55 @@ dispatch is ABSTRACT plus non-empty `discriminators`, read where needed (`Family
 and never stored as a second fact. A group member cannot be a selector: §5.11 makes a value modifier a parse
 error there.
 
-**A record template states its selectors as a record does**, with `=?`: `<V> { type: text =?  value: V }` is a
-labelled sum, each member pinning `type` where its application is declared (`dog => pet<dog_type> & { type?: = "dog"
-}`). A field's value is never a parameter (§5.10), so no pin is derived from one. A selector whose type names a
-parameter is refused (`refuseParameterTypedSelector`) — a position typed by the base reads the selector before it
-knows the member.
+**A record template states its selectors as a record does**, with `=?`, and they are each application's: with
+`tpet => abstract <B> { kind: text =?  extra?: B }`, `tpet<text>` is an abstract record dispatching on `kind`, and its
+members are the declarations composing it and pinning `kind` (`tdog => tpet<text> & { kind?: = "dog" }`). A field's
+value is never a parameter (§5.10), so no pin is derived from one. A selector whose type names a parameter is refused
+(`refuseParameterTypedSelector`): a selector means the same in every application.
 
-**On a template**, `abstract` is admitted and `final` refused: every application is a subtype of the template by
-construction, so the claim is false before anything else is written (§5.2, §5.10). On a record template the mark
-sets the template's own `extension`, which is each application's — the base itself is ABSTRACT by construction
-— and closing carries it to each member (`TemplateMaterialiser.closedExtension`). The `=?`-forces-ABSTRACT rule is
-a closed record's alone. An open body applying anything but `record` has no `extension` and is refused, named by
-the constructor it applies.
+**On a template**, `abstract` and a selector are each application's and `final` is refused (§5.2, §5.10). The mark,
+or ABSTRACT derived from a selector as on a record, sets the template's own `extension`, and closing carries it and
+`discriminators` to the record each application denotes (`TemplateMaterialiser.closeRecordTemplate`). `final` is
+refused because a template is applied to be composed, each member of a family composing an application, and the mark
+would forbid that of every application; a final type is a declaration of the application, marked as itself. An open
+body applying anything but `record` has no `extension` and is refused, named by the constructor it applies.
 
-## Record templates as family bases
+## Record templates: no type
 
-A record template is a `RecordTemplateBody` (`meta.record_template`), ABSTRACT by construction
-(`FamilySelectors.extensionOf`), and takes part in IS-A (§5.10). Its fields are `RecordTemplateField`s, labelling
-a parameter that stands for the whole type (`type_param`), each field classified
-once by its source spelling where it is built (`SchemaDesugarer`'s `RecordTemplateDef`, `DefinitionResolver.Built` over
-`BuiltField`); a parameter spelled like a schema type or like a name an absorbed field's arguments write is refused
-(`design/held-template-bodies.md`), and `checked` refuses a selector
-typed by a parameter and a literal value on a parameter-typed field. That is safe by *elimination*: no
-value is read against the template; a value at a position typed by it is a value of some member, selected by tag or
-discriminators, each member closed with its arguments fixed (`AbstractTemplateReader`,
-`design/class2-compilation.md`). A container, reference or
-constructor-application template is a `TemplateBody` with no such dispatch, and stays no type until applied.
+A record template is a `RecordTemplateBody` (`meta.record_template`). It is not a type (§5.10): no position names it
+bare (`TsonSchemaLinker.checkArity` at a position, `DefinitionResolver.refuseUnappliedTemplate` at an operand), it is
+in no `subtypes` index and no reference holds it, and it compiles to `OpenTemplateReader`, the refusal a data tag
+naming it gets. Its fields are `RecordTemplateField`s, labelling a parameter that stands for the whole type
+(`type_param`), each field classified once by its source spelling where it is built (`SchemaDesugarer`'s
+`RecordTemplateDef`, `DefinitionResolver.Built` over `BuiltField`); a parameter spelled like a schema type or like a
+name an absorbed field's arguments write is refused (`design/held-template-bodies.md`), and `checked` refuses a
+selector typed by a parameter and a literal value on a parameter-typed field. A container, reference or
+constructor-application template is a `TemplateBody`, and no type either.
 
-**Member dispatch does not travel to a member** (`TemplateMaterialiser.closedExtension`): closing pins the
-selectors and the member names none, so it is an ordinary concrete record. ABSTRACT without selectors does travel,
-which is how `abstract` reaches every instantiation (`AbstractTemplateFamilyTest`). `FamilySelectors.of` derives
-the selector fields from the base's own fields for either kind of base, a template's selector closed to a
-`RecordField` (its type names no parameter). A record template that IS-A a base is no member of it: a member is a
-`RecordBody`, so `RecordExtension`'s pin checks and both encodings' member dispatchers pass a template by type.
+**A family is declared with records.** An abstract record states the selectors and the fields every member shares,
+a template composes it, and each member composes an application and pins the selectors:
 
-**Two edges populate a family's `subtypes`, from two mechanisms.**
+```
+pet    => abstract { kind: text =?  name: text }
+pet_of => <T> pet & { pet: T }
+dog    => pet_of<dog_type> & { kind?: = "dog" }
+holder => { p: pet }
+```
 
-- **§5.8's reference-valued parents.** With `result => abstract <T> { payload: T }` and
-  `ok => <T> result<T> & { note: text }`, `result<text>` closes to an ABSTRACT entry whose `subtypes` holds
-  `ok<text>` and not `ok<int32>` — the edge folded into `ok<text>`'s chain by `appliedParentEdges`
-  (`design/template-materialisation.md`) and inverted by the linker. A template's own `supertypes` holds only the
-  closed entries its parents reach, never the template it applies, so `ok` is in no instantiation's `subtypes`
-  (`SubtypeTemplateFamilyTest`, `OpenOperandCompositionTest`). Base and members here are all minted, and §8.2
-  makes a minted name non-normative, which is why both record dispatchers follow aliases
-  (`design/record-dispatch.md`).
-- **Membership in the base itself.** A *declared* application of a family base (`dogpet => pet<dog_type>`)
-  carries the base in its own `supertypes` (§8.2's entry shape), added by `familyBaseEdges` and inverted into
-  `pet.subtypes`. A *minted* use-site application (`k: pet<dog_type>`) gets no edge: it is a type read where
-  it was written, never a candidate at a `pet` position, so no diagnostic asks a document for its content-derived
-  name. A lifted synthetic is never a member either.
+**An application's IS-A edges are its template's written parents', and never the template.** Two mechanisms give
+them:
+
+- **A closed parent** reaches every application through the template's own chain (`Ancestry.ofTemplate`): `dog`
+  IS-A `pet` because `pet_of` writes `pet`, at a closed operand and at a declared application alike.
+- **An applied parent** (§5.8's reference-valued parents). With `result => abstract <T> { payload: T }` and
+  `ok => <T> result<T> & { note: text }`, `ok<text>`'s chain keeps `result<text>` in `parents` until
+  `appliedParentEdges` folds it into the edge to the entry that application denotes, a declaration naming it or its
+  minted expansion (`design/template-materialisation.md`); the linker inverts it, so `result<text>`'s `subtypes`
+  holds `ok<text>` and not `ok<int32>` (`SubtypeTemplateFamilyTest`, `OpenOperandCompositionTest`). A minted base's
+  name is non-normative (§8.2), which is why both record dispatchers follow aliases (`design/record-dispatch.md`).
+
+A use-site application whose chain would name a declared type is refused when it is minted (`refuseMintedMember`),
+so every family member is declared.
 
 A resolved entry's `subtypes` is empty, minted or declared: linking computes it one phase later, which keeps two
 schemas closing one application agreeing on the entry §2.2.3 unifies them by (`MintedEntryUnificationTest`).
@@ -279,8 +279,8 @@ kernel's `meta.namespace` narrowing `meta.map`'s `key_type: meta.type_ref` to `m
 `meta.identifier_ref`'s refinement of `meta.type_ref`. The relation is nominal and nothing more (§5.7): `[int8]`
 restating `[int32]` and a variant restating its choice are refused, no IS-A edge joining either pair.
 Each record is judged against the nearest closed records on its chain, so an applied operand is judged through the
-entry its application denotes. One denoting none, whose edge is only to the open family base, is not judged, nor is
-a subtraction's tightening entry, its chain being empty (`BACKLOG.md`).
+entry its application denotes. One denoting none is judged against the closed parents its template writes, and a
+subtraction's tightening entry is not judged, its chain being empty (`BACKLOG.md`).
 
 **A restated field's annotations are the restatement's, in source order, then the inherited field's** (`merged`,
 §5.8), one path for refinement and composition. Concatenation, because [TSON-DATA] §3.1 makes an annotation name

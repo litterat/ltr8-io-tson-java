@@ -19,9 +19,9 @@ public enum EntryKind {
     /**
      * A held template -- [TSON-SCHEMA] §5.10's open entry over any constructor but {@code record}, whose body is a
      * {@link TemplateBody}. It is not a type: it cannot validate data, and naming one where a type is expected is
-     * a resolver error. A record template ({@link RecordTemplateBody}) is a type, the family base, and takes a
-     * record's kind. Like {@link
-     * #ALIAS} it is a {@code meta.type_ref} and not a base kind (§4.1), and it says nothing about what an
+     * a resolver error. A record template ({@link RecordTemplateBody}) is no type either, and takes the kind of the
+     * record each application closes to: PRODUCT, or the base kind its chain reaches. Like {@link #ALIAS} a held
+     * template is a {@code meta.type_ref} and not a base kind (§4.1), and it says nothing about what an
      * application of the template will produce -- that is the kind of the entry materialisation mints, derived
      * from the constructor its closed body applies.
      */

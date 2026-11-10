@@ -7,7 +7,7 @@ derived — and the static check that runs before any of it.
 **Invariants**
 
 - The pass order in `SchemaResolver` is fixed: the driving loop resolves every declaration, then
-  `TemplateRegularity.check`, then `ParameterTypes.check` and `checkDeferred`, then `materialise`, then `familyBaseEdges`,
+  `TemplateRegularity.check`, then `ParameterTypes.check` and `checkDeferred`, then `materialise`, then
   `appliedParentEdges` and `closeChains`, then the synthetic merge. Every step reads what the one before it settled.
 - A template that fails the regularity check, or whose parameters stand where none may, is replaced with the
   error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
@@ -47,12 +47,14 @@ derived — and the static check that runs before any of it.
   keeps its parents as written.
 - A minted record is a member of nothing: one whose chain names a declared type is refused when it is minted
   (`refuseMintedMember`), and the applied-parent fold skips synthetics.
+- No application is IS-A its template (§5.10): its edges are what its template's written parents reach, each closed
+  parent through `Ancestry`, and an applied parent through the fold to the entry that application denotes.
 - Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written; a held template is
   `TEMPLATE`. A record, open or closed, takes the base kind its chain reaches; every other entry takes the branch of
   `Top` its body occupies.
 
 Related: `design/held-template-bodies.md` (what a held body is, how each shape closes, the synthetic merge, parameter
-kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEdges`, the two family edges),
+kinds and argument checks), `design/schema-resolution.md` (chains, applied parents),
 `design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `DerivedName`, `MetaRefs`, `@meta.synthetic`),
 `design/constructor-application.md`, `design/linking-and-compilation.md`.
 
@@ -121,9 +123,9 @@ kinds and argument checks), `design/schema-resolution.md` (chains, `familyBaseEd
 - **Substitution changes no field fact.** A field's value is never a parameter (§5.10), so `type_param` becoming
   `type` is the whole of it: every member field is a closed `meta.record_field`, substituted on the model
   (`closeRecordTemplate`) with nothing written out or read back. A value that differs per application is pinned where
-  the application is declared (`created => response<order> & { status?: = 201 }`), by composition. What closing changes
-  is the record-level selector list: the member names none, and an ABSTRACT base that dispatches on members closes to
-  OPEN (`closedExtension`).
+  the application is declared (`created => response<order> & { status?: = 201 }`), by composition. The record-level
+  facts are kept as written too: `extension`, `discriminators`, groups and name type are each application's, so an
+  abstract template's application is an abstract record, the base of the declarations composing it (§5.10).
 - **A closed record is minted with no subtypes.** `subtypes` is linking's, derived over the closed namespace. Taking
   the template's list would hand each instantiation the whole family and, for a template imported already linked,
   itself — and an entry shaped by *which* schema closed it is not a function of its form, so two schemas closing one
@@ -161,11 +163,11 @@ resolves, before the batch pass runs. They are handled differently.
     are expected, the same entry the hand-written `customer & box<text>` reaches. The parent is carried as a
     reference rather than as the head name §5.8 describes because the edge is to `box<text>` and not to
     `box<int32>`. `OpenOperandCompositionTest` pins it.
-  - **Closed, on a declaration with no parameters** (`dog => pet<text> & { pet_type?: = "dog" }`): nothing later closes
-    the declaration, so the edge to the family base is stated where the composition resolves. A record template is
-    a family base (`OpenEntry.isFamilyBase`, a `RecordTemplateBody`), ABSTRACT by construction (§5.10), so `dog`
-    lands in `pet.subtypes` and a position typed `pet` dispatches to it. The application in the chain is folded
-    like any other. A removal empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
+  - **Closed, on a declaration with no parameters** (`dog => pet_of<dog_type> & { kind?: = "dog" }`): the operand's
+    template's ancestors are the declaration's (`pet_of => <T> pet & { … }` makes `dog` IS-A `pet`, so a position
+    typed `pet` dispatches to it), and the application kept in the chain is folded like any other, to the entry
+    `pet_of<dog_type>` denotes where one exists. No edge is stated to the template: a template is no type (§5.10).
+    A removal empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
 - **A closed refinement source is closed on demand** (`DefinitionResolver.closedApplication`, through the
   `ApplicationCloser` hook): `^` re-emits and tightens the source's whole field set, which lives on the entry the
   application denotes. The closing goes through `close`, so it reuses a declaration that owns the application or
@@ -190,7 +192,9 @@ resolves, before the batch pass runs. They are handled differently.
     §5.8): a parameter has no field set until applied. The check runs before the name is looked up, so a parameter
     shadows an entry of the same name;
   - a template named without arguments, `x => box & { … }` (`DefinitionResolver.refuseUnappliedTemplate`): a
-    template has fields only once its parameters are bound.
+    template is no type, and has fields only once its parameters are bound. Every other bare naming of a template --
+    a field, element, map key or value, tuple position, choice variant or argument -- is the linker's arity check
+    (`TsonSchemaLinker.checkArity`), refused against the declaration that wrote it.
 
 ## Kind (`schema.meta.EntryKind`)
 
@@ -204,8 +208,8 @@ resolves, before the batch pass runs. They are handled differently.
     the kind nor the chain does alone: `numeric.integer_type` is ATOM-kinded exactly like its instances.
 - **A held template is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes it not a type, so
   `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than ALIAS — a template whose
-  closure is a reference. It is not a base kind (§4.1). A record template (`RecordTemplateBody`) is a type, the
-  family base, and takes a record's kind: PRODUCT, or the base kind its chain reaches.
+  closure is a reference. It is not a base kind (§4.1). A record template (`RecordTemplateBody`) is no type either,
+  and takes the kind its applications close to: PRODUCT, or the base kind its chain reaches.
   - **A closed entry's kind is its substituted value's**, §4.1's "construction transfers kind" asked of the
     construction — not the constructor's *name*.
   - **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }` makes

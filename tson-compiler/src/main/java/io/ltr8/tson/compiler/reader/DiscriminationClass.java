@@ -124,7 +124,6 @@ public enum DiscriminationClass {
             case MacType ignored -> Optional.of(STRING);
             case EnumBody members -> ofEnum(members);
             case RecordBody ignored -> Optional.of(BRACE);
-            case RecordTemplateBody ignored -> Optional.of(BRACE); // every member is a record
             case MapBody m -> hasScalarKey(m, namespace) ? Optional.of(BRACE) : Optional.empty();
             case NamespaceBody ignored -> Optional.of(BRACE); // its keys are names
             case ArrayBody ignored -> Optional.of(BRACKET);
@@ -132,7 +131,8 @@ public enum DiscriminationClass {
             case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
             case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
             case Alias ignored -> Optional.empty();
-            case TemplateBody ignored -> Optional.empty();
+            case TemplateBody ignored -> Optional.empty(); // a template is no type
+            case RecordTemplateBody ignored -> Optional.empty();
             case ValueEntry ignored -> Optional.empty();
         };
     }

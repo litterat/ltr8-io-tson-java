@@ -105,52 +105,34 @@ class TemplateRegularityTest {
     //    unchecked: three are one arity rule, and the fourth is the converse of the closed-entry rule.
 
     /**
-     * <b>A template with no parent is not a type until it is applied.</b> Naming one without arguments used
-     * to compile and link clean, then fail at <em>read</em> time with "no usable compiled reader" and a
-     * library-fault exit code -- the author's error reported as this library's, at the latest possible
-     * moment. It survived because the eager-rejection discipline guarded *applications* and never bare names.
-     *
-     * <p><b>A record-bodied template is admitted instead</b>, naming the parent every such template has
-     * (§5.10): nothing is ever read against the template itself, a value there being a
-     * value of some member. So the subject here is a container, which has no parent to name -- and
-     * {@code TemplateAtATypePositionTest} carries both sides of the line.
+     * <b>A template is not a type.</b> Naming one without arguments is refused where the schema links, a record
+     * template and a held one alike (§5.10), rather than failing at <em>read</em> time against a document with
+     * nothing wrong with it. {@code TemplateAtATypePositionTest} carries the positions.
      */
     @Test
-    void namingATemplateWithNoParentIsRejected() {
+    void namingATemplateWithoutArgumentsIsRejected() {
         String message = rejected("""
                   tmpl => <T> [T]
                   use  => { u: tmpl }""");
 
         assertTrue(message.contains("is a template taking 1 type argument [T]"), message);
-        assertTrue(message.contains("not a type until it is applied"), message);
+        assertTrue(message.contains("a template is not a type"), message);
     }
 
     /**
-     * A recursive <b>bare</b> reference inside a record template names the parent rather than forgetting an
-     * argument list (§5.10): {@code tail: chain} is "any chain", which is what an
-     * abstract parent is for, and the recursion is regular because a reference is not an application that
-     * grows its argument at every level.
-     *
-     * <p><b>The arity half is unchanged and still runs here.</b> Arity over an *application* is decidable
-     * against a held body, because an application is a distinguishable shape in the wire tree. A bare name is
-     * not: a held body's tokens are field names, states, literals and type references alike, so "this token
-     * names a template" would reject a schema whose field happens to be called {@code box} beside a template
-     * of that name.
-     *
-     * <p>An unapplied template getting no verdict is the design's own position, not a shortfall it tolerates
-     * -- §5.10: "an unapplied template is checked no further and receives no verdict".
-     * `head: T` is not decoration: without it the parameter's only use would have been the missing argument
-     * list, and the unused-parameter rule -- which *is* answerable from a held body -- fires first.
+     * A recursive <b>bare</b> reference inside a record template is refused at the template's own declaration,
+     * applied or not: a template is no type (§5.10), so {@code tail: chain} names nothing a value could be. The
+     * recursion is written {@code chain<T>}. {@code head: T} is not decoration: without it the parameter's only use
+     * would have been the missing argument list, and the unused-parameter rule fires first.
      */
     @Test
-    void aRecursiveBareReferenceNamesTheParent() {
-        assertNotNull(compile("  chain => <T> { head: T  tail: chain? }"),
-                "unapplied, it gets no verdict");
-
+    void aRecursiveBareReferenceIsRefused() {
+        assertTrue(rejected("  chain => <T> { head: T  tail: chain? }")
+                .contains("'chain' is a template taking 1 type argument [T]"));
         assertNotNull(compile("""
-                  chain => <T> { head: T  tail?: chain? }
+                  chain => <T> { head: T  tail?: chain<T>? }
                   use   => { c: chain<text> }"""),
-                "applied, the bare `chain` names the parent every record template has");
+                "the recursion written as an application closes");
     }
 
     /**

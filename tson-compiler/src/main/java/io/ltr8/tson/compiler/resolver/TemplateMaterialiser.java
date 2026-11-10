@@ -794,8 +794,9 @@ final class TemplateMaterialiser {
     /**
      * A record template applied: its fields and parents substituted on the model ({@link
      * RecordTemplateSubstitution}), each field closed to a {@link RecordField} with the applications in its type
-     * closed, and taken as a member -- no {@code discriminators}, its pins being in place, and an extension that
-     * does not carry member dispatch ({@link #closedExtension}). The chain is completed from the parents as written
+     * closed, and the template's record-level facts kept as they are written: its {@code extension} and its {@code
+     * discriminators}, so an abstract template's application is an abstract record, the base of a family of its own
+     * over the declarations that compose it (§5.10). The chain is completed from the parents as written
      * ({@link Ancestry#chainOf}): a parent applied to the template's own parameter stays in {@code parents} beside its
      * template's ancestors, for {@code SchemaResolver}'s fold to turn into the edge to the entry the closed
      * application denotes -- {@code ok<text>} IS-A {@code result<text>} and not {@code result<int32>}, whatever order
@@ -818,7 +819,7 @@ final class TemplateMaterialiser {
                     case SiblingRef sibling -> sibling;
                 }).withPosition(Optional.empty()), substituted.getAnnotations(name)));
         return new RecordBody(Ancestry.chainOf(RecordTemplateSubstitution.parents(template, bindings), namespace),
-                AnnotatedMap.copyOf(fields), template.groups(), closedExtension(template), List.of(),
+                AnnotatedMap.copyOf(fields), template.groups(), template.extension(), template.discriminators(),
                 template.nameType());
     }
 
@@ -890,22 +891,6 @@ final class TemplateMaterialiser {
 
     /** A closed held body, and the wire form it was read from -- the one an entry name derives from. */
     private record Closed(CoreValue wire, Top body) {
-    }
-
-    /**
-     * A closed member's own {@code extension}: the template's, except that <b>member dispatch does not travel</b>.
-     *
-     * <p>ABSTRACT is a claim about the marked type alone and holds of every instantiation identically, which
-     * is how {@code abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}
-     * pins it). <b>Dispatching on members does not travel.</b> Closing has pinned those fields and left the
-     * member naming no selectors of its own, the selectors belonging to the base (§5.2) -- so a member of a
-     * sealed family is an ordinary
-     * concrete record, exactly as in a hand-written family, and a base that dispatches on members closes to
-     * OPEN rather than carrying its abstractness into every one of them.
-     */
-    private static RecordExtensionType closedExtension(RecordTemplateBody template) {
-        return template.extension() == RecordExtensionType.ABSTRACT && !template.discriminators().isEmpty()
-                ? RecordExtensionType.OPEN : template.extension();
     }
 
     /**

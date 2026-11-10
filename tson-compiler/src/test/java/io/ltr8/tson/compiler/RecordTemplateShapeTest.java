@@ -29,9 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §5.10's two kinds of template: a record template is a {@code record_template}, the family base its
- * declared applications are IS-A, whose fields label a parameter standing for a whole type, and every other
- * template is a held body. What is pinned here is where the template must not be mistaken for a closed record.
+ * [TSON-SCHEMA] §5.10's two kinds of template: a record template is a {@code record_template}, whose fields label a
+ * parameter standing for a whole type, and every other template is a held body; neither is a type. What is pinned
+ * here is where the template must not be mistaken for a closed record.
  */
 class RecordTemplateShapeTest {
 
@@ -73,7 +73,7 @@ class RecordTemplateShapeTest {
 
         RecordTemplateBody box = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("box"));
         assertEquals(List.of("T"), box.parameterNames());
-        assertTrue(OpenEntry.isFamilyBase(box));
+        assertTrue(OpenEntry.isOpen(box));
         assertInstanceOf(TemplateBody.class, compiled.schema().entries().get("boxes"));
     }
 
@@ -358,8 +358,9 @@ class RecordTemplateShapeTest {
     }
 
     /**
-     * A record template that composes a member-dispatched base is IS-A it, and may pin the selector itself; it is
-     * still no member. Only its declared application is, so a value pinned {@code "dog"} reads as {@code dogs}.
+     * A record template that composes a member-dispatched base may pin the selector itself, and is no member: a
+     * template is no type. Its declared application is, reaching the base through the template's written parent, so
+     * a value pinned {@code "dog"} reads as {@code dogs}.
      */
     @Test
     void anOpenSubtypeIsNoMemberOfTheFamilyItComposes() {

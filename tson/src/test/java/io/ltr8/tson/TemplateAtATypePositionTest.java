@@ -10,24 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Naming a template at a <b>type position</b> (§5.10): admitted where the template has
- * a parent, refused where it has none.
- *
- * <p><b>Why a record-bodied template may be named and a container may not.</b> "A template is not a type" is
- * a rule about <em>elimination</em>: a position typed {@code arr} would have to read a value against an
- * element type nothing has fixed, leaving a reader to infer arguments from the payload -- which is not
- * underspecified but ill-defined, an empty array determining nothing and two instantiations accepting one
- * document. None of that reaches a parent: a value there is a value of some member, selected by a tag or by
- * the discriminators, and every member is a closed entry with its arguments already fixed. The existential is
- * eliminated by dispatch, never by inference.
- *
- * <p>So the test is the parent's existence, which {@code template.extension} states: present for a record
- * body, absent for a container, a constructor application and an alias template alike.
- *
- * <p><b>What this test covers is whether the schema loads</b>, which is the half the parent's existence
- * decides. Reading such a position is {@code TemplateIsAFamilyBaseTest}'s: a value there dispatches to a
- * member, by tag or by the discriminators, and only a template with no parent still meets {@code
- * OpenTemplateReader}'s refusal.
+ * Naming a template at a <b>type position</b> (§5.10): refused, whatever the template's body. A template is not a
+ * type, so no position names one bare -- a record template, a selector template, a container template, a
+ * constructor application template and an alias template alike -- and the message names the remedy: write the
+ * application, or name the abstract record a family's applications compose. Reading a family declared through a
+ * template is {@code TemplateIsNotATypeTest}'s.
  */
 class TemplateAtATypePositionTest {
 
@@ -48,38 +35,39 @@ class TemplateAtATypePositionTest {
         return diagnostics.stream().map(Diagnostic::message).reduce("", (a, b) -> a + "\n" + b);
     }
 
-    // ── Admitted: the template has a parent ──────────────────────────────
+    private static final String REMEDY = "a template is not a type -- write";
 
     @Test
-    void aRecordTemplateMayBeNamedAtAFieldPosition() {
-        assertEquals(List.of(), validate("t1", """
+    void aRecordTemplateIsRefusedAtAFieldPosition() {
+        String message = refusal("t1", """
                   pet    => <V> { value: V }
                   holder => { p: pet }
-                """));
+                """);
+        assertTrue(message.contains("'pet' is a template taking 1 type argument") && message.contains(REMEDY),
+                message);
+        assertTrue(message.contains("name the abstract record its applications compose"), message);
     }
 
-    /** And in a container, which is the position the shape exists for: "any pet". */
+    /** And in a container: "any pet" is written with a record base, never with the template. */
     @Test
-    void aRecordTemplateMayBeNamedAtAnElementPosition() {
-        assertEquals(List.of(), validate("t2", """
+    void aRecordTemplateIsRefusedAtAnElementPosition() {
+        assertTrue(refusal("t2", """
                   pet    => <V> { value: V }
                   kennel => { pets: [pet] }
-                """));
+                """).contains(REMEDY));
     }
 
-    /** A labelled sum is the same rule with a discriminator: its parent is SEALED rather than ABSTRACT. */
+    /** A selector on the template changes nothing: it is each application's, and the template is still no type. */
     @Test
-    void aSealedRecordTemplateMayBeNamedToo() {
-        assertEquals(List.of(), validate("t3", """
-                  pet    => <V> { type: text =?  value: V }
+    void aSelectorTemplateIsRefusedToo() {
+        assertTrue(refusal("t3", """
+                  pet    => abstract <V> { type: text =?  value: V }
                   holder => { p: pet }
-                """));
+                """).contains(REMEDY));
     }
 
-    // ── Refused: no parent to name ───────────────────────────────────────
-
     @Test
-    void aContainerTemplateIsStillRefused() {
+    void aContainerTemplateIsRefused() {
         assertTrue(refusal("t4", """
                   arr    => <T> [T]
                   holder => { p: arr }
@@ -87,24 +75,23 @@ class TemplateAtATypePositionTest {
     }
 
     @Test
-    void aConstructorApplicationTemplateIsStillRefused() {
+    void aConstructorApplicationTemplateIsRefused() {
         assertTrue(refusal("t5", """
                   vector => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }
                   holder => { p: vector }
-                """).contains("a template is not a type until it is applied"));
+                """).contains(REMEDY));
     }
 
-    /** A reference is indirection, not a type of its own, so there is nothing for a parent to hold. */
     @Test
-    void anAliasTemplateIsStillRefused() {
+    void anAliasTemplateIsRefused() {
         assertTrue(refusal("t6", """
                   pair      => <A, B> { first: A  second: B }
                   uuid_pair => <B> pair<uuid, B>
                   holder    => { p: uuid_pair }
-                """).contains("a template is not a type until it is applied"));
+                """).contains("is a template"));
     }
 
-    /** An application still has to match arity: relaxing the bare-name case changes nothing else. */
+    /** An application has to match arity. */
     @Test
     void aWrongArgumentCountIsStillRefused() {
         assertTrue(refusal("t7", """

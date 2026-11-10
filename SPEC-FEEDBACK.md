@@ -172,6 +172,19 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   open are settled as built: a field with a default is no argument slot; a use-site construction names its
   content-keyed entry and never a declaration of the same construction; and an argument is not followed through an
   alias, which is the sugar forms' identity. The kernel's `set` and `meta.ref` are still templates.
+- *§5.10, a template as a type: gone.* No position names a template bare: not a field, element, map key or value,
+  tuple position, choice variant or argument, not a slot typed by a reference over types, and not an operand of `&`
+  or `^`. A template named inside its own record body is refused too. Each is a resolver error at the declaration
+  that wrote it, naming the application or the abstract record a family's applications compose as the remedy; a data
+  tag naming a template is a validation error. An application's IS-A edges are its template's written parents': each
+  closed parent, and the entry an applied parent denotes where one exists. The template's own name is never among
+  them, a template is in no `subtypes` index, and no reference holds one. `abstract` and the selectors on a template
+  are each application's, so `result => abstract <T> { ok: boolean =? }` makes `result<text>` an abstract record
+  dispatching over the declarations composing it; a selector makes a template's applications abstract as it makes a
+  record so. `final` on a template is a resolver error. A family is declared with records: an abstract base, a
+  template composing it, and members composing an application that pin the selector. A use-site application whose
+  template composes a declared type is still refused as an unnameable member. Still as in Revision 39:
+  `meta.record_template` is its own constructor.
 
 **Resolution proposed.** In §4.2, replace "and in a data document an application at a reference-typed slot names the
 entry the closure closed it to … a schema closing every application it holds before it loads" with "and in a data
@@ -191,4 +204,14 @@ paragraph with "**A bound is written.** A parameter passed as an argument to a p
 written with a bound that IS-A it: `rebox => <T: text> boxed<T>`. `rebox => <T> boxed<T>` is a resolver error at
 `rebox`. No bound is inferred, so a parameter is known in full at its declaration", and delete the paragraph on an
 argument to another template settling by a fixed point and the "derived, never required of the author" framing of
-the parameter paragraph. The text for the other steps follows as each lands.
+the parameter paragraph. For a template as a type: replace ¶999 with "**A template is not a type.** No position
+names a template bare — a field, element, variant or argument position or an operand of `&` or `^` — and an
+application of one is a type: the declaration naming it where one does, its expansion otherwise (§8.2). A family is
+declared by records: an abstract base states the selectors and the fields its members share, a template composes the
+base, and each member composes an application and pins the selectors. An application's IS-A edges are its
+template's written parents' — each closed parent, and for an applied parent the entry its application denotes — and
+never the template's own name. `abstract` and the selectors on a template are each application's `extension` and
+`discriminators`, a selector making the application abstract as it makes a record so; `final` on a template is a
+resolver error", and delete the family/abbreviation split in ¶952, ¶1001's "a family base is reached by a position",
+the record-template half of ¶1003 and of §8.1 ¶1457, and §4.2's `kind<record_template>`. The text for the other
+steps follows as each lands.
