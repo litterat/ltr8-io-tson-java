@@ -8,8 +8,10 @@ import java.util.Optional;
 /**
  * A type reference: a {@link Reference} that names a type, the object every reference-typed position but a record
  * field's type delivers, in a tree read and a bound one alike ([TSON-SCHEMA] §4.2). It is a {@link NameRef} or an
- * {@link ApplicationRef}, and {@link #of(String, List, Annotations, Closure)} decides which. {@code name} is the qualified
- * name, its {@link #segments} joined by {@code .}; {@code arguments} is the argument list, empty for a name, so
+ * {@link ApplicationRef}, and {@link #of(String, List, Annotations, Closure)} decides which; inside an open record it
+ * may also be a {@link ParamRef}, one of the record's parameters, which only the record itself makes. {@code name} is
+ * the qualified name, its {@link #segments} joined by {@code .}; {@code arguments} is the argument list, empty for a
+ * name, so
  * {@code result<T>} is the application {@code result} with arguments {@code [T]} ([TSON-SCHEMA] §4.2). An argument is
  * itself a reference, a name or an application, and never a literal token ([TSON-SCHEMA] §5.10).
  *
@@ -26,8 +28,8 @@ import java.util.Optional;
  * ({@code meta.ref<order>}) names the value its name reached in the governing schema ({@code ReferenceBody.Values}).
  * One built by hand, or read inside a schema document being resolved, carries {@link Closure#NONE}, and names nothing.
  *
- * <p>An argument-carrying reference survives only where an application is still open: a record template's
- * {@code chain.parents} and field types, held text, and the {@code @meta.application} annotation. A closed application
+ * <p>An argument-carrying reference survives only where an application is still open: an open record's
+ * {@code chain.parents} and field types, and the {@code @meta.application} annotation. A closed application
  * lifts to an entry and is named bare where it stands (§5.3).
  *
  * <p><b>{@code annotations} carries the annotations written on the reference itself</b>: [TSON-SCHEMA] §8.3 attaches
@@ -36,7 +38,7 @@ import java.util.Optional;
  * <b>Identity</b> is the variant, the name and the arguments: {@code annotations} and {@code closure} are excluded
  * from {@code equals}, as both are about where a reference came from, and §8.2 keys identity on where it points.
  */
-public sealed interface TypeRef extends Reference permits NameRef, ApplicationRef {
+public sealed interface TypeRef extends Reference permits NameRef, ApplicationRef, ParamRef {
 
     /** Where a reference finds what it names: the closure it was read under. */
     @FunctionalInterface

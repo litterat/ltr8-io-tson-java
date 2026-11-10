@@ -171,9 +171,10 @@ record factory, because the concrete reading is the only one that differs by mod
   the object's shape is consulted, and a tag naming the base is refused, the base having no direct instances.
 - **ABSTRACT naming discriminators** (SEALED) gets `DispatchMemberReader`, which reads those members and looks the
   value up. In the wrapper form the discriminators are inside `$value`, so the tag places the value and is required.
-- **A template is no type** ([TSON-SCHEMA] §5.10): `meta.record_template` and `meta.template` are both registered to
-  `DispatchFactories.TEMPLATE`, which `JsonSchemaCompiler` picks by the body's `@Typename` as it picks every other,
-  and both reach `OpenTemplateReader`. A family declared through a template is read at its base, a record: an
+- **A template is no type** ([TSON-SCHEMA] §5.10): an open record's `@Typename` is `meta.record`, so
+  `JsonSchemaCompiler` picks the record factory for it as for every record, and that factory (`DispatchFactories.over`)
+  answers an open body with `DispatchFactories.TEMPLATE`, an `OpenTemplateReader`. A family declared through a template
+  is read at its base, a record: an
   abstract record a template composes (`{ b: boxed }` over `box => <T> boxed & { … }` admits `{"$type": "int_box",
   "v": 1}` and refuses an untagged object, as TSON text does), or an abstract template's application, a closed record
   carrying the template's selectors. The selectors are stated on the base (`tson-schema`'s `FamilySelectors`), so

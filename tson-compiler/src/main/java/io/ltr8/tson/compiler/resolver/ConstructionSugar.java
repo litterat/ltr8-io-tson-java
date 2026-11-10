@@ -51,10 +51,11 @@ public final class ConstructionSugar {
 
     /**
      * Whether {@code definition}, the entry at the end of {@code name}'s alias chain, is a constructor construction
-     * sugar applies: a closed record IS-A {@code meta.type}.
+     * sugar applies: a closed record IS-A {@code meta.type}. An open record is applied by substitution, never
+     * constructed, whatever its chain reaches (§5.10).
      */
     public static boolean constructs(String name, Top definition) {
-        return definition instanceof RecordBody record
+        return definition instanceof RecordBody record && !record.isOpen()
                 && (TYPE.equals(name) || TypeChain.supertypesOf(record).contains(TYPE));
     }
 

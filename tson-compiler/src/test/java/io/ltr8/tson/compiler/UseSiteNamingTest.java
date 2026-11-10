@@ -21,9 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>[TSON-SCHEMA] §8.3 flattens a type position past an {@code ALIAS} entry and records the name the
  * author wrote as {@code @alias} on the type-ref, so {@code c: pct} over {@code pct => small} arrives at the
  * reader as {@code small} -- one shared reader, correctly named {@code small} for a position that names it
- * directly, and wrong for one that does not. A minted application ({@code e: pair_of<int32>}) is its expansion, an
- * entry whose content-derived key ({@code array_int32_1_2_…}) appears nowhere in the author's file, so its message
- * leads with no name at all.
+ * directly, and wrong for one that does not. A minted construction ({@code e: pair_of<int32>}) is an entry whose
+ * content-derived key appears nowhere in the author's file, so its message names the application that closed to it.
  *
  * <p>The name is chosen where a composite reader wires
  * its children, which is <b>compile time</b>. Nothing is added to {@code TsonReadContext} and no per-read
@@ -41,7 +40,7 @@ class UseSiteNamingTest {
               small => !integer ^ { max: 100 }
               pct   => small
               outer => pct
-              pair_of => <T> [T; 1..2]
+              pair_of => meta.array ^ { min_items?: = 1  max_items?: = 2 }
             """;
 
     /** Every diagnostic a read of {@code data} against {@code declarations} reports, message only. */
@@ -85,8 +84,8 @@ class UseSiteNamingTest {
     }
 
     /**
-     * <b>An application nothing declares is its expansion, named by the application as written</b> (§5.10, §8.2):
-     * {@code pair_of<int32>} is an array under a content-derived name no author wrote, and the message names the
+     * <b>An application nothing declares is named by the application as written</b> (§5.3, §8.2): {@code
+     * pair_of<int32>} constructs an array under a content-derived name no author wrote, and the message names the
      * application that closed to it instead.
      */
     @Test

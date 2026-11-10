@@ -14,7 +14,6 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
-import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SiblingRef;
@@ -535,58 +534,49 @@ class SchemaDesugarerTest {
     // ── Generic application heads (§3.3.1, §5.10) ────────────────────────
 
     /**
-     * A sugar form naming one of the enclosing declaration's own parameters lifts to an <b>open</b> synthetic
-     * -- a template of its own, over just the parameters it uses -- and the field applies it straight back.
-     * The parameters are renamed positionally, so two templates alike up to renaming land on one entry (§8.2).
+     * Inside an open record a container over one of its parameters is the reference it spells, {@code [T]} the
+     * application {@code meta.array<T>} and {@code {K => V}} the application {@code meta.map<K V>}, held as written:
+     * nothing is lifted for it (§5.10).
      */
     @Test
-    void aParameterBearingFormLiftsToAnOpenSynthetic() {
-        SchemaDocument document = desugar("  box => <T> { v: [T] }");
+    void aContainerOverAParameterIsTheApplicationItSpells() {
+        SchemaDocument document = desugar("  box => <T> { v: [T]  m: {text => T}  n: [[T]] }");
 
-        SchemaMap.Declaration lifted = document.body().declarations().values().stream()
-                .filter(declaration -> declaration.name().startsWith("array_p0_")).findFirst().orElseThrow();
-        Instance template = assertInstanceOf(Instance.class, lifted.typeDef());
-        assertEquals(List.of("p0"), template.typeParams());
-        assertEquals("meta.array", template.target());
-        // The open form is the closed form: one binding record, with the parameter simply standing where a
-        // concrete element type would. There is no per-slot quotation to assert against.
-        RecordValue payload = assertInstanceOf(RecordValue.class, template.value().coreValue());
-        assertEquals(List.of("element_type"), payload.fields().stream().map(RecordValue.Field::name).toList());
-        assertEquals(new TokenValue("p0", TokenForm.UNQUOTED),
-                payload.fields().getFirst().value().coreValue());
-
-        // `box` itself is `!record_template { ... }` by the time it leaves this phase (§5.2), so the field
-        // applying the lifted form is a reference inside its payload rather than an `ApplicationRef` in the AST.
-        RecordTemplateDef boxTemplate =
-                assertInstanceOf(RecordTemplateDef.class, document.body().declarations().get("box").typeDef());
-        assertEquals(Optional.of("meta.record_template"), boxTemplate.payload().typeRef());
-        assertEquals(applicationValue(lifted.name(), "T"), fieldSlot(boxTemplate, 0, "type"));
+        assertEquals(Set.of("box"), document.body().declarations().keySet(), "nothing lifted");
+        RecordDef box = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("box").typeDef()).body();
+        assertEquals(new ApplicationRef("meta.array", List.of(new NameRef("T"))),
+                ((FieldDef) box.entries().get(0)).type().orElseThrow().typeRef());
+        assertEquals(new ApplicationRef("meta.map", List.of(new NameRef("text"), new NameRef("T"))),
+                ((FieldDef) box.entries().get(1)).type().orElseThrow().typeRef());
+        assertEquals(new ApplicationRef("meta.array", List.of(new ApplicationRef("meta.array",
+                        List.of(new NameRef("T"))))),
+                ((FieldDef) box.entries().get(2)).type().orElseThrow().typeRef());
     }
 
-    /** Two templates differing only in what they call their parameter are one template, so one entry (§8.2). */
+    /** A form over a parameter that is no reference is refused, naming the form (§5.10). */
     @Test
-    void twoOpenFormsAlikeUpToRenamingLandOnOneEntry() {
-        SchemaDocument document = desugar("""
-                  box   => <T> { v: [T] }
-                  crate => <A> { w: [A] }""");
-
-        assertEquals(1, document.body().declarations().keySet().stream()
-                .filter(name -> name.startsWith("array_p0_")).count(),
-                () -> "one open synthetic, shared: " + document.body().declarations().keySet());
+    void aFormOverAParameterThatIsNoReferenceIsRefused() {
+        for (String form : List.of("[T; 1..]", "[T?]", "{text => T; ..10}", "( T | text )", "[T, text]")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> desugar("  box => <T> { v: " + form + " }"), form);
+            assertTrue(thrown.getMessage().contains("stands over the parameter 'T' and is no reference"),
+                    thrown.getMessage());
+        }
     }
 
-    /** A template's own body is the open construction, not a reference to a lifted one -- D5, one tier up. */
+    /** A template's body is a record body: a parameter list before anything else is refused (§5.10). */
     @Test
-    void aTemplatesOwnSugarBodyIsTheInstanceTemplate() {
-        SchemaDocument document = desugar("  vector => <T> [T]");
-
-        Instance template = assertInstanceOf(Instance.class,
-                document.body().declarations().get("vector").typeDef());
-        assertEquals(List.of("T"), template.typeParams(), "the declaration's own parameters, as written");
-        assertEquals("meta.array", template.target());
+    void aTemplateBodyThatIsNoRecordIsRefused() {
+        for (String body : List.of("<T> [T]", "<T> [T; 3]", "<V> {text => V}", "<T> ( T | text )", "<A, B> [A, B]",
+                "<T> T", "<B> pair<uuid, B>")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> desugar("  bad => " + body), body);
+            assertTrue(thrown.getMessage().contains("'bad': a template's body is a record body"),
+                    thrown.getMessage());
+        }
     }
 
-    /** A concrete form inside a template still lifts closed: D5 has one rule, and the parameters do not enter it. */
+    /** A concrete form inside a template still lifts closed: the lift rule is one, and the parameters do not enter it. */
     @Test
     void aConcreteFormInsideATemplateStillLiftsClosed() {
         SchemaDocument document = desugar("  box => <T> { v: T  w: [text] }");
@@ -597,45 +587,22 @@ class SchemaDesugarerTest {
     }
 
     /**
-     * A record <b>template</b> is normalised here -- §5.2's own rewrite, {@code { v: T }} into the
-     * {@code !record_template { fields: { ... }  parameters: [ ... ] }} it denotes, a whole parameter labelled while
-     * the parameters are in scope. The <b>application</b> of it still passes through untouched: substitution
-     * happens over the resolved template ({@code TemplateMaterialiser}), not over the AST, so this phase
-     * leaves {@code box<text>}'s head and arguments alone.
+     * An open record passes through as the record body it is written as, and the <b>application</b> of it too:
+     * substitution happens over the resolved open record ({@code TemplateMaterialiser}), not over the AST, so this
+     * phase leaves {@code box<text>}'s head and arguments alone.
      */
     @Test
-    void aRecordTemplateIsNormalisedAndItsApplicationLeftForMaterialisation() {
-        SchemaDocument document = desugar("""
+    void anOpenRecordAndItsApplicationPassThrough() {
+        SchemaDocument document = parse("""
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
-
-        RecordTemplateDef box = assertInstanceOf(RecordTemplateDef.class,
-                document.body().declarations().get("box").typeDef());
-        assertEquals(Optional.of("meta.record_template"), box.payload().typeRef());
-        assertEquals(List.of("T"), box.typeParams(), "the declaration's own list, as written");
-        assertEquals(new TokenValue("v", TokenForm.UNQUOTED), fieldKey(box, 0),
-                "the field's name is its key in the field map");
-        assertEquals(new TokenValue("T", TokenForm.UNQUOTED), fieldSlot(box, 0, "type_param"),
-                "a whole-type parameter is labelled where it is written");
-
-        RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
-                .typeDef()).body();
-        assertEquals(new ApplicationRef("box", List.of(new NameRef("text"))),
-                ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
-                "the application is untouched");
-    }
-
-    /** A <b>closed</b> record is not normalised: only a template's body is held, so only a template is rewritten. */
-    @Test
-    void aClosedRecordIsLeftExactlyAsItWasWritten() {
-        SchemaDocument document = parse("  plain => { v: text }");
 
         assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
     }
 
     /**
-     * A template whose body writes a container sugar form passes through as well: the form lifts open, and the
-     * application closes it at materialisation. What this phase used to refuse is now the mechanism.
+     * A template whose body writes a container over a parameter passes through as well: the form is the reference
+     * it spells, and the application closes it at materialisation.
      */
     @Test
     void applyingATemplateWhoseBodyCarriesSugarPassesThroughToo() {
@@ -722,25 +689,6 @@ class SchemaDesugarerTest {
                 .reduce((a, b) -> a + " " + b).orElse("") + "] }";
     }
 
-    /** The {@code fields} map of a record template's payload. */
-    private static MapValue heldFields(RecordTemplateDef template) {
-        RecordValue binding = (RecordValue) template.payload().coreValue();
-        return (MapValue) binding.fields().stream().filter(f -> f.name().equals("fields"))
-                .findFirst().orElseThrow().value().coreValue();
-    }
-
-    /** The key -- the field's name -- of the {@code n}th entry in a record template's {@code fields}. */
-    private static CoreValue fieldKey(RecordTemplateDef template, int n) {
-        return heldFields(template).entries().get(n).key().coreValue();
-    }
-
-    /** One member of the {@code n}th field in a record template's payload. */
-    private static CoreValue fieldSlot(RecordTemplateDef template, int n, String member) {
-        RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().coreValue();
-        return field.fields().stream().filter(f -> f.name().equals(member)).findFirst().orElseThrow()
-                .value().coreValue();
-    }
-
     // ── §5.2's position rule: a sibling reference stands only at a record field's type ─────────────
 
     /** At a record field's type, and a group member's, a sibling reference passes through as written. */
@@ -752,16 +700,13 @@ class SchemaDesugarerTest {
         assertEquals(new SiblingRef("kind"), field.type().orElseThrow().typeRef());
     }
 
-    /** A record template's field carries it into the template's payload as the reference value it is. */
+    /** An open record's field keeps it in the record body as written, as a closed record's does. */
     @Test
-    void aRecordTemplateFieldCarriesASiblingReference() {
-        RecordTemplateDef template = assertInstanceOf(RecordTemplateDef.class, desugar(
+    void anOpenRecordFieldKeepsASiblingReference() {
+        StructuralTypeDef typeDef = assertInstanceOf(StructuralTypeDef.class, desugar(
                 "  cell => <T> { kind: meta.type_ref  v?: kind!  w: T }").body().declarations().get("cell").typeDef());
-        RecordValue fields = (RecordValue) template.payload().coreValue();
-        MapValue map = (MapValue) fields.fields().get(0).value().coreValue();
-        RecordValue v = (RecordValue) map.entries().get(1).value().coreValue();
-        assertEquals(new ReferenceValue(io.ltr8.tson.schema.meta.SiblingRef.of("kind")),
-                v.fields().get(0).value().coreValue());
+        FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);
+        assertEquals(new SiblingRef("kind"), field.type().orElseThrow().typeRef());
     }
 
     /** Anywhere else in sugar it is refused before any lift, naming the slot. */

@@ -22,7 +22,7 @@ import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
-import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
+
 import io.ltr8.tson.compiler.ast.schema.Reference;
 import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -100,10 +100,16 @@ import java.util.function.UnaryOperator;
  *
  * <p><b>What is deliberately left alone.</b> Three positions keep their heads intact, because a name there is
  * being <em>declared</em> or <em>composed</em>, not applied: a declaration's own body reference
- * ({@code ReferenceTypeDef}), a refinement source, and a composition supertype. And nothing inside a
- * <em>parameterized</em> declaration is expanded at all: the desugared structure of a template body is its
- * recorded open form, and every nested form inside it becomes concrete only at materialisation, so lifting
- * one eagerly here would mint an entry for a template that may never be instantiated.
+ * ({@code ReferenceTypeDef}), a refinement source, and a composition supertype.
+ *
+ * <p><b>A template's body is a record body</b> ([TSON-SCHEMA] §5.10): braces, a composition or a refinement, and the
+ * record passes through as it would without parameters, for {@code DefinitionResolver} to build as an open record. A
+ * parameter list before a sugar form or a bare reference -- {@code <T> [T]}, {@code <T> ( T | error )}, {@code <B>
+ * pair<uuid, B>} -- is refused here, naming what to write instead ({@link #refuseTemplateBody}). Inside an open record
+ * a form over a parameter is admitted only where it is a reference: {@code [T]} and {@code {K => V}} are written as
+ * the applications they spell, {@code meta.array<T>} and {@code meta.map<K V>}, held until the record is applied, and
+ * every other form over a parameter -- a size, a {@code ?} element, a tuple, a choice -- is refused, naming the form
+ * ({@link #openForm}). Nothing is lifted for a form over a parameter; a form naming none lifts closed, as anywhere.
  *
  * <p><b>An invalid sugar form is reported per declaration, not thrown</b>, when a {@link
  * DesugarFailureReporter} is supplied -- the same one-pass treatment {@code SchemaResolver} and {@code
@@ -125,8 +131,6 @@ final class SchemaDesugarer {
     /** §5.4's desugar target for {@code (A | B)}. */
     private static final String CHOICE = KernelNames.of("choice");
 
-    /** §5.10's desugar target for a partial application {@code <B> pair<text, B>} -- an alias body. */
-    private static final String ALIAS = KernelNames.of("alias");
 
     /** The vocabulary fields the desugar table binds -- fixed by the table, not looked up in a governing meta. */
     private static final String ELEMENT_TYPE = "element_type";
@@ -136,9 +140,6 @@ final class SchemaDesugarer {
     private static final String MAX_ITEMS = "max_items";
     private static final String ELEMENTS = "elements";
     private static final String VARIANTS = "variants";
-
-    /** {@code alias}'s own member, the slot an alias body binds. */
-    private static final String TARGET = "target";
 
 
     /**
@@ -161,7 +162,7 @@ final class SchemaDesugarer {
      * <p>It is deliberately never in {@code TsonSchemaParser.declarationPositions()} -- the position belongs
      * to the diagnostic already reported against the real declaration, not to this stand-in.
      *
-     * <p><b>A stand-in keeping parameters is an open empty record</b>, a record template like any other where
+     * <p><b>A stand-in keeping parameters is an open empty record</b>, an open record like any other where
      * {@code DefinitionResolver} resolves it, so {@code TemplateMaterialiser} closes it by the one process.
      */
     private static TypeDef absorbed(SchemaMap.Declaration declaration) {
@@ -191,12 +192,14 @@ final class SchemaDesugarer {
     private Map<String, SchemaMap.Declaration> local = Map.of();
 
     /**
-     * The type parameters of the declaration currently being walked, or empty outside a template. A sugar
-     * form naming one of these lifts to an <em>open</em> entry rather than a closed one -- a closed entry
-     * would carry a reference to a parameter nothing has bound. Every other form in the same declaration
-     * lifts exactly as it would outside a template (§5.3's one lift rule).
+     * The type parameters of the declaration currently being walked, or empty outside a template. A sugar form
+     * naming one of these is no lift: it is the reference it spells, or refused ({@link #openForm}). Every other form
+     * in the same declaration lifts exactly as it would outside a template (§5.3's one lift rule).
      */
     private List<String> currentParameters = List.of();
+
+    /** The name of the declaration currently being walked, for a refusal that names it. */
+    private String currentName = "";
 
     /** Where an invalid sugar form is reported, or {@code null} to rethrow it and abandon the document. */
     private final DesugarFailureReporter reporter;
@@ -345,11 +348,13 @@ final class SchemaDesugarer {
     private SchemaMap.Declaration declaration(SchemaMap.Declaration declaration) {
         siblingsAtFieldTypesOnly(declaration.typeDef());
         currentParameters = typeParams(declaration.typeDef());
+        currentName = declaration.name();
         try {
             TypeDef typeDef = typeDef(declaration.typeDef());
             return typeDef == declaration.typeDef() ? declaration : declaration.withTypeDef(typeDef);
         } finally {
             currentParameters = List.of();
+            currentName = "";
         }
     }
 
@@ -420,34 +425,28 @@ final class SchemaDesugarer {
 
     /**
      * {@code AtomRefinement} and {@code Instance} are passed through: their target is a bare {@code String}
-     * type name and their payload is a {@code DataValue}, so neither can carry a sugar form.
+     * type name and their payload is a {@code DataValue}, so neither can carry a sugar form. An {@code Instance}
+     * with parameters is the resolver's to admit (before {@code !meta.record}) or refuse, since only it knows what
+     * the head is.
      *
-     * <p>A declaration carrying type parameters is passed through whole -- see the class Javadoc on why a
-     * template's body must not be expanded.
+     * <p>A template's record body is walked as any record's, its forms over a parameter written as the references
+     * they spell ({@link #openForm}); a parameter list before anything but a record body is refused ({@link
+     * #refuseTemplateBody}).
      */
     private TypeDef typeDef(TypeDef typeDef) {
         return switch (typeDef) {
             case StructuralTypeDef structural -> {
-                // A template's body *is* walked: a concrete form inside it lifts to an ordinary closed
-                // entry, exactly as it would outside a template, leaving a plain record template that
-                // applies. Only a form mentioning one of the declaration's own parameters is left alone --
-                // see currentParameters.
+                // A template's body is walked like any record's: a concrete form inside it lifts to an ordinary
+                // closed entry, exactly as it would outside a template, and a form naming one of the declaration's
+                // own parameters is the reference it spells, or refused -- see openForm.
                 StructuralDef body = structuralDef(structural.body());
-                // §5.2's own rewrite, applied where the body is written: a bare record body denotes a record
-                // construction, and with parameters that is the `!meta.record_template { ... }` written here,
-                // labelled while the parameters are in scope. See recordTemplate.
-                //
-                // Every parameterised record body takes this path, `~`-marked or not. A composition or
-                // refinement template is built one phase later (`DefinitionResolver.Built`), since both absorb
-                // fields from a source and the template is the flattened record. A bare record has none.
-                if (!structural.typeParams().isEmpty() && body instanceof RecordDef record) {
-                    yield new RecordTemplateDef(structural.typeParams(), recordTemplate(record));
-                }
                 yield body == structural.body() ? structural
                         : new StructuralTypeDef(structural.typeParams(), body);
             }
             // A declaration's own body reference names what this declaration *is*; only its arguments are
             // expandable, so the head stays put and its own handling is unchanged.
+            case ReferenceTypeDef reference when !reference.typeParams().isEmpty() ->
+                    throw refuseTemplateBody(reference.ref());
             case ReferenceTypeDef reference -> {
                 // **A declaration's own body never lifts** (§5.3): the form *is* the construction, so it
                 // becomes the instance directly rather than a reference to an injected one. That is what
@@ -457,31 +456,112 @@ final class SchemaDesugarer {
                 // `type-ref` like the rest, since there is no separate declaration-level tier.
                 Optional<Binding> binding = binding(reference.ref());
                 if (binding.isPresent()) {
-                    // The same rule one tier up: a template's own body is the open construction, so
-                    // `vector => <T> [T; 3]` *is* the instance template rather than a reference to one.
-                    // Its parameters are the declaration's own list as written, not the subset the body
-                    // happens to name -- a declared parameter the body never uses is an error the linker
-                    // reports (§5.10), and dropping it here would hide the very thing it looks for.
-                    yield instance(binding.get(), reference.typeParams());
-                }
-                if (!reference.typeParams().isEmpty()) {
-                    // §5.10's partial application, and the last open form that was not a constructor
-                    // application: `uuid_pair => <B> pair<text, B>` denotes `!meta.alias { target:
-                    // pair<text, B> }`, so it is written that way here and closes by the same walk as
-                    // every other template. `alias.target` is a reference, which carries the arguments.
-                    yield instance(new Binding(ALIAS, List.of(
-                            new RecordValue.Field(TARGET, WireForm.plain(refValue(reference.ref()))))),
-                            reference.typeParams());
+                    yield instance(binding.get());
                 }
                 TypeExpr ref = argumentsOnly(reference.ref());
                 yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);
             }
-            // The explicit spelling of a record template, `<T> !meta.record { ... }`, takes the same labels the sugar
-            // body does, so the two reach the resolver as one payload.
-            case Instance instance when !instance.typeParams().isEmpty()
-                    && WireForm.RECORD.equals(instance.target()) ->
-                    new RecordTemplateDef(instance.typeParams(), labelled(instance.value(), instance.typeParams()));
             default -> typeDef;
+        };
+    }
+
+    /**
+     * A parameter list before a body that is no record ([TSON-SCHEMA] §5.10: a template's body is a record body --
+     * braces, a composition or a refinement), refused with what to write instead. A sugar form is a construction,
+     * applied where it is used or declared as a refined constructor; a choice or a tuple is a discriminated record
+     * family or a field group; a bare reference is an alias template, which names a partial application nothing
+     * could close.
+     */
+    private SchemaValidationException refuseTemplateBody(TypeExpr body) {
+        String prefix = "'" + currentName + "': a template's body is a record body -- braces, a composition or a "
+                + "refinement (§5.10) -- and '" + spell(body) + "' is ";
+        return new SchemaValidationException(prefix + switch (body) {
+            case ArrayExpr _ -> "an array. Write the application where it is used ('meta.array<T>', '[T]'), or "
+                    + "declare a refined constructor ('nonempty_type => meta.array ^ { min_items?: = 1 }') and apply it";
+            case MapExpr _ -> "a map. Write the application where it is used ('meta.map<K V>', '{K => V}'), or "
+                    + "declare a refined constructor ('bounded_map => meta.map ^ { max_items?: = 10 }') and apply it";
+            case ChoiceExpr _ -> "a choice. Declare a discriminated record family instead (an abstract base with a "
+                    + "selector, a template composing it, and members pinning it), or write the alternative as a "
+                    + "field group inside a record, '( body: T | problem: problem )'";
+            case TupleExpr _ -> "a tuple. Name the positions as the fields of a record template, '<A, B> { first: A "
+                    + " second: B }', or declare the tuple for each type it holds";
+            default -> "a reference, so the declaration would be an alias template, which a template's body never "
+                    + "is. Restate the body as a record ('<B> { first: uuid  second: B }'), or write the application "
+                    + "at each use ('pair<uuid, int32>')";
+        });
+    }
+
+    /**
+     * A sugar form standing inside an open record, over one of its parameters ([TSON-SCHEMA] §5.10): admitted only
+     * where it is a reference. {@code [T]} and {@code {K => V}} are the applications they spell, {@code meta.array<T>}
+     * and {@code meta.map<K V>}, held as written until the record is applied; a size or a {@code ?} sets a field no
+     * argument list carries, and a tuple or a choice is no constructor over reference fields, so each is refused,
+     * naming the form. {@code children} are the form's positions, already expanded.
+     */
+    private TypeExpr openForm(TypeExpr written, List<TypeExpr> children) {
+        String parameter = children.stream().map(this::parameterIn).flatMap(Optional::stream).findFirst()
+                .orElseThrow();
+        String prefix = "'" + currentName + "': '" + spell(written) + "' stands over the parameter '" + parameter
+                + "' and is no reference, and inside an open record a form over a parameter is admitted only "
+                + "where it is one (§5.10) -- ";
+        return switch (written) {
+            case ArrayExpr array when array.size().isEmpty() && !array.elementType().voidable() ->
+                    new ApplicationRef(ARRAY, children);
+            case MapExpr map when map.size().isEmpty() && !map.valueType().voidable() ->
+                    new ApplicationRef(MAP, children);
+            case ArrayExpr _, MapExpr _ -> throw new SchemaValidationException(prefix + "a size or a '?' sets a "
+                    + "field of the container that no argument list carries, and '[T]' and '{K => V}' alone are "
+                    + "the references 'meta.array<T>' and 'meta.map<K V>'. Declare a refined constructor and apply "
+                    + "it ('nonempty_type => meta.array ^ { min_items?: = 1 }', then 'nonempty_type<" + parameter
+                    + ">'), or move the container into the argument");
+            case ChoiceExpr _ -> throw new SchemaValidationException(prefix + "a choice is no constructor over "
+                    + "reference fields, and an untagged sum over a parameter cannot be judged disjoint until it is "
+                    + "applied (§5.4). Write the alternative as a field group, '( body: " + parameter
+                    + " | problem: problem )'");
+            default -> throw new SchemaValidationException(prefix + "a tuple's positions are a list of records, not "
+                    + "reference fields. Name the positions as fields of the record");
+        };
+    }
+
+    /** The first of the enclosing declaration's parameters {@code ref} names, as itself or in an argument. */
+    private Optional<String> parameterIn(TypeExpr ref) {
+        return switch (ref) {
+            case NameRef simple -> currentParameters.contains(simple.name()) ? Optional.of(simple.name())
+                    : Optional.empty();
+            case ApplicationRef generic -> generic.args().stream().map(this::parameterIn).flatMap(Optional::stream)
+                    .findFirst();
+            default -> Optional.empty();
+        };
+    }
+
+    /** A form as the author spells it, for a message. */
+    private static String spell(TypeExpr ref) {
+        return switch (ref) {
+            case NameRef simple -> simple.name();
+            case SiblingRef sibling -> sibling.field() + "!";
+            case ApplicationRef generic -> generic.name() + "<" + String.join(", ",
+                    generic.args().stream().map(SchemaDesugarer::spell).toList()) + ">";
+            case ArrayExpr array -> "[" + spell(array.elementType()) + array.size().map(SchemaDesugarer::spell)
+                    .orElse("") + "]";
+            case MapExpr map -> "{" + spell(map.keyType()) + " => " + spell(map.valueType())
+                    + map.size().map(SchemaDesugarer::spell).orElse("") + "}";
+            case TupleExpr tuple -> "[" + String.join(", ",
+                    tuple.elementTypes().stream().map(SchemaDesugarer::spell).toList()) + "]";
+            case ChoiceExpr choice -> "( " + String.join(" | ",
+                    choice.variants().stream().map(SchemaDesugarer::spell).toList()) + " )";
+        };
+    }
+
+    private static String spell(ElementType element) {
+        return spell(element.typeRef()) + (element.voidable() ? "?" : "");
+    }
+
+    private static String spell(SizeSpec size) {
+        return "; " + switch (size) {
+            case SizeSpec.Exact exact -> exact.bound();
+            case SizeSpec.Ranged ranged -> ranged.lower() + ".." + ranged.upper();
+            case SizeSpec.Min min -> min.lower() + "..";
+            case SizeSpec.Max max -> ".." + max.upper();
         };
     }
 
@@ -557,10 +637,23 @@ final class SchemaDesugarer {
         return switch (ref) {
             case NameRef simple -> simple;
             case SiblingRef sibling -> sibling; // a field's type, as written: it names no entry to lift
-            case ArrayExpr _, TupleExpr _, MapExpr _ -> hoistOrKeep(binding(ref), ref);
-            case ChoiceExpr _ -> hoistOrKeep(binding(ref), ref);
+            case ArrayExpr array -> container(ref, List.of(elementRef(array.elementType())));
+            case MapExpr map -> container(ref, List.of(typeRef(map.keyType()), elementRef(map.valueType())));
+            case TupleExpr tuple -> container(ref, tuple.elementTypes().stream().map(this::elementRef).toList());
+            case ChoiceExpr choice -> container(ref, mapShared(choice.variants(), this::typeRef));
             case ApplicationRef generic -> applicationArguments(generic);
         };
+    }
+
+    /**
+     * A sugar form whose positions are {@code children}, already expanded: the reference it spells or refused where
+     * one of them names a parameter of the enclosing declaration ({@link #openForm}), and lifted closed otherwise.
+     */
+    private TypeExpr container(TypeExpr ref, List<TypeExpr> children) {
+        if (children.stream().anyMatch(child -> parameterIn(child).isPresent())) {
+            return openForm(ref, children);
+        }
+        return hoistOrKeep(binding(ref, children), ref);
     }
 
     /** Expands only within a reference's arguments, leaving its own head in place. */
@@ -579,12 +672,9 @@ final class SchemaDesugarer {
      * Checks a generic application, which after §3.3.1's type-name-only head resolution can only ever be a
      * §5.10 user-template application: {@code box => <T> { v: T }} applied as {@code box<text>}.
      *
-     * <p><b>A record template passes through</b> -- substitution happens over the <em>resolved</em> open
-     * form, not over the AST, so this phase leaves the application for {@code SchemaResolver} to materialise
-     * and the head keeps its arguments into resolution.
-     *
-     * <p><b>A template containing a sugar form passes through as well</b>: {@code box => <T> { v: [T] }}
-     * lifts that form to an open synthetic, which closes with the application like any other open body.
+     * <p><b>An open record passes through</b> -- substitution happens over the <em>resolved</em> open record, not
+     * over the AST, so this phase leaves the application for {@code SchemaResolver} to materialise and the head keeps
+     * its arguments into resolution.
      *
      * <p>A head this document neither declares nor imports is left alone -- the reference is simply
      * unresolved, which is {@code TsonSchemaLinker}'s verdict to deliver. A local head that declares no
@@ -615,9 +705,7 @@ final class SchemaDesugarer {
     static List<String> typeParams(TypeDef typeDef) {
         return switch (typeDef) {
             case Instance instance -> instance.typeParams();
-            case RecordTemplateDef template -> template.typeParams();
             case StructuralTypeDef structural -> structural.typeParams();
-
             case ReferenceTypeDef reference -> reference.typeParams();
             default -> List.of();
         };
@@ -645,10 +733,6 @@ final class SchemaDesugarer {
      * spelling of one reference would split one type across two entries.
      */
     private static CoreValue refValue(TypeExpr ref) {
-        if (ref instanceof SiblingRef sibling) {
-            // A record template field's type, the one slot a sibling reference reaches here.
-            return WireForm.refValue(io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field()));
-        }
         return WireForm.refValue(reference(ref));
     }
 
@@ -676,13 +760,28 @@ final class SchemaDesugarer {
      */
     private Optional<Binding> binding(TypeExpr ref) {
         return switch (ref) {
-            case ArrayExpr array -> arrayBinding(elementRef(array.elementType()),
-                    array.elementType().voidable(), array.size(), shownElement(array.elementType()));
-            case MapExpr map -> mapBinding(typeRef(map.keyType()), elementRef(map.valueType()),
-                    map.valueType().voidable(), map.size());
-            case TupleExpr tuple -> tupleBinding(tuple.elementTypes().stream()
-                    .map(e -> new Position(elementRef(e), e.voidable())).toList());
-            case ChoiceExpr choice -> choiceBinding(mapShared(choice.variants(), this::typeRef));
+            case ArrayExpr array -> binding(ref, List.of(elementRef(array.elementType())));
+            case MapExpr map -> binding(ref, List.of(typeRef(map.keyType()), elementRef(map.valueType())));
+            case TupleExpr tuple -> binding(ref, tuple.elementTypes().stream().map(this::elementRef).toList());
+            case ChoiceExpr choice -> binding(ref, mapShared(choice.variants(), this::typeRef));
+            default -> Optional.empty();
+        };
+    }
+
+    /** {@link #binding(TypeExpr)} over the form's positions, {@code children}, already expanded. */
+    private static Optional<Binding> binding(TypeExpr ref, List<TypeExpr> children) {
+        return switch (ref) {
+            case ArrayExpr array -> arrayBinding(children.getFirst(), array.elementType().voidable(), array.size(),
+                    shownElement(array.elementType()));
+            case MapExpr map -> mapBinding(children.get(0), children.get(1), map.valueType().voidable(), map.size());
+            case TupleExpr tuple -> {
+                List<Position> positions = new ArrayList<>();
+                for (int i = 0; i < children.size(); i++) {
+                    positions.add(new Position(children.get(i), tuple.elementTypes().get(i).voidable()));
+                }
+                yield tupleBinding(positions);
+            }
+            case ChoiceExpr _ -> choiceBinding(children);
             default -> Optional.empty();
         };
     }
@@ -803,192 +902,6 @@ final class SchemaDesugarer {
     }
 
     /**
-     * {@code !meta.record_template { fields: { x => { type_param: T } ... }  parameters: [ ... ] }} -- §5.2's own
-     * rewrite of a record template's bare body, applied where the body is written, so the template's explicit spelling
-     * ({@link #labelled}) and its sugar reach the resolver as one payload ({@link RecordTemplateDef}).
-     *
-     * <p><b>§5.2's rewrite is syntactic</b>, as fixed and as closed as the sugar table above, so it belongs beside it.
-     * Each field is classified here, once, by its source spelling while the parameters are in scope (§5.10's
-     * shadowing rule, {@link #label}): a bare parameter name in a field's type is its {@code type_param}, and
-     * everything else is written as the author wrote it -- a parameter at a field's value included, which the
-     * resolver refuses naming the slot (§5.10).
-     *
-     * <p><b>Only what the author wrote is written.</b> {@code access_pattern} and {@code size_type} are
-     * fixed on the {@code record} constructor and an unmarked field's facts are {@code meta.record_field}'s own
-     * defaults, so neither is stated -- the same economy {@link #arrayBinding} makes with an unmarked element's
-     * {@code state}. The parameters close the payload by name; the bound each is written with is put on where the
-     * declaration resolves.
-     */
-    private DataValue recordTemplate(RecordDef record) {
-        return recordTemplatePayload(recordBinding(record), currentParameters);
-    }
-
-    /** The bindings of a record template's body, its fields labelled -- see {@link #recordTemplate}. */
-    private List<RecordValue.Field> recordBinding(RecordDef record) {
-        List<MapValue.MapEntry> fields = new ArrayList<>();
-        List<DataValue> groups = new ArrayList<>();
-        List<DataValue> discriminators = new ArrayList<>();
-        Set<String> seen = new LinkedHashSet<>();
-        for (RecordEntry entry : record.entries()) {
-            switch (entry) {
-                case FieldDef field -> {
-                    requireFieldNameUnseen(field.name(), seen, "this body declares it twice");
-                    fields.add(WireForm.fieldEntry(field.name(), recordField(field)));
-                    // `=?` declares a selector. Only a *fresh* record body derives: this is the declaration that
-                    // states it, and a refinement or composition flattens through another path.
-                    if (FieldModifiers.discriminates(field)) {
-                        discriminators.add(WireForm.plain(WireForm.declaredName(field.name())));
-                    }
-                }
-                case GroupDef group -> {
-                    for (GroupDef.Member member : group.members()) {
-                        requireFieldNameUnseen(member.name(), seen, "a group member repeats it -- member "
-                                + "labels share the enclosing record's field namespace");
-                        // A group's members are ordinary optional fields of the record, voidable where the type
-                        // says so, and the group records its options, their optional members and its own state
-                        // (§5.11) -- the shape the resolver builds.
-                        CoreValue type = refValue(member.typeRef());
-                        List<RecordValue.Field> memberFields = new ArrayList<>(List.of(
-                                new RecordValue.Field(label(WireForm.TYPE, type), WireForm.plain(type))));
-                        WireForm.addFacts(memberFields, true, member.voidable(), FieldRole.FREE);
-                        fields.add(WireForm.fieldEntry(member.name(),
-                                WireForm.plain(new RecordValue(memberFields), member.annotations())));
-                    }
-                    groups.add(WireForm.group(group.fieldGroup(), group.annotations()));
-                }
-            }
-        }
-        List<RecordValue.Field> binding = new ArrayList<>();
-        binding.add(new RecordValue.Field(WireForm.FIELDS, WireForm.plain(WireForm.fieldMap(fields))));
-        if (!groups.isEmpty()) {
-            binding.add(new RecordValue.Field(WireForm.GROUPS, WireForm.plain(new ArrayValue(groups))));
-        }
-        // The record's own statement about which of its fields select a member (§5.2). Written here rather
-        // than per field, so a held body carries the list a base states and a member simply states none --
-        // §5.8 flattens a base's fields into every member, which a per-field mark had to be cleared from.
-        if (!discriminators.isEmpty()) {
-            binding.add(new RecordValue.Field(WireForm.DISCRIMINATORS,
-                    WireForm.plain(new ArrayValue(discriminators))));
-        }
-        return binding;
-    }
-
-    /**
-     * The explicit spelling, {@code <T> !meta.record { … }}, as the {@code !meta.record_template { … }} it denotes:
-     * each field of a written {@code fields} map labelled as {@link #recordTemplate} labels a sugar body's, a
-     * {@code !meta.record_field} tag read as {@code !meta.record_template_field}, and the parameters stated last.
-     * Every other slot is carried as written, for the resolver to answer in the author's terms -- a binding the
-     * record's vocabulary does not declare, or a parameter standing where §5.10 admits none. A positional field
-     * ({@code x => text}, {@code x => T}) is spelled out and labelled as its {@code type} would be, a template field
-     * having no positional form, so {@code item => T} is the template {@code item: T} and {@code item => { type: T }}
-     * are.
-     */
-    private static DataValue labelled(DataValue written, List<String> parameters) {
-        if (!(written.coreValue() instanceof RecordValue binding)) {
-            return new DataValue(written.annotations(), Optional.of(WireForm.RECORD_TEMPLATE), written.coreValue());
-        }
-        List<RecordValue.Field> fields = new ArrayList<>();
-        for (RecordValue.Field slot : binding.fields()) {
-            fields.add(WireForm.FIELDS.equals(slot.name()) && slot.value().coreValue() instanceof MapValue map
-                    ? new RecordValue.Field(WireForm.FIELDS, new DataValue(slot.value().annotations(),
-                            slot.value().typeRef(), new MapValue(map.entries().stream().map(entry ->
-                                    new MapValue.MapEntry(entry.key(), labelledField(entry.value(), parameters)))
-                            .toList())))
-                    : slot);
-        }
-        DataValue payload = recordTemplatePayload(fields, parameters);
-        return new DataValue(written.annotations(), payload.typeRef(), payload.coreValue());
-    }
-
-    /** One written {@code meta.record_field} as the {@code meta.record_template_field} it is in a template. */
-    private static DataValue labelledField(DataValue field, List<String> parameters) {
-        Optional<String> tag = field.typeRef().map(written -> WireForm.RECORD_FIELD.equals(written)
-                ? WireForm.RECORD_TEMPLATE_FIELD : written);
-        CoreValue members = switch (field.coreValue()) {
-            case RecordValue record -> new RecordValue(record.fields().stream().map(member -> new RecordValue.Field(
-                    label(member.name(), member.value().coreValue(), parameters), member.value())).toList());
-            case EmptyBrace empty -> empty;
-            default -> new RecordValue(List.of(new RecordValue.Field(label(WireForm.TYPE, field.coreValue(), parameters),
-                    WireForm.plain(field.coreValue()))));
-        };
-        return new DataValue(field.annotations(), tag, members);
-    }
-
-    /** A record template's {@code bindings}, its {@code parameters} stated last, each unbounded. */
-    private static DataValue recordTemplatePayload(List<RecordValue.Field> bindings, List<String> parameters) {
-        List<RecordValue.Field> fields = new ArrayList<>(bindings);
-        fields.add(new RecordValue.Field(WireForm.PARAMETERS, WireForm.plain(new ArrayValue(parameters.stream()
-                .map(parameter -> WireForm.plain(new RecordValue(List.of(WireForm.nameField(WireForm.NAME,
-                        parameter)))))
-                .toList()))));
-        return new DataValue(List.of(), Optional.of(WireForm.RECORD_TEMPLATE), new RecordValue(fields));
-    }
-
-    /** {@link #label(String, CoreValue, List)} against the declaration's own parameters. */
-    private String label(String slot, CoreValue value) {
-        return label(slot, value, currentParameters);
-    }
-
-    /**
-     * The name a record template field's {@code slot} is written under: {@code type_param} for a {@code type} that is
-     * an unquoted token naming one of {@code parameters} (§5.10's shadowing rule over the source spelling), and {@code
-     * slot} itself otherwise. A parameter at any other slot is written as it stands, for the resolver to refuse
-     * naming the slot ({@link ParameterTypes#checkSlots}).
-     */
-    private static String label(String slot, CoreValue value, List<String> parameters) {
-        boolean parameter = value instanceof TokenValue token && token.form() == TokenForm.UNQUOTED
-                && parameters.contains(token.text());
-        return parameter && WireForm.TYPE.equals(slot) ? WireForm.TYPE_PARAM : slot;
-    }
-
-
-    /**
-     * §5.11's uniqueness rule, over the body this phase is rewriting: a field name is unique across a
-     * record's plain fields and all its groups' members.
-     *
-     * <p><b>It has to be asked here as well as in the resolver</b>, and asking it twice is not duplication:
-     * the resolver's copy sees a closed record body, this one sees a template's, and after normalisation
-     * those are two different phases. The rule is syntactic -- two entries, one name -- so it needs nothing
-     * the resolver has and this phase does not. Left to the constructor's own reader instead, the wire form
-     * would carry one name twice as a key of {@code fields}, reported as a duplicate map key with no word of
-     * which declaration wrote it, or which way -- a field twice, or a group member repeating one.
-     */
-    private static void requireFieldNameUnseen(String name, Set<String> seen, String explanation) {
-        if (!seen.add(name)) {
-            throw new SchemaValidationException("field '" + name + "' is declared more than once -- "
-                    + explanation + " (§5.11: a field name is unique across a record's plain fields and all "
-                    + "its groups' members)");
-        }
-    }
-
-    /**
-     * One {@code meta.record_template_field}, with {@code state} and {@code value} written only where the author's
-     * marks say something the constructor's own defaults do not, and a parameter labelled ({@link #label}).
-     *
-     * <p>A field with no type-ref is a §5.7 tightening entry, which needs a source to elide toward and so
-     * cannot appear in the fresh record body this builds -- {@link FieldModifiers} has no view of an
-     * inherited field, and neither does this phase.
-     */
-    private DataValue recordField(FieldDef field) {
-        if (field.type().isEmpty()) {
-            throw new SchemaValidationException("field '" + field.name() + "' states only a modifier and no "
-                    + "type-ref, but names no inherited field to take a type from -- a modifier-only entry is "
-                    + "always a tightening, so it is only meaningful in a refinement or composition body, "
-                    + "against a field the source declares (§5.7)");
-        }
-        FieldDef.FieldType type = field.type().orElseThrow();
-        FieldModifiers.Resolved resolved =
-                FieldModifiers.of(field.name(), field.omittable(), type.voidable(), field.modifier());
-        List<RecordValue.Field> members = new ArrayList<>();
-        CoreValue written = refValue(type.typeRef());
-        members.add(new RecordValue.Field(label(WireForm.TYPE, written), WireForm.plain(written)));
-        WireForm.addFacts(members, resolved.optional(), resolved.voidable(), resolved.role());
-        resolved.value().ifPresent(token -> members.add(new RecordValue.Field(label(WireForm.VALUE, token),
-                WireForm.plain(token))));
-        return WireForm.plain(new RecordValue(members), field.annotations());
-    }
-
-    /**
      * §5.3's size specifier as the {@code min_items}/{@code max_items} pair it binds -- one rule for arrays
      * and maps alike, since both constructors declare the same two fields. An exact {@code N} pins both, so
      * {@code [T; 3]} and {@code [T; 3..3]} land on the very same entry.
@@ -1029,24 +942,7 @@ final class SchemaDesugarer {
      * the instantiation entry. The entry dangles for exactly the window an ordinary forward reference does.
      */
     private static TypeDef instance(Binding binding) {
-        return instance(binding, List.of());
-    }
-
-    /**
-     * The same construction with a parameter list, for a form naming a parameter of the declaration it sits
-     * in -- {@code <p0> !meta.array { element_type: p0 }}. {@code typeParams} is that form's own list, already
-     * renamed positionally.
-     *
-     * <p><b>The open form is the closed form.</b> One binding record serves both, because an open entry's
-     * body is held rather than read against its constructor's vocabulary until materialisation has
-     * substituted: a parameter in a slot is simply the token that stands there, and the phase needs no
-     * per-slot analysis to decide how to quote it. That is what removes the collection boundary -- a
-     * parameter in {@code variants} or {@code elements} is a token inside an array like any other, where a
-     * typed quotation had no case for it.
-     */
-    private static TypeDef instance(Binding binding, List<String> typeParams) {
-        return new Instance(typeParams, new DataValue(List.of(), Optional.of(binding.head()),
-                new RecordValue(binding.fields())));
+        return new Instance(new DataValue(List.of(), Optional.of(binding.head()), new RecordValue(binding.fields())));
     }
 
     /**
@@ -1060,34 +956,22 @@ final class SchemaDesugarer {
     /**
      * Records an injected declaration under its derived name and yields the reference that replaces the sugar.
      *
-     * <p><b>Which entry it lifts to is §5.3's one lift rule.</b> A form naming none of the enclosing declaration's
-     * parameters lifts <em>closed</em> -- an ordinary construction referenced by a bare name -- whether or not
-     * the declaration around it is a template. A form naming one lifts <em>open</em>: a template over just the
-     * parameters it uses, referenced by an application binding them straight back through. {@code <T> { a: [T]
-     *  b: [order] }} therefore injects one of each, and only the first has to wait for materialisation.
+     * <p><b>Which entry it lifts to is §5.3's one lift rule</b>: a closed construction referenced by a bare name,
+     * whether or not the declaration around it is a template. A form naming a parameter never reaches here: it is
+     * the reference it spells, or refused ({@link #openForm}).
      */
     private TypeExpr hoist(Binding binding) {
         refuseParameterBound(binding);
-        List<String> parameters = parametersIn(binding);
-        if (parameters.isEmpty()) {
-            String name = bindingName(binding);
-            claim(name, binding, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
-                    Optional.empty(), instance(binding)));
-            return new NameRef(name);
-        }
-        List<String> renamed = positionalNames(binding, parameters);
-        Binding normalised = rename(binding, parameters, renamed);
-        String name = bindingName(normalised);
-        claim(name, normalised, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
-                Optional.empty(), instance(normalised, renamed)));
-        return new ApplicationRef(name, parameters.stream()
-                .<TypeExpr>map(NameRef::new).toList());
+        String name = bindingName(binding);
+        claim(name, binding, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
+                Optional.empty(), instance(binding)));
+        return new NameRef(name);
     }
 
     /**
      * A size bound naming one of the enclosing declaration's parameters, {@code [T; N]}, refused naming the slot: a
-     * parameter is a type, and a bound is a count (§5.3, §5.10). Refused here rather than where the lifted form's
-     * parameters are checked, because lifting renames the parameter and the refusal would name the synthetic.
+     * parameter is a type, and a bound is a count (§5.3, §5.10). Refused here, before the form lifts closed with a
+     * parameter in it, so the refusal names the declaration that wrote it and not a synthetic.
      */
     private void refuseParameterBound(Binding binding) {
         for (RecordValue.Field field : binding.fields()) {
@@ -1097,105 +981,6 @@ final class SchemaDesugarer {
                 throw ParameterTypes.at(token.text(), "a size bound (" + binding.head() + "." + field.name() + ")");
             }
         }
-    }
-
-    /**
-     * Every parameter of the enclosing declaration this binding record names, in the order the declaration
-     * lists them -- the form's own parameter list, and the argument list of the reference that replaces it.
-     * Asked of the resolved record, not of the source form, so a parameter reaches it the same way whichever
-     * slot carried it: {@code [T]} names one in a type slot, {@code ( T | error )} inside a collection.
-     */
-    private List<String> parametersIn(Binding binding) {
-        List<String> found = new ArrayList<>();
-        for (String parameter : currentParameters) {
-            if (binding.fields().stream().anyMatch(field -> namesToken(field.value().coreValue(),
-                    parameter))) {
-                found.add(parameter);
-            }
-        }
-        return found;
-    }
-
-    /** Whether {@code value}, or anything nested inside it, is the bare token {@code text}. */
-    private static boolean namesToken(CoreValue value, String text) {
-        return switch (value) {
-            case ReferenceValue(io.ltr8.tson.schema.meta.TypeRef applied) ->
-                    WireForm.namesIn(applied).contains(text);
-            case TokenValue token -> token.text().equals(text);
-            case ArrayValue array -> array.elements().stream()
-                    .anyMatch(element -> namesToken(element.coreValue(), text));
-            case RecordValue record -> record.fields().stream()
-                    .anyMatch(field -> namesToken(field.value().coreValue(), text));
-            case MapValue map -> map.entries().stream()
-                    .anyMatch(entry -> namesToken(entry.key().coreValue(), text)
-                            || namesToken(entry.value().coreValue(), text));
-            default -> false;
-        };
-    }
-
-    /**
-     * The names an open form's own parameters take: {@code p0}, {@code p1}, ... positionally.
-     *
-     * <p><b>Renaming is what makes an open entry identify with its equals.</b> Two forms alike up to a
-     * consistent renaming of parameters are one template (§8.2), so {@code <T> [T]} and {@code <A> [A]} have
-     * to land on one entry -- and the name is derived from the record, so normalising the record is what
-     * normalises the name.
-     *
-     * <p>The prefix grows until it collides with nothing the record already names. A binding may hold a
-     * concrete reference to a type genuinely called {@code p0}, and renaming a parameter on top of it would
-     * make the two indistinguishable in the body that results.
-     */
-    private static List<String> positionalNames(Binding binding, List<String> parameters) {
-        String prefix = "p";
-        while (true) {
-            List<String> names = new ArrayList<>();
-            for (int i = 0; i < parameters.size(); i++) {
-                names.add(prefix + i);
-            }
-            boolean clash = names.stream().anyMatch(name -> !parameters.contains(name)
-                    && binding.fields().stream().anyMatch(field ->
-                            namesToken(field.value().coreValue(), name)));
-            if (!clash) {
-                return names;
-            }
-            prefix += "p";
-        }
-    }
-
-    /** The same binding record with each parameter token replaced by its positional name. */
-    private static Binding rename(Binding binding, List<String> parameters, List<String> renamed) {
-        Map<String, String> substitution = new LinkedHashMap<>();
-        for (int i = 0; i < parameters.size(); i++) {
-            substitution.put(parameters.get(i), renamed.get(i));
-        }
-        return new Binding(binding.head(), binding.fields().stream()
-                .map(field -> new RecordValue.Field(field.name(), renameData(field.value(), substitution)))
-                .toList());
-    }
-
-    private static DataValue renameData(DataValue value, Map<String, String> substitution) {
-        return new DataValue(value.annotations(), value.typeRef(), renameValue(value.coreValue(), substitution));
-    }
-
-    private static CoreValue renameValue(CoreValue value, Map<String, String> substitution) {
-        return switch (value) {
-            case ReferenceValue(io.ltr8.tson.schema.meta.TypeRef applied) -> WireForm.refValue(
-                    WireForm.renamedArguments(applied, substitution));
-            case TokenValue token -> substitution.containsKey(token.text())
-                    ? new TokenValue(substitution.get(token.text()), token.form())
-                    : token;
-            case ArrayValue array -> new ArrayValue(array.elements().stream()
-                    .map(element -> renameData(element, substitution)).toList());
-            case RecordValue record -> new RecordValue(record.fields().stream()
-                    .map(field -> new RecordValue.Field(field.name(), renameData(field.value(), substitution)))
-                    .toList());
-            case MapValue map -> new MapValue(map.entries().stream()
-                    .map(entry -> new MapValue.MapEntry(new DataValue(entry.key().annotations(),
-                            entry.key().typeRef(), renameValue(entry.key().coreValue(), substitution)),
-                            renameData(entry.value(), substitution)))
-                    .toList());
-            default -> value;
-        };
     }
 
     /**

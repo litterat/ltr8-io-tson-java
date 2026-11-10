@@ -19,7 +19,7 @@
   Conventions:
   - Every entry is its value: a name maps to the body it resolves
     to, `!meta.record { ... }`, `!numeric.integer_type { ... }`,
-    `!meta.alias { ... }`, `!meta.template { ... }`. Output is source with sugar
+    `!meta.alias { ... }`. Output is source with sugar
     expanded, bodies flattened and chains computed, and an entry
     written as a constructor application resolves to itself.
   - Fields at their default values are omitted (`optional: false`,
@@ -29,14 +29,13 @@
     name, closed to a fixed point through applied parents; `subtypes`
     is its inverse over the entries of this map only (inverse edges
     from schemas that import this one are not represented here);
-    `parents` is a record template's, the parents as written. Both
+    `parents` is an open record's, the parents as written. Both
     name lists are written lexically sorted; a resolver's native
     ordering is implementation-defined, so comparison tools
     canonicalise both lists before comparing. Set-typed fields are
     compared as written, in source declaration order (Part 2
     Sections 7.5, 8). An empty chain is omitted.
-  - An `!meta.alias` and a `!meta.template` compose `meta.top` and carry no
-    chain.
+  - An `!meta.alias` composes `meta.top` and carries no chain.
   - A record's `fields` are flattened: a composition's fields are
     its operands' and its own, merged, so every record composing
     `meta.type` (through `atom`, `product` or `sum`) states `chain` among
@@ -61,39 +60,28 @@
     unquoted in its canonical text, `result<T>`: no whitespace, and
     one space between arguments. A closed one lifts to an entry and is
     named bare, so one stands only where an application is still
-    open: a record template's `parents` and field types, held text,
-    and the `application` annotation.
+    open: an open record's `parents` and field types, and the
+    `application` annotation.
   - The container constructors carry no parameters: their type
     slots are plain required `meta.type_ref`-typed fields, filled by the
     construction (or by a sugar form's desugaring) like any other
-    required field. A record field is closed: its `type` names a
-    type and its `value` is a literal. A record template's field is a
-    `meta.record_template_field`, which labels a parameter standing
-    for the whole type (`type_param`); a parameter that is an argument
-    of an application in `type` is recognised by its text resolving
-    into the template's `parameters` (Part 2 Section 5.10's shadowing
-    rule). A field's value is never a parameter. Materialisation
-    substitutes the argument, `type_param` becoming `type`, and
-    changes no other fact.
-  - An argument is a reference, a name or an application, positional
-    against the head's parameters: in a template body a parameter
-    stands as its name, read against `parameters`.
-  - An open entry is one of two values (Part 2 Sections 5.10, 8.1).
-    A record template is a `!meta.record_template`, read as the
-    vocabulary and not held: a parameter stands at a field's
-    `type_param` or an application's argument, and
-    its `chain` holds `parents` as written, one of which may be an
-    application.
-    Every other open entry is held: a `!meta.template` carrying its
-    `parameters` and, as text in `template`, the constructor
-    application as written — a container as
-    `!meta.array`/`!meta.map`/`!meta.tuple`/`!meta.choice`, a reference
-    type as `!meta.reference_type`, an alias as `!meta.alias` — unread until
-    materialisation substitutes the parameters away. An entry that
-    closes a template application carries the derived `@meta.application`
-    at its schema-map key, the application it is the instantiation
-    of, read as stated on ingest; none appear here, as nothing in
-    this schema applies a non-constructor template.
+    required field. An application of a constructor is that
+    construction: `set<text>` is `!meta.set_type { element_type: text }`,
+    its arguments filling the required fields typed by a reference
+    naming types, in declaration order (Part 2 Section 5.3).
+  - An open record is a `!meta.record` carrying `parameters` (Part 2
+    Sections 5.10, 8.1), read as the vocabulary and never held as
+    text. A parameter is a reference value: it stands as its name at a
+    field's `type`, or as an argument of an application there or in a
+    parent, and never at a field's `value`; it is read against the
+    record's `parameters` before the namespace (Part 2 Section 5.10's
+    shadowing rule). Its `chain` holds
+    `parents` as written, one of which may be an application. An
+    application substitutes the arguments and closes to a
+    `!meta.record` without `parameters`, which carries the derived
+    `@meta.application` at its schema-map key, read as stated on
+    ingest. None appear here: no kernel entry is an open record, and
+    none applies one.
   - Synthetic entries — the closed forms the sugar lifts to (Part 2
     Section 5.3) — are instances of the constructor they build, are
     referenced by the field that wrote the sugar, and carry the
@@ -107,7 +95,7 @@
     conformance point; the hash spelling is an implementation's own
     business and the placeholder is deliberately not a real digest.
   - Bare parameter names (e.g. T) in bodies are read against the
-    enclosing entry's `parameters` list.
+    enclosing record's `parameters` list.
   """
 !schema {
   numeric => !meta.schema {
@@ -223,7 +211,7 @@
   meta => !meta.schema {
     top => !meta.record {
       chain: {
-        subtypes: [binary.bytes_type enum meta.alias meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.record_template meta.reference_type meta.set_type meta.sum meta.template meta.tuple meta.type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.alias meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {}
       extension: ABSTRACT
@@ -238,7 +226,7 @@
     type => !meta.record {
       chain: {
         supertypes: [meta.top]
-        subtypes: [binary.bytes_type enum meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.record_template meta.reference_type meta.set_type meta.sum meta.tuple meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {
         chain => !meta.record_field { type: meta.type_chain  optional: true }
@@ -249,7 +237,7 @@
     atom => !meta.record {
       chain: {
         supertypes: [meta.top meta.type]
-        subtypes: [binary.bytes_type enum meta.enum_type meta.reference_type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.enum_type meta.ref meta.reference_type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {
         chain => !meta.record_field { type: meta.type_chain  optional: true }
@@ -257,7 +245,7 @@
       extension: ABSTRACT
     }
 
-    product => !meta.record { chain: { supertypes: [meta.top meta.type]  subtypes: [meta.array meta.map meta.namespace meta.record meta.record_template meta.set_type meta.tuple] }  fields: {
+    product => !meta.record { chain: { supertypes: [meta.top meta.type]  subtypes: [meta.array meta.map meta.namespace meta.record meta.set_type meta.tuple] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type }
       size_type      => !meta.record_field { type: meta.product_size_type }
@@ -271,14 +259,9 @@
       target => !meta.record_field { type: meta.type_ref }
     } }
 
-    template_param => !meta.record { fields: {
+    param => !meta.record { fields: {
       name  => !meta.record_field { type: meta.param_name }
       bound => !meta.record_field { type: meta.type_ref  optional: true }
-    } }
-
-    template => !meta.record { chain: { supertypes: [meta.top] }  fields: {
-      parameters => !meta.record_field { type: array_template_param_xxhash }
-      template   => !meta.record_field { type: text }
     } }
 
     void_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
@@ -323,41 +306,16 @@
 
     field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }
 
-    record_template_field => !meta.record { fields: {
-      type        => !meta.record_field { type: meta.field_type_ref  optional: true }
-      type_param  => !meta.record_field { type: meta.param_name  optional: true }
-      optional    => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
-      voidable    => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
-      role        => !meta.record_field { type: meta.field_role  optional: true  role: DEFAULT  value: FREE }
-      value       => !meta.record_field { type: type!  optional: true }
-    }
-    groups: [
-      !meta.field_group { members: [[type] [type_param]] }
-    ] }
-
-    record_template_field_map => !meta.map { key_type: text  value_type: meta.record_template_field  ordered: true }
-
     record => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: FIXED }
+      parameters     => !meta.record_field { type: array_param_1_xxhash  optional: true }
       fields         => !meta.record_field { type: meta.field_map }
       groups         => !meta.record_field { type: array_field_group_xxhash  optional: true }
       extension      => !meta.record_field { type: meta.record_extension_type  optional: true  role: DEFAULT  value: OPEN }
       discriminators => !meta.record_field { type: array_text_1_xxhash  optional: true }
       name_type      => !meta.record_field { type: meta.identifier_ref  optional: true }
-    } }
-
-    record_template => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
-      chain          => !meta.record_field { type: meta.type_chain  optional: true }
-      access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
-      size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: FIXED }
-      fields         => !meta.record_field { type: meta.record_template_field_map }
-      groups         => !meta.record_field { type: array_field_group_xxhash  optional: true }
-      extension      => !meta.record_field { type: meta.record_extension_type  optional: true  role: DEFAULT  value: OPEN }
-      discriminators => !meta.record_field { type: array_text_1_xxhash  optional: true }
-      name_type      => !meta.record_field { type: meta.identifier_ref  optional: true }
-      parameters     => !meta.record_field { type: array_template_param_1_xxhash }
     } }
 
     array => !meta.record { chain: { supertypes: [meta.product meta.top meta.type]  subtypes: [meta.set_type] }  fields: {
@@ -420,13 +378,6 @@
       elements       => !meta.record_field { type: array_tuple_element_xxhash }
     } }
 
-    tuple1 => !meta.template { parameters: [{ name: T }]  template: "!meta.tuple { elements: [{ element_type: T }] }" }
-
-    voidable_tuple1 => !meta.template {
-      parameters: [{ name: T }]
-      template: "!meta.tuple { elements: [{ element_type: T  voidable: true }] }"
-    }
-
     enum_set => !meta.set_type { element_type: text  min_items: 1 }
 
     enum_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type]  subtypes: [enum] }  fields: {
@@ -449,16 +400,17 @@
 
     declared => !meta.declared_type {}
 
-    reference_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
+    reference_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type]  subtypes: [meta.ref] }  fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
       of            => !meta.record_field { type: meta.type_ref }
       allow_sibling => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
     } }
 
-    ref => !meta.template {
-      parameters: [{ name: T }]
-      template: "!meta.reference_type { of: T  allow_sibling: false }"
-    }
+    ref => !meta.record { chain: { supertypes: [meta.atom meta.reference_type meta.top meta.type] }  fields: {
+      chain         => !meta.record_field { type: meta.type_chain  optional: true }
+      of            => !meta.record_field { type: meta.type_ref }
+      allow_sibling => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
+    } }
 
     field_type_ref => !meta.reference_type { chain: { subtypes: [meta.identifier_ref meta.type_ref] }  of: meta.type }
 
@@ -524,13 +476,11 @@
     members   => !meta.record_field { type: meta.enum_set }
   } }
 
-  set => !meta.template { parameters: [{ name: T }]  template: "!meta.set_type { element_type: T }" }
+  set => !meta.alias { target: meta.set_type }
 
   schema => !meta.alias { target: meta.schema }
 
-  @meta.synthetic array_template_param_xxhash => !meta.array { element_type: meta.template_param }
-
-  @meta.synthetic array_template_param_1_xxhash => !meta.array { element_type: meta.template_param  min_items: 1 }
+  @meta.synthetic array_param_1_xxhash => !meta.array { element_type: meta.param  min_items: 1 }
 
   @meta.synthetic array_type_ref_xxhash => !meta.array { element_type: meta.type_ref }
 

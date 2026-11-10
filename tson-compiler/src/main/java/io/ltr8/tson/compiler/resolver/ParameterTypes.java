@@ -7,19 +7,15 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
-import io.ltr8.tson.schema.meta.ReferenceBody;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Alias;
-import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -33,26 +29,20 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 /**
  * [TSON-SCHEMA] §5.10's parameters: where each may stand, and the bound each is written with.
  *
- * <p><b>A parameter is a type.</b> It stands only where a type is named -- a slot whose declared type is a reference
- * naming types ({@code meta.type_ref}, or a refinement of it such as {@code meta.identifier_ref}), which in a record
- * template is a field's type -- or as an argument of an application there or in a parent. A parameter anywhere else
- * is refused at the declaration, naming the slot ({@link #at}): a facet ({@code min_items: N}), a field's default or
- * fixed value ({@link #atValue}), an enum member, a size bound, a field name, a group member, a field's {@code
- * optional}, {@code voidable} or {@code role}, the record's {@code extension}, {@code name_type} or {@code
- * discriminators}. Each would leave the template without one shape its applications share, and a field's value in
- * particular is never a parameter, whatever the field's type: a pin on a slot typed {@code meta.type_ref}
- * ({@code <T> meta.array ^ { element_type?: = T }}) is refused with every other parameter at a value.
- *
- * <p><b>The slot's declared type is what says where a type is named.</b> A held body is the constructor application
- * as written, so the body alone cannot tell {@code element_type: T} from {@code min_items: N} -- both are bare
- * tokens. The constructor's own vocabulary does: {@code array.element_type} is typed {@code meta.type_ref}, {@code
- * array.min_items} {@code numeric.count}. §4.2 makes that reading general rather than a table of kernel names, so an
- * extension meta-schema's own constructors are judged by the same walk with nothing added here.
+ * <p><b>A parameter is a type.</b> It stands only at a field's type, or as an argument of an application there or in a
+ * parent. A parameter anywhere else is refused at the declaration, naming the slot ({@link #at}): a field's default or
+ * fixed value ({@link #atValue}), a size bound, a field name, a group member, a field's {@code optional}, {@code
+ * voidable} or {@code role}, the record's {@code extension}, {@code name_type} or {@code discriminators}. Each would
+ * leave the open record without one shape its applications share, and a field's value in particular is never a
+ * parameter, whatever the field's type: a pin on a slot typed {@code meta.type_ref} ({@code <T> meta.array ^ {
+ * element_type?: = T }}) is refused with every other parameter at a value. An open record built from a record body
+ * holds a parameter only where it may stand, its fields' types and its parents' arguments being the only references it
+ * has; the explicit spelling, {@code <T> !meta.record { … }}, is walked against {@code record}'s own vocabulary before
+ * it is bound ({@link #checkSlots}).
  *
  * <p><b>A bound is written.</b> A declaration writes one after the name ({@code <T: text>}), which must name a type;
  * otherwise the parameter is unbounded. Nothing about a parameter is inferred from its uses. A parameter passed as an
@@ -60,24 +50,18 @@ import java.util.function.Predicate;
  * {@code rebox => <T> { b: boxed<T> }} over {@code boxed => <T: text> { v: T }} is refused at {@code rebox}. Each
  * declaration is checked once, against the bounds its callees wrote, so no order among templates is needed. A
  * constructor's slot judges the argument that arrives when the record is applied, so a parameter passed to one
- * ({@code meta.namespace<K text>}) needs no bound.
- *
- * <p><b>A lifted form is looked through.</b> Its own parameters are the lift's, which no author wrote and which carry
- * no bound, so a parameter reaching {@code boxed} inside {@code [boxed<T>]} is judged at the declaration that wrote it,
- * against {@code boxed}'s bound, and the lifted form is never a callee.
+ * ({@code meta.namespace<K text>}, {@code [boxed<T>]} as {@code meta.array<boxed<T>>}) needs no bound, the
+ * applications nested in its arguments being judged in turn.
  */
 final class ParameterTypes {
 
-    /** The kind of the types, {@code meta.ref<type>}: what a slot naming a type is declared as. */
-    private static final String TYPE_REF = KernelNames.of("type_ref");
-
-    /** The kernel record whose {@code type} and {@code value} slots a record template's field binds. */
+    /** The kernel record whose {@code type} and {@code value} slots an open record's field binds. */
     private static final String RECORD_FIELD = "meta.record_field";
 
-    /** The constructor a record template's payload applies. */
+    /** The constructor an open record applies. */
     private static final String RECORD = KernelNames.of("record");
 
-    /** The one slot of a record template a parameter may stand in as a whole token: a field's type. */
+    /** The one slot of an open record a parameter may stand in as a whole token: a field's type. */
     private static final String FIELD_TYPE = RECORD_FIELD + "." + WireForm.TYPE;
 
     /** A field's value, which is never a parameter. */
@@ -109,18 +93,17 @@ final class ParameterTypes {
     }
 
     /**
-     * Checks every local open entry's parameters at its declaration, and returns the entries refused: where each
-     * parameter stands, that each written bound names a type, and that each parameter passed to a bounded parameter
-     * is written with a bound that IS-A it.
+     * Checks every local open record's parameters at its declaration, and returns the entries refused: that each
+     * written bound names a type, and that each parameter passed to a bounded parameter is written with a bound that
+     * IS-A it.
      *
      * <p>{@code entries} is the <b>whole namespace</b>, imports included, because a local template may pass a
      * parameter to an imported one, whose recorded bounds are what its author wrote. {@code local} is the subset this
      * schema produced: those are checked, and the only names a failure is reported against, since an imported entry
-     * was checked in its own schema. {@code synthetic} says which open entries are lifted forms, looked through
-     * rather than judged as callees. {@code meta} is where a constructor's vocabulary is read.
+     * was checked in its own schema. {@code meta} is where a bound's name is read when the schema does not hold it.
      */
-    static Set<String> check(Map<String, Top> entries, Set<String> local, Predicate<String> synthetic,
-                             Function<String, Top> meta, FailureReporter reporter) {
+    static Set<String> check(Map<String, Top> entries, Set<String> local, Function<String, Top> meta,
+                             FailureReporter reporter) {
         Set<String> refused = new LinkedHashSet<>();
         Map<String, List<TypeRef>> written = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
@@ -128,8 +111,8 @@ final class ParameterTypes {
                 return;
             }
             try {
-                written.put(name, applications(definition, meta));
-                for (TemplateParam parameter : OpenEntry.parameters(definition)) {
+                written.put(name, OpenEntry.applications(definition));
+                for (Param parameter : OpenEntry.parameters(definition)) {
                     parameter.bound().ifPresent(bound -> requireType(bound, entries::get));
                 }
             } catch (SchemaValidationException e) {
@@ -137,16 +120,13 @@ final class ParameterTypes {
                 reporter.report(name, e);
             }
         });
-        Callees callees = new Callees(entries, local, synthetic, written, Set.copyOf(refused), meta);
+        Callees callees = new Callees(entries, local, Set.copyOf(refused), meta);
         written.forEach((name, applications) -> {
-            if (synthetic.test(name)) {
-                return; // its parameters are the lift's, judged at the declaration that wrote the form
-            }
-            Map<String, TemplateParam> mine = new LinkedHashMap<>();
+            Map<String, Param> mine = new LinkedHashMap<>();
             OpenEntry.parameters(entries.get(name)).forEach(p -> mine.put(p.name(), p));
             try {
                 for (TypeRef application : applications) {
-                    callees.passedOn(application, mine::get, new LinkedHashSet<>());
+                    callees.passedOn(application, mine::get);
                 }
             } catch (SchemaValidationException e) {
                 refused.add(name);
@@ -157,32 +137,17 @@ final class ParameterTypes {
     }
 
     /**
-     * The walk's own refusals, thrown, over a record template's payload not yet bound: its parameters are confined
-     * to its field types before {@code record_template}'s reader is asked to bind them, so a parameter at a value or
-     * a scalar slot is refused for where it stands ([TSON-SCHEMA] §5.10) rather than for the token it is. The payload
-     * is walked as the {@code record} construction the author wrote, so each slot is named as {@code record} and
-     * {@code record_field} name it; a field's {@code type_param} is where a parameter belongs, and the parameter list
-     * the desugarer stated is no slot of {@code record}'s.
+     * The walk's own refusals, thrown, over an open record's explicit payload not yet bound, {@code <T> !meta.record {
+     * … }}: its parameters are confined to its field types before {@code record}'s reader is asked to bind them, so a
+     * parameter at a value or a scalar slot is refused for where it stands ([TSON-SCHEMA] §5.10) rather than for the
+     * token it is. The payload is walked as the {@code record} construction the author wrote, so each slot is named as
+     * {@code record} and {@code record_field} name it.
      */
     static void checkSlots(List<String> parameters, DataValue payload, Function<String, Top> meta) {
-        Walk walk = new Walk(parameters, meta, true, new ArrayList<>());
+        Walk walk = new Walk(parameters, meta);
         if (walk.resolve(RECORD) instanceof RecordBody vocabulary) {
             walk.payload(payload.coreValue(), RECORD, vocabulary);
         }
-    }
-
-    /**
-     * One open entry's applications, once where each of its parameters stands is checked: a held template's text
-     * walked against its constructor's vocabulary ({@link Walk}), which yields the applications written at a slot
-     * naming a type, or a record template's references read off the model, whose labels need no check.
-     */
-    private static List<TypeRef> applications(Top open, Function<String, Top> meta) {
-        if (open instanceof RecordTemplateBody template) {
-            return template.references().stream().filter(reference -> !reference.arguments().isEmpty()).toList();
-        }
-        List<TypeRef> found = new ArrayList<>();
-        Walk.over(HeldBody.of((TemplateBody) open), OpenEntry.parameterNames(open), meta, found);
-        return found;
     }
 
     /** Where a declaration whose parameters are refused is reported, entry by entry. */
@@ -194,48 +159,36 @@ final class ParameterTypes {
     // ── A parameter passed on ────────────────────────────────────────────────────────────────────
 
     /**
-     * The applications a declaration writes, judged against the bounds their heads wrote. {@code written} holds the
-     * applications the first pass found in each local open entry; an imported lifted form is walked when reached. A
-     * head already refused is not judged against: its verdict is in.
+     * The applications a declaration writes, judged against the bounds their heads wrote. A head already refused is
+     * not judged against: its verdict is in.
      */
-    private record Callees(Map<String, Top> entries, Set<String> local, Predicate<String> synthetic,
-                           Map<String, List<TypeRef>> written, Set<String> refused, Function<String, Top> meta) {
+    private record Callees(Map<String, Top> entries, Set<String> local, Set<String> refused,
+                           Function<String, Top> meta) {
 
         /**
          * Each argument of {@code application} that is one of the declaration's parameters ({@code parameterOf}
-         * maps a name to it, or to {@code null}), against the head's parameter at that position. A lifted head is
-         * looked through, its own parameters mapped to the arguments it was given, and a nested application is judged
-         * in turn. {@code through} holds the lifted heads already looked through on this path.
+         * maps a name to it, or to {@code null}), against the head's parameter at that position; a nested
+         * application is judged in turn. A head that is no open record -- a constructor's construction sugar --
+         * has no parameters to bound.
          */
-        void passedOn(TypeRef application, Function<String, TemplateParam> parameterOf, Set<String> through) {
+        void passedOn(TypeRef application, Function<String, Param> parameterOf) {
             Top head = entries.get(application.name());
-            List<TemplateParam> heads = OpenEntry.isOpen(head) && !refused.contains(application.name())
+            List<Param> heads = OpenEntry.isOpen(head) && !refused.contains(application.name())
                     ? OpenEntry.parameters(head) : List.of();
-            boolean lifted = synthetic.test(application.name());
-            Map<String, TemplateParam> renamed = new LinkedHashMap<>();
             for (int i = 0; i < application.arguments().size(); i++) {
                 TypeRef argument = application.arguments().get(i);
-                TemplateParam mine = argument.arguments().isEmpty() ? parameterOf.apply(argument.name()) : null;
+                Param mine = argument.arguments().isEmpty() ? parameterOf.apply(argument.name()) : null;
                 if (mine == null) {
-                    passedOn(argument, parameterOf, through);
-                } else if (i < heads.size() && lifted) {
-                    renamed.put(heads.get(i).name(), mine);
+                    passedOn(argument, parameterOf);
                 } else if (i < heads.size()) {
-                    TemplateParam theirs = heads.get(i);
+                    Param theirs = heads.get(i);
                     theirs.bound().ifPresent(bound -> requireBound(mine, application.name(), theirs.name(), bound));
                 }
-            }
-            if (!renamed.isEmpty() && through.add(application.name())) {
-                List<TypeRef> inner = written.get(application.name());
-                for (TypeRef nested : inner != null ? inner : applications(head, meta)) {
-                    passedOn(nested, renamed::get, through);
-                }
-                through.remove(application.name());
             }
         }
 
         /** {@code mine}, passed to {@code callee}'s {@code theirs}, bounded by {@code bound}: written IS-A it. */
-        private void requireBound(TemplateParam mine, String callee, String theirs, TypeRef bound) {
+        private void requireBound(Param mine, String callee, String theirs, TypeRef bound) {
             String required = "'" + callee + "', which declares '" + theirs + ": " + spell(bound) + "'";
             if (mine.bound().isEmpty()) {
                 throw new SchemaValidationException("parameter '" + mine.name() + "' is passed to " + required
@@ -325,22 +278,11 @@ final class ParameterTypes {
     // ── The walk ─────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * One held body walked against the vocabulary of the constructor it applies. {@code recordTemplate} says the
-     * body applies {@code record}, whose one whole-token parameter slot is a field's type; every walk below carries
-     * the slot it is in, as {@code constructor.field}, so a refusal can name it. Each application written at a slot
-     * naming a type is added to {@code applications}.
+     * An open record's explicit payload walked against {@code record}'s own vocabulary, whose one whole-token parameter
+     * slot is a field's type; every walk below carries the slot it is in, as {@code constructor.field}, so a refusal
+     * can name it.
      */
-    private record Walk(List<String> parameters, Function<String, Top> meta, boolean recordTemplate,
-                        List<TypeRef> applications) {
-
-        static void over(HeldBody held, List<String> parameters, Function<String, Top> meta,
-                         List<TypeRef> applications) {
-            String head = held.application().typeRef().orElse(null);
-            Walk walk = new Walk(parameters, meta, RECORD.equals(head), applications);
-            if (head != null && walk.resolve(head) instanceof RecordBody vocabulary) {
-                walk.payload(held.application().coreValue(), head, vocabulary);
-            }
-        }
+    private record Walk(List<String> parameters, Function<String, Top> meta) {
 
         private boolean declares(String name) {
             return parameters.contains(name);
@@ -384,11 +326,11 @@ final class ParameterTypes {
         private void value(CoreValue written, TypeRef declared, String slot) {
             Top type = resolve(declared.name());
             switch (written) {
-                case TokenValue token when declares(token.text()) -> token(token.text(), declared, type, slot);
+                // A field written positionally, `item => T`, is its record_field's one unmarked slot, its type.
+                case TokenValue token when declares(token.text()) -> token(token.text(),
+                        RECORD_FIELD.equals(declared.name()) ? FIELD_TYPE : slot);
                 case ArrayValue array -> elements(array, type, slot);
                 case MapValue map when type instanceof MapBody entries -> entries(map, entries, slot);
-                case ReferenceValue(TypeRef applied) when namesTypes(declared, type)
-                        && !applied.arguments().isEmpty() -> applications.add(applied);
                 case RecordValue record when type instanceof RecordBody nested ->
                         record(record, declared.name(), nested);
                 default -> {
@@ -407,13 +349,9 @@ final class ParameterTypes {
             }
         }
 
-        /**
-         * A parameter standing at a slot: admitted only where the slot names a type -- in a record template, only at a
-         * field's type -- and refused naming the slot anywhere else.
-         */
-        private void token(String parameter, TypeRef declared, Top type, String slot) {
-            boolean admitted = recordTemplate ? FIELD_TYPE.equals(slot) : namesTypes(declared, type);
-            if (!admitted) {
+        /** A parameter standing at a slot: admitted only at a field's type, and refused naming the slot anywhere else. */
+        private void token(String parameter, String slot) {
+            if (!FIELD_TYPE.equals(slot)) {
                 throw at(parameter, slot);
             }
         }
@@ -432,16 +370,6 @@ final class ParameterTypes {
                                 .elementType();
                 value(array.elements().get(i).coreValue(), declared, slot);
             }
-        }
-
-        /**
-         * Whether a slot declared {@code declared}, resolving to {@code type}, names a type: the kind of the types
-         * itself, or a reference type refining it, such as {@code meta.identifier_ref}. A reference naming values
-         * ({@code meta.ref<method>}) names no type.
-         */
-        private static boolean namesTypes(TypeRef declared, Top type) {
-            return TYPE_REF.equals(declared.name())
-                    || type instanceof ReferenceBody && TypeChain.supertypesOf(type).contains(TYPE_REF);
         }
 
         /**

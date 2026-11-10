@@ -9,7 +9,7 @@ import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Sum;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
 import io.ltr8.tson.schema.binary.BytesType;
 import io.ltr8.tson.schema.net.Cidr4Type;
 import io.ltr8.tson.schema.net.Cidr6Type;
@@ -32,7 +32,7 @@ import io.ltr8.tson.schema.net.Ipv6Type;
 import io.ltr8.tson.schema.net.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+
 import io.ltr8.tson.schema.unicode.RegexType;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.temporal.TimeType;
@@ -123,6 +123,7 @@ public enum DiscriminationClass {
             case Cidr6Type ignored -> Optional.of(STRING);
             case MacType ignored -> Optional.of(STRING);
             case EnumBody members -> ofEnum(members);
+            case RecordBody record when record.isOpen() -> Optional.empty(); // an open record is no type
             case RecordBody ignored -> Optional.of(BRACE);
             case MapBody m -> hasScalarKey(m, namespace) ? Optional.of(BRACE) : Optional.empty();
             case NamespaceBody ignored -> Optional.of(BRACE); // its keys are names
@@ -131,8 +132,6 @@ public enum DiscriminationClass {
             case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
             case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
             case Alias ignored -> Optional.empty();
-            case TemplateBody ignored -> Optional.empty(); // a template is no type
-            case RecordTemplateBody ignored -> Optional.empty();
             case ValueEntry ignored -> Optional.empty();
         };
     }

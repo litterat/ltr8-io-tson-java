@@ -50,16 +50,17 @@ class ApplicabilityIsIsATopTest {
     }
 
     /**
-     * Both spellings apply {@code alias}: a closed application and an open one resolve by the same
-     * applicability rule, {@code alias} being IS-A {@code top}.
+     * A construction applies {@code alias}, {@code alias} being IS-A {@code top}; a parameter list before it is
+     * refused, a template's body being a record (§5.10).
      */
     @Test
-    void aliasAppliesClosedAndOpenAlike() {
+    void aliasAppliesClosedAndRefusesParameters() {
         assertEquals(List.of(), problems("  r => !meta.alias { target: int32 }"));
-        assertEquals(List.of(), problems("""
+        List<Diagnostic> open = problems("""
                   r => <T> !meta.alias { target: T }
-                  c => r<int32>
-                """));
+                """);
+        assertEquals(1, open.size(), open::toString);
+        assertTrue(open.getFirst().message().contains("a template's body is a record body"), open::toString);
     }
 
     /**
@@ -69,7 +70,7 @@ class ApplicabilityIsIsATopTest {
      * {@code alias} as source, which is what a construction of any other head yields.
      *
      * <p>The distinction was unreachable while the closed form was refused, which is why it is asserted here
-     * against all three spellings at once rather than left to the one that already worked.
+     * against both spellings at once rather than left to the one that already worked.
      */
     @Test
     void everySpellingOfAnAliasDenotesTheSameEntry() {
@@ -80,22 +81,16 @@ class ApplicabilityIsIsATopTest {
                 !schema {
                   bare    => int32
                   closed  => !meta.alias { target: int32 }
-                  open    => <T> !meta.alias { target: T }
-                  applied => open<int32>
                 }
                 """;
         var entries = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
                 .resolve(source).schema().entries();
 
-        for (String name : List.of("bare", "closed", "applied")) {
+        for (String name : List.of("bare", "closed")) {
             Top definition = entries.get(name);
             assertEquals(EntryKind.ALIAS, EntryKind.of(definition, n -> true), name);
             assertEquals("int32", ((Alias) definition).target().name(), name);
         }
-        // The open one is a template until it closes, and its kind says so: a template is not a type
-        // (§5.10), so it is TEMPLATE rather than the ALIAS its closure produces. `applied` above is
-        // where the ALIAS appears -- the entry closing it mints.
-        assertEquals(EntryKind.TEMPLATE, EntryKind.of(entries.get("open"), n -> true));
     }
 
     /**

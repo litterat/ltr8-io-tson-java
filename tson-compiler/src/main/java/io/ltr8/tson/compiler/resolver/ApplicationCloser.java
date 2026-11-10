@@ -45,9 +45,7 @@ interface ApplicationCloser {
      * own terms.
      *
      * <p>Returns {@code null} where this declaration cannot own an entry, and the caller falls back to the
-     * reference form: an unresolved or non-template head, an arity mismatch (both the ordinary path's to
-     * report), and §5.10's <b>partial application</b>, which mints no entry at all -- the composed
-     * application's entry belongs to whoever names it.
+     * reference form: an unresolved or non-template head, or an arity mismatch, both the ordinary path's to report.
      *
      * <p>A {@code default} for {@link #checkArguments}'s reason: this stays a functional interface, so the
      * kernel bootstrap and the tests over hand-built namespaces keep passing a lambda and keep the

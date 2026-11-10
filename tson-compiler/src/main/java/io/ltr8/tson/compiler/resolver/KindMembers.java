@@ -5,7 +5,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.ValueEntry;
@@ -33,12 +33,12 @@ import java.util.function.Function;
  * meta.ref<order>} names values and {@code meta.ref<record>} types.
  *
  * <p><b>Membership of a type name is one walk</b> over resolved entries, never over spellings. From an entry, alias
- * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, a template
- * (a record template or a held body, neither a type, §5.10) and a value entry are no type's name. For every
- * other entry the type of its value -- the tag resolved output writes, {@code !meta.record}, {@code
- * !unicode.identifier_type}, {@code !meta.namespace} -- is followed, through a constructor template's held body to the
- * constructor it applies, until a constructor is reached, and the entry is a member when that constructor is {@code of} or
- * has {@code of} among its supertypes. A reference over {@code record} holds the kernel's {@code top}, a fresh
+ * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, an open
+ * record (a template, no type, §5.10) and a value entry are no type's name, so no member set over {@code
+ * meta.ref<meta.record>} reaches an open record. For every other entry the type of its value -- the tag resolved output
+ * writes, {@code !meta.record}, {@code !unicode.identifier_type}, {@code !meta.namespace} -- is followed until a
+ * constructor is reached, and the entry is a member when that constructor is {@code of} or has {@code of} among its
+ * supertypes. A reference over {@code record} holds the kernel's {@code top}, a fresh
  * abstract record IS-A nothing, and a constructor whose declaration is a record, {@code uuid_type => atom & { … }}:
  * its value is a record whose instances are declarations, and nothing in the predicate sets it apart -- {@link
  * io.ltr8.tson.schema.meta.EntryKind#isConstructor} answers for applicability, a different question, and is not
@@ -55,7 +55,7 @@ import java.util.function.Function;
  * itself reaches it whether or not a namespace in reach declares it: the name is the constructor's.
  *
  * <p><b>A reference is not a bound.</b> {@code of} is the type of the named entry's value, and the walk is
- * construction; {@code meta.template_param.bound} names a type the argument itself IS-A.
+ * construction; {@code meta.param.bound} names a type the argument itself IS-A.
  */
 public final class KindMembers {
 
@@ -114,15 +114,6 @@ public final class KindMembers {
             if (next.isEmpty()) {
                 return current.equals(constructorOf);
             }
-            if (next.get().definition() instanceof TemplateBody held) {
-                // A constructor template (`kind => <T> !meta.reference_type { of: T }`): built with what its body applies.
-                Optional<String> applied = HeldBody.of(held).application().typeRef();
-                if (applied.isEmpty()) {
-                    return false;
-                }
-                current = applied.get();
-                continue;
-            }
             return isConstructor(next.get().definition()) && reaches(next.get(), constructorOf);
         }
         return false;
@@ -156,7 +147,7 @@ public final class KindMembers {
                     + "names of entries whose values are of a type, and nothing has a value of a value");
         }
         if (OpenEntry.isOpen(definition)) {
-            return Optional.of("its 'of' names '" + of + "', an open entry: a template denotes no type until it is "
+            return Optional.of("its 'of' names '" + of + "', an open record: a template denotes no type until it is "
                     + "applied (§5.10)");
         }
         return Optional.empty();

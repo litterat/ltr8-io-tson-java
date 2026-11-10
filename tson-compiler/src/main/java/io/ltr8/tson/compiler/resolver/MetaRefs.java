@@ -8,9 +8,9 @@ import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.ReferenceBody;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -73,19 +73,16 @@ final class MetaRefs {
 
     private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map, boolean mapChain) {
         Top mapped = switch (body) {
-            // A record template maps the field types that name none of its parameters, which mean the same thing
-            // in every application and so are closed already: the base names the entry each member names. A
-            // `type_param`, or a type naming a parameter at any depth, waits for substitution to supply the
-            // argument. Its chain maps below, a record template being IS-A its parents as any record is.
-            case RecordTemplateBody template -> template.withFields(template.mapFields(field ->
-                    field.parameterInType(template.parameterNames()).isPresent()
-                            ? field : field.withType(mapField(field.type().orElseThrow(), map))));
             // `discriminators` is carried, not mapped: it holds field *names* of this record, which no
             // reference rewrite touches. Dropping it here would lose a family's selector list on every
             // synthetic rename and every materialisation rewrite -- a body that arrived sealed would come
-            // back with nothing to dispatch on.
+            // back with nothing to dispatch on. An open record maps the field types that name none of its
+            // parameters, which mean the same thing in every application and so are closed already: the base
+            // names the entry each member names. A type naming a parameter at any depth waits for substitution to
+            // supply the argument. Its chain maps below, an open record being IS-A its parents as any record is.
             case RecordBody record -> record.withFields(record.mapFields(field ->
-                    field.withType(mapField(field.type(), map))));
+                    OpenEntry.parameterIn(field.type()).isPresent() ? field
+                            : field.withType(mapField(field.type(), map))));
             case ArrayBody array -> new ArrayBody(array.chain(), map.apply(array.elementType()),
                     array.voidable(), array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(mapBody.chain(),
@@ -99,8 +96,7 @@ final class MetaRefs {
             case ChoiceBody choice -> new ChoiceBody(choice.chain(),
                     choice.variants().stream().map(map).toList(), choice.disjoint());
             // An alias's target maps like any other reference, arguments and all -- which is what lets a
-            // closed alias follow its target onto the entry materialisation minted for it, and a partial
-            // application keep the arguments it binds.
+            // closed alias follow its target onto the entry materialisation minted for it.
             case Alias alias -> new Alias(map.apply(alias.target()));
             // `of` is a type reference like any other, arguments and all: `!meta.reference_type { of: box<text> }`
             // closes its application here as `meta.ref<box<text>>` closes its argument before substituting it,
@@ -111,10 +107,7 @@ final class MetaRefs {
             // Every other atom's facets are values, never references; a declared type holds its chain alone.
             case Atom atom -> atom;
             case DeclaredType declared -> declared;
-            // A held body maps nothing: its references are tokens that have not been resolved against
-            // anything yet, and rewriting one would be rewriting a name whose meaning is not settled until
-            // substitution supplies the arguments.
-            case TemplateBody held -> held;
+
             // A value is data: a name it holds is judged at link against the closure (`ValuesByName`), and
             // data writes no sugar form, so none names a synthetic a rewrite here could move.
             case ValueEntry value -> value;

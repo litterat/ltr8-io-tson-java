@@ -25,7 +25,7 @@ import java.util.List;
  * on the {@code TypeRef}.
  *
  * <p><b>An application is a value here while a kernel body resolves</b>: resolved output holds one where an
- * application is still open (a record template's parents and field types), and a sugar form's lift writes one into the
+ * application is still open (an open record's parents and field types), and a sugar form's lift writes one into the
  * slot it fills ({@code [meta.ref<record>]} fills {@code element_type} with {@code meta.ref<record>}), which the
  * resolver closes afterwards and judges the name that replaces it. In a value body
  * ({@link TsonReadContext#readsValueBody()}) nothing lifts or mints, so an application is refused and the alias

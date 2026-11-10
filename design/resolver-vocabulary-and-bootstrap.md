@@ -7,14 +7,13 @@ meta.tn, itself. Current form only; history lives in git.
 
 **Invariants**
 
-- There is one `WireForm`: a held body is written by one phase and read by four, and a second opinion about what an
-  application looks like is what makes one of them wrong. A record template has no held body: `SchemaDesugarer`
-  writes its payload labelled, from `WireForm`'s member names, and it is substituted on the model
-  (`RecordTemplateSubstitution`).
+- There is one `WireForm`: a binding record is written by two phases and read by three, and a second opinion about
+  what an application in a slot looks like is what makes one of them wrong. An open record is no binding record: it is
+  built on the model and substituted there (`Substitution`).
 - `recordWire` builds a closed record's binding record directly, for a minted member's name — `TsonObjectWriter`
   output is fully quoted and writes every default, a different spelling from the one every other closed form is
   named by.
-- Every walk over a held body descends into a map slot, key and value both.
+- Every walk over a binding record descends into a map slot, key and value both.
 - `MetaRefs`' switch over `Top` is exhaustive with no default arm, so a new body shape fails to compile there until
   it says which references it holds.
 - `DerivedName`'s two families stay apart, `ofBinding` is called by **both** lift channels, and a derived name is
@@ -52,7 +51,7 @@ meta.tn, itself. Current form only; history lives in git.
   refuses an undeclared name.
 
 Related: `design/schema-resolution.md` (definition resolution), `design/template-materialisation.md` and
-`design/held-template-bodies.md` (the callers of `WireForm` and `DerivedName`), `design/constructor-application.md`,
+`design/open-records.md` (the callers of `WireForm` and `DerivedName`), `design/constructor-application.md`,
 `design/schema-grammar-and-desugaring.md` (the desugar lift), `design/linking-and-compilation.md`.
 
 ## Shared vocabulary: `WireForm`, `MetaRefs`, `DerivedName`
@@ -64,42 +63,28 @@ once.
 **`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names; the
 `plain`/`nameField` builders every producer goes through; `refValue`, which writes a reference as a bare token or,
 carrying arguments, as a `ReferenceValue`, the data grammar's reference ([TSON-DATA] §7.4), and
-its inverse `applicationIn`, an `instanceof ReferenceValue`; `substituted`, which walks an application's argument tree,
-rewrites a parameter named among its arguments at any depth, and writes the application again as a `ReferenceValue`;
-the closed-record writer `recordWire`, which spells `fields` as a map from each field's declared name to its
-`meta.record_field` (`fieldMap`/`fieldEntry`) for a minted record's name; and §5.10 `substitute` over a held body. Every
-walk over a held body descends into a map's keys and values as it does into a record or an array, `fields` being one.
+its inverse `applicationIn`, an `instanceof ReferenceValue`; the closed-record writer `recordWire`, which spells
+`fields` as a map from each field's declared name to its `meta.record_field` (`fieldMap`/`fieldEntry`) for a minted
+record's name; and `annotationValue`, a field annotation's bound value back in wire form for it. Every walk over a
+binding record descends into a map's keys and values as it does into a record or an array, `fields` being one.
 
-- **Why one class and not a producer beside one phase and a consumer beside another.** A held tree is written
-  by one phase (`SchemaDesugarer` lifting a sugar form) and read by
-  four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
-  declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterTypes`
-  walking one for parameter kinds). `applicationIn`'s own contract is that a held body is written by one
-  phase and read by several, so a second opinion about what an application looks like is what makes one of
-  them wrong. The writer, the reader and `ParameterTypes` all go through it; a walker recognising
-  applications on its own is the copy that drifts silently, since nothing fails, only a parameter kind quietly
-  not inferred. A quoted token is never an application, so a held body's text literal (`pattern: "box<T>"`) is
-  text whatever it spells.
-- **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
-  gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
-  `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
-  parameters at all. A held body is built by the desugar phase directly, and a minted record's binding record by
-  `recordWire`. Once built, the tree is an
-  AST, and `TsonObjectWriter` writes an AST as syntax rather than as a description of itself
-  (`AstWriter`) — which is how `HeldBody.held` turns it into `TemplateBody.template`.
+- **Why one class and not a producer beside one phase and a consumer beside another.** A binding record is written
+  by two phases (`SchemaDesugarer` lifting a sugar form, `TemplateMaterialiser` naming a closed record by
+  `recordWire`) and read by three (`TemplateMaterialiser` closing the applications one holds, `SyntheticMerge`
+  asking whether one holds an application, `ParameterTypes.checkSlots` walking an open record's explicit payload).
+  A walker recognising applications on its own is the copy that drifts silently. A quoted token is never an
+  application, so a text slot holding `"box<T>"` is text whatever it spells.
+- **`TsonObjectWriter` cannot *build* a binding record.** Writing a resolved `Top` gives canonical-explicit, fully
+  quoted output -- a different language from the one a binding is named in, where a name is an unquoted token. A
+  lifted form's binding is built by the desugar phase directly, and a minted record's by `recordWire`.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
   materialisation note (`design/template-materialisation.md`).
-- **Every walk over a held body descends into a map slot.** A constructor with a map-typed field lets a template
-  put a parameter inside a map — in a key, or inside the array its value names. Each of the three walks fails
-  differently if it
-  skips one: `substitute` leaves the parameter name standing where the argument belongs; `ParameterTypes`
-  never observes the parameter, so its kind is never inferred and a type argument stays on the
-  reference channel and fails as an unresolved reference; and `DerivedName`'s canonical rendering — the half
-  §8.2 keys identity on — renders the whole map as the unknown-value mark, so two bindings differing only
-  inside one hash alike while the readable half masks it, which is the `startsWith` hazard inverted and why
+- **Every walk over a binding record descends into a map slot.** A map slot holds applications like any other
+  (`{ S => [box<text>] }` writes one in the array its value names), and `DerivedName`'s canonical rendering -- the half
+  §8.2 keys identity on -- would otherwise render the whole map as the unknown-value mark, so two bindings differing
+  only inside one hash alike while the readable half masks it, which is the `startsWith` hazard inverted and why
   `DerivedNameTest` asserts `canonicalBinding` directly. A map key and its value are each a `data-value`
-  ([TSON-DATA] §2.6), rebuilt through `WireForm.rewritten` and `WireForm.retyped`; both halves descend, because a
-  parameter reaches either.
+  ([TSON-DATA] §2.6), rebuilt through `WireForm.rewritten` and `WireForm.retyped`; both halves descend.
 
 **`MetaRefs`** — the `schema.meta` reference walk: `mapRefs` maps an entry's chain too,
 `mapRefsKeepingChain` leaves the chain as written. Two callers: materialisation rewrites an application onto the
@@ -107,22 +92,23 @@ entry it closed, and §8.2's synthetic merge renames onto a merged entry. No pas
 an alias chain — see "References are hops" below. Which body shape carries which references is a fact about the
 value model, so it is stated once, where the model is walked:
 
-- A record's field types (a record template's only where they name none of its parameters), an array's element, a
+- A record's field types (an open record's only where they name none of its parameters), an array's element, a
   map's and a namespace type's `key_type` and `value_type`, a tuple's elements, a choice's variants, and an alias's
   target, each a `TypeRef`, arguments and all.
 - A reference's `of`, a `TypeRef`, arguments and all: an application written in the body (`!meta.reference_type {
-  of: box<text> }`) closes here, as `meta.ref<T>` closes its argument before substituting, so `of` names an entry, a
+  of: box<text> }`) closes here, as `meta.ref<T>` closes its argument before constructing, so `of` names an entry, a
   lifted synthetic among them (`meta.ref<[box<text>]>`), which the merge renames like any other reference.
-- Nothing in any other atom (its facets are values), a declared type, a held body (its tokens are unresolved until
-  substitution), or a value entry (data writes no sugar form, and its names are judged at link by `ValuesByName`).
+- Nothing in any other atom (its facets are values), a declared type, or a value entry (data writes no sugar form,
+  and its names are judged at link by `ValuesByName`).
 
-§5.10's regularity check does not use the walk: every entry with parameters is open, and reads its applications off
-its held tree (`HeldBody.applications`).
+§5.10's regularity check does not use the walk: every entry with parameters is an open record, and reads its
+applications off its references (`OpenEntry.applications`).
 
 **`DerivedName`** — §8.2's names and the renderings their hashes run over, in two families that stay apart:
 
-- A **binding record** names a closed form (what a sugar form lifts to, what closing an open synthetic
-  produces) and renders with its fields under their own names. An **application** names an instantiation and
+- A **binding record** names a closed form (what a sugar form lifts to, what a construction builds, and the record an
+  open record's application closes to) and renders with its fields under their own names. An **application** names an
+  instantiation and
   renders positionally. The two reuse the same tag letters in different roles, so merging them would be
   merging two questions that only look alike.
 - What must *not* fork is each family's own rendering. `ofBinding` is called by **both** lift channels, and
@@ -176,9 +162,9 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `AL
   (`resolveAtomRefinement`: `!count ^ { … }` over `count => integer` IS-A `integer`). An annotation is identified by the
   entries on its alias chain, not by its end (`AliasChain.annotates`/`passesThrough`): `@meta.disjoint` reaches
   `meta.disjoint` and then `void`, and the linker asks whether `meta.disjoint` is on the way. An alias of a constructor is
-  applied as its target wherever it heads a body, a held template's included (§3.3.1): over `labels => enum`, `!labels [a b]`
-  and `<T> !labels [a T]` apply `enum` (the definition reader follows the chain and retags the value). No bundled document
-  relies on it.
+  applied as its target wherever it heads a body or an application (§3.3.1): over `labels => enum`, `!labels [a b]` applies
+  `enum` (the definition reader follows the chain and retags the value), and the root's `set => meta.set_type` makes
+  `set<text>` the construction `!meta.set_type { element_type: text }`.
 - **Anything that needs the chain end walks it and says so.** `TsonSchemaLinker.checkFieldValue` walks to the
   terminal before checking a `~`/`=` value, since a field typed by an alias states a value of whatever the
   alias names; `FieldValueConformanceTest` pins both directions.
@@ -212,26 +198,26 @@ annotation is: there is no author to resolve against, and the value is fixed.
   entry's value. §6 forbids hoisting between the two positions and nothing here does.
 - **Marked: exactly the synthetic entries, from both channels.** The desugar lift produces them and
   `SchemaDesugarer.lifted` names them as the document's own set difference
-  (`design/schema-grammar-and-desugaring.md`); materialisation produces more of the same kind when it closes an
-  open synthetic, and `TemplateMaterialiser.syntheticNames()` reports which of its minted entries those are.
+  (`design/schema-grammar-and-desugaring.md`); materialisation produces more of the same kind when it builds a
+  construction or mints an expansion, and `TemplateMaterialiser.syntheticNames()` reports which of its minted entries
+  those are.
   A declaration's own sugar body is **not** one: `tag_list => [text; 1..2]` *is* the construction, not a lift
   of one (§5.3).
 - **`SchemaResolver` attaches it where it assembles the entry map**, from those two mint sites — the desugar lift
-  (`SchemaDesugarer.lifted`, the document's own set difference) and materialisation closing an open synthetic
+  (`SchemaDesugarer.lifted`, the document's own set difference) and materialisation's constructions and expansions
   (`TemplateMaterialiser.syntheticNames`).
 - **Unmarked: instantiation entries.** §8.2 draws that line itself: only synthetics are the
   fold-back-into-display case the marker serves; an instantiation is a type the author named by its
   application. Marking too much would be as wrong as marking too
   little, so `SyntheticEntryMarkerTest` asserts both halves.
 - **`@meta.application` is the second derived key annotation** (§6, §8.1): on the key of every entry that
-  closes a template application, the application it is the instantiation of, `@meta.application:box<int32>`, a
+  closes an application of an open record, the application it is the instantiation of, `@meta.application:box<int32>`, a
   `meta.type_ref` reference carrying arguments, written unquoted and stated as written: nested arguments unreduced
   (`@meta.application:pair<box<text> int32>`), a bare-name argument past its alias hops
-  (`TemplateMaterialiser.asWritten`). An expansion carries none; what a message needs
-  of it is `TsonSchema.EntryFacts.closes`, held in memory and never written. It is about the entry, not about a
-  type — a record template's member, a value entry (`order_api => orders<order>` over `orders => <T> !interface {
-  get => { response: T } }`), the `Alias` a non-record template's application closes to — which is why it is no
-  field of `meta.type_chain`. The materialiser records
+  (`TemplateMaterialiser.asWritten`). An expansion carries none, and nor does a construction, its value stating its
+  constructor and its arguments; what a message needs of either is `TsonSchema.EntryFacts.closes`, held in memory and
+  never written. It is a fact about the entry and not about its chain -- the record does not state the head it was
+  substituted from -- which is why it is no field of `meta.type_chain`. The materialiser records
   each application in a map it shares with `SchemaResolver` (the applied-parent fold keys on it, an import's read off
   its keys), and `SchemaResolver` writes it where it attaches `@meta.synthetic`;
   `TsonSchema.applicationOf` is the one accessor. **Unlike `@meta.synthetic` it is read as stated on ingest**, not
@@ -243,7 +229,7 @@ annotation is: there is no author to resolve against, and the value is fixed.
   gave it.
 - **The bootstrap route attaches none, deliberately.** `KernelBootstrapResolver` exists to be *just*
   enough to load the real kernel from its own file, and nothing in the pipeline reads this marker — it is
-  informational. The kernel's own seven synthetics, minted at meta.tn's root, are marked anyway, because the entries
+  informational. The kernel's own six synthetics, minted at meta.tn's root, are marked anyway, because the entries
   anything else sees come from ordinary resolution: the bootstrap output stands in only as the transient vocabulary the
   kernel's own ordinary resolution reads through.
 - Cross-checked against the spec's own output by `ResolvedFixtureTest.theSameEntriesAreMarkedSyntheticOnBothSides` — six keys
@@ -283,15 +269,16 @@ is read through the compile of the document that declared it — `!meta.record` 
 The kernel, meta.tn (`TsonBundledSchemas.META_ID`), is special: its header is its `!!id` alone. It holds the kernel's
 one wait cycle, every name the cycle's declarations reference, closed to a fixed point, so it resolves and links on its
 own, and the concepts that belong with them: `meta.map`, `meta.tuple`, `meta.choice` and `meta.tuple_element`,
-`meta.template`, `meta.application`, `meta.ref`, `meta.field_name`, `meta.disjoint`, `meta.tuple1`,
-`meta.voidable_tuple1`, `set`, the octet-sequence constructor `binary.bytes_type` with `binary.bytes_encoding` and
+`meta.application`, `meta.ref`, `meta.field_name`, `meta.disjoint`, `set`, the octet-sequence constructor
+`binary.bytes_type` with `binary.bytes_encoding` and
 `bytes`, and the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric` the
 data-format libraries state their types with. It is the one kernel document. Its root is the thirteen names an author
 writes (`void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`
 and `schema`; `enum => meta.enum_type ^ { name_type?: = meta.identifier }`, so resolved output tags `!enum`, and `schema
-=> meta.schema`, the alias every schema map's tag names); everything else is a
+=> meta.schema`, the alias every schema map's tag names, and `set => meta.set_type` its alias); everything else is a
 member of `meta => !schema { … }`, named by its path (§9), `meta.identifier` among them. It imports
-nothing and applies only its own constructors (§3.4's one cycle, closed by pre-loading, not resolution). It is never resolved
+nothing, applies only its own constructors and declares no open record (§3.4's one cycle, closed by pre-loading, not
+resolution); `meta.param` and `record.parameters` describe an open record and are applied by none. It is never resolved
 from a document, and its names reach any other schema only by import. Every name resolves from the root (#14), so an entry
 naming a sibling writes its path, and the synthetics its sugar lifts are minted at its root. A schema importing it alone has
 every sugar form and `meta.ref`. numeric.tn, temporal.tn and net.tn each import it alone and declare their
@@ -313,9 +300,9 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   lifted over `meta.type_ref`, `meta.field_group` and `text` and arrays of those (`PRE_LOADED_ELEMENTS` — a lifted
   array is named by its content, so it is designated by what it holds; an entry the source declares is no lift, so a
   declaration whose body is `[text]` is read, not built). `meta.field_type_ref => !meta.reference_type { of: meta.type
-  }` is on the cycle because reading its `of` waits on `meta.type_ref`, its own refinement. `record_field.value` and
-  `record_template_field.value` are typed `type!`, a dependent field, whose value a schema document holds as written
-  through a reader of its own (`DependentFieldReader`), so neither record waits on any entry for it. `instanceBody`
+  }` is on the cycle because reading its `of` waits on `meta.type_ref`, its own refinement. `record_field.value` is
+  typed `type!`, a dependent field, whose value a schema document holds as written through a reader of its own
+  (`DependentFieldReader`), so the record waits on no entry for it. `instanceBody`
   covers the shapes those apply — a bare `{}` (each target's unconstrained constant), a bare token array (`enum`, the
   kernel's own enumeration constructor), and a record of tokens (`meta.reference_type` with its `of` and an
   `allow_sibling` defaulting to true, `meta.map` for `meta.field_map`, the `meta.array`/`meta.set_type` binding records
@@ -326,15 +313,16 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   a refinement of `meta.type_ref`, lists `meta.field_type_ref` too. `KernelBootstrapResolverTest` measures the
   cycle with `WaitGraph` from `spec/fixtures/meta-resolved.tn` (the six maps read as their members under their paths)
   and asserts the hand-built names equal it, so a kernel edit that moves the cycle fails there. `KernelWaitGraphTest`
-  prints the measurement — 88 entries (68 members of the six maps, 13 at the root and 7 synthetics; the maps
-  themselves make the kernel's 94 resolved entries), one cycle of 25, longest wait chain 4 — and
-  `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel contains the cycle's closure (66
-  entries, the root tag's `schema` among them: reading the document waits on the alias its tag names) and the related
-  concepts, pinning all three. Of the 25, 13 are hand-built (the 9 of
-  `PRE_LOADED` and 4 lifted arrays); the other 12 are records and compositions resolved from their grammar, and the
-  63 entries beyond the cycle are made ready in wait order.
+  prints the measurement — 81 entries (62 members of the six maps, 13 at the root and 6 synthetics; the maps
+  themselves make the kernel's 87 resolved entries), one cycle of 25, longest wait chain 4 — and
+  `theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts` asserts the kernel contains the cycle's closure (69
+  entries, the root tag's `schema` among them, and `meta.param`, `meta.param_name` and the array of `meta.param`
+  reached through `record.parameters`) and the related concepts, pinning all three. Of the 25, 13 are hand-built (the
+  9 of `PRE_LOADED` and 4 lifted arrays); the other 12 are records and compositions resolved from their grammar, and
+  the 56 entries beyond the cycle are made ready in wait order.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
-  a refinement of a record, an alias, a template — as `SchemaResolver` resolves one. The bootstrap readies these and
+  a refinement of a record (`meta.ref` among them), an alias — as `SchemaResolver` resolves one. The bootstrap readies these
+  and
   the pre-loaded set first, so the first compile holds every head a read applies. Two refinements wait on the cycle
   and stay off it: `meta.namespace => meta.map ^ { … }` waits on its source `meta.map`, and `meta.identifier_ref =>
   !meta.type_ref ^ { … }` on `meta.type_ref`, hand-built; the names their `key_type` and `of` hold order nothing, so
@@ -357,8 +345,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   entry not yet ready (`net.scheme_name` reaching `unicode.identifier_base` and `unicode.normalization`) forces another
   compile. Its output's nested map `meta` is derived from the members, so the order test compares its names.
 - **Parameters are checked after every entry is ready**, through `ParameterTypes.check` as `SchemaResolver` checks a
-  schema's; a failure is a broken kernel. A kernel parameter carries the bound its declaration writes, and none of
-  the kernel's templates writes one.
+  schema's; a failure is a broken kernel. The kernel declares no open record, so the check finds nothing to judge.
 - **The partial link is contained.** It passes over a reference to a pending name, and an entry's walk stops at its
   first one, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed by
   (`TsonCompiledVocabularyRegistry.loadVocabulary` links and compiles the output into the stand-in).

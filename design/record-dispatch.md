@@ -96,8 +96,8 @@ at the value too.
 written name *denotes nothing* — the schemaless reader's own check (`TypeRefCheck`) and an annotation naming
 no type the governing schema declares (`AnnotationCapture`) — two classes, and the only ones that report it. Everything
 where a name resolves and is merely not admissible is `TYPE_MISMATCH`: §7.2 subsumption, a choice's variant
-membership, a union's member test, a type-ref naming a template (`OpenTemplateReader`, which every template, record
-or held, compiles to). So is a position where a **required**
+membership, a union's member test, a type-ref naming a template (`OpenTemplateReader`, which every open record
+compiles to). So is a position where a **required**
 selector is absent, since no type is established either way — which is what the family readers already gave
 `tagRequired`, and what makes "a required tag is missing" need no member of its own. The distinction is what
 a consumer routes on: one says *correct the name*, the other says *this name means nothing here*. It also

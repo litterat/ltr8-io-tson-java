@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -98,17 +98,13 @@ final class ResolvedForm {
      * mean rebuilding every body shape here.
      */
     static String rendered(Object value) {
-        // An open entry's body is text, and [TSON-SCHEMA] §5.10 compares the *parsed* form: one spelling is
-        // required of the application, not of the whitespace around it. Both sides are reduced to their
-        // parsed application here, so a held body compares like every other body and needs no side channel.
         // A resolved form read as data holds each entry's value, and a value entry's is the value itself.
         if (SchemaPaths.isNestedMap(value)) {
             // A nested map's members are entries under their paths, each compared on its own; the map is its names.
             Object members = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
             return "!meta.schema " + ((io.ltr8.tson.schema.meta.Namespace<?>) members).keySet();
         }
-        Object entry = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
-        Object compared = entry instanceof TemplateBody held ? parsedForComparison(held) : entry;
+        Object compared = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
         String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(compared instanceof Top top ? canonical(top)
                 : compared)).replaceAll(HASH_PLACEHOLDER);
         return SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty");
@@ -152,19 +148,6 @@ final class ResolvedForm {
                 new io.ltr8.tson.schema.meta.Namespace<>(members.type(), own));
     }
 
-    /**
-     * A held body with its text replaced by the structure that text denotes.
-     *
-     * <p>[TSON-SCHEMA] §5.10's one-spelling rule is about the application, not about the whitespace around
-     * it: an open synthetic's identity is derived from its held binding record, so what must agree between
-     * two resolvers is the parsed form. Reducing both sides here is that rule applied once, and it is what
-     * lets an open entry be compared by {@link #rendered} like every other entry rather than through a
-     * second channel of its own.
-     */
-    private static Top parsedForComparison(TemplateBody held) {
-        return new TemplateBody(held.parameters(),
-                String.valueOf(new TsonDataParser(held.template()).parseDocument().root()));
-    }
 
     /**
      * The names a §8 resolved-schema document marks {@code @meta.synthetic} at its schema-map keys, hashes

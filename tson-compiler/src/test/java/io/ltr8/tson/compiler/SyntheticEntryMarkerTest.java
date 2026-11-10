@@ -51,7 +51,7 @@ class SyntheticEntryMarkerTest {
             !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               @doc:"An order." order => { id: text }
-              paged => <T> { items: [T; 1..] }
+              paged => <T> { items: [T] }
               order_response => paged<order>
               tag_list => [text; 1..2]
               holder => {
@@ -124,9 +124,9 @@ class SyntheticEntryMarkerTest {
                 lifted.add(name);
             }
         });
-        // `[T; 1..]` open in the template, `[T; 1..]` closed as `[order; 1..]` by materialising
-        // `paged<order>`, and `holder`'s own `[order; 2..]` and `(text | int32)`.
-        assertEquals(4, lifted.size(), "expected four synthetic entries, got " + lifted);
+        // `[order]`, constructed by materialising `paged<order>` (the template holds `meta.array<T>` and lifts
+        // nothing), and `holder`'s own `[order; 2..]` and `(text | int32)`.
+        assertEquals(3, lifted.size(), "expected three synthetic entries, got " + lifted);
     }
 
     /** A name the author wrote is never one, however sugary its body. */
@@ -168,10 +168,8 @@ class SyntheticEntryMarkerTest {
                 instantiations.add(name);
                 assertFalse(marked(entries, name), name + " is an instantiation entry, which §8.2 leaves bare");
             } else if (marked(entries, name)) {
-                // A closed synthetic records the constructor it is an instance of; an open one's is the first
-                // token of the application its held text writes, which nothing records beside it.
-                assertTrue(factsOf(ID, name).constructor().isPresent()
-                                || definition instanceof io.ltr8.tson.schema.meta.TemplateBody,
+                // A synthetic records the constructor it is an instance of.
+                assertTrue(factsOf(ID, name).constructor().isPresent(),
                         name + " is marked synthetic but records no constructor");
             }
         });
@@ -202,7 +200,7 @@ class SyntheticEntryMarkerTest {
                 synthetics.add(name);
             }
         });
-        assertEquals(4, synthetics.size(), "expected four synthetic entries, got " + synthetics);
+        assertEquals(3, synthetics.size(), "expected three synthetic entries, got " + synthetics);
         for (String name : synthetics) {
             assertTrue(marked(importing, name), name + " lost its marker on the way through !!import");
         }

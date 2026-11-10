@@ -47,7 +47,9 @@ import java.util.stream.Stream;
  * suffix added explicitly ({@link #ALIASES}: {@code meta.record} is {@code meta.RecordBody}). A constructor that
  * tightens another -- {@code meta.set_type} over {@code meta.array}, {@code enum} over {@code meta.enum_type} -- needs
  * no alias: it restates fields and adds none, and the bind lookup falls back along its chain to the constructor it
- * tightens ({@code ValueReaderContext.bindingNamesFor}).
+ * tightens ({@code ValueReaderContext.bindingNamesFor}). {@code meta.ref} over {@code meta.reference_type} is the
+ * exception, its name mangling to {@link io.ltr8.tson.schema.meta.Ref}, the value a host receives by name, so it is
+ * aliased to the body its instances are.
  *
  * <p>Some entries resolve to a class that is not a record: {@code meta.atom}/{@code meta.product}/{@code
  * meta.sum}/{@code meta.top} mangle to the sealed marker interfaces {@link io.ltr8.tson.schema.meta.Atom}/{@link
@@ -71,15 +73,16 @@ public final class SchemaModelNameBinder {
     /** Full path to the path its class is mangled from, where the entry's own name does not reach it. */
     private static final Map<String, String> ALIASES = Map.ofEntries(
             Map.entry("meta.record", "meta.record_body"),
-            Map.entry("meta.record_template", "meta.record_template_body"),
+
             Map.entry("meta.array", "meta.array_body"),
             Map.entry("meta.map", "meta.map_body"),
             Map.entry("meta.namespace", "meta.namespace_body"),
             Map.entry("meta.tuple", "meta.tuple_body"),
             Map.entry("meta.choice", "meta.choice_body"),
             Map.entry("meta.reference_type", "meta.reference_body"),
+            Map.entry("meta.ref", "meta.reference_body"),
             Map.entry("meta.enum_type", "meta.enum_body"),
-            Map.entry("meta.template", "meta.template_body"),
+
             Map.entry("temporal.datetime_type", "temporal.date_time_type"));
 
     private static final DataNameBinder MANGLED = new DataNameBinder.DefaultDataNameBinder(Set.of(PACKAGE), ALIASES);

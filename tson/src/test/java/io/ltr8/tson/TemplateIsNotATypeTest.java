@@ -6,7 +6,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+
 import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
@@ -166,7 +166,7 @@ class TemplateIsNotATypeTest {
                   b_box  => box<int32>
                   pet    => <V> { type: text =?  value: V }
                   dogpet => pet<text> & { type?: = "dog" }
-                  arr    => <T> [T]
+                  arr    => <T> { items: [T] }
                   texts  => arr<text>
                 """);
 
@@ -209,7 +209,7 @@ class TemplateIsNotATypeTest {
         assertEquals(RecordExtensionType.ABSTRACT, base.extension());
         assertEquals(List.of("kind"), base.discriminators());
         assertEquals(List.of("tcat", "tdog"), TypeChain.subtypesOf(base).stream().sorted().toList());
-        RecordTemplateBody template = (RecordTemplateBody) schema.schema().entries().get("tpet");
+        RecordBody template = (RecordBody) schema.schema().entries().get("tpet");
         assertEquals(List.of(), TypeChain.subtypesOf(template));
         assertFalse(TypeChain.supertypesOf(schema.schema().entries().get("tdog")).contains("tpet"));
     }
@@ -238,9 +238,7 @@ class TemplateIsNotATypeTest {
     private static String fieldType(TsonLinkedSchema schema, String entry, String field) {
         return switch (schema.schema().entries().get(entry)) {
             case RecordBody record -> record.fields().get(field).typeRef().name();
-            case RecordTemplateBody template ->
-                    RecordField.typeRef(template.fields().get(field).type().orElseThrow()).name();
-            default -> throw new AssertionError(entry + " is neither a record nor a record template");
+            default -> throw new AssertionError(entry + " is no record");
         };
     }
 

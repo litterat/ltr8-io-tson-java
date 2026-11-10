@@ -64,7 +64,8 @@ import java.util.List;
  *                                included
  * @param maxAliasChain           the hops from a use site to a terminal entry
  * @param maxSupertypeChain       the length of one type's {@code chain.supertypes}
- * @param maxMaterialisationDepth the nested open synthetics closed for one template application
+ * @param maxMaterialisationDepth the nested applications closed for one template application -- a resource cap,
+ *                                regular recursion closing on its first repeat
  * @param maxWaitDepth            the longest chain of waits resolving one schema runs, each entry waiting on the
  *                                next being ready -- see {@link #maxWaitDepth()}
  */
@@ -132,7 +133,7 @@ public record LimitsPolicy(int maxDepth, long maxTokenLength, long maxTextLength
     /** The default supertype chain, 64 types. */
     public static final int DEFAULT_MAX_SUPERTYPE_CHAIN = 64;
 
-    /** The default materialisation depth, 64 nested open synthetics. */
+    /** The default materialisation depth, 64 nested applications. */
     public static final int DEFAULT_MAX_MATERIALISATION_DEPTH = 64;
 
     /** The default wait depth, 64 waits in one chain. */

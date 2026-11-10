@@ -20,7 +20,7 @@ is why they are the linker's. Current form only; history lives in git.
   `ReferenceBody`'s equality is `of` and the chain, never the index, so an importer re-deriving an import's kind
   unifies with it.
 - `of` resolves in the schema's one namespace and names any type or constructor; refused are a name resolving to
-  nothing, an open entry and a value entry (`KindMembers.ofRefusal`). A kind is not a bound.
+  nothing, an open record and a value entry (`KindMembers.ofRefusal`). A kind is not a bound.
 - A constructor is a member where the walk says so, as any type is: one whose declaration is a record (`net.uuid_type
   => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
   `meta.ref<meta.product>` hold it, `meta.namespace` and `meta.reference_type` among them. A namespace type is built with
@@ -37,7 +37,7 @@ is why they are the linker's. Current form only; history lives in git.
   no entry past its hops being an alias.
 - Whether a `name_type` referent may stand in its slot is membership of the slot's kind (`NameType.admits`, reading
   the kind off the constructor's `name_type` field), never a test of the referent's body class.
-- A `name_type`, pinned by the constructor (traced through a template's held body) or written by the author,
+- A `name_type`, pinned by the constructor or written by the author,
   resolves in the schema's one namespace. `NameType` is the one place that resolves it, for enums and records alike,
   shared with materialisation.
 - An enum's and a record's name type is an identifier family whose `normalization` implies NFC (`NONE` never;
@@ -65,7 +65,8 @@ schema's one namespace (§3.3), and the members are computed.
 
 ## The types built with a constructor (`KindMembers`, §4.2)
 
-A kind (`!meta.reference_type { of: net.uuid_type }`, or `meta.ref<net.uuid_type>` through the kernel's template) is an atom
+A kind (`!meta.reference_type { of: net.uuid_type }`, or `meta.ref<net.uuid_type>`, the construction `!meta.ref { of:
+net.uuid_type }` of the kernel's refined constructor) is an atom
 whose values are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a
 listed one. The kernel declares `meta.type_ref` and its refinement `meta.identifier_ref`, and types
 `meta.enum_type.name_type` and `meta.record.name_type` by the second. `computeKinds` derives every reference's index
@@ -73,12 +74,12 @@ listed one. The kernel declares `meta.type_ref` and its refinement `meta.identif
 that names values gets `namesTypes` false and no members.
 
 - **Membership is one walk over resolved entries.** `KindMembers`' class Javadoc states the walk: alias hops to the
-  type, an alias stopping at an application, every open entry (a record template or a held body, neither a type,
-  §5.10) and value entries excluded, then the constructor the value applies (its recorded tag,
-  `EntryFacts.constructor`, else its body's `@Typename`) followed through a constructor template's held body until
-  `of` or a constructor IS-A it is reached. So a record template is a member of no reference, not even
-  `meta.ref<meta.record_template>`; its declared applications are records. `set<text>` is a member of
-  `meta.ref<meta.set_type>` while the kernel's template `set` is not, `meta.top` of `meta.type_ref`,
+  type, an alias stopping at an application, every open record (a template, no type, §5.10) and value entries
+  excluded, then the constructor the value applies (its recorded tag, `EntryFacts.constructor`, else its body's
+  `@Typename`) until `of` or a constructor IS-A it is reached. So an open record, built with `meta.record`, is a member
+  of no reference, `meta.ref<meta.record>` included; its declared applications are records. `set<text>` is a member of
+  `meta.ref<meta.set_type>` while the root's `set`, an alias of the constructor itself, is not, `meta.top` of
+  `meta.type_ref`,
   `meta.ref<meta.product>` and `meta.ref<meta.record>`, and so is a constructor whose declaration is a record:
   membership is not `EntryKind.isConstructor`, which answers applicability.
 - **A kind is a member of itself where the walk says so.** `meta.type_ref` is built with `meta.reference_type`, which IS-A
@@ -92,7 +93,7 @@ that names values gets `namesTypes` false and no members.
   the schema's, and `meta.ref<meta.namespace>` holds a schema's own namespace type `api` beside `meta.schema`, and
   `meta.ref<meta.map>` holds those and `meta.field_map`, which `meta.ref<meta.namespace>` does not.
 - **`of` is checked in `validateBody`**, through its alias hops in the one namespace: a name resolving to nothing is
-  an unresolved reference, and an open entry or a value entry is refused (`KindMembers.ofRefusal`), against the
+  an unresolved reference, and an open record or a value entry is refused (`KindMembers.ofRefusal`), against the
   declaration that wrote the application (`reportedAgainst`). A refinement's `of` is then judged against its source's
   (`checkReferenceNarrows`): the source's or IS-A it, by the chain of the entry `of` names past its alias hops, so a
   widening or an unrelated `of` is refused. The resolver binds a refinement before the names `of` holds are ready
@@ -133,14 +134,13 @@ which equality, which profile) lives in a namespace the body cannot see.
   or imports (`!meta.enum_type { name_type: kebab … }`); one the constructor pinned (`!enum [A B]` names the kernel's
   `meta.identifier`) resolves in the same namespace, and since the closure holds the kernel's `meta.identifier`, no schema
   declares one of its own to displace it. Pinned is found through the constructor the entry's value applies
-  (`TsonSchemaLinker.constructorOf`) and through a template's held body to the constructor it applies: `named =>
-  names<c>` is built by `names`, not `enum`. A record stating no name type takes `meta.field_name`, the kernel's alias
+  (`TsonSchemaLinker.constructorOf`). A record stating no name type takes `meta.field_name`, the kernel's alias
   of its `meta.identifier`.
 - **Membership, not body class.** `NameType.admits` reads the slot's kind off the `name_type` field of the constructor
   the entry applies, and asks `KindMembers.isMember` of the referent. Where the slot's kind is out of reach (a
   closure holding no kernel, as a hand-built schema's may), `meta.identifier_ref`'s `of`, `unicode.identifier_type`, is
-  used. An application of a template over `unicode.identifier_type` expands to a `unicode.identifier_type` instance, and is
-  admitted (`KindMembersTest`).
+  used. A construction of `unicode.identifier_type` through a refined constructor of it is an instance of that
+  refinement, IS-A the constructor, and is admitted (`KindMembersTest`).
 - **The profile is the type's.** `NameType.profile` reads the profile of an admitted type only; `checkNames` judges
   an enum's members and a record's field names by §8.2's per-name rules under it, so a `medial: " "` among its added
   characters is its own. An entry with no admitted profile and not refused falls back to the identifier grammar's.
@@ -164,11 +164,9 @@ atom, string-class like any other (`design/choice-disjointness.md`).
 
 `EnumLabels`' peer over field names: the type must be an identifier family, every name the record states (in `fields`,
 `discriminators` and its groups) must be a value of it, and no two fields may be one value under its equality. Where
-no kernel is in scope, the identifier grammar the default stands for applies. A record template is judged the same
-way, once, its field names being every application's. The facts read are the ones both bodies state at the record
-level, read as one value (`schema.meta.RecordHead`, `RecordHead.of`), so `FieldNames`, `NameType.of`, the linker's
-field-name scope and `FamilySelectors.namesOf` ask one question of either shape. It is a value each body produces and
-no parent type: a record never names a template.
+no kernel is in scope, the identifier grammar the default stands for applies. An open record is judged the same way,
+once, its field names being every application's: it is a `RecordBody`, so `FieldNames`, `NameType.of` and the linker's
+field-name scope read it as they read a closed record. A parameter is never a field's name (`DefinitionResolver.checked`).
 
 - **Supertypes decide.** A record with supertypes takes their one type, refuses two that disagree, and refuses a
   stated type that is not theirs; two are one when their alias chains end at one entry (`sameNameType`), so an
@@ -179,7 +177,7 @@ no parent type: a record never names a template.
 - **A schema's own references to a field match its declared spelling exactly**, under a folding type too: a group
   member, a refinement's or removal's restated field, a discriminator. Only a document's names are matched in the
   type's form.
-- **Recorded for the readers.** Each record or record template whose body states a name type is recorded in
+- **Recorded for the readers.** Each record, open or closed, whose body states a name type is recorded in
   `TsonLinkedSchema.nameTypes` with the definition it resolves to (`FieldNames.readBy`), because its readers judge a
   document's names by it and cannot resolve it themselves. A template is read against by no reader, but its member
   dispatch matches its selectors' keys in that form, as its members do; a composition takes an applied operand's

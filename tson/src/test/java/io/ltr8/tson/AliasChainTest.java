@@ -46,10 +46,10 @@ class AliasChainTest {
                 .resolveLinked(TsonBundledSchemas.META_ID).schema().entries().get(name);
     }
 
-    /** The kernel's own case: {@code meta.template_param.name} is declared {@code meta.param_name} and stays it. */
+    /** The kernel's own case: {@code meta.param.name} is declared {@code meta.param_name} and stays it. */
     @Test
     void aKernelAliasAtAFieldTypeNamesWhatWasWritten() {
-        TypeRef name = fieldType(kernelEntry("meta.template_param"), "name");
+        TypeRef name = fieldType(kernelEntry("meta.param"), "name");
         assertEquals("meta.param_name", name.name());
         assertTrue(name.annotations().isEmpty(), "nothing is attached to record where it points");
     }

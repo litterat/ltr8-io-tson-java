@@ -99,8 +99,8 @@ public final class KernelBootstrapResolver {
      * {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text} atoms, {@code
      * meta.field_type_ref}, the reference a record field's type is read by, {@code field_map}, the map type a
      * record's fields are a value of, and the two refinements, {@code numeric.count} and {@code meta.type_ref}. The
-     * {@code value} of {@code record_field} and {@code record_template_field} is not among them: it is typed {@code
-     * type!}, a dependent field whose value a schema document holds as written, which waits on no entry.
+     * {@code value} of {@code record_field} is not among them: it is typed {@code type!}, a dependent field whose
+     * value a schema document holds as written, which waits on no entry.
      */
     private static final Set<String> PRE_LOADED = Set.of("boolean", "meta.field_role", "meta.enum_set",
             "integer", "numeric.count", "text", "meta.field_type_ref", "meta.type_ref", "meta.field_map");
@@ -332,12 +332,11 @@ public final class KernelBootstrapResolver {
         }
 
         /**
-         * §5.10's parameters, checked once every entry is ready, as {@link SchemaResolver} checks a schema's: where
-         * each stands, and each written bound. A failure is a broken kernel.
+         * §5.10's parameters, checked once every entry is ready, as {@link SchemaResolver} checks a schema's: each
+         * written bound. A failure is a broken kernel; the kernel declares no open record, so nothing is checked.
          */
         private void checkParameters() {
-            ParameterTypes.check(entries, declarations.keySet(),
-                    name -> facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).synthetic(), entries::get,
+            ParameterTypes.check(entries, declarations.keySet(), entries::get,
                     (name, error) -> {
                         throw error;
                     });

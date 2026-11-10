@@ -125,16 +125,16 @@ class TypeInhabitanceTest {
     }
 
     /**
-     * A template is judged when it closes, not where it is written: its body is held until materialisation
-     * substitutes, so the bounds and element types this rule reads are tokens meaning nothing until an
-     * application supplies the arguments. The closure is an ordinary entry by the time linking runs, so
-     * §8's own {@code tree} fixture is caught the moment anything applies it -- and a template nobody applies
-     * is judged nowhere, the same answer §5.10's deferred checking gives everywhere else.
+     * A template is judged when it closes, not where it is written: the element types this rule reads stand over
+     * parameters until an application supplies the arguments. The closure is an ordinary entry by the time linking
+     * runs, so §8's {@code tree} fixture, its recursive position non-empty through a refined constructor, is caught
+     * the moment anything applies it -- and a template nobody applies is judged nowhere.
      */
     @Test
     void anUninhabitedTemplateIsRejectedWhereItCloses() {
         rejection("""
-                  tree => <T> { value: T  children: [tree<T>; 1..] }
+                  nonempty => meta.array ^ { min_items?: = 1 }
+                  tree => <T> { value: T  children: nonempty<tree<T>> }
                   use  => tree<text>""");
     }
 
@@ -152,16 +152,19 @@ class TypeInhabitanceTest {
     @Test
     void theChainIsSpelledTheWayTheAuthorWroteIt() {
         String message = rejection("""
-                  tree => <T> { value: T  children: [tree<T>; 1..] }
+                  nonempty => meta.array ^ { min_items?: = 1 }
+                  tree => <T> { value: T  children: nonempty<tree<T>> }
                   use  => tree<text>""");
 
-        assertTrue(message.contains("use needs [use; 1..] needs use"), message);
+        assertTrue(message.contains("use needs nonempty<tree<text>> needs use"), message);
     }
 
     /** The other half of the same rule: unapplied, it is not judged, and that is not a warning either. */
     @Test
     void aTemplateNobodyAppliesGetsNoVerdict() {
-        accepted("  tree => <T> { value: T  children: [tree<T>; 1..] }");
+        accepted("""
+                  nonempty => meta.array ^ { min_items?: = 1 }
+                  tree => <T> { value: T  children: nonempty<tree<T>> }""");
     }
 
     /** An uninhabited variant is a mistake even where the choice around it still works. */

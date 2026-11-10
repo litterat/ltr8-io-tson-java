@@ -20,9 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * (§4.2). They are different operations, and a template named at a construction site is an author error.
  *
  * <p><b>It is a schema error, never an {@code IllegalStateException}</b> -- this project's spelling of "an
- * internal invariant broke", on which `tson validate` prints the please-report-it banner and exits <b>70</b>. The
- * case reaches {@code DefinitionResolver} because an <em>open</em> declaration holds its body rather than resolving
- * it to a record, and a parameterised construction is exactly one.
+ * internal invariant broke", on which `tson validate` prints the please-report-it banner and exits <b>70</b>.
  *
  * <p>End to end through {@link Tson} rather than at {@code DefinitionResolver}, because the construction
  * head resolves against the schema's namespace -- which needs a real imported vocabulary, and
@@ -35,8 +33,8 @@ class TemplateClosesByApplicationTest {
     private static final String USER = "https://example.test/u.tn";
 
     /**
-     * Two templates in one vocabulary schema: a construction of {@code meta.array} whose parameter stands in its type
-     * slot, and an unmarked §5.10 record template. Both are templates, which is the only thing the rule turns on.
+     * Two templates in one vocabulary schema, both open records: a fresh record body holding {@code [T]}, and a
+     * composition. Both are templates, which is the only thing the rule turns on.
      */
     private static String vocabulary(String extraDeclarations) {
         return """
@@ -44,7 +42,7 @@ class TemplateClosesByApplicationTest {
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   base       => {}
-                  my_vec     => <T> !meta.array { element_type: T  max_items: 3 }
+                  my_vec     => <T> { items: [T] }
                   box        => <T> base & { value: T }
                   %s
                 }
@@ -86,7 +84,7 @@ class TemplateClosesByApplicationTest {
 
     @Test
     void aConstructorTemplateAtAConstructionSiteIsAnAuthorError() {
-        List<Diagnostic> problems = schemaProblems("n => !my_vec { element_type: text }");
+        List<Diagnostic> problems = schemaProblems("n => !my_vec { items: [text] }");
 
         assertEquals(1, problems.size(), problems::toString);
         Diagnostic only = problems.getFirst();
@@ -112,9 +110,9 @@ class TemplateClosesByApplicationTest {
         assertFalse(problems.getFirst().message().contains("atom refinement"), problems::toString);
     }
 
-    /** An application of a construction template closes to the construction its arguments complete. */
+    /** An application of a template closes to the record its arguments complete. */
     @Test
-    void aConstructionTemplateClosesByApplication() {
+    void aTemplateClosesByApplication() {
         assertEquals(List.of(), vocabularyProblems("tags => my_vec<text>"));
         assertEquals(1, vocabularyProblems("tags => my_vec<no_such_type>").size());
     }

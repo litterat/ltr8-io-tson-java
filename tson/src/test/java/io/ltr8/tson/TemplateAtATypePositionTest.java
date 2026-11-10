@@ -66,29 +66,18 @@ class TemplateAtATypePositionTest {
                 """).contains(REMEDY));
     }
 
+    /**
+     * Every template is an open record, so there is no other kind to name bare: a parameter list before a container,
+     * a construction or a reference is refused at its own declaration (§5.10).
+     */
     @Test
-    void aContainerTemplateIsRefused() {
-        assertTrue(refusal("t4", """
-                  arr    => <T> [T]
-                  holder => { p: arr }
-                """).contains("is a template taking 1 type argument"));
-    }
-
-    @Test
-    void aConstructorApplicationTemplateIsRefused() {
-        assertTrue(refusal("t5", """
-                  vector => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }
-                  holder => { p: vector }
-                """).contains(REMEDY));
-    }
-
-    @Test
-    void anAliasTemplateIsRefused() {
-        assertTrue(refusal("t6", """
-                  pair      => <A, B> { first: A  second: B }
-                  uuid_pair => <B> pair<uuid, B>
-                  holder    => { p: uuid_pair }
-                """).contains("is a template"));
+    void aTemplateOverAnythingButARecordIsRefusedWhereItIsDeclared() {
+        for (String declaration : List.of("arr    => <T> [T]",
+                "vector => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }",
+                "pair   => <A, B> { first: A  second: B }\n  uuid_pair => <B> pair<uuid, B>")) {
+            assertTrue(refusal("t4", "  " + declaration + "\n").contains("a template's body is a record body"),
+                    declaration);
+        }
     }
 
     /** An application has to match arity. */

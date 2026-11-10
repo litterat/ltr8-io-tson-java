@@ -10,11 +10,12 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.Param;
+import io.ltr8.tson.schema.meta.ParamRef;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Sum;
-import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
@@ -32,17 +33,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * What [TSON-SCHEMA] §8.1 says about an <b>open</b> entry's resolved form, asked of real documents.
  *
- * <p>An open entry's body is an instance of the kernel's {@code template} constructor -- the parameter
- * names, and the application as <b>text</b> -- because a body carrying a parameter in a value slot
- * ({@code min_items: N}) is not a value of any constructor's record shape and cannot be typed as one
- * (§8.1's "Open entries"). The tests below hold that against real documents: the published fixtures
- * validate, §5.10's own {@code vector} example validates, and a held body reads back as the application it
- * holds rather than as the constructor it names.
- *
- * <p><b>Each pins a failure the text form exists to prevent</b>, which is what makes them a guard rather than a
- * description: read as the constructor it names, the value-parameter case fails with two
- * {@code ATOM_CONSTRAINT_VIOLATION}s, and the held case binds {@code S} as a relative URI -- the two failures
- * §8.1 cites as the reason a held body is text.
+ * <p>An open entry is an open record: a {@code !meta.record} carrying {@code parameters}, each a type written where it
+ * stands as its name, a reference value, so the record is read against {@code record}'s own vocabulary as any record
+ * is. The tests below hold that against real documents: the published fixtures validate, an open record validates
+ * and reads back with its parameters, every entry with parameters is one, and an entry's kind is derived.
  */
 class OpenEntryResolvedFormTest {
 
@@ -77,10 +71,7 @@ class OpenEntryResolvedFormTest {
      * of §8's whole output form -- and the fixtures are the spec's own statement of it, not this
      * implementation's.
      *
-     * <p>It passes because the only templates the bundled schemas declare put every parameter in a {@code
-     * meta.type_ref} slot ({@code set<T>}, {@code meta.ref<T>}, {@code meta.tuple1<T>}), which is exactly the
-     * case §8.1's premise covers. It is a regression guard, not evidence that the premise is sound; the next
-     * test is the counterexample.
+     * <p>The kernel declares no open record, so this is a regression guard over closed entries.
      */
     @Test
     void everyPublishedResolvedFixtureValidatesAgainstItsGoverningSchema() throws Exception {
@@ -101,87 +92,79 @@ class OpenEntryResolvedFormTest {
         }
     }
 
-    // ── What §5.10's own example does, with a held body as text ──────
+    // ── An open record's resolved form ───────────────────────────────────
 
     /**
-     * <b>A held body validates in §8.1's own prescribed form.</b> The declaration is
+     * <b>An open record validates in §8.1's form</b>: a {@code !meta.record} carrying {@code parameters}, each standing
+     * where it is written as its name, a reference value -- at a field's type, and among an application's arguments.
+     * Nothing about it needs a vocabulary of its own: it is read against {@code record}'s, as any record is.
      *
-     * <pre>{@code vector => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }}</pre>
-     *
-     * and its resolved body is a {@code !template} whose {@code template} field is the application as written, so
-     * the parameter in its type slot is never read against {@code array}'s vocabulary and the entry's value is a
-     * {@code top} like any other.
-     *
-     * <p>The document is hand-authored in §8.1's form rather than produced by this library's writer,
-     * deliberately: the claim under test is about the <em>spec's</em> prescribed serialization, and routing
-     * it through a writer would put this implementation's own canonicalisation between the claim and the
-     * verdict.
+     * <p>The document is hand-authored rather than produced by this library's writer, deliberately: the claim under
+     * test is about the <em>spec's</em> prescribed serialization.
      */
     @Test
-    void anOpenEntryWithAHeldBodyValidates() {
+    void anOpenRecordValidatesAsARecord() {
         assertEquals(List.of(), ResolvedForm.validateResolved(tson(), """
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
-                  vector => !meta.template {
-                    parameters: [ { name: T } ]
-                    template: "!meta.array { element_type: T  min_items: 3  max_items: 3 }"
+                  page => !meta.record {
+                    parameters: [ !meta.param { name: T } ]
+                    fields: {
+                      item  => !meta.record_field { type: T }
+                      items => !meta.record_field { type: meta.array<T> }
+                    }
                   }
                 }
-                """), "a parameter has no slot to fail against once the body is held as text");
+                """), "a parameter is a reference value, admitted by the slot it stands at");
     }
 
     /**
-     * <b>And a held body is read back as held, not as the constructor it names.</b> Read as the constructor
-     * it names, this would validate clean and bind as something else -- {@code M} as a third enum member
-     * spelled {@code M} -- accepted, and wrong, with no diagnostic anywhere. What comes back is the
-     * application as text, with nothing having tried to read it.
+     * <b>And it reads back as the open record it is</b>: the record's parameters are looked up before the namespace,
+     * so its field types are parameters ({@link ParamRef}), whole and as an argument, and no reference names an
+     * entry spelled {@code T}.
      */
     @Test
-    void aHeldBodyReadsBackAsTheApplicationItHolds() {
-        Tson tson = metaBoundTson();
-        String resolved = """
+    void anOpenRecordReadsBackWithItsParameters() {
+        Map<String, Object> read = ResolvedForm.readResolved(metaBoundTson(), """
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
-                  e => !meta.template {
-                    parameters: [ { name: M } ]
-                    template: "!enum { members: [a b M] }"
+                  page => !meta.record {
+                    parameters: [ !meta.param { name: T } ]
+                    fields: {
+                      item  => !meta.record_field { type: T }
+                      items => !meta.record_field { type: meta.array<T> }
+                    }
                   }
                 }
-                """;
-        assertEquals(List.of(), ResolvedForm.validateResolved(tson, resolved), "the open entry is valid data");
+                """);
 
-        Map<String, Object> read = ResolvedForm.readResolved(tson, resolved);
-
-        TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e"));
-        assertEquals("!enum { members: [a b M] }", e.template(),
-                "the application as written -- no third enum member spelled 'M'");
-        assertEquals(List.of(new TemplateParam("M")), e.parameters());
+        RecordBody page = assertInstanceOf(RecordBody.class, read.get("page"));
+        assertEquals(List.of(new Param("T")), page.parameters());
+        assertEquals(ParamRef.of("T"), page.fields().get("item").type());
+        assertEquals(TypeRef.of("meta.array", List.of(ParamRef.of("T"))), page.fields().get("items").type());
     }
 
     // ── The biconditional an entry's parameters rest on ─────────────────
 
     /**
-     * <b>A record template is a {@code record_template}, and every other open entry is held.</b> [TSON-SCHEMA]
-     * §5.10's two kinds of template, asked of every entry of every schema -- the three bundled ones and a schema
-     * exercising each template shape: an entry with parameters is either a {@code RecordTemplateBody} or a {@code
-     * TemplateBody}, a held body never applies {@code record}, and no other entry declares parameters.
+     * <b>An entry declares parameters exactly when it is an open record</b>, asked of every entry of every bundled
+     * schema and of a schema exercising each template shape: a fresh record body, a composition and a refinement. The
+     * kernel declares none.
      */
     @Test
-    void aRecordTemplateIsItsOwnShapeAndEveryOtherTemplateIsHeld() {
+    void anEntryWithParametersIsAnOpenRecord() {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/shapes.tn"
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
-                  base           => { id: text }
-                  pair           => <A, B> { first: A  second: B }
-                  uuid_pair      => <B> pair<text, B>
-                  boxes          => <T> [T]
-                  text_keyed_map => <V> {text => V}
-                  vec            => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }
-                  composed       => <T> base & { value: T }
-                  holder         => { p: pair<text, int32>  q: vec<int32> }
+                  base     => { id: text }
+                  pair     => <A, B> { first: A  second: B }
+                  composed => <T> base & { value: T }
+                  refined  => <T> pair<T, text> ^ { second: = hi }
+                  composed_int => composed<int32>
+                  holder   => { p: pair<text, int32>  q: composed_int }
                 }
                 """);
         List<String> ids = List.of(TsonBundledSchemas.META_ID, TsonBundledSchemas.NUMERIC_ID,
@@ -189,33 +172,25 @@ class OpenEntryResolvedFormTest {
                 "https://example.com/shapes.tn");
 
         List<String> broken = new ArrayList<>();
-        int open = 0;
+        List<String> open = new ArrayList<>();
         for (String id : ids) {
             for (Map.Entry<String, Top> entry
                     : tson.bindRegistry().core().resolveLinked(id).schema().entries().entrySet()) {
                 Top definition = entry.getValue();
                 boolean declares = !OpenEntry.parameterNames(definition).isEmpty();
                 if (declares) {
-                    open++;
+                    open.add(entry.getKey());
                 }
-                boolean shape = switch (definition) {
-                    case TemplateBody held -> !held.template().startsWith("!record") && declares;
-                    case RecordTemplateBody ignored -> declares;
-                    default -> !declares;
-                };
-                if (!shape) {
+                if (declares != (definition instanceof RecordBody record && record.isOpen())) {
                     broken.add(id + "#" + entry.getKey() + ": parameters " + OpenEntry.parameterNames(definition)
                             + " with a " + definition.getClass().getSimpleName() + " body");
                 }
             }
         }
 
-        int openEntries = open;
-        assertEquals(List.of(), broken,
-                "§5.10: a record template is a record_template, every other template is held");
-        assertTrue(openEntries >= 8, () -> "not enough open entries to mean anything: " + openEntries);
+        assertEquals(List.of(), broken, "§5.10: a template is an open record");
+        assertEquals(List.of("pair", "composed", "refined"), open, "the kernel declares no open record");
     }
-
     // ── §8.1: a kind is derived, never recorded ─────────────────────────
 
     /**
@@ -229,10 +204,9 @@ class OpenEntryResolvedFormTest {
      * {@code integer} is {@code !integer_type {}} and {@code integer_type} is meta.tn's -- which the value's
      * Java shape answers on its own, a body's class being the branch of {@code Top} its constructor builds.
      *
-     * <p><b>The rule is total.</b> An open entry is {@code TEMPLATE}, answered from the entry alone rather than
-     * inherited from the constructor its held body applies -- that would be a fact about an application of it,
-     * not about the template. {@link #derive} is
-     * therefore the whole rule, and the one §8.1 states under "Kind is derived".
+     * <p><b>The rule is total.</b> An open record takes the kind its chain reaches, as a closed record does, answered
+     * from the entry alone. {@link #derive} is therefore the whole rule, and the one §8.1 states under "Kind is
+     * derived".
      */
     @Test
     void kindAgreesWithWhatTheEntryAlreadyStates() {
@@ -264,8 +238,6 @@ class OpenEntryResolvedFormTest {
                 !schema {
                   listed      => <T> meta.atom & { members: [T] }
                   listed_text => listed<text>
-                  payloads     => <T> !meta.namespace { key_type: meta.identifier  value_type: T }
-                  iri_payloads => payloads<iri>
                 }
                 """);
         List<String> ids = List.of(TsonBundledSchemas.META_ID, TsonBundledSchemas.NUMERIC_ID,
@@ -320,7 +292,7 @@ class OpenEntryResolvedFormTest {
         int outsideOwnSchema = neededTheGoverningMeta;
         assertEquals(List.of(), mismatches, "kind restates what supertypes and body already determine");
         assertTrue(closedEntries > 140, () -> "not enough entries for this to mean anything: " + closedEntries);
-        assertTrue(openEntries > 0, () -> "no open entry exercised the TEMPLATE branch: " + openEntries);
+        assertTrue(openEntries > 0, () -> "no open record exercised the rule: " + openEntries);
         assertTrue(outsideOwnSchema > 25, () -> "the lookup should reach outside the entry's own schema for "
                 + "most of core.tn's instances -- that is why the field stays: " + outsideOwnSchema + " of "
                 + closedEntries);
@@ -328,12 +300,6 @@ class OpenEntryResolvedFormTest {
 
     /** §4.1's rule, read off what the entry already states. Four branches; see the test's own note. */
     private static EntryKind derive(Top definition, Map<String, Top> universe) {
-        if (definition instanceof TemplateBody) {
-            // A held template is not a type (§5.10), so its kind says that and nothing about what applying it
-            // produces -- that is the kind of the entry materialisation mints, from its own closed body. A record
-            // template is a type, the family base, and falls to the record rules below.
-            return EntryKind.TEMPLATE;
-        }
         if (definition instanceof Alias) {
             // §4.1 gives an alias the kind ALIAS, a meta.type_ref and not a base kind -- and the kernel's `alias`
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
@@ -363,7 +329,6 @@ class OpenEntryResolvedFormTest {
             case Product product -> product.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Sum sum -> sum.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Alias alias -> "alias";
-            case TemplateBody held -> "template";
             case io.ltr8.tson.schema.meta.ValueEntry value -> value.type();
         };
     }

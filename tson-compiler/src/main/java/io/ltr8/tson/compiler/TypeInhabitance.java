@@ -12,11 +12,11 @@ import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -89,11 +89,10 @@ final class TypeInhabitance {
      */
     private static boolean isInhabited(Top definition, Map<String, Top> namespace,
             Set<String> inhabited) {
-        // A held body is not walked: its element type and bounds are tokens that mean nothing until
-        // substitution supplies the arguments, so a template is inhabited here and the closure that does
-        // supply them is judged on its own -- it is an ordinary entry in this map by the time linking
-        // runs, materialisation having minted it. A template nobody applies is judged nowhere, which is
-        // the same answer §5.10's deferred checking gives everywhere else.
+        // An open record is not walked: its parameters mean nothing until substitution supplies the arguments,
+        // so a template is inhabited here and the closure that does supply them is judged on its own -- it is an
+        // ordinary entry in this map by the time linking runs, materialisation having minted it. A template nobody
+        // applies is judged nowhere.
         if (OpenEntry.isOpen(definition)) {
             return true;
         }
@@ -117,8 +116,7 @@ final class TypeInhabitance {
             // referent only the linker judges.
             case ReferenceBody reference -> !reference.namesTypes() || !reference.memberNames().isEmpty();
             case Alias alias -> refInhabited(alias.target(), namespace, inhabited);
-            case TemplateBody ignored -> true; // open, answered above
-            case RecordTemplateBody ignored -> true; // open, answered above
+
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
             case ValueEntry ignored -> true; // a value, which nothing is typed by
@@ -301,8 +299,7 @@ final class TypeInhabitance {
             // A choice fails on every variant at once, so no single link continues the chain; the rest name none.
             case Sum ignored -> null;
             case Atom ignored -> null;
-            case TemplateBody ignored -> null;
-            case RecordTemplateBody ignored -> null;
+
             case ValueEntry ignored -> null;
         };
     }

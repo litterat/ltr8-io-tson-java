@@ -21,23 +21,22 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   `TsonCompiledVocabulary.buildConstructors` filters on the same predicate, so every constructor head has a reader. With `C`
   any other type the entry is a value of `C` (`resolveValueEntry`, `design/namespace-types-and-value-entries.md`), never a
   refusal for want of applicability.
-- `meta.template` is resolver vocabulary (§8.1): IS-A `meta.top`, yet a source declaration applying it, closed or open, is an
-  author error (`requireAuthorable`).
+- A construction never writes `parameters` (`refuseWrittenParameters`): an open record's parameters are the list before
+  its body, `<T> { … }` or `<T> !meta.record { … }`, and a parameter list before any other head is refused
+  (`openInstance`, `design/open-records.md`).
 - An atom instance is **ATOM-kinded and not itself applicable**; both halves are needed, and IS-A `meta.atom` alone runs
   backwards (true of the constructor, false of every instance).
 - `!meta.alias { target: X }` resolves to the alias's own entry — `kind: ALIAS`, `X` as source and body — the same
   entry `name => X` denotes.
 - Construction transfers kind and no supertypes (§5.5), so an instance carries an empty chain and is not itself a
   constructor. Any schema may declare a constructor; nothing ties it to what the document imports.
-- A constructor's parameters are confined to no channel: nothing is checked at the declaration, and each channel is
-  decided where the argument lands.
 - `C<args>` over a constructor (a closed record IS-A `meta.type`) is the construction `!C { … }` over its argument
   slots (§5.3, `ConstructionSugar`), and resolves through the very path the braced form takes: a declaration through
   `resolveInstance`, a use site through the constructor's reader into the content-keyed synthetic. No verdict is the
   sugar's own but the argument count and an argument that is no reference.
 
 Related: `design/schema-resolution.md` (the resolution phase around this), `design/atom-refinement-and-coherence.md`
-(`!I ^ { ... }`), `design/template-materialisation.md` and `design/held-template-bodies.md` (how `C<...>` closes),
+(`!I ^ { ... }`), `design/template-materialisation.md` and `design/open-records.md` (how `C<...>` closes),
 `design/resolver-vocabulary-and-bootstrap.md` (alias hops, the vocabulary), `design/linking-and-compilation.md`.
 
 ## Constructor application (`tson-compiler/.../resolver/DefinitionResolver.java`)
@@ -47,11 +46,9 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   (§5.10); `!C { ... }` fills a *constructor's* own vocabulary (§4.2). Different operations, and the check
   is on being a template — having parameters — so any §5.10 template gets the
   same advice instead of the "did you mean atom refinement?" hint, which cannot help when what is missing is
-  the argument list. **This check is what keeps the `RecordBody` check below it sound**: a parameterised
-  declaration is either held (a `TemplateBody`) or a record template (a `RecordTemplateBody`), so without it
-  `!my_set { … }` would reach an `IllegalStateException` — this project's spelling of *an internal invariant broke*,
-  which the CLI reports as a library fault at exit 70 — and `!box { … }` over a record template would apply a
-  template as a constructor.
+  the argument list. **This check is what keeps the construction below it sound**: a parameterised declaration is
+  an open record, a `RecordBody` like any constructor's, so without it `!box { … }` over an open record composing
+  `meta.top` would apply a template as a constructor.
   `TemplateClosesByApplicationTest` pins all of it.
 - **A construction head resolves through its alias chain first** (§8.3, `resolveConstructorTarget`).
   An alias is a hop, not a rewrite, so `alias_array => meta.array` makes `!alias_array { … }` an application of
@@ -64,27 +61,25 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   entry. §4.1 makes every base kind IS-A `meta.top` and every constructor transitively so, while IS-A stops at
   construction — an instance or a fresh record carries an empty chain — so the predicate admits every constructor and
   nothing else. Over the bundled schemas that is every vocabulary constructor plus `meta.top`, `meta.type`, the three base
-  kinds, `meta.namespace`, `meta.alias` and `meta.template` — judged by where `meta.top` is defined (one predicate the
-  resolver, the compiled vocabulary's reader table and the linker all ask), and over a template's chain as over a closed
-  one's. Every other head is an ordinary type, and the entry is a value of it (`resolveValueEntry`): a component record,
-  `!meta.record_field { … }`, a namespace type, `!api { … }`, and a consumer's record type, `!operation { … }`, alike. **A
+  kinds, `meta.namespace`, `meta.alias`, `meta.reference_type` and its refinement `meta.ref` — judged by where `meta.top`
+  is defined (one predicate the resolver, the compiled vocabulary's reader table and the linker all ask), and over an
+  open record's chain as over a closed one's. Every other head is an ordinary type, and the entry is a value of it
+  (`resolveValueEntry`): a component record, `!meta.record_field { … }`, a namespace type, `!api { … }`, and a consumer's
+  record type, `!operation { … }`, alike. **A
   per-entry constructor marker would be both too narrow and inconsistent.** `meta.alias` describes no value, so it would go
-  unmarked, and the language needs it applicable — which takes a by-name exception that the open and closed paths must then
-  both remember, or `<T> !meta.alias { target: T }` resolves while `!meta.alias { target: int32 }` does not, one construction
-  with two answers. IS-A `meta.top` needs no exception. `meta.top`, `meta.type` and the base kinds are admitted and then
+  unmarked, and the language needs it applicable — which takes a by-name exception. IS-A `meta.top` needs none. `meta.top`,
+  `meta.type` and the base kinds are admitted and then
   refused as abstract (§4.1, `refuseAbstractHead`): each is `extension: ABSTRACT`, so its reader is the abstract dispatch
   every abstract record has, and a tag naming the base itself is refused naming the subtypes that would satisfy the position,
   which is the better message. **Admitting `meta.alias` closed means giving it the alias's own entry**, not just letting it
   through: `!meta.alias { target: X }` resolves to `kind: ALIAS` with `X` as its body, the same entry `name => X` denotes
   (§8.3), where a construction of any other head takes the head's kind and records the head as its constructor
-  (`design/schema-resolution.md`). The closed path dispatches on the *body* being an `Alias`, having already read it;
-  `resolveInstanceTemplate` holds its body unread and so goes by the head's name. **`meta.template` is admitted by the
-  predicate and refused by name** (`requireAuthorable`, on both paths). It is IS-A `meta.top` because resolved output is
-  typed by it, but it is resolver vocabulary (§8.1): an open entry's body, derived from a declaration's `<…>` and never
-  applied by a source declaration. Admitted, `!meta.template { parameters: [T] template: "…" }` would mint an open entry with
-  a hand-written held body, skipping every declaration-time check §5.10 makes of a template. Tested at the chain's end, so an
-  alias of it is refused too. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's question — *is
-  this an atom instance?* — as **ATOM-kinded and not itself applicable**, which is exactly what an instance is: §4.1's "IS-A
+  (`design/schema-resolution.md`); the path dispatches on the *body* being an `Alias`, having already read it. **A
+  construction of `meta.record` writing `parameters` is refused** (`refuseWrittenParameters`, tested at the head's chain
+  end): admitted, it would mint an open record whose parameters no `<…>` put in scope, skipping every declaration-time
+  check §5.10 makes of a template. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's question —
+  *is this an atom instance?* — as **ATOM-kinded and not itself applicable**, which is exactly what an instance is: §4.1's
+  "IS-A
   does not extend below construction" is what separates the pair, `!T {}` transferring kind and not supertypes, so `integer`
   carries an empty chain where `numeric.integer_type => meta.atom & { … }` carries `[meta.atom, meta.top]`. **Both halves are
   needed, and the obvious single test runs backwards.** IS-A `meta.atom` is true of the *constructor* and false of every
@@ -108,15 +103,12 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   composes `meta.type` (`c => meta.product & { … }`), the instance would be a type, whose body must be one of the schema
   model's, and it is refused as `NOT_IMPLEMENTED` (`unmodelledType`): a gap, since a generic body for such an instance is
   open work.
-- **A parameter is a type, wherever the template's body applies a constructor** (§5.10): it stands at a slot that
-  names a type, or as an argument of an application, and anywhere else is refused at the declaration, naming the slot
-  (`design/held-template-bodies.md`). A pin is a field's value, so a refinement template pinning a slot to its
-  parameter — `my_set => <T> array ^ { element_type?: = T }`, `meta.type_ref`-typed or not — is refused with every other
-  parameter at a value. A parameter standing as a *field type* or a *variant* closes into a working type
-  rather than a tolerated one: `ctor_box => <T> base & { value: T }` with `flagged => ctor_box<boolean>`
-  materialises, compiles, accepts `{ value: true }` and rejects `{ value: banana }` with a `TYPE_MISMATCH` at
-  `/value`, and the variant channel behaves the same
-  (`DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord`).
+- **A template over a constructor is refused; the constructor is applied instead** (§5.10): `<T> !meta.array {
+  element_type: T  min_items: 1 }` has no home for `parameters`, so `openInstance` refuses it, naming the remedy -- the
+  application where it is used (`meta.array<T>`, `[T]`), or a refined constructor declared once and applied
+  (`nonempty_type => meta.array ^ { min_items?: = 1 }`, then `nonempty_type<T>`). A pin is a field's value, so a
+  refinement template pinning a slot to its parameter -- `my_set => <T> meta.array ^ { element_type?: = T }` -- is refused
+  with every other parameter at a value (`ParameterTypes.atValue`).
 
 ## Construction sugar (`resolver/ConstructionSugar.java`)
 
@@ -130,8 +122,14 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   it, and it is the rule `[T]` and `{K => V}` already follow.
 - **A constructor here is a closed record IS-A `meta.type`** (`ConstructionSugar.constructs`), read past the head's
   alias hops: its instances are types. A head composing `meta.top` alone builds values and is no constructor of this
-  rule, and an open entry substitutes (§5.10). The check runs before the template path in both places an application
-  resolves, so a head is asked once which operation it stands for.
+  rule, and an open record substitutes (§5.10) whatever its chain reaches -- `listed => <T> meta.atom & { … }` composes
+  `meta.top` and is still a template. The check runs before the template path in both places an application resolves,
+  so a head is asked once which operation it stands for.
+- **The kernel applies its own constructors this way**: the root's `set => meta.set_type` is an alias, so `set<text>`
+  constructs `!meta.set_type { element_type: text }` through it, and `meta.ref => meta.reference_type ^ {
+  allow_sibling?: = false }` is a refined constructor, so `meta.ref<method>` is `!meta.ref { of: method }`. A refined
+  constructor's construction is an instance of the refinement, a subtype constructor, so a question about what a body
+  is goes by the constructor's chain (`meta.ref` IS-A `meta.reference_type`, `meta.set_type` IS-A `meta.array`).
 - **A declaration is the construction** (`DefinitionResolver.construction`): the payload is built and handed to
   `resolveInstance` as `!C { … }`, so `text_list => meta.array<text>` gets every check and fact the braced form does,
   its tag the head as written, and records no application. **A use site names the synthetic**
@@ -141,7 +139,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   wrote them, not dereferenced, as the sugar forms write theirs. Nothing is owned: a use site names the content-keyed
   entry whatever a declaration elsewhere constructs, as `[text]` does.
 - **The sugar decides where an argument lands and nothing else.** The arity (`requireArity`, also the linker's
-  `checkArity` over a held reference such as `meta.array<T>` in a record template) is refused here; a literal
+  `checkArity` over a held reference such as `meta.array<T>` in an open record) is refused here; a literal
   argument (`meta.array<3>`) never arrives, the grammar refusing it where it is written (§5.10); an argument a slot's
   `of` refuses is refused at link as the braced form's is; a required field no
   slot fills leaves the construction incomplete and the constructor's reader refuses it. A refined constructor's

@@ -1,132 +1,70 @@
-# Desugaring: open forms and templates
+# Desugaring: forms over a parameter, and template bodies
 
-Design notes for the half of `SchemaDesugarer` that deals with type parameters: which sugar forms lift open, how a
-parameterised alias is normalised into a held `!C value` body, and how a record template is written as the labelled
-`!meta.record_template` payload it denotes. Current form only; history lives
-in git. The sugar table and the naming rule these bullets refer to are in `design/schema-grammar-and-desugaring.md`.
+Design notes for the half of `SchemaDesugarer` that deals with type parameters: what a sugar form over a parameter
+becomes inside an open record (`openForm`), and which template bodies are refused before anything resolves
+(`refuseTemplateBody`). Current form only; history lives in git. The sugar table and the naming rule these bullets refer
+to are in `design/schema-grammar-and-desugaring.md`; what an open record is, in `design/open-records.md`.
 
 **Invariants**
 
-- A form naming none of the enclosing declaration's parameters lifts *closed*; a form naming one lifts *open*, carrying
-  just the parameters it uses, renamed positionally.
-- A declaration's own sugar body keeps the declaration's parameter list as written, not the subset the body names.
-- A size bound naming one of the declaration's parameters is refused here (`refuseParameterBound`), naming the slot:
-  a parameter is a type (§5.10), and the lift would rename it before any later check could name it.
+- **A template's body is a record body** ([TSON-SCHEMA] §5.10): braces, a composition or a refinement, which pass through
+  as they would without parameters, for `DefinitionResolver` to build as an open record. A parameter list before a
+  sugar form or a bare reference is refused here, naming what to write instead (`refuseTemplateBody`); before a
+  construction (`<T> !C { … }`) it passes through, `DefinitionResolver.openInstance` admitting `!meta.record` alone,
+  since only the resolver knows what the head is.
+- **Inside an open record a form over a parameter is admitted only where it is a reference** (`openForm`): `[T]` is
+  written as the application `meta.array<T>` and `{K => V}` as `meta.map<K V>`, held as written until the record is
+  applied. A size or a `?` element (`[T; 1..]`, `{K => V; ..10}`, `[T?]`), a tuple (`[T, text]`) and a choice (`( T |
+  error )`) over a parameter are refused at the declaration, naming the form; a choice's message points at field
+  groups.
+- **Nothing is lifted for a form over a parameter.** There is no open synthetic entry: a form naming none of the
+  declaration's parameters lifts closed, as it would outside a template (§5.3's one lift rule), and a form naming one
+  is a reference or an error.
+- **A size bound naming one of the declaration's parameters is refused** (`refuseParameterBound`), naming the slot,
+  before the form lifts closed with a parameter in it: a bound is a count, never a type.
 - `WireForm.refValue` is the single place a type slot's shape is decided: one producer, one spelling, because
   `DerivedName.ofBinding` hashes what is written.
-- `DataClassObjectWriter` cannot produce a held body: `HeldBody.names()` and substitution key on a token being
-  *unquoted*.
-- Only a *template* is normalised; a closed record or closed alias resolves at its declaration. A record template,
-  sugar or explicit `<T> !meta.record { … }`, is written as the `!meta.record_template { … }` it denotes, each
-  whole-type parameter labelled here, where the parameters are in scope (`RecordTemplateDef`), and the resolver binds
-  it (`DefinitionResolver.openRecord`). A parameter at any other slot is written as it stands, for the resolver to
-  refuse naming the slot.
-- Only what the author wrote is written into a record template's payload — no fixed constructor fields, no field
-  facts at their `meta.record_field` defaults.
-- §5.11's uniqueness rule is asked here as well as in the resolver; the two see different phases' bodies.
+- A refused declaration is replaced with the absorbing stand-in, an open empty record keeping its parameters
+  (`absorbed`), so an application of it closes against an empty body and says nothing further.
 
 Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived names, reporting),
-`design/schema-grammar.md`, `design/template-materialisation.md`, `design/held-template-bodies.md`,
-`design/references.md` (a reference carrying arguments).
+`design/schema-grammar.md`, `design/template-materialisation.md` (how a held reference closes),
+`design/open-records.md`, `design/references.md` (a reference carrying arguments),
+`design/constructor-application.md` (construction sugar).
 
-## Which entry a form lifts to: open and closed lifts
+## Forms over a parameter (`openForm`)
 
-- **Which entry a form lifts to is §5.3's one lift rule, and the enclosing declaration's parameters do not
-  enter it.** A form naming none of them lifts *closed*, template or not; a form naming one lifts *open* — an
-  `Instance` carrying just the parameters it uses, with the position that held it applying them straight
-  back (`<T> { a: [T] }` injects `array_p0_… => <p0> !meta.array { element_type: p0 }` and the field becomes
-  `array_p0_…<T>`). So `<T> { a: [T]  b: [order] }` injects one of each, and only the first waits for
-  materialisation.
-  - **The parameters are renamed positionally**, because two forms alike up to a consistent renaming are one
-    template (§8.2) and the name is derived from the record — so normalising the record is what normalises
-    the name. The prefix grows (`p`, `pp`, …) until it collides with nothing the record already names: a
-    binding may hold a concrete reference to a type genuinely called `p0`.
-  - **A declaration's own sugar body is the open construction**, one tier up from the same rule:
-    `vector => <T> [T]` *is* the open construction, and its parameters are the declaration's list as
-    written, not the subset the body names — a declared parameter the body never uses is an error the linker
-    reports, and dropping it here would hide the very thing it looks for.
-  - **A size bound is a count, never a parameter.** `[T; N]` with `N` a parameter is refused before it lifts
-    (`refuseParameterBound`), naming the slot; a bound is otherwise carried as its token, for `array`'s own
-    `min_items` to read.
-  - **A scalar type slot may hold an application**, not just a name — which is what makes `[tree<T>; 1..]`
-    and `[[T]]` lift at all. The table keeps both renderings of such a slot: the wire field a closed
-    construction would write (the reference, `element_type: tree<p0>`, which is what
-    `DerivedName.ofBinding` hashes) and the reference *as written*, which is what an open binding holds. Only
-    `element_type`/`key_type`/`value_type` are reached this way, a named slot being the one an open binding
-    can address; `tuple` and `choice` put their positions inside a collection, so they keep only the first
-    rendering — written through the same `WireForm.refValue` producer, since a `[meta.type_ref]` holds what a
-    `meta.type_ref` holds, and rewritten a pass later by `MetaRefs.mapRefsKeepingChain`, which maps a choice's variants
-    and a tuple's elements like any other reference.
-    - **No slot refuses an application, because a slot that did would not fail where it decided.** A
-      `choiceBinding` requiring a bare name per variant would leave `( box<text> | int32 )` unlifted *whole*, to
-      reach `DefinitionResolver` as a `ChoiceExpr` it has no case for — and, inside a template, to reach
-      `refValue`, whose two inputs are `NameRef` and `ApplicationRef`.
-    - **A closed construction writes the reference and lets materialisation close it.** Its body goes
-      through the constructor's own reader, so the application has to survive a wire hop, and the resulting
-      entry names something that is not an entry yet — for exactly the window an ordinary forward reference
-      lives in, since `close()` walks every closed entry's references after the driving loop. It rests on a
-      kind slot reading an application in a kernel body (`KindSlotReader`, `design/references.md`).
-    - **A size bound reaches identity as its token**, and `NumericIdentity` applies [TSON-DATA] §4.3's
-      equivalence there, so `[float32; 255]` and `[float32; 0xFF]` are one binding record — radix, digit
-      separators and a redundant sign falling away. §8.2 states exactly that split: recorded as written, compared
-      as the value the token denotes under §4, "and no wider".
-  - **All four sugar forms lift open, collections included** — a parameter stands at a tuple's or a choice's
-    positions as readily as at an array's element. `tuple` and `choice` bind a collection (`elements`,
-    `variants`); a held body is not read against the constructor's vocabulary at all until materialisation
-    substitutes, so a parameter inside a collection is a token inside an array and lifts like any other,
-    `result => <T> ( T | error )` being the spec's own example.
-  - **The open form is the closed form**, so there is no per-slot analysis: one binding record
-    serves both, since a parameter in a slot is simply the token standing there. `instance(binding,
-    typeParams)` builds either, and the phase needs no rule for how to quote a parameter — only for whether
-    the declaration around it has one.
+- **The test is whether the form is a reference.** `container` expands a form's positions first, innermost-first, then
+  asks whether any of them names a parameter of the enclosing declaration (`parameterIn`, through application
+  arguments at any depth). If none does, the form lifts closed by the table. If one does, `openForm` decides.
+- **`[T]` and `{K => V}` are the grammar's spelling of a construction** (§5.3's sugar table, construction sugar), so
+  over a parameter they are written as the construction's own application: `[box<T>]` becomes `meta.array<box<T>>`,
+  `[[T]]` becomes `meta.array<meta.array<T>>` (the inner form already an application by the time the outer is built),
+  `{text => T}` becomes `meta.map<text T>`. The open record holds that reference as written, a `ParamRef` among its
+  arguments, and when the record is applied the materialiser constructs it -- the same content-keyed entry the sugar
+  written over the argument lifts to (`design/template-materialisation.md`).
+- **A size or a `?` sets a field no argument list carries.** `meta.array<T>` fills `element_type` alone; admitting
+  `[T; 1..]` would take a refined constructor nobody wrote, and would leave the line between it, `{text => T}` and `( T
+  | text )` to be argued form by form. The author writes the constructor (`nonempty_type => meta.array ^ { min_items?:
+  = 1 }`, then `nonempty_type<T>`) or moves the container into the argument; the message says both.
+- **A tuple or a choice is no constructor over reference fields.** Their positions are a list, so construction sugar
+  does not reach them, and an untagged sum over a parameter cannot be judged disjoint until it is applied (§5.4). A
+  labelled alternative inside the record is a field group, `( body: T | problem: problem )`.
+- **An inline record over a parameter needs no rule here**: §5.3 already refuses a bare record at a field position.
 
-## Parameterised aliases
+## Template bodies (`refuseTemplateBody`)
 
-- **A parameterised alias is normalised here as well** (§5.10's partial application). `uuid_pair => <B>
-  pair<text, B>` leaves this phase as `<B> !meta.alias { target: pair<text B> }` — §8.1's own reading of what
-  an alias body is, spellable because the kernel's `alias.target` is a reference, which may carry arguments.
-  With it no open form is anything but a constructor application: §12.1's
-  `[type-params] "!" type-name ws core-value` covers every template and one walk closes them all.
-  - Only a *parameterised* one. A closed alias (`text_box => box<text>`) resolves to an `ALIAS` entry
-    directly, the way a closed record resolves to a `RecordBody`: nothing about it is deferred, so there is
-    nothing to hold.
-
-## Record templates
-
-- **A record template is normalised here too, and for the same reason the sugar forms are** (`recordTemplate`).
-  §5.2 says a bare record body denotes a record construction, and with parameters that is a `record_template`, so
-  `test => <T> { x: T }` leaves this phase as the `RecordTemplateDef` `<T> !meta.record_template { fields: { x => {
-  type_param: T } }  parameters: [ { name: T } ] }`. The rule is as fixed and as closed as the
-  sugar table: §5.2's six field spellings decide `state` and `value` from the two marks the author wrote, and nothing
-  else is consulted. The explicit `<T> !meta.record { … }` takes the same labels (`labelled`), every other slot
-  carried as written for the resolver to answer in `meta.record`'s terms.
-  - **Its own `TypeDef`, so no flag tells it from an author's construction.** A written `!meta.record_template { … }`
-    is an `Instance`, refused as resolver vocabulary (`requireAuthorable`); the desugarer's is a `RecordTemplateDef`,
-    which no parser builds, and goes straight to `openRecord`.
-  - **Only a *template*.** A closed record still resolves at its declaration into a `RecordBody`, because
-    nothing about it is deferred. **Every** template takes it: there is no marker to route one elsewhere. The
-    two paths share the §5.2 state
-    table (`FieldModifiers`) so the spellings and the errors around them cannot drift apart between a template and
-    the closed record beside it.
-  - **Only what the author wrote is written.** `access_pattern` and `size_type` are fixed on the `record`
-    constructor, and an unmarked field's facts are `meta.record_field`'s own defaults, so none of them is stated —
-    the same economy `arrayBinding` makes with an unmarked element's `state`, and what keeps the held form the
-    one the author would recognise.
-  - **The rewrite has to be here rather than in the resolver.** Resolving the body and writing the resolved
-    form back out puts a *second producer* in front of a wire form two later phases read, and since
-    `DerivedName.ofBinding` hashes what is written, a second spelling is a second entry for one type. One
-    producer, one spelling: `WireForm.refValue` is the single place a type slot's shape is decided.
-  - **A parameter is labelled where it is written** (`label`, §5.10's shadowing rule over the source spelling): a
-    bare parameter name in `type` is the field's `type_param`. A parameter in `value` is not labelled -- a field's
-    value is never a parameter -- and is refused by the resolver naming the slot. A positional field (`a => T`) is
-    spelled out and labelled the same way, so the explicit form's three spellings of one field are one template field.
-  - **A composition or refinement template is built one phase later**, as the *flattened* record template
-    (`DefinitionResolver.Built`, over its own `BuiltField`). Both absorb fields from a source, and a §5.7 tightening entry
-    states a modifier and no type-ref, so it is not a field at all until the inherited field supplies one. That needs a
-    namespace this phase does not have, so the flattening happens in the resolver, which labels each entry the declaration
-    writes as it resolves it and writes no wire form for the template at all.
-  - **§5.11's uniqueness rule is asked here as well**, and asking it twice is not duplication: the resolver's
-    copy sees a closed record body and this one sees a template's, which after normalisation are two
-    different phases. Left to the constructor's own reader instead, the wire form carries one name twice as
-    a key of `fields`, and the map's duplicate-key refusal would name neither the declaration nor which way
-    the name was repeated — a field twice, or a group member repeating one.
+- **Before a sugar form**: `<T> [T]` and `<V> {text => V}` are constructions, written where they are used
+  (`meta.array<T>`, `[T]`) or declared as a refined constructor and applied; `<T> ( T | error )` is a discriminated
+  record family or a field group; `<A, B> [A, B]` an open record's fields, or one tuple per type.
+- **Before a bare reference** -- an alias template, `uuid_pair => <B> pair<uuid, B>` or `ident => <T> T` -- the body is
+  no record, and names a partial application nothing could close (§5.10: there is no partial application). The
+  remedy is restating the body as a record or writing the application at each use.
+- **A record body is not rewritten.** `<T> { x: T }` leaves this phase as the `StructuralTypeDef` it was parsed as, its
+  closed forms lifted and its forms over a parameter written as references, and the resolver builds it the way it
+  builds a closed record (`DefinitionResolver.resolveRecordBody`). The explicit `<T> !meta.record { … }` passes through
+  as the `Instance` it is. §5.11's uniqueness rule and the modifier-only refusal are therefore asked once, by the
+  resolver, for a template and the closed record beside it alike (`FieldModifiers`).
+- **An application passes through.** `box<text>` keeps its head and arguments for materialisation; the one thing
+  asked here is that a local head declaring no parameters, with a body no constructor has, takes no arguments
+  (`checkTemplateApplication`).

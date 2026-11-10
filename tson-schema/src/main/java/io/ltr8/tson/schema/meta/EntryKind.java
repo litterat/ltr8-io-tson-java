@@ -14,22 +14,11 @@ public enum EntryKind {
      * A value entry ({@link ValueEntry}): an instance of an ordinary type, {@code orders => !api { ... }}. It is
      * no type, and no kind holds it.
      */
-    VALUE,
-
-    /**
-     * A held template -- [TSON-SCHEMA] §5.10's open entry over any constructor but {@code record}, whose body is a
-     * {@link TemplateBody}. It is not a type: it cannot validate data, and naming one where a type is expected is
-     * a resolver error. A record template ({@link RecordTemplateBody}) is no type either, and takes the kind of the
-     * record each application closes to: PRODUCT, or the base kind its chain reaches. Like {@link #ALIAS} a held
-     * template is a {@code meta.type_ref} and not a base kind (§4.1), and it says nothing about what an
-     * application of the template will produce -- that is the kind of the entry materialisation mints, derived
-     * from the constructor its closed body applies.
-     */
-    TEMPLATE;
+    VALUE;
 
     /**
      * {@code value}'s kind. A body is the branch of {@link Top} it occupies -- an instance takes its constructor's
-     * kind by being built as one (§5.5's transfer) -- except a record or a record template, whose kind is the base
+     * kind by being built as one (§5.5's transfer) -- except a record, open or closed, whose kind is the base
      * kind its chain reaches ({@link #ofChain}): {@code integer_type => atom & { ... }} is a record describing
      * atoms, and the kind of a constructor is what its instances are.
      *
@@ -40,12 +29,12 @@ public enum EntryKind {
     public static EntryKind of(Top value, Predicate<String> kernel) {
         return switch (value) {
             case RecordBody record -> ofChain(record.supertypes(), kernel);
-            case RecordTemplateBody template -> ofChain(template.supertypes(), kernel);
+
             case Atom ignored -> ATOM;
             case Product ignored -> PRODUCT;
             case Sum ignored -> SUM;
             case Alias ignored -> ALIAS;
-            case TemplateBody ignored -> TEMPLATE;
+
             case ValueEntry ignored -> VALUE;
         };
     }

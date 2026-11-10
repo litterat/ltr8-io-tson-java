@@ -18,14 +18,11 @@ package io.ltr8.tson.schema.meta;
  * makes binding straight against {@code Top}/{@link Atom} practical at all (see {@code ltr8-bind}'s
  * own README "Under development" history for the bug this fixed).
  *
- * <p>{@link TemplateBody} describes something other than a constructed value, and composes with {@code top}
- * directly for that reason: the held body of an entry that declares type parameters, an ordinary record carrying
- * the application as text.
- *
+
  * <p>{@link ValueEntry} is the one branch that is not built by a constructor: an entry whose value is an instance of
  * an ordinary type, {@code orders => !api { ... }} or {@code create_order => !operation { ... }}. It is a value,
  * never a type, and is how a schema puts vocabulary of its own in a schema map. Every branch is sealed, so an
  * entry's kind is decidable by inspection and every switch over them is exhaustive.
  */
-public sealed interface Top permits Type, Alias, TemplateBody, ValueEntry {
+public sealed interface Top permits Type, Alias, ValueEntry {
 }

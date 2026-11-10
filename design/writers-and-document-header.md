@@ -124,7 +124,7 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
   type-ref, the sinks it writes to) where an engine owns one value and contributes no framing. `AstWriter`
   and `AtomWriter` are engines too and live there beside them.
 - **The resolver reaches for the engine, never the facade.** `DefinitionResolver`'s atom-refinement merge
-  and `HeldBody`'s held template body both write a wire record and parse it straight back, where a header
+  and `WireForm.annotationValue` both write a wire record and parse it straight back, where a header
   would be content the parse would then have to strip — so what they want *is* the engine's contract. It is
   also what keeps the direction honest: a resolver naming `TsonObjectWriter` would make the engine depend
   on a front door built over it.

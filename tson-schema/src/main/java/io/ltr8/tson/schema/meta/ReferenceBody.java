@@ -15,10 +15,11 @@ import java.util.Optional;
 import java.util.function.BiPredicate;
 
 /**
- * An instance of the kernel's {@code reference_type} constructor, resolved ([TSON-SCHEMA] §4.2, §5.12): the atom whose
- * values are names, each naming an entry whose value's type, past its alias hops, IS-A {@link #of}.
- * {@code meta.ref<record>} and {@code !meta.reference_type { of: record  allow_sibling: false }} are one instance; the
- * template is a spelling, and the slot's meaning comes from {@link #of}.
+ * An instance of the kernel's {@code reference_type} constructor, or of its refinement {@code ref}, resolved
+ * ([TSON-SCHEMA] §4.2, §5.12): the atom whose values are names, each naming an entry whose value's type, past its
+ * alias hops, IS-A {@link #of}. {@code meta.ref<record>} is the construction {@code !meta.ref { of: record }}, its
+ * {@code allow_sibling} pinned false by the refinement; the slot's meaning comes from {@link #of}, whichever of the
+ * two built it, so a question of whether a body is a reference goes by the constructor's chain, never its name.
  *
  * <p><b>{@link #of} is a {@link TypeRef}</b>, the kernel typing it {@code meta.type_ref}, so a body may write an
  * application there: {@code !meta.reference_type { of: box<text> }} is {@code meta.ref<box<text>>}. Resolution closes

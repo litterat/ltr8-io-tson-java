@@ -13,6 +13,8 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -30,23 +32,21 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /**
- * How schema vocabulary is spelled as data, in both directions -- the one place that knows what a reference and a
- * held application look like on the wire, and the one that rewrites a parameter standing inside one. A record
- * template is no held body: {@code SchemaDesugarer} writes its payload labelled, and it is substituted on the model
- * afterwards ({@code RecordTemplateSubstitution}).
+ * How schema vocabulary is spelled as data, in both directions -- the one place that knows what a reference and an
+ * application in a slot look like on the wire.
  *
- * <p><b>Why one class rather than a producer over here and a consumer over there.</b> A held body is written
- * by one phase and read by four: {@code SchemaDesugarer} lifts a sugar form; {@code TemplateMaterialiser} closes
- * one, {@link HeldBody} answers §5.10's declaration-time questions about one, {@code SyntheticMerge} asks whether
- * one holds an application, and {@code ParameterTypes} walks one for §5.10's parameter types. A second opinion
- * about what an application looks like is what makes one of those wrong.
+ * <p><b>Why one class rather than a producer over here and a consumer over there.</b> A binding record is written
+ * by two phases and read by three: {@code SchemaDesugarer} lifts a sugar form and {@code TemplateMaterialiser}
+ * names a closed record by its content ({@link #recordWire}); {@code TemplateMaterialiser} closes the applications
+ * a binding holds, {@code SyntheticMerge} asks whether one holds an application, and {@code ParameterTypes} walks
+ * an open record's explicit payload for where its parameters stand. A second opinion about what an application looks
+ * like is what makes one of those wrong.
  *
  * <p><b>Nothing here is canonical output, and {@code DataClassObjectWriter} cannot serve any of it.</b> That
- * writer's output is canonical-explicit and fully quoted, which is a different language from the one a held
- * body is written in: {@code TemplateBody.names()} and {@link #substitute} both key on a token being
- * unquoted, so a quoted body references no parameters at all. What is written here is what an author would
- * have written -- an unquoted token where the writer would quote, an application as the data grammar's reference,
- * and nothing at all where the constructor's own default says it.
+ * writer's output is canonical-explicit and fully quoted, which is a different language from the one a binding is
+ * named in: a name is an unquoted token. What is written here is what an author would have written -- an unquoted
+ * token where the writer would quote, an application as the data grammar's reference, and nothing at all where the
+ * constructor's own default says it.
  *
  * <p><b>One spelling per shape is the requirement, not the tidiness.</b> An entry name derives from what is
  * written ({@code SchemaDesugarer.internalName}), so a second spelling of one reference splits one type
@@ -54,6 +54,9 @@ import java.util.function.Function;
  * {@link #applicationIn} -- its inverse -- lives beside it rather than in the phase that happens to read.
  */
 final class WireForm {
+
+    /** Writes a bound annotation value back as text, for {@link #annotationValue} to parse. */
+    private static final DataClassObjectWriter ANNOTATION_WRITER = new DataClassObjectWriter();
 
     private WireForm() {
     }
@@ -63,23 +66,14 @@ final class WireForm {
     /** {@code meta.record_field.value}: §8.1's literal channel. */
     static final String VALUE = "value";
 
-    /** {@code meta.record}: the constructor a record template's explicit spelling applies, and its members close to. */
+    /** {@code meta.record}: the constructor an open record applies, and an application of one closes to. */
     static final String RECORD = KernelNames.of("record");
 
-    /** {@code meta.record_template}: the constructor {@code SchemaDesugarer} writes a record template's body with. */
-    static final String RECORD_TEMPLATE = KernelNames.of("record_template");
-
     static final String RECORD_FIELD = KernelNames.of("record_field");
-    static final String RECORD_TEMPLATE_FIELD = KernelNames.of("record_template_field");
+
+    /** {@code meta.record.parameters}: an open record's parameters, each a {@code meta.param}. */
     static final String PARAMETERS = "parameters";
     static final String NAME = "name";
-
-    /** {@code meta.record_template_field.type_param}: a parameter standing for a field's whole type. */
-    static final String TYPE_PARAM = "type_param";
-
-    static final String ALIAS = KernelNames.of("alias");
-
-    static final String TARGET = "target";
 
     static final String FIELDS = "fields";
     static final String GROUPS = "groups";
@@ -110,14 +104,14 @@ final class WireForm {
 
     /**
      * {@code record.name_type} -- the type a record's field names are values of ([TSON-SCHEMA] §5.2). Written
-     * exactly where the record states one, so a held body keeps the difference between stating and not.
+     * exactly where the record states one, so a binding keeps the difference between stating and not.
      */
     static final String NAME_TYPE = "name_type";
 
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * A {@code meta.field_group} as a held body writes it: {@code optional_members} only where it names a member, and
+     * A {@code meta.field_group} as a binding writes it: {@code optional_members} only where it names a member, and
      * {@code optional} only where it is set.
      */
     static DataValue group(FieldGroup group, List<Annotation> annotations) {
@@ -139,7 +133,7 @@ final class WireForm {
     }
 
     /**
-     * {@code record.fields} as a held body writes it: a map from each field's declared name ({@link
+     * {@code record.fields} as a binding writes it: a map from each field's declared name ({@link
      * #declaredName}) to its {@code meta.record_field}, in declaration order. An empty one is the empty brace, which
      * is what the text parses back to.
      */
@@ -159,7 +153,7 @@ final class WireForm {
 
     /**
      * The same, carrying the annotations written on the construct it stands for. §6 puts a field's own
-     * annotations on the {@code meta.record_field} in resolver output, and a held body reaches that through the
+     * annotations on the {@code meta.record_field} in resolver output, and a binding reaches that through the
      * wire value, so they travel here rather than being re-attached after the fact.
      */
     static DataValue plain(CoreValue value, List<Annotation> annotations) {
@@ -168,8 +162,8 @@ final class WireForm {
 
     /**
      * A {@code meta.record_field}'s presence and role, each written only where it leaves the kernel's own default
-     * ({@code optional: false}, {@code voidable: false}, {@code role: FREE}) -- the one spelling both producers
-     * of a held record share, so a template body and the closed record beside it state a field alike.
+     * ({@code optional: false}, {@code voidable: false}, {@code role: FREE}) -- the one spelling every producer
+     * of a record binding shares, so two records stating one field state it alike.
      */
     static void addFacts(List<RecordValue.Field> members, boolean optional, boolean voidable, FieldRole role) {
         if (optional) {
@@ -191,8 +185,7 @@ final class WireForm {
      * A declared field name -- in {@code fields}, a group, {@code discriminators} -- as an author writes one:
      * unquoted where it is an identifier, quoted where it is not. A record's names are its name type's values
      * ([TSON-SCHEMA] §5.2), so {@code "@id"} or {@code "first name"} is a field name, and written unquoted
-     * it is not one token: a held body would not parse back. Quoting is safe for the parameter channel, which
-     * keys on unquoted tokens, because a parameter's name is an identifier and so is never quoted here.
+     * it is not one token: the binding would not parse back.
      */
     static TokenValue declaredName(String name) {
         return new TokenValue(name, IdentifierGrammar.validate(name).isEmpty() ? TokenForm.UNQUOTED
@@ -208,20 +201,6 @@ final class WireForm {
     }
 
     // ── Writing: a resolved value as the wire form it was written in ───────────────────────────
-
-    /**
-     * The held body of an <b>open alias</b> -- {@code <B> !meta.alias { target: pair<uuid B> }}, the form
-     * [TSON-SCHEMA] §8.1 says a partial application denotes: {@code alias.target} is a reference, and a reference
-     * may carry the arguments the alias already binds.
-     *
-     * <p>The target goes through {@link #refValue} like every other reference this package writes, so a
-     * no-argument target is a bare token and an application a {@link ReferenceValue} -- the one spelling §5.10
-     * requires, however many phases produce it.
-     */
-    static DataValue heldReference(TypeRef target) {
-        return new DataValue(List.of(), Optional.of(ALIAS), new RecordValue(List.of(
-                new RecordValue.Field(TARGET, plain(refValue(target))))));
-    }
 
     /**
      * A closed record's binding record, written as an author would write it -- what a minted record's name derives
@@ -261,9 +240,8 @@ final class WireForm {
         }
         List<RecordValue.Field> binding = new ArrayList<>();
         if (!parents.isEmpty()) {
-            // Held text's one chain slot, the parents as written (TypeChain.parents). Through refValue like every
-            // other reference: a closed parent is a bare token and only a parent still applied to a parameter
-            // carries arguments, which is what lets substitution close it.
+            // The one chain slot a binding writes, the parents as written (TypeChain.parents), through refValue like
+            // every other reference.
             binding.add(new RecordValue.Field(CHAIN, plain(new RecordValue(List.of(new RecordValue.Field(PARENTS,
                     plain(new ArrayValue(parents.stream().map(parent -> plain(refValue(parent)))
                             .toList()))))))));
@@ -298,18 +276,17 @@ final class WireForm {
     }
 
     /**
-     * A reference in the held spelling: a bare name an unquoted token, and an application a {@link ReferenceValue},
+     * A reference in the wire spelling: a bare name an unquoted token, and an application a {@link ReferenceValue},
      * written unquoted as data grammar ([TSON-DATA] §7.4).
      *
      * <p><b>One spelling is the requirement, not the tidiness.</b> An entry name derives from what is written, so a
-     * second spelling of one reference would give one type two entry names. That is why {@link TemplateMaterialiser}'s
-     * substitution writes a bound reference through this rather than spelling one of its own.
+     * second spelling of one reference would give one type two entry names.
      */
     static CoreValue refValue(TypeRef ref) {
         return ref.arguments().isEmpty() ? new TokenValue(ref.name(), TokenForm.UNQUOTED) : new ReferenceValue(ref);
     }
 
-    /** A record field's type in the held spelling: a type reference as {@link #refValue(TypeRef)}, a sibling as itself. */
+    /** A record field's type in the wire spelling: a type reference as {@link #refValue(TypeRef)}, a sibling as itself. */
     static CoreValue refValue(Reference ref) {
         return switch (ref) {
             case TypeRef reference -> refValue(reference);
@@ -321,32 +298,17 @@ final class WireForm {
 
     /**
      * The application {@code value} is, or empty where it is none: a {@link ReferenceValue}, the data grammar's
-     * reference with arguments. A bare name is an unquoted token, and a quoted token is never a reference, so a held
-     * body's text slot holding {@code "box<T>"} is text. Package-visible so {@link HeldBody} and {@code
-     * ParameterTypes} recognise an application by the same test that closes one.
+     * reference with arguments. A bare name is an unquoted token, and a quoted token is never a reference, so a
+     * text slot holding {@code "box<T>"} is text. Package-visible so {@code ParameterTypes} recognises an application
+     * by the same test that closes one.
      */
     static Optional<TypeRef> applicationIn(CoreValue value) {
         return value instanceof ReferenceValue(TypeRef reference) ? Optional.of(reference) : Optional.empty();
     }
 
-    /** The names an application writes: its head and every reference among its arguments, at any depth. */
-    static List<String> namesIn(TypeRef application) {
-        List<String> names = new ArrayList<>();
-        names.add(application.name());
-        for (TypeRef argument : application.arguments()) {
-            names.addAll(namesIn(argument));
-        }
-        return names;
-    }
-
-    /** {@code application} with each argument that is a bare name in {@code renames} renamed, at any depth. */
-    static TypeRef renamedArguments(TypeRef application, Map<String, String> renames) {
-        List<TypeRef> arguments = new ArrayList<>(application.arguments().size());
-        for (TypeRef argument : application.arguments()) {
-            arguments.add(argument.arguments().isEmpty() && renames.containsKey(argument.name())
-                    ? TypeRef.of(renames.get(argument.name())) : renamedArguments(argument, renames));
-        }
-        return TypeRef.of(application.name(), arguments, application.annotations());
+    /** A field annotation's bound value back in wire form, for {@link #recordWire}. */
+    static DataValue annotationValue(Object value) {
+        return new TsonDataParser(ANNOTATION_WRITER.toTson(value)).parseDocument().root();
     }
 
     static Optional<CoreValue> field(RecordValue record, String name) {
@@ -354,98 +316,10 @@ final class WireForm {
                 .map(f -> f.value().coreValue()).findFirst();
     }
 
-    // ── Substituting a parameter standing in a held body (§5.10) ───────────────────────────────
-
-    /**
-     * The held body with every token naming one of the template's parameters replaced by the argument applied
-     * for it -- at any depth, in a type slot, an argument list, or inside a collection alike.
-     *
-     * <p><b>A held token needs no channel label, and that is the whole economy of holding.</b> A typed open
-     * vocabulary has to record which slots hold a parameter; here the body is uninterpreted until this
-     * substitution finishes, so
-     * §8.1's shadowing rule decides it -- a token that resolves into {@code parameters} is a parameter, and
-     * anything else is what it looks like. Inside an application ({@link #applicationIn}) an argument naming a
-     * parameter is rewritten the same way, and the application written again through {@link #refValue}.
-     *
-     * <p><b>An argument may itself be open, and that is a supported use rather than an accident.</b>
-     * {@code DefinitionResolver} substitutes an operand's held body with the arguments an enclosing
-     * declaration wrote, which may be that declaration's own parameters -- the result is a held body still
-     * carrying them, absorbed as fields and closed when the enclosing declaration is. Nothing here has to
-     * know: a binding is a reference either way, and this walk never asks whether the token it
-     * writes is concrete.
-     */
-    static CoreValue substitute(CoreValue value, String head, List<String> parameters,
-            Map<String, TypeRef> bindings) {
-        return switch (value) {
-            case TokenValue token when token.form() == TokenForm.UNQUOTED
-                    && parameters.contains(token.text()) ->
-                    refValue(argumentFor(token.text(), head, bindings));
-            case ReferenceValue(TypeRef reference) ->
-                    refValue(substituted(reference, head, parameters, bindings));
-            case ArrayValue array -> new ArrayValue(array.elements().stream()
-                    .map(element -> rewritten(element, substitute(element.coreValue(), head, parameters,
-                            bindings))).toList());
-            case RecordValue record -> new RecordValue(record.fields().stream()
-                    .map(field -> substituteField(field, head, parameters, bindings)).toList());
-            // Both halves of an entry, because a parameter reaches either: one may stand in a key, and another
-            // inside the array its value names. Each half is a data-value ([TSON-DATA] §2.6), rebuilt with its
-            // own annotations and type-ref kept.
-            case MapValue map -> new MapValue(map.entries().stream()
-                    .map(entry -> new MapValue.MapEntry(
-                            retyped(entry.key(), substitute(entry.key().coreValue(), head, parameters, bindings)),
-                            rewritten(entry.value(), substitute(entry.value().coreValue(), head, parameters,
-                                    bindings))))
-                    .toList());
-            default -> value;
-        };
-    }
-
-    /** {@link #rescope}'s counterpart for a map key, which is a bare {@code data-value} and carries no scope. */
+    /** {@link #rewritten}'s counterpart for a map key, which is a bare {@code data-value}. */
     static DataValue retyped(DataValue original, CoreValue rewritten) {
         return new DataValue(original.annotations(), original.typeRef(), rewritten);
     }
-
-    /** One field of a held record, its value substituted. */
-    private static RecordValue.Field substituteField(RecordValue.Field field, String head,
-            List<String> parameters, Map<String, TypeRef> bindings) {
-        return new RecordValue.Field(field.name(),
-                rewritten(field.value(), substitute(field.value().coreValue(), head, parameters, bindings)));
-    }
-
-    /**
-     * An application with each argument naming a parameter replaced by the argument bound for it, at any depth. The
-     * head is never a parameter: {@code T<text>} applies one, which is no form §12.1 has.
-     */
-    static TypeRef substituted(TypeRef application, String head, List<String> parameters,
-                               Map<String, TypeRef> bindings) {
-        List<TypeRef> arguments = new ArrayList<>(application.arguments().size());
-        for (TypeRef argument : application.arguments()) {
-            arguments.add(argument.arguments().isEmpty()
-                    ? parameters.contains(argument.name()) ? argumentFor(argument.name(), head, bindings) : argument
-                    : substituted(argument, head, parameters, bindings));
-        }
-        return TypeRef.of(application.name(), arguments, application.annotations());
-    }
-
-    private static TypeRef argumentFor(String parameter, String head, Map<String, TypeRef> bindings) {
-        TypeRef argument = bindings.get(parameter);
-        if (argument == null) {
-            // A parameter of an enclosing template, still open: this application is not the one that closes
-            // it. Nothing today reaches here -- an application is closed only once every argument is concrete
-            // -- and saying so is what keeps that true rather than assuming it.
-            throw new UnsupportedOperationException("'" + head + "<...>' holds the parameter '" + parameter
-                    + "', which this application does not supply, and closing an open form onto another open "
-                    + "form is not implemented (§5.10)");
-        }
-        return argument;
-    }
-
-    /*
-     * An argument stands where its parameter stood in the held spelling, through refValue: a no-argument reference as a
-     * bare token, one carrying arguments as a ReferenceValue, so box<inner<T>> keeps inner<T> whole. Reusing the
-     * desugarer's producer is the requirement, not the convenience: two spellings of one form are two entries for one
-     * type, an entry name deriving from what is written.
-     */
 
     /** The same data value carrying a rewritten core value -- annotations and type-ref kept as written. */
     static DataValue rewritten(DataValue original, CoreValue rewritten) {

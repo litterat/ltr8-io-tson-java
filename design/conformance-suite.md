@@ -189,14 +189,12 @@ record-shaped code and is still a resolver error. What is checked per diagnostic
 a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch codes say the vector could not be judged, and
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
 
-**No `class2/schema/` subject declares a template yet, and nothing stops one now.** An open entry's body is
-the kernel's `meta.template` constructor carrying the application as text (`schema.meta.TemplateBody`), so it is a
-schema-map value like any other and reads back as ordinary data — where §8.1's older shape wrote the
-application as though it were a value of the constructor's own vocabulary, which no reader could apply
-(§8.1). `ResolvedForm` compares an open entry's body by its *parsed* form, §5.10's one
-spelling being about the application and not the whitespace, so the layer needs no expectation format of its
-own. Templates are covered at the `link/` layer meanwhile, over the entries they mint; `BACKLOG.md` carries
-the vectors that are owed.
+**A template's expected resolved form is a record.** An open record is a `!meta.record` carrying `parameters`, its
+parameters written where they stand as their names (`type: T`, `type: meta.array<T>`, `parents: [result<T>]`), so it
+is a schema-map value like any other, read back through `record`'s own reader with the record's `parameters`
+consulted before the namespace, and compared by `ResolvedForm` as every other entry is. An application of one is a
+closed `!meta.record` carrying `@meta.application` at its key; a construction (`meta.ref<X>`, `set<text>`) is an
+instance of its constructor and carries none.
 
 **Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
 with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, so a Part 1

@@ -11,15 +11,15 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.RecordTemplateField;
+
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.unicode.TextType;
-import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.VoidType;
@@ -159,13 +159,11 @@ class TsonSchemaLinkerTest {
                 refused.getMessage());
     }
 
-    /** A one-parameter record template whose one field {@code field} is typed by the parameter ([TSON-SCHEMA] §5.10). */
+    /** A one-parameter open record whose one field {@code field} is typed by the parameter ([TSON-SCHEMA] §5.10). */
     private static Top recordTemplate(String parameter, String field) {
-        AnnotatedMap<String, RecordTemplateField> fields = new AnnotatedMap<>();
-        fields.put(field, new RecordTemplateField(Optional.empty(), Optional.of(parameter), false, false,
-                FieldRole.FREE, Optional.empty(), null, null));
-        return new RecordTemplateBody(null, fields, null, RecordExtensionType.OPEN, null, Optional.empty(),
-                List.of(new TemplateParam(parameter)));
+        return new RecordBody(null, List.of(new Param(parameter)),
+                RecordBody.fieldMap(Map.entry(field, RecordField.required(TypeRef.of(parameter)))), null,
+                RecordExtensionType.OPEN, null, Optional.empty());
     }
 
     /**

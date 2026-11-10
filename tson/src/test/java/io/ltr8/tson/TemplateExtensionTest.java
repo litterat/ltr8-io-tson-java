@@ -6,7 +6,6 @@ import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 
@@ -49,7 +48,7 @@ class TemplateExtensionTest {
                   box  => <V> { item: V }
                   abox => abstract <V> { item: V }
                   pet  => <V> { type: text =?  value: V }
-                  arr  => <T> [T]
+                  arr  => <T> { items: [T] }
                 """);
         for (String template : List.of("box", "abox", "pet", "arr")) {
             assertEquals(Optional.empty(), FamilySelectors.extensionOf(entries.get(template)), template);
@@ -62,7 +61,7 @@ class TemplateExtensionTest {
     void anUnmarkedTemplatesApplicationIsOpen() {
         Namespace<Top> entries = entries("e2", "  box => <V> { item: V }\n  bt => box<text>\n");
 
-        assertEquals(RecordExtensionType.OPEN, ((RecordTemplateBody) entries.get("box")).extension());
+        assertEquals(RecordExtensionType.OPEN, ((RecordBody) entries.get("box")).extension());
         assertEquals(RecordExtensionType.OPEN, ((RecordBody) entries.get("bt")).extension());
     }
 
@@ -79,7 +78,7 @@ class TemplateExtensionTest {
     void aSelectorTemplatesApplicationDispatchesOnIt() {
         Namespace<Top> entries = entries("e4", "  pet => <V> { type: text =?  value: V }\n  pt => pet<text>\n");
 
-        assertEquals(RecordExtensionType.ABSTRACT, ((RecordTemplateBody) entries.get("pet")).extension());
+        assertEquals(RecordExtensionType.ABSTRACT, ((RecordBody) entries.get("pet")).extension());
         RecordBody applied = (RecordBody) entries.get("pt");
         assertEquals(RecordExtensionType.ABSTRACT, applied.extension());
         assertEquals(List.of("type"), applied.discriminators());

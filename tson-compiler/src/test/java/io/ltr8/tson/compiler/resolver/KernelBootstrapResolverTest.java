@@ -74,7 +74,7 @@ class KernelBootstrapResolverTest {
         // A sample spanning every construct DefinitionResolver already handles on its own.
         for (String name : List.of("meta.top", "meta.atom", "meta.product", "meta.sum", "meta.alias",
                 "numeric.integer_size", "numeric.integer_type", "meta.record", "meta.array", "meta.namespace", "meta.schema",
-                "meta.type_name", "meta.declared", "meta.map", "meta.tuple", "meta.choice", "meta.template")) {
+                "meta.type_name", "meta.declared", "meta.map", "meta.tuple", "meta.choice", "meta.param")) {
             assertTrue(schema.entries().containsKey(name), name + " should resolve via DefinitionResolver alone");
         }
     }
@@ -152,8 +152,8 @@ class KernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is its 88 declarations -- its six maps and their 69 members, and the root's thirteen -- and one
-     * injected declaration per distinct sugar form within them: seven {@code array} entries from §5.3's {@code [X]}
+     * output is its 81 declarations -- its six maps, their members and the root's own -- and one injected
+     * declaration per distinct sugar form within them: six {@code array} entries from §5.3's {@code [X]}
      * field-type sugar, minted at the root. Producing them here is what leaves the linker with nothing to materialize
      * (see {@code MetaKernelSchemaRegistryTest}).
      * {@code enum}'s member set is not among them: it is the fixture's own {@code meta.enum_set} declaration, since
@@ -162,12 +162,12 @@ class KernelBootstrapResolverTest {
      * {@code field_map} for the same reason, an ordered map having no sugar either.
      */
     @Test
-    void theFixtureDeclarationsResolveAlongsideSevenDesugaredEntries() {
+    void theFixtureDeclarationsResolveAlongsideSixDesugaredEntries() {
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
-        assertEquals(94, schema.entries().size());
+        assertEquals(87, schema.entries().size());
         for (String head : List.of("array_array_text_1", "array_text_1", "array_type_ref",
-                "array_template_param", "array_template_param_1", "array_field_group", "array_tuple_element")) {
+                "array_param_1", "array_field_group", "array_tuple_element")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
                     "expected a desugared entry with head '" + head + "'");
         }

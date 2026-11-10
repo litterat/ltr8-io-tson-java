@@ -33,10 +33,10 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -323,13 +323,13 @@ public final class SchemaResolver {
         // closes applications on demand: a supertype or refinement source has to absorb the *closed* entry's
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
         // closing and a later batch closing of the same application land on one entry.
-        // A held body closes to whatever its head builds: a type where the head is a constructor, and a value entry
-        // where it is an ordinary type (`fetch => <T> !operations { ... }`, then `get_order => fetch<order>`).
+        // A construction builds whatever its head builds: a type where the head is a constructor, and a value entry
+        // where it is an ordinary type.
         ConstructionReader reads = new ConstructionReader() {
 
             @Override
             public Top read(String written, io.ltr8.tson.compiler.ast.DataValue value) {
-                // An alias of a constructor is applied as its target is (§3.3.1), a held body's head included.
+                // An alias of a constructor is applied as its target is (§3.3.1).
                 String type = heads.definition(written) == null ? written
                         : AliasChain.terminal(written, heads::definition);
                 if (!type.equals(written) && value.typeRef().filter(written::equals).isPresent()) {
@@ -377,7 +377,6 @@ public final class SchemaResolver {
             }
         };
         TemplateMaterialiser materialiser = new TemplateMaterialiser(waitOrder, namespace::put, reads,
-                generated,
                 heads::definition, waitOrder::current, facts, applications, kernel);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
@@ -468,15 +467,12 @@ public final class SchemaResolver {
         // different halves: `materialise` walks `resolvedLocals`, while the application's head is looked up
         // through the getter over `namespace`.
         condemn(irregular, resolvedLocals, namespace);
-        // §5.10's parameters, before anything closes, each declaration once: where each parameter stands (a
-        // parameter is a type, so it stands only where a type is named), that a written bound names a type, and
-        // that a parameter passed to a bounded parameter is written with a bound IS-A it. Here because a slot's
-        // declared type comes from the constructor's own vocabulary and a callee's bound from its declaration, both
-        // ready only now. A refused template is condemned on the same terms as an irregular one: the verdict is in,
-        // and closing an application of it only reports the consequence against whichever entry applied it.
-        Set<String> refusedParameters = ParameterTypes.check(namespace, declarations.keySet(),
-                name -> generated.contains(name) || facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).synthetic(),
-                heads::definition,
+        // §5.10's parameters, before anything closes, each declaration once: that a written bound names a type, and
+        // that a parameter passed to a bounded parameter is written with a bound IS-A it. Here because a callee's
+        // bound comes from its declaration, ready only now. A refused template is condemned on the same terms as an
+        // irregular one: the verdict is in, and closing an application of it only reports the consequence against
+        // whichever entry applied it.
+        Set<String> refusedParameters = ParameterTypes.check(namespace, declarations.keySet(), heads::definition,
                 (name, error) -> {
                     if (!problems.collecting()) {
                         throw error;
@@ -587,10 +583,9 @@ public final class SchemaResolver {
                 localOnly.put(name, definition);
             }
         });
-        // §8.2's second derived key annotation: every entry that closes an application, whatever its kind -- a
-        // record template's member, a namespace entry, the hop a non-record template's application closes to --
-        // carries `@meta.application` on its key, which is where resolved output states an instantiation's identity
-        // and where ingest reads it back as stated.
+        // §8.2's second derived key annotation: every entry that closes an application of an open record carries
+        // `@meta.application` on its key, which is where resolved output states an instantiation's identity and where
+        // ingest reads it back as stated. A construction carries none: its value states its constructor.
         // The application is stated as written, its nested arguments unreduced: a reader and a message see the
         // reference the author wrote, and each level resolves structurally to the entry it closed to.
         for (String name : List.copyOf(localOnly.keySet())) {
@@ -759,7 +754,7 @@ public final class SchemaResolver {
     private static void closeChains(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
                                     Map<String, Top> instantiations) {
         for (Map<String, Top> entries : List.of(resolvedLocals, instantiations)) {
-            // A record template keeps the parents as written: they may still name its own parameters, and
+            // An open record keeps the parents as written: they may still name its own parameters, and
             // closing each application is what completes that application's chain from them.
             entries.replaceAll((name, definition) -> definition instanceof Type type && !type.parents().isEmpty()
                     && !OpenEntry.isOpen(definition)
@@ -964,7 +959,7 @@ public final class SchemaResolver {
 
     /**
      * §5.10 admits no head abstraction: a type parameter stands for a type, never for a template, so
-     * {@code <T> { v: T<text> }} is no form. Refused here, over every application the held body writes,
+     * {@code <T> { v: T<text> }} is no form. Refused here, over every application the open record writes,
      * because here is the last point at which the author's own spelling is still what fails.
      *
      * <p><b>It cannot wait for the linker</b>, which checks the rest of §5.10's arity rule off the same
@@ -978,7 +973,7 @@ public final class SchemaResolver {
             return;
         }
         List<String> parameters = OpenEntry.parameterNames(resolved);
-        for (io.ltr8.tson.schema.meta.TypeRef application : HeldBody.applicationsOf(resolved)) {
+        for (io.ltr8.tson.schema.meta.TypeRef application : OpenEntry.applications(resolved)) {
             if (parameters.contains(application.name())) {
                 throw new SchemaValidationException("'" + name + "': '" + application.name()
                         + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
@@ -1007,7 +1002,7 @@ public final class SchemaResolver {
      * the schema further, the actual fix being upstream at the declaration that failed. With the arity
      * intact the application closes against an empty body and says nothing.
      *
-     * <p><b>An empty record (an empty record template, for an open declaration), because the point is to absorb
+     * <p><b>An empty record (an empty open record, for an open declaration), because the point is to absorb
      * rather than to be recognised</b> -- javac's model,
      * where the error type answers every question, rather than Swift's, where every questioner must first ask
      * whether it is looking at one. A dependent that composes with a failed declaration ({@code parent =>
@@ -1017,10 +1012,10 @@ public final class SchemaResolver {
      * placeholder exists to prevent.
      */
     private static Top unresolved(List<String> parameters) {
-        // An open placeholder is an empty record template, so it closes by the one process a template does.
+        // An open placeholder is an empty open record, so it closes by the one process a template does.
         return parameters.isEmpty() ? RecordBody.of(RecordBody.fieldMap())
-                : new RecordTemplateBody(TypeChain.EMPTY, new AnnotatedMap<>(), List.of(), RecordExtensionType.OPEN,
-                        List.of(), Optional.empty(), parameters.stream().map(TemplateParam::new).toList());
+                : new RecordBody(TypeChain.EMPTY, parameters.stream().map(Param::new).toList(), new AnnotatedMap<>(),
+                        List.of(), RecordExtensionType.OPEN, List.of(), Optional.empty());
     }
 
     /**

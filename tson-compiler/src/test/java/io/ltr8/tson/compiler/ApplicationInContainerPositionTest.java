@@ -2,14 +2,12 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
-import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -26,15 +24,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A container position holding a <b>template application</b> rather than a name -- {@code [tree<T>; 1..]},
- * {@code [[T]]}, {@code [[T; 3]; 3]}. These are the change report's own §8 fixtures, in the spelling §8
- * writes them.
+ * A container position holding an <b>application</b> rather than a name -- {@code [tree<T>]}, {@code [[T]]}, {@code
+ * [box<text>]}.
  *
- * <p><b>The position has no name at desugar time, which is the whole difficulty.</b> A closed form
- * ({@code [box<text>]}) names the entry {@code box<text>} denotes, and that entry does not exist until
- * materialisation runs a phase later -- so it stays refused, and {@link #aClosedContainerCannotHoldAn
- * Application} pins the reason. An <b>open</b> form needs no name: its binding holds the reference
- * directly, arguments intact, and materialisation closes it once the parameters are bound.
+ * <p><b>Inside an open record a container over a parameter is the reference it spells</b> ([TSON-SCHEMA] §5.10):
+ * {@code [tree<T>]} is the application {@code meta.array<tree<T>>}, held as written until the record is applied, and
+ * then constructed, the content-keyed entry {@code [tree<text>]} lifts to. A sized form over a parameter is no
+ * reference and is refused. <b>A closed form</b> ({@code [box<text>]}) names the entry {@code box<text>} denotes,
+ * which does not exist until materialisation runs a phase later: the lift writes the application as its reference,
+ * and materialisation closes it.
  */
 class ApplicationInContainerPositionTest {
 
@@ -68,17 +66,6 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * The entry a field's type resolves to, following an instantiation entry's hop. Only an expansion that names
-     * its own application has one -- every other application names its synthetic directly -- so for most
-     * fixtures this is the field's own type.
-     */
-    private static Top formBehind(TsonCompiledSchema compiled, String record, String field) {
-        Top entry = compiled.schema().entries().get(fieldType(compiled, record, field));
-        return entry instanceof Alias alias
-                ? compiled.schema().entries().get(alias.target().name()) : entry;
-    }
-
-    /**
      * The entries this schema derived rather than the author declaring them -- synthetics and instantiations, its
      * closure's own left out.
      */
@@ -90,75 +77,48 @@ class ApplicationInContainerPositionTest {
                 .map(java.util.Map.Entry::getKey).sorted().toList();
     }
 
-    /** Derived entries still carrying parameters -- the open half of §8's counts. */
-    private static List<String> openNames(TsonCompiledSchema compiled) {
-        return derived(compiled).stream()
-                .filter(n -> compiled.schema().entries().get(n) instanceof TemplateBody).toList();
-    }
-
-    private static long openSynthetics(TsonCompiledSchema compiled) {
-        return openNames(compiled).size();
-    }
-
-    /** Derived entries that are usable as types -- closed synthetics and instantiation entries alike. */
-    private static long closedDerived(TsonCompiledSchema compiled) {
-        return derived(compiled).size() - openSynthetics(compiled);
-    }
-
-    // ── §8's tree fixture: the knot tied through a synthetic ──────────────
+    // ── A recursive template: the knot tied through a construction ──────────
 
     /**
-     * {@code tree => <T> { value: T  children: [tree<T>; 1..] }} closed via {@code tree<text>}. The array the
-     * sugar lifts to is <b>open</b>, and its own binding names {@code tree} -- the very template whose field
-     * holds it. Closing {@code tree<text>} therefore reaches back into an entry still under construction, and
-     * the memo is what answers: the synthetic's {@code element_type} names the instantiation entry, recorded
-     * before that entry completes.
+     * {@code tree => <T> { value: T  children?: [tree<T>] }} closed via {@code tree<text>}. The field holds the
+     * reference {@code meta.array<tree<T>>}; closing {@code tree<text>} substitutes it to {@code
+     * meta.array<tree<text>>}, whose argument reaches back to the entry still under construction, and the memo is
+     * what answers: the array's {@code element_type} names the instantiation entry, recorded before it completes.
      */
     @Test
-    void theTreeFixtureTiesTheKnotThroughTheSynthetic() {
+    void aRecursiveTemplateTiesTheKnotThroughTheArray() {
         TsonCompiledSchema compiled = compile("""
-                  tree => <T> { value: T  children?: [tree<T>; 1..]? }
+                  tree => <T> { value: T  children?: [tree<T>] }
                   use  => { t: tree<text> }""");
 
         String instantiation = fieldType(compiled, "use", "t");
-        String synthetic = fieldType(compiled, instantiation, "children");
         ArrayBody children = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(synthetic));
+                compiled.schema().entries().get(fieldType(compiled, instantiation, "children")));
 
         assertEquals(TypeRef.of(instantiation), children.elementType(), "the knot");
-        assertEquals(Optional.of(1L), children.minItems());
+        assertEquals("tree", compiled.schema().applicationOf(instantiation).orElseThrow().name(),
+                "an expansion naming itself keeps an entry recording its application");
         assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries().get(instantiation))
-                .fields().values().stream().toList().get(0).type(), "T bound at the value field too");
+                .fields().get("value").type(), "T bound at the value field too");
     }
 
-    /** The open form the fixture rests on: an array template whose element is an application of {@code tree}. */
+    /** The template holds the array as the reference it spells, its parameter among the arguments. */
     @Test
-    void theLiftedArrayIsOpenAndItsBindingKeepsTheApplication() {
+    void theOpenRecordHoldsTheArrayAsAReference() {
         TsonCompiledSchema compiled = compile("""
-                  tree => <T> { value: T  children?: [tree<T>; 1..]? }
-                  use  => { t: tree<text> }""");
+                  tree => <T> { value: T  children?: [tree<T>] }""");
 
-        // The lifted synthetic, by its derived name: `tree` itself holds a body too now (a record template
-        // is normalised into the `!record { ... }` §5.2 says it denotes), so "the first held body" no longer
-        // names this one.
-        Top open = compiled.schema().entries().entrySet().stream()
-                .filter(e -> e.getKey().startsWith("array_") && e.getValue() instanceof TemplateBody)
-                .findFirst().orElseThrow().getValue();
-        TemplateBody body = (TemplateBody) open;
-
-        assertEquals(List.of("p0"), OpenEntry.parameterNames(open), "renamed positionally, as every open synthetic is");
-        // The application is held whole, so the names it mentions are simply the tokens in the body -- its
-        // own head and the parameter it still awaits.
-        assertTrue(HeldBody.of(body).names().containsAll(List.of("tree", "p0")),
-                () -> "held names: " + HeldBody.of(body).names());
+        RecordBody tree = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("tree"));
+        assertTrue(tree.isOpen());
+        assertEquals(TypeRef.of("meta.array", List.of(TypeRef.of("tree", List.of(ParamRef.of("T"))))),
+                tree.fields().get("children").type());
+        assertTrue(derived(compiled).isEmpty(), () -> "nothing lifted for a form over a parameter: "
+                + derived(compiled));
     }
 
-    /**
-     * The same shape unsized, which is the one that can actually be read: a recursive type terminates only if
-     * its recursive position can be empty.
-     */
+    /** A recursive type terminates only if its recursive position can be empty, as this one can. */
     @Test
-    void anUnsizedTreeReadsRealData() {
+    void aTreeReadsRealData() {
         TsonCompiledSchema compiled = compile("""
                   tree => <T> { value: T  children: [tree<T>] }
                   use  => { t: tree<text> }""");
@@ -168,215 +128,83 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * §8's own spelling pins {@code 1..} on the recursive position <em>and</em> leaves the field REQUIRED, so
-     * every node needs a child and nothing can ever be a {@code tree}. The {@code ?} the fixtures above carry
-     * is the whole difference -- and it is the schema that is rejected now, not the document
-     * (§5.10.1's productivity rule).
+     * §8's own spelling sizes the recursive position, {@code [tree<T>; 1..]}: a size over a parameter sets a field no
+     * argument list carries, so the form is no reference and is refused at the declaration ([TSON-SCHEMA] §5.10).
      */
     @Test
-    void theSpecsOwnTreeSpellingIsRejectedAsUninhabited() {
+    void aSizedArrayOverAParameterIsRefused() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           tree => <T> { value: T  children: [tree<T>; 1..] }
                           use  => { t: tree<text> }"""));
 
-        assertTrue(thrown.getMessage().contains("can never be satisfied"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'[tree<T>; 1..]' stands over the parameter 'T' and is no "
+                + "reference"), thrown.getMessage());
     }
 
-    // ── §8's grid fixture: one entry per form, whichever channel produced it ──
+    // ── One entry per form, whichever channel produced it ────────────────────
 
     /**
-     * §8's primary grid, in the <b>record</b> spelling D10 legalised: {@code <T> { x: [[T; 1..3]; 2..3] }}.
-     * Closing {@code grid<pixel>} from two declarations derives six entries in all -- {@code grid} itself,
-     * two open synthetics for the two container levels, two closed synthetics they become, and one
-     * instantiation entry for the application -- and a third declaration writing the inner form directly
-     * lands on the closed synthetic rather than minting a second (§8.2's cross-channel dedup).
-     *
-     * <p><b>This spelling is the primary fixture because it is the only one that exercises the instantiation
-     * channel</b> -- see {@link #theWholeBodySpellingRecordsNoInstantiationEntry}.
+     * {@code grid => <T> { x: [[T]] }} closed via {@code grid<pixel>} from two declarations derives one record and
+     * the two arrays it holds, and a declaration writing {@code [[pixel]]} directly lands on the same arrays: the
+     * construction and the lift name a form by its content (§8.2). Nothing records the application, an application
+     * nothing declares being its expansion.
      */
     @Test
-    void theRecordFormGridDerivesTwoOpenSyntheticsTwoClosedAndOneInstantiation() {
+    void aHeldArrayClosesOntoTheFormItsSugarLiftsTo() {
         TsonCompiledSchema compiled = compile("""
                   pixel  => { r: int32 }
-                  grid   => <T> { x: [[T; 1..3]; 2..3] }
+                  grid   => <T> { x: [[T]] }
                   a      => { g: grid<pixel> }
                   b      => { g: grid<pixel> }
-                  direct => { d: [pixel; 1..3] }""");
-
-        assertEquals(fieldType(compiled, "a", "g"), fieldType(compiled, "b", "g"), "one instantiation");
-        assertEquals(List.of(2L, 3L), List.of(openSynthetics(compiled), closedDerived(compiled)),
-                () -> "two open, three closed (two synthetics and the instantiation): " + derived(compiled));
-
-        // grid<pixel> -> { x: [[pixel; 1..3]; 2..3] }, outermost entry inwards.
-        String outer = fieldType(compiled, fieldType(compiled, "a", "g"), "x");
-        ArrayBody rows = assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(outer));
-        assertEquals(Optional.of(2L), rows.minItems());
-        assertEquals(fieldType(compiled, "direct", "d"), rows.elementType().name(),
-                "the row the grid builds is the row written directly");
-    }
-
-    /**
-     * The <b>whole-body</b> spelling is its expansion: an application nothing declares names the closed
-     * synthetic its closing produced, so {@code grid<pixel>} and {@code [[pixel; 3]; 3]} written out are one
-     * entry, and no entry records the application.
-     */
-    @Test
-    void theWholeBodySpellingIsItsExpansion() {
-        TsonCompiledSchema compiled = compile("""
-                  pixel  => { r: int32 }
-                  grid   => <T> [[T; 3]; 3]
-                  a      => { g: grid<pixel> }
-                  direct => { d: [[pixel; 3]; 3] }""");
+                  direct => { d: [[pixel]] }""");
 
         String form = fieldType(compiled, "a", "g");
-        assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(form));
-        assertEquals(Optional.of("meta.array"), compiled.schema().constructorOf(form),
-                "the form stays an instance of the constructor it builds");
-        assertEquals(form, fieldType(compiled, "direct", "d"), "the grid is the form written out");
+        assertEquals(form, fieldType(compiled, "b", "g"), "one expansion");
+        assertEquals(fieldType(compiled, "direct", "d"), fieldType(compiled, form, "x"),
+                "the rows the grid builds are the rows written directly");
         assertTrue(compiled.schema().applicationOf(form).isEmpty(), "no entry records the application");
+        assertEquals(3, derived(compiled).size(), () -> "one record and two arrays: " + derived(compiled));
     }
 
     /**
-     * An expansion that names its own application cannot be written without a name, so the application keeps
-     * an entry of its own: a reference to the synthetic, recording the application, which is what the knot is
-     * tied on.
+     * <b>Templates are consulted, never modified, by closure.</b> Closing {@code grid<voxel>} after {@code
+     * grid<pixel>} leaves {@code grid} exactly as it was and adds the second application's forms beside the first's.
      */
     @Test
-    void aSelfReachingExpansionIsNamedByItsApplication() {
-        TsonCompiledSchema compiled = compile("""
-                  nested => <T> ( T | [nested<T>] )
-                  use    => { n: nested<text> }""");
-
-        String instantiation = fieldType(compiled, "use", "n");
-        Alias hop = assertInstanceOf(Alias.class, compiled.schema().entries().get(instantiation));
-        assertEquals("nested", compiled.schema().applicationOf(instantiation).orElseThrow().name());
-        assertEquals(Optional.of("meta.choice"), compiled.schema().constructorOf(hop.target().name()));
-    }
-
-    /**
-     * A generated head closing its own intermediate form mints no instantiation: nobody wrote
-     * {@code array_p0_3_3_…<pixel>}, and an entry named for it would carry that internal name into identity,
-     * which is exactly what D6 says must not happen.
-     */
-    @Test
-    void closingAGeneratedSyntheticRecordsNoApplication() {
-        TsonCompiledSchema compiled = compile("""
-                  pixel => { r: int32 }
-                  grid  => <T> [[T; 3]; 3]
-                  a     => { g: grid<pixel> }""");
-
-        assertTrue(derived(compiled).stream().noneMatch(n -> compiled.schema().applicationOf(n).isPresent()),
-                () -> "no instantiation, the application being its expansion: " + derived(compiled));
-        List<String> generated = openNames(compiled);
-        assertTrue(derived(compiled).stream().noneMatch(n -> generated.stream().anyMatch(g -> n.startsWith(g + "_"))),
-                () -> "no entry named after a generated head: " + derived(compiled));
-    }
-
-    /**
-     * A template that applies itself ties the knot rather than recursing. Both closure paths share one memo
-     * now; before, an open instance short-circuited ahead of it and this was a {@code StackOverflowError}.
-     */
-    @Test
-    void aTemplateApplyingItselfTiesTheKnot() {
-        TsonCompiledSchema compiled = compile("""
-                  weird => <T> [weird<T>]
-                  use   => { w: weird<text> }""");
-
-        String instantiation = fieldType(compiled, "use", "w");
-        ArrayBody form = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "w"));
-
-        assertEquals(instantiation, form.elementType().name(), "the knot");
-    }
-
-    /**
-     * {@code grid => <T> [[T; 3]; 3]} closed via {@code grid<pixel>} from two declarations yields
-     * exactly one instantiation entry and one synthetic for the inner row -- and a third declaration writing
-     * {@code [pixel; 3]} directly lands on that same synthetic (§8.2's cross-channel dedup).
-     */
-    @Test
-    void theGridFixtureProducesOneEntryPerDistinctForm() {
-        TsonCompiledSchema compiled = compile("""
-                  pixel  => { r: int32 }
-                  grid   => <T> [[T; 3]; 3]
-                  a      => { g: grid<pixel> }
-                  b      => { g: grid<pixel> }
-                  direct => { d: [pixel; 3] }""");
-
-        assertEquals(fieldType(compiled, "a", "g"), fieldType(compiled, "b", "g"), "one instantiation");
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "a", "g"));
-        assertEquals(fieldType(compiled, "direct", "d"), outer.elementType().name(),
-                "the row the grid builds is the row written directly");
-        assertEquals(Optional.of(3L), outer.minItems());
-    }
-
-    /**
-     * <b>Templates are consulted, never modified, by closure.</b> Closing {@code grid<voxel>} after
-     * {@code grid<pixel>} leaves {@code grid} and both open synthetics exactly as they were and adds three
-     * fresh closed entries beside the first three -- two container levels and one instantiation.
-     *
-     * <p>The property matters beyond tidiness: substitution walks a template's recorded open form, and a walk
-     * that rewrote what it read would make the second closure depend on the first.
-     */
-    @Test
-    void closingASecondArgumentLeavesEveryTemplateUntouched() {
-        TsonCompiledSchema compiled = compile("""
+    void closingASecondArgumentLeavesTheTemplateUntouched() {
+        TsonCompiledSchema one = compile("""
                   pixel => { r: int32 }
                   voxel => { v: int32 }
-                  grid  => <T> { x: [[T; 1..3]; 2..3] }
+                  grid  => <T> { x: [[T]] }
                   three => { g: grid<pixel> }""");
-        List<String> openBefore = openNames(compiled);
-
         TsonCompiledSchema both = compile("""
                   pixel => { r: int32 }
                   voxel => { v: int32 }
-                  grid  => <T> { x: [[T; 1..3]; 2..3] }
+                  grid  => <T> { x: [[T]] }
                   three => { g: grid<pixel> }
                   four  => { g: grid<voxel> }""");
 
-        assertEquals(List.of("T"), OpenEntry.parameterNames(both.schema().entries().get("grid")),
-                "the declared template, unchanged");
-        assertEquals(openBefore, openNames(both), "both open synthetics reused, neither rewritten");
-        assertEquals(2, openSynthetics(both));
-        assertEquals(6, closedDerived(both),
-                () -> "three fresh closed entries per closure: " + derived(both));
+        Top grid = both.schema().entries().get("grid");
+        assertEquals(List.of("T"), OpenEntry.parameterNames(grid), "the declared template, unchanged");
+        assertEquals(one.schema().entries().get("grid"), grid);
+        assertEquals(6, derived(both).size(), () -> "three forms per closure: " + derived(both));
     }
 
-    /** The whole-body spelling reuses in the same way, one entry per level fewer. */
+    /** The smallest form needing any of this: one array over one parameter, closed to an array of the argument. */
     @Test
-    void theWholeBodySpellingReusesItsOpenSyntheticToo() {
-        TsonCompiledSchema compiled = compile("""
-                  pixel => { r: int32 }
-                  voxel => { v: int32 }
-                  grid  => <T> [[T; 3]; 3]
-                  three => { g: grid<pixel> }
-                  four  => { g: grid<voxel> }""");
-
-        assertInstanceOf(TemplateBody.class, compiled.schema().entries().get("grid"));
-        assertEquals(1, openSynthetics(compiled),
-                () -> "one open synthetic, shared by both closures: " + derived(compiled));
-        assertEquals(4, closedDerived(compiled),
-                () -> "two closed arrays per closure: " + derived(compiled));
-    }
-
-    /**
-     * §8's smallest fixture, and Tranche D's declared stage-one target: the least a sugar form over a
-     * parameter can be. One open synthetic, one closed array, one instantiation.
-     */
-    @Test
-    void theSmallestFormNeedingAnyOfThisIsOneArrayOverOneParameter() {
+    void theSmallestFormIsOneArrayOverOneParameter() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { a: [T] }
                   use => { u: box<uuid> }""");
 
-        assertEquals(1, openSynthetics(compiled), () -> derived(compiled).toString());
-        assertEquals(2, closedDerived(compiled), () -> derived(compiled).toString());
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
         assertEquals(TypeRef.of("uuid"), array.elementType());
+        assertEquals(2, derived(compiled).size(), () -> derived(compiled).toString());
     }
 
-    // ── The nested form in miniature, and the closed case that stays out ──
+    // ── The nested form in miniature, and the closed case ─────────────────────
 
     @Test
     void anArrayOfAnArrayOverAParameterClosesInnermostFirst() {

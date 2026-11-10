@@ -59,11 +59,11 @@ class TemplateRegularityTest {
         assertTrue(message.contains("the application 'box<...>'"), "names what argument 1 actually is: " + message);
     }
 
-    /** A template of any constructor is checked, its held tree read as a record template's is. */
+    /** A growing argument held in a constructor's application is checked as any argument is. */
     @Test
-    void aGrowingArgumentInANamespaceTemplateIsRejected() {
+    void aGrowingArgumentInsideAConstructionIsRejected() {
         String message = rejected(
-                "  weird => <T> !meta.namespace { key_type: meta.identifier  value_type: weird<box<T>> }");
+                "  weird => <T> { m: meta.namespace<meta.identifier weird<box<T>>>  t: T }");
 
         assertTrue(message.contains("'weird' applies 'weird' recursively"), message);
     }
@@ -112,7 +112,7 @@ class TemplateRegularityTest {
     @Test
     void namingATemplateWithoutArgumentsIsRejected() {
         String message = rejected("""
-                  tmpl => <T> [T]
+                  tmpl => <T> { a: [T] }
                   use  => { u: tmpl }""");
 
         assertTrue(message.contains("is a template taking 1 type argument [T]"), message);

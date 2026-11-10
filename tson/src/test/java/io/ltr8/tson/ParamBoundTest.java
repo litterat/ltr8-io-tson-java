@@ -5,7 +5,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * written and never inferred, required of a parameter passed on to a bounded parameter wherever it is an argument, and
  * enforced at the application.
  */
-class TemplateParamBoundTest {
+class ParamBoundTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/bounds-1.tn"
@@ -37,15 +37,15 @@ class TemplateParamBoundTest {
             {
               non_empty_text => !text ^ { min_length: 1 }
               boxed          => <T: text> { a: T }
-              vec            => <T: text> !meta.array { element_type: T }
+              vec            => <T: text> { items: meta.array<T> }
               rebox          => <T: text> { b: boxed<T> }
               narrower       => <T: non_empty_text> { b: boxed<T> }
               loose          => <T> { a: T }
             }
             """;
 
-    private static Map<String, List<TemplateParam>> parameters() {
-        Map<String, List<TemplateParam>> parameters = new LinkedHashMap<>();
+    private static Map<String, List<Param>> parameters() {
+        Map<String, List<Param>> parameters = new LinkedHashMap<>();
         Tson.standard().resolve(SCHEMA).schema().entries().forEach((name, definition) -> {
             if (OpenEntry.isOpen(definition)) {
                 parameters.put(name, OpenEntry.parameters(definition));
@@ -54,8 +54,8 @@ class TemplateParamBoundTest {
         return parameters;
     }
 
-    private static TemplateParam bounded(String name, String bound) {
-        return new TemplateParam(name, Optional.of(TypeRef.of(bound)));
+    private static Param bounded(String name, String bound) {
+        return new Param(name, Optional.of(TypeRef.of(bound)));
     }
 
     private static List<Diagnostic> problems(String declarations) {
@@ -79,7 +79,7 @@ class TemplateParamBoundTest {
     }
 
     @Test
-    void anInstanceConstructionsWrittenTypeIsABound() {
+    void aBoundOverAConstructionsArgumentIsABound() {
         assertEquals(List.of(bounded("T", "text")), parameters().get("vec"));
     }
 
@@ -92,7 +92,7 @@ class TemplateParamBoundTest {
 
     @Test
     void anUnwrittenBoundIsAbsent() {
-        assertEquals(List.of(new TemplateParam("T")), parameters().get("loose"));
+        assertEquals(List.of(new Param("T")), parameters().get("loose"));
     }
 
     // ── Refused at the declaration ─────────────────────────────────────────
@@ -108,8 +108,7 @@ class TemplateParamBoundTest {
         assertRefused(BOXED + "  rebox => <T> { b: [boxed<T>] }", needs);
         assertRefused(BOXED + "  pair  => <A, B> { a: A  b: B }\n  rebox => <T> { b: pair<boxed<T>, text> }", needs);
         assertRefused(BOXED + "  rebox => <T> boxed<T> & { c: text }", needs);
-        assertRefused(BOXED + "  rebox => <T> boxed<T>", needs);
-        assertRefused(BOXED + "  rebox => <T> !meta.array { element_type: boxed<T> }", needs);
+        assertRefused(BOXED + "  rebox => <T> { b: meta.array<boxed<T>> }", needs);
     }
 
     /** The message names the declaration that wrote the parameter, not the template it is passed to. */
@@ -142,7 +141,7 @@ class TemplateParamBoundTest {
         assertRefused(BOXED + "  wrong => <T: int32> { b: boxed<T> }",
                 "is declared 'T: int32' and passed to 'boxed', which declares 'T: text', and int32 is not a type "
                         + "that IS-A text");
-        assertRefused(BOXED + "  wrong => <T: int32> boxed<T>", "int32 is not a type that IS-A text");
+        assertRefused(BOXED + "  wrong => <T: int32> boxed<T> & { c: text }", "int32 is not a type that IS-A text");
     }
 
     /** The bound an imported template records is what its author wrote, and a parameter passed to it is judged by it. */
@@ -206,7 +205,7 @@ class TemplateParamBoundTest {
         assertRefused(BOXED + "  held   => boxed<int32>", "binds 'T' to 'int32', which is not a type that IS-A text");
         assertRefused(BOXED + "  held   => boxed<int32> & { b: text }", "binds 'T' to 'int32'");
         assertRefused(BOXED + "  held   => boxed<boxed<int32>>", "binds 'T' to 'int32'");
-        assertRefused(BOXED + "  rebox  => <T: text> boxed<T>\n  held   => rebox<int32>",
+        assertRefused(BOXED + "  rebox  => <T: text> boxed<T> & { c: text }\n  held   => rebox<int32>",
                 "'rebox<...>' binds 'T' to 'int32'");
         assertEquals(List.of(), problems(BOXED + "  short  => !text ^ { max_length: 8 }\n  held   => boxed<short>"));
     }

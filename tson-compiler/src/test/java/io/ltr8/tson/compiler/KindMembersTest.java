@@ -118,8 +118,9 @@ class KindMembersTest {
     }
 
     /**
-     * A template is no type and no member (§5.10), a record template included: a kind of {@code record} holds its
-     * applications and not it, and a kind of {@code record_template} holds nothing, so it is refused as uninhabited.
+     * A template is no type and no member (§5.10): it is an open record, built with {@code record}, and a kind of
+     * {@code record} holds its applications and not it. The root's {@code set} is an alias of the constructor {@code
+     * meta.set_type} itself, no instance of it, so no member of a kind over it.
      */
     @Test
     void anInstantiationIsAMemberOfItsConstructorsKindAndATemplateOfNone() {
@@ -133,18 +134,10 @@ class KindMembersTest {
                 }
                 """);
 
-        // `set` is meta's template, a `template` body: no type, so no member. The kernel's own sets are members.
         List<String> sets = kind(linked, "sets").memberNames();
         assertTrue(sets.containsAll(List.of("tags", "meta.enum_set")) && !sets.contains("set"), sets.toString());
         List<String> recs = kind(linked, "recs").memberNames();
         assertTrue(recs.contains("box_t") && !recs.contains("boxed"), recs.toString());
-        SchemaValidationException empty = assertThrows(SchemaValidationException.class, () -> link("""
-                {
-                  boxed => <T> { v: T }
-                  tmpls => !meta.reference_type { of: meta.record_template }
-                }
-                """));
-        assertTrue(empty.getMessage().contains("'tmpls' can never be satisfied"), empty.getMessage());
     }
 
     @Test
@@ -251,8 +244,9 @@ class KindMembersTest {
         List<String> members = kind(kernel, "meta.type_ref").memberNames();
 
         assertTrue(members.containsAll(List.of("meta.field_map", "meta.schema", "meta.declared", "meta.set_type",
-                "meta.record", "meta.alias", "meta.namespace", "meta.reference_type", "meta.top")), members::toString);
-        assertFalse(members.contains("meta.kind") || members.contains("meta.ref"), members::toString);
+                "meta.record", "meta.alias", "meta.namespace", "meta.reference_type", "meta.ref", "meta.top")),
+                members::toString);
+        assertFalse(members.contains("meta.kind"), members::toString);
     }
 
     /**

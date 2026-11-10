@@ -130,10 +130,10 @@ public final class JsonSchemaCompiler {
     }
 
     /**
-     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, so a record
-     * template takes {@code record_template}'s reader and every other open entry {@code template}'s, each the refusal
-     * of a template named where a type is read ([TSON-SCHEMA] §5.10). A value entry names the ordinary type it is a
-     * value of, which has no factory: nothing is typed by such an entry, and its reader is the refusal.
+     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, so an open
+     * record takes {@code record}'s factory, which answers it with the refusal of a template named where a type is
+     * read ([TSON-SCHEMA] §5.10). A value entry names the ordinary type it is a value of, which has no factory:
+     * nothing is typed by such an entry, and its reader is the refusal.
      */
     private static String constructorOf(Top body) {
         if (body instanceof ValueEntry value) {

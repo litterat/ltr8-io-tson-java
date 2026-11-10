@@ -18,7 +18,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   those path entries (`SchemaPaths.synced`, `design/schema-resolution.md`). It is open: several documents of a closure
   declaring one map path contribute to one map, the union of their members (`design/linking-and-compilation.md`).
   Every other namespace type's value stays a value entry.
-- `Top` is sealed all the way down (`permits Type, Reference, TemplateBody, ValueEntry`). A switch over a body's kind
+- `Top` is sealed all the way down (`permits Type, Alias, ValueEntry`). A switch over a body's kind
   is exhaustive with an explicit `ValueEntry` arm and no `default`: `EntryKind.of`, `TypeInhabitance`,
   `DiscriminationClass`, and the linker's `validateBody`, `collectNames` and coherence check.
 - **`meta.namespace` is a refinement of `meta.map`** (`meta.map ^ { key_type: meta.identifier_ref voidable?: = false
@@ -149,8 +149,9 @@ against the entry with the read's path.
 A value entry's payload is a **value body** (`TsonReadContext.readsValueBody`; a nested `!schema` map's is none, its
 members being declarations): nothing in it lifts or mints, so a
 kind-typed slot holds one bare name and an application (`request: box<order>`) is refused with the alias spelling
-named (`order_box => box<order>`, then `request: order_box`). A template over an ordinary type closes to a value entry
-(`fetch => <T> !operations { … }`, `get_order => fetch<order>`).
+named (`order_box => box<order>`, then `request: order_box`). There is no template over an ordinary type: a template's
+body is a record, so `fetch => <T> !operations { … }` is refused at the declaration, and a value is declared once per
+instantiation (`design/open-records.md`).
 
 **§8.2 reaches the payload at the read, not at the link.** The linker cannot see into a value -- its fields' types are
 left in the declaring schema -- so the payload is read under the loader's identifier policy (`SchemaResolver`'s `value`)

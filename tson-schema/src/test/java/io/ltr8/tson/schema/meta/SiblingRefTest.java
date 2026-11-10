@@ -69,10 +69,7 @@ class SiblingRefTest {
     }
 
     @Test
-    void aSiblingWritesNoParameterAndNoTypeReferenceOfATemplate() {
-        RecordTemplateField payload = new RecordTemplateField(Optional.of(SiblingRef.of("kind")), Optional.empty(),
-                false, false, FieldRole.FREE, Optional.empty(), null, null);
-        assertEquals(Optional.empty(), payload.parameterInType(List.of("kind", "T")));
-        assertEquals(RecordField.required(SiblingRef.of("kind")), payload.closed());
+    void aSiblingWritesNoParameter() {
+        assertEquals(Optional.empty(), OpenEntry.parameterIn(SiblingRef.of("kind")));
     }
 }

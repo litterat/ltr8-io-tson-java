@@ -60,7 +60,7 @@ public final class UseSite {
      * A reader that leads its messages with a type name, and can be handed a different one.
      *
      * <p>Implemented by the families whose diagnostics name the type they were reading. A family that does
-     * not -- or one whose name is already the use site's, like a record template's single substituted entry
+     * not -- or one whose name is already the use site's, like an open record's single substituted entry
      * -- simply does not implement it, and {@link #named} hands its reader straight back.
      */
     public interface Renamed {

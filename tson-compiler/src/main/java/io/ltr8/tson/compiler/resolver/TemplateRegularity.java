@@ -40,7 +40,7 @@ import java.util.Set;
  * reverse cannot. {@code design/template-materialisation.md} records the narrowing, and
  * {@code TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate} pins it.
  *
- * <p>Arity is <em>not</em> checked here: {@code TsonSchemaLinker} checks it over every application a held body
+ * <p>Arity is <em>not</em> checked here: {@code TsonSchemaLinker} checks it over every application an open record
  * writes, whether or not the template is ever applied. This compares positionally only where the arity already
  * matches.
  */
@@ -152,13 +152,13 @@ final class TemplateRegularity {
      * Every application a template's body writes, including ones nested inside another application's
      * arguments ({@code box<chain<T>>} at a field position applies both).
      *
-     * <p>Every entry with parameters is open -- a held body or a record template -- and either answers which
-     * applications it writes ({@link HeldBody#applicationsOf}), the same kind of declared question as its names,
-     * which is what keeps this rule at the declaration, before anything is resolved against it.
+     * <p>Every entry with parameters is an open record, which answers which applications it writes ({@link
+     * OpenEntry#applications}), the same kind of declared question as its names, which is what keeps this rule at the
+     * declaration, before anything is resolved against it.
      */
     private static List<Application> applicationsIn(Top template) {
         List<Application> found = new ArrayList<>();
-        HeldBody.applicationsOf(template).forEach(ref -> collect(ref, found));
+        OpenEntry.applications(template).forEach(ref -> collect(ref, found));
         return found;
     }
 

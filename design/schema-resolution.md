@@ -1,7 +1,7 @@
 # Schema resolution
 
 The resolution phase: turning grammar-layer declarations into resolved `schema.meta` values, an entry being its
-value — the two resolvers, declaration annotations, definition marks, record templates and the IS-A edges of their
+value — the two resolvers, declaration annotations, definition marks, open records and the IS-A edges of their
 applications, field facts and refinement, groups, subtraction, and the exception boundary.
 
 **Invariants**
@@ -37,14 +37,14 @@ applications, field facts and refinement, groups, subtraction, and the exception
   never supplied.
 - Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
   omission yields, so that order is asked of `RecordField.omitted`.
-- An entry is its value (§8.1). Every type body, a record template's included, carries its own chain, `type`'s one
+- An entry is its value (§8.1). Every type body, an open record's included, carries its own chain, `type`'s one
   field `chain`, a `TypeChain`: `parents` as written, `supertypes`, `subtypes`. The application an entry
   instantiates is the derived `@meta.application` on its key (`TsonSchema.applicationOf`). What no value holds — where
   the entry was declared, the annotations on its value, its constructor, the entry a `^` names — is
   `TsonSchema.EntryFacts`, never a field of any constructor.
 - `supertypes` is names without arguments, each a path from the root, sorted, complete to a fixed point through applied
-  parents (`SchemaResolver.appliedParentEdges`); `parents` is the one list holding applications, and a closed type that is no
-  template keeps none (`closeChains`). A declaration never writes `chain`, and a constructor never declares a field of that
+  parents (`SchemaResolver.appliedParentEdges`); `parents` is the one list holding applications, and a closed type keeps
+  none (`closeChains`). A declaration never writes `chain`, and a constructor never declares a field of that
   name (`refuseWrittenChain`, `refuseDeclaredChain`).
 - `subtypes` is linking's throughout: no resolved entry, minted or declared, carries any.
 - A kind and a constructor are judged by where `top` and the base kinds are defined, never by their spelling: the
@@ -63,7 +63,7 @@ applications, field facts and refinement, groups, subtraction, and the exception
 
 Related: `design/constructor-application.md` (what `!C { … }` may apply and how its head resolves),
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
-`design/template-materialisation.md` and `design/held-template-bodies.md` (§5.10 closing, applied-parent edges),
+`design/template-materialisation.md` and `design/open-records.md` (§5.10 closing, applied-parent edges),
 `design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.synthetic`, the
 kernel's bootstrap), `design/namespace-types-and-value-entries.md` (value entries),
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
@@ -163,7 +163,7 @@ dispatch is ABSTRACT plus non-empty `discriminators`, read where needed (`Family
 and never stored as a second fact. A group member cannot be a selector: §5.11 makes a value modifier a parse
 error there.
 
-**A record template states its selectors as a record does**, with `=?`, and they are each application's: with
+**An open record states its selectors as a record does**, with `=?`, and they are each application's: with
 `tpet => abstract <B> { kind: text =?  extra?: B }`, `tpet<text>` is an abstract record dispatching on `kind`, and its
 members are the declarations composing it and pinning `kind` (`tdog => tpet<text> & { kind?: = "dog" }`). A field's
 value is never a parameter (§5.10), so no pin is derived from one. A selector whose type names a parameter is refused
@@ -171,22 +171,22 @@ value is never a parameter (§5.10), so no pin is derived from one. A selector w
 
 **On a template**, `abstract` and a selector are each application's and `final` is refused (§5.2, §5.10). The mark,
 or ABSTRACT derived from a selector as on a record, sets the template's own `extension`, and closing carries it and
-`discriminators` to the record each application denotes (`TemplateMaterialiser.closeRecordTemplate`). `final` is
+`discriminators` to the record each application denotes (`TemplateMaterialiser.closeOpenRecord`). `final` is
 refused because a template is applied to be composed, each member of a family composing an application, and the mark
-would forbid that of every application; a final type is a declaration of the application, marked as itself. An open
-body applying anything but `record` has no `extension` and is refused, named by the constructor it applies.
+would forbid that of every application; a final type is a declaration of the application, marked as itself.
 
-## Record templates: no type
+## Open records: no type
 
-A record template is a `RecordTemplateBody` (`meta.record_template`). It is not a type (§5.10): no position names it
-bare (`TsonSchemaLinker.checkArity` at a position, `DefinitionResolver.refuseUnappliedTemplate` at an operand), it is
-in no `subtypes` index and no reference holds it, and it compiles to `OpenTemplateReader`, the refusal a data tag
-naming it gets. Its fields are `RecordTemplateField`s, labelling a parameter that stands for the whole type
-(`type_param`), each field classified once by its source spelling where it is built (`SchemaDesugarer`'s
-`RecordTemplateDef`, `DefinitionResolver.Built` over `BuiltField`); a parameter spelled like a schema type or like a
-name an absorbed field's arguments write is refused (`design/held-template-bodies.md`), and `checked` refuses a
-selector typed by a parameter and a literal value on a parameter-typed field. A container, reference or
-constructor-application template is a `TemplateBody`, and no type either.
+A template is an open record, a `RecordBody` carrying `parameters` (`design/open-records.md`). It is not a type
+(§5.10): no position names it bare (`TsonSchemaLinker.checkArity` at a position,
+`DefinitionResolver.refuseUnappliedTemplate` at an operand), it is in no `subtypes` index, no reference holds it, no
+`FamilySelectors` question treats it as a base, and it compiles to `OpenTemplateReader`, the refusal a data tag naming
+it gets. It is built as a closed record is (`resolveRecordBody`, `resolveComposition`, `resolveRefinement`, then
+`Built.finish` with the declaration's parameters), its explicit spelling `<T> !meta.record { … }` through `openRecord`;
+a parameter in it is the `ParamRef` the record's constructor makes of a name its parameters declare. `checked` refuses
+a field or `name_type` named like a parameter, a selector typed by one and a literal value on a parameter-typed field;
+a parameter spelled like a schema entry is refused by the shadowing rule. A template over any other body is refused
+at its declaration (`SchemaDesugarer.refuseTemplateBody`, `DefinitionResolver.openInstance`).
 
 **A family is declared with records.** An abstract record states the selectors and the fields every member shares,
 a template composes it, and each member composes an application and pins the selectors:
@@ -257,9 +257,9 @@ entry are its own document's, and the merged map carries none of an import's. A 
 `voidable`, and `~`/`=` give the `role` (DEFAULT or FIXED) and its `value`. `FieldModifiers.of` maps the marks one to
 one and adds only refusals — a default on an unmarked name, a pin on a voidable type, `= _` and `~ _` (spell
 "omitted or `_`" as `a?: void?`), and `=?` on anything but an unmarked name over a non-voidable type.
-`SchemaDesugarer` asks the same table for a template body, so the two cannot drift. A parameter in `value` rides
-the same slot as a literal and the role is the modifier's: `= P` is FIXED where written, and closing substitutes
-the value without changing a fact (§5.7's "Open modifiers").
+An open record's fields are built by the same path, so the two cannot drift. A field's value is never a parameter
+(§5.10): an unquoted token naming one of the declaration's parameters in `value` is refused where the field resolves
+(`ParameterTypes.atValue`).
 
 A tightening replaces the inherited field in place, keeping its position — supertypes' fields first, in their
 order, then the body's. A modifier-only entry has no type slot, so it inherits the tightened field's type and with
@@ -294,11 +294,11 @@ the kernel declares changes how a value reads, so the ordering is pinned over re
 A field typed by a sibling reference, `v?: kind!`, is a **dependent field**: each instance's value is read against the
 type that instance's `kind` names. Resolution keeps the sibling reference as written wherever a field's type flows —
 sugar (`SchemaDesugarer` passes one through at a field's type and refuses it elsewhere), `BuiltField`, composition and
-refinement flattening, a record template's substitution and an application's closing — so a pinned sibling's
+refinement flattening, an open operand's substitution and an application's closing — so a pinned sibling's
 refinement still spells the field `type: kind!`, and resolved output writes it as the source does.
 
 The rules are checked when the record links, against its flattened fields (`DependentFields.check`, called from
-`TsonSchemaLinker.validateBody` before any field's type reference is validated), so a record template's member is
+`TsonSchemaLinker.validateBody` before any field's type reference is validated), so an open record's member is
 judged once its application closes it:
 
 - **Declared before it.** The fields are a telescope, each depending only on those before it in `fields`' order, so
@@ -309,13 +309,12 @@ judged once its application closes it:
   reference as its value is refused where the dependent field is read.
 - **There to read whenever the dependent field is**: required, defaulted, pinned, or a field group's member with the
   dependent field optional; never voidable, and never optional with no default. A group's members are declared
-  `optional`, so a dependent field that is a member counts as optional, as `value` does on
-  `meta.record_template_field` beside `( type | type_param )`, and a refinement making one required is judged on the
-  flattened record. A member is absent when another option is chosen, so a dependent field written without it is
+  `optional`, so a dependent field that is a member counts as optional, and a refinement making one required is judged
+  on the flattened record. A member is absent when another option is chosen, so a dependent field written without it is
   refused where it is read (`design/readers-and-diagnostics.md`); nothing refuses a sibling and its dependent field
   in two options of one group, where the field can be written in no document.
-- **Its pin or default names a type a value can be read against**: a template, a record template among them, and a
-  sibling reference are refused. Membership of the sibling's reference is `checkKindValue`'s, as for any field value.
+- **Its pin or default names a type a value can be read against**: a template and a sibling reference are refused. Membership
+  of the sibling's reference is `checkKindValue`'s, as for any field value.
 - **The dependent field** is never voidable and carries no default or pin: its type is not fixed at its declaration.
   It may be restated only as itself, its marks moving along §5.7's orders as any field's do; restating it with a named
   type, or a typed field as a dependent one, is refused (`DependentFields.restates`, asked by
@@ -329,11 +328,11 @@ walked (`ValuesByName.dependentType`, `design/namespace-types-and-value-entries.
 as written at the read and judged against that type when the schema links (`HeldValues`,
 `design/linking-and-compilation.md`).
 
-**A template field's `value` is one too**, typed `type!` with `type` its sibling, a member of `( type | type_param )`.
-A literal is held as written and judged when the template closes, against the closed field's type (`checkFieldValue`),
-its §8.2 hygiene being judged on the template (`TsonSchemaLinker.checkFieldValues`). A literal beside `type_param` is
-refused by `openRecord` before the payload is bound, so the author reads §5.10's reason and not the reader's; a literal
-on an application over a parameter is refused after it (`refuseLiteralOnOpenType`), the sibling `type` being there.
+**A literal in an open record is judged on the closed type it needs.** A field typed by a parameter, whole or as an
+argument, takes no literal (`refuseLiteralOnOpenType`; in the explicit spelling `refuseLiteralOnParameter` refuses one
+beside `type: T` before the payload is bound, so the author reads §5.10's reason and not the reader's). A literal on a
+closed type is judged when the template closes, against the closed field's type (`checkFieldValue`), its §8.2 hygiene
+on the template (`TsonSchemaLinker.checkFieldValues`).
 
 ## Field groups
 
@@ -417,19 +416,20 @@ path (`design/front-door-and-config.md`); a class no entry declares stays in `sc
 `Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as Java subtyping, and an entry's kind is
 `EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record carries `TypeChain chain` as its first
 component, mirroring the constructor's flattened shape (`type`'s field first);
-`Alias`, `TemplateBody` and `ValueEntry` carry none. A reference's argument is itself a `TypeRef`, a name or an
-application, never a literal (§5.10). `Reference` is the parsed
+`Alias` and `ValueEntry` carry none. A reference's argument is itself a `TypeRef`, a name, an application or a
+parameter, never a literal (§5.10). `Reference` is the parsed
 form of a reference value, sealed over `TypeRef` and `SiblingRef` (`kind!`, a record field's type chosen per instance
 by a sibling field's value, [TSON-SCHEMA] §5.2); `TypeRef` is sealed in turn over `NameRef`
-(no arguments) and `ApplicationRef` (at least one), the variant chosen by `TypeRef.of`, which never builds a sibling. Only
-`RecordField.type` and `RecordTemplateField.type` are typed `Reference`; every other slot holding a reference is
+(no arguments), `ApplicationRef` (at least one), the variant chosen by `TypeRef.of`, which never builds a sibling, and
+`ParamRef`, which only an open record makes of a name its parameters declare. Only
+`RecordField.type` is typed `Reference`; every other slot holding a reference is
 typed `TypeRef`, so the position rule is the Java type and only the field-type consumers switch on the variant. **The
 position rule is enforced where a sibling is read**, so none reaches a `TypeRef` slot: in sugar by `SchemaDesugarer`
 (`design/schema-grammar-and-desugaring.md`); in an explicit instance or a resolved form by the slot reader `BindTargets`
 picks by the component's class, a `TypeNameSlotReader` refusing one at its token where the component is a `TypeRef`
 (`TYPE_MISMATCH`, naming the slot, `!meta.array { element_type: kind! }`) and admitting it where it is a `Reference`
-at a reference whose `allow_sibling` admits one (`record_field.type`, `record_template_field.type`, positional or
-not); inside an argument list by the data stream;
+at a reference whose `allow_sibling` admits one (`record_field.type`, positional or not); inside an argument list by
+the data stream;
 and wherever no component narrows the read (a tree-mode read, a field typed `meta.type_ref` in data) by the reference
 atom's parser, which reads every variant through `ReferenceGrammar.parseReference` and admits a sibling only where the
 reference's `allow_sibling` does (`meta.field_type_ref`), refusing it elsewhere as a constraint the value breaks

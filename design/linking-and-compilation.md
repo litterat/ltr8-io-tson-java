@@ -37,14 +37,14 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   and each is merged through imports.
 - A namespace type resolves to a `NamespaceBody`, and a value of it is read as the map `NamespaceBody.read()` states:
   both compilers hand that map to the `map` factory, so neither factory table has a `namespace` entry.
-- `checkHeldArity` asks `HeldBody.applicationsOf` only, never `HeldBody.namesOf`. It is the one place an entry's own
-  parameters are in scope: a closed entry holds none, so `validateTypeRef` and `checkFieldValue` resolve every name
-  in the schema's namespace.
+- `checkOpenArity` is the one place an entry's own parameters are in scope: it reads an open record's references, a
+  `ParamRef` among them, and judges arity alone. A closed entry holds no parameter, so `validateTypeRef` and
+  `checkFieldValue` resolve every name in the schema's namespace.
 - `TsonSchemaRegistry` never overwrites an identity and exposes no way to remove or enumerate one: that *is* the
   "locked" guarantee.
-- Everything that asks what an entry IS-A asks its `TypeChain`: `computeSubtypes` credits a record template as it
-  does a type, and the constructor test (`EntryKind.isConstructor`) reads a template's chain as a closed one's,
-  judging `top` by its origin.
+- Everything that asks what an entry IS-A asks its `TypeChain`: `computeSubtypes` credits every closed type and no
+  open record, so a template is in no `subtypes` index, and the constructor test (`EntryKind.isConstructor`) reads an
+  open record's chain as a closed one's, judging `top` by its origin.
 
 Related: `design/namespace-types-and-value-entries.md`, `design/references.md`, `design/class2-compilation.md`,
 `design/compiled-registries.md`, `design/schema-resolution.md`, `design/template-materialisation.md`.
@@ -58,7 +58,7 @@ the registry is storage over the `schema.meta` value model and stays in `tson-sc
 
 **The linker materializes nothing.** `SchemaDesugarer` and `TemplateMaterialiser` have turned every sugar form and
 closable application into a declaration one phase earlier, in the module that can bind a constructor generically. The
-references carrying arguments the linker sees are inside open entries, validated and never rewritten, every argument
+references carrying arguments the linker sees are inside open records, validated and never rewritten, every argument
 judged as a type's name; an application
 whose head names nothing in scope keeps its argument list rather than collapsing to its bare head
 (`design/template-materialisation.md`), so what the linker judges is what the author wrote.
@@ -81,7 +81,7 @@ load-bearing, each step reading what an earlier one wrote:
 1. **Merge the closure** (`mergeImports`): every `!!import`.
 2. **Add the local entries**: a collision with the closure is refused unless the two are equal. The merged map is
    the one namespace every later step reads.
-3. **`computeSubtypes`**, the reverse of `supertypes` over every `Type`, a record template included.
+3. **`computeSubtypes`**, the reverse of `supertypes` over every closed `Type`, an open record left out.
 4. **`enumForms`** for each local enum (`EnumLabels.labelForm`).
 5. **`computeKinds`**, every reference's derived index, whether `of` names a constructor and, for a kind, its
    members (`design/kinds-and-name-types.md`).
@@ -117,7 +117,7 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
   name is derived from the form alone, so two documents writing `[text]` without importing each other each mint
   `array_text_…`, and a closure holding both reaches one entry by two routes: the first arrival is kept with its
   origin, every use in either document names it, and its `closes` facts take the union, since a form one document
-  lifts and another reaches by closing a template's open synthetic close different applications. Both keys must carry
+  lifts and another constructs by closing a template's held `[T]` close different applications. Both keys must carry
   `@meta.synthetic`; a minted name meeting a declared one is the collision above. The two bodies are compared, their
   `subtypes` left out, and a disagreement is an `IllegalStateException`, the cross-document form of the broken naming
   function `MintedNames.claim` refuses within one phase. A document that writes a form an import already minted lifts
@@ -146,7 +146,7 @@ are worth their place here, each catching what would otherwise link, compile, an
   value), naming the type it is a value of. A value entry's payload was judged by the read against its type and its
   names by `ValuesByName`, so `validateBody` asks nothing of it.
 - **A `meta.type_ref` slot is judged by membership** of `meta.type_ref` (`KindMembers.isMember`), where `type` is in reach:
-  an alias stopping at an application, an open entry and a value entry are no type a value can have. A constructor
+  an alias stopping at an application, an open record and a value entry are no type a value can have. A constructor
   is one, its declaration a record (`spec: net.uuid_type` holds a declaration body as data; §4.1).
 - **A choice's variants are distinct at the end of each §8.3 alias chain** (`AliasChain.terminal`), since an
   alias and its target are one type: `(text | my_text)` with `my_text => text` is caught, the only spelling an author
@@ -155,7 +155,7 @@ are worth their place here, each catching what would otherwise link, compile, an
 **A chain's names resolve in the same namespace.** A refinement of a kernel constructor reaches one (`meta.set_type =>
 meta.array ^ {...}` carries `[meta.array, meta.product, meta.top, meta.type]`), and the defining schema's closure is inside
 the importer's, so every name on it is there. A `reference_type` body's `of` names any type or constructor, an application
-there having closed to its entry during resolution, never a value entry or an open entry (`KindMembers.ofRefusal`); what it
+there having closed to its entry during resolution, never a value entry or an open record (`KindMembers.ofRefusal`); what it
 names decides whether the slot holds a type's name or a value's. A namespace type's stated `key_type` must be a member of
 `meta.identifier_ref`: its keys are names.
 
@@ -176,19 +176,18 @@ Both are decidable at link and neither depends on anyone applying a template.
   declares parameters. Too many, too few, and **none at all**: a template named bare otherwise links and compiles and
   fails at read time against a document with nothing wrong with it. A template is not a type (§5.10), so a bare
   template is refused at every position -- a field, element, map key or value, tuple position, choice variant or
-  argument -- a record template included, the message naming the remedy: the application, or the abstract record a
+  argument -- the message naming the remedy: the application, or the abstract record a
   family's applications compose. An operand is `DefinitionResolver.refuseUnappliedTemplate`'s, one phase earlier. A
   type parameter written with arguments (`T<text>`) is refused: §5.10 admits no head abstraction.
-- **Parameter usage** (`checkOpenEntryUsesEveryParameter`): an open entry references every parameter it declares, so
+- **Parameter usage** (`checkOpenEntryUsesEveryParameter`): an open record references every parameter it declares, so
   `box => <T> { v: text }` is refused. The converse needs no check: at a closed entry a token in a value slot *is* a
   literal, and a parameter reference is already an unresolved one.
-- **A held body answers arity for the applications it writes** (`checkHeldArity`). A held body withholds what a
-  reference *resolves to*, so type-kind validation and inhabitance wait for materialisation; arity counts the
-  parameters the referenced entry declares and does not. Nothing ever closes `chain => <T> { tail: chain<T, T>? }`,
-  so deferring it would ship the mistake. **Applications only**: `HeldBody.names()` returns every token, field names
-  and literals among them, so asking the zero-argument half of `names()` would refuse a correct schema whose field is
-  called `box` beside a template of that name. That half runs on the entry materialisation mints, and an unapplied
-  template gets no verdict (§5.10: "an unapplied template is checked no further and receives no verdict").
+- **An open record answers arity for every reference it holds** (`checkOpenArity`), bare ones included: its field
+  types and parents are references of the model, so a template named bare inside a template is refused at the
+  template's own declaration, and a field named `box` beside a template of that name is told apart, a field name being
+  no reference. What a reference *resolves to* waits for an application, so type-kind validation and inhabitance run
+  on the record an application closes to; arity counts the parameters the referenced entry declares and does not.
+  Nothing ever closes `chain => <T> { tail: chain<T, T>? }`, so deferring it would ship the mistake.
 
 ## The facts linking records (`TsonLinkedSchema`)
 
@@ -271,7 +270,7 @@ The same walk judges two more names, so one rule decides what a value's name rea
 - **One namespace for the slot's type and the name.** The first segment resolves in `merged`, a segment naming a
   member of a nested `!schema` map collapses onto that member's path entry, alias hops are followed (§8.3), and only
   there, so `method: place_order` is unresolved even though `orders` holds that key. Found first,
-  judged after: nothing is a choice among candidates. A type entry admits no further segment, an open entry is no
+  judged after: nothing is a choice among candidates. A type entry admits no further segment, an open record is no
   referent, a list has no named members, and a map that is no namespace is not entered whatever its key type.
 - **The judgement is §7.2's IS-A, by canonical identity.** An entry's declared type is the constructor that built its
   body: its recorded tag where that names a constructor, else the kernel constructor its body's class mirrors

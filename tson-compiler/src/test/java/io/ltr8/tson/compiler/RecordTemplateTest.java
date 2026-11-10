@@ -301,18 +301,17 @@ class RecordTemplateTest {
     }
 
     /**
-     * A form written over the declaration's own parameter closes with it: the open synthetic it lifted to is
-     * closed innermost-out as the application that reaches it is, so the field ends up naming an ordinary
-     * container entry. {@code ContainerSugarEndToEndTest} carries the shape of what it closes into; here the
-     * point is only that applying the template is accepted.
+     * A container written over the declaration's own parameter is the reference it spells, and closes with the
+     * application: the field ends up naming an ordinary container entry. {@code ApplicationInContainerPositionTest}
+     * carries the shape of what it closes into; here the point is only that applying the template is accepted.
      */
     @Test
     void aParameterBearingSugarFormClosesWithTheApplication() {
-        for (String field : List.of("[T]", "[T; 1..2]", "{text => T}")) {
+        for (String field : List.of("[T]", "{text => T}", "nonempty<T>")) {
             TsonCompiledSchema compiled = compile("""
-                      box  => <T> { v: T }
-                      tmpl => <T> { a: %s }
-                      use  => { u: tmpl<text> }""".formatted(field));
+                      nonempty => meta.array ^ { min_items?: = 1 }
+                      tmpl     => <T> { a: %s }
+                      use      => { u: tmpl<text> }""".formatted(field));
 
             Top closed = compiled.schema().entries()
                     .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a"));
@@ -322,13 +321,14 @@ class RecordTemplateTest {
     }
 
     /**
-     * The whole arc for an open instance: the sugar over a parameter, closed by the application, compiled,
-     * and reading real data -- and rejecting data the closed form's own constraints refuse.
+     * The whole arc for a refined constructor applied over a parameter: held in the open record, constructed when the
+     * record is applied, compiled, and reading real data -- and rejecting data the constructor's own pins refuse.
      */
     @Test
     void anOpenFormClosedByAnApplicationReadsRealData() {
         TsonCompiledSchema compiled = compile("""
-                  tags   => <T> { xs: [T; 2] }
+                  two_of => meta.array ^ { min_items?: = 2  max_items?: = 2 }
+                  tags   => <T> { xs: two_of<T> }
                   holder => { t: tags<text> }""");
 
         assertNotNull(compiled.get("holder")
@@ -339,15 +339,15 @@ class RecordTemplateTest {
     }
 
     /**
-     * §8.2's deferred check, at the one place D7 gives it a home. {@code <K> !meta.namespace { key_type: K … }} is a
-     * fine declaration -- {@code K} could name an identifier family -- and {@code keyed<int32>} is where it stops
-     * being one, because substitution is what finally hands {@code key_type} something to judge.
+     * §8.2's deferred check: {@code <K> { m: meta.namespace<K text> }} is a fine declaration -- {@code K} could name
+     * an identifier family -- and {@code keyed<int32>} is where it stops being one, because substitution is what
+     * finally hands {@code key_type} something to judge.
      */
     @Test
     void anArgumentTheSlotCannotTakeIsReportedAtTheApplication() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
-                          keyed  => <K> !meta.namespace { key_type: K  value_type: text }
+                          keyed  => <K> { m: meta.namespace<K text> }
                           holder => { t: keyed<int32> }"""));
 
         assertTrue(thrown.getMessage().contains("int32"), thrown.getMessage());
@@ -505,128 +505,26 @@ class RecordTemplateTest {
         assertTrue(thrown.getMessage().contains("declares no type parameters"), thrown.getMessage());
     }
 
+    /**
+     * <b>No alias templates</b> (§5.10): a template's body is a record body, so a body that is a bare reference -- a
+     * partial application, the identity, or one applying itself -- is refused at the declaration. A use site writes
+     * the application it means.
+     */
+    @Test
+    void anAliasTemplateIsRefused() {
+        for (String body : List.of("<B> pair<text, B>", "<T> T", "<T> uuid_pair<T>")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
+                      pair      => <A, B> { first: A  second: B }
+                      uuid_pair => %s""".formatted(body)), body);
+            assertTrue(thrown.getMessage().contains("'uuid_pair': a template's body is a record body")
+                    && thrown.getMessage().contains("alias template"), thrown.getMessage());
+        }
+    }
+
     // ── A template named as a data value's own type ──────────────────────
-    //    A template is not a type (§5.10), a record template included, so naming one in data is refused by
+    //    A template is not a type (§5.10), so naming one in data is refused by
     //    OpenTemplateReader, whose message names the route: declare the application and name that. It is the
     //    author's error and an ordinary data diagnostic, never a gap in this library.
-
-    /**
-     * A <b>parameterised alias</b> (§5.10 partial application): a declaration whose whole body is an
-     * application, and which is itself a template because some of that application's arguments are its own
-     * parameters. Applying the alias substitutes into the inner argument list and closes what results, so
-     * {@code uuid_pair<int32>} is the same entry {@code pair<text, int32>} written directly denotes.
-     */
-    @Test
-    void aParameterisedAliasClosesThroughTheApplicationItNames() {
-        TsonCompiledSchema compiled = compile("""
-                  pair      => <A, B> { first: A  second: B }
-                  uuid_pair => <B> pair<text, B>
-                  holder    => { p: uuid_pair<int32>  q: pair<text, int32> }""");
-
-        assertEquals(List.of("B"), OpenEntry.parameterNames(compiled.schema().entries().get("uuid_pair")),
-                "the alias is itself a template");
-        assertEquals(1, instantiationsOf(compiled, "pair").size(), "one entry for the one closed pair");
-        String closed = fieldType(compiled, "holder", "p");
-        assertEquals(closed, fieldType(compiled, "holder", "q"), "the alias and the direct form are one type");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, closed, "first").type());
-        assertEquals(TypeRef.of("int32"), fieldOf(compiled, closed, "second").type());
-    }
-
-    /**
-     * §5.10 is explicit that an alias template composes during substitution with "no intermediate entry
-     * per alias hop", so a chain of them lands on the one entry the innermost application denotes.
-     */
-    @Test
-    void aChainOfParameterisedAliasesComposesToOneEntry() {
-        TsonCompiledSchema compiled = compile("""
-                  pair   => <A, B> { first: A  second: B }
-                  keyed  => <B> pair<text, B>
-                  keyed2 => <C> keyed<C>
-                  holder => { p: keyed2<int32> }""");
-
-        assertTrue(compiled.schema().entries().keySet().stream()
-                        .noneMatch(n -> n.startsWith("keyed") && compiled.schema().positionOf(n).isEmpty()),
-                "the alias hops mint nothing");
-        assertEquals(1, instantiationsOf(compiled, "pair").size());
-        assertEquals(instantiationsOf(compiled, "pair").get(0), fieldType(compiled, "holder", "p"));
-    }
-
-    /** The degenerate alias template: its body <em>is</em> the parameter, so applying it is the argument. */
-    @Test
-    void anAliasTemplateWhoseBodyIsTheParameterClosesToTheArgument() {
-        TsonCompiledSchema compiled = compile("""
-                  box    => <T> { v: T }
-                  ident  => <T> T
-                  holder => { a: box<ident<text>> }""");
-
-        assertEquals(1, instantiationsOf(compiled, "box").size(), "ident<text> is text, so only box is closed");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, fieldType(compiled, "holder", "a"), "v").type());
-    }
-
-    /** An alias over an <em>open instance</em> template closes by that path, one hop further in. */
-    @Test
-    void aParameterisedAliasMayNameAnOpenInstanceTemplate() {
-        TsonCompiledSchema compiled = compile("""
-                  rows   => <T> [T; 3]
-                  triple => <T> rows<T>
-                  holder => { r: triple<int32> }""");
-
-        // `triple` itself mints nothing, and neither does `rows<int32>`, the open instance one hop in: the
-        // field names the closed array synthetic that closing it produced, the application being its expansion.
-        String synthetic = fieldType(compiled, "holder", "r");
-        ArrayBody array = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(synthetic));
-        assertEquals(TypeRef.of("int32"), array.elementType());
-        assertEquals(Optional.of(3L), array.minItems());
-        assertEquals(Optional.of(3L), array.maxItems());
-    }
-
-    /** Arity is the <b>alias's</b> own parameter list, not the arity of the application it names. */
-    @Test
-    void aParameterisedAliasIsAppliedAtItsOwnArity() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
-                  pair   => <A, B> { first: A  second: B }
-                  keyed  => <B> pair<text, B>
-                  holder => { p: keyed<int32, text> }"""));
-
-        assertTrue(thrown.getMessage().contains("'keyed' takes 1 type argument [B], but 2 were applied"),
-                thrown.getMessage());
-    }
-
-    /**
-     * An alias template that applies itself never reaches a body, and -- unlike a recursive record --
-     * mints no entry a knot could be tied on. Diagnosed as the author's error rather than handing a field
-     * the name of an entry nothing defines.
-     */
-    @Test
-    void aSelfApplyingAliasTemplateIsASchemaError() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
-                  loop   => <T> loop<T>
-                  holder => { p: loop<text> }"""));
-
-        assertTrue(thrown.getMessage().contains("alias template whose own body applies it again"),
-                thrown.getMessage());
-    }
-
-    /** End to end: a document validates through the alias exactly as through the application it names. */
-    @Test
-    void aDocumentReadsThroughAParameterisedAlias() {
-        TsonCompiledSchema compiled = compile("""
-                  pair      => <A, B> { first: A  second: B }
-                  text_pair => <B> pair<text, B>
-                  holder    => { p: text_pair<int32> }""");
-        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
-
-        TsonValue value = (TsonValue) compiled.get("holder")
-                .read(TestDocuments.document("{ p: { first: \"a\"  second: 1 } }", problems));
-
-        assertEquals(List.of(), problems.diagnostics());
-        assertEquals(Optional.of("a"), value.at("/p/first").asString());
-
-        DiagnosticsCollector rejected = DiagnosticsReceiver.collecting();
-        compiled.get("holder").read(TestDocuments.document("{ p: { first: \"a\"  second: \"x\" } }", rejected));
-        assertEquals(1, rejected.diagnostics().size(), () -> rejected.diagnostics().toString());
-    }
 
     /**
      * The mistake the target use case invites: "a page of orders" names {@code paged}, the thing the schema
