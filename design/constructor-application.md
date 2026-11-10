@@ -31,6 +31,10 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   constructor. Any schema may declare a constructor; nothing ties it to what the document imports.
 - A constructor's parameters are confined to no channel: nothing is checked at the declaration, and each channel is
   decided where the argument lands.
+- `C<args>` over a constructor (a closed record IS-A `meta.type`) is the construction `!C { … }` over its argument
+  slots (§5.3, `ConstructionSugar`), and resolves through the very path the braced form takes: a declaration through
+  `resolveInstance`, a use site through the constructor's reader into the content-keyed synthetic. No verdict is the
+  sugar's own but the argument count and an argument that is no reference.
 
 Related: `design/schema-resolution.md` (the resolution phase around this), `design/atom-refinement-and-coherence.md`
 (`!I ^ { ... }`), `design/template-materialisation.md` and `design/held-template-bodies.md` (how `C<...>` closes),
@@ -116,3 +120,35 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   materialises, compiles, accepts `{ value: true }` and rejects `{ value: banana }` with a `TYPE_MISMATCH` at
   `/value`, and the variant channel behaves the same
   (`DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord`).
+
+## Construction sugar (`resolver/ConstructionSugar.java`)
+
+- **`C<a₁ … aₙ>` over a constructor is `!C { f₁: a₁ … fₙ: aₙ }`** (§5.3), the arguments landing in `C`'s argument
+  slots: its required fields typed by a reference naming types and not pinned by its chain, in declaration order. A
+  field is a slot where it is not optional, its role is `FREE` (a pin or a default supplies its value, so the
+  construction needs none), and its type, past its alias hops, is a reference whose `of` names types
+  (`KindMembers.namesTypes`). `meta.array` has one (`element_type`), `meta.map` two (`key_type value_type`),
+  `meta.namespace` the same two, `meta.reference_type` one (`of`), `meta.enum_type` one (`name_type`, `members`
+  being a set of values), and `meta.tuple` and the root's `enum` none. Nothing is written on a constructor to permit
+  it, and it is the rule `[T]` and `{K => V}` already follow.
+- **A constructor here is a closed record IS-A `meta.type`** (`ConstructionSugar.constructs`), read past the head's
+  alias hops: its instances are types. A head composing `meta.top` alone builds values and is no constructor of this
+  rule, and an open entry substitutes (§5.10). The check runs before the template path in both places an application
+  resolves, so a head is asked once which operation it stands for.
+- **A declaration is the construction** (`DefinitionResolver.construction`): the payload is built and handed to
+  `resolveInstance` as `!C { … }`, so `text_list => meta.array<text>` gets every check and fact the braced form does,
+  its tag the head as written, and records no application. **A use site names the synthetic**
+  (`TemplateMaterialiser.construction`): the payload, each application among its arguments closed first, is named by
+  `DerivedName.ofBinding` over the terminal constructor and read by its reader, so it lands on the entry `[text]` lifts
+  to and an application through an alias of the constructor on the same one. Arguments are written as the author
+  wrote them, not dereferenced, as the sugar forms write theirs. Nothing is owned: a use site names the content-keyed
+  entry whatever a declaration elsewhere constructs, as `[text]` does.
+- **The sugar decides where an argument lands and nothing else.** The arity (`requireArity`, also the linker's
+  `checkArity` over a held reference such as `meta.array<T>` in a record template) and an argument that is a literal
+  are refused here; an argument a slot's `of` refuses is refused at link as the braced form's is; a required field no
+  slot fills leaves the construction incomplete and the constructor's reader refuses it. A refined constructor's
+  instance is its own kind and is not normalised to its source's: `nonempty_type<uuid>` and `[uuid; 1..]` are two
+  entries. `ConstructionSugarTest` pins all of it.
+- **The desugarer cannot tell a constructor from a record**, so `checkTemplateApplication` refuses an argument list
+  only on a local head whose body says it is none: a fresh record, a construction or an atom refinement. A
+  composition, a refinement or an alias passes through for resolution to judge.

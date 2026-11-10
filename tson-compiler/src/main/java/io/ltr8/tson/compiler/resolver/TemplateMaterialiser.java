@@ -467,6 +467,10 @@ final class TemplateMaterialiser {
         if (ref.arguments().isEmpty()) {
             return ref;
         }
+        String constructed = construction(ref);
+        if (constructed != null) {
+            return TypeRef.of(constructed);
+        }
         List<TypeArgument> arguments = new ArrayList<>();
         for (TypeArgument argument : ref.arguments()) {
             arguments.add(argument instanceof TypeArgument.Ref nested
@@ -479,6 +483,47 @@ final class TemplateMaterialiser {
             closedApplications.putIfAbsent(plain(ref), entry);
         }
         return entry == null ? TypeRef.of(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
+    }
+
+    /**
+     * The entry an application over a <b>constructor</b> denotes, building it on first sight, or {@code null} where
+     * the head, past its alias hops, is no constructor ({@link ConstructionSugar}). {@code meta.array<text>} is the
+     * construction {@code !meta.array { element_type: text }}, so it is the closed synthetic {@code [text]} lifts
+     * to: one binding record, named by its content ({@link DerivedName#ofBinding}) and built by the constructor's
+     * own reader, the arguments as written and each application among them closed first. Identity is the
+     * constructor's, so an application through an alias of it names the same entry.
+     *
+     * <p><b>No {@code @meta.application}, no instantiation entry, no ownership.</b> The value states its
+     * constructor and its arguments, and nothing is substituted, so there is nothing to record beside it; and a use
+     * site names the content-keyed entry whatever a declaration elsewhere constructs, as {@code [text]} does.
+     */
+    private String construction(TypeRef application) {
+        String constructor = AliasChain.terminal(application.name(), this::lookup);
+        Top definition = lookup(constructor);
+        if (!ConstructionSugar.constructs(constructor, definition)) {
+            return null;
+        }
+        CoreValue wire = closeApplications(ConstructionSugar.payload(application, (RecordBody) definition,
+                this::lookup));
+        List<RecordValue.Field> fields = wire instanceof RecordValue record ? record.fields() : List.of();
+        String formName = DerivedName.ofBinding(constructor, fields);
+        minted.claim(formName, DerivedName.canonicalBinding(constructor, fields));
+        if (namespace.definition(formName) == null) {
+            Top body;
+            try {
+                body = constructionReader.read(constructor, new DataValue(List.of(), Optional.of(constructor), wire));
+            } catch (ReadException e) {
+                throw DefinitionResolver.payloadFailure("'" + application.text() + "' constructs a body that",
+                        "'" + application.text() + "' constructs '!" + constructor + " { ... }', which is not valid "
+                                + "data for '" + constructor + "' -- " + e.getMessage(), e);
+            }
+            note(formName, constructor);
+            materialised.put(formName, body);
+            synthetics.add(formName);
+            publish.accept(formName, body);
+        }
+        closedApplications.putIfAbsent(plain(application), formName);
+        return formName;
     }
 
     /**

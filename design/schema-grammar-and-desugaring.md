@@ -8,8 +8,9 @@ The schema grammar itself is in `design/schema-grammar.md`.
 
 - Every node not being rewritten is returned by identity — `declarationPositions()` is an `IdentityHashMap` — and a
   declaration that is rebuilt has its position re-registered against the node replacing it (`SchemaDesugarerTest`).
-- `TypeRef.arguments` non-empty means an open form, a template application; everything closed is an entry referenced by
-  a bare name, so `DefinitionResolver` only ever sees a bare reference or `!C value`.
+- `TypeRef.arguments` non-empty means an application, a template's or construction sugar over a constructor, which
+  materialisation closes; everything closed is an entry referenced by a bare name, so `DefinitionResolver` only ever
+  sees a bare reference or `!C value` at a use site.
 - The phase is purely syntactic and consults no other schema: the sugar table is fixed, its targets the kernel's
   `meta.array`, `meta.map`, `meta.tuple`, `meta.choice` and `meta.alias` whatever a document imports, so the kernel's
   bootstrap needs no special case, and every closure holds every target.
@@ -53,10 +54,10 @@ rather than splitting it across the resolver (declaration position) and the link
 **The injected-entry half is the spec's own rule.** §8.2: "**Every application materialises** ... Nothing is
 carried structurally in place: a use site holds a bare reference to its entry", and the materialised entries
 merge under `!!import` by the same structural identities they have within a schema. Two rules make it so:
-§4.2's `meta.array`/`meta.map` constructors are parameterless, so a container at a use site cannot be
-an application at all — no constructor of the kernel's takes type parameters, `meta.map` holding
-`key_type`/`value_type` as ordinary fields — and §5.3 states one lift rule, every sugar form lifting at desugar, a concrete
-form to a closed synthetic entry. `ResolvedFixtureTest` asserts the resolved fixtures and this output agree entry for entry.
+§4.2's `meta.array`/`meta.map` constructors are parameterless, so a container at a use site is no
+template application — `meta.map` holds `key_type`/`value_type` as ordinary fields, and `meta.map<K V>` is
+construction sugar filling them, which lands on the entry `{K => V}` lifts to — and §5.3 states one lift rule,
+every sugar form lifting at desugar, a concrete form to a closed synthetic entry. `ResolvedFixtureTest` asserts the resolved fixtures and this output agree entry for entry.
 
 **The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — a template application,
 whose arguments are what materialisation substitutes. Everything closed is an entry, referenced by a bare
@@ -104,17 +105,17 @@ rebuilt and called a cache.
   imported entries into the phase, and **the kernel's bootstrap needs no special case** — routing read
   off the imported vocabulary would, for the constructors the kernel applies to itself, have to come from
   the very entries it is in the middle of producing.
-- **A generic application is a user template, and this phase mostly leaves it alone.** `name<args>` resolves
-  its head in the schema's one namespace (§3.3.1) — parameters, then locals, then the closure — so
-  `meta.map<text, text>` finds the kernel's `meta.map`, a parameterless constructor, and is refused as declaring no type
-  parameters (`ContainerSugarEndToEndTest`); `{text => text}` is the spelling. A head that resolves to a
-  template is a §5.10 one. Substitution happens over the **resolved** form
-  (`TemplateMaterialiser`, `design/template-materialisation.md`), not over the AST, so an application passes through
-  here with its head and arguments intact. `checkTemplateApplication` refuses exactly one thing: a local
-  head declaring *no* parameters, the author's error — nothing there takes type arguments. A head this
-  document neither declares nor imports is the linker's unresolved reference, and a template whose body writes
-  a container sugar form over one of its own parameters lifts open
-  (`design/desugaring-open-forms-and-templates.md`).
+- **A generic application passes through this phase.** `name<args>` resolves its head in the schema's one
+  namespace (§3.3.1) — parameters, then locals, then the closure. A head that resolves to a template is a §5.10
+  application; one that resolves to a constructor is construction sugar (§5.3), so `meta.map<text, text>` is the
+  construction `{text => text}` spells and names its entry (`ContainerSugarEndToEndTest`,
+  `design/constructor-application.md`). Both are decided over the **resolved** form (`TemplateMaterialiser`,
+  `design/template-materialisation.md`), where a head's chain is known, so an application passes through here with
+  its head and arguments intact. `checkTemplateApplication` refuses exactly one thing: a local head declaring *no*
+  parameters whose body says it is no constructor — a fresh record, a construction, an atom refinement — the author's
+  error. A composition, refinement or alias may be a constructor and passes. A head this document neither declares
+  nor imports is the linker's unresolved reference, and a template whose body writes a container sugar form over one
+  of its own parameters lifts open (`design/desugaring-open-forms-and-templates.md`).
 - **Identity is the resolved binding record, not the spelling.** The injected name is
   `head_value_value_hash`, derived from the record the form desugars to, so `[T; 3]` and `[T; 3..3]` land on
   the same entry and any two structurally identical forms anywhere in the document collapse to one

@@ -1539,6 +1539,12 @@ final class DefinitionResolver {
         }
         io.ltr8.tson.schema.meta.TypeRef target =
                 io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), arguments);
+        if (parameters.isEmpty()) {
+            Optional<Top> constructed = construction(name, target);
+            if (constructed.isPresent()) {
+                return constructed.get();
+            }
+        }
         if (parameters.isEmpty() && applicationCloser != null) {
             // Closed: this declaration owns the entry. A null answer means it cannot -- an unresolved head,
             // an arity mismatch, or a partial application -- and the reference form below is the fallback.
@@ -1548,6 +1554,28 @@ final class DefinitionResolver {
             }
         }
         return openAliasOr(target, parameters);
+    }
+
+    /**
+     * A declaration whose body applies a <b>constructor</b> -- {@code text_list => meta.array<text>} -- is the
+     * construction it denotes ({@link ConstructionSugar}), resolved exactly as {@code text_list => !meta.array {
+     * element_type: text }} is: its value states the constructor and the arguments, its tag is the head as written,
+     * and it records no application, since nothing was substituted. Empty where the head, past its alias hops, is
+     * no constructor, for the template path to take.
+     */
+    private Optional<Top> construction(String name, io.ltr8.tson.schema.meta.TypeRef application) {
+        java.util.function.Function<String, Top> types = type -> {
+            Top found = vocabularyDefinitions.definition(type);
+            return found != null ? found : namespaceDefinitions.definition(type);
+        };
+        String constructor = AliasChain.terminal(application.name(), types);
+        Top definition = types.apply(constructor);
+        if (!ConstructionSugar.constructs(constructor, definition)) {
+            return Optional.empty();
+        }
+        RecordValue payload = ConstructionSugar.payload(application, (RecordBody) definition, types);
+        return Optional.of(resolveInstance(name, new Instance(
+                new DataValue(List.of(), Optional.of(application.name()), payload))));
     }
 
     /**

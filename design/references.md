@@ -81,6 +81,18 @@ field names a whole-type or whole-value parameter under its own label (`type_par
   annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
   resolution and arity, and its arguments by the head's parameters: only an argument at a type parameter is judged
   as a type's name (`TsonSchemaLinker.typeArguments`).
+- **An application whose head is a constructor constructs** (§5.3's construction sugar, `ConstructionSugar`): past
+  its alias hops, a closed record IS-A `meta.type` is applied by building `!C { f₁: a₁ … fₙ: aₙ }`, its **argument
+  slots** `f₁ … fₙ` being its required fields (not optional, role `FREE`) typed by a reference naming types
+  (`KindMembers.namesTypes` over the field type's `of`), in declaration order. `meta.array<uuid>` is the construction
+  `[uuid]` spells and names the same synthetic; `meta.map<text int32>` is `{text => int32}`'s; a declared
+  `uuid_list => meta.array<uuid>` *is* `!meta.array { element_type: uuid }`, tag `meta.array`, no `@meta.application`.
+  The arity is the slot count and every argument a reference (`ConstructionSugar.requireArity`, `payload`); every
+  other verdict is the construction's own, so `meta.namespace<int32 text>` is refused at link as `key_type: int32` is,
+  and `meta.enum_type<meta.identifier>` by the constructor's reader for the `members` it leaves unwritten. A refined
+  constructor is applied the same way and its instance is its own kind: `nonempty_type<uuid>` is `!nonempty_type {
+  element_type: uuid }`, a different entry from `[uuid; 1..]`. An application whose head is an open entry substitutes
+  (§5.10), and a head that is neither takes no arguments.
 - A slot that names the type of a value is typed `meta.type_ref` (`meta.tuple_element.element_type`,
   `meta.array.element_type`, `meta.map.key_type` and `value_type`,
   `meta.namespace.value_type`, `meta.choice.variants`, `meta.template_param.type` and `bound`, `meta.alias.target`,
@@ -197,7 +209,7 @@ A name stands in a schema in one of five forms. Two are not references.
 |---|---|---|
 | **Key** | declares: the name an entry, field, parameter or namespace value is addressed by | the map's key type, which judges spelling and equality |
 | **Reference** | names something declared elsewhere, by its key | **store** (where the first segment resolves) and **judgement** (what the referent must be) |
-| **Application** | a reference carrying an argument list: names an open entry and closes it with arguments; a use site then holds a reference to the minted entry | the head, and the arguments |
+| **Application** | a reference carrying an argument list: names an open entry and closes it with arguments, or names a constructor and constructs it over its argument slots; a use site then holds a reference to the minted entry | the head, and the arguments |
 | **Tag** | names the type of the value it is written on, `!T v` | store and judgement, as a reference, and the payload is read under the referent |
 | **Index** | computed at link and written out: `supertypes`, `subtypes`, the `application` annotation | none; never read as a reference on ingest |
 
@@ -224,7 +236,7 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 |---|---|---|---|---|
 | schema-map key, `meta.field_map` key, `meta.template_param.name` | key | — | spelling under the key type; `fields`, keyed by `text`, by the record's `name_type` after resolution | `checkNames`, `checkFieldNameTypes` |
 | `meta.enum_type.members` | values of a set | — | each a value of `name_type`, distinct under its equality | `checkEnumTypes` |
-| `meta.type_chain.parents`, `application` | reference, `meta.type_ref`, with arguments where open | namespace | a constructor or a record type for an operand; an open entry or a parameter for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
+| `meta.type_chain.parents`, `application` | reference, `meta.type_ref`, with arguments where open | namespace | a constructor or a record type for an operand; an open entry, a constructor or a parameter for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
 | `meta.type_chain.supertypes`, `subtypes` | index, `meta.type_ref` | — | — | link |
 | `meta.alias.target` | reference, `meta.type_ref` | namespace | any entry, type or constructor, by resolution; arguments only in an open alias's held text | `validateTypeRef` |
 | `meta.template_param.type`, `bound` | reference | namespace | `meta.type_ref`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
