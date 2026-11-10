@@ -163,12 +163,11 @@ dispatch is ABSTRACT plus non-empty `discriminators`, read where needed (`Family
 and never stored as a second fact. A group member cannot be a selector: §5.11 makes a value modifier a parse
 error there.
 
-**A record template also derives selectors from parametric pins** (`SchemaDesugarer.parametricallyPinned`): in a
-*fresh* record template a field pinned to a value parameter takes one value per application, so
-`<T, V> { type: text = T  value: V }` is a labelled sum with no mark written. A field whose *type* is a parameter
-is passed over, and a selector whose type names a parameter is refused (`refuseParameterTypedSelector`) — a
-position typed by the base reads the selector before it knows the member. A refinement or composition template
-derives none: `array ^ { element_type: = T }` pins a constructor's facet and says nothing about a family.
+**A record template states its selectors as a record does**, with `=?`: `<V> { type: text =?  value: V }` is a
+labelled sum, each member pinning `type` where its application is declared (`dog => pet<dog_type> & { type?: = "dog"
+}`). A field's value is never a parameter (§5.10), so no pin is derived from one. A selector whose type names a
+parameter is refused (`refuseParameterTypedSelector`) — a position typed by the base reads the selector before it
+knows the member.
 
 **On a template**, `abstract` is admitted and `final` refused: every application is a subtype of the template by
 construction, so the claim is false before anything else is written (§5.2, §5.10). On a record template the mark
@@ -181,7 +180,7 @@ the constructor it applies.
 
 A record template is a `RecordTemplateBody` (`meta.record_template`), ABSTRACT by construction
 (`FamilySelectors.extensionOf`), and takes part in IS-A (§5.10). Its fields are `RecordTemplateField`s, labelling
-a parameter that stands for the whole type (`type_param`) or the whole value (`value_param`), each field classified
+a parameter that stands for the whole type (`type_param`), each field classified
 once by its source spelling where it is built (`SchemaDesugarer`'s `RecordTemplateDef`, `DefinitionResolver.Built` over
 `BuiltField`); a parameter spelled like a schema type or like a name an absorbed field's arguments write is refused
 (`design/held-template-bodies.md`), and `checked` refuses a selector
@@ -208,9 +207,9 @@ the selector fields from the base's own fields for either kind of base, a templa
   (`SubtypeTemplateFamilyTest`, `OpenOperandCompositionTest`). Base and members here are all minted, and §8.2
   makes a minted name non-normative, which is why both record dispatchers follow aliases
   (`design/record-dispatch.md`).
-- **Membership in the base itself.** A *declared* application of a family base (`dogpet => pet<"dog", dog_type>`)
+- **Membership in the base itself.** A *declared* application of a family base (`dogpet => pet<dog_type>`)
   carries the base in its own `supertypes` (§8.2's entry shape), added by `familyBaseEdges` and inverted into
-  `pet.subtypes`. A *minted* use-site application (`k: pet<"dog", dog_type>`) gets no edge: it is a type read where
+  `pet.subtypes`. A *minted* use-site application (`k: pet<dog_type>`) gets no edge: it is a type read where
   it was written, never a candidate at a `pet` position, so no diagnostic asks a document for its content-derived
   name. A lifted synthetic is never a member either.
 
@@ -418,9 +417,8 @@ path (`design/front-door-and-config.md`); a class no entry declares stays in `sc
 `Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as Java subtyping, and an entry's kind is
 `EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record carries `TypeChain chain` as its first
 component, mirroring the constructor's flattened shape (`type`'s field first);
-`Alias`, `TemplateBody` and `ValueEntry` carry none. `TypeArgument` is a sealed interface (`Ref`/`Value`), one
-argument of a reference, because a record of two `Optional`s would not say that exactly one is present; it compares
-by its canonical text, the head's parameter and not the grammar deciding which it binds. `Reference` is the parsed
+`Alias`, `TemplateBody` and `ValueEntry` carry none. A reference's argument is itself a `TypeRef`, a name or an
+application, never a literal (§5.10). `Reference` is the parsed
 form of a reference value, sealed over `TypeRef` and `SiblingRef` (`kind!`, a record field's type chosen per instance
 by a sibling field's value, [TSON-SCHEMA] §5.2); `TypeRef` is sealed in turn over `NameRef`
 (no arguments) and `ApplicationRef` (at least one), the variant chosen by `TypeRef.of`, which never builds a sibling. Only

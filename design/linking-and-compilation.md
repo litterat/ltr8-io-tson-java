@@ -58,8 +58,8 @@ the registry is storage over the `schema.meta` value model and stays in `tson-sc
 
 **The linker materializes nothing.** `SchemaDesugarer` and `TemplateMaterialiser` have turned every sugar form and
 closable application into a declaration one phase earlier, in the module that can bind a constructor generically. The
-references carrying arguments the linker sees are inside open entries, validated and never rewritten, an argument
-judged as a type's name only where the head's parameter is a type parameter (`typeArguments`); an application
+references carrying arguments the linker sees are inside open entries, validated and never rewritten, every argument
+judged as a type's name; an application
 whose head names nothing in scope keeps its argument list rather than collapsing to its bare head
 (`design/template-materialisation.md`), so what the linker judges is what the author wrote.
 
@@ -164,8 +164,8 @@ names decides whether the slot holds a type's name or a value's. A namespace typ
 (`checkRestatedFieldTypes`, §5.7, §5.8). The resolver binds each before the names it holds need be ready, which is why
 neither runs there; `design/schema-resolution.md` has the field rule.
 
-**Every body is asked its family's coherence rule** (`checkCoherent`), which catches the bounds an application closed
-onto parameters (`sized<10, 3>`); a declared body was already asked at resolution, and one refused there never reaches
+**Every body is asked its family's coherence rule** (`checkCoherent`), which catches the forms an application closes
+to; a declared body was already asked at resolution, and one refused there never reaches
 the linker (`design/atom-refinement-and-coherence.md`).
 
 ## The two §5.10 template rules
@@ -189,11 +189,6 @@ Both are decidable at link and neither depends on anyone applying a template.
   and literals among them, so asking the zero-argument half of `names()` would refuse a correct schema whose field is
   called `box` beside a template of that name. That half runs on the entry materialisation mints, and an unapplied
   template gets no verdict (§5.10: "an unapplied template is checked no further and receives no verdict").
-  - **A literal argument whose type the body leaves open is refused here too** (`checkOpenLiterals`): with `pin2 =>
-    <T, P> { a?: T = P }`, `<X> { f: pin2<X, 3> }` binds `P`, a value of `T`'s argument, to `3` while that argument
-    is the open `X`. A literal needs a closed type (§5.10), and no argument of `X` changes that, so it is the
-    declaration's verdict, naming `3`, `P` and `X`. An operand applied the same way is refused where it is
-    substituted (`RecordTemplateSubstitution`), with the same words.
 
 ## The facts linking records (`TsonLinkedSchema`)
 

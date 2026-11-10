@@ -163,8 +163,8 @@ rebuilt and called a cache.
 - **The size specifier is one rule over the `min_items`/`max_items` pair, for arrays and maps alike.** There
   is no template in between — no bundled schema declares a size template — and each of the
   four spellings binds the pair directly, an exact `N` pinning both. §5.3's bound coherence (`min <= max`) is
-  checked here, where the bounds are literal at schema load; a bound naming a value parameter is
-  materialisation's question. The rejection of a **vacuous `[T; 0..]`** is here too: §5.3 makes `0..` a
+  checked here, where the bounds are literal at schema load; a bound naming a parameter is refused here, naming the
+  slot (a parameter is a type, §5.10). The rejection of a **vacuous `[T; 0..]`** is here too: §5.3 makes `0..` a
   resolver error, because structural identity (§8.2) makes it an entry
   *distinct from* `[T]` that means the same thing, and the diagnostic SHOULD say so. Only a literal `0` is
   caught.

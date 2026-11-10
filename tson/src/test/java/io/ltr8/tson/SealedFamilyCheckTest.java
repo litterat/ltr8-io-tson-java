@@ -267,9 +267,9 @@ class SealedFamilyCheckTest {
         String refusal = problems(Tson.standard(), "displayed", """
                 {
                   pet => abstract { pet_type: text =? }
-                  pet_of => <T, V> pet & { pet_type?: = T  pet: V }
-                  a => pet_of<"cat", text>
-                  b => pet_of<"cat", int32>
+                  pet_of => <V> pet & { pet: V }
+                  a => pet_of<text> & { pet_type?: = "cat" }
+                  b => pet_of<int32> & { pet_type?: = "cat" }
                 }""");
 
         assertTrue(refusal.contains("'a'"), refusal);

@@ -507,15 +507,14 @@ class KindMembersTest {
 
     /**
      * {@code enum_type.name_type} is typed {@code meta.identifier_ref}, and the name type an enum states is judged a
-     * member of it: an instantiation of a template over {@code identifier_type} is built with {@code
-     * identifier_type}, so it names an identifier family.
+     * member of it: an instance of {@code identifier_type} is built with {@code identifier_type}, so it names an
+     * identifier family.
      */
     @Test
-    void anInstantiationOfAnIdentifierTemplateIsANameType() {
+    void anIdentifierInstanceIsANameType() {
         TsonLinkedSchema linked = link("""
                 {
-                  words_of => <C: text> !unicode.identifier_type { continue_add: "-"  medial: C }
-                  spaced   => words_of<" ">
+                  spaced   => !unicode.identifier_type { continue_add: "-"  medial: " " }
                   cities   => !meta.enum_type { name_type: spaced  members: ["New York" Sydney] }
                 }
                 """);

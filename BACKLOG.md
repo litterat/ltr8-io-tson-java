@@ -50,13 +50,6 @@ spec-required case:
   entry for the same application (`design/template-materialisation.md`, "Operands and on-demand closing"). Unify the
   on-demand closing with a later declaration that owns the application, and add `schema/valid` vectors in both orders
   with one expected output.
-- [ ] **A value parameter's written type still reads in a structure namespace** ([TSON-SCHEMA] §5.10; Revision 39
-  change log #2). With one namespace there is no structure namespace: a written type on a value parameter resolves in
-  the schema's namespace and must IS-A the type its uses derive. `ParameterTypes.readsInStructure` still picks the
-  kernel's types for a template applying a constructor other than `record`, and refuses
-  `rb => <N: int8> box<N>` over `box => <N> { w?: integer ~ N }` for `int8` not being in the structure namespace.
-  Remove the split, so the alias resolves and `<N: int8>` over a `numeric.count`-typed slot is refused for `int8` not
-  being a count. Rewrite `design/held-template-bodies.md`'s "The template's form decides where value types are read".
 - [ ] **A template's applied parent earns no edge to the parent's head** ([TSON-SCHEMA] §5.8, §8.1; Revision 39
   change log #20). Under the expansion rule, `ok_of => ok<text>` over `ok => <T> result<T> & { note: text }` is IS-A
   `result` as well as `result<text>`, as its hand-written expansion is, and joins `result`'s family, its own pins or
@@ -158,18 +151,16 @@ spec-required case:
   `CrossEncodingParityTest` case.
 - [ ] **§5.7: a field restated where no closed record is on the chain is not judged for its type.** The link
   judges a restated type against the nearest closed records on the chain (`TsonSchemaLinker.checkRestatedFieldTypes`).
-  `dog => pet<"dog", dog_type> & { pet: cat_type }`, where no entry names `pet<"dog", dog_type>`, has an edge only to
+  `dog => pet<dog_type> & { pet: cat_type }`, where no entry names `pet<dog_type>`, has an edge only to
   the open family base `pet`, whose `pet` is `T`, so it links; so does `wrap<text>` from `wrap => <T> box<T> & { v:
   int32 }` where nothing denotes `box<text>`. A subtraction's tightening entries, which §5.9's rule 4 puts under
   §5.7's rules, are not judged either: its chain is empty. The resolver holds the inherited field
   (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a deferred judgement there, or the inherited
   fields carried to link, would close all three without reporting a case the link already judges twice.
-- [ ] **An application argument where a value parameter stands is accepted when a record template closes**
-  ([TSON-SCHEMA] §5.10). With `pin => <N> { v?: int32 = N }`, `<T> pin<box<T>> & { … }` is refused where the operand
-  is substituted (`RecordTemplateSubstitution`), but `pin<box<text>>` is not: `TemplateMaterialiser` closes nested
-  arguments to an entry name before the substitution classifies them, so the minted name reads as a token and lands
-  in `value`. Classify each argument against its parameter's kind before closing nested applications, and add an
-  invalid vector.
+- [ ] **Remove `DefinitionResolver.refuseAbsorbedSpelling`** ([TSON-SCHEMA] §5.10). With every argument a reference,
+  a name an absorbed field's argument writes is a namespace entry, so the shadowing rule
+  (`SchemaResolver.OnDemand.refuseShadowingParameters`) already refuses a parameter spelled like it; delete the rule,
+  its message and the second invariant in `design/held-template-bodies.md` that states it.
 
 - [ ] **A dependent field whose sibling names an unbound type fails each read, not the bind-mode compile.** With
   `payload: kind!` and `kind` admitting a type no class binds, a document naming that type throws

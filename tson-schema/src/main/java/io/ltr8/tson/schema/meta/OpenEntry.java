@@ -56,12 +56,8 @@ public final class OpenEntry {
         if (parameters.contains(type.name())) {
             return Optional.of(type.name());
         }
-        for (TypeArgument argument : type.arguments()) {
-            Optional<String> found = switch (argument) {
-                case TypeArgument.Ref ref -> parameterIn(ref.ref(), parameters);
-                case TypeArgument.Value value -> parameters.contains(value.value().text())
-                        ? Optional.of(value.value().text()) : Optional.empty();
-            };
+        for (TypeRef argument : type.arguments()) {
+            Optional<String> found = parameterIn(argument, parameters);
             if (found.isPresent()) {
                 return found;
             }
@@ -71,7 +67,7 @@ public final class OpenEntry {
 
     /**
      * {@code value} with each parameter replaced by {@code settled}'s entry for it, where there is one -- how a
-     * parameter's derived type is stamped. A closed entry is returned as it is.
+     * parameter's inherited bound is stamped. A closed entry is returned as it is.
      */
     public static Top withParameters(Top value, Map<String, TemplateParam> settled) {
         return switch (value) {

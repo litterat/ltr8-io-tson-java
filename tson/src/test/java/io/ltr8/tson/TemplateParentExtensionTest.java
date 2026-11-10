@@ -67,15 +67,15 @@ class TemplateParentExtensionTest {
     }
 
     /**
-     * The labelled sum: `type: text = T` survives erasure, so the parent dispatches on it. The extension is
+     * The labelled sum: `type: text =?` survives erasure, so the parent dispatches on it. The extension is
      * ABSTRACT like any other base -- what says the members are placed by their pins is `discriminators`.
      */
     @Test
     void aLabelledSumDispatchesOnItsSurvivingSelector() {
         assertEquals(Optional.of(RecordExtensionType.ABSTRACT),
-                parentOf("p2", "  pet => <T, V> { type: text = T  value: V }\n", "pet"));
+                parentOf("p2", "  pet => <V> { type: text =?  value: V }\n", "pet"));
         assertEquals(List.of("type"),
-                selectorsOf("p2b", "  pet => <T, V> { type: text = T  value: V }\n", "pet"));
+                selectorsOf("p2b", "  pet => <V> { type: text =?  value: V }\n", "pet"));
     }
 
     /** A composition template holds its flattened body, and the parent is derived over that. */
@@ -95,7 +95,7 @@ class TemplateParentExtensionTest {
     @Test
     void aConstructorApplicationTemplateHasNoParent() {
         assertEquals(Optional.empty(), parentOf("p5",
-                "  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }\n", "vector"));
+                "  vector => <T> !meta.array { element_type: T  min_items: 3  max_items: 3 }\n", "vector"));
     }
 
     /** §5.10's partial application: a reference is indirection, so it has nothing to be abstract over. */
@@ -108,8 +108,8 @@ class TemplateParentExtensionTest {
     // ── The one condition the derivation needs ───────────────────────────
 
     /**
-     * A discriminator's <em>pin</em> is what an argument supplies, and does. Its <em>type</em> is read before
-     * the member is known, so a type that varies per application is one no decoder can read.
+     * A discriminator's <em>type</em> is read before the member is known, so a type that varies per application
+     * is one no decoder can read.
      */
     @Test
     void aDiscriminatorTypedByAParameterIsRefused() {
@@ -123,9 +123,7 @@ class TemplateParentExtensionTest {
     @Test
     void aDiscriminatorTypedByAnApplicationOfAParameterIsRefused() {
         String refusal = refusal("p8", """
-                  capped => <M> !numeric.integer_type { max: M }
-                  pet     => <M, N> { kind: capped<M> = N  name: text }
-                  cat     => pet<9, 3>
+                  pet     => <M> { kind: meta.ref<M> =?  name: text }
                 """);
 
         assertTrue(refusal.contains("discriminator field 'kind'"), refusal);

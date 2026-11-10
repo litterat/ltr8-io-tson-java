@@ -108,7 +108,7 @@ distinction. They rethrow the original untouched (the linker re-states only an `
     lift records only the constructor it applies, and an alias composes its argument into someone else's application
     (`half => <B> pair<no_such_type, B>` closes to a `pair` instantiation, and `pair` is faultless). Asking which held
     body *mentions the name* (`HeldBody.names()`) reaches `half` directly — and reaches nothing when the name came from
-    the argument list, so `box<3>` and `box<some_typo>` keep their verdict at the application, where those mistakes are.
+    the argument list, so `box<some_typo>` keeps its verdict at the application, where that mistake is.
   - **Both filters are load-bearing.** Only a *derived* entry (no position of its own) is retargeted, or a closed
     declaration's own typo would be blamed on any template that names it; and only an authored open declaration
     (`OpenEntry.isOpen`) is a candidate. `HeldBody.names()` cannot tell a type reference from a field name, so it is

@@ -7,8 +7,6 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -94,11 +92,8 @@ final class DerivedName {
     /** An application in a slot, readable as its head and arguments. */
     private static void appendReadable(StringBuilder out, TypeRef application) {
         out.append('_').append(InternalName.part(application.name()));
-        for (TypeArgument argument : application.arguments()) {
-            switch (argument) {
-                case TypeArgument.Ref ref -> appendReadable(out, ref.ref());
-                case TypeArgument.Value value -> out.append('_').append(InternalName.part(canonicalText(value.value())));
-            }
+        for (TypeRef argument : application.arguments()) {
+            appendReadable(out, argument);
         }
     }
 
@@ -158,26 +153,22 @@ final class DerivedName {
     // ── An application: the instantiation entry a closure produces ───────────────────────────────
 
     /** The name for an application, rendered positionally where a binding record is rendered by field name. */
-    static String ofApplication(String head, List<TypeArgument> arguments) {
+    static String ofApplication(String head, List<TypeRef> arguments) {
         StringBuilder readable = new StringBuilder(InternalName.part(head));
-        for (TypeArgument argument : arguments) {
-            switch (argument) {
-                case TypeArgument.Ref ref -> readable.append('_').append(InternalName.part(ref.ref().name()));
-                case TypeArgument.Value value ->
-                        readable.append('_').append(InternalName.part(canonicalText(value.value())));
-            }
+        for (TypeRef argument : arguments) {
+            readable.append('_').append(InternalName.part(argument.name()));
         }
         return readable.append('_')
                 .append(String.format("%08x", canonicalApplication(head, arguments).hashCode())).toString();
     }
 
     /** An application rendered structurally and injectively -- what decides whether two are the same application. */
-    static String canonicalApplication(String head, List<TypeArgument> arguments) {
+    static String canonicalApplication(String head, List<TypeRef> arguments) {
         StringBuilder canonical = new StringBuilder();
         appendText(canonical.append('A'), head);
         canonical.append('(');
-        for (TypeArgument argument : arguments) {
-            appendArgument(canonical, argument);
+        for (TypeRef argument : arguments) {
+            appendRef(canonical.append('r'), argument);
         }
         return canonical.append(')').toString();
     }
@@ -185,35 +176,12 @@ final class DerivedName {
     private static void appendRef(StringBuilder out, TypeRef ref) {
         appendText(out.append('n'), ref.name());
         out.append('(');
-        for (TypeArgument argument : ref.arguments()) {
-            appendArgument(out, argument);
+        for (TypeRef argument : ref.arguments()) {
+            appendRef(out.append('r'), argument);
         }
         out.append(')');
     }
 
-    /**
-     * One argument, as the reference grammar parses it: an unquoted token that is no number renders as the
-     * reference it parses as, whether a resolver filed it as a value at its parameter or not, so {@code names<red>}
-     * is one application however it was read ([TSON-SCHEMA] §8.2).
-     */
-    private static void appendArgument(StringBuilder out, TypeArgument argument) {
-        switch (argument) {
-            case TypeArgument.Ref ref -> appendRef(out.append('r'), ref.ref());
-            case TypeArgument.Value value when value.value().form() == Token.Form.UNQUOTED
-                    && NumericIdentity.of(value.value().text(), true) == null ->
-                    appendRef(out.append('r'), TypeRef.of(value.value().text()));
-            case TypeArgument.Value value -> {
-                // The form by name, not ordinal: inserting a constant would renumber every ordinal.
-                appendText(out.append('v'), value.value().form().name());
-                appendNumberAware(out, value.value().text(), value.value().form() == Token.Form.UNQUOTED);
-            }
-        }
-    }
-
-    /** A value argument's readable segment, with §4.3's numeric equivalence applied ({@link NumericIdentity}). */
-    private static String canonicalText(Token token) {
-        return NumericIdentity.textOf(token.text(), token.form() == Token.Form.UNQUOTED);
-    }
 
     // ── Shared leaves ────────────────────────────────────────────────────────────────────────────
 
@@ -227,9 +195,6 @@ final class DerivedName {
      * ({@link NumericIdentity}). A number writes its base-type kind and its canonical magnitude as two
      * fields where anything else writes its text as one; every field being length-prefixed, no token's own
      * text can be mistaken for a tagged number.
-     *
-     * <p>One method for both families: the two rendered a {@code TokenValue} and a {@code Token} separately
-     * and identically, which is a shared decision about identity kept in two places.
      */
     private static void appendNumberAware(StringBuilder out, String text, boolean unquoted) {
         NumericIdentity.Canonical canonical = NumericIdentity.of(text, unquoted);

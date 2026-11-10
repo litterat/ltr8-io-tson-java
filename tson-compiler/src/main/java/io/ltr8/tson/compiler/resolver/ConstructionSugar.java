@@ -8,7 +8,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -40,7 +39,8 @@ import java.util.function.Function;
  * one {@code !C { … }} written out gets: an argument the slot's {@code of} refuses ({@code meta.namespace<int32
  * text>}) is refused at link as {@code key_type: int32} is, and a required field no slot fills ({@code
  * meta.enum_type<meta.identifier>} leaves {@code members}) is refused by the constructor's reader as an incomplete
- * construction. Only the argument count, and an argument that is a literal and no reference, are refused here.
+ * construction. Only the argument count is refused here; an argument is a reference by the grammar ([TSON-SCHEMA]
+ * §5.10), a literal token being refused where it is written.
  */
 public final class ConstructionSugar {
 
@@ -110,18 +110,13 @@ public final class ConstructionSugar {
      *
      * @param written the head as the author wrote it, for a refusal
      * @param slots the constructor's argument slots ({@link #slots})
-     * @throws SchemaValidationException where the count differs from the slots', or an argument is a literal
+     * @throws SchemaValidationException where the count differs from the slots'
      */
-    static RecordValue payload(String written, List<String> slots, List<TypeArgument> arguments) {
+    static RecordValue payload(String written, List<String> slots, List<TypeRef> arguments) {
         requireArity(written, slots, arguments.size());
         List<RecordValue.Field> fields = new ArrayList<>(slots.size());
         for (int i = 0; i < slots.size(); i++) {
-            if (!(arguments.get(i) instanceof TypeArgument.Ref argument)) {
-                throw new SchemaValidationException("'" + written + "<...>' gives '" + slots.get(i) + "' the literal '"
-                        + ((TypeArgument.Value) arguments.get(i)).value().text() + "', and a construction's argument "
-                        + "lands in a field typed by a reference naming types, so it is a type's name (§5.3)");
-            }
-            fields.add(new RecordValue.Field(slots.get(i), WireForm.plain(WireForm.refValue(argument.ref()))));
+            fields.add(new RecordValue.Field(slots.get(i), WireForm.plain(WireForm.refValue(arguments.get(i)))));
         }
         return new RecordValue(fields);
     }

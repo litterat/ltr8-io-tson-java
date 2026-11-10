@@ -3,8 +3,6 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SiblingRef;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
@@ -34,10 +32,9 @@ class TypeRefWriteTest {
 
     @Test
     void anApplicationIsItsUnquotedText() {
-        assertEquals("box<text>", written(TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
-        assertEquals("map<text 3 \"a b\">", written(TypeRef.of("map", List.of(
-                new TypeArgument.Ref(TypeRef.of("text")), new TypeArgument.Value(new Token("3", Token.Form.UNQUOTED)),
-                new TypeArgument.Value(new Token("a b", Token.Form.SINGLE_LINE_QUOTED))))));
+        assertEquals("box<text>", written(TypeRef.of("box", List.of(TypeRef.of("text")))));
+        assertEquals("map<text box<int32>>", written(TypeRef.of("map", List.of(
+                TypeRef.of("text"), TypeRef.of("box", List.of(TypeRef.of("int32")))))));
     }
 
     @Test

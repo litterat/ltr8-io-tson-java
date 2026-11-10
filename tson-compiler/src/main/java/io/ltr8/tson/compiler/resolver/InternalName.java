@@ -8,7 +8,7 @@ import io.ltr8.unicode.Xid;
  * identifier}, whatever the author wrote</b>.
  *
  * <p>Both minting sites splice author-written content into that half -- {@code SchemaDesugarer} from a lifted
- * binding record, {@code TemplateMaterialiser} from an application's head and value arguments -- which makes
+ * binding record, {@code TemplateMaterialiser} from an application's head and arguments -- which makes
  * a derived name a place where a document's own text reaches the schema namespace. Two things follow, and
  * the second is why the first is not enough on its own.
  *

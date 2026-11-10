@@ -49,9 +49,9 @@ class TemplateFamilyEncodingParityTest {
             {
               dog_type => { breed: text }
               cat_type => { indoor: boolean }
-              pet      => <T, V> { type?: text = T  value: V }
-              dogpet   => pet<"dog", dog_type>
-              catpet   => pet<"cat", cat_type>
+              pet      => <V> { type: text =?  value: V }
+              dogpet   => pet<dog_type> & { type?: = "dog" }
+              catpet   => pet<cat_type> & { type?: = "cat" }
               holder   => { p: pet }
             }""";
 

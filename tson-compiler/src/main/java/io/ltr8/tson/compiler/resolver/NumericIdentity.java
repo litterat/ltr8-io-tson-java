@@ -7,11 +7,10 @@ import io.ltr8.tson.atom.number.NumberGrammar;
 /**
  * [TSON-DATA] §4.3's numeric equivalence, applied where an entry's identity is derived.
  *
- * <p>[TSON-SCHEMA] §8.2 keys an instantiation on the flattened application it closes, and a
- * lifted sugar form on the binding record it writes. Both are derived from what the author spelled, so
- * without this {@code vector<float32, 255>} and {@code vector<float32, 0xFF>} are two entries for one type
+ * <p>[TSON-SCHEMA] §8.2 keys a lifted sugar form on the binding record it writes, which is derived from what the
+ * author spelled, so without this {@code [float32; 255]} and {@code [float32; 0xFF]} are two entries for one type
  * -- §4.3 making the two one number, and their bodies coming out byte-identical because the slot decodes
- * through {@code integer} either way. The consequence is a wrong verdict rather than a redundant entry:
+ * through {@code numeric.count} either way. The consequence is a wrong verdict rather than a redundant entry:
  * §5.4 requires a choice's variants to resolve to distinct types, and two names for one type pass a check
  * two spellings of one name fail, so {@code ( [float32; 255] | [float32; 0xFF] )} is admitted where
  * {@code ( [float32; 255] | [float32; 255] )} is refused.
@@ -23,10 +22,9 @@ import io.ltr8.tson.atom.number.NumberGrammar;
  * {@link Canonical#kind} keeps them apart even though one magnitude covers both. Merging across that line
  * would be this implementation inventing an equivalence rather than applying one.
  *
- * <p><b>Identity only.</b> The token itself is recorded as written -- §5.10 describes a type argument's
- * literal as a bare token, and the reference grammar keeps it as one -- so resolved output still shows the
- * author's spelling. What changes is only what two spellings are compared as. Where two spellings do meet,
- * one entry results and it carries whichever reached the resolver first.
+ * <p><b>Identity only.</b> The token itself is recorded as written, so resolved output still shows the author's
+ * spelling. What changes is only what two spellings are compared as. Where two spellings do meet, one entry results
+ * and it carries whichever reached the resolver first.
  *
  * <p>A quoted token is never a number (§4.4), which is why every entry point takes the form alongside the
  * text rather than guessing from the text alone.

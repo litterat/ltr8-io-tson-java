@@ -13,7 +13,7 @@ import java.util.Objects;
  * without arguments is a {@link NameRef}. {@code annotations} normalises {@code null} to empty and {@code closure} to
  * {@link TypeRef.Closure#NONE}. Identity is the name and the arguments; see {@link TypeRef}.
  */
-public record ApplicationRef(String name, List<TypeArgument> arguments, Annotations annotations,
+public record ApplicationRef(String name, List<TypeRef> arguments, Annotations annotations,
                              TypeRef.Closure closure) implements TypeRef {
 
     public ApplicationRef {
@@ -33,8 +33,7 @@ public record ApplicationRef(String name, List<TypeArgument> arguments, Annotati
 
     @Override
     public ApplicationRef withClosure(Closure closure) {
-        List<TypeArgument> carried = arguments.stream().map(argument -> argument instanceof TypeArgument.Ref ref
-                ? (TypeArgument) new TypeArgument.Ref(ref.ref().withClosure(closure)) : argument).toList();
+        List<TypeRef> carried = arguments.stream().map(argument -> argument.withClosure(closure)).toList();
         return new ApplicationRef(name, carried, annotations, closure);
     }
 

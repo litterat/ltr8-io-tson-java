@@ -103,7 +103,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution
   derives rather than shaping the type-def, and the declaration survives every desugar rewrite of its type-def.
 - **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
-  [type-params] "!" qualified-name ws core-value`) -- `vector => <T, N> !meta.array { element_type: T  min_items: N }`.
+  [type-params] "!" qualified-name ws core-value`) -- `vector => <T> !meta.array { element_type: T  min_items: 3 }`.
   §12.1 has one production for both, and its own note says so: "`!` opens an `instance`, with or without a
   preceding `<…>`". `Instance` carries
   the parameter list, and `parseTypeDef` reads that list *before* dispatching on `!` -- one token then

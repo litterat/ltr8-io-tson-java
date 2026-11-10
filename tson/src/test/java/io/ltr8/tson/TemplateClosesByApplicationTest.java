@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>It is a schema error, never an {@code IllegalStateException}</b> -- this project's spelling of "an
  * internal invariant broke", on which `tson validate` prints the please-report-it banner and exits <b>70</b>. The
  * case reaches {@code DefinitionResolver} because an <em>open</em> declaration holds its body rather than resolving
- * it to a record, and a parameterised {@code ~} declaration is exactly one.
+ * it to a record, and a parameterised construction is exactly one.
  *
  * <p>End to end through {@link Tson} rather than at {@code DefinitionResolver}, because the construction
  * head resolves against the schema's namespace -- which needs a real imported vocabulary, and
@@ -35,9 +35,8 @@ class TemplateClosesByApplicationTest {
     private static final String USER = "https://example.test/u.tn";
 
     /**
-     * Three templates in one vocabulary schema: a {@code ~} constructor whose parameter routes into a
-     * <b>value</b> slot (§4.2's legal shape), one whose parameter routes into a <b>type</b> slot, and an
-     * unmarked §5.10 template. All three are templates, which is the only thing the rule turns on.
+     * Two templates in one vocabulary schema: a construction of {@code meta.array} whose parameter stands in its type
+     * slot, and an unmarked §5.10 record template. Both are templates, which is the only thing the rule turns on.
      */
     private static String vocabulary(String extraDeclarations) {
         return """
@@ -45,8 +44,7 @@ class TemplateClosesByApplicationTest {
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   base       => {}
-                  my_bounded => <N> meta.array ^ { max_items?: = N }
-                  my_set     => <T> meta.array ^ { element_type?: = T  ordered?: = false  unique_items?: = true }
+                  my_vec     => <T> !meta.array { element_type: T  max_items: 3 }
                   box        => <T> base & { value: T }
                   %s
                 }
@@ -88,13 +86,13 @@ class TemplateClosesByApplicationTest {
 
     @Test
     void aConstructorTemplateAtAConstructionSiteIsAnAuthorError() {
-        List<Diagnostic> problems = schemaProblems("n => !my_bounded { max_items: 3 }");
+        List<Diagnostic> problems = schemaProblems("n => !my_vec { element_type: text }");
 
         assertEquals(1, problems.size(), problems::toString);
         Diagnostic only = problems.getFirst();
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, only.code());
-        assertTrue(only.message().contains("is a template taking 1 type argument [N]"), only::toString);
-        assertTrue(only.message().contains("my_bounded<...>"), only::toString);
+        assertTrue(only.message().contains("is a template taking 1 type argument [T]"), only::toString);
+        assertTrue(only.message().contains("my_vec<...>"), only::toString);
         // Located at the declaration the author wrote, not at the template's own line in another document.
         assertEquals("/n", only.schemaPointer().orElseThrow());
     }
@@ -114,26 +112,25 @@ class TemplateClosesByApplicationTest {
         assertFalse(problems.getFirst().message().contains("atom refinement"), problems::toString);
     }
 
-    /**
-     * §4.2's <b>value-route-only</b> rule, from the working end: a parameter routed into a slot typed by an
-     * atom closes by application, so the check cannot simply refuse every parameterised {@code ~}
-     * declaration.
-     */
+    /** An application of a construction template closes to the construction its arguments complete. */
     @Test
-    void aValueRoutedConstructorParameterClosesByApplication() {
-        assertEquals(List.of(), vocabularyProblems("three => my_bounded<3>"));
+    void aConstructionTemplateClosesByApplication() {
+        assertEquals(List.of(), vocabularyProblems("tags => my_vec<text>"));
+        assertEquals(1, vocabularyProblems("tags => my_vec<no_such_type>").size());
     }
 
     /**
-     * And the type-channel spelling closes the same way: {@code element_type} is typed {@code meta.type_ref}, an atom, so
-     * §5.2 admits a fixed value there, and the pin {@code text} is judged a member of the kind where it is written --
-     * a constructor template may pin its element type as {@code set_type} pins {@code unique_items}.
+     * A refinement template pinning a slot to its parameter is refused at the declaration: a field's value is never a
+     * parameter, whatever the field's type -- {@code element_type} is typed {@code meta.type_ref}, and its pin is a
+     * value all the same (§5.10).
      */
     @Test
-    void aTypeChannelConstructorParameterPinsWhenItCloses() {
-        assertEquals(List.of(), vocabularyProblems("tags => my_set<text>"));
-        List<Diagnostic> problems = vocabularyProblems("tags => my_set<no_such_type>");
+    void aPinOfAParameterOnAReferenceTypedFieldIsRefused() {
+        List<Diagnostic> problems = vocabularyProblems(
+                "my_set => <T> meta.array ^ { element_type?: = T  ordered?: = false  unique_items?: = true }");
 
         assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains("parameter 'T' stands at the value of field 'element_type'"),
+                problems::toString);
     }
 }

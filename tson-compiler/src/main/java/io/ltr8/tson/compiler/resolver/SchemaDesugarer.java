@@ -33,14 +33,12 @@ import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
-import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.TemplateParam;
 import io.ltr8.tson.base.SourcePosition;
 
 import java.util.ArrayList;
@@ -407,11 +405,8 @@ final class SchemaDesugarer {
             case SiblingRef sibling -> throw new SchemaValidationException(
                     io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field()).refusedAt(slot));
             case NameRef _ -> { }
-            case ApplicationRef application -> application.args().forEach(argument -> {
-                if (argument instanceof TypeArg.Ref nested) {
-                    siblingRefused(nested.ref(), "a template argument");
-                }
-            });
+            case ApplicationRef application ->
+                    application.args().forEach(argument -> siblingRefused(argument, "a template argument"));
             case ArrayExpr array -> siblingRefused(array.elementType().typeRef(), "an array's element type");
             case MapExpr map -> {
                 siblingRefused(map.keyType(), "a map's key type");
@@ -463,7 +458,7 @@ final class SchemaDesugarer {
                 Optional<Binding> binding = binding(reference.ref());
                 if (binding.isPresent()) {
                     // The same rule one tier up: a template's own body is the open construction, so
-                    // `vector => <T, N> [T; N]` *is* the instance template rather than a reference to one.
+                    // `vector => <T> [T; 3]` *is* the instance template rather than a reference to one.
                     // Its parameters are the declaration's own list as written, not the subset the body
                     // happens to name -- a declared parameter the body never uses is an error the linker
                     // reports (§5.10), and dropping it here would hide the very thing it looks for.
@@ -576,16 +571,8 @@ final class SchemaDesugarer {
     /** {@code generic} with its arguments expanded, the same node where none changes. */
     private ApplicationRef applicationArguments(ApplicationRef generic) {
         checkTemplateApplication(generic.name());
-        List<TypeArg> args = mapShared(generic.args(), this::typeArg);
+        List<TypeExpr> args = mapShared(generic.args(), this::typeRef);
         return args == generic.args() ? generic : new ApplicationRef(generic.name(), args);
-    }
-
-    private TypeArg typeArg(TypeArg arg) {
-        if (!(arg instanceof TypeArg.Ref ref)) {
-            return arg;
-        }
-        TypeExpr rewritten = typeRef(ref.ref());
-        return rewritten == ref.ref() ? arg : new TypeArg.Ref(rewritten);
     }
 
     /**
@@ -656,12 +643,6 @@ final class SchemaDesugarer {
      * unquoted ({@link WireForm#refValue}). <b>One spelling per shape, produced in one place</b> -- a slot written two ways
      * is a slot two phases disagree about, and {@link DerivedName#ofBinding} hashes what is written, so a second
      * spelling of one reference would split one type across two entries.
-     *
-     * <p>A <em>value</em> argument makes the trip intact, its token as written: §5.10 describes a type argument's
-     * literal as a bare token rather than as the value it denotes. The spelling is therefore what reaches identity,
-     * and {@link NumericIdentity} applies [TSON-DATA] §4.3's equivalence there so {@code <255>} and {@code <0xFF>}
-     * are one application -- [TSON-SCHEMA] §8.2's rule exactly: recorded as written, compared as the value the
-     * token denotes.
      */
     private static CoreValue refValue(TypeExpr ref) {
         if (ref instanceof SiblingRef sibling) {
@@ -671,23 +652,15 @@ final class SchemaDesugarer {
         return WireForm.refValue(reference(ref));
     }
 
-    /** A grammar-level reference as the reference value it spells: a name, or an application of names and tokens. */
+    /** A grammar-level reference as the reference value it spells: a name, or an application of references. */
     private static io.ltr8.tson.schema.meta.TypeRef reference(TypeExpr ref) {
         if (ref instanceof NameRef simple) {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
         ApplicationRef generic = (ApplicationRef) ref;
-        List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new ArrayList<>();
-        for (TypeArg argument : generic.args()) {
-            arguments.add(switch (argument) {
-                case TypeArg.Ref reference -> new io.ltr8.tson.schema.meta.TypeArgument.Ref(reference(reference.ref()));
-                case TypeArg.Value value -> new io.ltr8.tson.schema.meta.TypeArgument.Value(
-                        new io.ltr8.tson.schema.meta.Token(value.value().text(), switch (value.value().form()) {
-                            case UNQUOTED -> io.ltr8.tson.schema.meta.Token.Form.UNQUOTED;
-                            case SINGLE_LINE_QUOTED -> io.ltr8.tson.schema.meta.Token.Form.SINGLE_LINE_QUOTED;
-                            case MULTI_LINE_QUOTED -> io.ltr8.tson.schema.meta.Token.Form.MULTI_LINE_QUOTED;
-                        }));
-            });
+        List<io.ltr8.tson.schema.meta.TypeRef> arguments = new ArrayList<>();
+        for (TypeExpr argument : generic.args()) {
+            arguments.add(reference(argument));
         }
         return io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), arguments);
     }
@@ -836,16 +809,15 @@ final class SchemaDesugarer {
      *
      * <p><b>§5.2's rewrite is syntactic</b>, as fixed and as closed as the sugar table above, so it belongs beside it.
      * Each field is classified here, once, by its source spelling while the parameters are in scope (§5.10's
-     * shadowing rule, {@link #label}): a bare parameter name in a field's type is its {@code type_param}, an unquoted
-     * parameter token in its value its {@code value_param}, and everything else is written as the author wrote it.
-     * The role is the modifier's either way ({@link FieldModifiers}), so closing substitutes a value and changes no
-     * fact.
+     * shadowing rule, {@link #label}): a bare parameter name in a field's type is its {@code type_param}, and
+     * everything else is written as the author wrote it -- a parameter at a field's value included, which the
+     * resolver refuses naming the slot (§5.10).
      *
      * <p><b>Only what the author wrote is written.</b> {@code access_pattern} and {@code size_type} are
      * fixed on the {@code record} constructor and an unmarked field's facts are {@code meta.record_field}'s own
      * defaults, so neither is stated -- the same economy {@link #arrayBinding} makes with an unmarked element's
-     * {@code state}. The parameters close the payload, each provisionally a type parameter, its type derived once the
-     * schema has resolved.
+     * {@code state}. The parameters close the payload, each unbounded until the schema has resolved and its written or
+     * inherited bound is stamped.
      */
     private DataValue recordTemplate(RecordDef record) {
         return recordTemplatePayload(recordBinding(record), currentParameters);
@@ -862,12 +834,9 @@ final class SchemaDesugarer {
                 case FieldDef field -> {
                     requireFieldNameUnseen(field.name(), seen, "this body declares it twice");
                     fields.add(WireForm.fieldEntry(field.name(), recordField(field)));
-                    // `=?`, or -- in a template -- a pin taken from a value parameter, which supplies one
-                    // value per application and so one per member (§5.10). Only a
-                    // *fresh* record body derives: this is the declaration that states the selector, where a
-                    // refinement template pinning a constructor's own facet (`array ^ { element_type: = T }`)
-                    // states nothing about a family and flattens through another path.
-                    if (FieldModifiers.discriminates(field) || parametricallyPinned(field)) {
+                    // `=?` declares a selector. Only a *fresh* record body derives: this is the declaration that
+                    // states it, and a refinement or composition flattens through another path.
+                    if (FieldModifiers.discriminates(field)) {
                         discriminators.add(WireForm.plain(WireForm.declaredName(field.name())));
                     }
                 }
@@ -945,12 +914,12 @@ final class SchemaDesugarer {
         return new DataValue(field.annotations(), tag, members);
     }
 
-    /** A record template's {@code bindings}, its {@code parameters} stated last, each provisionally a type parameter. */
+    /** A record template's {@code bindings}, its {@code parameters} stated last, each unbounded. */
     private static DataValue recordTemplatePayload(List<RecordValue.Field> bindings, List<String> parameters) {
         List<RecordValue.Field> fields = new ArrayList<>(bindings);
         fields.add(new RecordValue.Field(WireForm.PARAMETERS, WireForm.plain(new ArrayValue(parameters.stream()
-                .map(parameter -> WireForm.plain(new RecordValue(List.of(WireForm.nameField(WireForm.NAME, parameter),
-                        WireForm.nameField(WireForm.TYPE, TemplateParam.TYPE_REF.name())))))
+                .map(parameter -> WireForm.plain(new RecordValue(List.of(WireForm.nameField(WireForm.NAME,
+                        parameter)))))
                 .toList()))));
         return new DataValue(List.of(), Optional.of(WireForm.RECORD_TEMPLATE), new RecordValue(fields));
     }
@@ -961,21 +930,15 @@ final class SchemaDesugarer {
     }
 
     /**
-     * The name a record template field's {@code slot} is written under: {@code type_param} for a {@code type} and
-     * {@code value_param} for a {@code value} that is an unquoted token naming one of {@code parameters} (§5.10's
-     * shadowing rule over the source spelling), and {@code slot} itself otherwise.
+     * The name a record template field's {@code slot} is written under: {@code type_param} for a {@code type} that is
+     * an unquoted token naming one of {@code parameters} (§5.10's shadowing rule over the source spelling), and {@code
+     * slot} itself otherwise. A parameter at any other slot is written as it stands, for the resolver to refuse
+     * naming the slot ({@link ParameterTypes#checkSlots}).
      */
     private static String label(String slot, CoreValue value, List<String> parameters) {
         boolean parameter = value instanceof TokenValue token && token.form() == TokenForm.UNQUOTED
                 && parameters.contains(token.text());
-        if (!parameter) {
-            return slot;
-        }
-        return switch (slot) {
-            case WireForm.TYPE -> WireForm.TYPE_PARAM;
-            case WireForm.VALUE -> WireForm.VALUE_PARAM;
-            default -> slot;
-        };
+        return parameter && WireForm.TYPE.equals(slot) ? WireForm.TYPE_PARAM : slot;
     }
 
 
@@ -996,26 +959,6 @@ final class SchemaDesugarer {
                     + explanation + " (§5.11: a field name is unique across a record's plain fields and all "
                     + "its groups' members)");
         }
-    }
-
-    /**
-     * Whether this field's value is pinned to one of the enclosing template's own value parameters -- a
-     * selector by derivation. A field whose declared <em>type</em> is a parameter is passed over: a position
-     * typed by the template reads a selector before it knows the member, so a type that varies per
-     * application is one it cannot read, and `<T, N> { v: T = N }` is an ordinary template rather than a
-     * family.
-     */
-    private boolean parametricallyPinned(FieldDef field) {
-        if (field.type().isEmpty()
-                || (field.type().get().typeRef() instanceof NameRef simple
-                        && currentParameters.contains(simple.name()))) {
-            return false;
-        }
-        return field.modifier()
-                .filter(m -> m.kind() == FieldDef.Modifier.Kind.FIXED)
-                .filter(m -> m.value() instanceof FieldDef.Modifier.Value.Literal literal
-                        && currentParameters.contains(literal.token().text()))
-                .isPresent();
     }
 
     /**
@@ -1054,8 +997,7 @@ final class SchemaDesugarer {
      * {@code 0} with no upper bound ({@code 0..}) is a resolver error". More than a style nit --
      * identity is structural (§8.2), so the form
      * lands on an entry <em>distinct from</em> the unbounded one that means exactly the same thing. That is an
-     * identity trap, and the author's fix is the one §5.3 itself names. Only a literal {@code 0} is caught: a
-     * bound naming a value parameter is not concrete until materialisation.
+     * identity trap, and the author's fix is the one §5.3 itself names.
      */
     private static List<RecordValue.Field> sizeFields(SizeSpec size, String shown) {
         return switch (size) {
@@ -1125,6 +1067,7 @@ final class SchemaDesugarer {
      *  b: [order] }} therefore injects one of each, and only the first has to wait for materialisation.
      */
     private TypeExpr hoist(Binding binding) {
+        refuseParameterBound(binding);
         List<String> parameters = parametersIn(binding);
         if (parameters.isEmpty()) {
             String name = bindingName(binding);
@@ -1138,16 +1081,29 @@ final class SchemaDesugarer {
         claim(name, normalised, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
                 Optional.empty(), instance(normalised, renamed)));
         return new ApplicationRef(name, parameters.stream()
-                .<TypeArg>map(parameter -> new TypeArg.Ref(new NameRef(parameter))).toList());
+                .<TypeExpr>map(NameRef::new).toList());
+    }
+
+    /**
+     * A size bound naming one of the enclosing declaration's parameters, {@code [T; N]}, refused naming the slot: a
+     * parameter is a type, and a bound is a count (§5.3, §5.10). Refused here rather than where the lifted form's
+     * parameters are checked, because lifting renames the parameter and the refusal would name the synthetic.
+     */
+    private void refuseParameterBound(Binding binding) {
+        for (RecordValue.Field field : binding.fields()) {
+            if ((MIN_ITEMS.equals(field.name()) || MAX_ITEMS.equals(field.name()))
+                    && field.value().coreValue() instanceof TokenValue token
+                    && currentParameters.contains(token.text())) {
+                throw ParameterTypes.at(token.text(), "a size bound (" + binding.head() + "." + field.name() + ")");
+            }
+        }
     }
 
     /**
      * Every parameter of the enclosing declaration this binding record names, in the order the declaration
      * lists them -- the form's own parameter list, and the argument list of the reference that replaces it.
-     *
-     * <p><b>Asked of the resolved record, not of the source form</b>, so a parameter reaches it the same way
-     * whichever channel carried it: {@code [T]} names one in a type slot and {@code [order; N]} in a value
-     * slot, and §5.3's size specifier keeps its bound as raw token text precisely because it may be either.
+     * Asked of the resolved record, not of the source form, so a parameter reaches it the same way whichever
+     * slot carried it: {@code [T]} names one in a type slot, {@code ( T | error )} inside a collection.
      */
     private List<String> parametersIn(Binding binding) {
         List<String> found = new ArrayList<>();

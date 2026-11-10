@@ -24,7 +24,6 @@ import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.net.CidrNetwork;
 import io.ltr8.tson.base.atom.Complex;
-import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
 import io.ltr8.tson.base.atom.Rational;
 import io.ltr8.tson.tree.*;
@@ -284,7 +283,7 @@ class ConformanceSuiteTest {
         assertCoreValueMatches((RecordValue) fieldValue(expected, "core").coreValue(), actual.coreValue());
     }
 
-    /** A reference with arguments: its name, and each argument a nested reference or a token, in order. */
+    /** A reference with arguments: its name, and each argument a nested reference or a name's token, in order. */
     private static void assertReferenceMatches(RecordValue expected, io.ltr8.tson.schema.meta.TypeRef actual) {
         assertEquals(fieldText(expected, "name"), actual.name(), "reference name");
         ArrayValue expArguments = (ArrayValue) fieldCore(expected, "arguments");
@@ -293,25 +292,14 @@ class ConformanceSuiteTest {
             RecordValue.Field argument = soleField((RecordValue) expArguments.elements().get(i).coreValue(),
                     "reference argument");
             RecordValue payload = (RecordValue) argument.value().coreValue();
-            switch (actual.arguments().get(i)) {
-                case io.ltr8.tson.schema.meta.TypeArgument.Ref ref when !ref.ref().arguments().isEmpty() -> {
-                    assertEquals("reference", argument.name(), "argument[" + i + "] kind");
-                    assertReferenceMatches(payload, ref.ref());
-                }
-                case io.ltr8.tson.schema.meta.TypeArgument.Ref ref -> {
-                    assertEquals("token", argument.name(), "argument[" + i + "] kind");
-                    assertEquals("unquoted", fieldText(payload, "form"), "argument[" + i + "] form");
-                    assertEquals(fieldText(payload, "text"), ref.ref().name(), "argument[" + i + "] text");
-                }
-                case io.ltr8.tson.schema.meta.TypeArgument.Value value -> {
-                    assertEquals("token", argument.name(), "argument[" + i + "] kind");
-                    assertEquals(fieldText(payload, "form"), switch (value.value().form()) {
-                        case UNQUOTED -> "unquoted";
-                        case SINGLE_LINE_QUOTED -> "single-line";
-                        case MULTI_LINE_QUOTED -> "multi-line";
-                    }, "argument[" + i + "] form");
-                    assertEquals(fieldText(payload, "text"), value.value().text(), "argument[" + i + "] text");
-                }
+            io.ltr8.tson.schema.meta.TypeRef nested = actual.arguments().get(i);
+            if (!nested.arguments().isEmpty()) {
+                assertEquals("reference", argument.name(), "argument[" + i + "] kind");
+                assertReferenceMatches(payload, nested);
+            } else {
+                assertEquals("token", argument.name(), "argument[" + i + "] kind");
+                assertEquals("unquoted", fieldText(payload, "form"), "argument[" + i + "] form");
+                assertEquals(fieldText(payload, "text"), nested.name(), "argument[" + i + "] text");
             }
         }
     }

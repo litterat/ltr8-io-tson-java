@@ -66,16 +66,12 @@ class EnumTypeTest {
                   shout      => !enum [LOUD QUIET] }""")));
     }
 
-    /** An {@code enum} applied in a template's held body is typed as one applied directly. */
+    /** A parameter is a type, so one standing at an enum member is refused at the declaration (§5.10). */
     @Test
-    void anEnumAppliedThroughATemplateNamesTheKernelsIdentifier() {
-        assertEquals(List.of(), Tson.standard().validateSchema(schema("held-enum", """
-                { names => <M> !enum [a b M]
-                  named => names<c> }""")));
-        List<Diagnostic> refused = Tson.standard().validateSchema(schema("held-enum-bad", """
-                { names => <M> !enum [a b M]
-                  named => names<"not a name"> }"""));
-        assertTrue(messages(refused).contains("is not an identifier"), messages(refused));
+    void aParameterAtAnEnumMemberIsRefused() {
+        List<Diagnostic> refused = Tson.standard().validateSchema(schema("held-enum", """
+                { names => <M> !enum [a b M] }"""));
+        assertTrue(messages(refused).contains("parameter 'M' stands at enum.members"), messages(refused));
     }
 
     /** An author's own identifier type admits names the kernel's does not, and an enum over it has them. */

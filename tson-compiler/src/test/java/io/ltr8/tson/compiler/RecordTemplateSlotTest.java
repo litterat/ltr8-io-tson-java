@@ -15,9 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Where a record template's parameters may stand ([TSON-SCHEMA] §5.10): a field's type, a field's default or fixed
- * value, and an argument of an application. Anywhere else in a {@code !record} body would leave the family base
- * without a shape its applications share, and a parameter is never itself the operand of {@code &} or {@code ^}.
+ * Where a template's parameters may stand ([TSON-SCHEMA] §5.10): a parameter is a type, so it stands at a field's
+ * type or as an argument of an application. Anywhere else -- a field's value, a scalar slot of any constructor -- is
+ * refused at the declaration, naming the slot, and a parameter is never itself the operand of {@code &} or {@code ^}.
  */
 class RecordTemplateSlotTest {
 
@@ -47,9 +47,9 @@ class RecordTemplateSlotTest {
         return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
     }
 
-    /** The three places, each applied so the closing runs as well as the declaration. */
+    /** The two places, each applied so the closing runs as well as the declaration. */
     @Test
-    void aParameterStandsInAFieldsTypeItsValueAndAnApplicationsArguments() {
+    void aParameterStandsInAFieldsTypeAndAnApplicationsArguments() {
         List<String> admitted = List.of(
                 """
                   box => <T> { v: T }
@@ -66,16 +66,8 @@ class RecordTemplateSlotTest {
                   ok_text => ok<text>
                 """,
                 """
-                  pet => <N> { type: text = N  name: text }
-                  cat => pet<"cat">
-                """,
-                """
-                  sized => <N> { w?: int32 ~ N }
-                  s => sized<3>
-                """,
-                """
-                  vec => <T, N> { items: [T; N] }
-                  v3 => vec<text, 3>
+                  vec => <T> { items: [T; 3] }
+                  v3 => vec<text>
                 """);
         for (String declarations : admitted) {
             assertDoesNotThrow(() -> compile(declarations), declarations);
@@ -86,6 +78,7 @@ class RecordTemplateSlotTest {
     @Test
     void aParameterAnywhereElseInARecordBodyIsRefusedAtTheDeclaration() {
         Map<String, String> refused = Map.of(
+                "  pinned => <N> { w?: int32 ~ N }", "parameter 'N' stands at meta.record_field.value",
                 "  keyed => <K> { K: text }", "parameter 'K' stands at a key of meta.record.fields",
                 "  grouped => <A> { ( A: text | b: text ) }", "parameter 'A' stands at a key of meta.record.fields",
                 "  maybe => <B> !meta.record { fields: { v => { type: text  optional: B } } }",
@@ -104,19 +97,22 @@ class RecordTemplateSlotTest {
             String message = rejected(declaration);
 
             assertTrue(message.contains(expected), message);
-            assertTrue(message.contains("a record template's parameters stand only in a field's type"), message);
+            assertTrue(message.contains("a parameter is a type, and stands only at a field's type"), message);
         });
     }
 
-    /** The confinement is a record template's: another constructor's scalar slot still takes a value parameter. */
+    /** The confinement is every template's: another constructor's scalar slot takes no parameter either. */
     @Test
-    void aTemplateOverAnotherConstructorKeepsItsScalarSlots() {
-        assertDoesNotThrow(() -> compile("""
+    void aParameterAtAnotherConstructorsScalarSlotIsRefused() {
+        String voidable = rejected("""
                   pair => <V> !meta.tuple { elements: [{ element_type: text  voidable: V } { element_type: int32 }] }
-                  p => pair<true>
+                """);
+        String capped = rejected("""
                   capped => <N> !meta.array { element_type: text  min_items: N }
-                  b => capped<2>
-                """));
+                """);
+
+        assertTrue(voidable.contains("parameter 'V' stands at") && voidable.contains(".voidable"), voidable);
+        assertTrue(capped.contains("parameter 'N' stands at meta.array.min_items"), capped);
     }
 
     /** A parameter has no fields until the template is applied, so neither operator has a body to flatten. */

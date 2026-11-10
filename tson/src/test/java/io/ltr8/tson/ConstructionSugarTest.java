@@ -135,9 +135,12 @@ class ConstructionSugarTest {
         assertRefused(problems("none", "  post => { a: meta.tuple<uuid> }"), "no required field typed by a reference");
     }
 
+    /** An argument is a reference by the grammar (§5.10), so a literal is refused where it is written. */
     @Test
     void anArgumentIsAReference() {
-        assertRefused(problems("literal", "  post => { a: meta.array<3> }"), "the literal '3'");
+        List<Diagnostic> problems = problems("literal", "  post => { a: meta.array<3> }");
+        assertEquals(1, problems.size(), () -> "expected one diagnostic, got " + problems);
+        assertTrue(problems.getFirst().message().contains("'3' is no type argument"), problems::toString);
     }
 
     @Test

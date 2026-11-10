@@ -37,8 +37,9 @@ class TextNormalizationTest {
               safe_header => !meta.enum_type { name_type: header_name  members: [Accept content-type] }
               allowed => { h: safe_header }
               chosen => { h: safe_header = Content-Type }
-              typed_by => <T, N> { w?: T ~ N }
-              picked => { p: typed_by<safe_header, Content-Type> }
+              typed_by => <T> { w?: T }
+              safe_typed => typed_by<safe_header> & { w?: ~ Content-Type }
+              picked => { p: safe_typed }
               web => !uri ^ { schemes: [HTTP https] }
               link => { to: web }
               folded_name => !unicode.identifier_type { start: NONE  continue: NONE
@@ -221,16 +222,18 @@ class TextNormalizationTest {
         assertEquals(1, tson().validateSchema(SCHEMA.replace("schemes: [HTTP https]", "schemes: [\"ht tp\"]")).size());
     }
 
-    /** A template's value argument of an enum type is a value of the enum, matched in the name type's form. */
+    /**
+     * A default restated over an application, on a field the argument types as an enum, is a value of the enum,
+     * matched in the name type's form.
+     */
     @Test
-    void aTemplateValueArgumentOfAnEnumTypeIsMatchedInTheLabelTypesForm() {
+    void aDefaultRestatedOverAnApplicationIsMatchedInTheLabelTypesForm() {
         assertEquals(List.of(), tson().validateSchema(SCHEMA));
         TsonValue tree = tson().treeReader().read(document("!picked { p: {} }"));
         assertEquals("content-type", tree.get("p").get("w").asString().orElseThrow());
-        List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace("typed_by<safe_header, Content-Type>",
-                "typed_by<safe_header, X-Trace>"));
+        List<Diagnostic> refused = tson().validateSchema(SCHEMA.replace("w?: ~ Content-Type", "w?: ~ X-Trace"));
         assertEquals(1, refused.size(), refused.toString());
-        assertTrue(refused.getFirst().message().contains("not a value of safe_header"), refused.toString());
+        assertTrue(refused.getFirst().message().contains("X-Trace"), refused.toString());
     }
 
     /** {@code ASCII_CASEFOLD} folds A..Z, so any casing of an ASCII name is the one value. */

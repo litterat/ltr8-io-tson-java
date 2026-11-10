@@ -15,10 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A declaration's written parameter types ({@code <T: text, N>}, [TSON-SCHEMA] §5.10): read by the kind the
- * positions give -- a bound on a type parameter, a narrower {@code type} on a value parameter -- checked against
- * what the positions derive at the declaration, inherited through another template's argument list, and enforced
- * at the application.
+ * A declaration's written parameter bounds ({@code <T: text>}, [TSON-SCHEMA] §5.10): recorded on the parameter,
+ * inherited through another template's argument list, checked against an inherited bound at the declaration, and
+ * enforced at the application.
  */
 class TemplateParamBoundTest {
 
@@ -33,11 +32,9 @@ class TemplateParamBoundTest {
             {
               non_empty_text       => !text ^ { min_length: 1 }
               boxed      => <T: text> { a: T }
-              vec        => <T: text, N> !meta.array { element_type: T  min_items: N }
+              vec        => <T: text> !meta.array { element_type: T }
               rebox      => <T> boxed<T>
               narrower   => <T: non_empty_text> boxed<T>
-              counted    => <N: numeric.count> !meta.array { element_type: text  min_items: N }
-              typed_by   => <T, N> { w?: T ~ N }
             }
             """;
 
@@ -52,7 +49,7 @@ class TemplateParamBoundTest {
     }
 
     private static TemplateParam bounded(String name, String bound) {
-        return new TemplateParam(name, TemplateParam.TYPE_REF, Optional.of(TypeRef.of(bound)));
+        return new TemplateParam(name, Optional.of(TypeRef.of(bound)));
     }
 
     private static List<Diagnostic> problems(String declarations) {
@@ -73,9 +70,8 @@ class TemplateParamBoundTest {
     }
 
     @Test
-    void anInstanceConstructionNarrowsOneParameterAndKeepsTheOthersDerivedType() {
-        assertEquals(List.of(bounded("T", "text"), new TemplateParam("N", TypeRef.of("numeric.count"))),
-                parameters().get("vec"));
+    void anInstanceConstructionsWrittenTypeIsABound() {
+        assertEquals(List.of(bounded("T", "text")), parameters().get("vec"));
     }
 
     @Test
@@ -88,13 +84,6 @@ class TemplateParamBoundTest {
         assertEquals(List.of(bounded("T", "non_empty_text")), parameters().get("narrower"));
     }
 
-    /** The kernel's numeric.count, which the slot is typed by: the same type, so it narrows. */
-    @Test
-    void aValueParametersWrittenTypeNarrowsItsType() {
-        assertEquals(List.of(new TemplateParam("N", TypeRef.of("numeric.count"))),
-                parameters().get("counted"));
-    }
-
     // ── Refused at the declaration ─────────────────────────────────────────
 
     @Test
@@ -102,12 +91,6 @@ class TemplateParamBoundTest {
         assertRefused("""
                   boxed => <T: text> { a: T }
                   wrong => <T: int32> boxed<T>""", "needs a type that IS-A text");
-    }
-
-    @Test
-    void aWrittenValueTypeThePositionsDoNotReadAsIsRefused() {
-        assertRefused("  bad => <N: text> !meta.array { element_type: text  min_items: N }",
-                "read it as numeric.count");
     }
 
     @Test
@@ -162,21 +145,4 @@ class TemplateParamBoundTest {
                   holder => { b: rebox<int32> }""", "'rebox<...>' binds 'T' to 'int32'");
     }
 
-    @Test
-    void aValueArgumentMustBeAValueOfTheParametersType() {
-        assertRefused("""
-                  vec    => <T, N> !meta.array { element_type: T  min_items: N }
-                  holder => { v: vec<text, "two"> }""", "binds 'N' to 'two', which is not a value of "
-                + "numeric.count");
-    }
-
-    @Test
-    void aValueTypedByAnEarlierParameterIsReadAsThatParametersArgument() {
-        assertEquals(List.of(), problems("""
-                  typed_by => <T, N> { w?: T ~ N }
-                  holder   => { t: typed_by<int32, 5> }"""));
-        assertRefused("""
-                  typed_by => <T, N> { w?: T ~ N }
-                  holder   => { t: typed_by<int32, "five"> }""", "not a value of int32");
-    }
 }

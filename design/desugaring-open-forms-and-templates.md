@@ -10,16 +10,17 @@ in git. The sugar table and the naming rule these bullets refer to are in `desig
 - A form naming none of the enclosing declaration's parameters lifts *closed*; a form naming one lifts *open*, carrying
   just the parameters it uses, renamed positionally.
 - A declaration's own sugar body keeps the declaration's parameter list as written, not the subset the body names.
-- A binding's channel follows §12.1's `type-arg` rule, not the slot: a quoted or number-shaped token is a literal,
-  every other token rides the reference channel.
+- A size bound naming one of the declaration's parameters is refused here (`refuseParameterBound`), naming the slot:
+  a parameter is a type (§5.10), and the lift would rename it before any later check could name it.
 - `WireForm.refValue` is the single place a type slot's shape is decided: one producer, one spelling, because
   `DerivedName.ofBinding` hashes what is written.
 - `DataClassObjectWriter` cannot produce a held body: `HeldBody.names()` and substitution key on a token being
   *unquoted*.
 - Only a *template* is normalised; a closed record or closed alias resolves at its declaration. A record template,
   sugar or explicit `<T> !meta.record { … }`, is written as the `!meta.record_template { … }` it denotes, each
-  whole-type and whole-value parameter labelled here, where the parameters are in scope (`RecordTemplateDef`), and the
-  resolver binds it (`DefinitionResolver.openRecord`).
+  whole-type parameter labelled here, where the parameters are in scope (`RecordTemplateDef`), and the resolver binds
+  it (`DefinitionResolver.openRecord`). A parameter at any other slot is written as it stands, for the resolver to
+  refuse naming the slot.
 - Only what the author wrote is written into a record template's payload — no fixed constructor fields, no field
   facts at their `meta.record_field` defaults.
 - §5.11's uniqueness rule is asked here as well as in the resolver; the two see different phases' bodies.
@@ -44,9 +45,9 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     `vector => <T> [T]` *is* the open construction, and its parameters are the declaration's list as
     written, not the subset the body names — a declared parameter the body never uses is an error the linker
     reports, and dropping it here would hide the very thing it looks for.
-  - **A binding's channel follows §12.1's own `type-arg` rule**, not the slot: a quoted or number-shaped
-    token is a literal, every other token rides the reference channel, and resolution settles what it turns
-    out to be. Deciding it here instead would make `[text; N]` bind the *literal* `"N"`.
+  - **A size bound is a count, never a parameter.** `[T; N]` with `N` a parameter is refused before it lifts
+    (`refuseParameterBound`), naming the slot; a bound is otherwise carried as its token, for `array`'s own
+    `min_items` to read.
   - **A scalar type slot may hold an application**, not just a name — which is what makes `[tree<T>; 1..]`
     and `[[T]]` lift at all. The table keeps both renderings of such a slot: the wire field a closed
     construction would write (the reference, `element_type: tree<p0>`, which is what
@@ -65,19 +66,15 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
       entry names something that is not an entry yet — for exactly the window an ordinary forward reference
       lives in, since `close()` walks every closed entry's references after the driving loop. It rests on a
       kind slot reading an application in a kernel body (`KindSlotReader`, `design/references.md`).
-    - **A *value* argument makes the trip intact.** The reference grammar keeps a value argument as its token
-      (`TypeArgument.Value`) — §5.10 calls a type argument's literal a bare token rather than the value it
-      denotes — so nothing decodes it. The spelling is therefore what reaches identity,
-      and `NumericIdentity` applies [TSON-DATA] §4.3's equivalence there, so `<255>` and `<0xFF>` are one
-      application — radix, digit separators and a redundant sign falling away, and a float's written scale
-      with them, while the base-type line does not (`1` is an integer and `1.0` a float under §4, so those
-      stay two). §8.2 states exactly that split: recorded as written, compared as the value the token
-      denotes under §4, "and no wider".
-  - **All four sugar forms lift open, collections included** — §5.10's "collection-valued slots are
-    parameterizable". `tuple` and `choice` bind a collection (`elements`, `variants`); a held body is not
-    read against the constructor's vocabulary at all until materialisation substitutes, so a parameter
-    inside a collection is a token inside an array and lifts like any other, `result => <T> ( T | error )`
-    being the spec's own example.
+    - **A size bound reaches identity as its token**, and `NumericIdentity` applies [TSON-DATA] §4.3's
+      equivalence there, so `[float32; 255]` and `[float32; 0xFF]` are one binding record — radix, digit
+      separators and a redundant sign falling away. §8.2 states exactly that split: recorded as written, compared
+      as the value the token denotes under §4, "and no wider".
+  - **All four sugar forms lift open, collections included** — a parameter stands at a tuple's or a choice's
+    positions as readily as at an array's element. `tuple` and `choice` bind a collection (`elements`,
+    `variants`); a held body is not read against the constructor's vocabulary at all until materialisation
+    substitutes, so a parameter inside a collection is a token inside an array and lifts like any other,
+    `result => <T> ( T | error )` being the spec's own example.
   - **The open form is the closed form**, so there is no per-slot analysis: one binding record
     serves both, since a parameter in a slot is simply the token standing there. `instance(binding,
     typeParams)` builds either, and the phase needs no rule for how to quote a parameter — only for whether
@@ -99,7 +96,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 - **A record template is normalised here too, and for the same reason the sugar forms are** (`recordTemplate`).
   §5.2 says a bare record body denotes a record construction, and with parameters that is a `record_template`, so
   `test => <T> { x: T }` leaves this phase as the `RecordTemplateDef` `<T> !meta.record_template { fields: { x => {
-  type_param: T } }  parameters: [ { name: T  type: meta.type_ref } ] }`. The rule is as fixed and as closed as the
+  type_param: T } }  parameters: [ { name: T } ] }`. The rule is as fixed and as closed as the
   sugar table: §5.2's six field spellings decide `state` and `value` from the two marks the author wrote, and nothing
   else is consulted. The explicit `<T> !meta.record { … }` takes the same labels (`labelled`), every other slot
   carried as written for the resolver to answer in `meta.record`'s terms.
@@ -119,11 +116,10 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     form back out puts a *second producer* in front of a wire form two later phases read, and since
     `DerivedName.ofBinding` hashes what is written, a second spelling is a second entry for one type. One
     producer, one spelling: `WireForm.refValue` is the single place a type slot's shape is decided.
-  - **A parameter is labelled where it is written** (`label`, §5.10's shadowing rule over the source spelling): an
-    unquoted parameter token in `value` is the field's `value_param`, a bare parameter name in `type` its
-    `type_param`. The role beside it is the modifier's (`FieldModifiers`): `= P` is FIXED where it is written, and
-    closing only substitutes the value. A positional field (`a => T`) is spelled out and labelled the same way, so the
-    explicit form's three spellings of one field are one template field.
+  - **A parameter is labelled where it is written** (`label`, §5.10's shadowing rule over the source spelling): a
+    bare parameter name in `type` is the field's `type_param`. A parameter in `value` is not labelled -- a field's
+    value is never a parameter -- and is refused by the resolver naming the slot. A positional field (`a => T`) is
+    spelled out and labelled the same way, so the explicit form's three spellings of one field are one template field.
   - **A composition or refinement template is built one phase later**, as the *flattened* record template
     (`DefinitionResolver.Built`, over its own `BuiltField`). Both absorb fields from a source, and a §5.7 tightening entry
     states a modifier and no type-ref, so it is not a field at all until the inherited field supplies one. That needs a

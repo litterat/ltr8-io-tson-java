@@ -370,13 +370,14 @@ public final class TsonDataStream implements TsonEventSource {
 
     /**
      * The reference {@code head} heads, its argument list next at the cursor: {@code "<" ws type-args ws ">"}, each
-     * argument a qualified name (a reference, itself possibly applied) or any other token (a value), separated as an
-     * array's elements are. Assembled whole, so the stream delivers one value.
+     * argument a reference -- a qualified name, itself possibly applied -- separated as an array's elements are. A
+     * token that is no qualified name is no argument ([TSON-SCHEMA] §5.10). Assembled whole, so the stream delivers
+     * one value.
      */
     private io.ltr8.tson.schema.meta.TypeRef referenceArguments(Token head) {
         requireQualifiedName(head);
         advance(); // '<'
-        List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new ArrayList<>();
+        List<io.ltr8.tson.schema.meta.TypeRef> arguments = new ArrayList<>();
         if (check(TokenType.GREATER_THAN)) {
             throw parseError("an argument list holds at least one argument, and '" + head.text() + "<>' holds none");
         }
@@ -388,7 +389,7 @@ public final class TsonDataStream implements TsonEventSource {
         return io.ltr8.tson.schema.meta.TypeRef.of(head.text(), arguments);
     }
 
-    private io.ltr8.tson.schema.meta.TypeArgument referenceArgument() {
+    private io.ltr8.tson.schema.meta.TypeRef referenceArgument() {
         Token t = peekToken();
         switch (t.type()) {
             case UNQUOTED -> {
@@ -397,24 +398,15 @@ public final class TsonDataStream implements TsonEventSource {
                     throw new ParseException(siblingReference(t).refusedAt("a template argument"), t.start());
                 }
                 boolean applied = opensArguments(t);
-                if (ReferenceGrammar.isQualifiedName(t.text())) {
-                    return new io.ltr8.tson.schema.meta.TypeArgument.Ref(applied ? referenceArguments(t)
-                            : io.ltr8.tson.schema.meta.TypeRef.of(t.text()));
+                if (!ReferenceGrammar.isQualifiedName(t.text())) {
+                    throw new ParseException("'" + t.text() + "' is no argument: a reference's argument is a "
+                            + "reference, a qualified name or an application, and never a literal token", t.start());
                 }
-                if (applied) {
-                    requireQualifiedName(t);
-                }
-                return new io.ltr8.tson.schema.meta.TypeArgument.Value(
-                        new io.ltr8.tson.schema.meta.Token(t.text(), io.ltr8.tson.schema.meta.Token.Form.UNQUOTED));
+                return applied ? referenceArguments(t) : io.ltr8.tson.schema.meta.TypeRef.of(t.text());
             }
-            case SINGLE_LINE_STRING, MULTI_LINE_STRING -> {
-                advance();
-                opensArguments(t);
-                return new io.ltr8.tson.schema.meta.TypeArgument.Value(new io.ltr8.tson.schema.meta.Token(t.text(),
-                        t.type() == TokenType.SINGLE_LINE_STRING ? io.ltr8.tson.schema.meta.Token.Form.SINGLE_LINE_QUOTED
-                                : io.ltr8.tson.schema.meta.Token.Form.MULTI_LINE_QUOTED));
-            }
-            default -> throw mismatch("a reference's argument: a qualified name, an application or a token "
+            case SINGLE_LINE_STRING, MULTI_LINE_STRING -> throw new ParseException("a quoted token is no argument: "
+                    + "a reference's argument is a reference, a qualified name or an application", t.start());
+            default -> throw mismatch("a reference's argument: a qualified name or an application "
                     + "(no structure stands in an argument list in data)");
         }
     }

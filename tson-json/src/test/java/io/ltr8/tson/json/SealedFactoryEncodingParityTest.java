@@ -20,15 +20,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * <b>A sealed family whose members a subtype-template factory mints reads alike in both encodings</b>
- * ([TSON-JSON] §9.4): the pin a factory writes from a type parameter ({@code kind: = T}) places a value
- * exactly as a hand-written pin does, and a payload nested under a single field is read the same way in both.
+ * ([TSON-JSON] §9.4): the pin each member writes where its factory application is declared ({@code kind?: =
+ * "ping"}) places a value exactly as a hand-written pin does, and a payload nested under a single field is read the
+ * same way in both.
  *
  * <p><b>The shape is distinct from the two parity tests beside it, which is why it has its own.</b> {@link
  * CrossEncodingParityTest}'s factory sits over an {@code abstract} base, so it dispatches by tag and its
  * payload is flat; {@link TemplateFamilyEncodingParityTest}'s base is the template itself. Here the base is a
- * closed {@code abstract} record and every member is minted, which is what puts a routed pin on the dispatch
- * path: {@code kind: = T} is an ordinary FIXED field of the closed member, its argument substituted, by the
- * time either encoding reads it, and {@code FamilySelectors} states the selector on the entry, so neither stack
+ * closed {@code abstract} record and every member composes an application, which puts a member's own pin on the
+ * dispatch path: {@code kind?: = "ping"} is an ordinary FIXED field of the closed member by the time either
+ * encoding reads it, and {@code FamilySelectors} states the selector on the entry, so neither stack
  * parses held text to find what selects.
  *
  * <p>The comparison is the strongest one available -- code, data pointer, {@code expected} and the prose --
@@ -44,13 +45,13 @@ class SealedFactoryEncodingParityTest {
             !!import:"%s"
             !schema {
               msg    => abstract { kind: text =? }
-              msg_of => <T, V> msg & { kind?: = T  body: V }
+              msg_of => <V> msg & { body: V }
 
               ping_body => { seq: int32 }
               pong_body => { seq: int32  latency: int32 }
 
-              ping => msg_of<"ping", ping_body>
-              pong => msg_of<"pong", [pong_body]>
+              ping => msg_of<ping_body> & { kind?: = "ping" }
+              pong => msg_of<[pong_body]> & { kind?: = "pong" }
 
               channel => { m: msg }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);

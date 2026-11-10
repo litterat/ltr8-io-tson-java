@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.base.CanonicalIdentity;
@@ -22,14 +21,13 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A container position holding a <b>template application</b> rather than a name -- {@code [tree<T>; 1..]},
- * {@code [[T]]}, {@code [[T; N]; N]}. These are the change report's own §8 fixtures, in the spelling §8
+ * {@code [[T]]}, {@code [[T; 3]; 3]}. These are the change report's own §8 fixtures, in the spelling §8
  * writes them.
  *
  * <p><b>The position has no name at desugar time, which is the whole difficulty.</b> A closed form
@@ -188,8 +186,8 @@ class ApplicationInContainerPositionTest {
     // ── §8's grid fixture: one entry per form, whichever channel produced it ──
 
     /**
-     * §8's primary grid, in the <b>record</b> spelling D10 legalised: {@code <T, N> { x: [[T; 1..N]; 2..N] }}.
-     * Closing {@code grid<pixel, 3>} from two declarations derives six entries in all -- {@code grid} itself,
+     * §8's primary grid, in the <b>record</b> spelling D10 legalised: {@code <T> { x: [[T; 1..3]; 2..3] }}.
+     * Closing {@code grid<pixel>} from two declarations derives six entries in all -- {@code grid} itself,
      * two open synthetics for the two container levels, two closed synthetics they become, and one
      * instantiation entry for the application -- and a third declaration writing the inner form directly
      * lands on the closed synthetic rather than minting a second (§8.2's cross-channel dedup).
@@ -201,16 +199,16 @@ class ApplicationInContainerPositionTest {
     void theRecordFormGridDerivesTwoOpenSyntheticsTwoClosedAndOneInstantiation() {
         TsonCompiledSchema compiled = compile("""
                   pixel  => { r: int32 }
-                  grid   => <T, N> { x: [[T; 1..N]; 2..N] }
-                  a      => { g: grid<pixel, 3> }
-                  b      => { g: grid<pixel, 3> }
+                  grid   => <T> { x: [[T; 1..3]; 2..3] }
+                  a      => { g: grid<pixel> }
+                  b      => { g: grid<pixel> }
                   direct => { d: [pixel; 1..3] }""");
 
         assertEquals(fieldType(compiled, "a", "g"), fieldType(compiled, "b", "g"), "one instantiation");
         assertEquals(List.of(2L, 3L), List.of(openSynthetics(compiled), closedDerived(compiled)),
                 () -> "two open, three closed (two synthetics and the instantiation): " + derived(compiled));
 
-        // grid<pixel, 3> -> { x: [[pixel; 1..3]; 2..3] }, outermost entry inwards.
+        // grid<pixel> -> { x: [[pixel; 1..3]; 2..3] }, outermost entry inwards.
         String outer = fieldType(compiled, fieldType(compiled, "a", "g"), "x");
         ArrayBody rows = assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(outer));
         assertEquals(Optional.of(2L), rows.minItems());
@@ -220,15 +218,15 @@ class ApplicationInContainerPositionTest {
 
     /**
      * The <b>whole-body</b> spelling is its expansion: an application nothing declares names the closed
-     * synthetic its closing produced, so {@code grid<pixel, 3>} and {@code [[pixel; 3]; 3]} written out are one
+     * synthetic its closing produced, so {@code grid<pixel>} and {@code [[pixel; 3]; 3]} written out are one
      * entry, and no entry records the application.
      */
     @Test
     void theWholeBodySpellingIsItsExpansion() {
         TsonCompiledSchema compiled = compile("""
                   pixel  => { r: int32 }
-                  grid   => <T, N> [[T; N]; N]
-                  a      => { g: grid<pixel, 3> }
+                  grid   => <T> [[T; 3]; 3]
+                  a      => { g: grid<pixel> }
                   direct => { d: [[pixel; 3]; 3] }""");
 
         String form = fieldType(compiled, "a", "g");
@@ -258,19 +256,20 @@ class ApplicationInContainerPositionTest {
 
     /**
      * A generated head closing its own intermediate form mints no instantiation: nobody wrote
-     * {@code array_p0_p1_p1_06c4e11f<pixel, 3>}, and an entry named for it would carry that internal name
-     * into identity, which is exactly what D6 says must not happen.
+     * {@code array_p0_3_3_…<pixel>}, and an entry named for it would carry that internal name into identity,
+     * which is exactly what D6 says must not happen.
      */
     @Test
     void closingAGeneratedSyntheticRecordsNoApplication() {
         TsonCompiledSchema compiled = compile("""
                   pixel => { r: int32 }
-                  grid  => <T, N> [[T; N]; N]
-                  a     => { g: grid<pixel, 3> }""");
+                  grid  => <T> [[T; 3]; 3]
+                  a     => { g: grid<pixel> }""");
 
         assertTrue(derived(compiled).stream().noneMatch(n -> compiled.schema().applicationOf(n).isPresent()),
                 () -> "no instantiation, the application being its expansion: " + derived(compiled));
-        assertTrue(derived(compiled).stream().noneMatch(n -> n.contains("06c4e11f_")),
+        List<String> generated = openNames(compiled);
+        assertTrue(derived(compiled).stream().noneMatch(n -> generated.stream().anyMatch(g -> n.startsWith(g + "_"))),
                 () -> "no entry named after a generated head: " + derived(compiled));
     }
 
@@ -291,7 +290,7 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * {@code grid => <T, N> [[T; N]; N]} closed via {@code grid<pixel, 3>} from two declarations yields
+     * {@code grid => <T> [[T; 3]; 3]} closed via {@code grid<pixel>} from two declarations yields
      * exactly one instantiation entry and one synthetic for the inner row -- and a third declaration writing
      * {@code [pixel; 3]} directly lands on that same synthetic (§8.2's cross-channel dedup).
      */
@@ -299,9 +298,9 @@ class ApplicationInContainerPositionTest {
     void theGridFixtureProducesOneEntryPerDistinctForm() {
         TsonCompiledSchema compiled = compile("""
                   pixel  => { r: int32 }
-                  grid   => <T, N> [[T; N]; N]
-                  a      => { g: grid<pixel, 3> }
-                  b      => { g: grid<pixel, 3> }
+                  grid   => <T> [[T; 3]; 3]
+                  a      => { g: grid<pixel> }
+                  b      => { g: grid<pixel> }
                   direct => { d: [pixel; 3] }""");
 
         assertEquals(fieldType(compiled, "a", "g"), fieldType(compiled, "b", "g"), "one instantiation");
@@ -312,8 +311,8 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * <b>Templates are consulted, never modified, by closure.</b> Closing {@code grid<pixel, 4>} after
-     * {@code grid<pixel, 3>} leaves {@code grid} and both open synthetics exactly as they were and adds three
+     * <b>Templates are consulted, never modified, by closure.</b> Closing {@code grid<voxel>} after
+     * {@code grid<pixel>} leaves {@code grid} and both open synthetics exactly as they were and adds three
      * fresh closed entries beside the first three -- two container levels and one instantiation.
      *
      * <p>The property matters beyond tidiness: substitution walks a template's recorded open form, and a walk
@@ -323,17 +322,19 @@ class ApplicationInContainerPositionTest {
     void closingASecondArgumentLeavesEveryTemplateUntouched() {
         TsonCompiledSchema compiled = compile("""
                   pixel => { r: int32 }
-                  grid  => <T, N> { x: [[T; 1..N]; 2..N] }
-                  three => { g: grid<pixel, 3> }""");
+                  voxel => { v: int32 }
+                  grid  => <T> { x: [[T; 1..3]; 2..3] }
+                  three => { g: grid<pixel> }""");
         List<String> openBefore = openNames(compiled);
 
         TsonCompiledSchema both = compile("""
                   pixel => { r: int32 }
-                  grid  => <T, N> { x: [[T; 1..N]; 2..N] }
-                  three => { g: grid<pixel, 3> }
-                  four  => { g: grid<pixel, 4> }""");
+                  voxel => { v: int32 }
+                  grid  => <T> { x: [[T; 1..3]; 2..3] }
+                  three => { g: grid<pixel> }
+                  four  => { g: grid<voxel> }""");
 
-        assertEquals(List.of("T", "N"), OpenEntry.parameterNames(both.schema().entries().get("grid")),
+        assertEquals(List.of("T"), OpenEntry.parameterNames(both.schema().entries().get("grid")),
                 "the declared template, unchanged");
         assertEquals(openBefore, openNames(both), "both open synthetics reused, neither rewritten");
         assertEquals(2, openSynthetics(both));
@@ -346,9 +347,10 @@ class ApplicationInContainerPositionTest {
     void theWholeBodySpellingReusesItsOpenSyntheticToo() {
         TsonCompiledSchema compiled = compile("""
                   pixel => { r: int32 }
-                  grid  => <T, N> [[T; N]; N]
-                  three => { g: grid<pixel, 3> }
-                  four  => { g: grid<pixel, 4> }""");
+                  voxel => { v: int32 }
+                  grid  => <T> [[T; 3]; 3]
+                  three => { g: grid<pixel> }
+                  four  => { g: grid<voxel> }""");
 
         assertInstanceOf(TemplateBody.class, compiled.schema().entries().get("grid"));
         assertEquals(1, openSynthetics(compiled),
@@ -434,44 +436,6 @@ class ApplicationInContainerPositionTest {
                         .values().stream().toList().get(0).type());
     }
 
-    /**
-     * A <b>value</b> argument makes the wire trip too. The reference grammar keeps a value argument as its
-     * {@code Token}, not the value it denotes -- §4 decoding would leave {@code <3>} and {@code <"3">}
-     * indistinguishable, and the form is exactly what identity needs.
-     */
-    @Test
-    void aValueArgumentInAClosedContainerKeepsItsToken() {
-        TsonCompiledSchema compiled = compile("""
-                  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
-                  holder => { p: [vector<float32, 3>] }""");
-
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "holder", "p"));
-        Top inner = compiled.schema().entries().get(outer.elementType().name());
-        ArrayBody vector = assertInstanceOf(ArrayBody.class, inner instanceof Alias r
-                ? compiled.schema().entries().get(r.target().name()) : inner);
-
-        assertEquals(Optional.of(3L), vector.minItems());
-        assertNotNull(compiled.get("holder")
-                .read(TestDocuments.document("{ p: [ [ 1.0 2.0 3.0 ] ] }")));
-        assertThrows(ReadException.class, () -> compiled.get("holder")
-                .read(TestDocuments.document("{ p: [ [ 1.0 2.0 ] ] }")));
-    }
-
-    /**
-     * And the form is what keeps two spellings apart. {@code <float32, 3>} and {@code <float32, "3">} apply
-     * different arguments, so they must land on different entries -- which they do only because the token
-     * reached identity with its form intact rather than decoded to the same {@code 3} twice.
-     */
-    @Test
-    void aQuotedValueArgumentIsADifferentApplicationFromABareOne() {
-        String vector = "  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }\n";
-        TsonCompiledSchema bare = compile(vector + "  holder => { p: [vector<float32, 3>] }");
-        TsonCompiledSchema quoted = compile(vector + "  holder => { p: [vector<float32, \"3\">] }");
-
-        assertNotEquals(fieldType(bare, "holder", "p"), fieldType(quoted, "holder", "p"),
-                "one entry each, not one shared");
-    }
-
     /** A map's value slot takes one the same way -- the table's scalar type slots are one rule, not three. */
     @Test
     void aMapValueSlotHoldsAnApplicationToo() {
@@ -497,10 +461,11 @@ class ApplicationInContainerPositionTest {
     void aConcreteApplicationInABindingClosesAtTheDeclaration() {
         TsonCompiledSchema compiled = compile("""
                   box     => <T> { v: T }
-                  capped => <N> [box<text>; N..]
-                  use     => { u: capped<2> }""");
+                  capped  => <T> { a: [box<text>; 2..]  b: T }
+                  use     => { u: capped<int32> }""");
 
-        ArrayBody closed = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "u"));
+        ArrayBody closed = assertInstanceOf(ArrayBody.class,
+                compiled.schema().entries().get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
 
         assertEquals(Optional.of(2L), closed.minItems());
         assertInstanceOf(RecordBody.class,

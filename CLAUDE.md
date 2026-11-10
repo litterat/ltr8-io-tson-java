@@ -155,7 +155,8 @@ edited in place; a release fixes the document under its identity (§10). Use `.t
 
 One line each; the class Javadoc and the note carry the why. Read before touching the class involved.
 
-- `TypeArgument` is a sealed interface (`Ref`/`Value`), never a record with two `Optional`s, and compares by its text.
+- A reference's argument is itself a `TypeRef`, a name or an application, never a literal; a `TypeRef` compares by its
+  name and arguments.
 - `SchemaDesugarer` returns un-rewritten nodes **by identity** — positions live in an `IdentityHashMap`.
 - A desugar-reported declaration is replaced with an absorbing stand-in that **keeps its type parameters**; injected
   declarations are never rolled back.

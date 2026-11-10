@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -22,21 +21,15 @@ interface ApplicationCloser {
     String closeApplication(TypeRef application);
 
     /**
-     * §5.10's argument kinds, for an application absorbed <b>by value</b> rather than closed.
-     *
-     * <p>A composition operand mints no entry, so it never reaches the materialiser -- and it needs the one
-     * thing closing did for it besides making an entry: §12.1 decides an argument's channel by the shape of
-     * the token that spells it, so an unquoted {@code red} arrives as a reference, and only the kind of the
-     * parameter it binds says it is an enum member instead. Without this, {@code t<red>} against
-     * {@code t => <M> { a: st ~ M }} writes a type reference into a value slot.
+     * §5.10's call-site check, for an application absorbed <b>by value</b> rather than closed: each argument must
+     * name a type that IS-A its parameter's bound. A composition operand mints no entry, so it never reaches the
+     * materialiser, and would otherwise go unchecked.
      *
      * <p>A {@code default} rather than a second abstract method, so this stays a functional interface: the
      * resolvers built without a materialiser -- the kernel bootstrap, and unit tests over hand-built
-     * namespaces -- pass a lambda, and an operand there classifies as §12.1 spelled it.
+     * namespaces -- pass a lambda, and an operand there is not checked.
      */
-    default List<TypeArgument> byParameterKind(String head, Top template,
-            List<String> parameters, List<TypeArgument> arguments) {
-        return arguments;
+    default void checkArguments(String head, Top template, List<TypeRef> arguments) {
     }
 
     /**
@@ -56,7 +49,7 @@ interface ApplicationCloser {
      * report), and §5.10's <b>partial application</b>, which mints no entry at all -- the composed
      * application's entry belongs to whoever names it.
      *
-     * <p>A {@code default} for {@link #byParameterKind}'s reason: this stays a functional interface, so the
+     * <p>A {@code default} for {@link #checkArguments}'s reason: this stays a functional interface, so the
      * kernel bootstrap and the tests over hand-built namespaces keep passing a lambda and keep the
      * reference shape.
      */

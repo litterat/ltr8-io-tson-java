@@ -7,10 +7,10 @@ package io.ltr8.tson.compiler.ast.schema;
  * {@code N} into {@code N..N} is a resolution-time equivalence (§5.3: "two spellings of the same
  * application"), not a grammar fact, and this stage only builds the grammar's own AST.
  *
- * <p>Each bound is preserved as raw token text, not parsed to a number: within a template body a
- * bound MAY be a value-parameter name instead of a {@code decimal-natural} literal (§5.3), and
- * classifying which is a later, semantic-layer step ("parameters cannot be numeric" is the
- * disambiguation rule, but nothing here needs to act on it yet).
+ * <p>Each bound is preserved as raw token text, not parsed to a number: the bound is read where the
+ * lifted form binds it, against {@code array}'s own {@code min_items}/{@code max_items}, so a token that is
+ * no {@code decimal-natural} is refused there -- a template's parameter among them, which stands only where
+ * a type is named (§5.10).
  */
 public sealed interface SizeSpec {
 

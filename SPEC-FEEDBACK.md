@@ -88,9 +88,10 @@ might differ.
 does not decide it.
 
 - *A schema document refuses the quoted form* at every reference position it reads: a field type (`{ b: "text" }`,
-  "expected a type reference, found the quoted token 'text'"), a template argument (`box<"text">`, "a quoted token is
-  a literal, never a name (§5.10)"), and a constructor body's reference-typed slot (`!meta.array { element_type:
-  "text" }`).
+  "expected a type reference, found the quoted token 'text'"), a template argument (`box<"text">`, "'text' is no type
+  argument: an argument is a type, written as a reference"), and a constructor body's reference-typed slot
+  (`!meta.array { element_type: "text" }`). On the Revision 40 proposal branch an argument is a reference in both
+  grammars (#3), so [TSON-SCHEMA] §5.3's quoted value argument is gone and a data document refuses `box<"text">` too.
 - *A data document accepts it* at a field typed by a reference: with `s => { t: meta.type_ref }`, `!s { t: "int32" }`
   is valid, and with `s => { t: meta.ref<meta.record> }` and `r => { x: text }`, `!s { t: "r" }` is valid and
   `!s { t: "no_such" }` is refused as not a member — the token's text is resolved as a name.
@@ -129,6 +130,17 @@ that is not a record, and no `meta.template` or `meta.record_template`.
 
 **What is running** on the Revision 40 proposal branch, step by step. Everything not listed is Revision 39's.
 
+- *§5.10, value parameters: gone.* A parameter is a type. It stands at a slot typed `meta.type_ref` or a refinement
+  of it, or as an argument of an application; anywhere else is a resolver error at the declaration, naming the slot:
+  a facet, a field's default or fixed value (a pin on a reference-typed field included), an enum member, a size
+  bound, a field name, a modifier. An argument is a reference in both grammars: a number or a quoted token in an
+  argument list is a grammar error, in a schema document and in data (`maxint<10>`, `box<"x">`).
+  `meta.template_param` is `{ name, bound? }` and `meta.record_template_field` has no `value_param`. A value that
+  differs per application is written where the application is declared,
+  `created => response<order> & { status?: = 201 }`. Still as in Revision 39: a parameter at a construction's type
+  slot (`<T> !meta.array { element_type: T }`), which the kernel's `set`, `meta.ref` and `tuple1` are until the
+  kernel moves, and bounds inherited by a fixed point. The rule that a parameter may not be spelled like a name an
+  absorbed field type writes no longer refuses anything the shadowing rule does not: every such name is an entry.
 - *§4.2, an application in a data document: running.* In a data document a value at a reference-typed slot is a
   name. One carrying an argument list is a validation error whether or not the schema's closure closed that
   application, in both encodings: a constraint violation of the reference atom, whose message gives the remedy, the
@@ -154,4 +166,11 @@ document a reference is a name: an application is a validation error". To §5.3'
 `C` a constructor: `!C { f1: a1 … fn: an }`, its required fields typed by a reference naming types and not pinned by
 its chain, in declaration order", saying whether a field with a default is one of them; in §5.6 say the positional,
 braced and applied spellings of one construction are one entry; and in §8.2 scope the clause comparing an
-application's arguments past their aliases to substitutions. The text for the other steps follows as each lands.
+application's arguments past their aliases to substitutions. For value parameters: replace §5.10's
+"A parameter's type is derived …" through its narrowing rules with "**Parameters are types.** Every parameter stands
+for a type: an argument for it is a reference, a name or an application, and a parameter stands only at a field's
+type, or as an argument of an application there or in a parent. A parameter anywhere else is a resolver error at the
+declaration, naming the slot"; replace §5.7's "Open modifiers" with the rule that a value differing per application
+is written where the application is declared; delete §8.2's "Value arguments compare as values"; end §5.3's size
+bound at a decimal integer; make §12.1's and [TSON-DATA] §7.4's `type-arg` a reference; and rewrite §1.6's worked
+example, whose `flagged<status, 2>` carries a value argument. The text for the other steps follows as each lands.

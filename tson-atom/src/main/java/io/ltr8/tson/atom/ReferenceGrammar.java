@@ -2,8 +2,6 @@ package io.ltr8.tson.atom;
 
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.SiblingRef;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -18,13 +16,12 @@ import java.util.List;
  *   reference   = sibling-ref / qualified-name ["&lt;" ws type-args ws "&gt;"]   ; "&lt;" adjacent to the name
  *   sibling-ref = identifier "!"                                  ; one segment; the text ends at the "!"
  *   type-args   = type-arg *(separator type-arg) [ws ","]         ; separator = ws "," ws / ws1
- *   type-arg    = reference / token                               ; a qualified name is a reference, any other
- *                                                                 ; token (a number, a quoted token) a value
+ *   type-arg    = reference                                       ; a name or an application, never a literal
  * </pre>
  *
- * <p>A quoted argument is {@code "} delimited, with {@code \"}, {@code \\}, {@code \n}, {@code \r}, {@code \t}
- * and {@code \}{@code uXXXX} escapes, and is never a reference. Whitespace inside an argument list is free, so
- * {@code result< T >} and {@code result<T>} parse to one reference.
+ * <p>An argument is a type ([TSON-SCHEMA] §5.10), so a token that is no reference -- a number, a quoted token -- is
+ * no argument, and {@code maxint<10>} spells no reference. Whitespace inside an argument list is free, so {@code
+ * result< T >} and {@code result<T>} parse to one reference.
  *
  * <p><b>Two entry points, one production.</b> {@link #parseReference} reads every variant, a sibling reference
  * ({@code kind!}) among them, for the one slot that holds one, a record field's type. {@link #parse} reads a {@link
@@ -82,10 +79,8 @@ public final class ReferenceGrammar {
     public static List<String> names(TypeRef reference) {
         List<String> names = new ArrayList<>();
         names.add(reference.name());
-        for (TypeArgument argument : reference.arguments()) {
-            if (argument instanceof TypeArgument.Ref ref) {
-                names.addAll(names(ref.ref()));
-            }
+        for (TypeRef argument : reference.arguments()) {
+            names.addAll(names(argument));
         }
         return names;
     }
@@ -149,7 +144,7 @@ public final class ReferenceGrammar {
                 return TypeRef.of(head);
             }
             at++;
-            List<TypeArgument> arguments = new ArrayList<>();
+            List<TypeRef> arguments = new ArrayList<>();
             skipSeparators();
             while (true) {
                 if (atEnd()) {
@@ -187,9 +182,9 @@ public final class ReferenceGrammar {
             return new SiblingRef(field, null);
         }
 
-        private TypeArgument argument() {
+        private TypeRef argument() {
             if (text.charAt(at) == '"') {
-                return new TypeArgument.Value(new Token(quoted(), Token.Form.SINGLE_LINE_QUOTED));
+                throw error("an argument is a reference, a name or an application, and a quoted token is neither");
             }
             int start = at;
             String word = word();
@@ -201,13 +196,11 @@ public final class ReferenceGrammar {
                         .refusedAt("a template argument"), "a template argument");
             }
             if (!isQualifiedName(word)) {
-                if (!atEnd() && text.charAt(at) == '<') {
-                    throw error("'" + word + "' is no qualified name, so it takes no argument list");
-                }
-                return new TypeArgument.Value(new Token(word, Token.Form.UNQUOTED));
+                throw error("'" + word + "' is no argument: an argument is a reference, a name or an application, "
+                        + "and never a literal token");
             }
             at = start;
-            return new TypeArgument.Ref((TypeRef) reference());
+            return (TypeRef) reference();
         }
 
         /** Each {@code .}-separated segment of {@code head} an identifier, none empty. */
@@ -229,46 +222,6 @@ public final class ReferenceGrammar {
                 at++;
             }
             return text.substring(start, at);
-        }
-
-        private String quoted() {
-            StringBuilder out = new StringBuilder();
-            at++;
-            while (true) {
-                if (atEnd()) {
-                    throw error("a quoted argument has no closing '\"'");
-                }
-                char c = text.charAt(at++);
-                if (c == '"') {
-                    return out.toString();
-                }
-                if (c != '\\') {
-                    out.append(c);
-                    continue;
-                }
-                if (atEnd()) {
-                    throw error("a quoted argument ends inside an escape");
-                }
-                char escaped = text.charAt(at++);
-                switch (escaped) {
-                    case '"', '\\', '/' -> out.append(escaped);
-                    case 'n' -> out.append('\n');
-                    case 'r' -> out.append('\r');
-                    case 't' -> out.append('\t');
-                    case 'u' -> {
-                        if (at + 4 > text.length()) {
-                            throw error("a '\\u' escape needs four hex digits");
-                        }
-                        try {
-                            out.append((char) Integer.parseInt(text.substring(at, at + 4), 16));
-                        } catch (NumberFormatException e) {
-                            throw error("a '\\u' escape needs four hex digits");
-                        }
-                        at += 4;
-                    }
-                    default -> throw error("'\\" + escaped + "' is no escape");
-                }
-            }
         }
 
         private void skipWhitespace() {

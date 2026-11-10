@@ -73,10 +73,13 @@ class TsonDataStreamTest {
     /** A qualified name with an adjacent argument list is one value, nested to any depth; whitespace inside is free. */
     @Test
     void aReferenceIsOneValue() {
+        for (String literal : List.of("box<201>", "box<\"a b\">", "box<T 1x>")) {
+            assertThrows(ParseException.class, () -> shape(literal), literal);
+        }
         assertEquals(List.of("DocumentStart(|)", "Reference(map<text list<int32>>)", "DocumentEnd"),
                 shape("map< text,  list<int32> >"));
-        assertEquals(List.of("DocumentStart(|)", "Reference(geo.address<T 201 \"a b\">)", "DocumentEnd"),
-                shape("geo.address<T 201 \"a b\">"));
+        assertEquals(List.of("DocumentStart(|)", "Reference(geo.address<T pair<text int32>>)", "DocumentEnd"),
+                shape("geo.address<T pair<text, int32>>"));
         assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(t)", "Reference(box<text>)",
                 "FieldName(n)", "Token(1,UNQUOTED)", "RecordEnd", "DocumentEnd"), shape("{ t: box<text>  n: 1 }"));
     }

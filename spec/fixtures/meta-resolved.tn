@@ -54,7 +54,7 @@
     readers, after linking, not in resolved output.
   - A slot that names a type (`meta.record_field.type`,
     `meta.tuple_element.element_type`, a container's type slots, choice
-    variants, a parameter's `meta.type` and `bound`) is typed `meta.type_ref`,
+    variants, a parameter's `bound`) is typed `meta.type_ref`,
     the kind of the types, and holds a bare name: a type's name,
     judged a member of the kind when the schema links. An
     application is a reference with an argument list, written
@@ -69,30 +69,26 @@
     required field. A record field is closed: its `type` names a
     type and its `value` is a literal. A record template's field is a
     `meta.record_template_field`, which labels a parameter standing
-    for the whole type (`type_param`) or the whole value
-    (`value_param`); a parameter that is an argument of an
-    application in `type` is recognised by its text resolving into
-    the template's `parameters` (Part 2 Section 5.10's shadowing
-    rule). A parametric `= P` is FIXED and `~ P` DEFAULT where it is
-    written, the parameter in `value_param`; materialisation
-    substitutes the argument, `type_param` becoming `type` and
-    `value_param` becoming `value`, and changes no other fact, and
-    `optional` is the name's mark as written (Part 2 Section 5.7).
-  - An argument is a reference or a token, positional against the
-    head's parameters and typed where it lands: in a template body a
-    parameter of either kind stands as its name, read against
-    `parameters`.
+    for the whole type (`type_param`); a parameter that is an argument
+    of an application in `type` is recognised by its text resolving
+    into the template's `parameters` (Part 2 Section 5.10's shadowing
+    rule). A field's value is never a parameter. Materialisation
+    substitutes the argument, `type_param` becoming `type`, and
+    changes no other fact.
+  - An argument is a reference, a name or an application, positional
+    against the head's parameters: in a template body a parameter
+    stands as its name, read against `parameters`.
   - An open entry is one of two values (Part 2 Sections 5.10, 8.1).
     A record template is a `!meta.record_template`, read as the
     vocabulary and not held: a parameter stands at a field's
-    `type_param` or `value_param` or an application's argument, and
+    `type_param` or an application's argument, and
     its `chain` holds `parents` as written, one of which may be an
     application.
     Every other open entry is held: a `!meta.template` carrying its
     `parameters` and, as text in `template`, the constructor
     application as written — a container as
-    `!meta.array`/`!meta.map`/`!meta.tuple`/`!meta.choice`, an atom constructor as
-    `!numeric.integer_type`, an alias as `!meta.alias` — unread until
+    `!meta.array`/`!meta.map`/`!meta.tuple`/`!meta.choice`, a reference
+    type as `!meta.reference_type`, an alias as `!meta.alias` — unread until
     materialisation substitutes the parameters away. An entry that
     closes a template application carries the derived `@meta.application`
     at its schema-map key, the application it is the instantiation
@@ -277,7 +273,6 @@
 
     template_param => !meta.record { fields: {
       name  => !meta.record_field { type: meta.param_name }
-      type  => !meta.record_field { type: meta.type_ref }
       bound => !meta.record_field { type: meta.type_ref  optional: true }
     } }
 
@@ -335,11 +330,9 @@
       voidable    => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       role        => !meta.record_field { type: meta.field_role  optional: true  role: DEFAULT  value: FREE }
       value       => !meta.record_field { type: type!  optional: true }
-      value_param => !meta.record_field { type: meta.param_name  optional: true }
     }
     groups: [
       !meta.field_group { members: [[type] [type_param]] }
-      !meta.field_group { members: [[value] [value_param]]  optional: true }
     ] }
 
     record_template_field_map => !meta.map { key_type: text  value_type: meta.record_template_field  ordered: true }
@@ -427,10 +420,10 @@
       elements       => !meta.record_field { type: array_tuple_element_xxhash }
     } }
 
-    tuple1 => !meta.template { parameters: [{ name: T  type: meta.type_ref }]  template: "!meta.tuple { elements: [{ element_type: T }] }" }
+    tuple1 => !meta.template { parameters: [{ name: T }]  template: "!meta.tuple { elements: [{ element_type: T }] }" }
 
     voidable_tuple1 => !meta.template {
-      parameters: [{ name: T  type: meta.type_ref }]
+      parameters: [{ name: T }]
       template: "!meta.tuple { elements: [{ element_type: T  voidable: true }] }"
     }
 
@@ -463,7 +456,7 @@
     } }
 
     ref => !meta.template {
-      parameters: [{ name: T  type: meta.type_ref }]
+      parameters: [{ name: T }]
       template: "!meta.reference_type { of: T  allow_sibling: false }"
     }
 
@@ -531,7 +524,7 @@
     members   => !meta.record_field { type: meta.enum_set }
   } }
 
-  set => !meta.template { parameters: [{ name: T  type: meta.type_ref }]  template: "!meta.set_type { element_type: T }" }
+  set => !meta.template { parameters: [{ name: T }]  template: "!meta.set_type { element_type: T }" }
 
   schema => !meta.alias { target: meta.schema }
 

@@ -2,8 +2,6 @@ package io.ltr8.tson.atom;
 
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.SiblingRef;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
@@ -15,16 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The reference grammar a reference-typed slot's value is read by ([TSON-DATA] §7.4): segments, an optional
- * argument list of references and tokens, and one canonical text.
+ * argument list of references, and one canonical text.
  */
 class ReferenceGrammarTest {
 
-    private static TypeArgument.Ref ref(String name) {
-        return new TypeArgument.Ref(TypeRef.of(name));
-    }
-
-    private static TypeArgument.Value value(String text, Token.Form form) {
-        return new TypeArgument.Value(new Token(text, form));
+    private static TypeRef ref(String name) {
+        return TypeRef.of(name);
     }
 
     @Test
@@ -35,16 +29,25 @@ class ReferenceGrammarTest {
         assertEquals(List.of("geo", "address"), ReferenceGrammar.parse("geo.address<T>").segments());
     }
 
-    /** A qualified name is a reference, nested ones included; any other token, a number or a quoted one, a value. */
+    /** An argument is a reference, a qualified name or an application, nested ones included. */
     @Test
-    void anArgumentIsAReferenceOrAToken() {
-        assertEquals(TypeRef.of("response", List.of(ref("order"), value("201", Token.Form.UNQUOTED))),
-                ReferenceGrammar.parse("response<order 201>"));
-        assertEquals(TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("pair",
-                        List.of(ref("text"), value("a b", Token.Form.SINGLE_LINE_QUOTED)))))),
-                ReferenceGrammar.parse("box<pair<text \"a b\">>"));
-        assertEquals(TypeRef.of("p", List.of(value("-1", Token.Form.UNQUOTED), value("1box", Token.Form.UNQUOTED))),
-                ReferenceGrammar.parse("p<-1 1box>"));
+    void anArgumentIsAReference() {
+        assertEquals(TypeRef.of("response", List.of(ref("order"), ref("geo.address"))),
+                ReferenceGrammar.parse("response<order geo.address>"));
+        assertEquals(TypeRef.of("box", List.of(TypeRef.of("pair", List.of(ref("text"), ref("int32"))))),
+                ReferenceGrammar.parse("box<pair<text int32>>"));
+    }
+
+    /** A token that is no reference -- a number, a quoted token -- is no argument ([TSON-SCHEMA] §5.10). */
+    @Test
+    void aLiteralTokenIsNoArgument() {
+        for (String text : List.of("maxint<10>", "response<order 201>", "p<-1>", "p<1box>", "box<\"a b\">",
+                "box<pair<text \"a b\">>")) {
+            assertThrows(AtomParseException.class, () -> ReferenceGrammar.parse(text), text);
+        }
+        AtomParseException refused = assertThrows(AtomParseException.class,
+                () -> ReferenceGrammar.parse("maxint<10>"));
+        assertTrue(refused.getMessage().contains("never a literal token"), refused.getMessage());
     }
 
     /** Identity is the parsed form: whitespace and a comma between arguments are free, and the text is one. */
@@ -55,14 +58,6 @@ class ReferenceGrammarTest {
             assertEquals(canonical, ReferenceGrammar.parse(spelling), spelling);
             assertEquals("map<text integer>", ReferenceGrammar.parse(spelling).text(), spelling);
         }
-        assertEquals("p<\"a \\\"b\\\"\">", ReferenceGrammar.parse("p< \"a \\\"b\\\"\" >").text());
-    }
-
-    /** An argument's channel is no part of the reference: an unquoted token filed as a value is the name it spells. */
-    @Test
-    void anArgumentComparesByItsText() {
-        assertEquals(TypeRef.of("names", List.of(value("red", Token.Form.UNQUOTED))),
-                ReferenceGrammar.parse("names<red>"));
     }
 
     @Test
@@ -76,7 +71,7 @@ class ReferenceGrammarTest {
     @Test
     void theNamesAReferenceWritesAreItsHeadAndItsReferenceArguments() {
         assertEquals(List.of("response", "box", "order"),
-                ReferenceGrammar.names(ReferenceGrammar.parse("response<box<order> 201>")));
+                ReferenceGrammar.names(ReferenceGrammar.parse("response<box<order>>")));
     }
 
     /** {@code kind!} reads to the sibling reference it spells, and writes back as the same text. */

@@ -1,0 +1,86 @@
+package io.ltr8.tson.compiler;
+
+import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * [TSON-DATA] §4.3's numeric equivalence, applied where [TSON-SCHEMA] §8.2 derives an entry's identity
+ * ({@link io.ltr8.tson.compiler.resolver} {@code NumericIdentity}). {@code 255} and {@code 0xFF} are one
+ * number, so a size bound that differs only in which one the author wrote lifts to one binding record and one
+ * entry.
+ *
+ * <p><b>The stake is a verdict, not a redundant entry.</b> §5.4 requires a choice's variants to resolve to
+ * distinct types, and it asks that question of entry names -- so two names for one type would pass a check two
+ * spellings of one name fail, and {@code ( [float32; 255] | [float32; 0xFF] )} would be admitted as a choice
+ * between two identical variants that no untagged read could ever discriminate.
+ */
+class NumericBoundIdentityTest {
+
+    private static final String ID = "https://example.test/numeric-identity.tn";
+
+    private static TsonCompiledSchema compile(String declarations) {
+        String schema = """
+                !!id:"https://example.test/numeric-identity.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                %s
+                }
+                """.formatted(declarations);
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
+                return schema;
+            }
+            throw new IllegalStateException("unexpected fetch: " + uri);
+        };
+        return TsonCompiledSchemaRegistry.tree(TsonCompiledVocabularyRegistry
+                .withStandardLibrary(SchemaModelNameBinder.defaultContext(), source)).get(ID);
+    }
+
+    /**
+     * Every derived entry this schema declared, which is where two spellings of one number would show up as two --
+     * its closure's own derived entries, the kernel's and meta.tn's among them, left out.
+     */
+    private static List<String> derivedEntries(TsonCompiledSchema compiled) {
+        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(compiled.schema().id());
+        return compiled.schema().entries().keySet().stream().filter(n -> n.matches(".*_[0-9a-f]{8}"))
+                .filter(n -> compiled.linkedSchema().originOf(n).equals(own)).toList();
+    }
+
+    /**
+     * <b>The verdict this exists for.</b> Two spellings of one number are one variant, so §5.4 refuses the
+     * choice -- as it does for two spellings of one name, on the same footing.
+     */
+    @Test
+    void aChoiceOfOneTypeSpelledTwoWaysIsRefusedLikeAnyOtherRepeat() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> compile("  u => ( [float32; 255] | [float32; 0xFF] )"));
+
+        assertTrue(thrown.getMessage().contains("twice"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("§5.4"), thrown.getMessage());
+    }
+
+    /** §4.3's equivalence in full: radix, digit separators and a redundant sign all fall away. */
+    @ParameterizedTest
+    @ValueSource(strings = {"0xFF", "0b1111_1111", "0o377", "+255", "255"})
+    void everyIntegerSpellingOfOneMagnitudeLandsOnOneEntry(String spelling) {
+        List<String> derived = derivedEntries(compile(
+                "  u => { a: [float32; 255]  b: [float32; %s] }".formatted(spelling)));
+
+        // The count is the assertion, not the hash: §8.2 makes a derived name non-normative, so pinning the
+        // digits would pin an implementation detail and break on any change to the canonical rendering.
+        assertEquals(1, derived.size(), () -> spelling + " -> " + derived);
+        assertTrue(derived.getFirst().startsWith("array_float32_255_255_"), () -> spelling + " -> " + derived);
+    }
+}

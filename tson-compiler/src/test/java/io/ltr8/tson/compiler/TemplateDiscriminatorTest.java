@@ -71,16 +71,15 @@ class TemplateDiscriminatorTest {
 
     private static final String FAMILY = """
               dog_type => { breed: text }
-              pet      => <T, V> { type?: text = T  value: V }
-              dogpet   => pet<"dog", dog_type>
+              pet      => <V> { type: text =?  value: V }
+              dogpet   => pet<dog_type> & { type?: = "dog" }
             """;
 
     /**
-     * <b>The template names the selector, because the template's field is the base's.</b> The field is optional
-     * and FIXED to the parameter, its {@code value_param} (§5.7: the name's mark is the author's), and the base
-     * reads it required with the pin dropped -- so the statement belongs on the template, and without it a template
-     * family could never dispatch on its members, the fact having been dropped between the declaration and anything
-     * able to read it.
+     * <b>The template names the selector, because the template's field is the base's.</b> The author marks it
+     * {@code =?} and each member pins it where its application is declared (§5.10), so the statement belongs on the
+     * template, and without it a template family could never dispatch on its members, the fact having been dropped
+     * between the declaration and anything able to read it.
      */
     @Test
     void theHeldBodyNamesTheSelector() {
@@ -105,7 +104,7 @@ class TemplateDiscriminatorTest {
         String instantiation = target(compiled, "dogpet");
         RecordField selector = fieldOf(compiled, instantiation, "type");
 
-        assertEquals("dog", selector.value().orElseThrow().text(), "the argument's pin arrives");
+        assertEquals("dog", selector.value().orElseThrow().text(), "the member's pin arrives");
         assertTrue(bodyOf(compiled, instantiation).discriminators().isEmpty(),
                 () -> "and the statement stays with the base rather than being copied onto a member: "
                         + bodyOf(compiled, instantiation));

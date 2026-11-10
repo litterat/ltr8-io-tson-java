@@ -4,8 +4,8 @@ Design notes for every position in a schema that holds a name: which are referen
 judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The running shape
 is one reference atom with a constructor an ordinary record type (§4.1, §4.2); an application is a value of that
 atom, a reference carrying an argument list and written as data grammar ([TSON-DATA] §7.4; §4.2). A record template's
-field names a whole-type or whole-value parameter under its own label (`type_param`, `value_param`,
-`meta.record_template_field`), so only an argument of an application is a parameter recognised by its text.
+field names a whole-type parameter under its own label (`type_param`, `meta.record_template_field`), so only an
+argument of an application is a parameter recognised by its text.
 
 **Invariants**
 
@@ -58,8 +58,8 @@ field names a whole-type or whole-value parameter under its own label (`type_par
   read by `io.ltr8.tson.atom.ReferenceGrammar`. The canonical text (`TypeRef.text()`) has no whitespace and one space
   between arguments, no comma, `map<text integer>`. Identity is the parsed form, never the text, so `result< T >` is
   `result<T>`. A qualified head (`geo.box<T>`) names a member of a nested schema map as a bare head names a root
-  entry. The grammar classifies an argument, a reference first; the head's parameters judge whether it binds a type or a
-  value (§5.10), so `TypeArgument` compares by its text (`Ref(red)` equals an unquoted `Value(red)`).
+  entry. An argument is a reference, a name or an application, and a literal token is no argument (§5.10): the grammar
+  refuses `maxint<10>` and `box<"a">` where they are written.
 - **A reference may be a sibling reference** (§4.2, §5.2), `kind!`: a record field's type chosen per instance
   by the value of the field `kind` of the same record. It is data grammar as well, `sibling-ref = unquoted-token "!"`,
   the `!` adjacent to one identifier and followed by whitespace ([TSON-DATA] §7.4, §7.5); JSON holds the same text in
@@ -79,15 +79,14 @@ field names a whole-type or whole-value parameter under its own label (`type_par
 - A reference carries arguments only where an application is still open: a record template's `chain.parents` and
   field `type`s, held text (`!meta.alias { target: pair<uuid B> }` inside `meta.template.template`), and the `application`
   annotation. A closed application lifts to the entry it denotes and is named bare (§5.3). Its head is judged by
-  resolution and arity, and its arguments by the head's parameters: only an argument at a type parameter is judged
-  as a type's name (`TsonSchemaLinker.typeArguments`).
+  resolution and arity, and every argument is judged as a type's name.
 - **An application whose head is a constructor constructs** (§5.3's construction sugar, `ConstructionSugar`): past
   its alias hops, a closed record IS-A `meta.type` is applied by building `!C { f₁: a₁ … fₙ: aₙ }`, its **argument
   slots** `f₁ … fₙ` being its required fields (not optional, role `FREE`) typed by a reference naming types
   (`KindMembers.namesTypes` over the field type's `of`), in declaration order. `meta.array<uuid>` is the construction
   `[uuid]` spells and names the same synthetic; `meta.map<text int32>` is `{text => int32}`'s; a declared
   `uuid_list => meta.array<uuid>` *is* `!meta.array { element_type: uuid }`, tag `meta.array`, no `@meta.application`.
-  The arity is the slot count and every argument a reference (`ConstructionSugar.requireArity`, `payload`); every
+  The arity is the slot count (`ConstructionSugar.requireArity`) and every argument a reference by the grammar; every
   other verdict is the construction's own, so `meta.namespace<int32 text>` is refused at link as `key_type: int32` is,
   and `meta.enum_type<meta.identifier>` by the constructor's reader for the `members` it leaves unwritten. A refined
   constructor is applied the same way and its instance is its own kind: `nonempty_type<uuid>` is `!nonempty_type {

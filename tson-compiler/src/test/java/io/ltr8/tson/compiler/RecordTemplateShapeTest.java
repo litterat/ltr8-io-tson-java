@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-SCHEMA] §5.10's two kinds of template: a record template is a {@code record_template}, the family base its
- * declared applications are IS-A, whose fields label a parameter standing for a whole type or value, and every other
+ * declared applications are IS-A, whose fields label a parameter standing for a whole type, and every other
  * template is a held body. What is pinned here is where the template must not be mistaken for a closed record.
  */
 class RecordTemplateShapeTest {
@@ -78,13 +78,13 @@ class RecordTemplateShapeTest {
     }
 
     /**
-     * A parameter standing for a whole type or value is labelled; one standing as an argument stays in {@code type},
+     * A parameter standing for a whole type is labelled; one standing as an argument stays in {@code type},
      * recognised by §5.10's shadowing rule; a literal on a closed type stays a literal.
      */
     @Test
     void aWholeParameterIsLabelledAndAnArgumentIsNot() {
         TsonCompiledSchema compiled = compile("""
-                  pair => <T, N, M> { a: T  b: [T]  c?: int32 = N  d?: text ~ "x"  e?: T ~ M }
+                  pair => <T> { a: T  b: [T]  d?: text ~ "x" }
                 """);
 
         RecordTemplateBody pair = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("pair"));
@@ -95,11 +95,66 @@ class RecordTemplateShapeTest {
         assertEquals(Optional.empty(), b.typeParam());
         assertTrue(OpenEntry.parameterIn(RecordField.typeRef(b.type().orElseThrow()), pair.parameterNames()).isPresent(),
                 "the parameter rides an argument of the type: " + b.type());
-        assertEquals(Optional.of("N"), pair.fields().get("c").valueParam());
         assertEquals(Optional.of("x"), pair.fields().get("d").value().map(Token::text));
-        RecordTemplateField e = pair.fields().get("e");
-        assertEquals(Optional.of("T"), e.typeParam());
-        assertEquals(Optional.of("M"), e.valueParam());
+    }
+
+    /**
+     * A field's value is never a parameter, whatever the field's type (§5.10): a default or a pin naming one is
+     * refused at the declaration, naming the slot -- in a fresh record body, in the explicit spelling, and in a
+     * refinement template pinning a slot typed {@code meta.type_ref}.
+     */
+    @Test
+    void aParameterAtAFieldsValueIsRefused() {
+        String fresh = assertThrows(SchemaValidationException.class,
+                () -> compile("  retry => <T, N> { t: T  attempts?: int32 ~ N }")).getMessage();
+        String explicit = assertThrows(SchemaValidationException.class, () -> compile(
+                "  retry => <T, N> !meta.record { fields: { t => T  attempts => { type: int32  optional: true  "
+                        + "value: N } } }")).getMessage();
+        String pinned = assertThrows(SchemaValidationException.class,
+                () -> compile("  my_set => <T> meta.array ^ { element_type?: = T }")).getMessage();
+        String composed = assertThrows(SchemaValidationException.class, () -> compile("""
+                  base => { status: int32  body: text }
+                  bad  => <T> base & { status?: = T  extra: T }
+                """)).getMessage();
+
+        assertTrue(fresh.contains("parameter 'N' stands at meta.record_field.value"), fresh);
+        assertTrue(explicit.contains("parameter 'N' stands at meta.record_field.value"), explicit);
+        assertTrue(pinned.contains("parameter 'T' stands at the value of field 'element_type'"), pinned);
+        assertTrue(composed.contains("parameter 'T' stands at the value of field 'status'"), composed);
+    }
+
+    /**
+     * A parameter is a type, so one standing at a facet, a size bound or an enum member is refused at the declaration,
+     * naming the slot (§5.10).
+     */
+    @Test
+    void aParameterAtAScalarSlotIsRefused() {
+        String facet = assertThrows(SchemaValidationException.class,
+                () -> compile("  vec => <N> !meta.array { element_type: text  min_items: N }")).getMessage();
+        String bound = assertThrows(SchemaValidationException.class,
+                () -> compile("  grid => <T, N> { cells: [T; N] }")).getMessage();
+        String member = assertThrows(SchemaValidationException.class,
+                () -> compile("  names => <M> !enum [a b M]")).getMessage();
+
+        assertTrue(facet.contains("parameter 'N' stands at meta.array.min_items"), facet);
+        assertTrue(bound.contains("parameter 'N' stands at a size bound (meta.array.min_items)"), bound);
+        assertTrue(member.contains("parameter 'M' stands at enum.members"), member);
+    }
+
+    /** An argument is a type, written as a reference: a literal token is no argument (§5.10). */
+    @Test
+    void aLiteralTokenIsNoArgument() {
+        String number = assertThrows(RuntimeException.class, () -> compile("""
+                  box => <T> { v: T }
+                  ten => box<10>
+                """)).getMessage();
+        String quoted = assertThrows(RuntimeException.class, () -> compile("""
+                  box => <T> { v: T }
+                  dog => box<"dog">
+                """)).getMessage();
+
+        assertTrue(number.contains("'10' is no type argument"), number);
+        assertTrue(quoted.contains("'dog' is no type argument"), quoted);
     }
 
     /**
@@ -117,60 +172,34 @@ class RecordTemplateShapeTest {
 
         RecordTemplateBody fam = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("fam"));
         assertEquals(Optional.of("T"), fam.fields().get("kind").value().map(Token::text));
-        assertEquals(Optional.empty(), fam.fields().get("kind").valueParam());
         assertEquals(Optional.of("T"), fam.fields().get("v").typeParam());
     }
 
     /**
-     * An application still open where a value parameter stands -- an operand absorbing {@code pin<box<T>>} -- is
-     * refused at the declaration that wrote it (§5.10): a value parameter's argument is a token.
+     * A value that differs per application is written where the application is declared (§5.10): the member
+     * composes the application and pins the field, and a value other than the pin is refused at the read.
      */
     @Test
-    void anApplicationArgumentForAValueParameterIsRefused() {
-        String refused = assertThrows(SchemaValidationException.class, () -> compile("""
-                  box  => <T> { v: T }
-                  pin  => <N> { n?: text = N }
-                  bad  => <T> pin<box<T>> & { w: T }
-                """)).getMessage();
+    void aMemberPinsAFieldWhereTheApplicationIsDeclared() {
+        TsonCompiledSchema compiled = compile("""
+                  response => <T> { status: int32  body: T }
+                  created  => response<text> & { status?: = 201 }
+                """);
 
-        assertTrue(refused.contains("binds the value parameter 'N' to 'box<T>', an application"), refused);
-    }
-
-    /**
-     * A literal argument is refused where its parameter's type is still open, wherever the application stands --
-     * an operand or a field's type -- naming the argument and the open type (§5.10). Applied with a closed type the
-     * same literal is the member's pin, and an out-of-range one is refused against the parameter's type.
-     */
-    @Test
-    void aLiteralArgumentWhoseTypeIsStillOpenIsRefusedAtTheApplication() {
-        String pin = "  pin2 => <T, P> { a?: T = P }\n";
-        String operand = assertThrows(SchemaValidationException.class,
-                () -> compile(pin + "  w => <X> pin2<X, 3> & { z: int32 }")).getMessage();
-        String field = assertThrows(SchemaValidationException.class,
-                () -> compile(pin + "  w => <X> { f: pin2<X 3>  z: int32 }")).getMessage();
-        for (String refused : List.of(operand, field)) {
-            assertTrue(refused.contains("binds 'P' to the literal '3', whose type is 'X', still open"), refused);
-        }
-
-        TsonCompiledSchema closed = compile(pin + "  ok => pin2<int8, 3>");
-        assertEquals(List.of(), read(closed, "ok", "{ a: 3 }"));
+        assertEquals(List.of(), read(compiled, "created", "{ body: \"ok\" }"));
         assertEquals(List.of(Diagnostic.Code.FIELD_FIXED),
-                read(closed, "ok", "{ a: 4 }").stream().map(Diagnostic::code).toList());
-        assertThrows(SchemaValidationException.class, () -> compile(pin + "  big => pin2<int8, 300>"));
+                read(compiled, "created", "{ status: 200  body: \"ok\" }").stream().map(Diagnostic::code).toList());
     }
 
     /**
      * An operand's arguments land where the operand's labels stand: reordered, the absorbing template's own parameters
-     * land as its labels in the operand's order; a closed argument lands as a type or a literal; and a literal for a
-     * value parameter whose field type is closed is that field's value (§5.10).
+     * land as its labels in the operand's order, and a closed argument lands as a type (§5.10).
      */
     @Test
     void anOperandsArgumentsLandAtItsLabels() {
         TsonCompiledSchema compiled = compile("""
                   pair  => <A, B> { first: A  second: B }
                   swap  => <A, B> pair<B, A> & { tag: text }
-                  pv    => <A, N> { first: A  n?: int32 = N }
-                  mixed => <T> pv<T, 7> & { z: text }
                   wrap  => <T> pair<T, text> & { w: T }
                   swapped => swap<int32, text>
                 """);
@@ -178,10 +207,6 @@ class RecordTemplateShapeTest {
         RecordTemplateBody swap = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("swap"));
         assertEquals(Optional.of("B"), swap.fields().get("first").typeParam());
         assertEquals(Optional.of("A"), swap.fields().get("second").typeParam());
-        RecordTemplateBody mixed = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("mixed"));
-        assertEquals(Optional.of("T"), mixed.fields().get("first").typeParam());
-        assertEquals(Optional.of("7"), mixed.fields().get("n").value().map(Token::text));
-        assertEquals(Optional.empty(), mixed.fields().get("n").valueParam());
         RecordTemplateBody wrap = assertInstanceOf(RecordTemplateBody.class, compiled.schema().entries().get("wrap"));
         assertEquals(Optional.of(TypeRef.of("text")), wrap.fields().get("second").type());
 
@@ -205,45 +230,22 @@ class RecordTemplateShapeTest {
     }
 
     /**
-     * A record template's parameter spelled like a token an absorbed field's type writes among an application's
-     * arguments is refused at the template (§5.10): {@code base}'s {@code f: pick<T>} applies {@code pick} to the
-     * member {@code T}, and inside {@code t2} a parameter spelled {@code T} would be read first.
+     * An open operand's own parameters are replaced by what the absorbing template writes, and every other name its
+     * fields write stays: {@code pair}'s {@code V} becomes {@code t4}'s {@code X}, and {@code text} stays {@code
+     * text} (§5.10).
      */
     @Test
-    void aParameterSpelledLikeAnAbsorbedArgumentIsRefused() {
-        String refused = assertThrows(SchemaValidationException.class, () -> compile("""
-                  mode => !enum [T U]
-                  pick => <M> { m?: mode ~ M }
-                  base => { f: pick<T> }
-                  t2   => <T> base & { x: T }
-                """)).getMessage();
+    void anOpenOperandsParametersAreReplacedByTheAbsorbersArguments() {
+        TsonCompiledSchema compiled = compile("""
+                  two  => <A, B> { a: A  b: B }
+                  pair => <V> { z: two<V, text> }
+                  t4   => <X> pair<X> & { x: X }
+                  u4   => t4<int32>
+                """);
 
-        assertTrue(refused.contains("'t2': parameter 'T' is spelled like 'T' in the field 'f: pick<T>' it absorbs "
-                + "from 'base'"), refused);
-        assertTrue(refused.contains("Rename the parameter"), refused);
-    }
-
-    /**
-     * The same of an open operand's field, its own parameters aside: {@code pair}'s {@code V} is replaced by what
-     * {@code t3} writes, and its {@code T} is the member. {@code pair} itself is valid, and so is an absorber whose
-     * parameter is spelled otherwise (§5.10).
-     */
-    @Test
-    void aParameterSpelledLikeAnOperandsArgumentIsRefused() {
-        String operands = """
-                  mode => !enum [T U]
-                  two  => <A, M> { a: A  m?: mode ~ M }
-                  pair => <V> { z: two<V, T> }
-                """;
-        String refused = assertThrows(SchemaValidationException.class,
-                () -> compile(operands + "  t3 => <T> pair<T> & { x: T }")).getMessage();
-
-        assertTrue(refused.contains("'t3': parameter 'T' is spelled like 'T' in the field 'z: two<V, T>' it absorbs "
-                + "from 'pair'"), refused);
-        TsonCompiledSchema compiled = compile(operands + "  t4 => <X> pair<X> & { x: X }\n  u4 => t4<text>");
         RecordBody u4 = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("u4"));
-        assertEquals(TypeRef.of("text"), u4.fields().get("x").type());
-        assertEquals(List.of(), read(compiled, "u4", "{ z: { a: \"a\"  m: T }  x: \"b\" }"));
+        assertEquals(TypeRef.of("int32"), u4.fields().get("x").type());
+        assertEquals(List.of(), read(compiled, "u4", "{ z: { a: 1  b: \"t\" }  x: 2 }"));
     }
 
     /**
@@ -311,14 +313,7 @@ class RecordTemplateShapeTest {
                   boxy => <T> { w?: box<T> = x }
                 """)).getMessage();
 
-        String valueArgument = assertThrows(SchemaValidationException.class, () -> compile("""
-                  bounded => <M> !numeric.integer_type { max: M }
-                  capped  => <M> { v?: bounded<M> ~ 5 }
-                """)).getMessage();
-
         assertTrue(whole.contains("typed by the parameter 'T' and carries the literal value '5'"), whole);
-        assertTrue(valueArgument.contains("typed by the parameter 'M' and carries the literal value '5'"),
-                valueArgument);
         assertTrue(argument.contains("typed by the parameter 'T' and carries the literal value 'x'"), argument);
     }
 
@@ -338,7 +333,7 @@ class RecordTemplateShapeTest {
         String refused = assertThrows(SchemaValidationException.class, () -> compile("""
                   sneaky => !meta.record_template {
                     fields: { v => !meta.record_template_field { type_param: T } }
-                    parameters: [{ name: T  type: meta.type_ref }]
+                    parameters: [{ name: T }]
                   }
                 """)).getMessage();
 

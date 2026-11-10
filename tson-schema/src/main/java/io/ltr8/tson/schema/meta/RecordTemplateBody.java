@@ -28,9 +28,9 @@ import java.util.function.UnaryOperator;
  * optional list of parameters -- code that builds a record reader takes a {@link RecordBody} and cannot be handed a
  * template.
  *
- * <p><b>A parameter stands in three places</b>: a field's {@code type_param} or {@code value_param}, or an argument of
- * an application in a field's {@code type} or in a parent ({@code <T> result<T> & { ... }}). The rest of the
- * template is what every application shares. A literal {@code value} needs a closed type, and every field
+ * <p><b>A parameter stands in two places</b>: a field's {@code type_param}, or an argument of an application in a
+ * field's {@code type} or in a parent ({@code <T> result<T> & { ... }}). The rest of the template is what every
+ * application shares. A field's value is never a parameter, a literal {@code value} needs a closed type, and every field
  * {@link #discriminators} names is typed by no parameter, so the base reads each one without an application; both
  * are the author's rules, refused where the declaration resolves. What this value refuses itself is a label naming
  * no parameter it declares.
@@ -66,10 +66,6 @@ public record RecordTemplateBody(TypeChain chain, AnnotatedMap<String, RecordTem
         fields.forEach((name, field) -> {
             field.typeParam().filter(p -> !names.contains(p)).ifPresent(p -> {
                 throw new IllegalArgumentException("field '" + name + "' names '" + p + "' as its type parameter, "
-                        + "and the template declares " + names);
-            });
-            field.valueParam().filter(p -> !names.contains(p)).ifPresent(p -> {
-                throw new IllegalArgumentException("field '" + name + "' names '" + p + "' as its value parameter, "
                         + "and the template declares " + names);
             });
         });
@@ -134,7 +130,7 @@ public record RecordTemplateBody(TypeChain chain, AnnotatedMap<String, RecordTem
         return new RecordTemplateBody(chain, fields, groups, extension, discriminators, nameType, parameters);
     }
 
-    /** This template with {@code parameters} replaced -- how a parameter's derived type is stamped. */
+    /** This template with {@code parameters} replaced -- how a parameter's inherited bound is stamped. */
     public RecordTemplateBody withParameters(List<TemplateParam> parameters) {
         return new RecordTemplateBody(chain, fields, groups, extension, discriminators, nameType, parameters);
     }

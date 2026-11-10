@@ -53,7 +53,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
-import java.util.function.Function;
 
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
@@ -316,14 +315,6 @@ public final class SchemaResolver {
         // Where a construction head and an annotation type resolve: the whole namespace, made ready in wait order --
         // except in the kernel, whose own resolution reads every head through its pre-loaded stand-in (§3.4).
         DefinitionGetter heads = isKernel ? vocabulary::definition : waitOrder;
-        Function<String, Optional<String>> localConstructors = name -> {
-            Optional<String> recorded = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).constructor();
-            if (recorded.isPresent()) {
-                return recorded;
-            }
-            Top local = namespace.get(name);
-            return local != null ? Optional.of(TsonSchema.constructorOf(local)) : vocabulary.constructorOf(name);
-        };
         // Each body a read produced, with the references it read by name ([TSON-SCHEMA] §5.12) and the dependent
         // fields' values it held as written (§5.2), keyed by the body itself: the read hooks know the constructor
         // and the value, not the entry, and the body is the one thing that reaches the entry unchanged.
@@ -387,8 +378,7 @@ public final class SchemaResolver {
         };
         TemplateMaterialiser materialiser = new TemplateMaterialiser(waitOrder, namespace::put, reads,
                 generated,
-                heads::definition, waitOrder::current, facts, applications,
-                localConstructors, vocabulary::constructorOf, kernel);
+                heads::definition, waitOrder::current, facts, applications, kernel);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
@@ -404,12 +394,11 @@ public final class SchemaResolver {
                         return materialiser.closeApplication(application);
                     }
 
-                    /** An operand absorbed by value gets the same argument-kind inference a closed one does. */
+                    /** An operand absorbed by value gets the same bound check a closed one does. */
                     @Override
-                    public List<io.ltr8.tson.schema.meta.TypeArgument> byParameterKind(String head,
-                            Top template, List<String> parameters,
-                            List<io.ltr8.tson.schema.meta.TypeArgument> arguments) {
-                        return materialiser.byParameterKind(head, template, parameters, arguments);
+                    public void checkArguments(String head, Top template,
+                            List<io.ltr8.tson.schema.meta.TypeRef> arguments) {
+                        materialiser.checkArguments(head, template, arguments);
                     }
 
                     /**
@@ -479,12 +468,11 @@ public final class SchemaResolver {
         // different halves: `materialise` walks `resolvedLocals`, while the application's head is looked up
         // through the getter over `namespace`.
         condemn(irregular, resolvedLocals, namespace);
-        // §5.10's parameter kinds, inferred by use, before anything closes: an argument is "read by the
-        // position it lands in", and once a parameter's kind is known that position is known at the
-        // application rather than after substitution. Here because it needs every declaration resolved (a
-        // slot's declared type comes from the constructor's own vocabulary) and nothing yet closed.
-        // The declared templates' parameters are stamped here too, not only their kinds, so an application can
-        // check its arguments against them as it closes (§5.10).
+        // §5.10's parameters, before anything closes: where each stands is checked (a parameter is a type, so it
+        // stands only where a type is named), and each is stamped with its written or inherited bound, so an
+        // application can check its arguments against them as it closes. Here because it needs every
+        // declaration resolved (a slot's declared type comes from the constructor's own vocabulary, and a bound
+        // is inherited from the template a parameter is passed to) and nothing yet closed.
         Set<String> unkinded = new LinkedHashSet<>();
         Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written =
                 writtenParameterTypes(declarations, resolver, problems);
@@ -498,7 +486,7 @@ public final class SchemaResolver {
                     problems.report(declarations.get(name), "'" + name + "': " + error.getMessage(), error);
                 });
         stampParameters(declaredParameters, List.of(resolvedLocals, namespace));
-        materialiser.parameterKinds(ParameterTypes.kinds(declaredParameters));
+        materialiser.parametersStamped();
         // An application closed during the driving loop was checked against parameters carrying no bound yet,
         // so its check runs again now that they are stamped (§5.10) -- before anything else closes.
         // A declaration that already failed has its verdict, so a replayed check is not a second one.
@@ -511,7 +499,7 @@ public final class SchemaResolver {
             }
         });
         // Condemned on the same terms as an irregular template: the verdict is in, and closing an application
-        // of a template whose parameters cannot be classified only reports the consequence -- the substituted
+        // of a template whose parameters stand where none may only reports the consequence -- the substituted
         // body failing its constructor's vocabulary -- against whichever entry happened to apply it.
         condemn(unkinded, resolvedLocals, namespace);
 
@@ -1124,7 +1112,7 @@ public final class SchemaResolver {
         // An open placeholder is an empty record template, so it closes by the one process a template does.
         return parameters.isEmpty() ? RecordBody.of(RecordBody.fieldMap())
                 : new RecordTemplateBody(TypeChain.EMPTY, new AnnotatedMap<>(), List.of(), RecordExtensionType.OPEN,
-                        List.of(), Optional.empty(), parameters.stream().map(TemplateParam::typeParameter).toList());
+                        List.of(), Optional.empty(), parameters.stream().map(TemplateParam::new).toList());
     }
 
     /**

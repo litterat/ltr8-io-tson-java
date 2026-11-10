@@ -253,22 +253,16 @@ public final class SchemalessTreeReader {
 
     /**
      * A reference with arguments, kept as the structured value it is ([TSON-DATA] §4): its segments, and each
-     * argument read by the schemaless rule a token is read by, a nested application a reference of its own. Nothing
-     * resolves.
+     * argument a name read by the schemaless rule a token is read by, a nested application a reference of its own.
+     * Nothing resolves.
      */
     private static TsonApplicationReference reference(io.ltr8.tson.schema.meta.TypeRef reference, Optional<String> typeRef,
                                            List<TsonAnnotation> annotations) {
         List<TsonValue> arguments = new ArrayList<>(reference.arguments().size());
-        for (io.ltr8.tson.schema.meta.TypeArgument argument : reference.arguments()) {
-            arguments.add(switch (argument) {
-                case io.ltr8.tson.schema.meta.TypeArgument.Ref nested when !nested.ref().arguments().isEmpty() ->
-                        reference(nested.ref(), Optional.empty(), List.of());
-                case io.ltr8.tson.schema.meta.TypeArgument.Ref name ->
-                        TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(name.ref().name(), TokenForm.UNQUOTED)));
-                case io.ltr8.tson.schema.meta.TypeArgument.Value value ->
-                        TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(value.value().text(),
-                                TokenForm.valueOf(value.value().form().name()))));
-            });
+        for (io.ltr8.tson.schema.meta.TypeRef argument : reference.arguments()) {
+            arguments.add(argument.arguments().isEmpty()
+                    ? TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(argument.name(), TokenForm.UNQUOTED)))
+                    : reference(argument, Optional.empty(), List.of()));
         }
         return new TsonApplicationReference(reference.segments(), arguments, typeRef, annotations);
     }

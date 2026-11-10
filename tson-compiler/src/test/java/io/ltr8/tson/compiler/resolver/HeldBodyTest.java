@@ -109,6 +109,6 @@ class HeldBodyTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new TemplateBody(List.of(), "!set_type { element_type: T }"));
         assertThrows(NullPointerException.class,
-                () -> new TemplateBody(List.of(TemplateParam.typeParameter("T")), null));
+                () -> new TemplateBody(List.of(new TemplateParam("T")), null));
     }
 }

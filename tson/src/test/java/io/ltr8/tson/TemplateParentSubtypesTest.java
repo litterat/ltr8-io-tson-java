@@ -58,9 +58,9 @@ class TemplateParentSubtypesTest {
         TsonLinkedSchema schema = linked("s1", """
                   dog_type => { breed: text }
                   cat_type => { indoor: boolean }
-                  pet      => <T, V> { type?: text = T  value: V }
-                  dogpet   => pet<"dog", dog_type>
-                  catpet   => pet<"cat", cat_type>
+                  pet      => <V> { type: text =?  value: V }
+                  dogpet   => pet<dog_type> & { type?: = "dog" }
+                  catpet   => pet<cat_type> & { type?: = "cat" }
                 """);
 
         List<String> members = subtypesOf(schema, "pet");
@@ -73,8 +73,8 @@ class TemplateParentSubtypesTest {
     void aSealedTemplateIndexesItsMembersToo() {
         TsonLinkedSchema schema = linked("s2", """
                   dog_type => { breed: text }
-                  pet      => <T, V> { type?: text = T  value: V }
-                  dogpet   => pet<"dog", dog_type>
+                  pet      => <V> { type: text =?  value: V }
+                  dogpet   => pet<dog_type> & { type?: = "dog" }
                 """);
 
         assertTrue(subtypesOf(schema, "pet").contains(target(schema, "dogpet")),

@@ -19,7 +19,6 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
-import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
@@ -621,7 +620,7 @@ class SchemaDesugarerTest {
 
         RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
                 .typeDef()).body();
-        assertEquals(new ApplicationRef("box", List.of(new TypeArg.Ref(new NameRef("text")))),
+        assertEquals(new ApplicationRef("box", List.of(new NameRef("text"))),
                 ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
                 "the application is untouched");
     }
@@ -646,7 +645,7 @@ class SchemaDesugarerTest {
 
         RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
                 .typeDef()).body();
-        assertEquals(new ApplicationRef("box", List.of(new TypeArg.Ref(new NameRef("text")))),
+        assertEquals(new ApplicationRef("box", List.of(new NameRef("text"))),
                 ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
                 "left for materialisation, arguments intact");
     }
@@ -789,7 +788,7 @@ class SchemaDesugarerTest {
     /** An application in a slot: the data grammar's reference, {@code head<arg>}. */
     private static CoreValue applicationValue(String head, String argument) {
         return new ReferenceValue(io.ltr8.tson.schema.meta.TypeRef.of(head,
-                List.of(new io.ltr8.tson.schema.meta.TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(argument)))));
+                List.of(io.ltr8.tson.schema.meta.TypeRef.of(argument))));
     }
 
     private static DataValue plain(CoreValue value) {

@@ -18,11 +18,9 @@ import java.util.Objects;
  * {@code <B> pair<uuid, B>} holds the {@code !meta.alias { target: pair<uuid, B> }} §8.1 says it denotes.
  *
  * <p><b>Why the body is text, and not a value of the constructor's own vocabulary.</b> A parameter stands
- * wherever a token stands: {@code element_type: T} in a type slot, {@code min_items: N} in a value slot,
- * {@code variants: [T error]} inside a collection. So a body carrying one is not typed by any constructor's
- * record shape until it closes, and writing it as though it were leaves the two halves disagreeing -- a
- * value parameter refuses to read at all ({@code N} is not a {@code numeric.count}), and a type
- * parameter reads as a reference to a type nobody declared. Text is what "held" means, and it is what §8.1's
+ * where a type is named: {@code element_type: T} in a type slot, {@code variants: [T error]} inside a collection.
+ * So a body carrying one is not typed by any constructor's record shape until it closes, and writing it as though it
+ * were would read the parameter as a reference to a type nobody declared. Text is what "held" means, and it is what §8.1's
  * ingest rule already asks for: an open entry's body is re-resolved as source.
  *
  * <p><b>The text is authoritative; the parsed form is what compares.</b> Identity is derived from the parsed

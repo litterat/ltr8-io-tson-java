@@ -103,7 +103,7 @@ class TopKindHierarchyTest {
     }
 
     private static TypeRef box(TypeRef argument) {
-        return TypeRef.of("box", List.of(new TypeArgument.Ref(argument)));
+        return TypeRef.of("box", List.of(argument));
     }
 
     @Test

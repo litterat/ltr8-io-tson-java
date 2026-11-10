@@ -2,8 +2,6 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.ast.*;
 import io.ltr8.tson.compiler.ast.VoidValue;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
@@ -39,12 +37,8 @@ class DerivedNameTest {
         return WireForm.nameField(name, value);
     }
 
-    private static TypeArgument type(String name) {
-        return new TypeArgument.Ref(TypeRef.of(name));
-    }
-
-    private static TypeArgument value(String text) {
-        return new TypeArgument.Value(new Token(text, Token.Form.UNQUOTED));
+    private static TypeRef type(String name) {
+        return TypeRef.of(name);
     }
 
     @Test
@@ -61,16 +55,6 @@ class DerivedNameTest {
         assertEquals("pair_uuid_text_4b15adf4",
                 DerivedName.ofApplication("pair", List.of(type("uuid"), type("text"))));
         assertEquals("grid_int32_125f0dd6", DerivedName.ofApplication("grid", List.of(type("int32"))));
-    }
-
-    /** A value argument goes through {@code NumericIdentity}, which is the leaf the two channels share. */
-    @Test
-    void aValueArgumentIsNamedByItsCanonicalMagnitude() {
-        assertEquals("vec_float32_3_cc179805",
-                DerivedName.ofApplication("vec", List.of(type("float32"), value("3"))));
-        assertEquals(DerivedName.ofApplication("vec", List.of(type("float32"), value("255"))),
-                DerivedName.ofApplication("vec", List.of(type("float32"), value("0xFF"))),
-                "§4.3's equivalence applies where identity is derived: 255 and 0xFF are one application");
     }
 
     /**
