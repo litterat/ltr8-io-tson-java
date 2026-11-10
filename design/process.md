@@ -27,17 +27,19 @@ and net.tn, each with its instances at its root and its constructors under its m
 kernel's `numeric` and `net`); core.tn, importing the three and
 declaring the author annotations; and policy.tn) plus, in `spec/fixtures/`, their non-normative `*-resolved.tn`
 resolver-output fixtures (`meta-resolved.tn`, `numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn`,
-`core-resolved.tn`). Treat `spec/` as a cache, not a source of truth — with **two** standing exceptions. The six `.tn`
-schemas are **packaged from here at build time**, so they are the live copies rather than a snapshot. And
-**`spec/tson-part3-json.md` is editable in place**: see "Part 3 is drafted here" below.
+`core-resolved.tn`). On `main`, treat Parts 1 and 2 in `spec/` as a cache of the published revision, not a source of
+truth — with **two** standing exceptions. The six `.tn` schemas are **packaged from here at build time**, so they are
+the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in place**: see "Part 3 is drafted
+here" below.
 
 On `main` the bundled schemas carry **Revision 39 identities** (`https://tson.io/2026/39/m/*.tn`); on
-`r2026-40-proposal` they carry Revision 40's (`/2026/40/m/`). `spec/` holds
-**Revision 39** of Parts 1 and 2, a cache, not edited here except for §13.2's artifact rows,
-so the table names the bytes beside it and stays checkable; its Part 1 and Guide rows stay at the revision
-those documents actually are. **§13.2 is one more pin to move** whenever the artifacts change.
-`scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins, and the spec
-document is a cache — so §13.2 is re-stamped by hand and is the one that silently drifts.
+`r2026-40-proposal` they carry Revision 40's (`/2026/40/m/`). On `r2026-40-proposal` all three parts are
+**Revision 40's proposed text, edited in place**, with `spec/tson-rev40-changelog.md` recording the change in the
+form of the revision change logs before it: `git diff main -- spec/` is the proposal, section numbers stay stable
+because the code cites them, and every example is one the implementation accepts. §13.2's Guide row stays at the
+revision that document actually is. **§13.2 is one more pin to move** whenever the artifacts change.
+`scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins — so §13.2 is
+re-stamped by hand and is the one that silently drifts.
 `tson hash spec/m/<name>.tn` is the check.
 
 The bundled schemas are the kernel's own statement of its shape. What the resolver derives rather than reads

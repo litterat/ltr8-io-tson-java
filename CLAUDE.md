@@ -47,9 +47,10 @@ A from-scratch Java implementation of TSON (Typed Schema Object Notation), built
 - Part 3 — the JSON encoding, **drafted in this repo**: `spec/tson-part3-json.md`
 
 The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
-and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 39, not
-edited here) with **two exceptions that are live**: `spec/m/{meta,numeric,temporal,net,core,policy}.tn` are packaged
-from here at build time, and `spec/tson-part3-json.md` is edited in place.
+and check the revision number rather than trusting a cached copy. On this branch `spec/` holds **Revision 40's proposed
+text, edited in place**: Parts 1, 2 and 3, with `spec/tson-rev40-changelog.md` recording the change, so
+`git diff main -- spec/` is the proposal. `spec/m/{meta,numeric,temporal,net,core,policy}.tn` are packaged from here at
+build time.
 
 **Editing a bundled schema means re-stamping.** The library verifies the packaged bytes against
 `TsonBundledSchemas`' digests on every load, so one stale constant fails `Tson.standard()` and most of the suite.
