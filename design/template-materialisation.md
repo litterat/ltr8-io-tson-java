@@ -32,10 +32,11 @@ derived — and the static check that runs before any of it.
   record itself, recorded with its application. A nested application equal to the one a declaration is closing names
   that declaration (`closingInto`), so a recursive open record closes into its declaration. Any other application of
   an open record at a type slot — of a closed record, or left in another record's body by closing it — would close in
-  place, and is reported as not yet supported (`UnsupportedOperationException`, `NOT_IMPLEMENTED`), as is one at a
-  refinement source. Two are refused first, being errors whatever is supported (`instantiate`): one whose record in
-  place would be IS-A a declared type, through its template's written parents or an applied parent a declaration
-  names (`refuseMembership`, §5.2), and one of a recursive open record (`recursive`, §5.10.1). Held in an open record,
+  place, and is reported as not yet supported (`UnsupportedOperationException`, `NOT_IMPLEMENTED`). One at a
+  refinement source is absorbed, as a composition operand is (below). Two are refused first, being errors whatever
+  is supported (`instantiate`): one whose record in place would be IS-A a declared type, through its template's
+  written parents or an applied parent a declaration names (`refuseMembership`, §5.2), and one of a recursive open
+  record (`recursive`, §5.10.1). Held in an open record,
   either is reported at the declaration whose application closed it.
 - An argument of an open record's application is a name or a parameter (§5.3): a construction or an application
   there is refused (`closeArgument`, `argumentNotAName`), to be declared under a name and passed by it. Inside an open
@@ -153,13 +154,13 @@ resolves, before the batch pass runs. They are handled differently.
     typed `pet` dispatches to it), and the application kept in the chain is folded like any other, to the entry
     `pet_of<dog_type>` denotes where one exists. No edge is stated to the template: a template is no type (§5.10).
     A removal empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
-- **A closed refinement source is closed on demand** (`DefinitionResolver.closedApplication`, through the
-  `ApplicationCloser` hook): `^` re-emits and tightens the source's whole field set, which lives on the entry the
-  application denotes. The closing goes through `close`, so it reuses a declaration that owns the application or
-  mints the expansion. The hook is wired to the batch pass's own instance, so an on-demand closing and a later
-  closing of the same application land on one entry, and each entry is **published into the namespace as it is
-  built**: the source's fields are read through the namespace the very next step. A source applied to the
-  declaration's own parameters is absorbed by `openOperand` instead, as composition is.
+- **A refinement source is absorbed like an operand** (`DefinitionResolver.resolveRefinement`, through
+  `openOperand`): an application of an open record at `^`, closed (`x => box<text> ^ { … }`) or over the declaration's
+  own parameters, contributes the substituted field set `^` re-emits and tightens, and its template's ancestors, and
+  mints nothing. The application stays the written parent (`refineOnto`): an open record's, substituted when it closes,
+  and a closed declaration's, which the fold turns into the edge to the entry declared for it where one is, so `x` is
+  IS-A `box`'s written parents and `text_box` where `text_box => box<text>` is declared, and never `box`. Only a
+  refinement of a name records `refines`. `InlineTypeRulesTest` pins it.
 - **The cycle guard still applies.** An operand's or source's head resolves through the resolution's `WaitOrder`,
   where an entry waiting on itself is refused, so a cycle reached through an application
   (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on

@@ -77,6 +77,10 @@ does ([TSON-SCHEMA] §3.4.1).
   `TypeInline` beside its body (`TypeInline.constructor`, `@Unbound`: the tag on `of`, no field of the wrapper), the
   entry the construction applies past its alias hops, so `nonempty_type<uuid>` and `[uuid; 1..]` are two types though
   their bodies are equal, and `set<text>` is `meta.set_type`'s.
+- **A name and a construction are never one type** (§8.2), even a name for the very construction written: a
+  restated field's narrowing (`TsonSchemaLinker.narrows`) holds two constructions to equality and two names to IS-A,
+  and refuses a name restated as its construction or the reverse, naming the inherited spelling to write; variant
+  distinctness compares the same way. Nothing follows a name to its construction to compare it.
 - **The variadic pair, `choice` and `tuple`, differ in what one position *is*.** A variant is a type slot
   (`variants: [meta.type_expr]`); an element is a `meta.tuple_element` record carrying a type **and** its own
   `voidable`, so each tuple position needs a record built for it. `voidable` is written only for a marked position.

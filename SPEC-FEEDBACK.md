@@ -360,10 +360,17 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   merged, no name is derived from content, and no code that derived one remains. A user schema with inline forms reads
   data in tree and bind mode and through the JSON stack; the reader recovers an untagged value at a disjoint choice
   whose variant is a reference or a `{ of: … }` record.
-- *Identity.* A type written in place compares by its construction; a restated field's narrowing and a choice's
-  variant distinctness compare a name with an inline form by following the name to its declaration's construction.
+- *Identity.* A type written in place compares by its constructor and fields, and a name and a construction are
+  never one type: a restated field's narrowing refuses `text_list` restated as `[text]` and the reverse, and a choice's
+  variant distinctness counts `text_list` and `[text]` as two variants. Nothing follows a name to its construction.
+- *Values and choices.* A value modifier on an inline reference (`handler?: meta.ref<method> ~ orders.place_order`)
+  is admitted and judged at link as a declared reference's is; one on any other type written in place is refused at
+  the declaration. A dependent value whose sibling holds a type written in place is read against it in bind mode and
+  judged at link in a schema document. A choice that is not disjoint with a variant written in place
+  (`( [text] | [int32] )`) is refused, a tag naming a variant by its name.
 - *Applications.* A declared application is its substituted record under its name, `@meta.application` on its key.
-  An application at a composition operand is absorbed by value, an applied parent's edge naming the declared entry.
+  An application at a composition operand or a refinement source is absorbed by value, an applied parent's edge
+  naming the declared entry where there is one.
   Inside an open record an application over a parameter is held as written whatever its head, and a constructor's
   closes in place when the record is applied, one nested in another constructor's arguments included
   (`meta.map<text meta.array<T>>`). A recursive application closing a declaration ties to it:
@@ -385,8 +392,9 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
 and a nested application left at a slot by closing (`cursor: box<T>` once `page => <T> { cursor: box<T> }` is
 applied), do not yet close in place: each is reported as not implemented, `Diagnostic.Code.NOT_IMPLEMENTED`, after
 the two refusals above are judged. A record with no name needs readers, writers and bind targets built from its body
-in both encodings. Until then the abstract template applied in place (`s: shape<circle>`) is not reached, and an
-application at a refinement source that no declaration names is reported as not implemented rather than absorbed.
+in both encodings. Until then the abstract template applied in place (`s: shape<circle>`) is not reached. A tree
+read reports a dependent value whose sibling holds a type written in place as not implemented, holding the sibling as
+the record it is written as rather than as the type.
 
 **Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 2 §1.3, §1.6, §2.2.3,
 §3.3.3, §3.4.1, §4.1, §4.2 (the type-slot choice), §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12,

@@ -70,7 +70,7 @@ public final class EntryDisplayName {
 
     private static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
                                              Optional<TypeRef> application, Lookup lookup) {
-        if (facts.position().isPresent()) {
+        if (value == null || facts.position().isPresent()) {
             return Optional.of(name);
         }
         return applied(application).or(() -> Optional.ofNullable(switch (value) {

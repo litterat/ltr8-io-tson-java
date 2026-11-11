@@ -282,6 +282,12 @@ final class TemplateMaterialiser {
         if (!argument.arguments().isEmpty() && (constructs(argument) || appliesAnOpenRecord(argument))) {
             throw argumentNotAName(argument, application);
         }
+        if (argument.arguments().isEmpty() && appliesAnOpenRecord(argument)) {
+            // A template is no type, and no position names one bare, an argument included (§5.10).
+            throw new SchemaValidationException("'" + argument.name() + "', passed as an argument of '"
+                    + application.text() + "', is a template, and a template is not a type -- write it with its "
+                    + "arguments, declared under a name, and pass that name (§5.10)");
+        }
         return argument;
     }
 

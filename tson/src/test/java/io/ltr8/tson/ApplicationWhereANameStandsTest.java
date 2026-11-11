@@ -61,6 +61,12 @@ class ApplicationWhereANameStandsTest {
         refused("  r => { f: wrap<meta.array<text>> }", "r", "'meta.array<text>' is passed as an argument");
     }
 
+    /** A template named bare as an argument is no type, and is refused before the gap of closing in place. */
+    @Test
+    void aTemplateNamedBareAsAnArgumentIsRefused() {
+        refused("  r => { f: wrap<box> }", "r", "'box', passed as an argument of 'wrap<box>', is a template");
+    }
+
     /** Inside an open record too, at its own declaration, before anything applies it. */
     @Test
     void anApplicationAsAnOpenRecordsArgumentIsRefusedInAnOpenRecord() {

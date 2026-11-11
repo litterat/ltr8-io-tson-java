@@ -35,9 +35,37 @@ public sealed class TsonCompiledSchema permits TsonCompiledVocabulary {
     private final TsonLinkedSchema linkedSchema;
     private final Map<String, TsonTypeReader<?>> entries;
 
+    /** What builds the reader of a type written in place, or null where this schema was assembled from its entries. */
+    private final TsonTypeReaderResolver readers;
+
     public TsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, TsonTypeReader<?>> entries) {
+        this(linkedSchema, entries, null);
+    }
+
+    /** The same, with the readers a type written in place is read through ({@link #get(TypeExpr)}). */
+    TsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, TsonTypeReader<?>> entries,
+                       TsonTypeReaderResolver readers) {
         this.linkedSchema = linkedSchema;
         this.entries = entries;
+        this.readers = readers;
+    }
+
+    /**
+     * The reader of what a type slot holds: a name's entry reader ({@link #get(String)}), or the reader of a type
+     * written in place, built from its body. Package-private: the linker reads a held value against a type its sibling
+     * writes in place.
+     */
+    TsonTypeReader<?> get(io.ltr8.tson.schema.meta.TypeExpr type) {
+        return switch (type) {
+            case io.ltr8.tson.schema.meta.TypeRef reference -> get(reference.name());
+            case io.ltr8.tson.schema.meta.TypeInline inline -> {
+                if (readers == null) {
+                    throw new IllegalStateException("this schema was assembled from its entries, and builds no "
+                            + "reader of the type written in place '" + inline.text() + "'");
+                }
+                yield readers.resolveInline(inline);
+            }
+        };
     }
 
     /**

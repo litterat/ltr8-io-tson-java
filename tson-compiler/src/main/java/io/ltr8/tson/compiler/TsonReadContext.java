@@ -279,13 +279,13 @@ public interface TsonReadContext {
 
     /**
      * Records the value of the dependent field this context is at, held as written in a schema document ([TSON-SCHEMA]
-     * §5.2), with the slot it fills: {@code sibling} is the field typing it, and {@code named} what the sibling holds
-     * in this instance, null where the read produced no reference there. {@code written} is the value's events
-     * ({@link #asWritten}). Only a schema document's read keeps it, handing it to the sink its factory was given
-     * ({@link #schemaDocument}), for the linker to judge against the type the sibling names in the reading schema's
-     * namespace.
+     * §5.2), with the slot it fills: {@code sibling} is the field typing it, and {@code named} the type the sibling
+     * holds in this instance, a name or a type written in place, null where the read produced none there. {@code
+     * written} is the value's events ({@link #asWritten}). Only a schema document's read keeps it, handing it to the
+     * sink its factory was given ({@link #schemaDocument}), for the linker to judge against the type the sibling
+     * holds, a name read in the reading schema's namespace.
      */
-    void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.Reference named,
+    void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.FieldTypeExpr named,
                        List<TsonEvent> written);
 
     /**

@@ -47,16 +47,12 @@ spec-required case:
   name, in tree and bind mode and in `tson-json`, keyed by the construction as `CompiledReaders` already keys the
   other inline bodies; and diagnostics locating the record by field path. Then restore the conformance vectors that
   wait on it and add `schema/valid` vectors for `f: page<order>` beside `page_order => page<order>` (two types of one shape).
-- [ ] **An application at a refinement source that no declaration names is not absorbed** ([TSON-SCHEMA] §5.7).
-  `x => box<text> ^ { … }` refines the substituted record and is IS-A its template's written parents and, where a
-  declaration names `box<text>`, that entry, in either declaration order; with no such declaration
-  `TemplateMaterialiser.closeApplication` reports `NOT_IMPLEMENTED`. Absorb it as `ApplicationCloser` absorbs a
-  composition operand, and add `schema/valid` vectors with and without a declaration, in both orders.
-- [ ] **A value modifier on a field typed by a reference written in place** ([TSON-SCHEMA] §5.2).
-  `handler?: meta.ref<method> ~ orders.place_order` is refused, a value never being read against a type written in
-  place, and the reference is declared (`method_ref => meta.ref<method>`). `DependentFieldReader.referenceIn` treats
-  a `TypeInline` as naming no type, so check what the linker does with the field's `value` today, refuse it at the
-  declaration if it loads, and add a `schema/invalid` vector.
+- [ ] **A tree read does not read a dependent value against a sibling written in place** ([TSON-SCHEMA] §5.2).
+  `setting => { kind: meta.type_expr  v?: kind! }` with `kind: { of: !meta.array { element_type: int32 } }` reads `v`
+  against the array in bind mode, where the sibling binds to its `TypeInline`; a tree read holds the sibling as the
+  record it is written as and reports `v` `NOT_IMPLEMENTED` (`RecordAbstractReader.Dependents.heldInPlace`, and
+  `tson-json`'s `RecordReader`). Build the `TypeInline` a tree's wrapper record denotes (its `of`'s tag and fields,
+  read against the kernel's model) and read the value through its reader, in both encodings.
 - [ ] **A literal under a closed type in an open record is judged only when the template closes**
   ([TSON-SCHEMA] §5.10). `t => <T> { a: T  n?: int8 ~ 500 }` loads, the default held until an application closes the
   field; the type is closed, so its verdict cannot vary by application and §5.10 judges it at the declaration, as

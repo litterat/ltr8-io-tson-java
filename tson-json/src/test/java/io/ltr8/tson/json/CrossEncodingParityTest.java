@@ -78,6 +78,7 @@ class CrossEncodingParityTest {
               in_place  => { grid: [[text]]  prices: {text => [int32]}  pair: [text, int32]  id: ( int32 | text ) }
               pair_of   => meta.array ^ { min_items?: = 1  max_items?: = 2 }
               refined   => { few: pair_of<int32>  many: [int32; 1..2] }
+              setting   => { kind: meta.type_expr  v?: kind! }
               scalars   => ( text | int32 | boolean )
               circle    => { radius: float64 }
               square    => { side: float64 }
@@ -989,6 +990,19 @@ class CrossEncodingParityTest {
         sameRule("in_place", """
                 { grid: []  prices: {}  pair: [x]  id: 1 }""", """
                 {"grid": [], "prices": {}, "pair": ["x"], "id": 1}""");
+    }
+
+    /**
+     * A dependent value whose sibling holds a type written in place: a tree read in either encoding holds the sibling
+     * as the record it is written as, and says it does not yet read a value against one rather than dropping it.
+     */
+    @Test
+    void aDependentValueOverASiblingWrittenInPlaceIsNotYetReadInATree() {
+        sameCodes("setting", "{ kind: { of: !meta.array { element_type: int32 } }  v: [1 2] }", """
+                {"kind": {"of": {"$type": "meta.array", "element_type": "int32"}}, "v": [1, 2]}""");
+        assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED), json("setting", """
+                {"kind": {"of": {"$type": "meta.array", "element_type": "int32"}}, "v": [1, 2]}""").stream()
+                .map(Verdict::code).toList());
     }
 
     /**

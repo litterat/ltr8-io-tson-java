@@ -790,6 +790,7 @@ public final class TsonSchemaLinker {
 
         AnnotatedMap<String, Top> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
+        checkTaggedVariantsAreNamed(schema, annotated, facts, localNames, receiver);
         closure.set(annotated);
         reached.set(new ValuesByName(schema, annotated, facts, origins, values));
 
@@ -1004,6 +1005,54 @@ public final class TsonSchemaLinker {
                     + "class (or one has no class at all), so no encoding's single form-resolution pass can "
                     + "tell them apart and every value keeps its !variant tag; drop the assertion, or use a "
                     + "field group (§5.11), which discriminates by label and needs no disjointness");
+        }
+    }
+
+    /**
+     * A choice that is not disjoint has every variant a name ([TSON-SCHEMA] §5.4): its values are selected by a tag, a
+     * tag names a variant by its name, and a variant written in place has none, so it could never be selected. Asked
+     * of every local choice, a declared one and one written in place at any depth; a choice whose {@code
+     * @meta.disjoint} fails is left to {@link #checkDisjointAssertions}, which reports it on its own terms.
+     */
+    private static void checkTaggedVariantsAreNamed(TsonSchema schema, AnnotatedMap<String, Top> entries,
+                                                    Map<String, TsonSchema.EntryFacts> facts,
+                                                    Set<String> localNames, DiagnosticsReceiver receiver) {
+        for (String name : localNames) {
+            Top entry = entries.get(name);
+            if (entry == null) {
+                continue;
+            }
+            boolean asserted = AliasChain.annotates(facts.getOrDefault(name, TsonSchema.EntryFacts.NONE)
+                    .annotations(), DISJOINT, entries) || AliasChain.annotates(entries.getAnnotations(name), DISJOINT,
+                    entries);
+            List<ChoiceBody> choices = new ArrayList<>();
+            if (entry instanceof ChoiceBody declared && !asserted) {
+                choices.add(declared);
+            }
+            mapInline(entry, body -> {
+                if (body instanceof ChoiceBody inPlace) {
+                    choices.add(inPlace);
+                }
+                return body;
+            });
+            for (ChoiceBody choice : choices) {
+                if (!choice.disjoint().equals(Optional.of(false))
+                        || Set.copyOf(choice.variants()).size() != choice.variants().size()) {
+                    continue; // disjoint, or a repeated variant, which distinctness has refused
+                }
+                List<String> inPlace = choice.variants().stream().filter(TypeInline.class::isInstance)
+                        .map(TypeExpr::text).toList();
+                if (inPlace.isEmpty()) {
+                    continue;
+                }
+                report(receiver, schema, name, at(facts, name), "'" + name + "': the choice '"
+                        + choice.variants().stream().map(TypeExpr::text).collect(java.util.stream.Collectors.joining(
+                                " | ", "(", ")")) + "' is not disjoint, so a value selects its variant by a "
+                        + "tag, which names a variant by its name -- and " + inPlace + " " + (inPlace.size() == 1
+                        ? "is a variant" : "are variants") + " written in place, with no name a tag could give "
+                        + "(§5.4): declare each as an entry and name it, or make the variants disjoint");
+                break;
+            }
         }
     }
 
@@ -1559,10 +1608,8 @@ public final class TsonSchemaLinker {
      * merged. It runs after {@link #validateTypeRef} has accepted every variant, so an unresolved name is
      * already reported and never reaches the walk.
      *
-     * <p>Arguments are compared as written rather than flattened through: only the head name is walked. The
-     * gap is unreachable from the sugar -- {@code SchemaDesugarer} hoists any argument-bearing variant to a
-     * bare name -- and reaches only a hand-written {@code !meta.choice { variants: [...] } } naming two
-     * differently-spelled applications of one type.
+     * <p>A type written in place is compared by its constructor and fields, and never with a name: a name and a
+     * construction are two types, even a name for the construction written beside it ([TSON-SCHEMA] §8.2).
      */
     private static void checkVariantsAreDistinct(String entryName, ChoiceBody choice,
                                                   Map<String, Top> namespace) {
@@ -1791,9 +1838,14 @@ public final class TsonSchemaLinker {
                     violations.add(dependent.get());
                 } else if (!(restated.type() instanceof SiblingRef) && !narrows(inherited.getValue(), restated,
                         namespace)) {
+                    boolean oneIsANameOneInPlace = restated.typeExpr() instanceof TypeInline
+                            != inherited.getValue().typeExpr() instanceof TypeInline;
                     violations.add("field '" + inherited.getKey() + "' is typed '"
                             + shownType(restated.typeExpr(), shown) + "', which is not '"
-                            + shownType(inherited.getValue().typeExpr(), shown) + "' or IS-A it");
+                            + shownType(inherited.getValue().typeExpr(), shown) + "' or IS-A it"
+                            + (oneIsANameOneInPlace ? " -- a name and a type written in place are never one type "
+                                    + "(§8.2), so write '" + shownType(inherited.getValue().typeExpr(), shown)
+                                    + "' as it is inherited" : ""));
                 }
             }
             if (!violations.isEmpty()) {
@@ -1813,14 +1865,13 @@ public final class TsonSchemaLinker {
 
     /**
      * Whether {@code restated}'s type narrows {@code inherited}'s, as {@link #checkRestatedFieldTypes} states it. A
-     * type written in place IS-A nothing but itself (§1.2 of its identity: the same construction), so where either
-     * side is one, the two narrow exactly when they are one construction -- a name standing for its declared
-     * construction compared by its body.
+     * type written in place IS-A nothing but itself, and a name and a construction are never one type ([TSON-SCHEMA]
+     * §8.2), even a name for the very construction written: two types written in place narrow exactly when they are
+     * one, the same constructor and fields, and a name never narrows to a construction nor a construction to a name.
      */
     private static boolean narrows(RecordField inherited, RecordField restated, Map<String, Top> namespace) {
         if (inherited.typeExpr() instanceof TypeInline || restated.typeExpr() instanceof TypeInline) {
-            Optional<Top> from = construction(inherited.typeExpr(), namespace);
-            return from.isPresent() && from.equals(construction(restated.typeExpr(), namespace));
+            return inherited.typeExpr().equals(restated.typeExpr());
         }
         TypeRef from = (TypeRef) inherited.typeExpr();
         TypeRef to = (TypeRef) restated.typeExpr();
@@ -1830,19 +1881,6 @@ public final class TsonSchemaLinker {
         }
         return isA(to.name(), from.name(), namespace) || restated.voidable()
                 && namespace.get(AliasChain.terminal(to.name(), namespace)) instanceof VoidType;
-    }
-
-    /**
-     * The construction a slot holds: a type written in place's body, or the body a name's chain ends at, without
-     * the chain a declaration places it in -- so {@code text_list => [text]} and an inline {@code [text]} are one.
-     */
-    private static Optional<Top> construction(TypeExpr type, Map<String, Top> namespace) {
-        return switch (type) {
-            case TypeInline inline -> Optional.of(inline.of());
-            case TypeRef reference -> Optional.ofNullable(namespace.get(AliasChain.terminal(reference.name(), namespace)))
-                    .map(body -> body instanceof io.ltr8.tson.schema.meta.Type typed
-                            ? typed.withChain(TypeChain.EMPTY) : body);
-        };
     }
 
     /**

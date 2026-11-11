@@ -96,7 +96,13 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
 - **A dependent field is read against the type its sibling's value names** ([TSON-SCHEMA] §5.2;
   `DependentFieldReader`, built by `FieldReaders.declared` for a field typed `kind!`). It is `DeclaredReader`'s
   dispatch with the tag taken from the sibling: the named entry's reader, in the mode the schema compiled in, reads
-  the value. The type is known
+  the value. A sibling typed by the type-slot choice may hold a type written in place
+  (`{ of: !meta.ref { of: method } }`): `DependentFieldReader.typeIn` carries it, and the value is read through that
+  type's own reader -- in bind mode, where the sibling binds to the `TypeInline`. A tree read holds the sibling as the
+  record it is written as, no type to read against, and reports the dependent value `NOT_IMPLEMENTED` rather than
+  dropping it (`RecordAbstractReader.Dependents.heldInPlace`); `tson-json`'s `RecordReader` does the same. A held
+  value in a schema document whose sibling holds one is judged at link through `TsonCompiledSchema.get(TypeExpr)`
+  (`HeldValues`). The type is known
   when the reader reaches the field in one of three ways, and only the third orders the document:
   - **a pinned sibling**: the pin types the field wherever the sibling is written, or whether it is;
   - **a discriminator**: member dispatch selects a member before any field is read, and each member pins it;

@@ -256,7 +256,10 @@ one and adds only refusals — a default on an unmarked name, a pin on a voidabl
 "omitted or `_`" as `a?: void?`), and `=?` on anything but an unmarked name over a non-voidable type.
 An open record's fields are built by the same path, so the two cannot drift. A field's value is never a parameter
 (§5.10): an unquoted token naming one of the declaration's parameters in `value` is refused where the field resolves
-(`ParameterTypes.atValue`).
+(`ParameterTypes.atValue`). A value on a field typed by a type written in place that is no reference — a container, a
+tuple or a choice — is refused where the field resolves too (`resolveFieldEntry`, §5.2), as a declared container's is
+at link (`TsonSchemaLinker.notAScalarType`); one on an inline reference (`handler?: meta.ref<method> ~
+orders.place_order`) is admitted and judged at link as a declared reference's is (`checkFieldValue`).
 
 A tightening replaces the inherited field in place, keeping its position — supertypes' fields first, in their
 order, then the body's. A modifier-only entry has no type slot, so it inherits the tightened field's type and with

@@ -173,12 +173,12 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * links against the type its sibling names: that type is one of the reading schema's namespace, which the readers
      * of the layer governing the document do not hold. {@code slot} is the path from the body to the value, as for
      * {@link ValueByName}; {@code field} and {@code sibling} name the dependent field and its sibling. {@code named}
-     * is what the sibling holds in this instance -- its pin, the value written, or its default -- and is empty where
-     * the read produced no reference there, a refusal it has reported. {@code written} is the value as written, opaque
-     * to this model: what the engine that read it replays to judge it.
+     * is the type the sibling holds in this instance -- its pin, the value written, or its default: a name, or a type
+     * written in place -- and is empty where the read produced none there, a refusal it has reported. {@code
+     * written} is the value as written, opaque to this model: what the engine that read it replays to judge it.
      */
-    public record HeldValue(List<String> slot, String field, String sibling, Optional<Reference> named,
-                            Object written) {
+    public record HeldValue(List<String> slot, String field, String sibling,
+                            Optional<io.ltr8.tson.schema.meta.FieldTypeExpr> named, Object written) {
 
         public HeldValue {
             slot = List.copyOf(slot);

@@ -416,10 +416,14 @@ final class ValuesByName {
         if (held == null && holder == null) {
             throw new SchemaValidationException(unreached);
         }
-        Reference named = DependentFieldReader.referenceIn(held);
-        if (named == null) {
+        io.ltr8.tson.schema.meta.FieldTypeExpr typed = DependentFieldReader.typeIn(held);
+        if (typed == null) {
             throw new SchemaValidationException(naming + ", which the value does not hold, so the name has no type "
                     + "to go on through");
+        }
+        if (!(typed instanceof Reference named)) {
+            throw new SchemaValidationException(naming + ", which holds the type written in place '" + typed.text()
+                    + "', and a name goes on through a value's declared type alone (§5.12)");
         }
         return switch (typeNamed(named, merged)) {
             case DependentFieldReader.TypeNamed.Entry entry -> entry.name();

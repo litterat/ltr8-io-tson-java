@@ -1825,14 +1825,18 @@ final class DefinitionResolver {
      * transitive chain's literal atom/product/sum name, not the source's own resolved kind).
      */
     private Built resolveRefinement(String name, RefinedDef refined, List<String> parameters) {
-        if (refined.target() instanceof ApplicationRef generic && namesOwnParameter(generic, parameters)) {
-            // §5.7 against an open source: the same absorption composition does. The source names no entry
-            // yet, but its own ancestors are types and its whole field set arrives, which is what `^` re-emits
-            // and then tightens; the open record writes the source as its parent, and closing it reaches the
-            // edge to the entry the closed application denotes.
+        if (refined.target() instanceof ApplicationRef generic && (namesOwnParameter(generic, parameters)
+                || OpenEntry.isOpen(namespaceDefinitions.definition(generic.name())))) {
+            // §5.7 against an application of an open record, over this declaration's parameters or closed: the same
+            // absorption composition does (§5.8). The application names no entry and nothing is minted for it: its
+            // ancestors are types and its whole field set arrives, which is what `^` re-emits and then tightens, and
+            // the application stays the written parent -- an open record's, substituted when it closes, and a
+            // closed declaration's, which SchemaResolver folds into the edge to the entry declared for it where one
+            // is, so nothing is IS-A the template itself.
             OpenOperand operand = openOperand(name, generic, parameters, "refinement source");
             return refineOnto(name, refined, parameters,
-                    io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), typeArguments(name, generic)),
+                    io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), namesOwnParameter(generic, parameters)
+                            ? typeArguments(name, generic) : operand.arguments()),
                     new ArrayList<>(operand.ancestors()), operand.fields(), operand.groups(), operand.nameType());
         }
         if (refined.target() instanceof NameRef simple) {
@@ -1922,10 +1926,11 @@ final class DefinitionResolver {
         }
 
         determineKind(name, transitiveSupertypes);
-        // §5.7's one written parent: an open record keeps it in its chain, and a closed refinement records it as a
-        // fact, since its chain cannot tell `^` from a composition adding nothing (TsonSchema.EntryFacts).
+        // §5.7's one written parent: an open record keeps it in its chain, as a closed declaration keeps an applied
+        // one for SchemaResolver's fold, and a closed refinement of a name records it as a fact, since its chain
+        // cannot tell `^` from a composition adding nothing (TsonSchema.EntryFacts).
         TypeChain chain = TypeChain.of(transitiveSupertypes);
-        if (parameters.isEmpty()) {
+        if (parameters.isEmpty() && source.arguments().isEmpty()) {
             facts.put(name, factsOf(name).withRefines(Optional.of(source.name())));
         } else {
             chain = chain.withParents(List.of(source));
@@ -2460,8 +2465,20 @@ final class DefinitionResolver {
                     throw ParameterTypes.atValue(token.text(), field.name());
                 });
         if (field.type().isPresent()) {
-            return new BuiltField(resolveFieldType(field.name(), field.type().get().typeRef()), resolved.optional(),
-                    resolved.voidable(), resolved.role(), value, Annotations.empty(), positions.of(field));
+            io.ltr8.tson.schema.meta.FieldTypeExpr type = resolveFieldType(field.name(), field.type().get().typeRef());
+            if (value.isPresent() && type instanceof io.ltr8.tson.schema.meta.TypeInline inline
+                    && !(inline.of() instanceof io.ltr8.tson.schema.meta.ReferenceBody)) {
+                // §5.2: a value is admitted at a field typed by an atom or an enum, and a type written in place is one
+                // only as a reference; a container, a tuple or a choice in place carries none, as a declared one
+                // carries none.
+                throw new SchemaValidationException("field '" + field.name() + "' is declared '" + inline.text()
+                        + "', a type written in place that is no reference, so it cannot have "
+                        + (resolved.role() == FieldRole.DEFAULT ? "a default" : "a fixed value") + " (§5.2): a "
+                        + "fixed or default value is available on a field typed by an atom, an enum or a reference, "
+                        + "and nowhere else -- drop the modifier, or declare the field with a scalar type");
+            }
+            return new BuiltField(type, resolved.optional(), resolved.voidable(), resolved.role(), value,
+                    Annotations.empty(), positions.of(field));
         }
         // An elided type is the inherited field's, a parameter it carries and what its names mean included.
         return inherited.get().restated(resolved.optional(), resolved.voidable(), resolved.role(), value,

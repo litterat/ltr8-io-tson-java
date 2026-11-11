@@ -108,7 +108,8 @@ public final class TsonSchemaCompiler {
         // Every reader exists now, so the values readers hold as written -- a field's default or pin -- are
         // decoded through their types here, still before the schema is handed out (see CompiledReaders).
         compilation.readers.settle();
-        TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished));
+        TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished),
+                compilation.readers);
         // Hand every reader that resolves at *read* time over to the finished schema, releasing this
         // compilation -- see CompiledReaders, and the "never escape" invariant below that this preserves.
         compilation.readers.bind(compiled);

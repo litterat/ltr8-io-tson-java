@@ -564,12 +564,15 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 }
                 int before = ctx.reported();
                 decoded = fields.get(schemaIndex).parser().read(fieldCtx);
-                io.ltr8.tson.schema.meta.Reference named = null;
+                io.ltr8.tson.schema.meta.FieldTypeExpr named = null;
                 if (dependents != null && typesADependent[schemaIndex] || held != null && typesAHeld[schemaIndex]) {
-                    named = ctx.reported() > before ? null : DependentFieldReader.referenceIn(decoded);
+                    named = ctx.reported() > before ? null : DependentFieldReader.typeIn(decoded);
                 }
                 if (dependents != null && typesADependent[schemaIndex]) {
                     dependents.named[schemaIndex] = named;
+                    // A tree holds a type written in place as the record it is written as, no type to read against.
+                    dependents.heldInPlace[schemaIndex] = named == null
+                            && decoded instanceof io.ltr8.tson.tree.TsonValue tree && tree.isRecord();
                 }
                 if (held != null && typesAHeld[schemaIndex]) {
                     held.named[schemaIndex] = named;
@@ -640,13 +643,21 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         CompiledField sibling = fields.get(at);
         TsonReadContext fieldCtx = ctx.schemaField(written, field.name(), field.schema().position());
         TsonReadContext siblingCtx = ctx.schemaField(sibling.name(), sibling.name(), sibling.schema().position());
-        io.ltr8.tson.schema.meta.Reference named;
+        io.ltr8.tson.schema.meta.FieldTypeExpr named;
         if (fixedCheck[at] != null) {
-            named = DependentFieldReader.referenceIn(precomputedValue[at]);
+            named = DependentFieldReader.typeIn(precomputedValue[at]);
         } else if (seen[at]) {
             named = dependents == null ? null : dependents.named[at];
+            if (named == null && dependents != null && dependents.heldInPlace[at]) {
+                fieldCtx.report(Diagnostic.Code.NOT_IMPLEMENTED, "'" + written + "' is typed by its sibling '"
+                        + sibling.name() + "', which holds a type written in place, and a tree read does not yet "
+                        + "read a value against one ([TSON-SCHEMA] §5.2); a bind read does",
+                        "a value read against the type its sibling holds", "a type written in place");
+                TsonReadContext.skipUnjudged(ctx);
+                return null;
+            }
         } else if (omitted[at] == RecordField.Omitted.VALUE && !ctx.readsSchemaNames()) {
-            named = DependentFieldReader.referenceIn(precomputedValue[at]);
+            named = DependentFieldReader.typeIn(precomputedValue[at]);
             if (dependents != null) {
                 dependents.readBefore(index, written, fieldCtx);
             }
@@ -670,12 +681,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     private static final class Dependents {
 
-        final io.ltr8.tson.schema.meta.Reference[] named;
+        final io.ltr8.tson.schema.meta.FieldTypeExpr[] named;
+        final boolean[] heldInPlace;
         final String[] readBefore;
         final TsonReadContext[] readBeforeAt;
 
         Dependents(int size) {
-            named = new io.ltr8.tson.schema.meta.Reference[size];
+            named = new io.ltr8.tson.schema.meta.FieldTypeExpr[size];
+            heldInPlace = new boolean[size];
             readBefore = new String[size];
             readBeforeAt = new TsonReadContext[size];
         }
@@ -714,12 +727,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
         final List<List<TsonEvent>> written;
         final TsonReadContext[] at;
-        final io.ltr8.tson.schema.meta.Reference[] named;
+        final io.ltr8.tson.schema.meta.FieldTypeExpr[] named;
 
         Held(int size) {
             written = new ArrayList<>(java.util.Collections.nCopies(size, null));
             at = new TsonReadContext[size];
-            named = new io.ltr8.tson.schema.meta.Reference[size];
+            named = new io.ltr8.tson.schema.meta.FieldTypeExpr[size];
         }
 
         /** Field {@code index}'s value, at {@code fieldCtx}'s cursor, before it is read. */
@@ -738,13 +751,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     continue;
                 }
                 int sibling = record.heldSiblingOf[i];
-                io.ltr8.tson.schema.meta.Reference holds;
+                io.ltr8.tson.schema.meta.FieldTypeExpr holds;
                 if (record.fixedCheck[sibling] != null) {
-                    holds = DependentFieldReader.referenceIn(record.precomputedValue[sibling]);
+                    holds = DependentFieldReader.typeIn(record.precomputedValue[sibling]);
                 } else if (seen[sibling]) {
                     holds = named[sibling];
                 } else if (record.omitted[sibling] == RecordField.Omitted.VALUE) {
-                    holds = DependentFieldReader.referenceIn(record.precomputedValue[sibling]);
+                    holds = DependentFieldReader.typeIn(record.precomputedValue[sibling]);
                 } else {
                     holds = null;
                 }

@@ -22,6 +22,13 @@ and why the same table is what untagged reading dispatches on. Current form only
   would have been; a choice written in place is derived where it stands, at the slot that holds it
   (`TsonSchemaLinker.mapInline`), as an entry's choice is. A partial link derives nothing over a variant still
   pending: the choice keeps the fact as it stands until the whole schema links.
+- **A choice that is not disjoint has every variant a name** (`TsonSchemaLinker.checkTaggedVariantsAreNamed`): its
+  values are selected by a tag, a tag names a variant by its name, and a variant written in place has none. So `(
+  [text] | [int32] )`, both bracket-class, is refused at the declaration, a choice written in place at any depth
+  included; `( [text] | text )` is disjoint and unaffected, and so is a non-disjoint choice of names. A choice whose
+  `@meta.disjoint` fails keeps that diagnostic alone, and a repeated variant is distinctness's to refuse.
+- **Distinctness compares a name with a name and a construction with a construction**, never one with the other
+  (`checkVariantsAreDistinct`, §8.2): `( text_list | [text] )` over `text_list => [text]` lists two types.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
   §8.3 alias chain.
 - `ChoiceReader.untaggedRecovery` and the derivation both go through `DiscriminationClass.of`: one fact, not two.
