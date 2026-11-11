@@ -798,7 +798,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * A type-ref position (§5.3): a field's type, a group member's type, a choice variant, an inline element,
      * a type argument. <b>{@code !} is rejected here by name rather than by falling through to "expected a
      * type reference"</b> -- writing the refinement inline ({@code quantity: !integer ^ { min: 1 }}) is the
-     * natural first attempt, and the grammar's answer (hoist it to its own declaration, reference it by name)
+     * natural first attempt, and the grammar's answer (declare it under its own name, reference it by name)
      * is a one-line fix an author cannot guess from a token-level complaint.
      */
     private TypeExpr parseTypeRef() {
@@ -890,9 +890,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      * distinguishes them, which is why both alternatives share a first element.
      *
      * <p>There is no separate inline form, and no position where a size specifier or an element {@code ?} is
-     * refused. That split existed because a sized form had no inline representation to carry it; every form
-     * lifts to an entry now, so the restriction protected nothing and is gone rather than relocated: §12.1
-     * has one bracket production, and §5.3 makes both legal at every type-ref position.
+     * refused: §12.1 has one bracket production, and §5.3 makes both legal at every type-ref position, the
+     * construction written in place carrying them.
      */
     private TypeExpr parseBracket() {
         expect(TokenType.LBRACKET, "an array or tuple type's opening '['");

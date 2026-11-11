@@ -15,16 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A selector inside a <b>template</b> body survives being held and closed.
+ * A selector inside a <b>template</b> body survives onto the open record, and stops at the members that pin it.
  *
- * <p>§5.10 holds an open entry's body as the application written out, and {@code WireForm} is the one
- * spelling of that text. A record's fields travel through it, and so does the enclosing statement of which of
- * them a family dispatches on ({@code template.discriminators}); that statement did not, so an author's mark
- * was dropped between the declaration and the entry materialisation minted -- the pin arriving at the member
- * while the fact that gives it meaning did not.
+ * <p>An open record is a {@code RecordBody} with parameters (§5.10), so its fields and the statement of which of
+ * them a family dispatches on ({@code discriminators}) are both on it, and the pin each member writes arrives
+ * beside the fact that gives it meaning.
  *
  * <p>Nothing reads it back specially: {@code discriminators} is a declared kernel member, so the
- * constructor's own reader binds it when the closed body is read, exactly as it binds the pins beside it.
+ * constructor's own reader binds it with the rest of the body, exactly as it binds the pins beside it.
  */
 class TemplateDiscriminatorTest {
 
@@ -51,9 +49,8 @@ class TemplateDiscriminatorTest {
     }
 
     /**
-     * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
-     * its instantiation (§8.2), or the entry it aliases where an earlier declaration
-     * already named the same application.
+     * The entry {@code alias} denotes, past one alias hop: a {@code name => head<args>} declaration is itself the
+     * record its application closes to (§8.2).
      */
     private static String target(TsonCompiledSchema compiled, String alias) {
         return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref

@@ -78,34 +78,29 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * A failure inside a <b>derived</b> entry is reported against the declaration that caused it, and names
-     * the form rather than the entry. Neither half was true: {@code use => { u: [some_typo] }} reported
-     * against {@code array_some_typo_95c9a10f} -- a content-derived name §8.2 makes non-normative, that the
-     * author never wrote -- and carried no position at all, while the same mistake spelled {@code u:
-     * some_typo} landed on {@code /use} with its own line. The two now agree.
-     *
-     * <p>Nothing here involves a template: every sugar form lifts an entry, so this was every schema's
-     * problem and not the open form's.
+     * A failure inside a form written in place is reported against the declaration that wrote it, and names
+     * the form: {@code use => { u: [some_typo] }} lands on {@code /use} at its own line, as the same mistake
+     * spelled {@code u: some_typo} does. Nothing here involves a template.
      */
     @Test
-    void aFailureInsideALiftedFormIsReportedAgainstTheDeclarationThatWroteIt() {
-        List<Diagnostic> lifted = check("{ use => { u: [some_typo] } }");
+    void aFailureInsideAFormInPlaceIsReportedAgainstTheDeclarationThatWroteIt() {
+        List<Diagnostic> inPlace = check("{ use => { u: [some_typo] } }");
         List<Diagnostic> plain = check("{ use => { u: some_typo } }");
 
-        assertEquals(1, lifted.size(), lifted::toString);
-        assertEquals(plain.getFirst().schemaPointer(), lifted.getFirst().schemaPointer(), "same declaration");
+        assertEquals(1, inPlace.size(), inPlace::toString);
+        assertEquals(plain.getFirst().schemaPointer(), inPlace.getFirst().schemaPointer(), "same declaration");
         assertEquals(plain.getFirst().schemaPosition().map(SourcePosition::line),
-                lifted.getFirst().schemaPosition().map(SourcePosition::line), "and the same line");
-        assertTrue(lifted.getFirst().message().contains("'[some_typo]'"),
-                () -> "named by the form the author wrote: " + lifted.getFirst().message());
+                inPlace.getFirst().schemaPosition().map(SourcePosition::line), "and the same line");
+        assertTrue(inPlace.getFirst().message().contains("'[some_typo]'"),
+                () -> "named by the form the author wrote: " + inPlace.getFirst().message());
     }
 
     /**
      * <b>A defect a held body deferred belongs to the declaration whose text wrote it, not to whoever applied
      * the template.</b> Nothing checks {@code box}'s own references at its declaration -- a template's
-     * references cannot be settled until an application supplies arguments -- so the verdict arrives on the
-     * entry {@code box<text>} minted, and the walk back to a positioned entry finds {@code holder}. That line
-     * is not wrong and does not contain the name. Deferred checking is what holding buys, and it is
+     * references cannot be settled until an application supplies arguments -- so the verdict arrives where
+     * {@code box<text>} closes, in place at {@code holder}'s field. That line is not wrong and does not contain
+     * the name. Deferred checking is what holding buys, and it is
      * survivable only if the author is sent to the line they can edit.
      *
      * <p><b>The subject moves with the location</b>, which the two halves of this assert together: naming
@@ -128,8 +123,8 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * A closed form an open record lifts is reported against the open record that wrote it, and named by the form,
-     * as a lift inside a closed record is.
+     * A closed form an open record holds in place is reported against the open record that wrote it, and named by
+     * the form, as one inside a closed record is.
      */
     @Test
     void anOpenRecordHoldingAContainerIsBlamedForItsOwnText() {
@@ -170,8 +165,8 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * One mistake in a template is one mistake however many declarations apply it. Each application mints its
-     * own entry and each fails identically, so without this the author gets the same sentence once per
+     * One mistake in a template is one mistake however many declarations apply it. Each application closes its
+     * own record in place and each fails identically, so without this the author gets the same sentence once per
      * applier -- and the count is a property of the schema's callers rather than of the defect.
      */
     @Test
@@ -196,8 +191,8 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * A refusal of an application nothing declares names the application as written, never the entry minted for it:
-     * {@code meta.ref<nope>}'s expansion is a reference over a name nothing declares.
+     * A refusal of a construction written in place names the application as written: {@code meta.ref<nope>} is a
+     * reference over a name nothing declares.
      */
     @Test
     void anUnresolvedReferenceApplicationIsNamedAsWritten() {
@@ -305,10 +300,9 @@ class TsonValidateSchemaTest {
 
     /**
      * A regularity violation is reported where it is declared, once. The condemned template is replaced
-     * before materialisation, so nothing goes on to apply it: left in place, an application of it ran to
-     * the 64-deep backstop and reported the same defect a second time -- against the entry that applied it,
-     * carrying a chain of synthetic names the author never wrote. The depth guard itself stays exactly as
-     * it is; what it guards against is a hole in this check, not a template this check already condemned.
+     * before materialisation, so nothing goes on to apply it, and no application of it runs to the depth
+     * backstop to report the same defect a second time against the entry that applied it. The depth guard
+     * guards against a hole in this check, not a template this check already condemned.
      */
     @Test
     void anIrregularTemplateIsReportedAtItsDeclarationAndNotAgainAtItsApplication() {

@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * <b>A sealed family whose members a subtype-template factory mints reads alike in both encodings</b>
+ * <b>A sealed family whose members compose a subtype template's application reads alike in both encodings</b>
  * ([TSON-JSON] §9.4): the pin each member writes where its factory application is declared ({@code kind?: =
  * "ping"}) places a value exactly as a hand-written pin does, and a payload nested under a single field is read the
  * same way in both.
@@ -111,13 +111,13 @@ class SealedFactoryEncodingParityTest {
 
     /** The pin the factory wrote from {@code T} selects the member, with no tag in either encoding. */
     @Test
-    void aFactoryMintedMemberDispatchesOnItsPinInBoth() {
+    void aMemberComposingTheFactoryDispatchesOnItsPinInBoth() {
         bothAccept("channel",
                 "!channel { m: { kind: ping  body: { seq: 1 } } }",
                 "{\"m\":{\"kind\":\"ping\",\"body\":{\"seq\":1}}}");
     }
 
-    /** The other member, whose payload is a container -- minted over a synthetic of its own. */
+    /** The other member, whose payload is a container, an entry of its own. */
     @Test
     void theOtherPinSelectsTheContainerPayloadMemberInBoth() {
         bothAccept("channel",

@@ -83,11 +83,11 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
     }
 
     /**
-     * A tuple nothing binds a class to by name -- most often one written inline at a record field, whose entry
-     * has a minted name no author would bind. A tuple has no natural Java form to fall back on, as an array has
-     * its {@code List}, so this reader builds nothing: a record field rebuilds it against its own component's
-     * tuple class ({@link BindTargets}), and read directly it raises {@code
-     * missing}, which is what {@link ErrorReader} would have raised for the entry.
+     * A tuple nothing binds a class to by name -- most often one written in place at a record field, which has no
+     * name. A tuple has no natural Java form to fall back on, as an array has its {@code List}, so this reader
+     * builds nothing: a record field rebuilds it against its own component's tuple class ({@link BindTargets}), so
+     * the component's class is the only one, and read directly it raises {@code missing}, as {@link ErrorReader}
+     * does for an entry nothing binds.
      */
     static TupleBindReader unbound(String name, String displayName, TupleBody body, MissingBindingException missing,
                                    TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,

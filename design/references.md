@@ -40,15 +40,14 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   `TsonSchema.SlotType`'s `KIND` and `REFERENCE` roles are only how the read read the name. The index is never written: a
   resolved form states `!meta.reference_type { of: … }` alone, a written `members:` is refused as an unknown field, and
   equality and `toString` exclude it (`ReferenceBody.memberNames()` is the processor's own).
-- `of` names any type or constructor of the writer's namespace. It is a `TypeRef`, `meta.type_ref` being a type
-  position, so a body may write an application there: `!meta.reference_type { of: box<text> }` is
-  `meta.ref<box<text>>` (§4.2), and resolution closes it to the entry it denotes as it closes one at any type position
-  (`MetaRefs`' reference arm), so a resolved `of` is a name. Refused are a name resolving to nothing (an unresolved
-  reference, an application that did not close among them), an open record and a value entry (`KindMembers.ofRefusal`,
-  from `validateBody`). `meta.ref<meta.top>` holds
-  every type. `meta.ref<meta.alias>` admits nothing, no entry past its hops being an alias, and a required field typed by it
-  is refused by §5.10.1's productivity check (`TypeInhabitance`). A reference is not a bound: `meta.param.bound`
-  still refuses a constructor (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
+- `of` names any type or constructor of the writer's namespace. It is a `TypeRef` at a slot that holds a name alone
+  (§4.2): an application there, `!meta.reference_type { of: box<text> }` or `meta.ref<box<text>>`, is refused, to be
+  declared under a name and named (`MetaRefs`' reference arm, `TemplateMaterialiser.nameRequired`), so a resolved `of`
+  is a name. Refused too are a name resolving to nothing (an unresolved reference), an open record and a value entry
+  (`KindMembers.ofRefusal`, from `validateBody`). `meta.ref<meta.top>` holds every type. `meta.ref<meta.alias>`
+  admits nothing, no entry past its hops being an alias, and a required field typed by it is refused by §5.10.1's
+  productivity check (`TypeInhabitance`). A reference is not a bound: `meta.param.bound` still refuses a constructor
+  (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
 - **A reference may carry an argument list** (§4.2), and that is what an application is in a slot.
   It is data grammar ([TSON-DATA] §7.4): `reference = qualified-name "<" ws type-args ws ">"`, the `<` adjacent to the
   name (§7.5), arguments separated by whitespace or a comma, each a reference (a qualified name, with or without
@@ -250,7 +249,7 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 | `meta.record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference (typed `type!`, so read against the field's own `type`) | namespace | member of the slot's kind | `checkKindValue` |
 | `meta.record.discriminators`, `meta.field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
 | `meta.record.name_type`, `meta.enum_type.name_type` | reference | namespace | `meta.identifier_ref` | `NameType.admits` |
-| `meta.reference_type.of` | reference, `meta.type_ref`; an application closes to its entry | namespace | any type or constructor, never a value entry or an open record | `validateBody`, `KindMembers.ofRefusal` |
+| `meta.reference_type.of` | reference, `meta.type_ref`; an application is refused | namespace | any type or constructor, never a value entry or an open record | `validateBody`, `KindMembers.ofRefusal` |
 | a slot typed by a reference over a type that is no constructor | reference by key, a path | root namespace, then nested `!schema` members, namespace values and record fields | the referent's type IS-A `of` | `ValuesByName.judge` |
 | a schema-map value (`meta.schema.value_type: declared`) | tag | namespace | a constructor builds a type; any other type a value of it | `DefinitionResolver` |
 | `geo => !schema { … }` | tag, a spelling of the pre-loaded kernel's `schema` (an alias of `meta.schema`) or `meta.schema` | pre-loaded kernel | none: the payload is schema grammar, its members declarations keyed by path | `TsonSchemaParser`, `SchemaPaths` |

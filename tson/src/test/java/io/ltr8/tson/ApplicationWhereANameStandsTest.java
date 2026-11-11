@@ -56,7 +56,7 @@ class ApplicationWhereANameStandsTest {
     @Test
     void anApplicationAsAnOpenRecordsArgumentIsRefused() {
         refused("  r => { f: pair<box<text> int32> }", "r",
-                "'box<text>' is passed as an argument of 'pair<box<text> int32>'", "'text_box => box<text>'");
+                "'box<text>' is passed as an argument of 'pair<box<text> int32>'", "'box_text => box<text>'");
         refused("  w => wrap<box<text>>", "w", "'box<text>' is passed as an argument of 'wrap<box<text>>'");
         refused("  r => { f: wrap<meta.array<text>> }", "r", "'meta.array<text>' is passed as an argument");
     }
@@ -101,7 +101,7 @@ class ApplicationWhereANameStandsTest {
 
     @Test
     void anApplicationAtABoundIsRefused() {
-        refused("  b => <T: box<text>> { v: T }", "b", "'box<text>' is an application", "'text_box => box<text>'");
+        refused("  b => <T: box<text>> { v: T }", "b", "'box<text>' is an application", "'box_text => box<text>'");
     }
 
     @Test
@@ -116,7 +116,7 @@ class ApplicationWhereANameStandsTest {
     @Test
     void anApplicationThatWouldBeAFamilyMemberInPlaceIsRefused() {
         refused("  r => { k: dog_of<text> }", "r", "'dog_of<text>' would close in place to a record IS-A 'pet'",
-                "'text_dog_of => dog_of<text>'");
+                "'dog_of_text => dog_of<text>'");
         assertEquals(List.of(), problems("  dogs => dog_of<text>\n  r => { k: dogs }"));
     }
 
@@ -129,7 +129,7 @@ class ApplicationWhereANameStandsTest {
     /** A recursive application with no declaration closing it has nothing to tie to. */
     @Test
     void aRecursiveApplicationWithNoDeclarationIsRefused() {
-        refused("  r => { f: node<text> }", "r", "recursive open record 'node'", "'text_node => node<text>'");
+        refused("  r => { f: node<text> }", "r", "recursive open record 'node'", "'node_text => node<text>'");
         refused("  h => holder<text>", "h", "recursive open record 'node'");
         assertEquals(List.of(), problems("  text_node => node<text>\n  r => { f: text_node }"));
     }

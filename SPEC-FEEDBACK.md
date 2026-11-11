@@ -405,9 +405,7 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   lifted construction now needs the member declared.
 
 **What is not yet running.** A tree read reports a dependent value whose sibling holds a type written in place as not
-implemented, holding the sibling as the record it is written as rather than as the type. An application at a
-refinement source whose head is an alias of an open record (`ref_of => box`, then `x => ref_of<text> ^ { … }`) is
-reported as not implemented rather than absorbed.
+implemented, holding the sibling as the record it is written as rather than as the type.
 
 **Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 2 §1.3, §1.6, §2.2.3,
 §3.3.3, §3.4.1, §4.1, §4.2 (the type-slot choice), §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12,

@@ -96,9 +96,9 @@ class UseSiteNamingTest {
         assertTrue(found.getFirst().startsWith("'pair_of<int32>'"), found.getFirst());
     }
 
-    /** The same for a set: {@code set<text>} is named as the application, not as the array {@code [text]}. */
+    /** The same for a set in place: {@code set<text>} is named as the application, not as the array {@code [text]}. */
     @Test
-    void aMintedSetIsNamedByItsApplication() {
+    void aSetInPlaceIsNamedByItsApplication() {
         List<String> found = messages("  r => { t: set<text> }", "!r { t: [a a] }");
 
         assertEquals(List.of("'set<text>' requires unique elements, 'a' appears more than once"), found);

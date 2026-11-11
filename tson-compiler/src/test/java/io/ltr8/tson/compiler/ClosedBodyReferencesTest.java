@@ -20,9 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The references a namespace type and a reference hold are rewritten as every other body's are
- * ({@code MetaRefs}): materialisation closes an application in a namespace type's {@code key_type} and {@code
- * value_type}, and §8.2's synthetic merge renames a reference's {@code of} onto the entry it merged to.
+ * The type slots a namespace type holds are walked as every other body's are ({@code MetaRefs}): an application at
+ * its {@code value_type} closes in place, as a map type's does ([TSON-SCHEMA] §5.10).
  */
 class ClosedBodyReferencesTest {
 
@@ -82,7 +81,7 @@ class ClosedBodyReferencesTest {
 
     /**
      * {@code value_type: box<text>} closes in place to the record {@code box<text>} closes to, as a map type's does
-     * (§5.10), so a value of the namespace type reads against it. Left unclosed, the value at {@code a} was judged
+     * (§5.10), so a value of the namespace type reads against it. Unclosed, the value at {@code a} would be judged
      * against the template {@code box}, which is no type.
      */
     @Test

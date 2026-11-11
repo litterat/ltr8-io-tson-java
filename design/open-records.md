@@ -42,8 +42,8 @@ application of one closes is `design/template-materialisation.md`'s. Current for
   declaration is ready and before anything closes: each written bound names a type, and each parameter passed to a
   bounded parameter of another open record is written with a bound that IS-A it.
 
-Related: `design/template-materialisation.md` (the closing pass: identity, declared applications, the expansion rule,
-on-demand closing, kind, regularity), `design/desugaring-open-forms-and-templates.md` (forms over a parameter inside an
+Related: `design/template-materialisation.md` (the closing pass: identity, declared applications, closing in place,
+operands, kind, regularity), `design/desugaring-open-forms-and-templates.md` (forms over a parameter inside an
 open record, and the bodies refused), `design/schema-resolution.md` (`openRecord`, marks on an open record),
 `design/constructor-application.md` (construction sugar, which applies a constructor by constructing it),
 `design/references.md`.

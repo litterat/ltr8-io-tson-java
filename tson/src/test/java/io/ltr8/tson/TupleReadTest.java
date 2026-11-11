@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Where {@code TupleTreeReaderTest} exercises the reader over a hand-built {@code TupleBody}, these run
  * the whole pipeline: the sugar desugars to {@code !tuple { elements: [...] } }, resolves to a real entry,
  * links and compiles. Both spellings are covered -- at declaration position the bracket form <em>is</em> the
- * construction, at a field position it is hoisted into its own declaration and referenced -- since they
+ * construction, at a field position it is the construction written in place, with no entry -- since they
  * reach the resolver by different routes.
  *
  * <p>The counterpart to {@code ChoiceReadTest} for the other half of §5.3's variadic pair.
@@ -86,7 +86,7 @@ class TupleReadTest {
         assertEquals(Optional.of("text"), pair.get(1).typeRef());
     }
 
-    /** An inline tuple at a field position is hoisted, so the field's value carries the injected entry's name. */
+    /** An inline tuple at a field position is written in place, and reads as a tuple as the declared one does. */
     @Test
     void anInlineTupleAtAFieldPositionReadsAsATupleToo() {
         TsonValue holder = read("[integer, text]", "holder", "{ p: [1 \"a\"]  inline: [\"x\" true] }");

@@ -204,4 +204,34 @@ class InlineTypeRulesTest {
         assertTrue(supertypes.contains("tb"), supertypes::toString);
         assertFalse(supertypes.contains("pet_box"), supertypes::toString);
     }
+
+    /**
+     * An application whose head is an alias of an open record is the open record's application ([TSON-SCHEMA] §8.3),
+     * absorbed at a refinement source and at a composition operand alike, its edge naming the entry declared for the
+     * application, and so is one an open record composes over its own parameter.
+     */
+    @Test
+    void anApplicationThroughAnAliasIsAbsorbedAtAnOperand() {
+        String declarations = """
+                  pet_of => pet_box
+                  tb     => pet_box<text>
+                  x      => pet_of<text> ^ { legs: int32 }
+                  y      => pet_of<text> & { name: text }
+                  vip    => <T> pet_of<T> & { rank: int32 }
+                  vt     => vip<text>
+                """;
+        assertEquals(List.of(), problems(declarations));
+        var entries = Tson.standard().resolve(schema(declarations)).schema().entries();
+        RecordBody x = assertInstanceOf(RecordBody.class, entries.get("x"));
+        assertEquals(List.of("legs", "v"), List.copyOf(x.fields().keySet()));
+        assertFalse(x.fields().get("legs").optional(), "the refinement made 'legs' required");
+        RecordBody y = assertInstanceOf(RecordBody.class, entries.get("y"));
+        assertEquals(List.of("legs", "v", "name"), List.copyOf(y.fields().keySet()));
+        for (String name : List.of("x", "y", "vt")) {
+            List<String> supertypes = TypeChain.supertypesOf(entries.get(name));
+            assertTrue(supertypes.contains("animal"), name + " " + supertypes);
+            assertTrue(supertypes.contains("tb"), name + " " + supertypes);
+            assertFalse(supertypes.contains("pet_box") || supertypes.contains("pet_of"), name + " " + supertypes);
+        }
+    }
 }

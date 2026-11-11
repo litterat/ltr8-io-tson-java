@@ -85,16 +85,14 @@ final class TypeInhabitance {
      * Whether one definition is satisfied by the entries marked so far.
      *
      * <p><b>An open entry counts as inhabited, unjudged.</b> A template is not a type and no document ever
-     * has one; its closures are ordinary entries in this map by the time linking runs, and each is judged on
-     * its own. A template nobody applies is judged nowhere -- §5.10: "an unapplied template is checked no
-     * further and receives no verdict".
+     * has one; its closures are judged where they stand, a declared application as an entry in this map and one
+     * closed in place at the slot holding it. A template nobody applies is judged nowhere -- §5.10: "an unapplied
+     * template is checked no further and receives no verdict".
      */
     private static boolean isInhabited(Top definition, Map<String, Top> namespace,
             Set<String> inhabited) {
         // An open record is not walked: its parameters mean nothing until substitution supplies the arguments,
-        // so a template is inhabited here and the closure that does supply them is judged on its own -- it is an
-        // ordinary entry in this map by the time linking runs, materialisation having minted it. A template nobody
-        // applies is judged nowhere.
+        // so a template is inhabited here and each closure, which does supply them, is judged on its own.
         if (OpenEntry.isOpen(definition)) {
             return true;
         }

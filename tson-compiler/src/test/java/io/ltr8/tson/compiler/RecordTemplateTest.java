@@ -104,7 +104,7 @@ class RecordTemplateTest {
         assertEquals(TypeChain.EMPTY, record.chain(), "no chain");
         assertEquals(TypeRef.of("text"), fieldOf(b, "v").type(), "T := text");
         assertEquals("box<text>", b.text(), "named in a message by the application as written");
-        assertEquals(List.of(), instantiationsOf(compiled, "box"), "nothing minted, nothing recorded");
+        assertEquals(List.of(), instantiationsOf(compiled, "box"), "no entry records the application");
     }
 
     /**
@@ -286,13 +286,13 @@ class RecordTemplateTest {
                 .read(TestDocuments.document("{ b: { v: \"seven\" } }"))).getMessage().contains("int32"));
     }
 
-    // ── Sugar inside a template body (R2) ────────────────────────────────
-    //    A *concrete* form lifts to an ordinary closed entry at desugar, exactly as it would outside a
+    // ── Sugar inside a template body ─────────────────────────────────────
+    //    A *concrete* form is the construction written in place at desugar, exactly as it is outside a
     //    template, so the template that holds it applies like any other. Only a form written over one of
-    //    the declaration's own parameters has to wait for the open representation.
+    //    the declaration's own parameters waits for the application to close it.
 
     @Test
-    void aConcreteSugarFormInsideATemplateLiftsAndTheTemplateApplies() {
+    void aConcreteSugarFormInsideATemplateIsInPlaceAndTheTemplateApplies() {
         TsonCompiledSchema compiled = compile("""
                   order => { id: text }
                   tmpl  => <T> { a: T  b: [order] }
@@ -303,9 +303,9 @@ class RecordTemplateTest {
                 .read(TestDocuments.document("{ u: { a: \"x\"  b: [ { id: \"1\" } ] } }")));
     }
 
-    /** Every sugar form, not just the array: choice, map, and a nested bracket form all lift concretely. */
+    /** Every sugar form, not just the array: choice, map, and a nested bracket form are all concrete in place. */
     @Test
-    void everyConcreteSugarFormLiftsFromATemplateBody() {
+    void everyConcreteSugarFormInATemplateBodyIsInPlace() {
         for (String field : List.of("[order]", "(order | text)", "[[order]]", "{text => order}")) {
             assertNotNull(compile("""
                       order => { id: text }
@@ -384,9 +384,9 @@ class RecordTemplateTest {
         assertTrue(thrown.getMessage().contains("int32"), thrown.getMessage());
     }
 
-    /** A declaration's own body is the construction, not a reference to a lifted one -- unchanged by R2. */
+    /** A declaration's own body is the construction, with a template beside it as without. */
     @Test
-    void aDeclarationsOwnBodyStillDoesNotLift() {
+    void aDeclarationsOwnBodyIsTheConstruction() {
         TsonCompiledSchema compiled = compile("""
                   order => { id: text }
                   ids   => [order]""");
@@ -564,7 +564,7 @@ class RecordTemplateTest {
     /**
      * The mistake the target use case invites: "a page of orders" names {@code paged}, the thing the schema
      * declares. It is a data diagnostic like any other -- collectible, and located at the type-ref the
-     * author wrote, not at a lifted synthetic.
+     * author wrote.
      */
     @Test
     void namingATemplateAsADataTypeIsADataDiagnostic() {
@@ -592,7 +592,7 @@ class RecordTemplateTest {
     }
 
     /**
-     * The same for a template whose body needs no lifting at all: {@code box}'s field type is the parameter
+     * The same for a template with no sugar in its body: {@code box}'s field type is the parameter
      * itself, and the template is refused before any reader for {@code T} is reached.
      *
      * <p><b>And the declared application reads</b>, which is the other half of the rule: {@code !box} names a

@@ -188,11 +188,7 @@ class KernelBootstrapResolverTest {
                 read.add(entry);
             }
         }
-        Set<String> handBuilt = new TreeSet<>();
-        // A content hash is §8.2's to spell, and the fixture writes a placeholder for it.
-        KernelBootstrapResolver.preLoaded().forEach(name ->
-                handBuilt.add(name.replaceFirst("_[0-9a-f]{8}$", "_xxhash")));
-        assertEquals(read, handBuilt);
+        assertEquals(read, new TreeSet<>(KernelBootstrapResolver.preLoaded()));
     }
 
     /**

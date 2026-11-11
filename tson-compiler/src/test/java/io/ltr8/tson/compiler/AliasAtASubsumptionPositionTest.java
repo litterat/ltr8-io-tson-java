@@ -19,10 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * a {@code base} position names the position's own type, and {@code !s_of} names a subtype, whichever of the
  * two names the schema happens to have flattened.
  *
- * <p><b>The reason this is not a nicety.</b> A materialised entry's own name is implementation-chosen and
- * non-normative (§8.2), so for a template instantiation an alias is the only name an author has. Without
- * flattening on the subtype side, a subtype family over instantiations is unwritable: the family exists in
- * the index and nothing can name a member of it.
+ * <p><b>The reason this is not a nicety.</b> An alias is a name the author wrote for a type. Without flattening
+ * on the subtype side, a tag spelling an alias of a family member would be refused where the member's own name is
+ * admitted, though the two name one type.
  *
  * <p><b>The alias is admitted, not rewritten to its target.</b> An alias entry compiles to its target's
  * reader named for the entry doing the referring, so dispatching on the written name runs the same reader and
@@ -174,11 +173,11 @@ class AliasAtASubsumptionPositionTest {
     }
 
     /**
-     * The case the rule exists for: a subtype template's instantiation, whose entry name the resolver minted
-     * and no author can write. The alias is the only name there is.
+     * A subtype template's application, declared, needs no alias: {@code ok_of => ok<text>} is the record the
+     * application closes to under the author's name, and a tag spelling that name selects it.
      */
     @Test
-    void anAliasIsHowATemplateInstantiationIsNamedAtAll() {
+    void aDeclaredTemplateApplicationIsNamedByItsDeclaration() {
         read("""
                   result    => <T> { payload: T }
                   ok        => <T> result<T> & { note: text }

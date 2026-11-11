@@ -302,10 +302,10 @@ public final class SchemaResolver {
         // fields' values it held as written (§5.2), keyed by the body itself: the read hooks know the constructor
         // and the value, not the entry, and the body is the one thing that reaches the entry unchanged.
         Map<Object, HeldInBody> heldByName = new IdentityHashMap<>();
-        // One materialiser for the whole schema, created before the driving loop because resolution itself
-        // closes applications on demand: a supertype or refinement source has to absorb the *closed* entry's
-        // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
-        // closing and a later batch closing of the same application land on one entry.
+        // One materialiser for the whole schema, created before the driving loop because resolution itself asks
+        // it for applications on demand: a declaration naming an application closes into its own name as it
+        // resolves, and an absorbed operand's arguments are checked against their bounds. Sharing the instance
+        // is what lets the batch pass below see what those closings recorded.
         // A construction builds whatever its head builds: a type where the head is a constructor, and a value entry
         // where it is an ordinary type.
         ConstructionReader reads = new ConstructionReader() {
@@ -376,7 +376,7 @@ public final class SchemaResolver {
                         return materialiser.closeApplication(application);
                     }
 
-                    /** An operand absorbed by value gets the same bound check a closed one does. */
+                    /** An operand absorbed by value gets the same bound check an application closing does. */
                     @Override
                     public void checkArguments(String head, Top template,
                             List<io.ltr8.tson.schema.meta.TypeRef> arguments) {
@@ -385,8 +385,7 @@ public final class SchemaResolver {
 
                     /**
                      * A declaration naming a fully-bound application is the entry it denotes (§8.2), so the
-                     * closure happens here rather than minting a content-named entry for the declaration to
-                     * reference.
+                     * application closes here, into the declaration's own name.
                      */
                     @Override
                     public Top closeApplicationInto(String declaredName,
@@ -409,9 +408,8 @@ public final class SchemaResolver {
 
         // §5.10 materialisation, after every declaration has resolved and before anything reads the result:
         // a template application reaches here as a type-ref carrying arguments, and closing it needs the
-        // template's own *resolved* open form, which only exists once the driving loop above has run. The
-        // entries it produces are local to this schema and carry no source position -- they are named by
-        // derivation from the application, not declared -- so they join the map after the declared ones.
+        // template's own *resolved* open form, which only exists once the driving loop above has run. It adds no
+        // entry: an application closes in place, or into the declaration naming it.
         Map<String, Top> resolvedLocals = new LinkedHashMap<>();
         for (String name : declarations.keySet()) {
             resolvedLocals.put(name, namespace.get(name));
@@ -419,15 +417,13 @@ public final class SchemaResolver {
 
         // §5.10's regularity boundary, before anything closes: a template that grows its argument on every
         // recursive step has no finite set of types to build, and catching it at the declaration means a
-        // broken template is rejected even if nobody ever applies it. Materialisation's own depth guard
-        // stays as a backstop.
+        // broken template is rejected even if nobody ever applies it.
         Set<String> irregular = TemplateRegularity.check(resolvedLocals, problems.collecting()
                 ? (name, error) -> problems.report(declarations.get(name), error) : null);
 
         // A condemned template is replaced before materialisation, on the same terms as a declaration that
-        // failed to resolve: the verdict is in, and closing an application of one only reports the same
-        // defect a second time -- from the depth backstop, 64 instantiations deep, against whichever entry
-        // happened to apply it rather than the one that wrote it. Both maps, because the two are read by
+        // failed to resolve: the verdict is in, and closing an application of one would never end, an irregular
+        // application never repeating to tie or be refused. Both maps, because the two are read by
         // different halves: `materialise` walks `resolvedLocals`, while the application's head is looked up
         // through the getter over `namespace`.
         condemn(irregular, resolvedLocals, namespace);
@@ -494,7 +490,7 @@ public final class SchemaResolver {
             localOnly.put(name, resolvedLocals.get(name), nameAnnotations.getOrDefault(name, Annotations.empty()));
         }
         // §8.2's derived key annotation: every entry that closes an application of an open record carries
-        // `@meta.application` on its key, which is where resolved output states an instantiation's identity and where
+        // `@meta.application` on its key, which is where resolved output states a declared application and where
         // ingest reads it back as stated. A construction carries none: its value states its constructor.
         // The application is stated as written, its nested arguments unreduced.
         for (String name : List.copyOf(localOnly.keySet())) {
@@ -594,15 +590,15 @@ public final class SchemaResolver {
      * resolved, and the chains made complete through it.
      *
      * <p>Composition needs the operand's <em>fields</em> and nothing else, so a closed declaration and a closed
-     * template both keep the application in their chain's {@code parents} and mint no entry for it (§8.2). The
+     * template both keep the application in their chain's {@code parents} and absorb it by value (§5.8). The
      * edge is the half that has to wait: the entry an application denotes is whichever declaration names the
      * same application, and asking that <em>during</em> materialisation would make the answer depend on
      * declaration order -- {@code text_box} declared before the composition found, declared after it not. A
      * closed chain is completed once every parent is a type, and this is that moment.
      *
      * <p><b>Nothing is created here.</b> The pass derives an index over entries that already exist, keyed on
-     * §8.2's canonical application so two spellings of one application agree -- the application each
-     * instantiation records, an imported one's included. Where no declaration names the application there is no
+     * §8.2's canonical application so two spellings of one application agree -- the application each declared
+     * application's key records, an imported one's included. Where no declaration names the application there is no
      * name to record, and that is the right answer rather than a gap: nobody declared that type, so nothing can
      * be declared as it. {@link #closeChains} then drops every application left standing.
      *
@@ -619,7 +615,7 @@ public final class SchemaResolver {
         namespace.keySet().forEach(entryName -> Optional.ofNullable(applications.get(entryName))
                 .filter(application -> !application.arguments().isEmpty())
                 .ifPresent(application -> byApplication.putIfAbsent(
-                        DerivedName.canonicalApplication(application.name(), application.arguments()),
+                        CanonicalApplication.of(application.name(), application.arguments()),
                         entryName)));
         // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the chains the
         // previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs `ok_of`'s own
@@ -690,7 +686,9 @@ public final class SchemaResolver {
             if (parent.arguments().isEmpty()) {
                 continue;
             }
-            String owner = byApplication.get(DerivedName.canonicalApplication(parent.name(), parent.arguments()));
+            // A parent written through an alias of its open record is that open record's application (§8.3).
+            String head = Ancestry.templateHead(parent.name(), namespace::get);
+            String owner = byApplication.get(CanonicalApplication.of(head, parent.arguments()));
             if (owner != null) {
                 chain.add(owner);
             }
@@ -794,8 +792,7 @@ public final class SchemaResolver {
 
     /**
      * The entries of this document ready so far, as a schema of its own over the same imports: what the readers a
-     * value read against one of them comes from are compiled over. An entry this resolution minted (an application
-     * it closed) is the document's as much as a declared one.
+     * value read against one of them comes from are compiled over.
      */
     private static TsonSchema readySoFar(SchemaDocument document, Map<String, Top> namespace,
                                          Map<String, String> origins, Map<String, TsonSchema.EntryFacts> facts) {
@@ -835,9 +832,8 @@ public final class SchemaResolver {
      *
      * <p><b>It cannot wait for the linker</b>, which checks the rest of §5.10's arity rule off the same
      * accessor: materialisation runs first, and by then the parameter has been substituted away. What
-     * arrives at the {@code meta.type_name} head is then whatever bound it -- a bare entry name if the argument
-     * was closed, reported as an arity error against a content-derived name nobody typed, or an application if
-     * it was not. Neither names what the author did.
+     * arrives at the {@code meta.type_name} head is then whatever bound it, reported as an arity error against a
+     * type the author passed as an argument and never applied, which names nothing the author did.
      */
     private static void refuseHeadAbstraction(String name, Top resolved) {
         if (!OpenEntry.isOpen(resolved)) {
@@ -1047,9 +1043,9 @@ public final class SchemaResolver {
          * <p><b>A value is a payload the linker cannot see into</b> -- its fields' types are left behind in the
          * declaring schema -- so its keys and its identifier-typed values, a key of an identifier-keyed map among
          * them, are judged here under {@code names}, at the read, as the same values are in a data document. Nothing
-         * in one is ever lifted or minted ({@link TsonReadContext#readsValueBody()}), so a kind-typed slot holds a
-         * bare name. A constructor's payload builds the schema layer's own vocabulary, whose names [TSON-SCHEMA]
-         * §11.4's scopes cover and {@code TsonSchemaLinker} judges, and is read under no policy.
+         * in one is closed ({@link TsonReadContext#readsValueBody()}), so a kind-typed slot holds a bare name. A
+         * constructor's payload builds the schema layer's own vocabulary, whose names [TSON-SCHEMA] §11.4's scopes
+         * cover and {@code TsonSchemaLinker} judges, and is read under no policy.
          */
         Object value(String type, io.ltr8.tson.compiler.ast.DataValue value, IdentifierPolicy names,
                      Map<Object, HeldInBody> heldByName) {

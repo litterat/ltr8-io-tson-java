@@ -161,7 +161,7 @@ public final class TsonDiagnostics {
      *                    problem with the document as a whole rather than one of its declarations -- an
      *                    unloadable {@code !!import}, say -- which makes the pointer a <em>present</em>
      *                    {@code ""}, RFC 6901's own spelling of "the whole document", not an absence
-     * @param position    where that declaration begins in the schema source, absent for a synthesized entry
+     * @param position    where that declaration begins in the schema source, absent for an entry with no source text
      */
     public static Diagnostic ofSchemaError(String schemaId, String declaration, String message,
                                            Optional<SourcePosition> position) {

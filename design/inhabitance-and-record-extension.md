@@ -101,9 +101,7 @@ usable and its members pin them distinctly, and every member is declared.
   onto a declared type (`k: dog_of<text>`, or `dog_of<T>` held in a template body and closed by a declaration) is
   refused before linking, with the application in hand (`TemplateMaterialiser.refuseMembership`), at the declaration
   that wrote it or whose application closed it. A member is what a read reports, a tag names and a binding maps, all
-  by name. The linker keeps a check of its own over the entries it holds (`RecordExtension.isUndeclaredMember`: a
-  record with no source position that records an application and composes onto another), reported at the
-  declaration that wrote it (`reportedAgainst`) and skipped by the collision check, so one mistake gets one verdict.
+  by name, so every member `RecordExtension` judges is a declaration.
   A template is in no `subtypes` index (the linker credits no open entry), so a template composing a base is no
   member of it, its declared applications being the members.
 - **Pins compare as values through `ValueIdentity`**, which is why that class is visible outside its package. §4.3

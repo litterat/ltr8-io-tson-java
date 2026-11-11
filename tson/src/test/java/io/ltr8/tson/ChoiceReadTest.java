@@ -110,8 +110,8 @@ class ChoiceReadTest {
     }
 
     /**
-     * The inline field carries its own {@code (text | boolean)} -- hoisted into an injected declaration by
-     * {@code SchemaDesugarer} -- and reads exactly as the named one does.
+     * The inline field carries its own {@code (text | boolean)} -- the choice construction written in place at the
+     * field -- and reads exactly as the named one does.
      */
     @Test
     void anInlineChoiceReadsLikeADeclaredOne() {

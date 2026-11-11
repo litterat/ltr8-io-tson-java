@@ -27,7 +27,7 @@ to are in `design/schema-grammar-and-desugaring.md`; what an open record is, in 
 - A refused declaration is replaced with the absorbing stand-in, an open empty record keeping its parameters
   (`absorbed`), so an application of it closes against an empty body and says nothing further.
 
-Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived names, reporting),
+Related: `design/schema-grammar-and-desugaring.md` (the sugar table, reporting),
 `design/schema-grammar.md`, `design/template-materialisation.md` (how a held reference closes),
 `design/open-records.md`, `design/references.md` (a reference carrying arguments),
 `design/constructor-application.md` (construction sugar).

@@ -124,9 +124,10 @@ and the same reporting surfaces.
 and `policy.tn`'s `policy.limits` and `CliPolicy.CliLimits` carry the same seventeen, so `tson policy` and every
 envelope state each threshold. Nesting depth is counted at §9.1's default of 64, the tightest in common use, so a
 document that fits travels; wait depth at §11.5's default of 64 (below). The other fifteen are configured and reported
-but not counted, so nothing past one of them is refused for it; `BACKLOG.md` carries where each is counted. One of the
-schema-side six `TemplateMaterialiser.MAX_CLOSING_DEPTH` enforces as a bare constant at the default, not yet reading
-`maxMaterialisationDepth`.
+but not counted, so nothing past one of them is refused for it; `BACKLOG.md` carries where each is counted.
+Materialisation depth has nothing left to count: closing in place holds one application per open record on its stack
+(`TemplateMaterialiser.closingInPlace`, a repeat being tied to a declaration or refused), so its depth is bounded by the
+open records of the closure.
 
 **It is a component of `ProcessorPolicy`** — `Tson.limitsPolicy()` is `processorPolicy().limits()` in one call. A
 deployment states one policy, and the CLI envelope nests `limits` under `policy`. What the grouping keeps is the

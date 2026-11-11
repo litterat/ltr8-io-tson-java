@@ -28,7 +28,7 @@ import java.util.function.Function;
  * pipeline vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces.
  * Requires a {@link TsonLinkedSchema}, not a bare {@code TsonSchema} -- every reference
  * reachable from a body must already be argument-free (materialisation closes every {@code <...>}
- * application into a reference to the entry it mints), and every name a body refers to must
+ * application, into the declaration that names it or in place as a type written there), and every name a body refers to must
  * actually be present in {@code linkedSchema.schema().entries()}; a referenced-but-missing name is
  * treated as a bug, not a normal failure (see {@link Compilation#resolve}'s own {@code
  * IllegalStateException}).
@@ -178,9 +178,10 @@ public final class TsonSchemaCompiler {
 
         /**
          * The inverse of §8.3's alias hop, built once: which written names reach each entry. A binding map is
-         * keyed on the names an author wrote and a materialised entry has none of its own (§8.2), so a bind
-         * lookup asks under these before the entry's own name -- and, like {@code namesMeaning}, this is a
-         * property of the schema rather than of the entry, so deriving it per entry would be quadratic.
+         * keyed on the names an author wrote, so a bind lookup for an entry with no source position asks under
+         * these before the entry's own name ({@code ValueReaderContext.bindingNamesFor}) -- and, like {@code
+         * namesMeaning}, this is a property of the schema rather than of the entry, so deriving it per entry would
+         * be quadratic.
          */
         private final Map<String, List<String>> referrers;
 
@@ -260,8 +261,7 @@ public final class TsonSchemaCompiler {
                 // An alias is a hop, and this is where the chain is collapsed: after linking, once per
                 // entry, at the moment a reader is built. Resolved output states the chain the author wrote,
                 // so the target's reader is named for the entry doing the referring -- which is what a use
-                // site naming `pct` over `pct => small` needs, and what names a self-reaching instantiation by
-                // the application it records rather than by its synthetic's content-derived key.
+                // site naming `pct` over `pct => small` needs.
                 return UseSite.named(resolve(r.target().name()),
                         EntryDisplayName.of(name, definition, linked.schema().factsOf(name),
                                 linked.schema().applicationOf(name)));

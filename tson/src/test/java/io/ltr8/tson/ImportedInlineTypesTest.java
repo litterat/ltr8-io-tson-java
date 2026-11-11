@@ -5,7 +5,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.util.List;
@@ -17,12 +16,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A synthetic is identified by its form ([TSON-SCHEMA] §8.2), so two documents that each write {@code [text]} without
- * importing each other mint one entry, and a schema importing both takes it once: one name, one type, every use of
- * either document pointing at it. Two documents that each <em>declare</em> one name are still the collision §2.2.3
+ * A type written in place is no entry ([TSON-SCHEMA] §8.2): two documents that each write {@code [text]} without
+ * importing each other add nothing to the namespace for it, so a schema importing both, and writing {@code [text]}
+ * itself, reads through each. Two documents that each <em>declare</em> one name are still the collision §2.2.3
  * refuses.
  */
-class ImportedSyntheticTest {
+class ImportedInlineTypesTest {
 
     private static final Map<String, String> DOCUMENTS = Map.of(
             "https://example.test/tags.tn", """
@@ -65,9 +64,9 @@ class ImportedSyntheticTest {
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
     }
 
-    /** Both libraries' {@code [text]} is one entry of the importer's namespace, and a field of each reads through it. */
+    /** Each library's {@code [text]} stays in its own field, and a field of each reads through it. */
     @Test
-    void oneSyntheticMintedByTwoImportsIsOneEntry() {
+    void anArrayInPlaceInTwoImportsReadsThroughEach() {
         Tson tson = tson();
         assertEquals(List.of(), tson.validateSchema("""
                 !!id:"https://example.test/both.tn"
@@ -80,15 +79,6 @@ class ImportedSyntheticTest {
                 !both { tagged: { tags: [a b] }  labelled: { labels: [c] }  more: [d] }""");
         assertEquals(2, both.get("tagged").get("tags").elements().size());
         assertEquals(1, both.get("labelled").get("labels").elements().size());
-    }
-
-    /** The one closed {@code [text]} synthetic a schema declares itself, an import's left out. */
-    private static String ownClosedArray(TsonLinkedSchema linked) {
-        String own = CanonicalIdentity.canonicalize(linked.schema().id());
-        List<String> minted = linked.schema().entries().keySet().stream()
-                .filter(name -> name.startsWith("array_text_") && own.equals(linked.originOf(name))).toList();
-        assertEquals(1, minted.size(), minted::toString);
-        return minted.getFirst();
     }
 
     /** A data document importing both libraries reads under one namespace over both closures. */
@@ -116,14 +106,9 @@ class ImportedSyntheticTest {
                 problems.toString());
     }
 
-    /** The name this library mints for {@code [text]}, read off a schema that writes it. */
-    private static String mintedForTextArray() {
-        return ownClosedArray(tson().bindRegistry().core().resolveLinked("https://example.test/tags.tn"));
-    }
-
-    /** The same lift reusing an imported synthetic of its own form loads, as every import of the kernel's does. */
+    /** A schema writing in place the forms an import writes in place loads: neither is an entry to collide. */
     @Test
-    void aLiftReusingAnImportedSyntheticOfItsOwnFormLoads() {
+    void writingTheFormsAnImportWritesInPlaceLoads() {
         assertEquals(List.of(), tson().validateSchema("""
                 !!id:"https://example.test/reuser.tn"
                 !!import:"https://example.test/shapes.tn"

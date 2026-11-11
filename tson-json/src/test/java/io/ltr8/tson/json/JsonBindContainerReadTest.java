@@ -223,7 +223,7 @@ class JsonBindContainerReadTest {
     // ── Tuples ───────────────────────────────────────────────────────────
 
     /**
-     * An inline tuple has a minted entry name no binding map can hold, so it binds by the component that holds it:
+     * A tuple written in place has no name a binding map could hold, so it binds by the component that holds it:
      * an {@code @Tuple} class, each position bound to its element -- the {@code int32} into a {@code long}.
      */
     @Test

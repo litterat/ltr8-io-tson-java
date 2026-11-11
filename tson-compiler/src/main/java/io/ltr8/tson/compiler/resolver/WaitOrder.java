@@ -135,7 +135,7 @@ final class WaitOrder implements DefinitionGetter {
         return resolving.isEmpty() ? null : resolving.getLast();
     }
 
-    /** Whether {@code name} is one of this document's declarations, as opposed to an import or a minted entry. */
+    /** Whether {@code name} is one of this document's declarations, as opposed to an import. */
     boolean declares(String name) {
         return declarations.containsKey(name);
     }

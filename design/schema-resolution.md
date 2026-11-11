@@ -65,8 +65,8 @@ applications, field facts and refinement, groups, subtraction, and the exception
 Related: `design/constructor-application.md` (what `!C { … }` may apply and how its head resolves),
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
 `design/template-materialisation.md` and `design/open-records.md` (§5.10 closing, applied-parent edges),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.application`, the
-kernel's bootstrap), `design/namespace-types-and-value-entries.md` (value entries),
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`CanonicalApplication`, alias hops,
+`@meta.application`, the kernel's bootstrap), `design/namespace-types-and-value-entries.md` (value entries),
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
 
 ## The two resolvers

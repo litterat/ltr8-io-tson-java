@@ -36,7 +36,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -125,8 +124,8 @@ class TsonSchemaLinkerTest {
 
     /**
      * §5.10's arity rule at a field type. {@code set} declares no parameters, so applying it to one is the
-     * author's error -- and it is caught here rather than carried, because {@code arguments} non-empty means
-     * an open form and nothing else once inline sugar lifts to entries.
+     * author's error -- and it is caught here rather than carried, because a resolved field holds a closed
+     * application in place ({@code TypeInline}), so {@code arguments} non-empty there means an open form.
      */
     @Test
     void anArgumentBearingFieldTypeAgainstANonTemplateIsRejected() {
@@ -167,16 +166,11 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * An argument-bearing type-ref reaches the linker only from a parameterized declaration's own body --
-     * {@code SchemaDesugarer} turns every other one into a real declaration before resolution ever runs, so
-     * there is nothing here to synthesize an entry for. This pins that: link carries the application through
-     * untouched and adds no entries at all. What the linker therefore does <em>not</em> do -- building the
-     * {@code ArrayBody}/placeholder entries a materialisation pass would -- is covered in {@code
-     * SchemaDesugarerTest}, one phase earlier.
+     * The linker closes nothing: an application an entry's key records ({@code @meta.application}) is carried
+     * through as stated, and link adds no entry for it. Closing an application is the resolver's (§5.10).
      *
      * <p><b>The argument is a real entry, and it has to be.</b> An instantiation's key records the
-     * application it closes, closed; a partial application states the arguments it binds in its own {@code
-     * alias.target} (§8.1's alias paragraph). Neither puts a parameter here.
+     * application it closes, closed, so no parameter stands here.
      */
     @Test
     void anArgumentBearingApplicationIsCarriedThroughWithoutMaterialising() {
@@ -195,7 +189,7 @@ class TsonSchemaLinkerTest {
 
         assertEquals(otherOfToken, result.schema().applicationOf("generic").orElseThrow());
         assertEquals(3, result.schema().entries().size(),
-                "no synthetic entry created for an application an instantiation records");
+                "link adds no entry for an application an entry's key records");
     }
 
     /** The same body under a declared parameter is a template, which is exactly what may route one. */
@@ -468,22 +462,14 @@ class TsonSchemaLinkerTest {
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(local, loader));
     }
 
-    @Test
-    void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
-        // A genuinely different type under the same name: two identical entries are one entry ([TSON-SCHEMA]
-        // §8.2), which is no collision.
-        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), textEntry()));
-    }
-
     /**
-     * And the other half of the same rule: an entry a local declaration and an import both reach, agreeing
-     * byte for byte, unifies rather than colliding. §8.2 names a materialised instantiation by a function of
-     * its resolved form alone -- "two {@code box<text>} anywhere share one entry" -- so a consumer that
-     * closes an application its import already closed must link, or exporting a template is exporting a trap.
+     * A local entry of a name an import declares collides ([TSON-SCHEMA] §2.2.3), whatever its body: two schemas
+     * declaring one name declare two entries, as the resolver refuses the same declaration from text.
      */
     @Test
-    void anImportedEntryAndAnIdenticalLocalOneUnify() {
-        assertDoesNotThrow(() -> link("shared_name", emptyRecord(), emptyRecord()));
+    void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
+        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), textEntry()));
+        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), emptyRecord()));
     }
 
     /** Links a schema declaring {@code name} locally against an import declaring the same name. */

@@ -59,8 +59,8 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
     against (`VariantSchemaReader` dispatches on it) and what a tree node carries as its own `typeRef`, so
     substituting the display name would break dispatch and round-tripping alike.
   - **The pointer roots at the name the read entered through**, which is a different mechanism for the same
-    principle. A compiled reader is shared by every name that reaches it — `order_response => paged<order>`
-    compiles to the instantiation entry's own reader — so the root cannot come from the reader and comes
+    principle. A compiled reader is shared by every name that reaches it — `resp => order_response` compiles
+    to `order_response`'s own reader — so the root cannot come from the reader and comes
     from the facade, which seeds `ctx.underDeclaration(compiled.rootDeclaration(name))` before the read.
     `inRecord` then keeps that pointer and re-anchors only identity and line; a non-alias root seeds exactly
     what the reader would have established.

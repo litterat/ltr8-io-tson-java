@@ -62,8 +62,7 @@ final class AliasChain {
 
     /**
      * Each of {@code names} together with every alias that means it -- the set a written tag is matched
-     * against. A materialised entry's own name is implementation-chosen (§8.2), so for a template
-     * instantiation an alias is the only name an author has to write.
+     * against, [TSON-SCHEMA] §7.2 comparing "after alias flattening of both".
      *
      * <p><b>The alias is kept rather than reduced to its target.</b> An alias entry compiles to its
      * target's reader, so dispatching on the written name runs the same reader and reports under the name

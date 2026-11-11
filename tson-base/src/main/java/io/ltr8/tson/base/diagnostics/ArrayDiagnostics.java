@@ -14,7 +14,7 @@ import io.ltr8.unicode.ConfusableNames;
  * the element type's value space. So the only rule here a plain array never reaches is {@link #repeatedElement}.
  *
  * <p><b>A type no author named has no name in the message.</b> {@code typeName} is {@code null} for a form with
- * no spelling of its own -- {@code set<text>} at a use site is its expansion, a set no author named -- and
+ * no name of its own -- {@code set<text>} written in place at a field is a set no author named -- and
  * each sentence then states the rule alone, the diagnostic's position saying where.
  *
  * @param typeName the array or set type being read, as the author wrote it, or {@code null} for none

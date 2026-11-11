@@ -78,7 +78,7 @@ final class TemplateMaterialiser {
     private static final String RECORD = KernelNames.of("record");
 
     /**
-     * The application each instantiation this pass closed is the instantiation of, by entry name (§8.2) -- shared
+     * The application each declaration this pass closes an application into records, by entry name (§8.2) -- shared
      * with {@code SchemaResolver}, which keys the applied-parent fold on it and writes it on the entry's key.
      */
     private final Map<String, TypeRef> applications;
@@ -105,8 +105,9 @@ final class TemplateMaterialiser {
     private final Map<String, TypeRef> closingInPlace = new LinkedHashMap<>();
 
     /**
-     * Each instantiation entry's application as it was written, its nested arguments unreduced: what {@code
-     * @meta.application} states on the entry's key, so a reader and a message see the reference the author wrote.
+     * The application each declaration naming one closes into it, as written, its nested arguments unreduced: what
+     * {@code @meta.application} states on the entry's key, so a reader and a message see the reference the author
+     * wrote.
      */
     private final Map<String, TypeRef> writtenApplications = new LinkedHashMap<>();
 
@@ -203,7 +204,7 @@ final class TemplateMaterialiser {
         MetaRefs.Rewrite rewrite = slotRewrite();
         for (Map.Entry<String, Top> entry : entries.entrySet()) {
             try {
-                entry.setValue(MetaRefs.mapRefsKeepingChain(entry.getValue(), rewrite));
+                entry.setValue(MetaRefs.mapRefs(entry.getValue(), rewrite));
             } catch (SchemaValidationException | UnsupportedOperationException e) {
                 if (reporter == null) {
                     throw e;
@@ -223,11 +224,11 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * The entry a fully-bound application at a refinement source denotes -- the on-demand half, reached during
-     * resolution rather than from the batch pass afterwards. A construction there is refused, as at any slot that
-     * holds a name. An application of an open record is absorbed by value before it reaches here
-     * ({@code DefinitionResolver.openOperand}), except where its head is an alias of the open record, which is not
-     * yet supported.
+     * The name a fully-bound application at a refinement source leaves -- reached during resolution rather than from
+     * the batch pass afterwards. A construction there is refused, as at any slot that holds a name, and so is an
+     * application of a head that takes no parameters; one whose head names nothing is left whole for the linker. An
+     * application of an open record, through its alias hops or not, is absorbed by value and never reaches here
+     * ({@code DefinitionResolver.openOperand}).
      */
     String closeApplication(TypeRef application) {
         if (application.arguments().isEmpty()) {
@@ -238,9 +239,8 @@ final class TemplateMaterialiser {
         }
         return switch (closeApplicationOfRecord(application)) {
             case TypeRef named -> named.name();
-            case TypeInline ignored -> throw new UnsupportedOperationException("'" + application.text()
-                    + "' at a refinement source names its open record through an alias, and absorbing it that way "
-                    + "is not yet supported ([TSON-SCHEMA] §5.7): write the open record's own name as the head");
+            case TypeInline inline -> throw new IllegalStateException("'" + application.text() + "' closed in place "
+                    + "at a refinement source, where an application of an open record is absorbed by value");
         };
     }
 
@@ -268,7 +268,7 @@ final class TemplateMaterialiser {
         for (TypeRef argument : application.arguments()) {
             arguments.add(dereferenced(closeArgument(argument, application)));
         }
-        String canonical = DerivedName.canonicalApplication(head, arguments);
+        String canonical = CanonicalApplication.of(head, arguments);
         if (closingInto.putIfAbsent(canonical, declaredName) != null) {
             return null; // a second declaration of one application inside the first's closing: the ordinary path
         }
@@ -356,13 +356,16 @@ final class TemplateMaterialiser {
                 + "') and pass that name");
     }
 
-    /** A name for a declaration of {@code application}, for a message: {@code text_box} for {@code box<text>}. */
+    /**
+     * A name for a declaration of {@code application}, for a message: the head, then each argument, as [TSON-SCHEMA]
+     * §5.10.1 writes {@code node_text => node<text>}.
+     */
     static String suggestedName(TypeRef application) {
-        StringBuilder name = new StringBuilder();
+        StringBuilder name = new StringBuilder(application.segments().getLast());
         for (TypeRef argument : application.arguments()) {
-            name.append(argument.arguments().isEmpty() ? argument.segments().getLast() : "my").append('_');
+            name.append('_').append(argument.arguments().isEmpty() ? argument.segments().getLast() : "my");
         }
-        return name.append(application.segments().getLast()).toString();
+        return name.toString();
     }
 
     /**
@@ -420,7 +423,7 @@ final class TemplateMaterialiser {
         // body closes each one where it stands -- a nested constructor's application, which an open record holds
         // for a nested form over its parameter ({@code {text => [T]}}), in place at its type slot.
         return Optional.of(new TypeInline(constructor,
-                (Type) MetaRefs.mapRefsKeepingChain(type.withChain(TypeChain.EMPTY), slotRewrite())));
+                (Type) MetaRefs.mapRefs(type.withChain(TypeChain.EMPTY), slotRewrite())));
     }
 
     /** What {@link #materialise} applies to every reference: a slot's closed in place, a name's to a name. */
@@ -438,14 +441,9 @@ final class TemplateMaterialiser {
         };
     }
 
-    /**
-     * The template an application's head names: the head itself, or, where it is an alias of a template ({@code
-     * ref_of => ref}), the template at the end of its alias chain, the alias being the same entry under
-     * another name ([TSON-SCHEMA] §8.3).
-     */
+    /** The open record an application's head names, past its alias hops ({@link Ancestry#templateHead}). */
     private String templateHead(String head) {
-        String terminal = AliasChain.terminal(head, namespace::definition);
-        return !terminal.equals(head) && OpenEntry.isOpen(namespace.definition(terminal)) ? terminal : head;
+        return Ancestry.templateHead(head, namespace);
     }
 
     /**
@@ -491,7 +489,7 @@ final class TemplateMaterialiser {
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
         checkArguments(head, template, arguments);
-        String canonical = DerivedName.canonicalApplication(head, arguments);
+        String canonical = CanonicalApplication.of(head, arguments);
         String owner = closingInto.get(canonical);
         if (owner != null) {
             // The declaration closing this application reached it again while substituting: the recursion names
@@ -592,7 +590,7 @@ final class TemplateMaterialiser {
                     // A type written in place holds no parameter, and may still hold an application of an open
                     // record this pass has not reached in the template (`[box<text>; 2..]`): closed where it stands.
                     case TypeInline inline -> inline.withOf(
-                            (Type) MetaRefs.mapRefsKeepingChain(inline.of(), slotRewrite()));
+                            (Type) MetaRefs.mapRefs(inline.of(), slotRewrite()));
                     // A sibling names a field of the record, and has no application to close.
                     case SiblingRef sibling -> sibling;
                 }).withPosition(Optional.empty()), substituted.getAnnotations(name)));
@@ -634,7 +632,7 @@ final class TemplateMaterialiser {
         return TypeRef.of(reference.name(), reference.arguments());
     }
 
-    /** The application {@code name}'s entry closes, as written, where it is an instantiation entry. */
+    /** The application {@code name}'s entry closes, as written, where it is a declared application. */
     Optional<TypeRef> writtenApplication(String name) {
         return Optional.ofNullable(writtenApplications.get(name));
     }

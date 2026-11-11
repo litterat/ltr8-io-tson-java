@@ -51,11 +51,8 @@ import java.util.function.UnaryOperator;
  * <p><b>Why a phase rather than work inside the resolver or linker.</b> [TSON-SCHEMA] §5.3/§5.6 describe
  * {@code [T]} and {@code {K =&gt; V}} as <em>desugarings</em>, and §3.3.1 calls their targets "the implicit
  * desugar targets of the sugar forms". Doing that expansion once, on the AST, leaves {@code
- * DefinitionResolver} with a bare reference or {@code !C value} -- and it already handles the second
- * generically through the governing meta's compiled reader. The arrangement this replaces split the same
- * construct by position: a declaration-position application became a real body in the resolver, while a
- * field-position one was deferred to {@code TsonSchemaLinker}, which sits in a module that cannot reach that
- * generic machinery and so needed a hand-written assembler per constructor shape.
+ * DefinitionResolver} with a bare reference, an application or a {@code !C value} construction -- and it reads the
+ * last generically through the constructor's compiled reader, at a declaration's body and at a field's type alike.
  *
  * <p><b>Purely syntactic, and per declaration.</b> The sugar set is closed and grammar-supplied, so the
  * head each form desugars to and the vocabulary field each argument fills are a fixed table (§5.3):
@@ -76,8 +73,8 @@ import java.util.function.UnaryOperator;
  *
  * <p><b>A nested bracket or brace form expands innermost first.</b> §5.3's declaration-level container
  * syntax nests inside itself -- {@code [[T; N]; N]}, {@code {text =&gt; [order; 1..]}} -- so a position
- * holding one has the inner form injected under its own derived name and becomes a bare reference to it.
- * The enclosing container then routes a plain name like any other, at any depth. See {@link #elementRef}.
+ * holding one is desugared first, and the enclosing construction writes it in place, in its {@code { of: !C { ... }
+ * }} wrapper, at any depth. No declaration is added. See {@link #elementRef} and {@link #slotValue}.
  *
  * <p><b>An application passes through.</b> {@code name&lt;args&gt;} resolves its head in the schema's
  * namespace -- parameters, then locals, then imports -- and is a §5.10 template application or, over a
@@ -102,7 +99,7 @@ import java.util.function.UnaryOperator;
  * a form over a parameter is admitted only where it is a reference: {@code [T]} and {@code {K => V}} are written as
  * the applications they spell, {@code meta.array<T>} and {@code meta.map<K V>}, held until the record is applied, and
  * every other form over a parameter -- a size, a {@code ?} element, a tuple, a choice -- is refused, naming the form
- * ({@link #openForm}). Nothing is lifted for a form over a parameter; a form naming none lifts closed, as anywhere.
+ * ({@link #openForm}). A form naming no parameter is its construction in place, as anywhere.
  *
  * <p><b>An invalid sugar form is reported per declaration, not thrown</b>, when a {@link
  * DesugarFailureReporter} is supplied -- the same one-pass treatment {@code SchemaResolver} and {@code
@@ -294,8 +291,8 @@ final class SchemaDesugarer {
     /**
      * Refuses a sibling reference ({@code kind!}) written in sugar anywhere but at a record field's type, naming the
      * slot ([TSON-SCHEMA] §5.2). The grammar admits one wherever a type-ref stands, and it is refused here, before
-     * any lift: a lift would carry it into an entry outside the record, which has no sibling to read, so {@code
-     * [ kind! ]} would need an array chosen per value. A group member is a field of the record, and takes one as a
+     * the form is rewritten: the construction it sits in is a type of its own, which has no sibling to read, so
+     * {@code [ kind! ]} would need an array chosen per value. A group member is a field of the record, and takes one as a
      * field does. A construction's payload is data, read against its constructor, whose slot readers state the
      * same rule.
      */
@@ -369,9 +366,9 @@ final class SchemaDesugarer {
     private TypeDef typeDef(TypeDef typeDef) {
         return switch (typeDef) {
             case StructuralTypeDef structural -> {
-                // A template's body is walked like any record's: a concrete form inside it lifts to an ordinary
-                // closed entry, exactly as it would outside a template, and a form naming one of the declaration's
-                // own parameters is the reference it spells, or refused -- see openForm.
+                // A template's body is walked like any record's: a concrete form inside it is written in place,
+                // exactly as it would be outside a template, and a form naming one of the declaration's own
+                // parameters is the reference it spells, or refused -- see openForm.
                 StructuralDef body = structuralDef(structural.body());
                 yield body == structural.body() ? structural
                         : new StructuralTypeDef(structural.typeParams(), body);
@@ -381,12 +378,11 @@ final class SchemaDesugarer {
             case ReferenceTypeDef reference when !reference.typeParams().isEmpty() ->
                     throw refuseTemplateBody(reference.ref());
             case ReferenceTypeDef reference -> {
-                // **A declaration's own body never lifts** (§5.3): the form *is* the construction, so it
-                // becomes the instance directly rather than a reference to an injected one. That is what
-                // keeps `score_list => [integer; 1..]` a PRODUCT entry with a real body, and
-                // `contact => (email | phone)` a SUM entry with a real ChoiceBody, instead of aliases to
-                // ones. Every sugar form takes this path -- the bracket forms reach it through
-                // `type-ref` like the rest, since there is no separate declaration-level tier.
+                // **A declaration's own body is the construction** (§5.3): the form becomes the instance
+                // directly, which keeps `score_list => [integer; 1..]` a PRODUCT entry with a real body and
+                // `contact => (email | phone)` a SUM entry with a real ChoiceBody. Every sugar form takes this
+                // path -- the bracket forms reach it through `type-ref` like the rest, since there is no separate
+                // declaration-level tier.
                 Optional<Binding> binding = binding(reference.ref());
                 if (binding.isPresent()) {
                     yield instance(binding.get());

@@ -60,7 +60,7 @@ class MetaTn1CompiledEndToEndTest {
     }
 
     /**
-     * numeric.tn's registered entries -- its own, the kernel's it imports, and the synthetics their sugar lifts -- each
+     * numeric.tn's registered entries -- its own and the kernel's it imports -- each
      * compile cleanly with the same factory set {@link MetaKernelEndToEndTest} proves against the bootstrap's output.
      */
     @Test

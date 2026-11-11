@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * denotes it again -- so a rule stated with any one spelling refuses that one and admits the others. It is
  * stated instead on {@code ArrayBody}/{@code MapBody} ({@code Product.coherenceCheck}, the structural twin
  * of {@code Atom.coherenceCheck}), and asked at the two phases where a body becomes concrete: resolution
- * for a declared one, linking for the entries materialisation mints.
+ * for a declared one, linking for the body an application closes to.
  *
  * <p>{@code ContainerSugarEndToEndTest} owns the sugar form's own behaviour and {@code SchemaDesugarerTest}
  * owns what that phase produces; what is here is the comparison between spellings.

@@ -84,10 +84,9 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
-     * What the author wrote that names entry {@code name}, or {@code null} for a form with no spelling -- an
-     * application nothing declares, expanded to an atom instance -- whose message is the family's own, located
-     * by its position ({@link EntryDisplayName#authored}). A type written in place is named by its form, as {@link
-     * #displayName} names it.
+     * What the author wrote that names entry {@code name} ({@link EntryDisplayName#authored}): its own name, or for
+     * an entry with no source position the form or the application its key records. A type written in place is
+     * named by its form, as {@link #displayName} names it.
      */
     public String authoredName(String name, Top definition) {
         if (!schema().entries().containsKey(name)) {
@@ -153,14 +152,11 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      * The names a bind lookup for entry {@code name} tries, in order: the names an author wrote for it, the
      * entry's own, then -- for a constructor that tightens another -- that constructor's, up its chain.
      *
-     * <p><b>A binding map is written in the names the author wrote.</b> An entry a template application
-     * materialised is named by content ([TSON-SCHEMA] §8.2 -- resolver-chosen and unreachable from source),
-     * so {@code ping => msg_of<"ping", ping_body>} reaches a bind context under {@code ping}: the hash is not
-     * knowable when the map is written, and a generator emitting one cannot invent it.
-     *
-     * <p><b>Only a derived entry is reached this way</b>, which is the same test {@code EntryDisplayName}
-     * applies: an entry with a source position was declared, so its own name is the one the author wrote and
-     * an alias naming it must never redirect its binding.
+     * <p><b>A binding map is written in the names the author wrote.</b> Only an entry with no source position --
+     * one the kernel's bootstrap builds, or one read from a resolved form -- is also looked up under the names
+     * that reach it through an alias, which is the same test {@code EntryDisplayName} applies: an entry with a
+     * source position was declared, so its own name is the one the author wrote and an alias naming it must never
+     * redirect its binding.
      *
      * <p><b>A tightened constructor binds as the one it tightens.</b> {@code set_type => array ^ { ... }} and
      * {@code enum => enum_type ^ { name_type?: = meta.identifier }} restate fields and add none (§5.7), so their

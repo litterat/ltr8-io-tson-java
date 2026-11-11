@@ -257,9 +257,9 @@ final class BindRecordBuilder implements RecordBuilder {
     }
 
     /**
-     * The class bound to entry {@code name}, tried under the names an author wrote for it before the entry's own:
-     * a binding map is written in the names in the schema, and an entry a template application materialised has a
-     * minted name no author could have written ([TSON-SCHEMA] §8.2). No class at all is deferred rather than
+     * The class bound to entry {@code name}, tried under the aliases an author wrote for it before the entry's own:
+     * a binding map is written in the names in the schema, and an alias is one of them. No class at all is deferred
+     * rather than
      * fatal -- a schema declares types a given consumer never binds -- so it reaches the first read of this type.
      */
     private static DataClass boundClass(String name, ValueReaderContext context, DataBindContext binding) {

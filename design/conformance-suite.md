@@ -165,8 +165,8 @@ for a verdict.
 format: §1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a valid vector's subject
 is a schema document and its expected side is that document's resolved output in §8's own form, read back through
 `ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question of `spec/fixtures/*-resolved.tn`) and
-compared entry for entry, `@meta.application` key annotations included. Names are compared as written: no entry has a
-derived name. A nested schema map is walked into: `ResolvedForm.entries` keys each member under its path, `readResolved`
+compared entry for entry, `@meta.application` key annotations included. Names are compared as written: every entry is
+declared. A nested schema map is walked into: `ResolvedForm.entries` keys each member under its path, `readResolved`
 adds the path keys a schema holds (`SchemaPaths.withPaths`), and the nested map's own entry compares as its member
 names. `link/` states individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived
 disjointness, §8.2's `subtypes` index, a kind's derived `members` (compared as a set). `validate/` is a data document

@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A tuple written inline at a record field binds to the field's own {@code @Tuple} class. Its entry has a minted
- * name no author would bind, and a tuple has no natural Java form to fall back on as an array has its
+ * A tuple written inline at a record field binds to the field's own {@code @Tuple} class. It is a type written in place,
+ * with no name a binding map could hold, and a tuple has no natural Java form to fall back on as an array has its
  * {@code List}, so the component's class is the only one there is -- checked against the tuple's arity and its
  * voidable positions when the schema is compiled.
  */

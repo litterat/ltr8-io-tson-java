@@ -376,13 +376,11 @@ class TsonValidateTest {
     }
 
     /**
-     * A desugar-injected entry ({@code [text]}'s own {@code array_text_…}) is never what a diagnostic points
-     * at: the author wrote {@code tags: [text]}, so {@code /tagged/tags} is the location, and the injected
-     * name survives only in {@code message}. The enclosing record supplies the position, which the injected
-     * entry itself has none of.
+     * A form written in place is located by the field that wrote it: the author wrote {@code tags: [text]}, so
+     * {@code /tagged/tags} is the location, and the enclosing record supplies the position.
      */
     @Test
-    void anInjectedEntryIsLocatedByTheFieldThatDesugaredIntoIt() {
+    void aFormInPlaceIsLocatedByTheFieldThatWroteIt() {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/tags-1.tn"

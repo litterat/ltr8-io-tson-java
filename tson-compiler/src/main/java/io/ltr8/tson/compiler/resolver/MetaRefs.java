@@ -15,7 +15,6 @@ import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -23,7 +22,6 @@ import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.SiblingRef;
 
-import java.util.function.UnaryOperator;
 
 /**
  * The {@code schema.meta} reference walk: every {@link TypeRef} an entry holds that a rewrite may move.
@@ -58,33 +56,15 @@ final class MetaRefs {
             return atName(reference);
         }
 
-        /** A rewrite that puts a name back wherever it meets one. */
-        static Rewrite names(UnaryOperator<TypeRef> map) {
-            return map::apply;
-        }
     }
 
     /**
-     * Every {@link TypeRef} an entry's value holds, mapped -- its chain included ({@link TypeChain}): the parents
-     * and the names of the supertypes and subtypes, which a rename reaches like any other reference.
+     * Every {@link TypeRef} an entry's value holds, mapped, its chain left exactly as written: a parent an open record
+     * writes is substituted when the record closes, and {@code SchemaResolver} folds a closed declaration's applied
+     * parents into edges ({@code TemplateMaterialiser}, the caller).
      */
     static Top mapRefs(Top definition, Rewrite map) {
-        return mapBodyRefs(definition, map, true);
-    }
-
-    /**
-     * The same, leaving the chain exactly as written.
-     *
-     * <p>{@code TemplateMaterialiser} is the caller, and a composition operand is why: an application there
-     * denotes no entry -- its fields are absorbed by value -- so {@code parents} keeps it as written until {@code
-     * SchemaResolver} folds the chain, and closing it would mint the entry that path exists to avoid.
-     *
-     * <p><b>Skipping the call is the point, not discarding its result.</b> Closing an application publishes
-     * the entry as a side effect, so a walk that maps this channel has already minted whatever the caller
-     * then does with the rewritten reference.
-     */
-    static Top mapRefsKeepingChain(Top definition, Rewrite map) {
-        return mapBodyRefs(definition, map, false);
+        return mapBodyRefs(definition, map);
     }
 
     /** A field's type with {@code map} applied; a sibling names a field, which no rewrite of type names touches. */
@@ -109,18 +89,16 @@ final class MetaRefs {
 
     /** A type written in place with each slot inside it mapped; it stays in place, its constructor and no chain. */
     private static TypeInline mapInline(TypeInline inline, Rewrite map) {
-        return inline.withOf((Type) mapBodyRefs(inline.of(), map, false));
+        return inline.withOf((Type) mapBodyRefs(inline.of(), map));
     }
 
-    private static Top mapBodyRefs(Top body, Rewrite map, boolean mapChain) {
-        Top mapped = switch (body) {
+    private static Top mapBodyRefs(Top body, Rewrite map) {
+        return switch (body) {
             // `discriminators` is carried, not mapped: it holds field *names* of this record, which no
-            // reference rewrite touches. Dropping it here would lose a family's selector list on every
-            // synthetic rename and every materialisation rewrite -- a body that arrived sealed would come
-            // back with nothing to dispatch on. An open record maps the field types that name none of its
-            // parameters, which mean the same thing in every application and so are closed already: the base
-            // names the entry each member names. A type naming a parameter at any depth waits for substitution to
-            // supply the argument. Its chain maps below, an open record being IS-A its parents as any record is.
+            // reference rewrite touches; dropping it would leave a sealed body nothing to dispatch on. An open
+            // record maps the field types that name none of its parameters, which mean the same thing in every
+            // application and so are closed already: the base names the entry each member names. A type naming a
+            // parameter at any depth waits for substitution to supply the argument.
             case RecordBody record -> record.withFields(record.mapFields(field ->
                     OpenEntry.parameterIn(field.type()).isPresent() ? field
                             : field.withType(mapField(field.type(), map))));
@@ -137,13 +115,10 @@ final class MetaRefs {
                     .toList());
             case ChoiceBody choice -> new ChoiceBody(choice.chain(),
                     choice.variants().stream().map(variant -> mapSlot(variant, map)).toList(), choice.disjoint());
-            // An alias's target maps like any other name, arguments and all -- which is what lets a closed alias
-            // follow its target onto the entry materialisation closed it to.
+            // An alias's target is a name, and maps as one: an application there is refused, to be declared.
             case Alias alias -> new Alias(map.atName(alias.target()));
-            // `of` is a type reference like any other, arguments and all: `!meta.reference_type { of: box<text> }`
-            // closes its application here as `meta.ref<box<text>>` closes its argument before substituting it,
-            // so either way `of` names the entry the application denotes (§4.2). The index is carried, derived at
-            // link.
+            // `of` holds a name (§4.2), and maps as one: an application there is refused, to be declared. The index
+            // is carried, derived at link.
             case ReferenceBody reference -> new ReferenceBody(reference.chain(), map.atName(reference.of()),
                     reference.allowSibling(), reference.index());
             // Every other atom's facets are values, never references; a declared type holds its chain alone.
@@ -154,14 +129,5 @@ final class MetaRefs {
             // data writes no sugar form, so none names an entry a rewrite here could move.
             case ValueEntry value -> value;
         };
-        return mapChain && mapped instanceof Type type
-                ? TypeChain.withChain(mapped, mapChain(type.chain(), map)) : mapped;
-    }
-
-    /** Every reference {@code chain} holds, mapped -- a name in it as the bare reference it is. */
-    private static TypeChain mapChain(TypeChain chain, Rewrite map) {
-        UnaryOperator<String> name = written -> map.atName(TypeRef.of(written)).name();
-        return new TypeChain(chain.parents().stream().map(map::atName).toList(),
-                chain.supertypes().stream().map(name).toList(), chain.subtypes().stream().map(name).toList());
     }
 }

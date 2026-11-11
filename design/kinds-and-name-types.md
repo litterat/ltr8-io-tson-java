@@ -93,7 +93,7 @@ that names values gets `namesTypes` false and no members.
   `meta.ref<meta.map>` holds those and `meta.field_map`, which `meta.ref<meta.namespace>` does not.
 - **`of` is checked in `validateBody`**, through its alias hops in the one namespace: a name resolving to nothing is
   an unresolved reference, and an open record or a value entry is refused (`KindMembers.ofRefusal`), against the
-  declaration that wrote the application (`reportedAgainst`). A refinement's `of` is then judged against its source's
+  declaration that holds the reference. A refinement's `of` is then judged against its source's
   (`checkReferenceNarrows`): the source's or IS-A it, by the chain of the entry `of` names past its alias hops, so a
   widening or an unrelated `of` is refused. The resolver binds a refinement before the names `of` holds are ready
   (they wait on nothing, `design/resolver-vocabulary-and-bootstrap.md`), so the IS-A is the link's to ask, and the

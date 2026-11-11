@@ -21,7 +21,7 @@ import java.util.Set;
  *
  * <p><b>Why a static rule rather than a runtime limit.</b> Non-regular recursion grows its argument every
  * level ({@code weird => <T> { next: weird<box<T>>? } } reaches {@code weird<box<text>>}, then
- * {@code weird<box<box<text>>>}, …), so every instantiation is distinct, dedup-by-identity never fires, and
+ * {@code weird<box<box<text>>>}, …), so every application is distinct, none repeats to tie or be refused, and
  * there is no finite set of types to build. Caught only while materialising, it costs a depth counter --
  * a non-portable limit, and the same retrofit C++ reached for after shipping templates without a regularity
  * restriction. Caught here it is an ordinary schema error at the line that wrote it, and a template nobody
@@ -54,9 +54,8 @@ final class TemplateRegularity {
      * that wrote it. {@code reporter} may be {@code null}, in which case the first failure throws.
      *
      * @return the templates found irregular, for the caller to replace before anything closes an application
-     *         of one. A condemned template left in place materialises exactly as far as the depth backstop
-     *         allows and reports again from there -- one defect, two diagnostics, the second of them 64
-     *         instantiations long. Always empty when {@code reporter} is {@code null}, that mode having
+     *         of one. A condemned template left in place would close without end, an irregular application
+     *         never repeating. Always empty when {@code reporter} is {@code null}, that mode having
      *         thrown at the first failure.
      */
     static Set<String> check(Map<String, Top> entries, Reporter reporter) {

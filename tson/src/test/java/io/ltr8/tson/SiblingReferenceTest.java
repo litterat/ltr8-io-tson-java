@@ -62,7 +62,7 @@ class SiblingReferenceTest {
         });
     }
 
-    /** Sugar refuses it before any lift, through the front door as in the phase itself. */
+    /** Sugar refuses it before the form is rewritten, through the front door as in the phase itself. */
     @Test
     void sugarRefusesASiblingOffAFieldsType() {
         Diagnostic problem = only(Tson.standard().validateSchema(schema("cell => { kind: meta.type_ref  v: [ kind! ] }")));

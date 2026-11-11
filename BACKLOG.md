@@ -38,13 +38,6 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
-- [ ] **An application whose head is an alias of an open record is not absorbed at an operand** ([TSON-SCHEMA]
-  §5.7, §5.8, §8.3). Over `box => <T> { v: T }` and `ref_of => box`, `z => { f: ref_of<text> }` closes in place, the
-  alias being the open record under another name, but `x => ref_of<text> ^ { … }` is reported `NOT_IMPLEMENTED`
-  (`TemplateMaterialiser.closeApplication`) and `y => ref_of<text> & { … }` is refused as applying arguments to an
-  entry that declares no parameters, a library gap reported as the author's error (`DefinitionResolver.openOperand`,
-  which reads the head without following its alias chain). Follow the head's alias chain in `openOperand` and in
-  `resolveRefinement`'s test for an open operand, and add `schema/valid` vectors for both operators.
 - [ ] **A tree read does not read a dependent value against a sibling written in place** ([TSON-SCHEMA] §5.2).
   `setting => { kind: meta.type_expr  v?: kind! }` with `kind: { of: !meta.array { element_type: int32 } }` reads `v`
   against the array in bind mode, where the sibling binds to its `TypeInline`; a tree read holds the sibling as the
@@ -533,9 +526,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   length** after escape processing, **numeric literal length** (annotated tokens included), **decoded binary size**
   per `!bytes` value, **document size**, **elements** per array or set, **entries** per map, **fields** per record,
   **annotations** on one value, and **total values**. Schema side: **import closure**, **entries** in one schema map,
-  **alias chain**, **supertype chain**, and **materialisation depth** — which `TemplateMaterialiser` enforces as
-  the bare constant `MAX_CLOSING_DEPTH` at the default, and which moves to reading `maxMaterialisationDepth`. (Wait
-  depth, the sixth §11.5 limit, is counted, by `WaitOrder`, with its `--max-wait-depth` flag.) What
+  **alias chain** and **supertype chain**. (Wait depth is counted, by `WaitOrder`, with its `--max-wait-depth` flag;
+  materialisation depth needs no counter, closing in place being bounded by the closure's open records.) What
   still needs deciding per limit is *where it is counted*: the ones that bound shape are per-container state the
   stream does not keep, where depth was a counter it already had, and the aggregate (total values) needs its own
   counter since §9.1 is explicit that the total is not bounded by the parts.

@@ -1,9 +1,9 @@
 # Resolver vocabulary, alias hops, `@meta.application`, and the kernel bootstrap
 
-The facts the resolver phases share rather than own: the leaf classes (`WireForm`, `MetaRefs`, `DerivedName`), how an
-alias chain is kept in resolved output and walked, the one derived key annotation, the compiled vocabulary a
-resolution reads `!C` bodies and annotation values through, and the special-cased bootstrap that resolves the kernel,
-meta.tn, itself. Current form only; history lives in git.
+The facts the resolver phases share rather than own: the leaf classes (`WireForm`, `MetaRefs`,
+`CanonicalApplication`), how an alias chain is kept in resolved output and walked, the one derived key annotation, the
+compiled vocabulary a resolution reads `!C` bodies and annotation values through, and the special-cased bootstrap that
+resolves the kernel, meta.tn, itself. Current form only; history lives in git.
 
 **Invariants**
 
@@ -14,9 +14,8 @@ meta.tn, itself. Current form only; history lives in git.
   it says which references it holds. It tells a type slot (`TypeExpr`: may take a construction in place) from a slot
   that holds a name alone (a map's key, a reference's `of`, an alias's target, a parent), and walks into a type
   written in place, which stays in place.
-- Nothing is named by its content: every entry has an author-written name. `DerivedName` is one method,
-  `canonicalApplication`, the comparison §8.2 keys an application on (the applied-parent fold, a recursion closing into
-  its declaration).
+- Nothing is named by its content: every entry has an author-written name. `CanonicalApplication` is one method,
+  `of`, the comparison §8.2 keys an application on (the applied-parent fold, a recursion closing into its declaration).
 - Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
   `ALIAS` entry. `AliasChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
 - `@meta.application` goes on the **key** of exactly the declarations that close an application of an open record,
@@ -46,10 +45,10 @@ meta.tn, itself. Current form only; history lives in git.
   refuses an undeclared name.
 
 Related: `design/schema-resolution.md` (definition resolution), `design/template-materialisation.md` and
-`design/open-records.md` (the callers of `WireForm` and `DerivedName`), `design/constructor-application.md`,
+`design/open-records.md` (the callers of `WireForm` and `CanonicalApplication`), `design/constructor-application.md`,
 `design/schema-grammar-and-desugaring.md` (sugar written in place), `design/linking-and-compilation.md`.
 
-## Shared vocabulary: `WireForm`, `MetaRefs`, `DerivedName`
+## Shared vocabulary: `WireForm`, `MetaRefs`, `CanonicalApplication`
 
 Leaf classes the phases share. Each owns a fact that belongs to none of them individually; stated inside whichever
 phase happens to need it first, such a fact ends up stated more than once.
@@ -62,8 +61,8 @@ sugar form's binding record (a nested construction in its `{ of: … }` wrapper,
 a text slot holding `"box<T>"` is text whatever it spells. `TsonObjectWriter` cannot build a binding record: its
 output is canonical-explicit and fully quoted, a different language from the one a binding is written in.
 
-**`MetaRefs`** — the `schema.meta` reference walk: `mapRefs` maps an entry's chain too, `mapRefsKeepingChain` leaves
-the chain as written. Its one caller is materialisation, closing an application where it stands. No pass rewrites a
+**`MetaRefs`** — the `schema.meta` reference walk: `mapRefs` maps every reference an entry's value holds and leaves
+its chain as written. Its one caller is materialisation, closing an application where it stands. No pass rewrites a
 use site onto the end of an alias chain — see "References are hops" below. A walk is a `Rewrite` with two arms:
 `atSlot` for a reference at a type slot, which may come back as a construction written in place, and `atName` for one
 at a slot that holds a name alone. Which body shape carries which references is a fact about the value model, stated
@@ -79,7 +78,7 @@ once, where the model is walked:
 §5.10's regularity check does not use the walk: every entry with parameters is an open record, and reads its
 applications off its references (`OpenEntry.applications`).
 
-**`DerivedName`** — §8.2's canonical rendering of an application, `canonicalApplication`, which compares two
+**`CanonicalApplication`** — §8.2's canonical rendering of an application, `of`, which compares two
 applications after their arguments' alias chains are followed: the applied-parent fold keys on it, and the
 materialiser asks it whether a nested application is the one a declaration is closing. Nothing is named by it.
 

@@ -53,8 +53,18 @@ final class Ancestry {
      * and nothing for the template itself. Empty for a head that is no template.
      */
     static List<String> ofTemplate(String head, DefinitionGetter namespace) {
-        Top template = namespace.definition(head);
+        Top template = namespace.definition(templateHead(head, namespace));
         return OpenEntry.isOpen(template) ? TypeChain.supertypesOf(template) : List.of();
+    }
+
+    /**
+     * The open record an application's {@code head} names: the head itself, or, where it is an alias of an open record
+     * ({@code pet_of => pet_box}), the open record at the end of its alias chain, the alias being the same entry under
+     * another name ([TSON-SCHEMA] §8.3). {@code head} itself where the chain ends at anything else.
+     */
+    static String templateHead(String head, DefinitionGetter namespace) {
+        String terminal = AliasChain.terminal(head, namespace::definition);
+        return !terminal.equals(head) && OpenEntry.isOpen(namespace.definition(terminal)) ? terminal : head;
     }
 
     /**
