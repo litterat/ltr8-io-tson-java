@@ -410,7 +410,7 @@ final class DefinitionResolver {
      * written <em>after</em> {@code =>} annotate the value and ride the entry's facts; those
      * written before the name annotate the <em>name</em>, and a resolver "does not hoist annotations from key
      * to value", so {@link SchemaResolver} binds them through this same method and places them on the output
-     * schema-map <em>key</em> (§8.1), beside the derived {@code @meta.synthetic} marker.
+     * schema-map <em>key</em> (§8.1), beside the derived {@code @meta.application}.
      *
      * <p>A value is bound the same way §6 describes reading one: the annotation's name resolves in the schema's one
      * namespace (§3.3.3), and its value is read by that type's own compiled reader -- so {@code

@@ -97,12 +97,6 @@ final class TemplateMaterialiser {
     private final Map<String, String> closingInto = new LinkedHashMap<>();
 
     /**
-     * Every application this pass closed into a declaration, to that declaration. Held beside the entries, never
-     * written ({@link #closedApplications}).
-     */
-    private final Map<TypeRef, String> closedApplications = new LinkedHashMap<>();
-
-    /**
      * Each instantiation entry's application as it was written, its nested arguments unreduced: what {@code
      * @meta.application} states on the entry's key, so a reader and a message see the reference the author wrote.
      */
@@ -245,7 +239,6 @@ final class TemplateMaterialiser {
         try {
             note(declaredName, RECORD);
             Top closed = closeOpenRecord((RecordBody) template, bind(parameters, arguments));
-            closedApplications.putIfAbsent(plain(application), declaredName);
             return instantiation(declaredName, closed, TypeRef.of(head, arguments), application);
         } finally {
             closingInto.remove(canonical);
@@ -586,11 +579,6 @@ final class TemplateMaterialiser {
     /** {@code reference} with nothing but its name and arguments: no annotations, no closure. */
     private static TypeRef plain(TypeRef reference) {
         return TypeRef.of(reference.name(), reference.arguments());
-    }
-
-    /** Every application this pass closed into a declaration, to that declaration. */
-    Map<TypeRef, String> closedApplications() {
-        return new LinkedHashMap<>(closedApplications);
     }
 
     /** The application {@code name}'s entry closes, as written, where it is an instantiation entry. */

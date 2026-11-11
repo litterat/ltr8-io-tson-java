@@ -1,7 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.compiler.ast.*;
-import io.ltr8.tson.compiler.ast.VoidValue;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
@@ -12,94 +10,28 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
- * [TSON-SCHEMA] §8.2's derived names, pinned by value.
- *
- * <p><b>The hash is not normative and these expectations are not a requirement.</b> §8.2 keys a closed
- * synthetic on structural equality and leaves the spelling to the implementation, which is why {@code
- * ResolvedForm} reduces every hash to a placeholder before comparing against the spec's own fixtures. That
- * is the right thing for a conformance comparison and it means those fixtures, and the {@code class2/schema/}
- * corpus layer with them, cannot see a rendering change at all.
- *
- * <p>So what these assertions are for is the other question: that a change to the rendering is <b>deliberate
- * rather than accidental</b>. An entry name is part of the resolved form and reaches an importing schema,
- * which derives the same name for the same form -- so the spelling being non-normative does not make it free
- * to drift between two builds of this library.
- *
- * <p><b>Both channels, because they are two functions.</b> {@link DerivedName#ofBinding} names a binding
- * record and {@link DerivedName#ofApplication} names an application; they render under the same tag letters
- * in different roles and share only their two leaves. {@code SchemaDesugarerTest} already pins the binding
- * side end to end; the application side had no value-level guard at all -- every assertion on one tested the
- * readable half with {@code startsWith}, which a change to the hashed rendering passes.
+ * [TSON-SCHEMA] §8.2's canonical application: two applications are one exactly when their renderings are equal,
+ * an argument compared as its parsed form.
  */
 class DerivedNameTest {
-
-    private static RecordValue.Field slot(String name, String value) {
-        return WireForm.nameField(name, value);
-    }
 
     private static TypeRef type(String name) {
         return TypeRef.of(name);
     }
 
     @Test
-    void aBindingRecordIsNamedByItsHeadAndSlots() {
-        assertEquals("array_text_4cc4a482",
-                DerivedName.ofBinding("array", List.of(slot("element_type", "text"))));
-        assertEquals("map_text_integer_5c4af9ec",
-                DerivedName.ofBinding("map", List.of(slot("key_type", "text"), slot("value_type", "integer"))));
+    void anApplicationIsRenderedByItsHeadAndArguments() {
+        assertEquals("A3:box(rn4:text())", DerivedName.canonicalApplication("box", List.of(type("text"))));
+        assertEquals(DerivedName.canonicalApplication("pair", List.of(type("uuid"), type("text"))),
+                DerivedName.canonicalApplication("pair", List.of(type("uuid"), type("text"))));
     }
 
+    /** A nested argument is its parsed form, so no spelling of names can stand for another arrangement of them. */
     @Test
-    void anApplicationIsNamedByItsHeadAndArguments() {
-        assertEquals("box_text_04117bb4", DerivedName.ofApplication("box", List.of(type("text"))));
-        assertEquals("pair_uuid_text_4b15adf4",
-                DerivedName.ofApplication("pair", List.of(type("uuid"), type("text"))));
-        assertEquals("grid_int32_125f0dd6", DerivedName.ofApplication("grid", List.of(type("int32"))));
-    }
-
-    /**
-     * <b>A map slot renders both halves of every entry.</b> A binding record whose map-typed slot differs
-     * only in a key is a different type, so the two names below must differ: were the map to fall to an
-     * unknown-value mark, two applications that are two types would share one entry and one set of
-     * constraints.
-     *
-     * <p>Asserted as inequality rather than by value: what matters is that the slot contributes, and the two
-     * spellings above are the pair that has to differ. The values themselves are pinned by the two tests
-     * above, whose renderings this shares every leaf with.
-     */
-    @Test
-    void aMapSlotContributesBothHalvesOfEveryEntry() {
-        assertNotEquals(DerivedName.ofBinding("keyed", List.of(keys("a.tn"))),
-                DerivedName.ofBinding("keyed", List.of(keys("b.tn"))));
-
-        // Asserted against the canonical rendering and not only the whole name, because the readable half
-        // splices the same text and would mask a hash that does not distinguish them -- the inverse of the
-        // startsWith hazard this class's own Javadoc names. §8.2 keys identity on the hashed rendering, so
-        // that is the half that has to be injective on its own.
-        assertNotEquals(DerivedName.canonicalBinding("keyed", List.of(keys("a.tn"))),
-                DerivedName.canonicalBinding("keyed", List.of(keys("b.tn"))));
-        assertNotEquals(DerivedName.canonicalBinding("keyed", List.of(keys("a.tn"))),
-                DerivedName.canonicalBinding("keyed", List.of(WireForm.nameField("keys", "a.tn"))),
-                "a one-entry map and a bare token are different slots and must not render alike");
-    }
-
-    /** {@code keys: { <key> => _ }} -- a one-entry map slot. */
-    private static RecordValue.Field keys(String key) {
-        MapValue map = new MapValue(List.of(new MapValue.MapEntry(
-                new DataValue(List.of(), java.util.Optional.empty(),
-                        new TokenValue(key, TokenForm.SINGLE_LINE_QUOTED)),
-                WireForm.plain(new VoidValue()))));
-        return new RecordValue.Field("keys", WireForm.plain(map));
-    }
-
-    /**
-     * The two channels are separate functions and must not be collapsed into one: a binding record renders
-     * its slots under their own field names where an application renders its arguments positionally, so the
-     * same head and the same text land on different entries.
-     */
-    @Test
-    void theTwoChannelsAreNotOneFunction() {
-        assertNotEquals(DerivedName.ofBinding("box", List.of(slot("v", "text"))),
-                DerivedName.ofApplication("box", List.of(type("text"))));
+    void theRenderingIsInjective() {
+        assertNotEquals(DerivedName.canonicalApplication("pair", List.of(type("a"), type("b"))),
+                DerivedName.canonicalApplication("pair", List.of(TypeRef.of("a", List.of(type("b"))))));
+        assertNotEquals(DerivedName.canonicalApplication("box", List.of(type("a(b)"))),
+                DerivedName.canonicalApplication("box", List.of(TypeRef.of("a", List.of(type("b"))))));
     }
 }

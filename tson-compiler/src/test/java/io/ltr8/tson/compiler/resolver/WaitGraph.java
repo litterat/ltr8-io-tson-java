@@ -58,7 +58,7 @@ import java.util.TreeSet;
  *
  * <p><b>Where the rule as written is silent</b>, this implements: an entry's value is read against its head tag,
  * not against the enclosing schema's {@code value_type} (the document read waits on that, see
- * {@link #documentWaits()}); a schema-map key's annotations ({@code @meta.synthetic}) belong to the schema map, so
+ * {@link #documentWaits()}); a schema-map key's annotations ({@code @meta.application}) belong to the schema map, so
  * they too are waits of the document read and not of the entry they mark; a bare token at a record position is
  * that record's shorthand for its one required field; a namespace type stating no
  * {@code key_type} has its keys read by their spelling, as {@code text}, the host judging them later.

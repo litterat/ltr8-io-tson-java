@@ -505,16 +505,6 @@ public final class SchemaResolver {
                         TsonSchema.withApplication(localOnly.getAnnotations(name), application));
             }
         }
-        // Every application closed to an entry of this schema, kept with the entry's facts for a message to name
-        // the entry by the application that closed to it (TsonSchema.EntryFacts.closes).
-        Map<String, List<io.ltr8.tson.schema.meta.TypeRef>> closes = new LinkedHashMap<>();
-        materialiser.closedApplications().forEach((application, entry) -> closes
-                .computeIfAbsent(entry, ignored -> new ArrayList<>()).add(application));
-        closes.forEach((name, closed) -> {
-            if (localOnly.containsKey(name)) {
-                facts.put(name, facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).withCloses(closed));
-            }
-        });
         Map<String, List<TsonSchema.ValueByName>> valuesByName = new LinkedHashMap<>();
         Map<String, List<TsonSchema.HeldValue>> heldValues = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> localFacts = new LinkedHashMap<>();
@@ -1093,14 +1083,12 @@ public final class SchemaResolver {
      * against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its transitivity and
      * its identity-based collision rule (§2.2.3), since this is the same concept applied one stage earlier: an
      * import contributes everything its namespace holds, one schema reached by
-     * several routes unifies, one synthetic minted by two documents unifies ({@link ImportedSynthetics}), and two
-     * different schemas declaring one name is the error.
+     * several routes unifies, and two different schemas declaring one name is the error.
      *
      * <p>An entry reached by several routes is kept as it first arrived, as the linker's merge keeps it. Every
      * import is already linked, so each route's copy carries the {@code subtypes} that route's own link credited
-     * over its own closure; the first copy's are kept and none is reconciled, and a synthetic minted by two
-     * documents is compared without them ({@link ImportedSynthetics}). Each entry's facts travel with it into {@code
-     * facts}, so the tag of a constructor's instance another schema declared is found here as a local one's is.
+     * over its own closure; the first copy's are kept and none is reconciled. Each entry's facts travel with it into
+     * {@code facts}, so the tag of a constructor's instance another schema declared is found here as a local one's is.
      */
     private Map<String, Top> mergeImports(SchemaDocument document,
             Map<String, Annotations> importedNameAnnotations, Map<String, TsonSchema.EntryFacts> facts,
@@ -1125,16 +1113,11 @@ public final class SchemaResolver {
                 }
                 if (incumbent != null) {
                     if (!incumbent.equals(origin)) {
-                        // One synthetic minted by two documents is one entry (§8.2), whichever declared each.
-                        TsonSchema.EntryFacts arriving = imported.schema().factsOf(name);
-                        if (!ImportedSynthetics.areOne(name, facts.get(name), merged.get(name), incumbent, arriving,
-                                entry.getValue(), origin)) {
-                            throw new SchemaValidationException("'" + name + "' is declared by two different "
-                                    + "schemas reached through !!import ('" + incumbent + "' and '" + origin
-                                    + "') -- distinct types cannot share one name in the flat namespace; import "
-                                    + "one of them, or a version of each that agrees on where '" + name
-                                    + "' is declared");
-                        }
+                        throw new SchemaValidationException("'" + name + "' is declared by two different "
+                                + "schemas reached through !!import ('" + incumbent + "' and '" + origin
+                                + "') -- distinct types cannot share one name in the flat namespace; import "
+                                + "one of them, or a version of each that agrees on where '" + name
+                                + "' is declared");
                     }
                     continue;
                 }

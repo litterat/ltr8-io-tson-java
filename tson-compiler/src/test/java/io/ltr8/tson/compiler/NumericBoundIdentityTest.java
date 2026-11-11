@@ -15,15 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-DATA] §4.3's numeric equivalence, applied where [TSON-SCHEMA] §8.2 derives an entry's identity
- * ({@link io.ltr8.tson.compiler.resolver} {@code NumericIdentity}). {@code 255} and {@code 0xFF} are one
- * number, so a size bound that differs only in which one the author wrote lifts to one binding record and one
- * entry.
+ * [TSON-DATA] §4.3's numeric equivalence, applied where [TSON-SCHEMA] §8.2 compares a type written in place by its
+ * structure. {@code 255} and {@code 0xFF} are one number, read as one count, so a size bound that differs only in
+ * which one the author wrote is one construction.
  *
- * <p><b>The stake is a verdict, not a redundant entry.</b> §5.4 requires a choice's variants to resolve to
- * distinct types, and it asks that question of entry names -- so two names for one type would pass a check two
- * spellings of one name fail, and {@code ( [float32; 255] | [float32; 0xFF] )} would be admitted as a choice
- * between two identical variants that no untagged read could ever discriminate.
+ * <p><b>The stake is a verdict.</b> §5.4 requires a choice's variants to be distinct types, so {@code ( [float32; 255]
+ * | [float32; 0xFF] )} is a choice between two identical variants that no untagged read could ever discriminate.
  */
 class NumericBoundIdentityTest {
 

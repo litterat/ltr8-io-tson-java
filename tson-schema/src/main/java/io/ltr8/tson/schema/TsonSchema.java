@@ -40,8 +40,8 @@ import java.util.Optional;
  * names. None of it is a field of any constructor, so binding a value never fills it, and none of it is written.
  *
  * <p><b>An instantiation's application is a key annotation</b>, {@code @meta.application} ({@link #applicationOf}):
- * an entry of any kind can close a template application, so the fact is about the entry and sits beside it, as
- * {@code @meta.synthetic} does, where resolved output writes it and ingest reads it as stated.
+ * an entry of any kind can close a template application, so the fact is about the entry and sits beside it, where
+ * resolved output writes it and ingest reads it as stated.
  *
  * <p><b>{@code id} is required, not {@code Optional}</b> -- the grammar itself marks {@code !!id} optional (a raw
  * parsed {@code SchemaDocument} can genuinely lack one), but a {@code TsonSchema} value -- the *resolved*,
@@ -96,8 +96,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
 
     /**
      * An entry's facts beyond its value ({@link TsonSchema}'s own Javadoc). {@code position} is where the
-     * declaration's name sits in the schema text it was resolved from, absent for an entry the resolver minted
-     * (which is what tells a derived name from a declared one). {@code annotations} are those written after
+     * declaration's name sits in the schema text it was resolved from. {@code annotations} are those written after
      * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before
      * the name are the key's ({@link #entries}). {@code constructor} is the constructor
      * the value applies -- the tag resolved output writes, {@code !numeric.integer_type}, {@code !enum}, {@code
@@ -105,61 +104,40 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * entry a {@code ^} declaration's head names, as written: §5.7's refinement restates fields and adds none,
      * which is what lets a tightened constructor bind as the one it tightens, and the chain cannot tell it from a
      * composition adding nothing. All of it is provenance, and none of it is written ([TSON-SCHEMA] §8.1).
-     * {@code synthetic} is the key's {@code @meta.synthetic} mark as {@link #factsOf} reads it: a form no author
-     * named, which a message names by its spelling or not at all. {@code closes} is every application the resolver
-     * closed to this entry, as it met them, an expansion's among them, which carries no {@code @meta.application}: what
-     * a message names an expansion by.
      */
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
-                             Optional<String> constructor, Optional<String> refines, boolean synthetic,
-                             List<TypeRef> closes) {
+                             Optional<String> constructor, Optional<String> refines) {
 
-        /** An entry with none of the six. */
+        /** An entry with none of the four. */
         public static final EntryFacts NONE = new EntryFacts(Optional.empty(), Annotations.empty(), Optional.empty(),
-                Optional.empty(), false, List.of());
+                Optional.empty());
 
         public EntryFacts {
             position = position == null ? Optional.empty() : position;
             annotations = annotations == null ? Annotations.empty() : annotations;
             constructor = constructor == null ? Optional.empty() : constructor;
             refines = refines == null ? Optional.empty() : refines;
-            closes = closes == null ? List.of() : List.copyOf(closes);
-        }
-
-        /** The same facts with {@code closes} in place of these. */
-        public EntryFacts(Optional<SourcePosition> position, Annotations annotations, Optional<String> constructor,
-                          Optional<String> refines, boolean synthetic) {
-            this(position, annotations, constructor, refines, synthetic, List.of());
         }
 
         /** Whether this holds nothing at all -- the facts a schema need not record. */
         public boolean isEmpty() {
-            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty() && refines.isEmpty()
-                    && !synthetic && closes.isEmpty();
-        }
-
-        public EntryFacts withCloses(List<TypeRef> closes) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
+            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty() && refines.isEmpty();
         }
 
         public EntryFacts withPosition(Optional<SourcePosition> position) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
+            return new EntryFacts(position, annotations, constructor, refines);
         }
 
         public EntryFacts withAnnotations(Annotations annotations) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
+            return new EntryFacts(position, annotations, constructor, refines);
         }
 
         public EntryFacts withConstructor(Optional<String> constructor) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
+            return new EntryFacts(position, annotations, constructor, refines);
         }
 
         public EntryFacts withRefines(Optional<String> refines) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
-        }
-
-        public EntryFacts withSynthetic(boolean synthetic) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
+            return new EntryFacts(position, annotations, constructor, refines);
         }
 
         /** An entry declared at {@code position}. */
@@ -331,8 +309,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
 
     /** {@code name}'s facts, {@link EntryFacts#NONE} for an entry with none or a name this schema lacks. */
     public EntryFacts factsOf(String name) {
-        EntryFacts known = facts.getOrDefault(name, EntryFacts.NONE);
-        return entries.getAnnotations(name).has(SYNTHETIC) ? known.withSynthetic(true) : known;
+        return facts.getOrDefault(name, EntryFacts.NONE);
     }
 
     /** Where {@code name} was declared -- absent for an entry the resolver minted. */
@@ -367,9 +344,6 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
 
     /** The kernel's {@code application} annotation, derived and never author-written (§8.2). */
     public static final String APPLICATION = "meta.application";
-
-    /** The kernel's {@code synthetic} annotation: the key of a form no author named (§8.2). */
-    public static final String SYNTHETIC = "meta.synthetic";
 
     /**
      * The constructor {@code name}'s value applies: the one its facts record, and otherwise the one its Java

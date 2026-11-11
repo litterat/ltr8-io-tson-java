@@ -610,63 +610,6 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * A synthetic's identity is its form (§8.2): two libraries that each mint {@code array_text_…} for {@code [text]},
-     * neither importing the other, declare one entry, and a schema importing both takes it once, from the first.
-     */
-    @Test
-    void oneSyntheticMintedByTwoImportsUnifies() {
-        TsonLinkedSchema linked = TsonSchemaLinker.link(importingBoth(),
-                twoMinting(true, emptyRecord(), true, emptyRecord()));
-
-        assertEquals(CanonicalIdentity.canonicalize("https://example.test/import-one.tn"),
-                linked.originOf("minted_name"));
-        assertTrue(linked.schema().factsOf("minted_name").synthetic());
-    }
-
-    /** A name only one side minted is a declared entry meeting a synthetic, and still the §2.2.3 collision. */
-    @Test
-    void aSyntheticAndADeclaredEntryOfOneNameCollide() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> TsonSchemaLinker.link(importingBoth(),
-                        twoMinting(true, emptyRecord(), false, emptyRecord())));
-        assertTrue(thrown.getMessage().contains("'minted_name' is declared by two different schemas"),
-                thrown::getMessage);
-    }
-
-    /** Two forms under one minted name are a broken naming function, neither the author's error nor a gap. */
-    @Test
-    void twoFormsUnderOneMintedNameAreAnInvariantBreak() {
-        assertThrows(IllegalStateException.class,
-                () -> TsonSchemaLinker.link(importingBoth(),
-                        twoMinting(true, emptyRecord(), true, textEntry())));
-    }
-
-    /** The importer of {@code import-one.tn} and {@code import-two.tn}, declaring nothing itself. */
-    private static TsonSchema importingBoth() {
-        return new TsonSchema("https://example.test/importer.tn",
-                List.of("https://example.test/import-one.tn", "https://example.test/import-two.tn"), Map.of());
-    }
-
-    /** Two schemas each declaring {@code minted_name}, its key marked {@code @meta.synthetic} where asked. */
-    private static TsonSchemaLoader twoMinting(boolean firstSynthetic, Top first, boolean secondSynthetic,
-                                               Top second) {
-        Map<String, TsonLinkedSchema> byIdentity = Map.of(
-                CanonicalIdentity.canonicalize("https://example.test/import-one.tn"),
-                minting("https://example.test/import-one.tn", firstSynthetic, first),
-                CanonicalIdentity.canonicalize("https://example.test/import-two.tn"),
-                minting("https://example.test/import-two.tn", secondSynthetic, second));
-        return id -> Optional.ofNullable(byIdentity.get(id));
-    }
-
-    private static TsonLinkedSchema minting(String id, boolean synthetic, Top body) {
-        AnnotatedMap<String, Top> entries = new AnnotatedMap<>();
-        entries.put("minted_name", body, synthetic
-                ? Annotations.of(List.of(Annotation.of(TsonSchema.SYNTHETIC))) : Annotations.empty());
-        return new TsonLinkedSchema(new TsonSchema(id, List.of(), entries, false, Map.of(), Map.of()),
-                Map.of("minted_name", CanonicalIdentity.canonicalize(id)));
-    }
-
-    /**
      * The other side of the identity rule: <b>one</b> schema reached by two routes unifies. {@code b.tn}
      * imports {@code shared.tn} and the importer names both, so every one of {@code shared.tn}'s entries
      * arrives twice -- the diamond every schema importing core.tn forms. A name-occurrence rule rejects it;

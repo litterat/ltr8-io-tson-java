@@ -12,7 +12,6 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.ConstructionSugar;
-import io.ltr8.tson.compiler.resolver.ImportedSynthetics;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.*;
@@ -1235,9 +1234,8 @@ public final class TsonSchemaLinker {
         boolean namesTypes = KindMembers.namesTypes(reference.of().name(), structure);
         List<String> members = namesTypes ? KindMembers.of(reference, merged,
                 name -> constructorOf(name, merged.get(name), facts), structure) : List.of();
-        // A message lists the members as an author writes them: by name, a minted one, named by nobody, left out.
-        List<String> shown = members.stream()
-                .filter(name -> !facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).synthetic()).toList();
+        // A message lists the members by name, before the pending ones a partial link adds.
+        List<String> shown = members;
         if (namesTypes && !pending.isEmpty()) {
             members = java.util.stream.Stream.concat(members.stream(), pending.stream()).distinct().toList();
         }
@@ -1277,9 +1275,6 @@ public final class TsonSchemaLinker {
      * {@code /2026/40/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
      * conflict between two identically-spelled types much later.
      *
-     * <p><b>A synthetic's identity is its form</b> (§8.2): two documents that each mint one synthetic, neither
-     * importing the other, declare one entry, which unifies like a diamond's ({@link ImportedSynthetics}).
-     *
      * <p>Identity is the canonical one ([TSON-DATA] §2.2.1), so a pinned and an unpinned reference to one
      * schema unify -- which is what lets an author pin their own import while a peer's is unpinned.
      */
@@ -1315,16 +1310,11 @@ public final class TsonSchemaLinker {
                 }
                 if (incumbent != null) {
                     if (!incumbent.equals(origin)) {
-                        // One synthetic minted by two documents is one entry (§8.2), whichever declared each.
-                        TsonSchema.EntryFacts arriving = imported.schema().factsOf(name);
-                        if (!ImportedSynthetics.areOne(name, facts.get(name), merged.get(name), incumbent, arriving,
-                                entry.getValue(), origin)) {
-                            throw new SchemaValidationException("'" + name + "' is declared by two different "
-                                    + "schemas reached through !!import ('" + incumbent + "' and '" + origin
-                                    + "') -- distinct types cannot share one name in the flat namespace; import "
-                                    + "one of them, or a version of each that agrees on where '" + name
-                                    + "' is declared");
-                        }
+                        throw new SchemaValidationException("'" + name + "' is declared by two different "
+                                + "schemas reached through !!import ('" + incumbent + "' and '" + origin
+                                + "') -- distinct types cannot share one name in the flat namespace; import "
+                                + "one of them, or a version of each that agrees on where '" + name
+                                + "' is declared");
                     }
                     merged.put(name, unified(merged.get(name), entry.getValue()));
                     continue;

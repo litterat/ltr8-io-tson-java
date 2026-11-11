@@ -31,8 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>What the assertions are for.</b> Every fixture entry must read back, must have a counterpart here,
  * and must resolve to the same thing: no category of difference is expected or tolerated. What is
- * normalised before comparing -- index order, a synthetic's content hash, this model's own source position
- * -- is {@link ResolvedForm}'s to state, and it states it once for this and for the Class 2 conformance
+ * normalised before comparing -- index order and this model's own source position -- is {@link ResolvedForm}'s to
+ * state, and it states it once for this and for the Class 2 conformance
  * runner, which asks the same question of a corpus vector's expected side.
  */
 class ResolvedFixtureTest {
@@ -73,11 +73,6 @@ class ResolvedFixtureTest {
     /** This schema's OWN entries -- the fixture is resolver output, from before an import merged anything in. */
     private static Map<String, Top> ourEntries(String id) {
         return ResolvedForm.ownEntries(tson(), id);
-    }
-
-    /** The keys a fixture marks {@code @meta.synthetic}, hashes normalised. */
-    private static Set<String> fixtureSynthetics(String file) throws Exception {
-        return ResolvedForm.markedSynthetics(Files.readString(specDirectory().resolve(file)));
     }
 
     /** {@code spec/fixtures}, found by walking up rather than assumed relative to a working directory. */
@@ -201,21 +196,5 @@ class ResolvedFixtureTest {
         assertTrue(ResolvedForm.fixtureValueAnnotations(Files.readString(specDirectory()
                 .resolve("meta-resolved.tn"))).get("doc").contains("@meta.annotation"),
                 "meta-resolved.tn marks doc's value @meta.annotation");
-    }
-
-    /**
-     * <b>And no entry is synthetic on either side.</b> A sugar form is written in place at its slot, so nothing is
-     * lifted or minted and no key carries {@code @meta.synthetic}, which the kernel no longer declares: the fixtures
-     * mark none, and this resolver marks none.
-     *
-     * <p>This is the one assertion here that does not go through the bound document -- see {@link
-     * ResolvedForm#markedSynthetics}.
-     */
-    @Test
-    void noEntryIsMarkedSyntheticOnEitherSide() throws Exception {
-        for (Map.Entry<String, String> fixture : FIXTURES.entrySet()) {
-            assertEquals(Set.of(), fixtureSynthetics(fixture.getKey()), fixture.getKey());
-            assertEquals(Set.of(), ResolvedForm.ourSynthetics(tson(), fixture.getValue()), fixture.getKey());
-        }
     }
 }

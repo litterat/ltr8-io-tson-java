@@ -448,10 +448,9 @@ public final class KernelBootstrapResolver {
                     fieldToken(instance.value(), "voidable").map(Boolean::parseBoolean).orElse(false),
                     fieldToken(instance.value(), "ordered").map(Boolean::parseBoolean).orElse(false),
                     optionalCount(instance.value(), "min_items"), optionalCount(instance.value(), "max_items"));
-            // `enum_set => !meta.set_type { element_type: text  min_items: 1 }`: array and set differ only in the
-            // defaults set tightens (§5.7), ordered/duplicating vs unordered/unique.
-            case "meta.array" -> toArrayBody(instance.value(), false);
-            case "meta.set_type" -> toArrayBody(instance.value(), true);
+            // `enum_set => !meta.set_type { element_type: text  min_items: 1 }`: an array with the facets set pins
+            // (§5.3), unordered and unique.
+            case "meta.set_type" -> toSetBody(instance.value());
             // `void => !meta.void_type {}`: the one value it admits is `_`, and it has no facets.
             case "meta.void_type" -> {
                 requireEmptyBody(instance);
@@ -478,13 +477,12 @@ public final class KernelBootstrapResolver {
     }
 
     /**
-     * {@code !meta.array { element_type: T  min_items?: N  max_items?: M }}, or the same for {@code !meta.set_type},
-     * as the body it denotes -- every fact the binding record states, so a hand-built body is the one the ordinary path
-     * would read.
+     * {@code !meta.set_type { element_type: T  min_items?: N  max_items?: M }} as the body it denotes -- every fact the
+     * binding record states, so a hand-built body is the one the ordinary path would read.
      */
-    private static ArrayBody toArrayBody(DataValue value, boolean set) {
+    private static ArrayBody toSetBody(DataValue value) {
         TypeRef element = TypeRef.of(bindingField(value, "element_type"));
-        return new ArrayBody(element, false, !set, set, optionalCount(value, "min_items"),
+        return new ArrayBody(element, false, false, true, optionalCount(value, "min_items"),
                 optionalCount(value, "max_items"));
     }
 

@@ -128,8 +128,7 @@ public final class ConstructionSugar {
     /**
      * The construction {@code written<arguments>} denotes, as the binding record {@code !C { … }} would write: each
      * argument at its slot, in the held spelling ({@link WireForm#refValue}), so an argument that is itself an
-     * application stays one for materialisation to close and the record names one entry with the sugar forms'
-     * ({@link DerivedName#ofBinding}).
+     * application stays one for materialisation to close where it lands.
      *
      * @param written the head as the author wrote it, for a refusal
      * @param slots the constructor's argument slots ({@link #slots})
