@@ -153,7 +153,8 @@ class ResolvedFixtureTest {
      *
      * <p>What the agreement rests on is worth knowing before changing any of it: {@code array}, {@code set}
      * and {@code map} carry no parameter lists ([TSON-SCHEMA] §4.2), so a container form is never an
-     * application of one, and every sugar form lifts to a synthetic entry instead (§5.3).
+     * application of one, and every sugar form is the construction written in place at the slot that wrote it,
+     * {@code { of: !meta.array { … } }} (§5.3).
      */
     @Test
     void everyEntryResolvesIdentically() throws Exception {
@@ -203,25 +204,18 @@ class ResolvedFixtureTest {
     }
 
     /**
-     * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
-     * {@code @meta.synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
-     * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark six keys
-     * in meta.tn and three in net.tn, each at its document's root; numeric.tn, temporal.tn and core.tn lift no inline
-     * form and have none, which is as much a statement as the others.
+     * <b>And no entry is synthetic on either side.</b> A sugar form is written in place at its slot, so nothing is
+     * lifted or minted and no key carries {@code @meta.synthetic}, which the kernel no longer declares: the fixtures
+     * mark none, and this resolver marks none.
      *
      * <p>This is the one assertion here that does not go through the bound document -- see {@link
      * ResolvedForm#markedSynthetics}.
      */
     @Test
-    void theSameEntriesAreMarkedSyntheticOnBothSides() throws Exception {
-        // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
-        // scan that stopped matching or a resolver that stopped marking.
-        assertEquals(6, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks six keys");
-        assertEquals(3, fixtureSynthetics("net-resolved.tn").size(), "net.tn marks three keys");
-
+    void noEntryIsMarkedSyntheticOnEitherSide() throws Exception {
         for (Map.Entry<String, String> fixture : FIXTURES.entrySet()) {
-            assertEquals(fixtureSynthetics(fixture.getKey()),
-                    ResolvedForm.ourSynthetics(tson(), fixture.getValue()), fixture.getKey());
+            assertEquals(Set.of(), fixtureSynthetics(fixture.getKey()), fixture.getKey());
+            assertEquals(Set.of(), ResolvedForm.ourSynthetics(tson(), fixture.getValue()), fixture.getKey());
         }
     }
 }

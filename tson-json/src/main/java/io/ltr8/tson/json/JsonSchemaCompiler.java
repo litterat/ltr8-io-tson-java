@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeInline;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -58,6 +59,29 @@ public final class JsonSchemaCompiler {
         return compiled;
     }
 
+    /**
+     * Builds the reader of a type written in place ({@link TypeInline}) from its body, through the factory its
+     * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice or a reference, named
+     * for a message by the form as written. It holds the factories, the linked schema and the readers' handle, never
+     * the {@link Compilation}.
+     */
+    private static final class InlineReaders {
+        private final TsonLinkedSchema linked;
+        private final ValueReaderFactoryResolver factories;
+        private CompiledReaders readers;
+
+        InlineReaders(TsonLinkedSchema linked, ValueReaderFactoryResolver factories) {
+            this.linked = linked;
+            this.factories = factories;
+        }
+
+        JsonTypeReader<?> build(TypeInline type) {
+            Top read = type.of() instanceof NamespaceBody namespace ? namespace.read() : type.of();
+            return factories.resolve(constructorOf(read)).create(type.text(), read,
+                    new ValueReaderContext(linked, readers));
+        }
+    }
+
     /** One compile's own state: what is finished, what is in flight, and the factories it dispatches through. */
     private static final class Compilation {
 
@@ -68,12 +92,15 @@ public final class JsonSchemaCompiler {
         private final Set<String> building = new LinkedHashSet<>();
 
         /** How a factory reaches another entry's reader -- rebound once, when this ends. */
-        private final CompiledReaders readers = new CompiledReaders(this::resolve);
+        private final CompiledReaders readers;
 
         Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories) {
             this.linked = linked;
             this.schema = linked.schema();
             this.factories = factories;
+            InlineReaders inline = new InlineReaders(linked, factories);
+            this.readers = new CompiledReaders(this::resolve, inline::build);
+            inline.readers = readers;
         }
 
         JsonTypeReader<?> resolve(String name) {

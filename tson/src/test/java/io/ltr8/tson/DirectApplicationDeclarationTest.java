@@ -105,7 +105,7 @@ class DirectApplicationDeclarationTest {
         assertEquals(List.of(), named(linked, "box_"),
                 () -> "one entry for one application: " + linked.schema().entries().keySet());
         RecordBody holder = (RecordBody) linked.schema().entries().get("holder");
-        assertEquals("bx", holder.fields().values().stream().toList().get(0).typeRef().name(),
+        assertEquals("bx", holder.fields().values().stream().toList().get(0).typeExpr().text(),
                 "the field names the declaration, which is what the application denotes");
     }
 

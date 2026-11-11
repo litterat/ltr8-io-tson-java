@@ -665,7 +665,7 @@ class DefinitionResolverTest {
         // as SchemaResolver does: each bracket form is lifted to its own entry, so what the resolver sees at
         // each field is a bare name.
         SchemaMap schemaMap = SchemaDesugarer.desugar(
-                new TsonSchemaParser(readFixture("meta.tn")).parseSchemaDocument(), Set.of()).body();
+                new TsonSchemaParser(readFixture("meta.tn")).parseSchemaDocument()).body();
 
         Top fieldGroup = resolver.resolve(schemaMap.declarations().get("meta.field_group"));
 
@@ -1554,7 +1554,7 @@ class DefinitionResolverTest {
 
     private SchemaMap schemaMapFromFixture(String name) throws IOException {
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/" + name).normalize());
-        return SchemaDesugarer.desugar(new TsonSchemaParser(source).parseSchemaDocument(), Set.of()).body();
+        return SchemaDesugarer.desugar(new TsonSchemaParser(source).parseSchemaDocument()).body();
     }
 
     /**
@@ -1648,8 +1648,7 @@ class DefinitionResolverTest {
     private SchemaMap kernelDeclarations() throws IOException {
         Map<String, SchemaMap.Declaration> declarations = new java.util.LinkedHashMap<>();
         for (String file : List.of("meta.tn", "numeric.tn", "temporal.tn", "net.tn")) {
-            SchemaMap map = SchemaDesugarer.desugar(new TsonSchemaParser(readFixture(file)).parseSchemaDocument(),
-                    Set.of()).body();
+            SchemaMap map = SchemaDesugarer.desugar(new TsonSchemaParser(readFixture(file)).parseSchemaDocument()).body();
             map.declarations().forEach(declarations::putIfAbsent);
         }
         return new SchemaMap(List.of(), declarations);
@@ -1667,7 +1666,7 @@ class DefinitionResolverTest {
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema { %s }""".formatted(declaration)).parseSchemaDocument();
         TsonCompiledVocabulary kernelVocabulary = compiledKernel();
-        SchemaMap schemaMap = SchemaDesugarer.desugar(document, Set.of()).body();
+        SchemaMap schemaMap = SchemaDesugarer.desugar(document).body();
         return definitionResolverFor(kernelVocabulary, resolved::get, snippetFacts)
                 .resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
     }

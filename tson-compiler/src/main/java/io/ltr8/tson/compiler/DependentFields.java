@@ -14,6 +14,9 @@ import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.KernelNames;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -97,15 +100,16 @@ final class DependentFields {
                                      Map<String, Top> namespace) {
         RecordField field = record.fields().get(sibling.field());
         String about = "'" + entryName + "': field '" + dependent + "' takes its type from '" + sibling.field() + "'";
-        if (!(field.type() instanceof TypeRef type)) {
+        if (field.type() instanceof SiblingRef) {
             throw new SchemaValidationException(about + ", which is itself a dependent field ('" + field.type().text()
                     + "') and names no types -- a sibling is typed by a reference whose values name types, "
                     + "meta.type_ref or a meta.ref<C> over a constructor (§5.2)");
         }
-        if (!namesTypes(type, namespace)) {
-            throw new SchemaValidationException(about + ", which is typed '" + type.text() + "' -- a sibling is "
-                    + "typed by a reference whose values name types, meta.type_ref, a meta.ref<C> over a constructor, "
-                    + "or a refinement of either, so that every value it holds names a type to read '" + dependent
+        if (!namesTypes(field.typeExpr(), namespace)) {
+            throw new SchemaValidationException(about + ", which is typed '" + field.type().text() + "' -- a sibling "
+                    + "is typed by a reference whose values name types, meta.type_ref, a meta.ref<C> over a "
+                    + "constructor, or a refinement of either, or by what a type slot holds (meta.type_expr, "
+                    + "meta.field_type_expr), so that every value it holds names a type to read '" + dependent
                     + "' against (§5.2)");
         }
         if (field.voidable()) {
@@ -158,13 +162,31 @@ final class DependentFields {
     }
 
     /** Whether a field typed {@code type} holds names of types: past its alias hops, a reference over a constructor. */
-    private static boolean namesTypes(TypeRef type, Map<String, Top> namespace) {
-        if (!type.arguments().isEmpty()) {
-            return false; // a closed record names an application's entry bare; an open one is judged when it closes
-        }
-        Top target = namespace.get(AliasChain.terminal(type.name(), namespace));
+    /**
+     * Whether a sibling typed {@code type} holds type names: a reference naming types, written by name or in place
+     * ({@code meta.ref<C>}), or the kernel's {@code meta.type_expr} or {@code meta.field_type_expr}, whose names are
+     * a reference naming types and whose other variant, a type written in place, names no entry -- a value is never
+     * read against one, a value being admitted only on an atom or an enum.
+     */
+    private static boolean namesTypes(TypeExpr type, Map<String, Top> namespace) {
+        Top target = switch (type) {
+            // A closed record names no application bare; an open one is judged when it closes.
+            case TypeRef reference when !reference.arguments().isEmpty() -> null;
+            case TypeRef reference -> {
+                String terminal = AliasChain.terminal(reference.name(), namespace);
+                if (SLOT_CHOICES.contains(terminal)) {
+                    yield namespace.get(KernelNames.of("type_ref"));
+                }
+                yield namespace.get(terminal);
+            }
+            case TypeInline inline -> inline.of();
+        };
         return target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get);
     }
+
+    /** The kernel's two choices a type slot is typed by: a type's name, or a type written in place. */
+    private static final java.util.Set<String> SLOT_CHOICES = java.util.Set.of(KernelNames.of("type_expr"),
+            KernelNames.of("field_type_expr"));
 
     /**
      * Why {@code restated} is no restatement of {@code inherited} where either is a dependent field, or empty where

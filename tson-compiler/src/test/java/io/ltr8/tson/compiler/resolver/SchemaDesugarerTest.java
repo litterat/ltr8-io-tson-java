@@ -64,7 +64,7 @@ class SchemaDesugarerTest {
     }
 
     private static SchemaDocument desugar(String declarations, Set<String> imported) {
-        return SchemaDesugarer.desugar(parse(declarations), imported);
+        return SchemaDesugarer.desugar(parse(declarations));
     }
 
     /** The injected declaration for the sole form in {@code document} whose derived name starts with {@code prefix}. */
@@ -106,7 +106,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = parser.parseSchemaDocument();
         SchemaPositions positions = parser.schemaPositions();
 
-        SchemaDocument desugared = SchemaDesugarer.desugar(document, Set.of(), null, positions);
+        SchemaDocument desugared = SchemaDesugarer.desugar(document, null, positions);
 
         Map<String, SchemaMap.Declaration> after = desugared.body().declarations();
         assertNotSame(document.body().declarations().get("sugared"), after.get("sugared"),
@@ -121,7 +121,7 @@ class SchemaDesugarerTest {
     void aDocumentWithNoSugarComesBackUntouched() {
         SchemaDocument document = parse("  plain => { a: text  b: integer? }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     // ── The desugar table (§5.3) ─────────────────────────────────────────
@@ -597,7 +597,7 @@ class SchemaDesugarerTest {
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     /**
@@ -626,7 +626,7 @@ class SchemaDesugarerTest {
     void applyingAnImportedTemplateIsLeftForMaterialisationToo() {
         SchemaDocument document = parse("  holder => { b: elsewhere<text> }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of("elsewhere")));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     /**
@@ -638,7 +638,7 @@ class SchemaDesugarerTest {
     void aKernelConstructorNameAtAHeadIsNoLongerAnApplication() {
         SchemaDocument document = parse("  holder => { m: map<text, integer> }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     /** Applying arguments to a local declaration that takes none is the author's error, not a library gap. */
@@ -655,7 +655,7 @@ class SchemaDesugarerTest {
     void anUnknownHeadIsStillPassedThrough() {
         SchemaDocument document = parse("  holder => { b: nowhere<text> }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     // ── Rendering helpers ────────────────────────────────────────────────

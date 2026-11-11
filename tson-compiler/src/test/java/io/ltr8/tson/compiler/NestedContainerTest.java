@@ -91,7 +91,7 @@ class NestedContainerTest {
         assertEquals(TypeRef.of("text"), outer.elements().get(1).elementType());
 
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
-                entry(compiled, outer.elements().get(0).elementType().name()));
+                entry(compiled, outer.elements().get(0).elementType().text()));
         assertEquals(TypeRef.of("integer"), inner.elementType());
         assertEquals(Optional.of(2L), inner.minItems());
         assertEquals(Optional.of(2L), inner.maxItems());
@@ -119,7 +119,7 @@ class NestedContainerTest {
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
         assertEquals(Optional.of(3L), outer.minItems());
-        ArrayBody inner = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementName().name()));
+        ArrayBody inner = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().text()));
         assertEquals(TypeRef.of("integer"), inner.elementType());
         assertEquals(Optional.empty(), inner.maxItems(), "the inner array is unconstrained");
 
@@ -145,7 +145,7 @@ class NestedContainerTest {
         ArrayBody rows = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
         List<String> arrayEntries = compiled.schema().entries().keySet().stream()
                 .filter(name -> name.startsWith("array_integer_")).toList();
-        assertEquals(List.of(rows.elementName().name()), arrayEntries,
+        assertEquals(List.of(rows.elementType().text()), arrayEntries,
                 "one injected array<integer>, shared by every spelling of it");
     }
 
@@ -194,8 +194,8 @@ class NestedContainerTest {
         TsonCompiledSchema compiled = compile("  deep => [[[integer]]]");
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "deep"));
-        ArrayBody middle = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementName().name()));
-        ArrayBody innermost = assertInstanceOf(ArrayBody.class, entry(compiled, middle.elementName().name()));
+        ArrayBody middle = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().text()));
+        ArrayBody innermost = assertInstanceOf(ArrayBody.class, entry(compiled, middle.elementType().text()));
         assertEquals(TypeRef.of("integer"), innermost.elementType());
 
         assertNotNull((TsonValue) compiled.get("deep").read(TestDocuments.document("[ [ [1 2] [3] ] [] ]")));

@@ -36,9 +36,9 @@ class AliasChainTest {
     }
 
     private static TypeRef fieldType(Top definition, String field) {
-        return assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
+        return assertInstanceOf(TypeRef.class, assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
                 .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeRef();
+                .typeExpr());
     }
 
     private static Top kernelEntry(String name) {
@@ -101,7 +101,7 @@ class AliasChainTest {
         Top injected = resolve("  a => text\n  holder => { f: [a] }",
                 fieldType(holder, "f").name());
         assertEquals("a", assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class,
-                injected).elementName().name());
+                injected).elementType().text());
     }
 
     /**

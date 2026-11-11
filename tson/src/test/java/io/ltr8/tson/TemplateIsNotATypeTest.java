@@ -237,7 +237,7 @@ class TemplateIsNotATypeTest {
 
     private static String fieldType(TsonLinkedSchema schema, String entry, String field) {
         return switch (schema.schema().entries().get(entry)) {
-            case RecordBody record -> record.fields().get(field).typeRef().name();
+            case RecordBody record -> record.fields().get(field).typeExpr().text();
             default -> throw new AssertionError(entry + " is no record");
         };
     }

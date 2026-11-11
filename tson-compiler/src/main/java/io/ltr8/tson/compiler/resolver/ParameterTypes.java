@@ -18,6 +18,8 @@ import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 
@@ -300,7 +302,7 @@ final class ParameterTypes {
             List<Map.Entry<String, RecordField>> unmarked = vocabulary.fields().entrySet().stream()
                     .filter(f -> !f.getValue().optional()).toList();
             if (unmarked.size() == 1) {
-                unmarked.getFirst().getValue().namedType().ifPresent(type -> value(payload, type,
+                unmarked.getFirst().getValue().ownType().ifPresent(type -> value(payload, type,
                         constructor + "." + unmarked.getFirst().getKey()));
             }
         }
@@ -317,22 +319,29 @@ final class ParameterTypes {
                         && value instanceof TokenValue token && declares(token.text())) {
                     throw at(token.text(), FIELD_VALUE);
                 }
-                Optional.ofNullable(vocabulary.fields().get(written.name())).flatMap(RecordField::namedType)
+                Optional.ofNullable(vocabulary.fields().get(written.name())).flatMap(RecordField::ownType)
                         .ifPresent(type -> value(value, type, constructor + "." + written.name()));
             }
         }
 
-        /** One written value at {@code slot}, against the type the slot declares. */
-        private void value(CoreValue written, TypeRef declared, String slot) {
-            Top type = resolve(declared.name());
+        /**
+         * One written value at {@code slot}, against the type the slot declares: a name's entry, or a type the
+         * vocabulary writes in place ({@code variants: [meta.type_expr]}), faced as its body.
+         */
+        private void value(CoreValue written, TypeExpr declared, String slot) {
+            String declaredName = declared instanceof TypeRef reference ? reference.name() : null;
+            Top type = switch (declared) {
+                case TypeRef reference -> resolve(reference.name());
+                case TypeInline inline -> inline.of();
+            };
             switch (written) {
                 // A field written positionally, `item => T`, is its record_field's one unmarked slot, its type.
                 case TokenValue token when declares(token.text()) -> token(token.text(),
-                        RECORD_FIELD.equals(declared.name()) ? FIELD_TYPE : slot);
+                        RECORD_FIELD.equals(declaredName) ? FIELD_TYPE : slot);
                 case ArrayValue array -> elements(array, type, slot);
                 case MapValue map when type instanceof MapBody entries -> entries(map, entries, slot);
-                case RecordValue record when type instanceof RecordBody nested ->
-                        record(record, declared.name(), nested);
+                case RecordValue record when type instanceof RecordBody nested && declaredName != null ->
+                        record(record, declaredName, nested);
                 default -> {
                 }
             }
@@ -357,15 +366,15 @@ final class ParameterTypes {
         }
 
         private void elements(ArrayValue array, Top type, String slot) {
-            TypeRef element = switch (type) {
-                case ArrayBody arrayBody -> arrayBody.elementName();
+            TypeExpr element = switch (type) {
+                case ArrayBody arrayBody -> arrayBody.elementType();
                 default -> null;
             };
             if (element == null && !(type instanceof TupleBody)) {
                 return; // not a collection slot -- a shape error the constructor's own reader reports
             }
             for (int i = 0; i < array.elements().size(); i++) {
-                TypeRef declared = element != null ? element
+                TypeExpr declared = element != null ? element
                         : ((TupleBody) type).elements().get(Math.min(i, ((TupleBody) type).elements().size() - 1))
                                 .elementType();
                 value(array.elements().get(i).coreValue(), declared, slot);

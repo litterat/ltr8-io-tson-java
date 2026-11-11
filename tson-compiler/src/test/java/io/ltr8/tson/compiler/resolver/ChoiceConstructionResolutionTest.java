@@ -47,8 +47,10 @@ class ChoiceConstructionResolutionTest {
 
         Top contact = resolved.entries().get("contact");
         ChoiceBody body = assertInstanceOf(ChoiceBody.class, contact);
-        assertEquals(List.of("text", "integer"), body.variants().stream().map(TypeRef::name).toList());
+        assertEquals(List.of("text", "integer"),
+                body.variants().stream().map(io.ltr8.tson.schema.meta.TypeExpr::text).toList());
         // Each variant is a bare reference -- empty arguments, never null.
-        assertTrue(body.variants().stream().allMatch(variant -> variant.arguments().isEmpty()));
+        assertTrue(body.variants().stream()
+                .allMatch(variant -> variant instanceof TypeRef reference && reference.arguments().isEmpty()));
     }
 }

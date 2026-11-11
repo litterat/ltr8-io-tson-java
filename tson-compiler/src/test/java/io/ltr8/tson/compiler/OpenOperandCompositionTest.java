@@ -135,7 +135,7 @@ class OpenOperandCompositionTest {
                 .get(aliasTarget(compiled, "use"));
         assertEquals(List.of("id", "tag", "value"), closed.fields().keySet().stream().toList(),
                 "customer's field, then box's flattened field set, in composition order");
-        assertEquals("text", closed.fields().values().stream().toList().get(2).typeRef().name(),
+        assertEquals("text", closed.fields().values().stream().toList().get(2).typeExpr().text(),
                 () -> "the parameter absorbed from box<T> closes with vip: "
                         + closed.fields().values().stream().toList().get(2));
     }
@@ -224,7 +224,7 @@ class OpenOperandCompositionTest {
         RecordBody closed = (RecordBody) compiled.schema().entries()
                 .get(aliasTarget(compiled, "use"));
         assertEquals(List.of("tag", "note", "value"), closed.fields().keySet().stream().toList());
-        assertEquals("text", closed.fields().values().stream().toList().get(2).typeRef().name(),
+        assertEquals("text", closed.fields().values().stream().toList().get(2).typeExpr().text(),
                 "the parameter survived the refinement");
     }
 
@@ -248,12 +248,12 @@ class OpenOperandCompositionTest {
                 .get(aliasTarget(compiled, "use"));
         String v = closed.fields().entrySet().stream().filter(f -> f.getKey().equals("v"))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeRef().name();
+                .typeExpr().text();
 
         RecordBody held = (RecordBody) compiled.schema().entries().get(v);
         assertEquals(List.of("u"), held.fields().keySet().stream().toList(),
                 () -> "'v' should name the inner<text> instantiation, not bare 'inner': " + v);
-        assertEquals("text", held.fields().values().stream().toList().get(0).typeRef().name(),
+        assertEquals("text", held.fields().values().stream().toList().get(0).typeExpr().text(),
                 "the argument list survived, so U closed to text");
     }
 

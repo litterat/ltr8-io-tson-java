@@ -28,7 +28,8 @@ class TypeRefAnnotationTest {
     }
 
     private static TypeRef fieldType(Top definition) {
-        return assertInstanceOf(RecordBody.class, definition).fields().values().iterator().next().typeRef();
+        return assertInstanceOf(TypeRef.class,
+                assertInstanceOf(RecordBody.class, definition).fields().values().iterator().next().typeExpr());
     }
 
     /** An annotation written on the reference itself, read off a document. */

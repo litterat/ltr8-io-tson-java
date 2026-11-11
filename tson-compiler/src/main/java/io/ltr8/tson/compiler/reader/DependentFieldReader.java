@@ -158,6 +158,9 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
         return switch (value) {
             case null -> null;
             case Reference reference -> reference;
+            // A type written in place names no entry: a value is admitted only on an atom or an enum (§5.2), neither
+            // of which is written in place, so a sibling holding one types no dependent value.
+            case io.ltr8.tson.schema.meta.TypeInline ignored -> null;
             case io.ltr8.tson.schema.meta.Token token -> referenceIn(token.text());
             case io.ltr8.tson.schema.meta.Ref<?> ref -> referenceIn(ref.name());
             case CharSequence text -> {

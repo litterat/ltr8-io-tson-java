@@ -46,6 +46,17 @@ enum DiscriminationClass {
                 .flatMap(resolved -> classify(linked.schema(), resolved.definition()));
     }
 
+    /**
+     * The class of what a type slot holds: a name's, as {@link #of(TsonLinkedSchema, String)} gives it, or a type
+     * written in place classified by its own body.
+     */
+    static Optional<DiscriminationClass> of(TsonLinkedSchema linked, io.ltr8.tson.schema.meta.TypeExpr type) {
+        return switch (type) {
+            case io.ltr8.tson.schema.meta.TypeRef reference -> of(linked, reference.name());
+            case io.ltr8.tson.schema.meta.TypeInline inline -> classify(linked.schema(), inline.of());
+        };
+    }
+
     private static Optional<DiscriminationClass> classify(TsonSchema schema, Top definition) {
         return switch (definition) {
             case IntegerType ignored -> Optional.of(NUMBER);

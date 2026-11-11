@@ -37,6 +37,9 @@ import io.ltr8.tson.schema.unicode.RegexType;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.temporal.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.net.IriType;
@@ -93,6 +96,18 @@ public enum DiscriminationClass {
         // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
         // neither has a class, which is what the empty result means to every caller.
         return AliasChain.terminalDefinition(name, namespace).flatMap(def -> classify(def, namespace));
+    }
+
+    /**
+     * The class of what a type slot holds: a name's, as {@link #of(String, Function)} gives it, or a type written in
+     * place classified by its own body -- an array or a tuple bracket-class, a map brace-class where its keys are
+     * scalar, a reference string-class, and a nested choice none.
+     */
+    public static Optional<DiscriminationClass> of(TypeExpr type, Function<String, ? extends Top> namespace) {
+        return switch (type) {
+            case TypeRef reference -> of(reference.name(), namespace);
+            case TypeInline inline -> classify(inline.of(), namespace);
+        };
     }
 
     private static Optional<DiscriminationClass> classify(Top def, Function<String, ? extends Top> namespace) {

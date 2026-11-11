@@ -62,7 +62,7 @@ class ApplicationInContainerPositionTest {
         RecordBody body = (RecordBody) compiled.schema().entries().get(record);
         return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeRef().name();
+                .typeExpr().text();
     }
 
     /**
@@ -215,7 +215,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody outer = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(outer.elementName().name()));
+                compiled.schema().entries().get(outer.elementType().text()));
 
         assertEquals(TypeRef.of("text"), inner.elementType());
     }
@@ -237,7 +237,7 @@ class ApplicationInContainerPositionTest {
 
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, "box_carrier", "a")));
-        Top instantiation = compiled.schema().entries().get(array.elementName().name());
+        Top instantiation = compiled.schema().entries().get(array.elementType().text());
 
         assertEquals(List.of(), OpenEntry.parameterNames(instantiation), "closed");
         assertEquals(TypeRef.of("text"), ((RecordBody) instantiation).fields()
@@ -257,7 +257,7 @@ class ApplicationInContainerPositionTest {
 
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, "deep", "d")));
-        String inner = fieldType(compiled, array.elementName().name(), "a");
+        String inner = fieldType(compiled, array.elementType().text(), "a");
 
         assertEquals(TypeRef.of("int32"),
                 ((RecordBody) compiled.schema().entries().get(inner)).fields()
@@ -275,7 +275,7 @@ class ApplicationInContainerPositionTest {
                 .get(fieldType(compiled, "m", "entries")));
 
         assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries()
-                .get(map.valueType().name())).fields().values().stream().toList().get(0).type());
+                .get(map.valueType().text())).fields().values().stream().toList().get(0).type());
     }
 
     /**
@@ -297,6 +297,6 @@ class ApplicationInContainerPositionTest {
 
         assertEquals(Optional.of(2L), closed.minItems());
         assertInstanceOf(RecordBody.class,
-                compiled.schema().entries().get(closed.elementName().name()), "box<text>, closed");
+                compiled.schema().entries().get(closed.elementType().text()), "box<text>, closed");
     }
 }

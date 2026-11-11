@@ -30,8 +30,15 @@ final class KernelChainFields {
     static Map.Entry<String, RecordField> chainField(Map<String, Top> entries) {
         TsonSchema kernel = KernelBootstrapResolver.kernelSchema();
         RecordField declared = ((RecordBody) kernel.entries().get("meta.type")).fields().get("chain");
-        copy(declared.typeRef(), kernel, entries);
+        copy(declared.typeExpr(), kernel, entries);
         return Map.entry("chain", declared);
+    }
+
+    private static void copy(io.ltr8.tson.schema.meta.TypeExpr type, TsonSchema kernel, Map<String, Top> entries) {
+        switch (type) {
+            case TypeRef ref -> copy(ref, kernel, entries);
+            case io.ltr8.tson.schema.meta.TypeInline inline -> copyBody(inline.of(), kernel, entries);
+        }
     }
 
     private static void copy(TypeRef ref, TsonSchema kernel, Map<String, Top> entries) {
@@ -41,9 +48,13 @@ final class KernelChainFields {
             return;
         }
         entries.put(name, value);
+        copyBody(value, kernel, entries);
+    }
+
+    private static void copyBody(Top value, TsonSchema kernel, Map<String, Top> entries) {
         switch (value) {
-            case RecordBody record -> record.fields().values().forEach(f -> copy(f.typeRef(), kernel, entries));
-            case ArrayBody array -> copy(array.elementName(), kernel, entries);
+            case RecordBody record -> record.fields().values().forEach(f -> copy(f.typeExpr(), kernel, entries));
+            case ArrayBody array -> copy(array.elementType(), kernel, entries);
             case MapBody map -> {
                 copy(map.keyType(), kernel, entries);
                 copy(map.valueType(), kernel, entries);

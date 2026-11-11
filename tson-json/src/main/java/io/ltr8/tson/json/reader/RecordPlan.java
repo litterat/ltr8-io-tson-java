@@ -149,6 +149,12 @@ final class RecordPlan {
                         stated[i] = FieldValue.of(context.linked(), type.name(), field.value().get());
                     }
                 }
+                case io.ltr8.tson.schema.meta.TypeInline inline -> {
+                    schemaReaders[i] = context.readers().resolve(inline);
+                    if (field.value().isPresent()) {
+                        stated[i] = FieldValue.of(inline, field.value().get());
+                    }
+                }
                 // A dependent field's type is chosen per instance by its sibling's value, which the record hands it.
                 case SiblingRef sibling -> {
                     int at = order.indexOf(sibling.field());

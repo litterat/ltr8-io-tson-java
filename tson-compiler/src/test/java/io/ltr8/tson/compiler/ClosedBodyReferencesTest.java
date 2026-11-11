@@ -94,9 +94,10 @@ class ClosedBodyReferencesTest {
                 use => { f: api }""");
 
         NamespaceBody api = assertInstanceOf(NamespaceBody.class, compiled.schema().entries().get("api"));
-        assertTrue(api.valueType().arguments().isEmpty(), () -> "closed to an entry: " + api.valueType());
+        assertTrue(((io.ltr8.tson.schema.meta.TypeRef) api.valueType()).arguments().isEmpty(),
+                () -> "closed to an entry: " + api.valueType());
         RecordBody closed = assertInstanceOf(RecordBody.class,
-                compiled.schema().entries().get(api.valueType().name()));
+                compiled.schema().entries().get(api.valueType().text()));
         assertEquals(TypeRef.of("text"), closed.fields().get("v").type());
         assertNotNull(compiled.get("use").read(TestDocuments.document("{ f: { a => { v: \"s\" } } }")));
     }
@@ -114,7 +115,7 @@ class ClosedBodyReferencesTest {
                 direct => { d: [box<text>] }""");
 
         ReferenceBody reference = assertInstanceOf(ReferenceBody.class, entry(linked, "r"));
-        String array = ((RecordBody) entry(linked, "direct")).fields().get("d").typeRef().name();
+        String array = ((RecordBody) entry(linked, "direct")).fields().get("d").typeExpr().text();
         assertEquals(array, reference.of().name(), "one entry for one form, whichever position names it");
         assertInstanceOf(ArrayBody.class, entry(linked, reference.of().name()));
     }
@@ -124,7 +125,7 @@ class ClosedBodyReferencesTest {
     void aReferenceAtAFieldFollowsTheMergeToo() {
         TsonLinkedSchema linked = clean("rec => { f: meta.ref<[box<text>]> }");
 
-        String minted = ((RecordBody) entry(linked, "rec")).fields().get("f").typeRef().name();
+        String minted = ((RecordBody) entry(linked, "rec")).fields().get("f").typeExpr().text();
         ReferenceBody reference = assertInstanceOf(ReferenceBody.class, entry(linked, minted));
         assertInstanceOf(ArrayBody.class, entry(linked, reference.of().name()), () -> "of names a live entry: " + reference);
     }

@@ -15,6 +15,8 @@ import io.ltr8.tson.schema.meta.RecordField;
 
 import io.ltr8.tson.schema.unicode.TextFamily;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeInline;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.HashSet;
 import java.util.List;
@@ -115,8 +117,13 @@ public final class NameType {
             return Optional.empty();
         }
         return Optional.ofNullable(record.fields().get(NAME_TYPE))
-                .flatMap(RecordField::namedType)
-                .map(type -> constructors.apply(AliasChain.terminal(type.name(), constructors)))
+                .flatMap(RecordField::ownType)
+                .<Top>flatMap(type -> switch (type) {
+                    case TypeRef name -> Optional.ofNullable(
+                            constructors.apply(AliasChain.terminal(name.name(), constructors)));
+                    // A reference written in place, `meta.ref<…>`, is the kind itself.
+                    case TypeInline inline -> Optional.of(inline.of());
+                })
                 .filter(ReferenceBody.class::isInstance)
                 .map(ReferenceBody.class::cast);
     }

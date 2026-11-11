@@ -102,7 +102,7 @@ public final class EntryDisplayName {
         return applied(application).or(() -> Optional.ofNullable(switch (value) {
             // `[T]` is an ordered array that admits repeats; a set is the same body with neither, and has no sugar.
             case ArrayBody array when array.ordered() && !array.uniqueItems() -> "["
-                    + shown(array.elementName(), lookup) + size(array.minItems(), array.maxItems()) + "]";
+                    + shown(array.elementType(), lookup) + size(array.minItems(), array.maxItems()) + "]";
             case MapBody map -> "{" + shown(map.keyType(), lookup) + " => "
                     + shown(map.valueType(), lookup) + size(map.minItems(), map.maxItems()) + "}";
             case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType)
@@ -116,6 +116,7 @@ public final class EntryDisplayName {
                     .map(field -> field.getKey() + (field.getValue().optional() ? "?" : "") + ": "
                             + switch (field.getValue().type()) {
                                 case TypeRef type -> shown(type, lookup);
+                                case TypeInline inline -> shown(inline, lookup);
                                 case SiblingRef sibling -> sibling.text();
                             })
                     .collect(Collectors.joining("  ", "{ ", " }"));
@@ -136,6 +137,30 @@ public final class EntryDisplayName {
                Function<String, Optional<TypeRef>> applicationOf) {
             this(namespace, factsOf, applicationOf, new HashSet<>());
         }
+    }
+
+    /**
+     * One slot inside a form: a name display-rendered as below, and a type written in place as the form it is,
+     * each name inside it rendered the same way.
+     */
+    private static String shown(TypeExpr expr, Lookup lookup) {
+        return switch (expr) {
+            case TypeRef ref -> shown(ref, lookup);
+            case TypeInline inline -> switch (inline.of()) {
+                case ArrayBody array when array.ordered() && !array.uniqueItems() -> "["
+                        + shown(array.elementType(), lookup) + (array.voidable() ? "?" : "")
+                        + size(array.minItems(), array.maxItems()) + "]";
+                case MapBody map -> "{" + shown(map.keyType(), lookup) + " => " + shown(map.valueType(), lookup)
+                        + (map.voidable() ? "?" : "") + size(map.minItems(), map.maxItems()) + "}";
+                case TupleBody tuple -> tuple.elements().stream()
+                        .map(element -> shown(element.elementType(), lookup) + (element.voidable() ? "?" : ""))
+                        .collect(Collectors.joining(", ", "[", "]"));
+                case ChoiceBody choice -> choice.variants().stream().map(variant -> shown(variant, lookup))
+                        .collect(Collectors.joining(" | ", "(", ")"));
+                // A set, a namespace type and a reference have no sugar of their own; the wrapper writes them.
+                default -> inline.text();
+            };
+        };
     }
 
     /** One name inside a form, itself display-rendered when the namespace knows it and it is derived. */

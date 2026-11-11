@@ -23,7 +23,7 @@ record TuplePlan(String displayName, JsonSchemaLocation schemaLocation, boolean[
         JsonTypeReader<?>[] slots = new JsonTypeReader<?>[arity];
         for (int i = 0; i < arity; i++) {
             voidable[i] = body.elements().get(i).voidable();
-            slots[i] = context.readers().resolve(body.elements().get(i).elementType().name());
+            slots[i] = context.readers().resolve(body.elements().get(i).elementType());
         }
         String displayName = EntryDisplayName.of(name, context.schema());
         return new TuplePlan(displayName, context.locationOf(name), voidable, slots,

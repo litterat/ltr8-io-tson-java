@@ -46,7 +46,8 @@ class ChoiceSugarResolutionTest {
     }
 
     private static List<String> variantNames(Top definition) {
-        return assertInstanceOf(ChoiceBody.class, definition).variants().stream().map(TypeRef::name).toList();
+        return assertInstanceOf(ChoiceBody.class, definition).variants().stream()
+                .map(io.ltr8.tson.schema.meta.TypeExpr::text).toList();
     }
 
     /** The one entry whose name starts with the given prefix -- an injected declaration carries a derived hash suffix. */
@@ -99,7 +100,7 @@ class ChoiceSugarResolutionTest {
         assertEquals(List.of("text", "integer"), variantNames(choice.getValue()));
 
         RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));
-        assertEquals(choice.getKey(), person.fields().values().iterator().next().typeRef().name());
+        assertEquals(choice.getKey(), person.fields().values().iterator().next().typeExpr().text());
     }
 
     /**
@@ -127,6 +128,6 @@ class ChoiceSugarResolutionTest {
         String choice = injected(schema, "choice_text_integer_").getKey();
         RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));
         assertEquals(List.of(choice, choice),
-                person.fields().values().stream().map(field -> field.typeRef().name()).toList());
+                person.fields().values().stream().map(field -> field.typeExpr().text()).toList());
     }
 }

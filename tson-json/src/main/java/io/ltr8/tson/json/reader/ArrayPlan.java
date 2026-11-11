@@ -7,6 +7,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.Optional;
 
@@ -34,8 +35,10 @@ record ArrayPlan(String displayName, JsonSchemaLocation schemaLocation, boolean 
         String displayName = EntryDisplayName.of(name, context.schema());
         return new ArrayPlan(displayName, context.locationOf(name),
                 body.voidable(), body.uniqueItems(), body.minItems(), body.maxItems(),
-                context.readers().resolve(body.elementName().name()), new ArrayDiagnostics(displayName),
-                body.uniqueItems() && AliasChain.terminal(context.schema(), body.elementName().name())
+                context.readers().resolve(body.elementType()), new ArrayDiagnostics(displayName),
+                // A type written in place is a container, a tuple, a choice or a reference, never an identifier family.
+                body.uniqueItems() && body.elementType() instanceof TypeRef element
+                        && AliasChain.terminal(context.schema(), element.name())
                         .map(terminal -> terminal.definition() instanceof IdentifierType)
                         .orElse(false));
     }

@@ -60,12 +60,12 @@ class SiblingRefTest {
         RecordField field = RecordField.required(SiblingRef.of("kind"));
         assertEquals(SiblingRef.of("kind"), field.type());
         assertEquals(Optional.of("kind"), field.sibling());
-        assertEquals(Optional.empty(), field.namedType());
-        IllegalStateException asked = assertThrows(IllegalStateException.class, field::typeRef);
+        assertEquals(Optional.empty(), field.ownType());
+        IllegalStateException asked = assertThrows(IllegalStateException.class, field::typeExpr);
         assertTrue(asked.getMessage().contains("'kind!'"), asked.getMessage());
-        assertEquals(Optional.of(TypeRef.of("text")), RecordField.required(TypeRef.of("text")).namedType());
+        assertEquals(Optional.of(TypeRef.of("text")), RecordField.required(TypeRef.of("text")).ownType());
         assertSame(field.type(), field.withAnnotations(Annotations.empty()).type());
-        assertEquals(TypeRef.of("text"), RecordField.required(TypeRef.of("text")).typeRef());
+        assertEquals(TypeRef.of("text"), RecordField.required(TypeRef.of("text")).typeExpr());
     }
 
     @Test

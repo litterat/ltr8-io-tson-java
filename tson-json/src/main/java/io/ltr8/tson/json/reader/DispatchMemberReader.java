@@ -140,14 +140,27 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     }
 
     private static Selector selectorOf(String name, RecordField field, TsonLinkedSchema linked) {
-        AliasChain.Resolved target = AliasChain.terminal(linked.schema(), field.typeRef().name()).orElseThrow(
-                () -> new IllegalStateException("a discriminator typed '" + field.typeRef().name()
-                        + "' names nothing this schema declares"));
-        AtomType<?> parser = AtomParsers.forRead(target.definition(), linked.enumForm(target.name()))
-                .orElseThrow(
-                () -> new IllegalStateException("a discriminator typed '" + field.typeRef().name()
+        // A selector is an atom or an enum the linker judged; one written in place (a reference) is read by its body,
+        // and has no entry an enum's form is recorded under.
+        Top definition;
+        io.ltr8.unicode.Normalization form;
+        switch (field.typeExpr()) {
+            case io.ltr8.tson.schema.meta.TypeRef reference -> {
+                AliasChain.Resolved target = AliasChain.terminal(linked.schema(), reference.name()).orElseThrow(
+                        () -> new IllegalStateException("a discriminator typed '" + reference.name()
+                                + "' names nothing this schema declares"));
+                definition = target.definition();
+                form = linked.enumForm(target.name());
+            }
+            case io.ltr8.tson.schema.meta.TypeInline inline -> {
+                definition = inline.of();
+                form = io.ltr8.unicode.Normalization.NONE;
+            }
+        }
+        AtomType<?> parser = AtomParsers.forRead(definition, form).orElseThrow(
+                () -> new IllegalStateException("a discriminator typed '" + field.typeExpr().text()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
-        return new Selector(Nfc.of(name), parser, AtomForm.of(target.definition()));
+        return new Selector(Nfc.of(name), parser, AtomForm.of(definition));
     }
 
     /** One member's pins in the base's declaration order, or null where it does not pin them all. */

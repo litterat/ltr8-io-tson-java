@@ -9,9 +9,15 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.FieldTypeExpr;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TupleElement;
 
@@ -97,9 +103,11 @@ final class BindTargets {
             return reader;
         }
         TsonTypeReader<?> bound;
-        // Spike (inline types): a TypeExpr slot reached by a name reads as a TypeRef one does.
+        // A component holding what a type slot holds -- a name, or a name or a type written in place -- reads a name
+        // at a kind as a TypeRef component does; a type written in place reaches it through the choice that types
+        // the slot (meta.type_expr), whose own reader this leaves as it is.
         boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == Reference.class
-                || payload.typeClass() == io.ltr8.tson.schema.meta.TypeExpr.class;
+                || payload.typeClass() == TypeExpr.class || payload.typeClass() == FieldTypeExpr.class;
         boolean byName = typeRef || payload.typeClass() == Ref.class;
         if (byName && readsARef(reader)) {
             // The name reader produces the host value itself -- the Ref the linker will deliver into, or the
@@ -112,8 +120,9 @@ final class BindTargets {
         } else if (typeRef && readsAKind(reader)) {
             // The same for a type's name or an application: the reader produces the TypeRef itself, so the atom's
             // own bridge (the reference's text form) is not applied on top of it.
+            boolean siblingHeld = payload.typeClass() == Reference.class || payload.typeClass() == FieldTypeExpr.class;
             return AnnotationBoxing.wrap(new TypeNameSlotReader(slotAtom(reader), site.annotationTypes(), what,
-                    payload.typeClass() == Reference.class), target, site.annotationTypes());
+                    siblingHeld), target, site.annotationTypes());
         } else if (byName && (recordHeldByName(reader) || readsAnAtom(reader))) {
             site.mismatches().add(what + " is not a reference, and " + where + " holds a "
                     + payload.typeClass().getSimpleName() + " -- a value stands by name only at a position typed "
@@ -133,6 +142,26 @@ final class BindTargets {
             }
         }
         return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
+    }
+
+    /**
+     * The host type a natural reader guesses for what a slot holds: a name's bound class ({@code named}), and for a
+     * type written in place, which has no bound class of its own, the shape its constructor reads to -- a {@code List}
+     * of its element's host type for an array, a {@code Map} of its key's and value's for a map, and {@code Object}
+     * for a tuple, a choice or a reference, whatever the host binds there being declared by the component holding it.
+     */
+    static java.lang.reflect.Type hostType(TypeExpr type, java.util.function.Function<String, Class<?>> named) {
+        return switch (type) {
+            case TypeRef reference -> named.apply(reference.name());
+            case TypeInline inline -> switch (inline.of()) {
+                case ArrayBody array -> new io.ltr8.bind.DataParameterizedType(List.class,
+                        hostType(array.elementType(), named));
+                case MapBody map -> new io.ltr8.bind.DataParameterizedType(
+                        map.ordered() ? java.util.LinkedHashMap.class : java.util.Map.class,
+                        named.apply(map.keyType().name()), hostType(map.valueType(), named));
+                default -> Object.class;
+            };
+        };
     }
 
     /** Whether {@code reader} reads a reference ({@code meta.ref<T>}): a token there is a value's qualified name. */
@@ -234,7 +263,7 @@ final class BindTargets {
                     + collection.typeClass().getSimpleName() + ", which has no null to hold one");
         }
         String targetName = collection.typeClass().getSimpleName();
-        TsonTypeReader<?> element = to(site.resolver().resolve(array.body.elementName().name()),
+        TsonTypeReader<?> element = to(site.resolver().resolve(array.body.elementType()),
                 collection.arrayDataClass(), what + "'s element", targetName + "'s element", site, false);
         return new ArrayBindReader(top ? site.field() : array.name, top ? site.field() : array.displayName,
                 array.body, collection, element, array.schemaLocation, array.elementsAreNames);
@@ -256,7 +285,7 @@ final class BindTargets {
         String targetName = keyed.typeClass().getSimpleName();
         TsonTypeReader<?> key = to(site.resolver().resolve(map.body.keyType().name()), keyed.keyDataClass(),
                 what + "'s key", targetName + "'s key", site, false);
-        TsonTypeReader<?> value = to(site.resolver().resolve(map.body.valueType().name()), keyed.valueDataClass(),
+        TsonTypeReader<?> value = to(site.resolver().resolve(map.body.valueType()), keyed.valueDataClass(),
                 what + "'s value", targetName + "'s value", site, false);
         return new MapBindReader(top ? site.field() : map.name, top ? site.field() : map.displayName, map.body,
                 keyed, key, value, map.schemaLocation, map.keysAreNames, map.namespace);
@@ -305,7 +334,7 @@ final class BindTargets {
         List<TsonTypeReader<?>> positions = new ArrayList<>(tuple.body.elements().size());
         for (int i = 0; i < tuple.body.elements().size(); i++) {
             TupleElement element = tuple.body.elements().get(i);
-            positions.add(to(site.resolver().resolve(element.elementType().name()),
+            positions.add(to(site.resolver().resolve(element.elementType()),
                     positional.elements()[i].dataClass(), what + "'s position " + i,
                     targetName + "'s element " + i, site, false));
         }

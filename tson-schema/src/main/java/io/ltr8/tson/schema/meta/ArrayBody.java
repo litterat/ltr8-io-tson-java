@@ -29,18 +29,7 @@ public record ArrayBody(TypeChain chain,
         @Field("element_type") TypeExpr elementType, boolean voidable, boolean ordered,
                          @Field("unique_items") boolean uniqueItems,
                          @Field("min_items") Optional<Long> minItems,
-                         @Field("max_items") Optional<Long> maxItems) implements Product, TypeInline {
-    /**
-     * Spike: the element type where it is a name, for the consumers not yet taught an inline one. An inline element
-     * type is a gap here, not a schema error.
-     */
-    public TypeRef elementName() {
-        if (elementType instanceof TypeRef reference) {
-            return reference;
-        }
-        throw new UnsupportedOperationException("an inline element type is not yet read here: " + elementType);
-    }
-
+                         @Field("max_items") Optional<Long> maxItems) implements Product {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public ArrayBody {

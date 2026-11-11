@@ -47,7 +47,7 @@ class ConstructionSugarTest {
 
     /** The entry a record field's type names. */
     private static String fieldType(TsonLinkedSchema linked, String record, String field) {
-        return ((RecordBody) linked.schema().entries().get(record)).fields().get(field).typeRef().name();
+        return ((RecordBody) linked.schema().entries().get(record)).fields().get(field).typeExpr().text();
     }
 
     private static void assertRefused(List<Diagnostic> problems, String fragment) {

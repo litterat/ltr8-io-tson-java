@@ -40,8 +40,9 @@ class BootstrapReferencesTest {
         TsonSchema kernel = KernelBootstrapResolver.kernelSchema();
 
         RecordField name = field(kernel.entries().get("meta.param"), "name");
-        assertEquals("meta.param_name", name.typeRef().name());
-        assertTrue(name.type().annotations().isEmpty(), "nothing records where it points");
+        assertEquals("meta.param_name", name.typeExpr().text());
+        assertTrue(((io.ltr8.tson.schema.meta.Reference) name.type()).annotations().isEmpty(),
+                "nothing records where it points");
     }
 
     /** And a position naming something that is not an alias is unaffected here as well. */
@@ -50,8 +51,8 @@ class BootstrapReferencesTest {
         Top recordField = KernelBootstrapResolver.kernelSchema()
                 .entries().get("meta.record_field");
 
-        assertEquals("meta.field_type_ref", field(recordField, "type").typeRef().name());
-        assertTrue(field(recordField, "type").type().annotations().isEmpty());
+        assertEquals("meta.field_type_ref", field(recordField, "type").typeExpr().text());
+        assertTrue(((io.ltr8.tson.schema.meta.Reference) field(recordField, "type").type()).annotations().isEmpty());
     }
 
     /** The chain stays walkable through the entries, which is what a reader collapses it by. */

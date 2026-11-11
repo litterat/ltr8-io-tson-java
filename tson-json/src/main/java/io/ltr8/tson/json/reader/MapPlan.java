@@ -53,7 +53,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
         return new MapPlan(displayName, context.locationOf(name),
                 body.voidable(), body.ordered(), body.minItems(), body.maxItems(), keyParser,
                 keyParser == null ? context.readers().resolve(body.keyType().name()) : null,
-                context.readers().resolve(body.valueType().name()), new MapDiagnostics(displayName),
+                context.readers().resolve(body.valueType()), new MapDiagnostics(displayName),
                 keyProfile(context.schema(), body.keyType().name()));
     }
 

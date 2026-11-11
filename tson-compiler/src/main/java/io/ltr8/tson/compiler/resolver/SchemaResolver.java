@@ -77,15 +77,6 @@ import java.util.function.Predicate;
  */
 public final class SchemaResolver {
 
-    /**
-     * [TSON-SCHEMA] §8.2's derived marker, attached below to the key of every entry this resolver
-     * materialised from a sugar form. Valueless -- presence at the key is the whole of the information --
-     * and built by name rather than resolved through the import closure the way an author-written annotation
-     * is: there is no author to resolve against, and §8.1 makes it derived, discarded and recomputed on
-     * ingest rather than read from a document.
-     */
-    private static final Annotations SYNTHETIC = Annotations.of(List.of(Annotation.of(TsonSchema.SYNTHETIC)));
-
     private final TsonCompiledSchemaLoader loader;
 
     /** [TSON-SCHEMA] §11.5's limits this resolver counts: the wait depth ({@link WaitOrder}). */
@@ -266,18 +257,11 @@ public final class SchemaResolver {
         // position lookup below goes through this copy, so a rewritten declaration is located like any other.
         SchemaPositions positions = declarationPositions.copy();
         Problems problems = new Problems(CanonicalIdentity.canonicalize(id), positions, receiver);
-        // A lift whose name an import already declares references the import's entry: the form it stands for is
-        // kept, to hold that entry to once resolution can read it.
-        Map<String, SchemaMap.Declaration> reused = new LinkedHashMap<>();
+        // Desugaring rewrites each sugar form in place and adds no declaration, so the declarations below are
+        // exactly the ones the author wrote.
         SchemaDocument desugared = SchemaDesugarer.desugar(document,
-                namespace.keySet(), problems.collecting() ? problems::report : null, positions, reused);
+                problems.collecting() ? problems::report : null, positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
-        // The names desugaring generated, as opposed to the ones the author wrote. These are the schema's
-        // synthetic entries (§5.3's lift rule), so they are both what carries the derived @meta.synthetic marker
-        // at its key below (§8.2) and what tells a generated head closing its own intermediate form from an
-        // authored one: an application of a generated name is machinery, an application of an authored one
-        // is a use site worth recording.
-        Set<String> generated = SchemaDesugarer.lifted(document, desugared);
 
         // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them). A schema
         // map of one path is open: this document's contribution to an imported one is no collision, its members
@@ -304,7 +288,7 @@ public final class SchemaResolver {
         // variant's, an element's) is carried as a name, judged by the linker, and orders nothing. The imports are
         // ready before anything starts; a value read against one of this document's own entries is read through
         // readers compiled from the entries ready so far.
-        OnDemand onDemand = new OnDemand(declarations, Set.copyOf(namespace.keySet()), generated, problems, facts);
+        OnDemand onDemand = new OnDemand(declarations, Set.copyOf(namespace.keySet()), problems, facts);
         WaitOrder waitOrder = new WaitOrder(CanonicalIdentity.canonicalize(id), namespace, declarations,
                 limits.maxWaitDepth(),
                 (pending, tree) -> loader.compileReady(readySoFar(document, namespace, origins, facts), pending,
@@ -376,7 +360,7 @@ public final class SchemaResolver {
                 return vocabulary.value(type, value, names, heldByName);
             }
         };
-        TemplateMaterialiser materialiser = new TemplateMaterialiser(waitOrder, namespace::put, reads,
+        TemplateMaterialiser materialiser = new TemplateMaterialiser(waitOrder, reads,
                 heads::definition, waitOrder::current, facts, applications, kernel);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
@@ -414,25 +398,6 @@ public final class SchemaResolver {
         onDemand.resolveWith(resolver);
 
         waitOrder.readyAll(name -> false);
-        // Each imported entry a lift of this document references is a synthetic of that lift's form (§8.2): the
-        // form is resolved on its own, its facts left as the import's, and compared.
-        reused.forEach((name, declaration) -> {
-            TsonSchema.EntryFacts importedFacts = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
-            try {
-                Top own;
-                try {
-                    own = resolver.resolve(declaration);
-                } finally {
-                    facts.put(name, importedFacts);
-                }
-                ImportedSynthetics.requireForm(name, importedFacts, namespace.get(name), origins.get(name), own);
-            } catch (SchemaValidationException collision) {
-                if (!problems.collecting()) {
-                    throw collision;
-                }
-                problems.report(declaration, collision);
-            }
-        });
         // Every entry is ready: the judgements that walk a name to what it names run now (§3.4.1's sixth rule).
         resolver.judgeDeferred((name, error) -> {
             if (!problems.collecting()) {
@@ -492,61 +457,26 @@ public final class SchemaResolver {
             }
         });
 
-        Map<String, Top> instantiations = materialiser.materialise(resolvedLocals,
+        materialiser.materialise(resolvedLocals,
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
-        republish(namespace, resolvedLocals, instantiations);
-        appliedParentEdges(namespace, resolvedLocals, instantiations, applications,
-                materialiser.expansionsByApplication(), materialiser.syntheticNames());
-        closeChains(namespace, resolvedLocals, instantiations);
-
-        // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
-        // have resolved". A form the desugar phase lifted with an application in a slot was named before that
-        // application had an entry to be named for; at this point every application is closed, so it
-        // re-derives to the name the other channel gives the same form. See SyntheticMerge.
-        Map<String, String> merged = SyntheticMerge.renames(declarations, generated, materialiser);
-        Map<String, String> mergedNames = new LinkedHashMap<>(merged);
-        if (!merged.isEmpty()) {
-            SyntheticMerge.rewrite(resolvedLocals, merged);
-            SyntheticMerge.rewrite(instantiations, merged);
-            SyntheticMerge.rewriteApplications(applications, merged);
-            merged.forEach((from, to) -> {
-                // Dropped where the other channel already published the form, moved where it did not: the
-                // eager name was this schema's only one for it, and an entry nothing names is not an entry.
-                Top eager = resolvedLocals.remove(from);
-                TsonSchema.EntryFacts eagerFacts = facts.remove(from);
-                namespace.remove(from);
-                generated.remove(from);
-                generated.add(to);
-                if (!namespace.containsKey(to)) {
-                    resolvedLocals.put(to, eager);
-                    if (eagerFacts != null) {
-                        facts.putIfAbsent(to, eagerFacts);
-                    }
-                }
-            });
-            republish(namespace, resolvedLocals, instantiations);
-        }
+        republish(namespace, resolvedLocals);
+        appliedParentEdges(namespace, resolvedLocals, applications);
+        closeChains(namespace, resolvedLocals);
 
         // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
         // §3.3.3 cannot reach), and this loop runs outside the memoized getter that catches those -- so it
         // catches its own, once per name, leaving the entry intact and unannotated rather than losing the
         // whole schema to a bad @doc.
         for (String name : declarations.keySet()) {
-            // A merged form is keyed by the name it merged onto, and contributes nothing at all where that
-            // name belongs to the materialised half -- the entry is there, marked, and this is its old key.
-            String key = merged.getOrDefault(name, name);
-            if (!resolvedLocals.containsKey(key)) {
-                continue;
-            }
             try {
-                nameAnnotations.put(key, resolver.annotationsFor(name, declarations.get(name).nameAnnotations()));
+                nameAnnotations.put(name, resolver.annotationsFor(name, declarations.get(name).nameAnnotations()));
             } catch (SchemaValidationException | UnsupportedOperationException
                      | BindMismatchException e) {
                 if (!problems.collecting()) {
                     throw e;
                 }
                 problems.report(declarations.get(name), e);
-                nameAnnotations.put(key, Annotations.empty());
+                nameAnnotations.put(name, Annotations.empty());
             }
         }
 
@@ -562,47 +492,25 @@ public final class SchemaResolver {
         // written on the value are the entry's facts. Bound above; this only places them.
         AnnotatedMap<String, Top> localOnly = new AnnotatedMap<>();
         for (String name : declarations.keySet()) {
-            String key = merged.getOrDefault(name, name);
-            if (!resolvedLocals.containsKey(key)) {
-                continue;
-            }
-            // §8.2: a synthetic entry's key carries the derived @meta.synthetic marker, and a lifted declaration
-            // has nothing else at its key -- there is no source text in front of a name nobody wrote.
-            localOnly.put(key, resolvedLocals.get(key), generated.contains(key)
-                    ? SYNTHETIC : nameAnnotations.getOrDefault(key, Annotations.empty()));
+            localOnly.put(name, resolvedLocals.get(name), nameAnnotations.getOrDefault(name, Annotations.empty()));
         }
-        // An entry the materialiser minted has no declared name to carry author annotations from. The
-        // synthetic half of them still gets the derived marker: a template's open form closes into the same
-        // closed synthetic a directly-written form lifts to, and §8.2 marks it wherever it came from. An
-        // instantiation entry gets none, by the same section.
-        Set<String> minted = materialiser.syntheticNames();
-        instantiations.forEach((name, definition) -> {
-            if (minted.contains(name)) {
-                localOnly.put(name, definition, SYNTHETIC);
-            } else {
-                localOnly.put(name, definition);
-            }
-        });
-        // §8.2's second derived key annotation: every entry that closes an application of an open record carries
+        // §8.2's derived key annotation: every entry that closes an application of an open record carries
         // `@meta.application` on its key, which is where resolved output states an instantiation's identity and where
         // ingest reads it back as stated. A construction carries none: its value states its constructor.
-        // The application is stated as written, its nested arguments unreduced: a reader and a message see the
-        // reference the author wrote, and each level resolves structurally to the entry it closed to.
+        // The application is stated as written, its nested arguments unreduced.
         for (String name : List.copyOf(localOnly.keySet())) {
             io.ltr8.tson.schema.meta.TypeRef application = materialiser.writtenApplication(name)
-                    .map(asWritten -> SyntheticMerge.renamedReference(asWritten, mergedNames))
                     .orElse(applications.get(name));
             if (application != null) {
                 localOnly.put(name, localOnly.get(name),
                         TsonSchema.withApplication(localOnly.getAnnotations(name), application));
             }
         }
-        // Every application closed to an entry of this schema, an expansion's included, kept with the entry's facts
-        // for a message to name an expansion by the application that closed to it (TsonSchema.EntryFacts.closes).
+        // Every application closed to an entry of this schema, kept with the entry's facts for a message to name
+        // the entry by the application that closed to it (TsonSchema.EntryFacts.closes).
         Map<String, List<io.ltr8.tson.schema.meta.TypeRef>> closes = new LinkedHashMap<>();
         materialiser.closedApplications().forEach((application, entry) -> closes
-                .computeIfAbsent(mergedNames.getOrDefault(entry, entry), ignored -> new ArrayList<>())
-                .add(SyntheticMerge.renamedReference(application, mergedNames)));
+                .computeIfAbsent(entry, ignored -> new ArrayList<>()).add(application));
         closes.forEach((name, closed) -> {
             if (localOnly.containsKey(name)) {
                 facts.put(name, facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).withCloses(closed));
@@ -717,29 +625,20 @@ public final class SchemaResolver {
      * subtracted entry has no applied parent for this pass to find and an empty chain for it to close.
      */
     private static void appliedParentEdges(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                           Map<String, Top> instantiations,
-                                           Map<String, io.ltr8.tson.schema.meta.TypeRef> applications,
-                                           Map<String, String> expansions, Set<String> synthetics) {
+                                           Map<String, io.ltr8.tson.schema.meta.TypeRef> applications) {
         Map<String, String> byApplication = new LinkedHashMap<>();
         namespace.keySet().forEach(entryName -> Optional.ofNullable(applications.get(entryName))
                 .filter(application -> !application.arguments().isEmpty())
                 .ifPresent(application -> byApplication.putIfAbsent(
                         DerivedName.canonicalApplication(application.name(), application.arguments()),
                         entryName)));
-        // A minted expansion records no application, so the materialiser's index stands in for it: the edge an
-        // operand `& box<int32>` reaches is to the entry `box<int32>` written at a use site expanded to.
-        expansions.forEach(byApplication::putIfAbsent);
         // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the chains the
         // previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs `ok_of`'s own
         // edge to `result_of` to exist before `great_of` can inherit it. Bounded by the entry count: each round
         // adds at least one name to some chain or stops.
         for (int round = 0; round <= namespace.size(); round++) {
-            // Republished between the two folds as well as after them: an owner's chain grows in this same
-            // round, and `completed` reads its ancestors out of the namespace.
-            boolean changed = fold(resolvedLocals, byApplication, namespace, synthetics);
-            republish(namespace, resolvedLocals, instantiations);
-            changed |= fold(instantiations, byApplication, namespace, synthetics);
-            republish(namespace, resolvedLocals, instantiations);
+            boolean changed = fold(resolvedLocals, byApplication, namespace);
+            republish(namespace, resolvedLocals);
             if (!changed) {
                 return;
             }
@@ -751,26 +650,19 @@ public final class SchemaResolver {
      * names denotes an entry nothing can be declared as, so it reaches no edge, and a closed type's parents are
      * not part of it ([TSON-SCHEMA] §4.1). A template keeps its written parents.
      */
-    private static void closeChains(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                    Map<String, Top> instantiations) {
-        for (Map<String, Top> entries : List.of(resolvedLocals, instantiations)) {
-            // An open record keeps the parents as written: they may still name its own parameters, and
-            // closing each application is what completes that application's chain from them.
-            entries.replaceAll((name, definition) -> definition instanceof Type type && !type.parents().isEmpty()
-                    && !OpenEntry.isOpen(definition)
-                    ? type.withChain(type.chain().withParents(List.of()))
-                    : definition);
-        }
-        republish(namespace, resolvedLocals, instantiations);
+    private static void closeChains(Map<String, Top> namespace, Map<String, Top> resolvedLocals) {
+        // An open record keeps the parents as written: they may still name its own parameters, and
+        // closing each application is what completes that application's chain from them.
+        resolvedLocals.replaceAll((name, definition) -> definition instanceof Type type && !type.parents().isEmpty()
+                && !OpenEntry.isOpen(definition)
+                ? type.withChain(type.chain().withParents(List.of()))
+                : definition);
+        republish(namespace, resolvedLocals);
     }
 
-    /**
-     * One round of {@link #appliedParentEdges} over one map -- {@code true} when any chain grew. A minted
-     * expansion gains no edge: it is a member of nothing, and one whose chain would name a declared type was
-     * refused when it was minted ({@code TemplateMaterialiser}).
-     */
+    /** One round of {@link #appliedParentEdges} over one map -- {@code true} when any chain grew. */
     private static boolean fold(Map<String, Top> entries, Map<String, String> byApplication,
-                                 Map<String, Top> namespace, Set<String> synthetics) {
+                                 Map<String, Top> namespace) {
         boolean changedAny = false;
         // <b>To a fixed point within the map, not merely across rounds.</b> A pass visits entries in map
         // order while mutating them, so `great_of` can be reached before `ok_of` has grown the edge it
@@ -779,9 +671,6 @@ public final class SchemaResolver {
         for (int pass = 0; pass <= entries.size(); pass++) {
             boolean changed = false;
             for (Map.Entry<String, Top> entry : entries.entrySet()) {
-                if (synthetics.contains(entry.getKey())) {
-                    continue;
-                }
                 Top folded = completed(entry.getValue(), byApplication, namespace);
                 if (folded != entry.getValue()) {
                     entry.setValue(folded);
@@ -825,14 +714,12 @@ public final class SchemaResolver {
     }
 
     /**
-     * Puts the local and materialised entries back into the namespace, which every later phase and the
-     * on-demand getter both read through. Called after each pass that rewrites either map, since the two are
-     * kept in step by hand: the namespace also holds the imported entries, so it cannot simply be replaced.
+     * Puts the local entries back into the namespace, which every later phase and the on-demand getter both read
+     * through. Called after each pass that rewrites them: the namespace also holds the imported entries, so it
+     * cannot simply be replaced.
      */
-    private static void republish(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                  Map<String, Top> instantiations) {
+    private static void republish(Map<String, Top> namespace, Map<String, Top> resolvedLocals) {
         namespace.putAll(resolvedLocals);
-        namespace.putAll(instantiations);
     }
 
     /**
@@ -852,7 +739,6 @@ public final class SchemaResolver {
 
         private final Map<String, SchemaMap.Declaration> declarations;
         private final Set<String> imported;
-        private final Set<String> generated;
         private final Problems problems;
         private final Map<String, TsonSchema.EntryFacts> facts;
 
@@ -861,11 +747,10 @@ public final class SchemaResolver {
 
         private DefinitionResolver resolver;
 
-        OnDemand(Map<String, SchemaMap.Declaration> declarations, Set<String> imported, Set<String> generated,
+        OnDemand(Map<String, SchemaMap.Declaration> declarations, Set<String> imported,
                  Problems problems, Map<String, TsonSchema.EntryFacts> facts) {
             this.declarations = declarations;
             this.imported = imported;
-            this.generated = generated;
             this.problems = problems;
             this.facts = facts;
         }
@@ -882,9 +767,7 @@ public final class SchemaResolver {
 
         @Override
         public Top resolve(String name, SchemaMap.Declaration declaration) {
-            if (!generated.contains(name)) {
-                refuseShadowingParameters(name, SchemaDesugarer.typeParams(declaration.typeDef()));
-            }
+            refuseShadowingParameters(name, SchemaDesugarer.typeParams(declaration.typeDef()));
             Top resolved = resolver.resolve(declaration, problems.positions().of(declaration));
             refuseHeadAbstraction(name, resolved);
             return resolved;
@@ -894,8 +777,7 @@ public final class SchemaResolver {
          * [TSON-SCHEMA] §5.10: within a template's body a parameter's name is read before the schema's, so a
          * parameter spelled like an entry the schema's namespace holds -- a type or a value entry, its own or an
          * import's -- makes that entry unreachable there, and is a resolver error at the declaration rather than a
-         * silent capture. Judged by the name alone, before anything resolves, so no entry is waited on. A parameter
-         * list the desugarer wrote for a lifted form is its own renaming ({@code p0}, {@code p1}), and is not asked.
+         * silent capture. Judged by the name alone, before anything resolves, so no entry is waited on.
          */
         private void refuseShadowingParameters(String name, List<String> parameters) {
             for (String parameter : parameters) {

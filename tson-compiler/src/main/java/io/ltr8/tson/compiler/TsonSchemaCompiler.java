@@ -12,6 +12,7 @@ import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.compiler.reader.Subsumption;
 
 import java.util.LinkedHashMap;
@@ -115,6 +116,35 @@ public final class TsonSchemaCompiler {
     }
 
     /**
+     * Builds the reader of a type written in place ({@link TypeInline}) from its body, through the factory its
+     * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice or a reference, named
+     * for a message by the form as written. It has no entry, so it has no name a binding map or a schema location
+     * keys on, takes no part in §7.2's subsumption (nothing IS-A it), and is no alias. It holds the factories, the
+     * linked schema and the readers' handle, never the {@link Compilation}, so the handle may build one at read time.
+     */
+    private static final class InlineReaders {
+        private final TsonLinkedSchema linked;
+        private final Function<String, ValueReaderFactory> factoryFor;
+        private final Map<String, Set<String>> namesMeaning;
+        private final Map<String, List<String>> referrers;
+        private CompiledReaders readers;
+
+        InlineReaders(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor,
+                      Map<String, Set<String>> namesMeaning, Map<String, List<String>> referrers) {
+            this.linked = linked;
+            this.factoryFor = factoryFor;
+            this.namesMeaning = namesMeaning;
+            this.referrers = referrers;
+        }
+
+        TsonTypeReader<?> build(TypeInline type) {
+            Top read = type.of() instanceof NamespaceBody namespace ? namespace.read() : type.of();
+            ValueReaderFactory factory = factoryFor.apply(TsonCompiledVocabulary.typenameOf(read));
+            return factory.create(type.text(), read, new ValueReaderContext(linked, readers, namesMeaning, referrers));
+        }
+    }
+
+    /**
      * One {@link #compile} call's own private, per-compilation mutable state and recursive build
      * logic -- {@code finished}/{@code building} never escape a single {@link #compile} invocation
      * (the finished map is copied into an immutable {@link TsonCompiledSchema} once compilation
@@ -154,7 +184,7 @@ public final class TsonSchemaCompiler {
          * while the walk runs, then is rebound to the finished schema so nothing here outlives the call --
          * a reader that resolves at read time (dispatch, annotations) holds this, not {@code this}.
          */
-        private final CompiledReaders readers = new CompiledReaders(this::resolve);
+        private final CompiledReaders readers;
 
         /** The entries a compile of a resolution in progress reads as {@link PendingTypeReader}s; else empty. */
         private final Set<String> pending;
@@ -166,6 +196,9 @@ public final class TsonSchemaCompiler {
             this.factoryFor = factoryFor;
             this.namesMeaning = Subsumption.namesMeaning(schema.entries());
             this.referrers = ValueReaderContext.referrers(schema.entries());
+            InlineReaders inline = new InlineReaders(linked, factoryFor, namesMeaning, referrers);
+            this.readers = new CompiledReaders(this::resolve, inline::build);
+            inline.readers = readers;
         }
 
         TsonTypeReader<?> resolve(String name) {

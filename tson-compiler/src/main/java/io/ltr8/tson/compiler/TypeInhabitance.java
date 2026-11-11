@@ -18,6 +18,8 @@ import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TupleElement;
 
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -100,17 +102,17 @@ final class TypeInhabitance {
             case RecordBody record -> recordInhabited(record, namespace, inhabited);
             case ArrayBody array -> array.voidable()
                     || isEmptyAllowed(array.minItems())
-                    || refInhabited(array.elementName(), namespace, inhabited);
+                    || slotInhabited(array.elementType(), namespace, inhabited);
             case MapBody map -> isEmptyAllowed(map.minItems())
                     || (refInhabited(map.keyType(), namespace, inhabited)
-                            && refInhabited(map.valueType(), namespace, inhabited));
+                            && slotInhabited(map.valueType(), namespace, inhabited));
             case io.ltr8.tson.schema.meta.NamespaceBody ignored -> true; // the empty map is a value of it
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .allMatch(element -> positionInhabited(element, namespace, inhabited));
             // A sum needs one good variant, where a product needs all its parts -- the one place the walk
             // branches rather than conjoins, and the reason `(leaf | node)` survives a non-productive `node`.
             case ChoiceBody choice -> choice.variants().stream()
-                    .anyMatch(variant -> refInhabited(variant, namespace, inhabited));
+                    .anyMatch(variant -> slotInhabited(variant, namespace, inhabited));
             // A reference that names types admits the names of its members, whatever the types they name admit,
             // so it is inhabited exactly when linking found a member. One that names values admits a name whose
             // referent only the linker judges.
@@ -197,14 +199,39 @@ final class TypeInhabitance {
             // A dependent field is stated with a value of whichever type its sibling names (§5.2).
             return true;
         }
-        return !AliasChain.resolvesToVoid(field.typeRef().name(), namespace)
-                && refInhabited(field.typeRef(), namespace, inhabited);
+        return switch (field.typeExpr()) {
+            case TypeRef reference -> !AliasChain.resolvesToVoid(reference.name(), namespace)
+                    && refInhabited(reference, namespace, inhabited);
+            case TypeInline inline -> isInhabited(inline.of(), namespace, inhabited);
+        };
     }
 
     private static boolean positionInhabited(TupleElement element, Map<String, Top> namespace,
             Set<String> inhabited) {
         return element.voidable()
-                || refInhabited(element.elementType(), namespace, inhabited);
+                || slotInhabited(element.elementType(), namespace, inhabited);
+    }
+
+    /**
+     * What a type slot holds, inhabited: a name as {@link #refInhabited} judges it, and a type written in place by
+     * the same rules its body would be judged by as an entry, the names inside it judged in turn.
+     */
+    private static boolean slotInhabited(TypeExpr type, Map<String, Top> namespace, Set<String> inhabited) {
+        return switch (type) {
+            case TypeRef reference -> refInhabited(reference, namespace, inhabited);
+            case TypeInline inline -> isInhabited(inline.of(), namespace, inhabited);
+        };
+    }
+
+    /**
+     * The next link of the chain through a slot nothing satisfies: its name, or, for a type written in place, the
+     * first name inside it that is not satisfied.
+     */
+    private static String slotDependency(TypeExpr type, Map<String, Top> namespace, Set<String> inhabited) {
+        return switch (type) {
+            case TypeRef reference -> reference.name();
+            case TypeInline inline -> firstUnsatisfiedDependency(inline.of(), namespace, inhabited);
+        };
     }
 
     /**
@@ -266,7 +293,7 @@ final class TypeInhabitance {
             RecordField field = entry.getValue();
             if (!grouped.contains(entry.getKey()) && !demandsNothing(field)
                     && !satisfiable(field, namespace, inhabited)) {
-                return field.typeRef().name();
+                return slotDependency(field.typeExpr(), namespace, inhabited);
             }
         }
         return record.groups().stream()
@@ -275,7 +302,8 @@ final class TypeInhabitance {
                 .flatMap(group -> group.memberNames().stream())
                 .flatMap(member -> java.util.Optional.ofNullable(record.fields().get(member)).stream())
                 .filter(field -> !satisfiable(field, namespace, inhabited))
-                .map(field -> field.typeRef().name()).findFirst().orElse(null);
+                .map(field -> slotDependency(field.typeExpr(), namespace, inhabited))
+                .filter(java.util.Objects::nonNull).findFirst().orElse(null);
     }
 
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */
@@ -286,14 +314,15 @@ final class TypeInhabitance {
         }
         return switch (definition) {
             case RecordBody record -> recordDependency(record, namespace, inhabited);
-            case ArrayBody array -> refInhabited(array.elementName(), namespace, inhabited)
-                    ? null : array.elementName().name();
-            case MapBody map -> refInhabited(map.valueType(), namespace, inhabited)
-                    ? null : map.valueType().name();
+            case ArrayBody array -> slotInhabited(array.elementType(), namespace, inhabited)
+                    ? null : slotDependency(array.elementType(), namespace, inhabited);
+            case MapBody map -> slotInhabited(map.valueType(), namespace, inhabited)
+                    ? null : slotDependency(map.valueType(), namespace, inhabited);
             case io.ltr8.tson.schema.meta.NamespaceBody ignored -> null;
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .filter(element -> !positionInhabited(element, namespace, inhabited))
-                    .map(element -> element.elementType().name()).findFirst().orElse(null);
+                    .map(element -> slotDependency(element.elementType(), namespace, inhabited))
+                    .filter(java.util.Objects::nonNull).findFirst().orElse(null);
             case Alias alias -> refInhabited(alias.target(), namespace, inhabited)
                     ? null : alias.target().name();
             // A choice fails on every variant at once, so no single link continues the chain; the rest name none.
