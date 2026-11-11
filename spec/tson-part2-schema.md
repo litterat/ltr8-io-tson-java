@@ -668,7 +668,7 @@ A tuple position answers one question — may its value be void? — recorded as
 
 **Choice types** use `(type | type | ...)` — see §5.4.
 
-**Arguments** use `name<arg, arg>`: positional, each a type expression, which may nest (`box<[integer]>`, `pair<text, {text => order}>`). The head resolves per §3.3.2 to an open record, whose parameters the arguments bind (§5.10), or to a constructor, which the application constructs (below), and the list supplies every argument. An argument is a type and never a literal: a number or a quoted token there is a resolver error. In resolved output the application is the reference value [TSON-DATA] §7.4 reads, its arguments references and never sugar; in a data document it is a validation error (§4.2).
+**Arguments** use `name<arg, arg>`: positional, each a type expression, which may nest (`box<[integer]>`, `pair<text, {text => order}>`). The head resolves per §3.3.2 to an open record, whose parameters the arguments bind (§5.10), or to a constructor, which the application constructs (below), and the list supplies every argument. An argument is a type and never a literal: the grammar admits no number and no quoted token there (§12.1). In resolved output the application is the reference value [TSON-DATA] §7.4 reads, its arguments references and never sugar; in a data document it is a validation error (§4.2).
 
 **An application of a constructor constructs it.** Where the head resolves, past its alias hops, to a constructor — a closed record IS-A `meta.type` — `C<a₁ … aₙ>` is the construction `!C { f₁: a₁ … fₙ: aₙ }`, where `f₁ … fₙ` are `C`'s **argument slots**: its required fields with no default and no pin, typed by a reference naming types (`meta.type_ref`, `meta.identifier_ref`, a `meta.ref<C>` over a constructor, §4.2), in declaration order. `meta.array<text>` is the entry `[text]` is, `meta.map<text int32>` the one `{text => int32}` is, and `set<text>` is `!meta.set_type { element_type: text }`. Each argument is judged by its slot's `of` — `meta.namespace<int32 text>` is refused, `key_type` admitting identifier families alone — and is not followed through an alias, so `meta.array<user_id>` is `[user_id]` and not `[uuid]`. A constructor with no argument slot takes no arguments, and a construction leaving another required field unwritten is refused as any incomplete construction is (`meta.enum_type<meta.identifier>`, `members` unwritten). A use-site construction names its content-keyed entry, as `[text]` does, and never a declaration of the same construction (§8.2); a refined constructor applied, `nonempty<uuid>` over `nonempty => meta.array ^ { min_items?: = 1 }`, is an entry of its own, apart from the one `[uuid; 1..]` is. A declaration whose body is a construction is that construction in place (§5.6).
 
@@ -1821,12 +1821,12 @@ size-spec    = size-bound [ ws ".." ws [ size-bound ] ]
 type-args  = type-arg *(separator type-arg) [ ws "," ]
            ; separator = ws "," ws / ws1; a trailing comma
            ; follows a value and changes nothing
-type-arg   = type-expr / token
+type-arg   = type-expr
            ; wider than the data grammar's: a schema argument
            ; may be sugar, which lifts to its own entry (§5.3);
-           ; a sibling-ref, and a token that is no type-expr —
-           ; a number, a quoted string — are refused here by the
-           ; resolver, an argument being a type (§5.3)
+           ; a sibling-ref is refused here by the resolver, and
+           ; a number or a quoted string is no type-expr, an
+           ; argument being a type (§5.3)
 size-bound = unquoted-token
            ; text MUST match the decimal-natural production
            ; of [TSON-DATA] §7.6; a parameter's name here is a

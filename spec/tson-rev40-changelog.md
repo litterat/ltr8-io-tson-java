@@ -236,8 +236,8 @@ Open questions are recorded here and are NOT reflected as open text in the speci
     `@meta.application`.
 29. **§9** — the kernel row lists `meta.param` and drops the seven removed entries.
 30. **§11.5** — the materialisation-depth row counts nested applications.
-31. **§12.1** — `type-arg = type-expr / token`, a token that is no type-expr refused by the
-    resolver; `value-literal` goes; `size-bound` is decimal-natural; the `type-param`
+31. **§12.1** — `type-arg = type-expr`, a number or a quoted token being no argument in
+    either grammar; `value-literal` goes; `size-bound` is decimal-natural; the `type-param`
     comment reads "the written type is the parameter's bound"; `type-def` and `instance`
     note that the resolver admits a parameter list before a record body alone; the
     `type-params` note loses the family-base exception. **§12.2** — the dispatch comments
@@ -320,7 +320,7 @@ carries no open questions.
 |---|---|---|
 | #1 | [TSON-DATA] §2.1's example under an `!!import`. | Open — carried as written. |
 | #2 | A quoted token at a field typed by a reference in data. | Open — carried; the argument half closed by #3. |
-| #3 (reading) | A number or a quoted token in a *schema* document's argument list: the register and the proposal call it a grammar error, the corpus a resolver error. Part 2 §12.1 keeps `type-arg = type-expr / token` with the resolver refusing a token, which matches the corpus; [TSON-DATA] §7.4's data argument is narrowed in the grammar, a parse error there as the corpus's class 1 vector requires. | **[editorial]** — the running behaviour. |
+| #3 (reading) | A number or a quoted token in a *schema* document's argument list: a grammar error, as the register and the proposal have it: Part 2 §12.1 is `type-arg = type-expr`, and [TSON-DATA] §7.4's data argument is narrowed the same way. The corpus records the schema-document case under the `resolver` category, which every schema-document error carries, so it does not tell a grammar error from a resolver one. | **[settled]** — the running behaviour. |
 | #3 (reading) | The proposal narrows §12.1's `type-def` alternative `[type-params] type-expr` to a record body. A parameter list before a sugar form or a bare reference is a resolver error naming the remedy, so the production keeps the alternative and a comment says the resolver admits a record body alone. | **[editorial]** — the running behaviour. |
 | #3 (reading) | §4.1 makes an open record a type by its constructor, `meta.record`, while §5.10's rule is that no template is a type a position names. The text keeps §4.1's predicate and states the refusal on references, as the proposal's §1.3 does; §5.10's heading says "no template is a type a position names". | **[editorial]** — for confirmation. |
 | #3 (reading) | A self-reaching expansion (`nested<text>` over `nested => <T> { value?: T  more?: [nested<T>] }`) keeps its closed record under a name derived from the canonical application, carrying `@meta.application`; Revision 39's `!meta.alias` to a synthetic needed a non-record body to arise. | **[editorial]** — the running behaviour. |
