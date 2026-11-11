@@ -8,52 +8,48 @@ derived — and the static check that runs before any of it.
 
 - The pass order in `SchemaResolver` is fixed: the driving loop resolves every declaration, then
   `TemplateRegularity.check`, then `ParameterTypes.check` and `checkDeferred`, then `materialise`, then
-  `appliedParentEdges` and `closeChains`, then the synthetic merge. Every step reads what the one before it settled.
+  `appliedParentEdges` and `closeChains`. Every step reads what the one before it settled.
+- **Nothing is minted.** An application is closed where it stands, or closes into the declaration that names it, or
+  is reported; no entry is added under a name derived from content or from the application.
 - A template that fails the regularity check, or whose parameters stand where none may, is replaced with the
   error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
-  application's head resolves). The depth guard stays as a backstop for a hole in the check.
-- The pass runs over the **resolved** form. In an open record it closes only the field types that name none of its
-  parameters (`OpenEntry.parameterIn`, applied in `MetaRefs`).
-- An application's arguments are dereferenced before it is closed, and only a reference is dereferenced — a
-  refinement and a fresh instance keep their own applications.
-- `close` asks first whether the head, past its alias hops, is a constructor (`construction`,
-  `design/constructor-application.md`): construction sugar builds the binding record the braced form writes, its
-  arguments as written and not dereferenced, and names the content-keyed synthetic `[T]` and `{K => V}` land on. It
-  mints no instantiation entry, records no `@meta.application` and owns nothing; only `closedApplications` hears of it.
-- A declaration naming an application **is** that entry (`closeApplicationInto`): no internal name is derived or
-  claimed and nothing is published beside it; `ownedBy`, keyed on the canonical application, is what a use site
-  reuses.
-- The memo is registered before the body is substituted (knot-tying), arguments close innermost-first, and
-  substitution descends into arguments.
-- An application nothing declares is its expansion: the use site names the closed synthetic record, named for its
-  binding record (`mintedRecord`). The exception is an expansion that reaches its own application (`tied`), which keeps
-  an instantiation entry: the record itself, under the application-derived name.
-- Every instantiation — a declared one, a self-reaching one — records its application in the map `SchemaResolver`
-  shares with the materialiser, in its reduced form (each argument closed to the entry it names), which §8.2's
-  identity and the applied-parent fold key on. The entry's key carries it as `@meta.application` **as written**
-  (`asWritten`, `writtenApplications`): nested arguments unreduced and each stated the same way,
-  `@meta.application:pair<box<text> int32>`, a bare-name argument followed through its alias chain (§8.2). An
-  expansion carries no `@meta.application`.
-- Every application the pass closes, an expansion's included, is recorded against the entry it closed to
-  (`closedApplications`, as met, a construction's included), and `SchemaResolver` stores the
-  list on that entry as `TsonSchema.EntryFacts.closes`: held in memory, never written. It is what a message names a
-  minted entry by (`EntryDisplayName`). No read resolves an application against it: data holds a reference as a
-  name (§4.2, `design/references.md`).
-- A composition operand never closes, open or closed: it is absorbed by value and mints nothing. A closed refinement
-  source is closed on demand, through the same materialiser instance.
-- Which parents were applications is read off the open record's chain `parents`, not off the closed one, whose
-  `supertypes` are bare names; a closed type keeps no `parents` once `closeChains` has run, and an open record
-  keeps its parents as written.
-- A minted record is a member of nothing: one whose chain names a declared type is refused when it is minted
-  (`refuseMintedMember`), and the applied-parent fold skips synthetics.
+  application's head resolves).
+- The pass runs over the **resolved** form through `MetaRefs`, whose `Rewrite` tells a type slot (`atSlot`) from a
+  slot that holds a name (`atName`). In an open record it closes only the field types that name none of its
+  parameters (`OpenEntry.parameterIn`).
+- An application over a **constructor** (`construction`, `design/constructor-application.md`) is the construction
+  written in place at a type slot: construction sugar builds the binding record the braced form writes, the
+  constructor's reader reads it, the body is walked so each argument closes where it landed (a nested constructor's
+  application, which an open record holds for `{text => [T]}`, in place too), and the slot holds `TypeInline` of it.
+  Only a container, a tuple, a choice or a reference is written in place; any other construction is refused, to be
+  declared. At a slot that holds a name, a construction is refused.
+- An application of an **open record** closes into the declaration that names it (`closeApplicationInto`): the
+  record itself, recorded with its application. A nested application equal to the one a declaration is closing names
+  that declaration (`closingInto`), so a recursive open record closes into its declaration. Any other application of
+  an open record — at a slot of a closed record, left in another record's body by closing it, at a refinement source —
+  is reported as not yet supported (`UnsupportedOperationException`, `NOT_IMPLEMENTED`): closing one in place is
+  phase 2 of the inline-types work.
+- An argument of an open record's application is a name or a parameter: a construction there is refused, to be
+  declared under a name and passed by it. An application's arguments are dereferenced before it is closed, and only a
+  reference is dereferenced.
+- Every instantiation records its application in the map `SchemaResolver` shares with the materialiser, in its reduced
+  form, which the applied-parent fold keys on; the entry's key carries it as `@meta.application` **as written**
+  (`asWritten`, `writtenApplications`).
+- Every application the pass closes into a declaration is recorded against it (`closedApplications`), and
+  `SchemaResolver` stores the list on that entry as `TsonSchema.EntryFacts.closes`: held in memory, never written.
+- A composition operand never closes, open or closed: it is absorbed by value. Which parents were applications is
+  read off the open record's chain `parents`; a closed type keeps no `parents` once `closeChains` has run.
 - No application is IS-A its template (§5.10): its edges are what its template's written parents reach, each closed
-  parent through `Ancestry`, and an applied parent through the fold to the entry that application denotes.
-- Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written. A record, open or
-  closed, takes the base kind its chain reaches; every other entry takes the branch of `Top` its body occupies.
+  parent through `Ancestry`, and an applied parent through the fold to the declaration that application denotes.
+- Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written.
+
+**Not yet swept.** Where the sections below speak of a minted expansion, a synthetic, the merge or `ownedBy`, the
+invariants above govern: each is refused or gone, and those passages are due for the sweep that removes the naming
+code.
 
 Related: `design/open-records.md` (what an open record is, where a parameter stands, bounds and argument
 checks), `design/schema-resolution.md` (chains, applied parents),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `DerivedName`, `MetaRefs`, `@meta.synthetic`),
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `DerivedName`, `MetaRefs`, `@meta.application`),
 `design/constructor-application.md`, `design/linking-and-compilation.md`.
 
 ## Materialisation (`tson-compiler/.../resolver/TemplateMaterialiser.java`)

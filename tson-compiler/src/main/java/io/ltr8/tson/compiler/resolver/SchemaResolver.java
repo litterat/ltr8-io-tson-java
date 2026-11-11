@@ -9,7 +9,6 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.annotation.AnnotatedMap;
-import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;

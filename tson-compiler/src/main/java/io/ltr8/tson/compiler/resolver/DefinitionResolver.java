@@ -51,7 +51,6 @@ import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.annotation.Annotation;
-import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.TsonSchema;
 

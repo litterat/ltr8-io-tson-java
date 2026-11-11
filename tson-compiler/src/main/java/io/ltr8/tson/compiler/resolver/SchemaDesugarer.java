@@ -4,11 +4,7 @@ import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ReferenceValue;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
@@ -39,17 +35,13 @@ import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.base.SourcePosition;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.UnaryOperator;
 
 /**

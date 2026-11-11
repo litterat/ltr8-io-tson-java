@@ -2020,19 +2020,6 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * One reference validated. The entry it sits in is passed as {@code subject} and the path within that
-     * entry as {@code trail} ({@code " field 'w'"}, {@code " element[1]"}) rather than pre-joined, because
-     * {@link UnresolvedReference} has to be able to re-state itself against a different subject: a defect a
-     * open record deferred surfaces on the entry materialisation minted and belongs to the declaration whose
-     * text wrote it, and only the subject differs between the two statements of it.
-     *
-     * <p>A slot typed {@code meta.type_ref} holds the name of a type a value can have: resolved, then judged a member of
-     * the kind ({@link KindMembers}) where {@code constructors} is given, and a value entry refused with its own
-     * diagnostic. A constructor is a member: its value is a record, whose instances are declarations. An alias's
-     * target passes {@code null} and is judged by resolution alone, an alias of a constructor being applied as its
-     * target is.
-     */
-    /**
      * What a type slot holds, validated: a name as {@link #validateTypeRef} judges it, and a type written in place
      * as its body would be judged as an entry, under the entry that holds it.
      */
@@ -2045,6 +2032,19 @@ public final class TsonSchemaLinker {
         }
     }
 
+    /**
+     * One reference validated. The entry it sits in is passed as {@code subject} and the path within that
+     * entry as {@code trail} ({@code " field 'w'"}, {@code " element[1]"}) rather than pre-joined, because
+     * {@link UnresolvedReference} has to be able to re-state itself against a different subject: a defect a
+     * open record deferred surfaces on the entry materialisation minted and belongs to the declaration whose
+     * text wrote it, and only the subject differs between the two statements of it.
+     *
+     * <p>A slot typed {@code meta.type_ref} holds the name of a type a value can have: resolved, then judged a member of
+     * the kind ({@link KindMembers}) where {@code constructors} is given, and a value entry refused with its own
+     * diagnostic. A constructor is a member: its value is a record, whose instances are declarations. An alias's
+     * target passes {@code null} and is judged by resolution alone, an alias of a constructor being applied as its
+     * target is.
+     */
     private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace,
                                          Function<String, Optional<String>> constructors,
                                          String subject, String trail) {

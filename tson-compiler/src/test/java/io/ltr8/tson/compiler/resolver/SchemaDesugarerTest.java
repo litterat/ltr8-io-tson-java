@@ -2,11 +2,9 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;

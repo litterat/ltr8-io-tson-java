@@ -18,6 +18,10 @@ and why the same table is what untagged reading dispatches on. Current form only
 - A reference (`reference_type`, spelled `meta.ref<T>`) is an atom whose values are names, type names or
   qualified value names as its `of` decides, string-class as an identifier family is. It is no sum and carries no
   `disjoint`; a choice may list one as a variant like any other atom.
+- A variant written in place (`TypeInline`, `( text | [int32] )`) classifies by its own body, as the entry it
+  would have been; a choice written in place is derived where it stands, at the slot that holds it
+  (`TsonSchemaLinker.mapInline`), as an entry's choice is. A partial link derives nothing over a variant still
+  pending: the choice keeps the fact as it stands until the whole schema links.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
   §8.3 alias chain.
 - `ChoiceReader.untaggedRecovery` and the derivation both go through `DiscriminationClass.of`: one fact, not two.
@@ -66,8 +70,10 @@ requires, so an alias of `void` is caught too.
 **`disjoint` ⇔ the tag is droppable — one fact, not two.** `ChoiceReader.untaggedRecovery` builds its
 `class → variant` dispatch map through the same `DiscriminationClass.of` the derivation classifies with,
 so the derived fact and the reader's separability can never disagree — one fact, not a derivation and a
-dispatch rule held carefully in step. Recovery still engages only when every class is *scalar* —
-a `brace`/`bracket` variant is honestly disjoint from a scalar, but recovery dispatches on a token's
-resolved class and structural recovery from an opening delimiter isn't attempted yet. **The class table is
+dispatch rule held carefully in step. Recovery covers every class §5.4 counts: a scalar token by its resolved
+class, a reference token as string-class, and a `brace`/`bracket` variant by its opening delimiter
+(`NamedDispatchReader.classOf`). That is what reads a type slot untagged: `meta.type_expr` is
+`( meta.type_ref | meta.type_inline )`, a name string-class and the `{ of: … }` wrapper brace-class. A variant written
+in place has no name a tag could spell, so it is reached by recovery alone. **The class table is
 pinned twice over**: it decides which schemas load (`@meta.disjoint` on a `false` choice is an error) and which
 documents read untagged, so any change to it is a compatibility decision, not a free improvement.

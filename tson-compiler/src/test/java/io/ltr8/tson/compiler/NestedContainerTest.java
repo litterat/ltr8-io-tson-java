@@ -5,14 +5,11 @@ import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonVoid;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonValue;
 
-import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;

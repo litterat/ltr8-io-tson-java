@@ -6,7 +6,6 @@ import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.resolver.KindMembers;
-import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.Namespace;

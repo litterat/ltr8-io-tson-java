@@ -18,8 +18,6 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashSet;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

@@ -13,7 +13,6 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.FieldTypeExpr;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TypeExpr;

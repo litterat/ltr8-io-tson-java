@@ -24,6 +24,17 @@ choices. Current form only; history lives in git.
 - The subsumption guard follows the body, not `kind()`, admits an entry's aliases as the entry itself, and is transparent
   to `UseSite` renaming and bind-mode container rebinding.
 - `Subsumption.namesMeaning` and the binding-name index are built once per compile, not per entry.
+- A type written in place (`TypeInline`) has no entry and no compiled entry reader: a slot's reader is
+  `TsonTypeReaderResolver.resolve(TypeExpr)`, a name's entry reader or one built from the construction's body through
+  its constructor's factory (`TsonSchemaCompiler.InlineReaders`), memoised by the construction in `CompiledReaders`
+  (equal constructions share one, a cache and no entry) and buildable after the rebind, since the builder holds the
+  factories and the linked schema, never the `Compilation`. It is named for a message by its form (`[text]`), carries
+  no tag in a tree (`ValueReaderContext.tagOf`), and its §7.2 guard admits no tag. `tson-json` builds its own the
+  same way (`JsonSchemaCompiler.InlineReaders`).
+- In bind mode a component typed `TypeExpr` or `FieldTypeExpr` at a type slot's choice reads a name through the
+  `TypeNameSlotReader` a `TypeRef` component gets (`NamedDispatchReader.recoveringWith`), so the annotations written
+  on the name are kept; a natural reader's guess at an inline type's host class is its constructor's shape
+  (`BindTargets.hostType`).
 - A bind lookup redirects through an alias only for a derived entry (one with no source position).
 
 Related: `design/linking-and-compilation.md`, `design/choice-disjointness.md`, `design/compiled-registries.md`,

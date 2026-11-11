@@ -5,7 +5,6 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.RecordField;
 
 import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Disabled;
