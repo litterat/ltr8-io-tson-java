@@ -38,13 +38,6 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
-- [ ] **An application whose head is an alias of an open record is not absorbed at an operand** ([TSON-SCHEMA]
-  §5.7, §5.8, §8.3). Over `box => <T> { v: T }` and `ref_of => box`, `z => { f: ref_of<text> }` closes in place, the
-  alias being the open record under another name, but `x => ref_of<text> ^ { … }` is reported `NOT_IMPLEMENTED`
-  (`TemplateMaterialiser.closeApplication`) and `y => ref_of<text> & { … }` is refused as applying arguments to an
-  entry that declares no parameters, a library gap reported as the author's error (`DefinitionResolver.openOperand`,
-  which reads the head without following its alias chain). Follow the head's alias chain in `openOperand` and in
-  `resolveRefinement`'s test for an open operand, and add `schema/valid` vectors for both operators.
 - [ ] **A tree read does not read a dependent value against a sibling written in place** ([TSON-SCHEMA] §5.2).
   `setting => { kind: meta.type_expr  v?: kind! }` with `kind: { of: !meta.array { element_type: int32 } }` reads `v`
   against the array in bind mode, where the sibling binds to its `TypeInline`; a tree read holds the sibling as the

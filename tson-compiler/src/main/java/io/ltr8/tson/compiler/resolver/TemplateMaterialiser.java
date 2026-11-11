@@ -223,11 +223,11 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * The entry a fully-bound application at a refinement source denotes -- the on-demand half, reached during
-     * resolution rather than from the batch pass afterwards. A construction there is refused, as at any slot that
-     * holds a name. An application of an open record is absorbed by value before it reaches here
-     * ({@code DefinitionResolver.openOperand}), except where its head is an alias of the open record, which is not
-     * yet supported.
+     * The name a fully-bound application at a refinement source leaves -- reached during resolution rather than from
+     * the batch pass afterwards. A construction there is refused, as at any slot that holds a name, and so is an
+     * application of a head that takes no parameters; one whose head names nothing is left whole for the linker. An
+     * application of an open record, through its alias hops or not, is absorbed by value and never reaches here
+     * ({@code DefinitionResolver.openOperand}).
      */
     String closeApplication(TypeRef application) {
         if (application.arguments().isEmpty()) {
@@ -238,9 +238,8 @@ final class TemplateMaterialiser {
         }
         return switch (closeApplicationOfRecord(application)) {
             case TypeRef named -> named.name();
-            case TypeInline ignored -> throw new UnsupportedOperationException("'" + application.text()
-                    + "' at a refinement source names its open record through an alias, and absorbing it that way "
-                    + "is not yet supported ([TSON-SCHEMA] §5.7): write the open record's own name as the head");
+            case TypeInline inline -> throw new IllegalStateException("'" + application.text() + "' closed in place "
+                    + "at a refinement source, where an application of an open record is absorbed by value");
         };
     }
 
@@ -438,14 +437,9 @@ final class TemplateMaterialiser {
         };
     }
 
-    /**
-     * The template an application's head names: the head itself, or, where it is an alias of a template ({@code
-     * ref_of => ref}), the template at the end of its alias chain, the alias being the same entry under
-     * another name ([TSON-SCHEMA] §8.3).
-     */
+    /** The open record an application's head names, past its alias hops ({@link Ancestry#templateHead}). */
     private String templateHead(String head) {
-        String terminal = AliasChain.terminal(head, namespace::definition);
-        return !terminal.equals(head) && OpenEntry.isOpen(namespace.definition(terminal)) ? terminal : head;
+        return Ancestry.templateHead(head, namespace);
     }
 
     /**

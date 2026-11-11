@@ -690,7 +690,9 @@ public final class SchemaResolver {
             if (parent.arguments().isEmpty()) {
                 continue;
             }
-            String owner = byApplication.get(DerivedName.canonicalApplication(parent.name(), parent.arguments()));
+            // A parent written through an alias of its open record is that open record's application (§8.3).
+            String head = Ancestry.templateHead(parent.name(), namespace::get);
+            String owner = byApplication.get(DerivedName.canonicalApplication(head, parent.arguments()));
             if (owner != null) {
                 chain.add(owner);
             }

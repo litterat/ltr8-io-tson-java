@@ -175,6 +175,12 @@ resolves, before the batch pass runs. They are handled differently.
   and a closed declaration's, which the fold turns into the edge to the entry declared for it where one is, so `x` is
   IS-A `box`'s written parents and `text_box` where `text_box => box<text>` is declared, and never `box`. Only a
   refinement of a name records `refines`. `InlineTypeRulesTest` pins it.
+- **An operand's head is followed past its alias hops** (`Ancestry.templateHead`, §8.3): over `pet_of => pet_box`,
+  `pet_of<text>` at `&` or `^`, and `<T> pet_of<T> & { … }`, apply `pet_box` and are absorbed as `pet_box<text>` is.
+  The one rule serves every place an applied head is read: `openOperand` and `resolveRefinement`'s test for an open
+  source, `Ancestry.ofTemplate` when a chain is built, the materialiser's closing, and the fold, which keys a parent
+  written through the alias on the open record's application, so its edge still names the declaration of it. The
+  parent itself stays as written. `InlineTypeRulesTest.anApplicationThroughAnAliasIsAbsorbedAtAnOperand` pins it.
 - **The cycle guard still applies.** An operand's or source's head resolves through the resolution's `WaitOrder`,
   where an entry waiting on itself is refused, so a cycle reached through an application
   (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on

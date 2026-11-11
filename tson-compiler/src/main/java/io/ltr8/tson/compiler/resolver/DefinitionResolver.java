@@ -1826,7 +1826,8 @@ final class DefinitionResolver {
      */
     private Built resolveRefinement(String name, RefinedDef refined, List<String> parameters) {
         if (refined.target() instanceof ApplicationRef generic && (namesOwnParameter(generic, parameters)
-                || OpenEntry.isOpen(namespaceDefinitions.definition(generic.name())))) {
+                || OpenEntry.isOpen(namespaceDefinitions.definition(
+                        Ancestry.templateHead(generic.name(), namespaceDefinitions))))) {
             // §5.7 against an application of an open record, over this declaration's parameters or closed: the same
             // absorption composition does (§5.8). The application names no entry and nothing is minted for it: its
             // ancestors are types and its whole field set arrives, which is what `^` re-emits and then tightens, and
@@ -2061,7 +2062,9 @@ final class DefinitionResolver {
      */
     private OpenOperand openOperand(String name, ApplicationRef application, List<String> typeParams, String position) {
         String head = application.name();
-        Top template = namespaceDefinitions.definition(head);
+        // An alias of an open record is the open record under another name (§8.3), and is applied as it is.
+        String templateHead = Ancestry.templateHead(head, namespaceDefinitions);
+        Top template = namespaceDefinitions.definition(templateHead);
         if (template == null) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' names no type this schema declares or imports");
@@ -2092,7 +2095,7 @@ final class DefinitionResolver {
         List<io.ltr8.tson.schema.meta.TypeRef> arguments = typeArguments(name, application);
         // §5.10's bound check, which an operand absorbed by value would otherwise never get.
         if (applicationCloser != null) {
-            applicationCloser.checkArguments(head, template, arguments);
+            applicationCloser.checkArguments(templateHead, template, arguments);
         }
         Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings = new LinkedHashMap<>();
         for (int i = 0; i < templateParameters.size(); i++) {
@@ -2104,7 +2107,7 @@ final class DefinitionResolver {
         SequencedMap<String, BuiltField> fields = new LinkedHashMap<>();
         Substitution.fields(record, bindings).forEach((field, substituted) -> fields.put(field,
                 BuiltField.of(substituted)));
-        return new OpenOperand(Ancestry.ofTemplate(head, namespaceDefinitions), fields, record.groups(),
+        return new OpenOperand(Ancestry.ofTemplate(templateHead, namespaceDefinitions), fields, record.groups(),
                 record.nameType(), arguments);
     }
 
