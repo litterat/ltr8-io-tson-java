@@ -61,9 +61,9 @@ public final class JsonSchemaCompiler {
 
     /**
      * Builds the reader of a type written in place ({@link TypeInline}) from its body, through the factory its
-     * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice or a reference, named
-     * for a message by the form as written. It holds the factories, the linked schema and the readers' handle, never
-     * the {@link Compilation}.
+     * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice, a reference, or the
+     * record an application closes to in place, named for a message by the form as written. It holds the factories,
+     * the linked schema and the readers' handle, never the {@link Compilation}.
      */
     private static final class InlineReaders {
         private final TsonLinkedSchema linked;

@@ -64,10 +64,18 @@ public final class CompiledReaders implements TsonTypeReaderResolver {
     private final Function<TypeInline, TsonTypeReader<?>> inlineBuilder;
 
     /**
-     * The reader built for each type written in place, keyed by the construction itself: equal constructions share
-     * one reader, a private cache and no entry ([TSON-SCHEMA] §5.3).
+     * What a type written in place's reader is memoised by: the construction, equal ones sharing a reader, and the form
+     * it is named by in a message, which takes no part in the construction's identity -- {@code box<int32>} and {@code
+     * crate<int32>} close to one record, and each reader names the application its position wrote.
      */
-    private final Map<TypeInline, TsonTypeReader<?>> inline = new ConcurrentHashMap<>();
+    private record InlineKey(TypeInline type, String text) {
+    }
+
+    /**
+     * The reader built for each type written in place ({@link InlineKey}): equal constructions named alike share one
+     * reader, a private cache and no entry ([TSON-SCHEMA] §8.2).
+     */
+    private final Map<InlineKey, TsonTypeReader<?>> inline = new ConcurrentHashMap<>();
 
     /** Starts out resolving through {@code whileCompiling} -- the compilation's own recursive, cycle-aware build. */
     public CompiledReaders(TsonTypeReaderResolver whileCompiling) {
@@ -96,7 +104,8 @@ public final class CompiledReaders implements TsonTypeReaderResolver {
      */
     @Override
     public TsonTypeReader<?> resolveInline(TypeInline type) {
-        TsonTypeReader<?> built = inline.get(type);
+        InlineKey key = new InlineKey(type, type.text());
+        TsonTypeReader<?> built = inline.get(key);
         if (built != null) {
             return built;
         }
@@ -104,7 +113,7 @@ public final class CompiledReaders implements TsonTypeReaderResolver {
             return TsonTypeReaderResolver.super.resolveInline(type);
         }
         TsonTypeReader<?> fresh = inlineBuilder.apply(type);
-        TsonTypeReader<?> raced = inline.putIfAbsent(type, fresh);
+        TsonTypeReader<?> raced = inline.putIfAbsent(key, fresh);
         return raced == null ? fresh : raced;
     }
 

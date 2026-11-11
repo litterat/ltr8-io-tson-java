@@ -95,7 +95,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      * admits repetition is not one.
      */
     static boolean elementsAreNames(ArrayBody body, ValueReaderContext context) {
-        // A type written in place is a container, a tuple, a choice or a reference, and never an identifier family.
+        // A type written in place is a container, a tuple, a choice, a reference or a record, never an identifier family.
         return body.uniqueItems() && body.elementType() instanceof io.ltr8.tson.schema.meta.TypeRef element
                 && AliasChain.terminalDefinition(element.name(), context.schema().entries()::get)
                 .map(definition -> definition instanceof IdentifierType)

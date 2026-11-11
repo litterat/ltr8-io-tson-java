@@ -367,6 +367,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 throw new IllegalArgumentException(
                         "'" + name + "' is not record-shaped: " + typeDefinition);
             }
+            if (context.tagOf(name).isEmpty()) {
+                // A record in place has no name a binding map holds: the component holding it says its class.
+                return new RecordInPlaceBindReader(name, body, context);
+            }
             DataClass dataClass = descriptorFor(name, typeDefinition, context);
 
             if (context.subtypesOf(name, typeDefinition).isEmpty()) {

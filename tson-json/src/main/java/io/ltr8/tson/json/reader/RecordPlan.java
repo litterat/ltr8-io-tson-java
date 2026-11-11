@@ -127,9 +127,9 @@ final class RecordPlan {
         Map<String, Integer> byName = new HashMap<>();
         // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule, and
         // then put into the record's name type's form (§5.5), so a name the type holds equal to a field is it.
-        this.nameForm = context.linked().nameForm(name);
+        this.nameForm = context.linked().nameForm(name, body);
         this.nameType = body.nameTypeName();
-        IdentifierType identifiers = context.linked().nameType(name)
+        IdentifierType identifiers = context.linked().nameType(name, body)
                 .map(type -> type instanceof IdentifierType family ? family : null)
                 .orElse(null);
         this.nameReader = identifiers == null ? null : AtomParsers.forType(identifiers).orElseThrow(() ->

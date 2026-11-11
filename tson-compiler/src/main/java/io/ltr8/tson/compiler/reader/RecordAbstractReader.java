@@ -462,14 +462,15 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * {@link TsonReadContext.FieldNameRule#FIELD_NAME} where it has the kernel's default.
      */
     static TsonReadContext.FieldNameRule fieldNameRule(String name, RecordBody body, ValueReaderContext context) {
-        return context.linked().nameType(name).map(type -> {
+        return context.linked().nameType(name, body).map(type -> {
             if (!(type instanceof IdentifierType identifiers)) {
                 throw new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName() + "' reached a "
                         + "reader as no identifier family; the linker admits only one");
             }
             return new TsonReadContext.FieldNameRule(body.nameTypeName(), AtomParsers.forType(identifiers)
                     .orElseThrow(() -> new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName()
-                            + "' has no reader of its own")), identifiers.profile(), context.linked().nameForm(name));
+                            + "' has no reader of its own")), identifiers.profile(),
+                    context.linked().nameForm(name, body));
         }).orElse(TsonReadContext.FieldNameRule.FIELD_NAME);
     }
 

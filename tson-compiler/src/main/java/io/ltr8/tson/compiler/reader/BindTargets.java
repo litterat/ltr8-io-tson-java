@@ -6,6 +6,7 @@ import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -48,7 +49,8 @@ import java.util.function.UnaryOperator;
  *       ({@link NamespaceInstanceReader}). A map that is no namespace has no constructor to name and cannot fill
  *       one; a {@code Map} target at a namespace type receives the map.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
- *       nothing is rebuilt.</li>
+ *       nothing is rebuilt. A record written in place has no name to bind by, and is read into the target's own
+ *       record class ({@link RecordInPlaceBindReader}).</li>
  *   <li><b>A name at a reference- or kind-typed slot</b> is recorded with the slot's declared type for the linker
  * to judge, whatever the target holds. A {@code Reference} target reads as a {@code TypeRef} one does, a type reference
  * being a reference, and admits a sibling reference besides, which a {@code TypeRef} target refuses at its token, naming the
@@ -201,6 +203,7 @@ final class BindTargets {
     private static boolean recordHeldByName(TsonTypeReader<?> reader) {
         return switch (RecordAbstractReader.unwrapped(reader)) {
             case RecordAbstractReader<?> record -> !record.bareTokenFillsPositionally();
+            case RecordInPlaceBindReader ignored -> true;
             case ErrorReader ignored -> true;
             case RecordTagDispatchReader ignored -> true;
             case RecordMemberDispatchReader ignored -> true;
@@ -246,6 +249,7 @@ final class BindTargets {
             case MapBindReader map -> map(map, target, what, where, site, top);
             case TupleBindReader tuple -> tuple(tuple, target, what, where, site, top);
             case RecordBindReader record -> record(record, target, what, where, site);
+            case RecordInPlaceBindReader inPlace -> recordInPlace(inPlace, target, what, where, site);
             default -> reader;
         };
     }
@@ -364,6 +368,22 @@ final class BindTargets {
         }
         return new TupleBindReader(top ? site.field() : tuple.name, top ? site.field() : tuple.displayName,
                 tuple.body, positional, positions, tuple.schemaLocation);
+    }
+
+    /**
+     * A record written in place is bound by the component that holds it: no binding map can name it ([TSON-SCHEMA]
+     * §8.2), so the target's record class is the only one there is, and the record is read into it, each field bound
+     * to the class's component as a declared record's is.
+     */
+    private static TsonTypeReader<?> recordInPlace(RecordInPlaceBindReader inPlace, DataClass target, String what,
+                                                   String where, Site site) {
+        if (!(target instanceof DataClassRecord record)) {
+            site.mismatches().add(what + " is a record written in place, and " + where + " binds "
+                    + target.typeClass().getName() + ", which is not a record class -- a record in place binds to "
+                    + "the record class its component declares");
+            return inPlace;
+        }
+        return inPlace.boundTo(record);
     }
 
     /** A record is bound by its own schema type's name, so the class it builds has to be one the target holds. */

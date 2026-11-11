@@ -76,6 +76,8 @@ class CrossEncodingParityTest {
               robot     => { serial: text }
               holder    => { who: person  labels: [text] }
               in_place  => { grid: [[text]]  prices: {text => [int32]}  pair: [text, int32]  id: ( int32 | text ) }
+              ip_page   => <T> { items: [T]  size?: int32 ~ 10 }
+              ip_holder => { p: ip_page<text>  ps?: [ip_page<int32>] }
               pair_of   => meta.array ^ { min_items?: = 1  max_items?: = 2 }
               refined   => { few: pair_of<int32>  many: [int32; 1..2] }
               setting   => { kind: meta.type_expr  v?: kind! }
@@ -990,6 +992,20 @@ class CrossEncodingParityTest {
         sameRule("in_place", """
                 { grid: []  prices: {}  pair: [x]  id: 1 }""", """
                 {"grid": [], "prices": {}, "pair": ["x"], "id": 1}""");
+    }
+
+    /**
+     * An application of an open record at a slot closes in place to a record with no name, read alike in both: its
+     * fields, its default, an element of a list holding one, and a field it does not declare, at one pointer.
+     */
+    @Test
+    void aRecordInPlaceReadsAlike() {
+        bothAccept("ip_holder", """
+                { p: { items: [a b] }  ps: [ { items: [1]  size: 2 } ] }""", """
+                {"p": {"items": ["a", "b"]}, "ps": [{"items": [1], "size": 2}]}""");
+        sameCodeAndPath("ip_holder", """
+                { p: { size: 1 }  ps: [ { items: []  colour: red } ] }""", """
+                {"p": {"size": 1}, "ps": [{"items": [], "colour": "red"}]}""");
     }
 
     /**

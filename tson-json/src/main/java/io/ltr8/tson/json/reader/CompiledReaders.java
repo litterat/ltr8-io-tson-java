@@ -22,18 +22,26 @@ import java.util.function.Function;
  * never reaches the compile it came from.
  *
  * <p><b>A type written in place</b> has a reader built from its body by {@code inlineBuilder}, once per construction
- * (equal constructions share one, a private cache and no entry). The builder holds the factories and the linked
- * schema, never the compilation.
+ * and the form it is named by ({@link InlineKey}): a private cache, and no entry. The builder holds the factories and
+ * the linked schema, never the compilation.
  */
 public final class CompiledReaders implements TypeReaderResolver {
 
     private TypeReaderResolver building;
     private JsonCompiledSchema finished;
     private final Function<TypeInline, JsonTypeReader<?>> inlineBuilder;
-    private final Map<TypeInline, JsonTypeReader<?>> inline = new ConcurrentHashMap<>();
+    private final Map<InlineKey, JsonTypeReader<?>> inline = new ConcurrentHashMap<>();
 
     public CompiledReaders(TypeReaderResolver building) {
         this(building, null);
+    }
+
+    /**
+     * What a type written in place's reader is memoised by: the construction, equal ones sharing a reader, and the form
+     * it is named by in a message, which takes no part in the construction's identity -- {@code box<int32>} and {@code
+     * crate<int32>} close to one record, and each reader names the application its position wrote.
+     */
+    private record InlineKey(TypeInline type, String text) {
     }
 
     /** Resolving names through {@code building}, and an inline type's reader through {@code inlineBuilder}. */
@@ -62,7 +70,8 @@ public final class CompiledReaders implements TypeReaderResolver {
      */
     @Override
     public JsonTypeReader<?> resolveInline(TypeInline type) {
-        JsonTypeReader<?> built = inline.get(type);
+        InlineKey key = new InlineKey(type, type.text());
+        JsonTypeReader<?> built = inline.get(key);
         if (built != null) {
             return built;
         }
@@ -70,7 +79,7 @@ public final class CompiledReaders implements TypeReaderResolver {
             return TypeReaderResolver.super.resolveInline(type);
         }
         JsonTypeReader<?> fresh = inlineBuilder.apply(type);
-        JsonTypeReader<?> raced = inline.putIfAbsent(type, fresh);
+        JsonTypeReader<?> raced = inline.putIfAbsent(key, fresh);
         return raced == null ? fresh : raced;
     }
 }

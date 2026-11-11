@@ -118,11 +118,11 @@ public final class TsonSchemaCompiler {
 
     /**
      * Builds the reader of a type written in place ({@link TypeInline}) from its body, through the factory its
-     * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice or a reference, named
-     * for a message by the form as written. It has no entry, so it has no name a binding map, a schema location or a
-     * tree's tag keys on, nothing IS-A it, so §7.2's guard at its position admits no tag, and it is no alias. It holds
-     * the factories, the
-     * linked schema and the readers' handle, never the {@link Compilation}, so the handle may build one at read time.
+     * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice, a reference, or the
+     * record an application closes to in place, named for a message by the form as written. It has no entry, so it
+     * has no name a binding map, a schema location or a tree's tag keys on, nothing IS-A it, so §7.2's guard at its
+     * position admits no tag, and it is no alias. It holds the factories, the linked schema and the readers' handle,
+     * never the {@link Compilation}, so the handle may build one at read time.
      */
     private static final class InlineReaders {
         private final TsonLinkedSchema linked;

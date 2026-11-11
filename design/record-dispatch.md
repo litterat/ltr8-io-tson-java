@@ -12,7 +12,9 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
   fields and looks the value up.
 - Both dispatchers are `Subsumption.Applied`; without the marker `Subsumption.guard` puts a second dispatcher in front,
   which wins.
-- Both compare a written tag against flattened names (`Subsumption.admitting`).
+- Both compare a written tag against flattened names (`Subsumption.admitting`). A record written in place -- an abstract
+  open record applied at a slot -- has no name, so neither admits a tag naming it, and nothing is its member (§5.10):
+  a value there is refused at its position.
 - A family's verdicts are `base.diagnostics`' `RecordExtensionDiagnostics`, §7.2's refusal is `SubsumptionDiagnostics`,
   and the refusal is located at the value, not at the tag.
 - `UNKNOWN_TYPE_REF` means the written name denotes nothing; a name that resolves and is not admissible, or a required

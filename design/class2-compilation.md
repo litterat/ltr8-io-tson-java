@@ -25,15 +25,25 @@ choices. Current form only; history lives in git.
   to `UseSite` renaming and bind-mode container rebinding.
 - `Subsumption.namesMeaning` and the binding-name index are built once per compile, not per entry.
 - A type written in place (`TypeInline`) has no entry and no compiled entry reader: a slot's reader is
-  `TsonTypeReaderResolver.resolve(TypeExpr)`, a name's entry reader or one built from the construction's body through
-  its constructor's factory (`TsonSchemaCompiler.InlineReaders`), memoised by the construction in `CompiledReaders`
-  (equal constructions share one, a cache and no entry) and buildable after the rebind, since the builder holds the
+  `TsonTypeReaderResolver.resolve(TypeExpr)`, a name's entry reader or one built from the body through its
+  constructor's factory (`TsonSchemaCompiler.InlineReaders`) -- a container, a tuple, a choice, a reference, or the
+  record an application closes to in place, through `meta.record`'s factory -- memoised in `CompiledReaders` by the
+  construction and the form it is named by (`InlineKey`), and buildable after the rebind, since the builder holds the
   factories and the linked schema, never the `Compilation`. Equality includes the constructor, so `pair_of<int32>` and
-  `[int32; 1..2]` are two readers. It is named for a message by its form as written (`TypeInline.text()`: `[text]`,
-  `set<text>`, `pair_of<int32>`), which `ValueReaderContext.displayName`/`authoredName` pass through for a name that
-  is no entry rather than re-render from the body, which cannot say which constructor built it. It carries no tag in
-  a tree (`ValueReaderContext.tagOf`), and its §7.2 guard admits no tag. `tson-json` builds its own the same way
-  (`JsonSchemaCompiler.InlineReaders`).
+  `[int32; 1..2]` are two readers; `box<int32>` and `crate<int32>` closing to one record are one type and two readers,
+  each named by its own application. It is named for a message by its form as written (`TypeInline.text()`: `[text]`,
+  `set<text>`, `pair_of<int32>`, `page<order>`), which `ValueReaderContext.displayName`/`authoredName` pass through
+  for a name that is no entry rather than re-render from the body. It carries no tag in a tree
+  (`ValueReaderContext.tagOf`, `RecordTreeReader` included), a record dispatcher in front of a record in place admits
+  no tag naming it (`RecordDispatch`), and its §7.2 guard admits none. A record in place judges its field names by
+  the name type its body states (`TsonLinkedSchema.nameType(String, Top)`), having no entry the linker indexed.
+  `tson-json` builds its own the same way (`JsonSchemaCompiler.InlineReaders`).
+- In bind mode **a record in place binds by the component that holds it** (`RecordInPlaceBindReader`): no binding map
+  can name it (§8.2) and a record has no natural host form, so the factory builds a reader that builds nothing, and
+  `BindTargets` reads it again into the component's record class -- a field's, an element's, a map value's, a tuple
+  position's -- each field bound to that class's component as a declared record's is. A component whose class is no
+  record is a bind mismatch; read where no component says, it raises `MissingBindingException`. `tson-json`'s
+  `RecordInPlaceReader` is the same rule.
 - In bind mode a component typed `TypeExpr` or `FieldTypeExpr` at a type slot's choice reads an untagged value through
   readers of its own (`NamedDispatchReader.recoveringWith`): a name through the `TypeNameSlotReader` a `TypeRef`
   component gets, so the annotations written on the name are kept, and the `{ of: !C { … } }` wrapper through

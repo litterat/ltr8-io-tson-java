@@ -36,7 +36,8 @@ record ArrayPlan(String displayName, JsonSchemaLocation schemaLocation, boolean 
         return new ArrayPlan(displayName, context.locationOf(name),
                 body.voidable(), body.uniqueItems(), body.minItems(), body.maxItems(),
                 context.readers().resolve(body.elementType()), new ArrayDiagnostics(displayName),
-                // A type written in place is a container, a tuple, a choice or a reference, never an identifier family.
+                // A type written in place is a container, a tuple, a choice, a reference or a record, never an identifier
+                // family.
                 body.uniqueItems() && body.elementType() instanceof TypeRef element
                         && AliasChain.terminal(context.schema(), element.name())
                         .map(terminal -> terminal.definition() instanceof IdentifierType)

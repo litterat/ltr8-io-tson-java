@@ -33,7 +33,8 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
   name in a message as a `displayName` beside `name`). Nothing is lifted or minted (§8.2), so an entry's name is an
   author's, and an entry with a source position is named by it. A type written in place has no entry: its reader is
   built under its form as written (`TypeInline.text()`: `[order; 1..]`, `{text => order}`, `[text, int32]`,
-  `(text | int32)`, and a refined constructor's application, `pair_of<int32>` or `set<text>`), and
+  `(text | int32)`, a refined constructor's application, `pair_of<int32>` or `set<text>`, and a record in place as
+  the application it closes, `page<order>`, or its fields where a resolved form left that unknown), and
   `ValueReaderContext.displayName`/`authoredName` pass a name that is no entry through unchanged, since a body alone
   cannot say which constructor built it. An entry with no source position — one the kernel's bootstrap builds by hand,
   or one read from a resolved form — is shown as the form its body is, and a declared application as the application
