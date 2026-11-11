@@ -11,7 +11,7 @@ before editing — each opens with its invariants.
 | `TsonSchemaParser`, `ast/schema/` | `schema-grammar.md` |
 | `resolver/SchemaDesugarer` | `schema-grammar-and-desugaring.md`, `desugaring-open-forms-and-templates.md` |
 | `resolver/DefinitionResolver`, `SchemaResolver`, `ConstructionSugar` | `schema-resolution.md`, `constructor-application.md`, `atom-refinement-and-coherence.md` |
-| `resolver/WireForm`, `MetaRefs`, `DerivedName`, `KernelBootstrapResolver` | `resolver-vocabulary-and-bootstrap.md` |
+| `resolver/WireForm`, `MetaRefs`, `CanonicalApplication`, `KernelBootstrapResolver` | `resolver-vocabulary-and-bootstrap.md` |
 | `resolver/TemplateMaterialiser`, `Substitution`, `ParameterTypes` | `open-records.md`, `template-materialisation.md` |
 | `TsonSchemaLinker`, `ChoiceDisjointness`, `ValuesByName` | `linking-and-compilation.md`, `choice-disjointness.md`, `name-hygiene.md` |
 | `TypeInhabitance`, `RecordExtension` | `inhabitance-and-record-extension.md` |
