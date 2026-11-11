@@ -66,7 +66,7 @@ derived — and the static check that runs before any of it.
 
 Related: `design/open-records.md` (what an open record is, where a parameter stands, bounds and argument
 checks), `design/schema-resolution.md` (chains, applied parents),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `DerivedName`, `MetaRefs`, `@meta.application`),
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `CanonicalApplication`, `MetaRefs`, `@meta.application`),
 `design/constructor-application.md`, `design/linking-and-compilation.md`.
 
 ## Materialisation (`tson-compiler/.../resolver/TemplateMaterialiser.java`)
@@ -105,7 +105,7 @@ checks), `design/schema-resolution.md` (chains, applied parents),
   - **The parent edge is derived after the fact, order-independently** (`SchemaResolver.appliedParentEdges`). The
     entry an applied parent denotes is whichever declaration names that application, and asking during closing
     would make the answer depend on declaration order. The fold indexes entries by their recorded canonical
-    application (`DerivedName.canonicalApplication`) and folds each owner and its ancestors into `supertypes` to a
+    application (`CanonicalApplication.of`) and folds each owner and its ancestors into `supertypes` to a
     fixed point. An application no declaration names contributes no edge: nobody declared that type.
 - **An argument of an open record's application closes nothing.** It is a name or a parameter (§5.3), so an
   application or a construction there is refused (`closeArgument`); an argument of a constructor's application lands
@@ -232,9 +232,9 @@ a recursive application — direct or mutual — must pass each parameter throug
 
 - **A static rule, not a runtime limit** (§5.10.1: "the check is static, at declaration time"). A template that grows
   its argument every level (`weird => <T> { next: weird<box<T>>? }`) reaches `weird<box<text>>`,
-  `weird<box<box<text>>>`, …, so every instantiation is distinct, dedup never fires, and there is no finite set of
-  types to build; no portable depth limit tells that from legitimate depth. Checked at the declaration, a template
-  nobody applies is still rejected, at the line that wrote it.
+  `weird<box<box<text>>>`, …, so every application is distinct, none repeats to tie or be refused, and there is no
+  finite set of types to build; no portable depth limit tells that from legitimate depth. Checked at the declaration,
+  a template nobody applies is still rejected, at the line that wrote it.
 - **Mutual recursion needs reachability, not a self-edge**: neither template in an `a → b → a` cycle applies
   itself, so an application is checked whenever its head can reach the declaration it sits in.
 - **Applications nested inside arguments are checked too** (`box<deep<box<T>>>`), so the walk recurses through

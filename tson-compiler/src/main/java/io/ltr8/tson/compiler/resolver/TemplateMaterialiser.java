@@ -267,7 +267,7 @@ final class TemplateMaterialiser {
         for (TypeRef argument : application.arguments()) {
             arguments.add(dereferenced(closeArgument(argument, application)));
         }
-        String canonical = DerivedName.canonicalApplication(head, arguments);
+        String canonical = CanonicalApplication.of(head, arguments);
         if (closingInto.putIfAbsent(canonical, declaredName) != null) {
             return null; // a second declaration of one application inside the first's closing: the ordinary path
         }
@@ -355,13 +355,16 @@ final class TemplateMaterialiser {
                 + "') and pass that name");
     }
 
-    /** A name for a declaration of {@code application}, for a message: {@code text_box} for {@code box<text>}. */
+    /**
+     * A name for a declaration of {@code application}, for a message: the head, then each argument, as [TSON-SCHEMA]
+     * §5.10.1 writes {@code node_text => node<text>}.
+     */
     static String suggestedName(TypeRef application) {
-        StringBuilder name = new StringBuilder();
+        StringBuilder name = new StringBuilder(application.segments().getLast());
         for (TypeRef argument : application.arguments()) {
-            name.append(argument.arguments().isEmpty() ? argument.segments().getLast() : "my").append('_');
+            name.append('_').append(argument.arguments().isEmpty() ? argument.segments().getLast() : "my");
         }
-        return name.append(application.segments().getLast()).toString();
+        return name.toString();
     }
 
     /**
@@ -485,7 +488,7 @@ final class TemplateMaterialiser {
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
         checkArguments(head, template, arguments);
-        String canonical = DerivedName.canonicalApplication(head, arguments);
+        String canonical = CanonicalApplication.of(head, arguments);
         String owner = closingInto.get(canonical);
         if (owner != null) {
             // The declaration closing this application reached it again while substituting: the recursion names

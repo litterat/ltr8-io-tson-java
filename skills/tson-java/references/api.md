@@ -561,7 +561,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
                              Optional<String> constructor, Optional<String> refines) {}
     public EntryFacts factsOf(String name);              // NONE for a name with no facts
-    public Optional<SourcePosition> positionOf(String name); // absent for an entry the resolver minted
+    public Optional<SourcePosition> positionOf(String name); // absent where no source was read
     public Optional<String> constructorOf(String name);  // the constructor tag the entry's value applies
     public Optional<TypeRef> applicationOf(String name); // the @meta.application on its key (§8.2)
 }

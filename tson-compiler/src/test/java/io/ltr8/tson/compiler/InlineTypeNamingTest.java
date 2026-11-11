@@ -15,17 +15,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * What a diagnostic calls a schema entry, for the entries the author never named.
- *
- * <p>Every §5.3 sugar form lifts to an entry of its own and every §5.10 application materialises one, both
- * named content-derived (§8.2) -- so a reader that used the entry name told an author their document broke
- * {@code 'array_order_1_e9777a39'}, a string appearing nowhere in their file and nowhere in the spec. These
- * fixtures pin what it says instead: the form they actually wrote.
+ * What a diagnostic calls a type written in place ([TSON-SCHEMA] §8.2): no entry and no name, so the form the author
+ * wrote, {@code [order; 2..]}, and a declaration by the name its author gave it.
  *
  * <p>They are read through the real pipeline rather than by calling the renderer, because the claim is about
  * what a <em>reader</em> reports, and the reader has to have been handed the right name to report.
  */
-class SyntheticEntryNamingTest {
+class InlineTypeNamingTest {
 
     private static final String ID = "https://example.test/naming.tn";
 
@@ -95,16 +91,16 @@ class SyntheticEntryNamingTest {
     }
 
     @Test
-    void aLiftedArrayIsNamedByTheSugarThatLiftedIt() {
+    void anArrayInPlaceIsNamedByItsForm() {
         assertTrue(only("holder", "{ tags: [\"a\"]  inline: []  ix: { \"k\" => { id: \"1\" } }  "
                         + "pair: [\"a\" 1]  pick: \"x\"  "
                         + "page: { items: [ { id: \"1\" } ] } }")
                         .startsWith("'[order; 2..]' has 0 elements"),
-                "the field's own inline form, not the entry minted for it");
+                "the field's own form");
     }
 
     @Test
-    void aLiftedMapAndTupleAndChoiceAreNamedTheSameWay() {
+    void aMapATupleAndAChoiceInPlaceAreNamedTheSameWay() {
         assertTrue(only("holder", "{ tags: [\"a\"]  inline: [{ id: \"1\" } { id: \"2\" }]  ix: {}  "
                         + "pair: [\"a\" 1]  pick: \"x\"  "
                         + "page: { items: [ { id: \"1\" } ] } }")
@@ -120,14 +116,8 @@ class SyntheticEntryNamingTest {
     }
 
     /**
-     * A declared application needs no rendering at all: {@code order_response => paged<order>} <b>is</b> the
-     * instantiation entry (§8.2), so the reader already holds the name the author
-     * wrote. Rendering the application instead -- {@code 'paged<order>'} -- was the best available answer
-     * while the entry was content-named and the declaration a hop to it; the declared name is better, being
-     * a name the author can open.
-     *
-     * <p>{@code EntryDisplayName} still earns its keep for the entries that remain minted: a synthetic
-     * lifted from a sugar form, and an instantiation a <em>use site</em> closes.
+     * A declared application is named by its declaration: {@code order_response => paged<order>} <b>is</b> the
+     * closed record (§8.2), so the reader holds the name the author wrote, a name the author can open.
      */
     @Test
     void aDeclaredApplicationIsNamedByItsDeclaration() {
@@ -139,10 +129,8 @@ class SyntheticEntryNamingTest {
     // ── Where a diagnostic points, not just what it calls things ─────────
 
     /**
-     * The pointer roots at the name the read entered through. {@code order_response} is the entry the
-     * application denotes rather than a hop to one (#15), and its reader is shared by every use site that
-     * writes {@code paged<order>} -- so the root still cannot come from the reader, and comes from the
-     * facade that looked the name up.
+     * The pointer roots at the name the read entered through. A compiled reader is shared by every name that reaches
+     * it, so the root cannot come from the reader, and comes from the facade that looked the name up.
      */
     @Test
     void thePointerRootsAtTheNameTheReadEnteredThrough() {
@@ -152,14 +140,13 @@ class SyntheticEntryNamingTest {
     }
 
     /**
-     * And it carries a line to open. A minted entry has no position of its own, and taking that absence
-     * would answer "which line" with nothing -- so the nearest declaration that does have one stands:
-     * the alias here, the enclosing record when the application sits at a field.
+     * And it carries a line to open, whether the read entered at the declaration or reached it through another
+     * record's field.
      */
     @Test
-    void aTemplateDerivedProblemStillNamesALineTheAuthorCanOpen() {
+    void aProblemInsideADeclaredApplicationNamesALineTheAuthorCanOpen() {
         assertTrue(onlyDiagnostic("!order_response { items: 3 }").schemaPosition().isPresent(),
-                "the alias's own declaration");
+                "the declaration's own line");
         assertTrue(onlyDiagnostic("!holder { tags: [\"a\"]  inline: [{ id: \"1\" } { id: \"2\" }]  "
                         + "ix: { \"k\" => { id: \"1\" } }  pair: [\"a\" 1]  pick: \"x\"  "
                         + "page: { items: 3 } }")
@@ -167,15 +154,15 @@ class SyntheticEntryNamingTest {
                 "the enclosing record's own declaration");
     }
 
-    /** A declaration read directly still roots at itself, which is what it always did. */
+    /** A declaration read directly roots at itself. */
     @Test
-    void anOrdinaryDeclarationStillRootsAtItsOwnName() {
+    void aDeclarationRootsAtItsOwnName() {
         assertEquals(Optional.of("/order/id"), onlyDiagnostic("!order { id: [] }").schemaPointer());
     }
 
-    /** And a declaration keeps the name its author gave it, which is the whole distinction being drawn. */
+    /** And a declaration keeps the name its author gave it, where a type in place is named by its form. */
     @Test
-    void aDeclaredEntryIsStillNamedByItsOwnName() {
+    void aDeclarationIsNamedByItsOwnName() {
         assertTrue(only("holder", "{ tags: []  inline: [{ id: \"1\" } { id: \"2\" }]  "
                         + "ix: { \"k\" => { id: \"1\" } }  pair: [\"a\" 1]  pick: \"x\"  "
                         + "page: { items: [ { id: \"1\" } ] } }")

@@ -13,13 +13,13 @@ import java.util.List;
  * ({@code 4:text}) and each argument list bracketed, so no arrangement of delimiters inside a name can spell a
  * different application, and an application nested as an argument is its parsed form, never its spelling.
  */
-final class DerivedName {
+final class CanonicalApplication {
 
-    private DerivedName() {
+    private CanonicalApplication() {
     }
 
     /** An application rendered structurally and injectively -- what decides whether two are the same application. */
-    static String canonicalApplication(String head, List<TypeRef> arguments) {
+    static String of(String head, List<TypeRef> arguments) {
         StringBuilder canonical = new StringBuilder();
         appendText(canonical.append('A'), head);
         canonical.append('(');

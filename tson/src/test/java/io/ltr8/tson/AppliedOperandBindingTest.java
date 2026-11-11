@@ -20,20 +20,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * <b>A binding map is written in the names the author wrote.</b> An entry a template application materialised
- * is named by content ([TSON-SCHEMA] §8.2 -- resolver-chosen, fresh, unreachable from source), so a bind
- * context keyed on one cannot be written by hand and cannot be emitted by a generator: the hash is not known
- * until the schema resolves. The lookup therefore asks under the name the referring entry carries and falls
- * back to the minted one.
- *
- * <p>This is the binding twin of the rule {@code EntryDisplayName} applies to messages -- a type is named by
- * what the author wrote, never by a content-derived entry name.
+ * <b>A binding map is written in the names the author wrote.</b> A family member composing an application of an
+ * open record ({@code ping => msg_of<ping_body> & { … }}) is a declaration like any other, so a bind context keys it
+ * by its own name, whether the application's argument is a record or a container ([TSON-SCHEMA] §5.8, §5.10).
  */
-class AliasedInstantiationBindingTest {
+class AppliedOperandBindingTest {
 
     private static final String ENVELOPE_ID = "https://example.test/envelope.tn";
 
-    /** A discriminated family whose members are minted by a subtype-template factory (§5.10, #10). */
+    /** A discriminated family whose members compose an open record's applications (§5.10). */
     private static final String ENVELOPE = """
             !!id:"https://example.test/envelope.tn"
             !!import:"%s"
@@ -83,7 +78,7 @@ class AliasedInstantiationBindingTest {
         return tson;
     }
 
-    /** Every name here is one the author wrote: no entry is mapped by its minted name, because none can be. */
+    /** Every name here is one the author wrote. */
     private static Tson envelope() {
         return bound(ENVELOPE, Map.of(
                 "channel", Channel.class, "msg", Msg.class,
@@ -92,7 +87,7 @@ class AliasedInstantiationBindingTest {
     }
 
     @Test
-    void anAliasedInstantiationBindsUnderTheNameTheAuthorWrote() {
+    void aMemberComposingAnApplicationBindsUnderItsName() {
         Channel read = envelope().objectReader().read("""
                 !!import:"%s"
                 !channel { m: { kind: ping  body: { seq: 1 } } }""".formatted(ENVELOPE_ID), Channel.class);
@@ -100,9 +95,9 @@ class AliasedInstantiationBindingTest {
         assertEquals(new Ping(new PingBody(1)), read.m());
     }
 
-    /** The same through a container payload, whose member entry is minted over a synthetic of its own. */
+    /** The same where the application's argument is a declared container. */
     @Test
-    void anAliasedInstantiationOverAContainerPayloadBindsTheSameWay() {
+    void aMemberOverAContainerPayloadBindsTheSameWay() {
         Channel read = envelope().objectReader().read("""
                 !!import:"%s"
                 !channel { m: { kind: pong  body: [ { seq: 1  latency: 7 } ] } }""".formatted(ENVELOPE_ID),

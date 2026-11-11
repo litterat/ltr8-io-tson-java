@@ -619,7 +619,7 @@ public final class SchemaResolver {
         namespace.keySet().forEach(entryName -> Optional.ofNullable(applications.get(entryName))
                 .filter(application -> !application.arguments().isEmpty())
                 .ifPresent(application -> byApplication.putIfAbsent(
-                        DerivedName.canonicalApplication(application.name(), application.arguments()),
+                        CanonicalApplication.of(application.name(), application.arguments()),
                         entryName)));
         // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the chains the
         // previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs `ok_of`'s own
@@ -692,7 +692,7 @@ public final class SchemaResolver {
             }
             // A parent written through an alias of its open record is that open record's application (§8.3).
             String head = Ancestry.templateHead(parent.name(), namespace::get);
-            String owner = byApplication.get(DerivedName.canonicalApplication(head, parent.arguments()));
+            String owner = byApplication.get(CanonicalApplication.of(head, parent.arguments()));
             if (owner != null) {
                 chain.add(owner);
             }
