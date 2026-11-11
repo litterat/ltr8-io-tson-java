@@ -23,16 +23,26 @@ derived — and the static check that runs before any of it.
   application, which an open record holds for `{text => [T]}`, in place too), and the slot holds `TypeInline` of it,
   under the head past its alias hops (`pair_of<int32>` under `pair_of`, `set<text>` under `meta.set_type`).
   Only a container, a tuple, a choice or a reference is written in place; any other construction is refused, to be
-  declared. At a slot that holds a name, a construction is refused.
+  declared.
+- **Where only a name may stand an application closes nowhere** (§4.2): at a slot `MetaRefs` walks with `atName` — a
+  map's key, a reference's `of`, an alias's target — a construction and an application of an open record are both
+  refused (`closeName`, `nameRequired`), and so is an application at a parameter's bound (`ParameterTypes.requireType`).
+  Each is a `SchemaValidationException` at the declaration that wrote it, naming the declaration to write.
 - An application of an **open record** closes into the declaration that names it (`closeApplicationInto`): the
   record itself, recorded with its application. A nested application equal to the one a declaration is closing names
   that declaration (`closingInto`), so a recursive open record closes into its declaration. Any other application of
-  an open record — at a slot of a closed record, left in another record's body by closing it, at a refinement source —
-  is reported as not yet supported (`UnsupportedOperationException`, `NOT_IMPLEMENTED`): closing one in place is
-  phase 2 of the inline-types work.
-- An argument of an open record's application is a name or a parameter: a construction there is refused, to be
-  declared under a name and passed by it. An application's arguments are dereferenced before it is closed, and only a
-  reference is dereferenced.
+  an open record at a type slot — of a closed record, or left in another record's body by closing it — would close in
+  place, and is reported as not yet supported (`UnsupportedOperationException`, `NOT_IMPLEMENTED`), as is one at a
+  refinement source. Two are refused first, being errors whatever is supported (`instantiate`): one whose record in
+  place would be IS-A a declared type, through its template's written parents or an applied parent a declaration
+  names (`refuseMembership`, §5.2), and one of a recursive open record (`recursive`, §5.10.1). Held in an open record,
+  either is reported at the declaration whose application closed it.
+- An argument of an open record's application is a name or a parameter (§5.3): a construction or an application
+  there is refused (`closeArgument`, `argumentNotAName`), to be declared under a name and passed by it. Inside an open
+  record the held applications are judged at its declaration (`ParameterTypes`' `requireNames`): every argument of an
+  open record's application, and every argument of a constructor's that lands at a slot holding only a name
+  (`ConstructionSugar.slotsInPlace`); one at a constructor's type slot is held and closes there. An application's
+  arguments are dereferenced before it is closed, and only a reference is dereferenced.
 - Every instantiation records its application in the map `SchemaResolver` shares with the materialiser, in its reduced
   form, which the applied-parent fold keys on; the entry's key carries it as `@meta.application` **as written**
   (`asWritten`, `writtenApplications`).

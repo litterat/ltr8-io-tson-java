@@ -82,6 +82,16 @@ public final class ConstructionSugar {
     }
 
     /**
+     * For each of {@code constructor}'s argument slots ({@link #slots}), in order, whether it holds a type written in
+     * place: typed {@code meta.type_expr}, where an application closes in place, and not by a reference naming types,
+     * which holds only a name ([TSON-SCHEMA] §4.2).
+     */
+    static List<Boolean> slotsInPlace(RecordBody constructor, Function<String, Top> types) {
+        return slots(constructor, types).stream().map(slot -> TYPE_EXPR.equals(AliasChain.terminal(
+                ((TypeRef) constructor.fields().get(slot).type()).name(), types))).toList();
+    }
+
+    /**
      * Whether a field typed {@code name} holds a type: typed {@code meta.type_expr}, a type's name or a type written in
      * place, or by a reference naming types ([TSON-SCHEMA] §5.3).
      */

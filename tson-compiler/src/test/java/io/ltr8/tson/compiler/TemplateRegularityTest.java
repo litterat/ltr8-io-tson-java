@@ -94,11 +94,14 @@ class TemplateRegularityTest {
         assertTrue(message.contains("'na' applies 'nb' recursively"), message);
     }
 
-    /** An application that is not on a cycle back to its own declaration is left alone. */
+    /**
+     * An application that is not on a cycle back to its own declaration is left alone. An open record's argument is
+     * a name or a parameter (§5.3), so an argument grows only through a constructor's application.
+     */
     @Test
     void aNonRecursiveApplicationMayGrowItsArgumentFreely() {
         assertNotNull(compile("""
-                  holder => <T> { b?: box<box<T>>? }"""));
+                  holder => <T> { b?: meta.array<meta.array<box<T>>> }"""));
     }
 
     // ── The other §5.10 declaration-time rules ───────────────────────────
