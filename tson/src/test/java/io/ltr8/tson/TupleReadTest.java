@@ -94,8 +94,8 @@ class TupleReadTest {
         TsonTuple inline = assertInstanceOf(TsonTuple.class, holder.get("inline"));
         assertEquals(Optional.of("x"), inline.get(0).asString());
         assertEquals(Optional.of(Boolean.TRUE), inline.get(1).as(Boolean.class));
-        assertTrue(inline.typeRef().orElseThrow().startsWith("tuple_text_boolean_"),
-                "the injected declaration's derived name: " + inline.typeRef());
+        // A tuple written in place has no entry, so no name a tag could write: the value carries none.
+        assertEquals(Optional.empty(), inline.typeRef());
     }
 
     /** Arity is fixed and exact (§5.3) -- too few positions is a WRONG_ARITY, not a partial read. */

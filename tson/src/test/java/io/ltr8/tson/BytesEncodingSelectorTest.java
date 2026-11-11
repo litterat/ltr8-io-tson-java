@@ -53,6 +53,7 @@ class BytesEncodingSelectorTest {
               b32       => !binary.bytes_type { encoding: BASE32 }
               aliased   => hexdigest
               box => <T> { value: T }
+              hex_box => box<hexdigest>
 
               holder => {
                 plain:     bytes
@@ -62,7 +63,7 @@ class BytesEncodingSelectorTest {
                 in_array:  [hexdigest]
                 in_map:    {text => hexdigest}
                 in_tuple:  [hexdigest, text]
-                boxed:     box<hexdigest>
+                boxed:     hex_box
               }
             }
             """.formatted(ID);

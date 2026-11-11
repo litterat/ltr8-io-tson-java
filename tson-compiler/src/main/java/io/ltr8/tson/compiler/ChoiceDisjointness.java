@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.reader.DiscriminationClass;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeExpr;
 
 import java.util.EnumSet;
 import java.util.Map;
@@ -37,8 +37,8 @@ final class ChoiceDisjointness {
 
     static boolean derive(ChoiceBody choice, Map<String, Top> namespace) {
         Set<DiscriminationClass> seen = EnumSet.noneOf(DiscriminationClass.class);
-        for (TypeRef variant : choice.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), namespace::get);
+        for (TypeExpr variant : choice.variants()) {
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant, namespace::get);
             if (variantClass.isEmpty() || !seen.add(variantClass.get())) {
                 return false;
             }

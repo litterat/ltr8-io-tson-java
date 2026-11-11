@@ -12,8 +12,8 @@ before editing — each opens with its invariants.
 | `resolver/SchemaDesugarer` | `schema-grammar-and-desugaring.md`, `desugaring-open-forms-and-templates.md` |
 | `resolver/DefinitionResolver`, `SchemaResolver`, `ConstructionSugar` | `schema-resolution.md`, `constructor-application.md`, `atom-refinement-and-coherence.md` |
 | `resolver/WireForm`, `MetaRefs`, `DerivedName`, `KernelBootstrapResolver` | `resolver-vocabulary-and-bootstrap.md` |
-| `resolver/TemplateMaterialiser`, `Substitution`, `SyntheticMerge`, `ParameterTypes` | `open-records.md`, `template-materialisation.md` |
-| `TsonSchemaLinker`, `ChoiceDisjointness`, `ValuesByName` | `linking-and-compilation.md`, `choice-disjointness.md`, `name-hygiene-and-minted-names.md` |
+| `resolver/TemplateMaterialiser`, `Substitution`, `ParameterTypes` | `open-records.md`, `template-materialisation.md` |
+| `TsonSchemaLinker`, `ChoiceDisjointness`, `ValuesByName` | `linking-and-compilation.md`, `choice-disjointness.md`, `name-hygiene.md` |
 | `TypeInhabitance`, `RecordExtension` | `inhabitance-and-record-extension.md` |
 | `EnumLabels`, `FieldNames`, `resolver/KindMembers`, `resolver/NameType` | `kinds-and-name-types.md` |
 | `TsonSchemaCompiler`, the registries | `class2-compilation.md`, `compiled-registries.md` |

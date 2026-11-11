@@ -59,7 +59,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `record_template_field.value` are `type!`. A value entry's dependent value, of any form, is held as written and
       judged when the schema links against the type its sibling names in the schema's own namespace
 - [x] Every `!schema` value declares (Part 2 §4.1) — `geo => !schema { address => { … }
-      }` is a schema map nested as an entry, its members declarations that lift, mint, link and compile as root
+      }` is a schema map nested as an entry, its members declarations that resolve, link and compile as root
       entries do, each named by its path from the root (`geo.address`). A nested map is open: several documents of a closure
       declaring `geo` contribute to one map, the union of their members, and only a member path declared twice
       collides.
@@ -73,7 +73,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum` (`!enum [A B]`),
       `set<T>` and `schema`, the alias of `meta.schema` every schema map's tag names, and all its machinery sits under
       the open namespace `meta` (`meta.record`, `meta.identifier`, `meta.type_ref`, `meta.ref<meta.record>`,
-      `binary.bytes_type`, `@atom.ordering:TOTAL`, `@meta.synthetic`).
+      `binary.bytes_type`, `@atom.ordering:TOTAL`, `@meta.application`).
       The data-format libraries numeric.tn, temporal.tn and net.tn each import the kernel alone, hold their
       instances at their root (`int32`, `date`, `uuid`) and their constructors under a map of their own
       (`numeric.decimal_type`, `temporal.date_type`, `net.uuid_type`). core.tn imports the three and its root holds
@@ -116,8 +116,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `temporal.tn`, `net.tn`, `core.tn` and `policy.tn` resolves end to end (see [BACKLOG.md](BACKLOG.md) for the
       specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
-      directives during resolution, flattens argument-bearing type references into real named
-      entries, merges every `!!import`'s namespace into one per schema
+      directives during resolution, closes each argument-bearing type reference into its declaration or in place
+      (a construction, or the record an open record's application closes to, with no name), merges every
+      `!!import`'s namespace into one per schema
       (Part 2 §2.2.3, §3.3), validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`
 - [x] Value entries (Part 2 §4.1) — an entry whose tag names an ordinary type

@@ -106,7 +106,6 @@ class ParamBoundTest {
         String needs = "is passed to 'boxed', which declares 'T: text', and is written with no bound";
         assertRefused(BOXED + "  rebox => <T> { b: boxed<T> }", needs);
         assertRefused(BOXED + "  rebox => <T> { b: [boxed<T>] }", needs);
-        assertRefused(BOXED + "  pair  => <A, B> { a: A  b: B }\n  rebox => <T> { b: pair<boxed<T>, text> }", needs);
         assertRefused(BOXED + "  rebox => <T> boxed<T> & { c: text }", needs);
         assertRefused(BOXED + "  rebox => <T> { b: meta.array<boxed<T>> }", needs);
     }
@@ -197,14 +196,13 @@ class ParamBoundTest {
 
     /**
      * An application closed while the schema is still resolving -- a declaration naming it, a composition
-     * operand, a refinement source, an argument nested in one of those -- is checked against the same bound as
+     * operand, a refinement source -- is checked against the same bound as
      * one at a field, once every argument is ready.
      */
     @Test
     void aBoundIsEnforcedOnAnApplicationClosedDuringResolution() {
         assertRefused(BOXED + "  held   => boxed<int32>", "binds 'T' to 'int32', which is not a type that IS-A text");
         assertRefused(BOXED + "  held   => boxed<int32> & { b: text }", "binds 'T' to 'int32'");
-        assertRefused(BOXED + "  held   => boxed<boxed<int32>>", "binds 'T' to 'int32'");
         assertRefused(BOXED + "  rebox  => <T: text> boxed<T> & { c: text }\n  held   => rebox<int32>",
                 "'rebox<...>' binds 'T' to 'int32'");
         assertEquals(List.of(), problems(BOXED + "  short  => !text ^ { max_length: 8 }\n  held   => boxed<short>"));

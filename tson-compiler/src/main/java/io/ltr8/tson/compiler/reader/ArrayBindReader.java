@@ -69,7 +69,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                            AnnotationTypes annotationTypes, boolean elementsAreNames) {
         super(name, displayName, body,
                 ElementBridging.wrap(
-                        AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()),
+                        AnnotationBoxing.wrap(resolver.resolve(body.elementType()),
                                 descriptor.arrayDataClass(), annotationTypes),
                         descriptor.arrayDataClass()),
                 schemaLocation, elementsAreNames);
@@ -185,7 +185,8 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
             if (!(typeDefinition instanceof ArrayBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition);
             }
-            Type elementType = resolveElementType(body.elementType().name());
+            // A type written in place has no bound class of its own: its host type is its constructor's shape.
+            Type elementType = BindTargets.hostType(body.elementType(), this::resolveElementType);
             DataClass dataClass = descriptorFor(new DataParameterizedType(List.class, elementType));
             if (!(dataClass instanceof DataClassArray descriptor)) {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()

@@ -4,6 +4,9 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.TypeInline;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
 import java.util.Map;
@@ -11,6 +14,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,6 +52,57 @@ class RecordTemplateSlotTest {
         return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
     }
 
+    /**
+     * An application of an open record left in another's body by closing it closes in place there ([TSON-SCHEMA]
+     * §5.10): {@code bb}'s {@code items} holds the record {@code box<text>} closes to, with no name.
+     */
+    @Test
+    void aRecordWhoseBodyAppliesAnotherOpenRecordClosesItInPlace() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  boxes => <T> { items: box<T> }
+                  bb => boxes<text>
+                """);
+        RecordBody bb = (RecordBody) compiled.schema().entries().get("bb");
+        TypeInline items = assertInstanceOf(TypeInline.class, bb.fields().get("items").type());
+        assertEquals("box<text>", items.text());
+        assertEquals(TypeRef.of("text"), ((RecordBody) items.of()).fields().get("v").type());
+    }
+
+    /**
+     * A parameter at a type slot inside a type written in place, in an explicit payload, is no author's error but is
+     * not yet supported: the parameters are scoped and substituted at the field types and their applications, and
+     * neither reaches inside the wrapper. The sugar spelling, {@code [T]}, is the application and is admitted.
+     */
+    @Test
+    void aParameterInsideATypeWrittenInPlaceIsNotYetSupported() {
+        Map<String, String> gaps = Map.of(
+                "  arr => <T> !meta.record { fields: { v => { type: { of: !meta.array { element_type: T } } } } }",
+                "parameter 'T' stands at meta.array.element_type, inside a type written in place",
+                "  deep => <T> !meta.record { fields: { v => { type: { of: !meta.map { key_type: text  value_type: "
+                        + "{ of: !meta.array { element_type: T } } } } } } }",
+                "parameter 'T' stands at meta.array.element_type, inside a type written in place",
+                "  pick => <T> !meta.record { fields: { v => { type: { of: !meta.choice { variants: [text T] } } } } }",
+                "parameter 'T' stands at meta.choice.variants, inside a type written in place");
+        gaps.forEach((declaration, expected) -> {
+            UnsupportedOperationException gap = assertThrows(UnsupportedOperationException.class,
+                    () -> compile(declaration), declaration);
+            assertTrue(gap.getMessage().contains(expected), gap.getMessage());
+        });
+        assertDoesNotThrow(() -> compile("""
+                  arr => <T> { v: [T] }
+                  a => arr<text>
+                """));
+    }
+
+    /** A parameter at a slot that holds no type is the author's error inside a type written in place as outside it. */
+    @Test
+    void aParameterAtAScalarSlotInsideATypeWrittenInPlaceIsRefused() {
+        String message = rejected("  sized => <N> !meta.record { fields: { v => { type: { of: !meta.array { "
+                + "element_type: text  min_items: N } } } } }");
+        assertTrue(message.contains("parameter 'N' stands at meta.array.min_items"), message);
+    }
+
     /** The two places, each applied so the closing runs as well as the declaration. */
     @Test
     void aParameterStandsInAFieldsTypeAndAnApplicationsArguments() {
@@ -54,11 +110,6 @@ class RecordTemplateSlotTest {
                 """
                   box => <T> { v: T }
                   b => box<text>
-                """,
-                """
-                  box => <T> { v: T }
-                  boxes => <T> { items: box<T> }
-                  bb => boxes<text>
                 """,
                 """
                   result => abstract <T> { payload: T }

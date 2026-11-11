@@ -3,10 +3,14 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.schema.meta.TypeInline;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * The name-to-reader resolution a compiled schema offers, across both of the phases in which it is needed.
@@ -53,14 +57,64 @@ public final class CompiledReaders implements TsonTypeReaderResolver {
      */
     private volatile List<Runnable> waiting = new ArrayList<>();
 
+    /**
+     * Builds the reader of a type written in place from its body, or {@code null} for a handle that resolves entry
+     * names alone. It holds the factories and the linked schema, never the compilation, so it outlives {@link #bind}.
+     */
+    private final Function<TypeInline, TsonTypeReader<?>> inlineBuilder;
+
+    /**
+     * What a type written in place's reader is memoised by: the construction, equal ones sharing a reader, and the form
+     * it is named by in a message, which takes no part in the construction's identity -- {@code box<int32>} and {@code
+     * crate<int32>} close to one record, and each reader names the application its position wrote.
+     */
+    private record InlineKey(TypeInline type, String text) {
+    }
+
+    /**
+     * The reader built for each type written in place ({@link InlineKey}): equal constructions named alike share one
+     * reader, a private cache and no entry ([TSON-SCHEMA] §8.2).
+     */
+    private final Map<InlineKey, TsonTypeReader<?>> inline = new ConcurrentHashMap<>();
+
     /** Starts out resolving through {@code whileCompiling} -- the compilation's own recursive, cycle-aware build. */
     public CompiledReaders(TsonTypeReaderResolver whileCompiling) {
+        this(whileCompiling, null);
+    }
+
+    /**
+     * Resolving names through {@code whileCompiling}, and building the reader of a type written in place through
+     * {@code inlineBuilder}, once per construction, whether asked while the walk runs or at read time.
+     */
+    public CompiledReaders(TsonTypeReaderResolver whileCompiling,
+                           Function<TypeInline, TsonTypeReader<?>> inlineBuilder) {
         this.delegate = Objects.requireNonNull(whileCompiling, "whileCompiling");
+        this.inlineBuilder = inlineBuilder;
     }
 
     @Override
     public TsonTypeReader<?> resolve(String typeName) {
         return delegate.resolve(typeName);
+    }
+
+    /**
+     * The reader of a type written in place, built from its body the first time it is asked for. An inline type is
+     * a finite tree whose cycles pass through names, so building one never reaches itself; the build runs outside
+     * the map's lock, since it resolves the inline types nested in it.
+     */
+    @Override
+    public TsonTypeReader<?> resolveInline(TypeInline type) {
+        InlineKey key = new InlineKey(type, type.text());
+        TsonTypeReader<?> built = inline.get(key);
+        if (built != null) {
+            return built;
+        }
+        if (inlineBuilder == null) {
+            return TsonTypeReaderResolver.super.resolveInline(type);
+        }
+        TsonTypeReader<?> fresh = inlineBuilder.apply(type);
+        TsonTypeReader<?> raced = inline.putIfAbsent(key, fresh);
+        return raced == null ? fresh : raced;
     }
 
     /**

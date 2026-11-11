@@ -9,6 +9,7 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 
@@ -53,7 +54,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
     private final List<String> variants;
     private final JsonSchemaLocation schemaLocation;
     /** §8.2's condition, decided once: the choice is {@code disjoint}, so the kind alone selects. */
-    private final Map<DiscriminationClass, String> byClass;
+    private final Map<DiscriminationClass, TypeExpr> byClass;
 
     /** {@link #byClass}'s variants, as their readers. */
     private final Map<DiscriminationClass, JsonTypeReader<?>> readerByClass;
@@ -69,17 +70,20 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
     private DispatchChoiceReader(String name, ChoiceBody body, ValueReaderContext context,
                                  JsonSchemaLocation schemaLocation) {
         this.name = name;
-        this.variants = body.variants().stream().map(TypeRef::name).toList();
+        this.variants = body.variants().stream().map(TypeExpr::text).toList();
         this.schemaLocation = schemaLocation;
         this.byClass = variantsByClass(context.linked(), body);
         Map<DiscriminationClass, JsonTypeReader<?>> kinds = new LinkedHashMap<>();
         byClass.forEach((kind, variant) -> kinds.put(kind, context.readers().resolve(variant)));
         this.readerByClass = Map.copyOf(kinds);
         Map<String, Route> table = new LinkedHashMap<>();
-        for (String written : context.admitting(variants)) {
+        // A variant written in place has no name a $type can spell: it is reached by its class alone.
+        List<String> named = body.variants().stream().flatMap(variant -> TypeExpr.named(variant).stream())
+                .map(TypeRef::name).toList();
+        for (String written : context.admitting(named)) {
             table.put(written, Route.to(context.readers().resolve(written)));
         }
-        for (TypeRef variant : body.variants()) {
+        for (TypeRef variant : body.variants().stream().flatMap(v -> TypeExpr.named(v).stream()).toList()) {
             JsonTypeReader<?> reader = context.readers().resolve(variant.name());
             AliasChain.terminal(context.schema(), variant.name())
                     .ifPresent(resolved -> context.admitting(TypeChain.subtypesOf(resolved.definition()))
@@ -113,14 +117,14 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * containing one non-disjoint, so this is unreachable in a linked schema -- and treating it as "the tag is
      * required" is the safe reading if it ever is reached.
      */
-    private static Map<DiscriminationClass, String> variantsByClass(TsonLinkedSchema linked, ChoiceBody body) {
+    private static Map<DiscriminationClass, TypeExpr> variantsByClass(TsonLinkedSchema linked, ChoiceBody body) {
         if (!body.disjoint().orElse(false)) {
             return Map.of();
         }
-        Map<DiscriminationClass, String> table = new LinkedHashMap<>();
-        for (TypeRef variant : body.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(linked, variant.name());
-            if (variantClass.isEmpty() || table.put(variantClass.get(), variant.name()) != null) {
+        Map<DiscriminationClass, TypeExpr> table = new LinkedHashMap<>();
+        for (TypeExpr variant : body.variants()) {
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(linked, variant);
+            if (variantClass.isEmpty() || table.put(variantClass.get(), variant) != null) {
                 return Map.of();
             }
         }

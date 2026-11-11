@@ -75,7 +75,8 @@ class TemplateFamilyEncodingParityTest {
               pet      => abstract <V> { type: text =?  value: V }
               dogpet   => pet<text> & { type?: = "dog"  breed: text }
               catpet   => pet<text> & { type?: = "cat"  indoor: boolean }
-              holder   => { p: pet<text> }
+              pet_text => pet<text>
+              holder   => { p: pet_text }
             }""";
 
     /** A rule as both encodings must state it: which rule, where in the data, the constraint, and the prose. */

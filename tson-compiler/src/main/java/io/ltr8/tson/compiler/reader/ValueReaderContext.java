@@ -63,19 +63,36 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
+     * The tag a value read by entry {@code name}'s reader carries in a tree: the entry's name, or none for a type
+     * written in place, which has no entry and no name a document could write as a tag.
+     */
+    public java.util.Optional<String> tagOf(String name) {
+        return schema().entries().containsKey(name) ? java.util.Optional.of(name) : java.util.Optional.empty();
+    }
+
+    /**
      * What a message calls entry {@code name}, whose value is {@code definition}: its own name where an author
-     * wrote it, and otherwise the form that produced it ({@link EntryDisplayName}).
+     * wrote it, and otherwise the form that produced it ({@link EntryDisplayName}). A type written in place has no
+     * entry, and its reader's name is already its form as written, its constructor's application included ({@link
+     * io.ltr8.tson.schema.meta.TypeInline#text()}), which its body alone could not say.
      */
     public String displayName(String name, Top definition) {
+        if (!schema().entries().containsKey(name)) {
+            return name;
+        }
         return EntryDisplayName.of(name, definition, schema().factsOf(name), schema().applicationOf(name));
     }
 
     /**
      * What the author wrote that names entry {@code name}, or {@code null} for a form with no spelling -- an
      * application nothing declares, expanded to an atom instance -- whose message is the family's own, located
-     * by its position ({@link EntryDisplayName#authored}).
+     * by its position ({@link EntryDisplayName#authored}). A type written in place is named by its form, as {@link
+     * #displayName} names it.
      */
     public String authoredName(String name, Top definition) {
+        if (!schema().entries().containsKey(name)) {
+            return name;
+        }
         return EntryDisplayName.authored(name, definition, schema().factsOf(name), schema().applicationOf(name))
                 .orElse(null);
     }

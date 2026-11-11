@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/40/m/policy.tn?sha256=cd73f8eff6dde0f96f65dcbbe8c97198c89abda3d5cfbd33bb30882ae0978ccd"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=3180cd8428499d15765007ccd83cf3e760aeca73306622d0670f7abffb900b45"
+!!id:"https://tson.io/2026/40/m/policy.tn?sha256=d34d967e988eb0d06e8ebf4d4a13533115aec9c05d02b50367620ff8bbd280f3"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=c3d71e31fc369d2c8074e86a3ec47e8aa7a090d8de03cc35d33b4638a9116c74"
 @doc:"""
   TSON processor policy — what a processor admits and spends (2026 Revision 40
   draft).
@@ -73,7 +73,7 @@
       limit is a `policy.limit`.
       The §11.5 limits bound the work resolution adds over a schema: the
       schemas one header reaches through `!!import`, the
-      declarations in one schema map (synthetic and instantiation entries
+      declarations in one schema map (instantiation entries
       included), the hops from a use site to a terminal entry, the length of
       one type's supertype chain, the nested applications closed for one
       application -- a resource cap, regular recursion closing on its first

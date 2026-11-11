@@ -55,24 +55,24 @@ verifies the packaged bytes against `TsonBundledSchemas`' held digest on every l
 `Tson.standard()` and with it most of the suite. Restamping after each edit is what lets a schema change land across several
 commits with the integrity checks left on.
 
-**The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own `@doc` — "Parse the
-source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest` does it: every entry must read back into
-`schema.meta`, have a counterpart here and resolve identically, and every schema-map key must carry the same annotations
-(`@atom.ordering`, `@atom.bounded`, `@atom.exact`, `@atom.numeric`, `@meta.synthetic`). `@doc` is not compared: a fixture
-keeps only its header note for the reader and leaves entry docs out, since it exists to be compared and a summary of a source
-doc only drifts from it. **Key annotations are compared from the parsed text**, never through the bound document, which drops
-them, so both sides would carry none and agree for the wrong reason. They are the only external statement of what a
-conforming resolver produces. Keep them in step with the `.tn` beside them. A fixture's header is its source's and its
+**The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own `@doc` — "Parse
+the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest` does it: every entry must read
+back into `schema.meta`, have a counterpart here and resolve identically, and every schema-map key must carry the same
+annotations (`@atom.ordering`, `@atom.bounded`, `@atom.exact`, `@atom.numeric`). `@doc` is not compared: a fixture keeps
+only its header note for the reader and leaves entry docs out, since it exists to be compared and a summary of a source
+doc only drifts from it. **Key annotations are compared from the parsed text**, never through the bound document, which
+drops them, so both sides would carry none and agree for the wrong reason. They are the only external statement of what
+a conforming resolver produces. Keep them in step with the `.tn` beside them. A fixture's header is its source's and its
 root is `!schema`, the kernel root's `schema`, an alias of `meta.schema`; nothing marks it resolved, so
 `ResolvedFixtureTest` reads it as one (`parseResolvedForm()`, or `withImports(imports).readAs(text, "meta.schema")`),
 the kernel's form, which imports nothing, under the pre-loaded kernel. The kernel's form, `meta-resolved.tn`, writes its
-six maps nested, each tagged `!meta.schema`, their members inside them, and its thirteen root names and seven synthetics
-at the root; `numeric-resolved.tn`,
-`temporal-resolved.tn` and `net-resolved.tn` write their library's map the same way, with its instances at the root, and
-`core-resolved.tn` core.tn's author annotations. A fixture states its own document's entries only, never an import's members
-of the same map. A library's fixture holds instances of constructors its own source declares (net.tn's
-`ipv4 => !net.ipv4_type {}`), so every fixture but the kernel's is read beside its source, a resolved form being read under
-its source's imports and not over its own entries, where [TSON-SCHEMA] §8.1 supplies nothing beside the document.
+six maps nested, each tagged `!meta.schema`, their members inside them, and its root names at the root;
+`numeric-resolved.tn`, `temporal-resolved.tn` and `net-resolved.tn` write their library's map the same way, with its
+instances at the root, and `core-resolved.tn` core.tn's author annotations. A fixture states its own document's entries
+only, never an import's members of the same map. A library's fixture holds instances of constructors its own source
+declares (net.tn's `ipv4 => !net.ipv4_type {}`), so every fixture but the kernel's is read beside its source, a resolved
+form being read under its source's imports and not over its own entries, where [TSON-SCHEMA] §8.1 supplies nothing
+beside the document.
 
 ### Writing the bundled schemas' docs
 

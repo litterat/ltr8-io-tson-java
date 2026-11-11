@@ -6,7 +6,7 @@ of the link, reference validation, the two §5.10 template rules, the facts link
 
 The linker's other checks have notes of their own: kinds and name types in `design/kinds-and-name-types.md`, the
 inhabitance check and what `record.extension` obliges in `design/inhabitance-and-record-extension.md`, choice
-disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `design/name-hygiene-and-minted-names.md`.
+disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `design/name-hygiene.md`.
 
 **Invariants**
 
@@ -16,8 +16,7 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds unless it is equal to the entry already there. A nested `!schema` map is the
   exception that is no collision: several documents declaring one map path contribute to one map, the union of their
-  members (§2.2.3). A synthetic is the other: its identity is its form (§8.2), so two documents minting
-  one are one entry, and two bodies under one minted name are an `IllegalStateException`.
+  members (§2.2.3). Nothing is minted, so no other entry unifies across documents (§8.2).
 - One namespace per schema (§3.3): its own entries and the whole closure of its `!!import`s
   (`TsonSchema.namespaceSources`, header order, deduplicated by identity). Every name the schema writes resolves
   there; no rule ties what a schema may declare to what it imports, so any schema declares a constructor, a namespace
@@ -87,7 +86,7 @@ load-bearing, each step reading what an earlier one wrote:
    members (`design/kinds-and-name-types.md`).
 6. **`computeDisjointness`**, every choice's `disjoint` (`design/choice-disjointness.md`).
 7. **`checkEnumTypes`**, **`checkFieldNameTypes`**, then **`nameTypes`** for each record not refused.
-8. **`checkNames`**, §8.2 over scopes (`design/name-hygiene-and-minted-names.md`).
+8. **`checkNames`**, §8.2 over scopes (`design/name-hygiene.md`).
 9. **Validate** every entry (`validateEntry`).
 10. **`checkValuesByName`**, **`checkEveryEntryIsInhabited`**, **`checkRecordExtension`**.
 11. **`withNameAnnotations`**, then **`checkDisjointAssertions`**: an author's `@meta.disjoint` is read from both places §6
@@ -113,19 +112,12 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
   closure reaching both `/2026/37/m/core.tn` and `/2026/40/m/core.tn` is refused here rather than surfacing later as a
   field conflict between two identically spelled types. Listing one schema twice, or under two spellings of one
   identity, is redundant rather than an error. An unregistered import is a `SchemaValidationException`.
-- **A synthetic's identity is its form, not its origin** (`resolver.ImportedSynthetics`, called by both merges). Its
-  name is derived from the form alone, so two documents writing `[text]` without importing each other each mint
-  `array_text_…`, and a closure holding both reaches one entry by two routes: the first arrival is kept with its
-  origin, every use in either document names it, and its `closes` facts take the union, since a form one document
-  lifts and another constructs by closing a template's held `[T]` close different applications. Both keys must carry
-  `@meta.synthetic`; a minted name meeting a declared one is the collision above. The two bodies are compared, their
-  `subtypes` left out, and a disagreement is an `IllegalStateException`, the cross-document form of the broken naming
-  function `MintedNames.claim` refuses within one phase. A document that writes a form an import already minted lifts
-  nothing of its own (`SchemaDesugarer`'s `imported` set), and materialisation closing to an imported synthetic reuses
-  it, so the merge is the one place two mints of one form meet.
-- **A local entry equal to the closure's is the same entry.** §8.2 names a minted instantiation by its resolved form
-  alone, so an application this schema closed and one an import closed agree by construction; any other local reuse
-  of a closure name is refused and the local entry dropped, keeping the import's, which is already-linked material.
+- **No entry unifies by its form.** A type written in place travels inside the entry that holds it, so two documents
+  writing `[text]` hold two equal constructions and declare nothing between them; one name declared by two documents
+  is the collision above, whatever the bodies.
+- **A local entry equal by value to the closure's entry of its name is passed over** (`TsonSchemaLinker.link`); any
+  other local reuse of a closure name is refused and the local entry dropped, keeping the import's, which is
+  already-linked material.
 - **A nested schema map is open** (§2.2.3). `geo => !schema { … }` declared by several documents of
   one closure is one map, merged exactly as the root namespace merges across imports: its members are the union, each
   merged under its path, and a member path two different documents declare is the ordinary collision above. A

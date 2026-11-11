@@ -14,6 +14,7 @@ record AtomTreeFactory(ValueReaderFactory delegate) implements ValueReaderFactor
 
     @Override
     public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
-        return new AtomTreeReader(delegate.create(name, typeDefinition, context), name, AnnotationTypes.of(context));
+        return new AtomTreeReader(delegate.create(name, typeDefinition, context), context.tagOf(name).orElse(null),
+                AnnotationTypes.of(context));
     }
 }

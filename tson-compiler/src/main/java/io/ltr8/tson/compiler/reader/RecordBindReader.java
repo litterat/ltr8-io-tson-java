@@ -118,7 +118,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             // which collects a record's arguments through their bridges, is the step a schema-driven read replaces.
             TsonTypeReader<?> rebound = BindTargets.to(field.parser(), target.dataClass(),
                     "field '" + field.name() + "'", "component '" + target.name() + "'",
-                    new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches), true);
+                    new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches,
+                            written -> io.ltr8.tson.compiler.resolver.AliasChain.terminal(written,
+                                    context.schema().entries()::get)), true);
             if (rebound != field.parser()) {
                 fields.set(i, new CompiledField(field.name(), field.schema(), rebound));
             }
@@ -364,6 +366,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (!(typeDefinition instanceof RecordBody body)) {
                 throw new IllegalArgumentException(
                         "'" + name + "' is not record-shaped: " + typeDefinition);
+            }
+            if (context.tagOf(name).isEmpty()) {
+                // A record in place has no name a binding map holds: the component holding it says its class.
+                return new RecordInPlaceBindReader(name, body, context);
             }
             DataClass dataClass = descriptorFor(name, typeDefinition, context);
 

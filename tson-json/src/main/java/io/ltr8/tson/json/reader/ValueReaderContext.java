@@ -30,9 +30,13 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
         return linked.schema();
     }
 
-    /** Each of {@code names} with every alias that means it -- what a written {@code $type} is matched against. */
+    /**
+     * Each of {@code names} with every alias that means it -- what a written {@code $type} is matched against. A name
+     * no entry holds is the form of a type written in place, which no tag names ([TSON-SCHEMA] §7.2), and admits
+     * nothing.
+     */
     public Set<String> admitting(Collection<String> names) {
-        return AliasChain.admitting(names, namesMeaning);
+        return AliasChain.admitting(names.stream().filter(schema().entries()::containsKey).toList(), namesMeaning);
     }
 
     /**

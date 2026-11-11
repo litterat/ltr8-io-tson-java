@@ -36,9 +36,9 @@ class AliasChainTest {
     }
 
     private static TypeRef fieldType(Top definition, String field) {
-        return assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
+        return assertInstanceOf(TypeRef.class, assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
                 .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeRef();
+                .typeExpr());
     }
 
     private static Top kernelEntry(String name) {
@@ -57,7 +57,7 @@ class AliasChainTest {
     /** A position naming something that is not an alias is unaffected, as it always was. */
     @Test
     void aNonAliasIsUnaffected() {
-        assertEquals("meta.field_type_ref", fieldType(kernelEntry("meta.record_field"), "type").name());
+        assertEquals("meta.field_type_expr", fieldType(kernelEntry("meta.record_field"), "type").name());
     }
 
     private static final String CHAIN = """
@@ -94,14 +94,14 @@ class AliasChainTest {
         assertInstanceOf(io.ltr8.tson.schema.unicode.TextType.class, resolve(CHAIN, "a"));
     }
 
-    /** An argument list is no different -- a lifted synthetic's element type names what was written too. */
+    /** A construction written in place is no different -- its element type names what was written too. */
     @Test
     void aNestedArgumentNamesWhatWasWritten() {
         Top holder = resolve("  a => text\n  holder => { f: [a] }", "holder");
-        Top injected = resolve("  a => text\n  holder => { f: [a] }",
-                fieldType(holder, "f").name());
+        io.ltr8.tson.schema.meta.TypeInline inline = assertInstanceOf(io.ltr8.tson.schema.meta.TypeInline.class,
+                assertInstanceOf(RecordBody.class, holder).fields().get("f").type());
         assertEquals("a", assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class,
-                injected).elementType().name());
+                inline.of()).elementType().text());
     }
 
     /**

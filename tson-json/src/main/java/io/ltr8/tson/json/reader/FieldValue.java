@@ -51,11 +51,24 @@ record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue no
             body = definition;
             break;
         }
+        return of(fieldTypeName, body, linked.enumForm(name), token);
+    }
+
+    /**
+     * The same for a field whose type is written in place: only a reference among the forms that may be is an atom,
+     * and it has no entry an enum's form is recorded under.
+     */
+    static FieldValue of(io.ltr8.tson.schema.meta.TypeInline fieldType, Token token) {
+        return of(fieldType.text(), fieldType.of(), io.ltr8.unicode.Normalization.NONE, token);
+    }
+
+    private static FieldValue of(String fieldTypeName, Top body, io.ltr8.unicode.Normalization enumForm,
+                                 Token token) {
         if (!(body instanceof Atom atom)) {
             throw new IllegalStateException("'" + fieldTypeName + "' carries a schema-stated value but is not an "
                     + "atom -- [TSON-SCHEMA] §5.2 admits one only on an atom- or enum-typed field");
         }
-        AtomType<?> parser = AtomParsers.forRead(atom, linked.enumForm(name)).orElseThrow(() -> new IllegalStateException(
+        AtomType<?> parser = AtomParsers.forRead(atom, enumForm).orElseThrow(() -> new IllegalStateException(
                 "'" + fieldTypeName + "' carries a schema-stated value but has no parser to read it with"));
         AtomForm form = AtomForm.of(atom);
         Object pinned = parser.read(token.text());

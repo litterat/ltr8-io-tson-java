@@ -38,7 +38,9 @@ final class RecordDispatch {
                 return concrete.create(name, definition, context);
             }
             String displayName = EntryDisplayName.of(name, context.schema());
-            Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
+            // A record written in place has no name, so no tag names it ([TSON-SCHEMA] §7.2).
+            Set<String> selfNames = context.tagOf(name).isPresent()
+                    ? Subsumption.admitting(List.of(name), context.namesMeaning()) : Set.of();
             return switch (body.extension()) {
                 // ABSTRACT says the record has no values of its own; whether its members are placed by the
                 // tag or by reading their pins is the body's own `discriminators` and never a second member

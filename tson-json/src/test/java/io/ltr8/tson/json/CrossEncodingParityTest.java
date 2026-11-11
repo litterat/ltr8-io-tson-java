@@ -75,6 +75,12 @@ class CrossEncodingParityTest {
               employee  => person & { department: text }
               robot     => { serial: text }
               holder    => { who: person  labels: [text] }
+              in_place  => { grid: [[text]]  prices: {text => [int32]}  pair: [text, int32]  id: ( int32 | text ) }
+              ip_page   => <T> { items: [T]  size?: int32 ~ 10 }
+              ip_holder => { p: ip_page<text>  ps?: [ip_page<int32>] }
+              pair_of   => meta.array ^ { min_items?: = 1  max_items?: = 2 }
+              refined   => { few: pair_of<int32>  many: [int32; 1..2] }
+              setting   => { kind: meta.type_expr  v?: kind! }
               scalars   => ( text | int32 | boolean )
               circle    => { radius: float64 }
               square    => { side: float64 }
@@ -109,7 +115,7 @@ class CrossEncodingParityTest {
               won        => <T> outcome<T> & { prize: text }
               outcome_of => outcome<text>
               won_of     => won<text>
-              ledger     => { o: outcome<text> }
+              ledger     => { o: outcome_of }
               boxed      => abstract { }
               box        => <T> boxed & { v: T }
               int_box    => box<int32>
@@ -123,7 +129,8 @@ class CrossEncodingParityTest {
               tpet       => abstract <B> { tk: text =?  extra?: B }
               tdog       => tpet<text> & { tk?: = "dog"  breed: text }
               tcat       => tpet<text> & { tk?: = "cat"  indoor: boolean }
-              tpen       => { t: tpet<text> }
+              tpet_of    => tpet<text>
+              tpen       => { t: tpet_of }
               local_box  => { v: meta.declared }
               fragment   => { ( include: text | name?: text  type?: text ) }
               endpoint   => { ( host: text  port: int32 | socket: text )? }
@@ -553,7 +560,8 @@ class CrossEncodingParityTest {
 
     /**
      * An abstract template's application is an abstract record carrying the template's selector (§5.10), so a
-     * position typed {@code tpet<text>} dispatches over the declarations composing it, in both encodings.
+     * position typed {@code tpet_of}, the declaration of {@code tpet<text>}, dispatches over the declarations composing
+     * it, in both encodings.
      */
     @Test
     void anAbstractTemplatesApplicationDispatchesOverItsMembersInBoth() {
@@ -971,6 +979,61 @@ class CrossEncodingParityTest {
         bothAccept("shaped", """
                 { outline: !circle { radius: 1.0 } }""", """
                 {"outline": {"$type": "circle", "radius": 1.0}}""");
+    }
+
+    // ── Types written in place: each read by a reader built from its construction ────────
+
+    /** Container sugar at a field is the construction in place, nested and in a choice, read alike in both. */
+    @Test
+    void typesWrittenInPlaceReadAlike() {
+        bothAccept("in_place", """
+                { grid: [[a] []]  prices: { eur => [1 2] }  pair: [x 3]  id: name }""", """
+                {"grid": [["a"], []], "prices": {"eur": [1, 2]}, "pair": ["x", 3], "id": "name"}""");
+        sameRule("in_place", """
+                { grid: []  prices: {}  pair: [x]  id: 1 }""", """
+                {"grid": [], "prices": {}, "pair": ["x"], "id": 1}""");
+    }
+
+    /**
+     * An application of an open record at a slot closes in place to a record with no name, read alike in both: its
+     * fields, its default, an element of a list holding one, and a field it does not declare, at one pointer.
+     */
+    @Test
+    void aRecordInPlaceReadsAlike() {
+        bothAccept("ip_holder", """
+                { p: { items: [a b] }  ps: [ { items: [1]  size: 2 } ] }""", """
+                {"p": {"items": ["a", "b"]}, "ps": [{"items": [1], "size": 2}]}""");
+        sameCodeAndPath("ip_holder", """
+                { p: { size: 1 }  ps: [ { items: []  colour: red } ] }""", """
+                {"p": {"size": 1}, "ps": [{"items": [], "colour": "red"}]}""");
+    }
+
+    /**
+     * A dependent value whose sibling holds a type written in place: a tree read in either encoding holds the sibling
+     * as the record it is written as, and says it does not yet read a value against one rather than dropping it.
+     */
+    @Test
+    void aDependentValueOverASiblingWrittenInPlaceIsNotYetReadInATree() {
+        sameCodes("setting", "{ kind: { of: !meta.array { element_type: int32 } }  v: [1 2] }", """
+                {"kind": {"of": {"$type": "meta.array", "element_type": "int32"}}, "v": [1, 2]}""");
+        assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED), json("setting", """
+                {"kind": {"of": {"$type": "meta.array", "element_type": "int32"}}, "v": [1, 2]}""").stream()
+                .map(Verdict::code).toList());
+    }
+
+    /**
+     * A refined constructor applied in place is named by its application in both encodings, and the sugar its body
+     * also fits by its own form: the two are two types (§1.2), whatever data they admit alike.
+     */
+    @Test
+    void aRefinedConstructorInPlaceIsNamedByItsApplication() {
+        sameRule("refined", "{ few: [1 2 3]  many: [1 2 3] }", """
+                {"few": [1, 2, 3], "many": [1, 2, 3]}""");
+        List<String> messages = jsonDiagnostics("refined", """
+                {"few": [1, 2, 3], "many": [1, 2, 3]}""").stream().map(Diagnostic::message).toList();
+        assertEquals(2, messages.size(), messages::toString);
+        assertTrue(messages.get(0).startsWith("'pair_of<int32>'"), messages.get(0));
+        assertTrue(messages.get(1).startsWith("'[int32; 1..2]'"), messages.get(1));
     }
 
     // ── §6.1.5 subsumption: `!employee` in text, `$type` in JSON ────────

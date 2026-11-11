@@ -13,7 +13,6 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -68,7 +67,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
         super(name, displayName, body,
                 ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()),
                         descriptor.keyDataClass(), annotationTypes), descriptor.keyDataClass()),
-                ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.valueType().name()),
+                ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.valueType()),
                         descriptor.valueDataClass(), annotationTypes), descriptor.valueDataClass()),
                 schemaLocation, keysAreNames);
         this.descriptor = descriptor;
@@ -148,7 +147,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition);
             }
             Type keyType = resolveType(body.keyType().name());
-            Type valueType = resolveType(body.valueType().name());
+            // A value written in place has no bound class of its own: its host type is its constructor's shape.
+            Type valueType = BindTargets.hostType(body.valueType(), this::resolveType);
             // A value of a namespace type is a map of names, whose keys' annotations and order are part of what
             // an instance of the constructor holds (NamespaceInstanceReader).
             String terminal = AliasChain.terminal(name, context.schema().entries()::get);

@@ -151,26 +151,20 @@ class KernelBootstrapResolverTest {
     }
 
     /**
-     * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is its 81 declarations -- its six maps, their members and the root's own -- and one injected
-     * declaration per distinct sugar form within them: six {@code array} entries from §5.3's {@code [X]}
-     * field-type sugar, minted at the root. Producing them here is what leaves the linker with nothing to materialize
-     * (see {@code MetaKernelSchemaRegistryTest}).
-     * {@code enum}'s member set is not among them: it is the fixture's own {@code meta.enum_set} declaration, since
-     * {@code set} has no sugar and a {@code !} form stays prohibited at a field position (§5.2) -- and {@code
-     * record.fields} is the fixture's own
-     * {@code field_map} for the same reason, an ordered map having no sugar either.
+     * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, and the phase
+     * adds no declaration: each {@code [X]} at a field's type is the construction written in place there, so the
+     * output is the kernel's 77 declarations -- its six maps' members and the root's own -- and the six maps, and
+     * {@code record.parents} holds its array in place.
      */
     @Test
-    void theFixtureDeclarationsResolveAlongsideSixDesugaredEntries() {
+    void theFixtureDeclarationsResolveWithNoEntryAdded() {
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
-        assertEquals(87, schema.entries().size());
-        for (String head : List.of("array_array_text_1", "array_text_1", "array_type_ref",
-                "array_param_1", "array_field_group", "array_tuple_element")) {
-            assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
-                    "expected a desugared entry with head '" + head + "'");
-        }
+        assertEquals(83, schema.entries().size());
+        io.ltr8.tson.schema.meta.RecordBody chain =
+                (io.ltr8.tson.schema.meta.RecordBody) schema.entries().get("meta.type_chain");
+        assertEquals(new io.ltr8.tson.schema.meta.TypeInline(io.ltr8.tson.schema.meta.ArrayBody.of(
+                io.ltr8.tson.schema.meta.TypeRef.of("meta.type_ref"))), chain.fields().get("parents").type());
     }
 
     // ── The pre-loaded set, and what the rest of the kernel comes out as ──
@@ -271,8 +265,8 @@ class KernelBootstrapResolverTest {
     @Test
     void aTargetNoPreLoadedInstanceAppliesIsRefused() {
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> KernelBootstrapResolver.instanceBody("x", emptyInstance("meta.void_type")));
-        assertTrue(thrown.getMessage().contains("meta.void_type"));
+                () -> KernelBootstrapResolver.instanceBody("x", emptyInstance("meta.record")));
+        assertTrue(thrown.getMessage().contains("meta.record"));
     }
 
     @Test

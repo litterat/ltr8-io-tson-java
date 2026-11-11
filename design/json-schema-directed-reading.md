@@ -110,8 +110,8 @@ compares a written name against a set: a plain record's own name and its subtype
 base's own name and the deeper names each member admits, and a choice's variants and their subtypes. One index answers
 it — `AliasChain.namesMeaning`, built once per compile and held by `ValueReaderContext` (`admitting`) — so the set
 of positions that flatten cannot become whichever ones someone remembered. TSON text's peer is `Subsumption.admitting`.
-It is load-bearing for a template instantiation, whose entry name is minted and non-normative ([TSON-SCHEMA] §8.2): an
-alias is the only name a document has for one.
+It is load-bearing for an alias of a declared application, which a document may name as the application's
+declaration itself ([TSON-SCHEMA] §8.3).
 
 **Recognising one is a bounded peek, because the selectors lead** (§4.1). `$import` where present, then `$type`, then
 a sealed position's discriminators in any order among themselves (§6.1.5). `TagMembers.lead` reads those members and
@@ -121,17 +121,19 @@ holds before dispatch is a count the schema fixes, never one the document choose
 are the three only, so its `$value` directly follows them and the peek sees it there; a `$value` anywhere else is an
 extra member of an invalid object, refused by whoever reads it.
 
-**The concrete record reader does no lookahead at all.** It is reached only for its own type, so `RecordReader`'s
-member loop judges annotation members as they arrive: a `$type` in first place must restate the record
-(`RecordPlan.admitsTag`); `$value` straight after it makes the object a wrapper, read at the reader the enclosing
-position chose (`ExactReader`, `Route`), since the value inside may carry a tag of its own; a misplaced `$type` or
-`$value`, or any `$import`, refuses the object and the rest of it is skipped (`RecordPlan.refuseTagMember`).
-A member name is matched in NFC and then in the record's name type's form (`TsonLinkedSchema.nameForm`, held by
-`RecordPlan`; §6.1.1), so under a case-folding name type `NAME` is the field `name`; `TagMembers.lead` puts a sealed
-base's selectors in the same form. A member matching nothing is judged by that name type (`RecordPlan.unmatched`), as
-TSON's record reader judges it: one that is no value of the type is `UNRECOGNIZED_FIELD` with the type's reason and
-meets no hygiene rule, being no name; one that is meets [TSON-DATA] §8.2 under the type's profile, and only then is
-unknown (§9.4).
+**The concrete record reader does no lookahead at all.** It is reached only for its own type, so `RecordReader`'s member
+loop judges annotation members as they arrive: a `$type` in first place must restate the record (`RecordPlan.admitsTag`)
+-- a record written in place has no name, and `ValueReaderContext.admitting` admits nothing for a name no entry holds,
+so its `$type` is refused whatever it holds, its application's text included (§7.2); `$value` straight after it makes
+the object a wrapper, read at the reader the enclosing position chose (`ExactReader`, `Route`), since the value inside
+may carry a tag of its own; a misplaced `$type` or `$value`, or any `$import`, refuses the object and the rest of it is
+skipped (`RecordPlan.refuseTagMember`). A member name is matched in NFC and then in the record's name type's form
+(`TsonLinkedSchema.nameForm`, held by `RecordPlan`, the name type a record in place's body states included; §6.1.1), so
+under a case-folding name type `NAME` is the field `name`; `TagMembers.lead` puts a sealed base's selectors in the same
+form. A member matching nothing is judged by that name type (`RecordPlan.unmatched`), as TSON's record reader judges it:
+one that is no value of the type is `UNRECOGNIZED_FIELD` with the type's reason and meets no hygiene rule, being no
+name; one that is meets [TSON-DATA] §8.2 under the type's profile, and only then is unknown (§9.4).
+
 
 Members read before a refusal have already reported, so an invalid document's diagnostics follow its member order —
 accepted deliberately: holding them back would cost every valid document a buffer to tidy the answer for invalid
@@ -260,7 +262,10 @@ which is all any mode can promise ([TSON-SCHEMA] §7.5).
 standalone array or tuple binds to an unmodifiable `List` of its values' natural host values and a map to an
 unmodifiable `Map`; a record field declaring `long[]`, `List<Long>`, `Set<UUID>`, an `@Tuple` class or
 `Map<LocalDate, BigDecimal>` reads the same position again for that class. A tuple binds by its component and not by
-its schema name because an inline tuple's entry name is minted, and no binding map can hold it. `BindTargets` is the
+its schema name because a tuple written in place has no entry name, and no binding map can hold it; a record written in
+place, the record an application closes to at a slot, has none either and no natural host form, so it is read into the
+record class its component declares (`RecordInPlaceReader`, `BindRecordBuilder.boundTo`) and builds nothing where no
+component says. `BindTargets` is the
 one place that meets a component — an atom through `AtomReader.boundTo` (a reference's `TypeRef` or `Ref` component
 bound to the family's own production rather than a bridge from its name, so the `TypeRef` keeps its referent and the
 `Ref` is delivered), a container rebuilt over the component's class
@@ -312,5 +317,4 @@ compiles, so a read is one lookup and a route, as at a tagged record position. A
 An `!!import` merges the imported entries first, so a list in namespace order would show the bundled names and none of the
 author's. `JsonCompiledSchema.unknownTypeMessage` (the CLI's `--type` refusal, and `UNKNOWN_TYPE` at the facades)
 leads with the entries this schema declares and the author wrote — by the origin index and by having a source
-position, the test that tells a minted entry from an authored one. Imported and minted names remain usable root
-types; the count that follows covers them.
+position. Imported names remain usable root types; the count that follows covers them.

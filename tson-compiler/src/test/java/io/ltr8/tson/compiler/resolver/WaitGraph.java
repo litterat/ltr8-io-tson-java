@@ -58,7 +58,7 @@ import java.util.TreeSet;
  *
  * <p><b>Where the rule as written is silent</b>, this implements: an entry's value is read against its head tag,
  * not against the enclosing schema's {@code value_type} (the document read waits on that, see
- * {@link #documentWaits()}); a schema-map key's annotations ({@code @meta.synthetic}) belong to the schema map, so
+ * {@link #documentWaits()}); a schema-map key's annotations ({@code @meta.application}) belong to the schema map, so
  * they too are waits of the document read and not of the entry they mark; a bare token at a record position is
  * that record's shorthand for its one required field; a namespace type stating no
  * {@code key_type} has its keys read by their spelling, as {@code text}, the host judging them later.
@@ -92,6 +92,13 @@ final class WaitGraph {
     private final Map<String, Wait> documentWaits = new LinkedHashMap<>();
     private final List<Overapproximation> overapproximations = new ArrayList<>();
     private final List<String> problems = new ArrayList<>();
+
+    /**
+     * Each type written in place a slot holds, {@code { of: !C { … } }}, under a key no entry can have: it is no
+     * entry, so reading against one waits on no entry for the type itself, only on what reading its body reaches,
+     * its constructor's form read off the construction ({@link #shape}).
+     */
+    private final Map<String, DataValue> inline = new LinkedHashMap<>();
 
     private WaitGraph() {
     }
@@ -300,6 +307,9 @@ final class WaitGraph {
         }
 
         void waitOn(String target, String rule, String path) {
+            if (inline.containsKey(target)) {
+                return; // a type written in place is no entry, and waits on none of its own
+            }
             if (!declarations.containsKey(target)) {
                 problems.add(entry + ": waits on " + target + ", which no entry declares (" + rule + " at " + path + ")");
             }
@@ -346,7 +356,7 @@ final class WaitGraph {
                     }
                 }
                 case ARRAY -> {
-                    String element = token(field(shape.declaration(), "element_type"));
+                    String element = slot(field(shape.declaration(), "element_type"));
                     if (core instanceof ArrayValue array) {
                         for (int i = 0; i < array.elements().size(); i++) {
                             read(array.elements().get(i), element, "element", path + "[" + i + "]");
@@ -356,8 +366,8 @@ final class WaitGraph {
                     }
                 }
                 case MAP -> {
-                    String keyType = token(field(shape.declaration(), "key_type"));
-                    String valueType = token(field(shape.declaration(), "value_type"));
+                    String keyType = slot(field(shape.declaration(), "key_type"));
+                    String valueType = slot(field(shape.declaration(), "value_type"));
                     if (core instanceof MapValue map) {
                         for (MapValue.MapEntry entry : map.entries()) {
                             String key = text(entry.key().coreValue());
@@ -372,14 +382,15 @@ final class WaitGraph {
                     List<DataValue> elements = elements(field(shape.declaration(), "elements"));
                     if (core instanceof ArrayValue array && array.elements().size() <= elements.size()) {
                         for (int i = 0; i < array.elements().size(); i++) {
-                            String element = token(field(elements.get(i), "element_type"));
+                            String element = slot(field(elements.get(i), "element_type"));
                             read(array.elements().get(i), element, "element", path + "[" + i + "]");
                         }
                     } else {
                         problems.add(entry + ": a " + kind(core) + " at tuple " + type + " (" + path + ")");
                     }
                 }
-                case CHOICE -> dispatch(core, type, tokens(field(shape.declaration(), "variants")), path);
+                case CHOICE -> dispatch(core, type, elements(field(shape.declaration(), "variants")).stream()
+                        .map(WaitGraph.this::slot).toList(), path);
                 // A tagged value is read against its tag (`read`), so what reaches here is untagged, and names no type.
                 case DECLARED -> problems.add(entry + ": an untagged value at the declared " + type + " (" + path + ")");
                 case ABSTRACT -> dispatch(core, type, subtypes(shape.declaration()), path);
@@ -413,7 +424,7 @@ final class WaitGraph {
                             annotations(field.value().annotations(), path + "." + field.name());
                             continue;
                         }
-                        read(field.value(), token(field(declared, "type")), "field",
+                        read(field.value(), slot(field(declared, "type")), "field",
                                 path + "." + field.name());
                     }
                 }
@@ -430,7 +441,7 @@ final class WaitGraph {
                         return;
                     }
                     String name = required.getFirst();
-                    read(new DataValue(List.of(), Optional.empty(), token), token(field(fields.get(name), "type")),
+                    read(new DataValue(List.of(), Optional.empty(), token), slot(field(fields.get(name), "type")),
                             "record shorthand", path + "(." + name + ")");
                 }
                 default -> problems.add(entry + ": a " + kind(core) + " at record " + shape.terminal()
@@ -474,14 +485,15 @@ final class WaitGraph {
 
     /** {@code type}'s terminal declaration, through any aliases, and the form its constructor reads. */
     private Shape shape(String type, Read read, String path) {
-        String terminal = terminal(type);
+        DataValue written = inline.get(type);
+        String terminal = written != null ? type : terminal(type);
         if (terminal == null) {
             if (read != null) {
                 problems.add(read.entry + ": " + type + " has no terminal declaration (" + path + ")");
             }
             return null;
         }
-        DataValue declaration = declarations.get(terminal);
+        DataValue declaration = written != null ? written : declarations.get(terminal);
         String constructor = terminal(declaration.typeRef().orElse(""));
         if (constructor == null) {
             problems.add(terminal + ": its head " + declaration.typeRef() + " has no declaration");
@@ -540,7 +552,7 @@ final class WaitGraph {
      * by spelling, as {@code text}.
      */
     private Optional<String> namespaceType(Shape shape, String slot, Read read, String path) {
-        String type = token(field(shape.declaration(), slot));
+        String type = slot(field(shape.declaration(), slot));
         if (type == null && slot.equals("key_type")) {
             return Optional.of("text");
         }
@@ -579,6 +591,20 @@ final class WaitGraph {
     }
 
     // ── AST access ───────────────────────────────────────────────────────
+
+    /**
+     * What a type slot holds, as the name a read is made against: a name as written, or a type written in place, the
+     * construction its wrapper holds registered under a key of its own ({@link #inline}); {@code null} for neither.
+     */
+    private String slot(DataValue value) {
+        DataValue of = field(value, "of");
+        if (of == null || of.typeRef().isEmpty()) {
+            return token(value);
+        }
+        String key = "<inline " + inline.size() + ": !" + of.typeRef().get() + ">";
+        inline.put(key, of);
+        return key;
+    }
 
     private static DataValue field(DataValue value, String name) {
         if (value != null && value.coreValue() instanceof RecordValue record) {

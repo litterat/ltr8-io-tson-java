@@ -1,8 +1,8 @@
-# Name hygiene and minted names
+# Name hygiene
 
-Design notes for §8.2's three name-hygiene rules as the linker applies them (`TsonSchemaLinker.checkNames`), and for how
-a resolver-minted name is built so that the same walk can judge it (`InternalName`, `MintedNames`). Current form only;
-history lives in git.
+Design notes for §8.2's three name-hygiene rules as the linker applies them (`TsonSchemaLinker.checkNames`). Every name
+the walk judges is one an author wrote: the resolver mints none ([TSON-SCHEMA] §8.2). Current form only; history lives in
+git.
 
 **Invariants**
 
@@ -15,10 +15,6 @@ history lives in git.
 - A value entry's payload and an annotation value are judged at the payload read (`SchemaResolver`, under the
   loader's identifier policy), not in the walk, which cannot see into them; every constructor payload is read under
   no policy.
-- A minted name is ASCII and an identifier by construction, and is never exempted from the walk.
-- Non-ASCII or non-admitted content in a minted name is hashed rather than dropped; a part is capped at 64 characters,
-  hash included.
-- `MintedNames.claim` compares the canonical renderings, not the name's own 32-bit hash; it is per phase.
 - A refusal carries a policy code (`CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`), not `SCHEMA_ERROR`.
 - The bootstrap links under the default policy, not a caller's.
 
@@ -46,8 +42,7 @@ meets the two per-name rules in the same pass, under that family's own profile. 
 stands alone — but it is the schema's own copy of a value a read judges: a default reaches every document that
 omits the field, so a value the reader would refuse if written must not be one it injects
 (`design/name-hygiene-read-path.md`). An open record's literal values are judged the same way, once, at the
-template, applied or not: they are every application's, and judged only on a minted member they would be reported
-against a content-derived name.
+template, applied or not: they are every application's, and are judged once, against the declaration that wrote them.
 
 **A value entry and an annotation value are judged where they are read, not in the walk.** A value entry's payload (`!api { …
 }`, a map keyed by names) binds to the consumer's own classes or is held as a tree
@@ -72,71 +67,6 @@ Restrictive are incomparable. The default is Highly Restrictive over a whole nam
 `id_пользователя`; the relaxation to reach for is the *unit*, since `perSegment()` admits that and still
 refuses `аdmin`. The bootstrap links under the default rather than under a caller's policy: a configuration
 should not be able to break the kernel.
-
-## Minted names (`InternalName`, `MintedNames`)
-
-**A minted name is ASCII and an identifier by construction, which is what lets the walk judge it like any
-other** (`InternalName`). Both naming sites splice author-written content into the readable half —
-`SchemaDesugarer` from a lifted binding record, `TemplateMaterialiser` from an application's head and value
-arguments — so a derived name is a place where a document's own text reaches the schema namespace. Two
-requirements meet there, and the second is why meeting the first is not enough:
-
-- **[TSON-SCHEMA] §8.2's freshness MUST**, that an internal name is a valid `meta.identifier`. Splicing raw text
-  breaks it outright: a `text` field holding a path puts `/` in a name, and §7.7 admits only `XID_Continue` and
-  `-`. An HTTP operation is the case that finds it — a schema's value entries are motivated by one, and
-  every realistic path carries a slash.
-- **§8.2's hygiene must still be able to judge the result.** Admitting every `XID_Continue` character keeps
-  the name legal and still lets author text shape it: a Cyrillic `о` in a value would sit in a namespace
-  name, and a Latin head spliced with non-Latin content is mixed-script by construction, so the walk would
-  refuse ordinary schemas — `operation_путь_GET_…_bef13f0c` is a valid identifier refused under §8.2's
-  recommended default for containing a Russian word. Exempting minted names from the walk answers that and
-  opens a worse hole: the namespace then takes on whatever a document happens to contain, unchecked.
-
-So the rule is ASCII, in four cases, after a kernel path is read as its member (a `meta.array` head reads
-`array`, so the kernel's `[meta.type_ref]` mints `array_type_ref_…`). What is ASCII and admitted
-by §7.7 is spliced verbatim — the ordinary case, a type name or a verb or a bound. A qualified name of ASCII
-identifiers, `geo.inner.tag`, writes each dot `_` (`array_geo_inner_tag_…`), a minted name being one identifier; its
-path is no part of identity, so it needs no hash of its own. What is ASCII but not admitted keeps its admitted
-characters and gains a hash, so `"/x"` reads `x_h00000f2f` and `1.0` reads `1_0_h0000bdb3`. Anything else is the hash
-alone.
-**Hashed rather than dropped**, because replacing it would collapse two different values onto one readable
-half, where a hash keeps them visibly distinct and keeps the name inspectable — a reader holding the schema
-can hash the same text and match it. Nothing identity depends on is at stake either way: that is the
-structural hash at the end, computed over the binding and never over this text.
-
-**A part is capped at 64 characters, hash included.** Nothing in the series bounds a name — §8.2 asks for
-freshness, stability and a content-derived spelling, and §7.7's grammar is unbounded — but a part is spliced
-from author-written content and `DerivedName.ofBinding` walks a whole binding record, nested records and arrays
-included, so an unbounded rule makes name length a function of document size: a realistic REST path already
-mints 139 characters. Past the budget the readable half has stopped being readable and is only cost, at every
-reference to the entry and in §8 output. Truncation appends the hash rather than simply cutting, so two long
-texts sharing a prefix stay apart.
-
-**Non-collision is decided, not assumed** (`MintedNames`). §8.2's freshness MUST asks that an internal name
-collide with no declared entry and no other internal one. The first half is caught where a name is inserted —
-`SchemaDesugarer` inserts into the document's declarations with `putIfAbsent` and raises `IllegalStateException`. The second
-half is the subtle one: **deduping by name is the identity discipline working**, since two occurrences of one
-form must land on one entry — it is what makes `[text]` written twice one type, what lets a form written out
-and the same form arriving through a template agree, and what ties a recursive template's knot — and it is
-therefore also what would hide a collision, a second arrival under a name being indistinguishable from two
-different bindings that derived one.
-
-So the derivations are compared. Both sites already render a binding canonically before hashing it, and that
-rendering is injective — two are equal exactly when the bindings are — so `MintedNames.claim` states the MUST
-exactly rather than trusting the name's own 32-bit hash, which is a rendering and is not load-bearing on
-its own. **Per phase**: desugaring and materialisation hold one each and run either side of resolution, so a
-name minted in one phase colliding with a different form in the other is not caught; the two share their
-naming functions, so such a pair would have to have collided within a phase as well to exist.
-
-**Across documents, one form is one entry.** Two documents that mint one form without importing each other declare
-one synthetic, and a closure holding both keeps the first (`resolver.ImportedSynthetics`,
-`design/linking-and-compilation.md`). No canonical rendering crosses a schema boundary, so that merge compares the
-resolved bodies instead, and two bodies under one minted name are the same `IllegalStateException`. A local lift whose
-name an import already declares references the import's entry, and is held to it: `SchemaDesugarer` keeps the declaration
-it would have injected (`reused`), `SchemaResolver` resolves that form on its own once every entry is ready, and
-`ImportedSynthetics.requireForm` compares it with the import's entry, chain and a choice's linker-derived `disjoint` left
-out. A declared entry of the name is §2.2.3's collision, a
-`SchemaValidationException`; a synthetic of another form is the `IllegalStateException`.
 
 ## Why one walk, and what a refusal carries
 

@@ -29,6 +29,8 @@ import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.numeric.IntegerSize;
@@ -61,13 +63,15 @@ import java.util.Set;
  *
  * <ul>
  *   <li><b>The pre-loaded set is hand-built</b> ({@link #instanceBody}, {@link #refinedBody}): the instances and the
- *       two refinements on the kernel's one wait cycle, the cycle holding {@code record} -- {@link #PRE_LOADED} and
- *       the arrays lifted over {@link #PRE_LOADED_ELEMENTS}. Rule 4 makes the set a measurement of the kernel, and
- *       {@code KernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle
- *       fails there rather than here.</li>
+ *       two refinements on the kernel's one wait cycle, the cycle holding {@code record} -- {@link #PRE_LOADED},
+ *       built before anything is read. Rule 4 makes the set a measurement of the kernel, and {@code
+ *       KernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle fails
+ *       there rather than here.</li>
  *   <li><b>A declaration no read produces is resolved from its grammar</b> by {@link DefinitionResolver}, as {@link
- *       SchemaResolver} resolves a record: a composition, a refinement of a record, an alias, a template. It reads
- *       nothing, so it is ready as soon as the entries it composes are.</li>
+ *       SchemaResolver} resolves a record: a composition, a refinement of a record, an alias, a template. A record
+ *       holding a type written in place reads it, through its constructor's reader, and waits on what that read
+ *       reaches; {@code meta.type_inline}, the wrapper a type slot's choice recovers a brace to, is made ready with
+ *       the pre-loaded set, so the first such read classifies both of the choice's variants.</li>
  *   <li><b>Every other instance and atom refinement is read through the ordinary path</b>, {@link
  *       DefinitionResolver}'s, whose {@link ConstructionReader} reads through readers compiled from the entries
  *       ready so far ({@link TsonSchemaLinker#linkReady}, {@link TsonSchemaCompiler#compileReady}). An entry not
@@ -98,19 +102,18 @@ public final class KernelBootstrapResolver {
      * The kernel's named instances and refinements on its one wait cycle, built by hand: the {@code boolean} and
      * {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text} atoms, {@code
      * meta.field_type_ref}, the reference a record field's type is read by, {@code field_map}, the map type a
-     * record's fields are a value of, and the two refinements, {@code numeric.count} and {@code meta.type_ref}. The
-     * {@code value} of {@code record_field} is not among them: it is typed {@code type!}, a dependent field whose
-     * value a schema document holds as written, which waits on no entry.
+     * record's fields are a value of, the two refinements, {@code numeric.count} and {@code meta.type_ref}, and the
+     * two choices a type slot is typed by, {@code meta.type_expr} and {@code meta.field_type_expr}: a choice's own
+     * {@code variants} is a list of {@code meta.type_expr}, so reading {@code type_expr}'s declaration reaches
+     * {@code type_expr}. The {@code value} of {@code record_field} is not among them: it is typed {@code type!}, a
+     * dependent field whose value a schema document holds as written, which waits on no entry.
      */
     private static final Set<String> PRE_LOADED = Set.of("boolean", "meta.field_role", "meta.enum_set",
-            "integer", "numeric.count", "text", "meta.field_type_ref", "meta.type_ref", "meta.field_map");
+            "integer", "numeric.count", "text", "meta.field_type_ref", "meta.type_ref", "meta.field_map",
+            "meta.type_expr", "meta.field_type_expr", "meta.record_extension_type", "void");
 
-    /**
-     * The element types whose lifted arrays are on the cycle: {@code [meta.type_ref]}, {@code [meta.field_group]} and
-     * {@code [text; 1..]}, and an array of one of those ({@code [[text; 1..]; 1..]}). A lifted array is named by its
-     * content (§8.2), so it is designated by what it holds rather than by its name.
-     */
-    private static final Set<String> PRE_LOADED_ELEMENTS = Set.of("meta.type_ref", "meta.field_group", "text");
+    /** The kernel's wrapper for a type written in place, {@code { of: meta.type }}. */
+    private static final String TYPE_INLINE = KernelNames.of("type_inline");
 
     private KernelBootstrapResolver() {
     }
@@ -132,26 +135,23 @@ public final class KernelBootstrapResolver {
      * they are written in consulted for nothing.
      */
     static TsonSchema resolve(SchemaDocument parsed, SchemaPositions positions) {
-        SchemaDocument document = SchemaDesugarer.desugar(parsed, Set.of());
+        SchemaDocument document = SchemaDesugarer.desugar(parsed);
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
-        Map<String, Top> entries = new Bootstrap(document, parsed.body().declarations().keySet(), positions, facts)
-                .resolve();
+        Map<String, Top> entries = new Bootstrap(document, positions, facts).resolve();
         return new TsonSchema(id(document), document.imports(), AnnotatedMap.of(entries), true,
                 Map.of(), facts);
     }
 
     /**
-     * The entries {@link #kernelSchema()} builds by hand, by the names the desugared kernel gives them -- what
-     * {@code KernelBootstrapResolverTest} holds against the measured wait cycle.
+     * The entries {@link #kernelSchema()} builds by hand -- what {@code KernelBootstrapResolverTest} holds against the
+     * measured wait cycle.
      */
     static Set<String> preLoaded() {
-        SchemaDocument parsed = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID))
-                .parseSchemaDocument();
-        SchemaDocument document = SchemaDesugarer.desugar(parsed, Set.of());
+        SchemaDocument document = SchemaDesugarer.desugar(
+                new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument());
         Set<String> names = new LinkedHashSet<>();
-        Set<String> lifted = new LinkedHashSet<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
-            if (isPreLoaded(declaration, parsed.body().declarations().keySet(), lifted)) {
+            if (isPreLoaded(declaration)) {
                 names.add(declaration.name());
             }
         }
@@ -164,28 +164,9 @@ public final class KernelBootstrapResolver {
     }
 
 
-    /**
-     * Whether {@code declaration} is one of the pre-loaded set's, {@code lifted} collecting the lifted arrays already
-     * found to be: a lifted array's element is declared before it, its lift being depth first. A lifted array is one
-     * the kernel's source does not declare ({@code declared}), so an entry whose own body is a sugar form ({@code
-     * examples => @meta.annotation [text]}) is no lift.
-     */
-    private static boolean isPreLoaded(SchemaMap.Declaration declaration, Set<String> declared, Set<String> lifted) {
-        if (!WaitOrder.reads(declaration)) {
-            return false;
-        }
-        if (PRE_LOADED.contains(declaration.name())) {
-            return true;
-        }
-        if (!declared.contains(declaration.name()) && declaration.typeDef() instanceof Instance instance
-                && instance.target().equals(KernelNames.of("array"))) {
-            String element = bindingField(instance.value(), "element_type");
-            if (PRE_LOADED_ELEMENTS.contains(element) || lifted.contains(element)) {
-                lifted.add(declaration.name());
-                return true;
-            }
-        }
-        return false;
+    /** Whether {@code declaration} is one of the pre-loaded set's: one that is read, and named in {@link #PRE_LOADED}. */
+    private static boolean isPreLoaded(SchemaMap.Declaration declaration) {
+        return WaitOrder.reads(declaration) && PRE_LOADED.contains(declaration.name());
     }
 
     /**
@@ -206,7 +187,7 @@ public final class KernelBootstrapResolver {
         private final DefinitionResolver resolver;
         private final DataBindContext context = SchemaModelNameBinder.defaultContext();
 
-        Bootstrap(SchemaDocument document, Set<String> declared, SchemaPositions positions,
+        Bootstrap(SchemaDocument document, SchemaPositions positions,
                   Map<String, TsonSchema.EntryFacts> facts) {
             this.id = id(document);
             this.document = document;
@@ -214,7 +195,7 @@ public final class KernelBootstrapResolver {
             this.facts = facts;
             for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
                 declarations.put(declaration.name(), declaration);
-                if (isPreLoaded(declaration, declared, preLoaded)) {
+                if (isPreLoaded(declaration)) {
                     preLoaded.add(declaration.name());
                 }
             }
@@ -230,8 +211,13 @@ public final class KernelBootstrapResolver {
 
         /** Every entry, ready, in the order the kernel declares them. */
         Map<String, Top> resolve() {
-            // The pre-loaded set first, with the declarations resolved from their grammar: rule 4 has it ready before
-            // any declaration is read.
+            // The pre-loaded set first, built by hand before anything is read (rule 4), and with it the wrapper a type
+            // written in place takes: a record read from its grammar, which reads nothing, and the variant of
+            // `meta.type_expr` an untagged value at a type slot is told from a name by. A record's field written in
+            // place is read against that choice, whose recovery classifies both its variants (§5.4), so both are
+            // ready before the first such read.
+            preLoaded.forEach(order::definition);
+            order.definition(TYPE_INLINE);
             order.readyAll(preLoaded::contains);
             resolver.judgeDeferred((name, error) -> {
                 throw error;
@@ -433,10 +419,10 @@ public final class KernelBootstrapResolver {
 
     /**
      * The hand-written construction of a pre-loaded instance (see the class Javadoc). The pre-loaded set applies
-     * its constructors in three shapes, each checked rather than assumed: a bare {@code {}} for
+     * its constructors in four shapes, each checked rather than assumed: a bare {@code {}} for
      * {@code integer_type} and {@code text_type}, each the target's unconstrained constant; a bare token array for
-     * {@code enum}; and a record of tokens for {@code reference_type}, for {@code map} and for the {@code
-     * array}/{@code set_type} binding records {@link SchemaDesugarer} lifts.
+     * {@code enum}; a record of tokens for {@code reference_type} and for {@code map}; and a record holding a token
+     * array for {@code choice}, whose {@code variants} are names.
      *
      * <p>Package-private so {@code KernelBootstrapResolverTest} can reach the refusals the real kernel never
      * does.
@@ -462,9 +448,20 @@ public final class KernelBootstrapResolver {
                     fieldToken(instance.value(), "voidable").map(Boolean::parseBoolean).orElse(false),
                     fieldToken(instance.value(), "ordered").map(Boolean::parseBoolean).orElse(false),
                     optionalCount(instance.value(), "min_items"), optionalCount(instance.value(), "max_items"));
-            // array and set differ only in the defaults set tightens (§5.7): ordered/duplicating vs unordered/unique.
-            case "meta.array" -> toArrayBody(instance.value(), false);
-            case "meta.set_type" -> toArrayBody(instance.value(), true);
+            // `enum_set => !meta.set_type { element_type: text  min_items: 1 }`: an array with the facets set pins
+            // (§5.3), unordered and unique.
+            case "meta.set_type" -> toSetBody(instance.value());
+            // `void => !meta.void_type {}`: the one value it admits is `_`, and it has no facets.
+            case "meta.void_type" -> {
+                requireEmptyBody(instance);
+                yield new VoidType(TypeChain.EMPTY);
+            }
+            // `type_expr => @meta.disjoint ( meta.type_ref | meta.type_inline )`, each variant a name. A slot of the
+            // records on the cycle is read against it before `meta.type_inline` is ready, so it states the fact its
+            // `@meta.disjoint` asserts -- a name string-class, the wrapper brace-class -- and the whole kernel's
+            // link derives it again and holds the assertion to it.
+            case "meta.choice" -> new ChoiceBody(nameArray(name, instance.value(), "variants").stream()
+                    .map(TypeRef::of).toList(), Optional.of(true));
             default -> throw new IllegalStateException("'" + name + "' applies '" + instance.target()
                     + "', which no pre-loaded instance applies -- an instance outside the pre-loaded set is read, "
                     + "not built by hand");
@@ -480,14 +477,34 @@ public final class KernelBootstrapResolver {
     }
 
     /**
-     * {@code !meta.array { element_type: T  min_items?: N  max_items?: M }}, or the same for {@code !meta.set_type}, as the
-     * body it denotes -- every fact the binding record states, so a hand-built body is the one the ordinary path
-     * would read.
+     * {@code !meta.set_type { element_type: T  min_items?: N  max_items?: M }} as the body it denotes -- every fact the
+     * binding record states, so a hand-built body is the one the ordinary path would read.
      */
-    private static ArrayBody toArrayBody(DataValue value, boolean set) {
+    private static ArrayBody toSetBody(DataValue value) {
         TypeRef element = TypeRef.of(bindingField(value, "element_type"));
-        return new ArrayBody(element, false, !set, set, optionalCount(value, "min_items"),
+        return new ArrayBody(element, false, false, true, optionalCount(value, "min_items"),
                 optionalCount(value, "max_items"));
+    }
+
+    /** A field of a binding record holding an array of bare tokens, each a name: a choice's {@code variants}. */
+    private static List<String> nameArray(String name, DataValue value, String field) {
+        if (!(value.coreValue() instanceof RecordValue record)) {
+            throw new IllegalStateException("'" + name + "': expected a binding record, found " + value.coreValue());
+        }
+        for (RecordValue.Field written : record.fields()) {
+            if (written.name().equals(field) && written.value().coreValue() instanceof ArrayValue array) {
+                List<String> names = new ArrayList<>();
+                for (DataValue element : array.elements()) {
+                    if (!(element.coreValue() instanceof TokenValue token)) {
+                        throw new IllegalStateException("'" + name + "': '" + field + "' takes bare names in a "
+                                + "pre-loaded instance, found " + element.coreValue());
+                    }
+                    names.add(token.text());
+                }
+                return names;
+            }
+        }
+        throw new IllegalStateException("'" + name + "': no '" + field + "' array in " + value.coreValue());
     }
 
     /** An optional count field of a desugared instance's binding record, a bare integer token where written. */

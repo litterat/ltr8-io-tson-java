@@ -32,7 +32,7 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`. The schema-side walk is
-`design/name-hygiene-and-minted-names.md`.
+`design/name-hygiene.md`.
 
 ## Name hygiene on the read path ([TSON-DATA] §8.2)
 

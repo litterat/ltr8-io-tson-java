@@ -12,6 +12,7 @@ import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.compiler.reader.Subsumption;
 
 import java.util.LinkedHashMap;
@@ -107,11 +108,45 @@ public final class TsonSchemaCompiler {
         // Every reader exists now, so the values readers hold as written -- a field's default or pin -- are
         // decoded through their types here, still before the schema is handed out (see CompiledReaders).
         compilation.readers.settle();
-        TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished));
+        TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished),
+                compilation.readers);
         // Hand every reader that resolves at *read* time over to the finished schema, releasing this
         // compilation -- see CompiledReaders, and the "never escape" invariant below that this preserves.
         compilation.readers.bind(compiled);
         return compiled;
+    }
+
+    /**
+     * Builds the reader of a type written in place ({@link TypeInline}) from its body, through the factory its
+     * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice, a reference, or the
+     * record an application closes to in place, named for a message by the form as written. It has no entry, so it
+     * has no name a binding map, a schema location or a tree's tag keys on, nothing IS-A it, so §7.2's guard at its
+     * position admits no tag, and it is no alias. It holds the factories, the linked schema and the readers' handle,
+     * never the {@link Compilation}, so the handle may build one at read time.
+     */
+    private static final class InlineReaders {
+        private final TsonLinkedSchema linked;
+        private final Function<String, ValueReaderFactory> factoryFor;
+        private final Map<String, Set<String>> namesMeaning;
+        private final Map<String, List<String>> referrers;
+        private CompiledReaders readers;
+
+        InlineReaders(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor,
+                      Map<String, Set<String>> namesMeaning, Map<String, List<String>> referrers) {
+            this.linked = linked;
+            this.factoryFor = factoryFor;
+            this.namesMeaning = namesMeaning;
+            this.referrers = referrers;
+        }
+
+        TsonTypeReader<?> build(TypeInline type) {
+            Top read = type.of() instanceof NamespaceBody namespace ? namespace.read() : type.of();
+            ValueReaderFactory factory = factoryFor.apply(TsonCompiledVocabulary.typenameOf(read));
+            TsonTypeReader<?> built = factory.create(type.text(), read,
+                    new ValueReaderContext(linked, readers, namesMeaning, referrers));
+            // §7.2 at the position: no tag names a type written in place, so the guard admits none.
+            return Subsumption.guard(type.text(), read, built, namesMeaning, readers);
+        }
     }
 
     /**
@@ -154,7 +189,7 @@ public final class TsonSchemaCompiler {
          * while the walk runs, then is rebound to the finished schema so nothing here outlives the call --
          * a reader that resolves at read time (dispatch, annotations) holds this, not {@code this}.
          */
-        private final CompiledReaders readers = new CompiledReaders(this::resolve);
+        private final CompiledReaders readers;
 
         /** The entries a compile of a resolution in progress reads as {@link PendingTypeReader}s; else empty. */
         private final Set<String> pending;
@@ -166,6 +201,9 @@ public final class TsonSchemaCompiler {
             this.factoryFor = factoryFor;
             this.namesMeaning = Subsumption.namesMeaning(schema.entries());
             this.referrers = ValueReaderContext.referrers(schema.entries());
+            InlineReaders inline = new InlineReaders(linked, factoryFor, namesMeaning, referrers);
+            this.readers = new CompiledReaders(this::resolve, inline::build);
+            inline.readers = readers;
         }
 
         TsonTypeReader<?> resolve(String name) {

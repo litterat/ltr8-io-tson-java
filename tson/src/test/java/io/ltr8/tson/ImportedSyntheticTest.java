@@ -14,7 +14,6 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -83,31 +82,6 @@ class ImportedSyntheticTest {
         assertEquals(1, both.get("labelled").get("labels").elements().size());
     }
 
-    /**
-     * A form one library lifts directly and another constructs by closing a template's held {@code [T]} is one entry
-     * too, and a schema that writes the form itself, or closes the template again, reuses the imported entry.
-     */
-    @Test
-    void aLiftedAndAClosedSyntheticAreOneEntry() {
-        Tson tson = tson();
-        assertEquals(List.of(), tson.validateSchema("""
-                !!id:"https://example.test/mixed.tn"
-                !!import:"https://example.test/tags.tn"
-                !!import:"https://example.test/listed.tn"
-                !schema { mixed => { tagged: tagged  texts: texts  more: [text]  again: listed<text> } }"""));
-
-        TsonValue mixed = tson.treeReader().read("""
-                !!import:"https://example.test/mixed.tn"
-                !mixed { tagged: { tags: [a] }  texts: { items: [b c] }  more: []  again: { items: [d] } }""");
-        assertEquals(2, mixed.get("texts").get("items").elements().size());
-        // tags.tn lifts [text] and listed.tn closes its [T] at text: one minted name, each document's own, and the
-        // importer holds it once, the first import's.
-        var core = tson.bindRegistry().core();
-        String minted = ownClosedArray(core.resolveLinked("https://example.test/tags.tn"));
-        assertEquals(minted, ownClosedArray(core.resolveLinked("https://example.test/listed.tn")));
-        assertEquals("example.test/tags.tn", core.resolveLinked("https://example.test/mixed.tn").originOf(minted));
-    }
-
     /** The one closed {@code [text]} synthetic a schema declares itself, an import's left out. */
     private static String ownClosedArray(TsonLinkedSchema linked) {
         String own = CanonicalIdentity.canonicalize(linked.schema().id());
@@ -145,42 +119,6 @@ class ImportedSyntheticTest {
     /** The name this library mints for {@code [text]}, read off a schema that writes it. */
     private static String mintedForTextArray() {
         return ownClosedArray(tson().bindRegistry().core().resolveLinked("https://example.test/tags.tn"));
-    }
-
-    /**
-     * A document whose own lift derives a name an import already declares references the import's entry, so that
-     * entry must be the form: an import marking a different form synthetic under the name is the broken naming
-     * function, an invariant break rather than a silent reuse of the wrong type.
-     */
-    @Test
-    void aLiftReusingAnImportedSyntheticOfAnotherFormIsAnInvariantBreak() {
-        String minted = mintedForTextArray();
-        Tson tson = tson(Map.of("https://example.test/forged.tn", """
-                !!id:"https://example.test/forged.tn"
-                !!import:"https://tson.io/2026/40/m/meta.tn"
-                !schema { @meta.synthetic %s => !meta.array { element_type: integer } }""".formatted(minted)));
-
-        assertThrows(IllegalStateException.class, () -> tson.validateSchema("""
-                !!id:"https://example.test/reuser.tn"
-                !!import:"https://example.test/forged.tn"
-                !schema { tagged => { tags: [text] } }"""));
-    }
-
-    /** An import <em>declaring</em> the name a lift derives is the collision of a declared entry and a minted one. */
-    @Test
-    void aLiftWhoseNameAnImportDeclaresCollides() {
-        String minted = mintedForTextArray();
-        Tson tson = tson(Map.of("https://example.test/declared.tn", """
-                !!id:"https://example.test/declared.tn"
-                !!import:"https://tson.io/2026/40/m/meta.tn"
-                !schema { %s => !meta.array { element_type: text } }""".formatted(minted)));
-
-        List<Diagnostic> problems = tson.validateSchema("""
-                !!id:"https://example.test/reuser.tn"
-                !!import:"https://example.test/declared.tn"
-                !schema { tagged => { tags: [text] } }""");
-        assertEquals(1, problems.size(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("as an entry of its own"), problems.toString());
     }
 
     /** The same lift reusing an imported synthetic of its own form loads, as every import of the kernel's does. */

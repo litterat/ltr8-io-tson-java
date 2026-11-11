@@ -316,3 +316,105 @@ the value is then read at that variant as it would be at a position typed by it.
 
 The alternative is to keep the tag exact and refuse an abstract variant at the declaration, since it can hold no
 value. That keeps one rule for a tag and rules out the kernel shape above.
+
+## 5. [TSON-SCHEMA] §4.2, §5.3, §5.10, §8.2 — inline types: a type slot holds a name or a type written in place
+
+**Problem.** One sentence of §4.2 — every slot that names the type of a value holds a bare name in a closed entry —
+is paid for across the series. A container, tuple, choice or reference written at a use site, and every application
+of an open record no declaration names, lifts to a resolver-materialised entry named by its content. That brings
+`@meta.synthetic` and its recompute-on-ingest rule, internal names and a freshness rule for them, a merge of equal
+lifted forms within a document and of equal expansions across imports, a self-reaching instantiation entry for a
+recursive expansion, resolved forms compared "up to renaming of internal entries", a minted name a data document may
+write as a tag and that fails at the next processor, and a way to recover the written form for every diagnostic. None
+of it describes a value: two schemas that differ only in how their resolvers name lifted entries admit the same data.
+
+**The proposal.** A type slot holds a name or a type written where it is used, and the kernel's type says so:
+`type_inline => { of: meta.type }`, `type_expr => @meta.disjoint ( meta.type_ref | meta.type_inline )`, and
+`field_type_expr`, which admits the sibling reference too. `tags: [text]` resolves to
+`type: { of: !meta.array { element_type: text } }`; a refined constructor's construction carries its own tag
+(`!meta.set_type`, `!meta.ref`). The slots are a record field's `type`, `array.element_type`, `map.value_type`,
+`tuple_element.element_type` and each of `choice.variants`. What may be written in place is a container, a tuple, a
+choice or a reference, or a construction of a constructor refining one; a record, an enum and every other atom are
+declared and named, as §5.2 already requires, and the record an application of an open record closes to is the one
+record in place. A map's key is a name. A type written in place is no entry: structural identity (same constructor,
+same fields, names as the leaves, annotations taking no part), no chain, a member of no kind, named by no tag.
+Nothing is lifted, minted or merged, and `@meta.application` stays on a declared application's key alone. An
+application of an open record is the substituted record under a declaration's name, absorbed by value at a
+composition operand or refinement source, where an applied parent's edge is the one lookup of a declaration by its
+application, and closed in place at a type slot, never looked up; recursion ties to the declaration being closed,
+and a recursive application with none to tie to is refused. An argument of an open record's application is a name or
+a parameter; a slot typed `meta.type_ref` holds a name and refuses an application. Three rules widen: a dependent
+field's sibling may be typed by the type-slot choice, a constructor's argument slots include fields typed by it, and
+the positional form of a one-field record admits a field typed by it.
+
+**What is running** on the inline-types branch off the Revision 40 proposal branch, against the hand-written kernel
+and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-resolved.tn`).
+
+- *The kernel and the slots.* `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` are declared and the
+  five slots retyped; `map.key_type` stays `meta.type_ref`. `@meta.synthetic` is gone. The bundled schemas resolve,
+  link and compile, and `ResolvedFixtureTest` passes against the hand-written fixtures. The kernel's hand-built wait
+  cycle grows to 32 entries from 25: `meta.type_expr`, `meta.field_type_expr`, and through `of: meta.type` every
+  constructor's record, `meta.record_extension_type` and `void`.
+- *Sugar in place.* `[T; n..]`, `{K => V}`, `[A, B]`, `( A | B )`, `set<T>` and `meta.ref<T>` at a slot desugar to
+  `{ of: !C { … } }`, nested forms nested, each construction carrying its constructor's tag. Nothing is lifted or
+  merged, no name is derived from content, and no code that derived one remains. A user schema with inline forms reads
+  data in tree and bind mode and through the JSON stack; the reader recovers an untagged value at a disjoint choice
+  whose variant is a reference or a `{ of: … }` record.
+- *Identity.* A type written in place compares by its constructor and fields, and a name and a construction are
+  never one type: a restated field's narrowing refuses `text_list` restated as `[text]` and the reverse, and a choice's
+  variant distinctness counts `text_list` and `[text]` as two variants. Nothing follows a name to its construction.
+- *Values and choices.* A value modifier on an inline reference (`handler?: meta.ref<method> ~ orders.place_order`)
+  is admitted and judged at link as a declared reference's is; one on any other type written in place is refused at
+  the declaration. A dependent value whose sibling holds a type written in place is read against it in bind mode and
+  judged at link in a schema document. A choice that is not disjoint with a variant written in place
+  (`( [text] | [int32] )`) is refused, a tag naming a variant by its name.
+- *Applications.* A declared application is its substituted record under its name, `@meta.application` on its key.
+  An application at a composition operand or a refinement source is absorbed by value, an applied parent's edge
+  naming the declared entry where there is one. At a type slot an application closes in place: `f: page<order>` holds
+  `{ of: !meta.record { … } }`, the substituted record with no name, no chain and nothing recording it, never looked
+  up to a declaration, and so does a nested application a closing leaves at a slot (`cursor: box<T>` once `page =>
+  <T> { cursor: box<T> }` is applied). Two records in place are one type when their bodies are equal, whichever open
+  records produced them; `f: page<order>` and `f: page_order` are two types of one shape, so restating one as the other
+  is refused. An abstract open record applied in place closes to an abstract record nothing is a member of.
+  Inside an open record an application over a parameter is held as written whatever its head, and a constructor's
+  closes in place when the record is applied, one nested in another constructor's arguments included
+  (`meta.map<text meta.array<T>>`).
+- *Recursion.* A recursive application closing a declaration ties to it: `node_text => node<text>` over `node => <T>
+  { value: T  next?: node<T> }` holds `next: node_text`. Mutual recursion through records in place ties the same way:
+  closing `a_text => a<text>` over `a => <T> { b: b<T> }` and `b => <T> { a?: a<T> }` closes `b` in place, whose
+  `a<text>` names `a_text`. Recursion is judged by closing: an application reached again inside its own closing in
+  place, with no declaration closing it, is refused (`f: b<text>`, with or without `a_text` declared).
+- *Records in place, read and bound.* A record in place reads in tree and bind mode and through the JSON stack, by a
+  reader built from its body: the open record's field states, defaults, pins, groups, name type and dependent fields,
+  each diagnostic located by its field path and naming the application as written. A value there carries no tag and
+  admits none (a `$type` included). In bind mode it binds to the record class the component holding it declares -- at
+  a field, an element, a map's value or a tuple's position -- no binding map being able to name it; a component that is
+  no record class is a bind mismatch.
+- *Arguments and names.* A sugar form, an applied constructor or an application of an open record passed as an
+  argument of an open record's application is refused, at a closed record and, inside an open record, at its own
+  declaration, naming the declaration to write (`text_box => box<text>`); an argument of a constructor's application
+  inside an open record (`meta.array<box<T>>`) is held and closes at its slot. An application at a slot typed
+  `meta.type_ref` — a map's key, a reference's `of`, a parameter's bound, an alias's target — is refused the same way.
+- *Refused.* An application whose record in place would be IS-A a declared type (`k: dog_of<text>`, §5.2) and a
+  recursive application with no declaration closing it (`f: node<text>`, §5.10.1) are resolver errors, each at the
+  declaration that wrote it or, held in an open record, at the declaration whose application closed it, judged before
+  the record is closed.
+- *The three widened rules.* A dependent field's sibling typed by the type-slot choice, a constructor's argument
+  slot typed by it (`meta.array<text>` constructs), and the positional `fields: { p => text }` all run.
+- *Kinds.* A construction in place is a member of no kind; a kind over a refined constructor whose only member was a
+  lifted construction now needs the member declared.
+
+**What is not yet running.** A tree read reports a dependent value whose sibling holds a type written in place as not
+implemented, holding the sibling as the record it is written as rather than as the type. An application at a
+refinement source whose head is an alias of an open record (`ref_of => box`, then `x => ref_of<text> ^ { … }`) is
+reported as not implemented rather than absorbed.
+
+**Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 2 §1.3, §1.6, §2.2.3,
+§3.3.3, §3.4.1, §4.1, §4.2 (the type-slot choice), §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12,
+§6, §7.2, §8.1, §8.2 (rewritten as *Instantiation and Identity*), §8.3, §9, §10.1, §11.5, §12.1 and §12.2, and Part 3
+§3.3; `spec/tson-rev40-changelog.md` records each section's rule before and after. Four points the
+design left open are settled there as ruled: a refinement source's application is absorbed as an operand's is; a
+value modifier on a field typed by a reference written in place is admitted and read against it, and refused on a
+container, tuple or choice written in place; a choice that is not disjoint names every variant, a variant written in
+place there being a resolver error; and a name and a type written in place are never the same type, even where the
+name's construction is identical.

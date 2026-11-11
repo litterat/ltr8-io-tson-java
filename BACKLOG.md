@@ -38,18 +38,24 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
+- [ ] **An application whose head is an alias of an open record is not absorbed at an operand** ([TSON-SCHEMA]
+  §5.7, §5.8, §8.3). Over `box => <T> { v: T }` and `ref_of => box`, `z => { f: ref_of<text> }` closes in place, the
+  alias being the open record under another name, but `x => ref_of<text> ^ { … }` is reported `NOT_IMPLEMENTED`
+  (`TemplateMaterialiser.closeApplication`) and `y => ref_of<text> & { … }` is refused as applying arguments to an
+  entry that declares no parameters, a library gap reported as the author's error (`DefinitionResolver.openOperand`,
+  which reads the head without following its alias chain). Follow the head's alias chain in `openOperand` and in
+  `resolveRefinement`'s test for an open operand, and add `schema/valid` vectors for both operators.
+- [ ] **A tree read does not read a dependent value against a sibling written in place** ([TSON-SCHEMA] §5.2).
+  `setting => { kind: meta.type_expr  v?: kind! }` with `kind: { of: !meta.array { element_type: int32 } }` reads `v`
+  against the array in bind mode, where the sibling binds to its `TypeInline`; a tree read holds the sibling as the
+  record it is written as and reports `v` `NOT_IMPLEMENTED` (`RecordAbstractReader.Dependents.heldInPlace`, and
+  `tson-json`'s `RecordReader`). Build the `TypeInline` a tree's wrapper record denotes (its `of`'s tag and fields,
+  read against the kernel's model) and read the value through its reader, in both encodings.
 - [ ] **A literal under a closed type in an open record is judged only when the template closes**
   ([TSON-SCHEMA] §5.10). `t => <T> { a: T  n?: int8 ~ 500 }` loads, the default held until an application closes the
   field; the type is closed, so its verdict cannot vary by application and §5.10 judges it at the declaration, as
   §5.2 judges any default or pin. Judge a literal whose field type mentions no parameter when the template is
   declared, and add a `schema/invalid` vector for the out-of-range default.
-- [ ] **A refinement of an application depends on declaration order** ([TSON-SCHEMA] §5.7, §8.2; Revision 39 change
-  log #1, (a)). A refinement source is a trigger position: `x => box<text> ^ { … }` is IS-A the entry `box<text>`
-  denotes, whichever declaration is written first. Today, `tb => box<text>` written before `x` gives `x` the supertypes
-  `[box, tb]`. Written after it, `x` is IS-A a minted synthetic with no edge to `box`, and `tb` resolves to a second
-  entry for the same application (`design/template-materialisation.md`, "Operands and on-demand closing"). Unify the
-  on-demand closing with a later declaration that owns the application, and add `schema/valid` vectors in both orders
-  with one expected output.
 - [ ] **An open record's own references are judged only where it is applied** ([TSON-SCHEMA] §5.10, §3.3). An open
   record is read at its declaration, and a name its fields or parents write that is neither one of its parameters nor
   an entry is an unresolved reference there; the linker checks only arity over an open record
@@ -60,10 +66,11 @@ spec-required case:
   open record applies the open record (`TemplateMaterialiser.templateHead`: `bx<text>` over `bx => box` closes to the
   record `box<text>` closes to), and one through an alias of a constructor constructs (`ref_of<order>` over `ref_of =>
   meta.ref`); no test or vector pins either. Add a `schema/valid` vector for each, with the expected resolved form.
-- [ ] **A nested or aliased application across imports is untested at the IS-A edge fold.** An imported schema's
-  `@meta.application` is the application as written, nested arguments unreduced (`pair<box<text> int32>`), and
-  reaches the importer's edge fold in that form, where the fold expects the reduced one. Add a link vector with a nested and
-  an aliased application declared in an import and applied in the importer, and reduce on ingest if it misses.
+- [ ] **An aliased application across imports is untested at the IS-A edge fold.** An imported schema's
+  `@meta.application` is the application as written (`box<user_id>`), and reaches the importer's edge fold in that
+  form, where the fold compares canonical applications ([TSON-SCHEMA] §8.2), arguments past their aliases. Add a link
+  vector with an aliased application declared in an import and composed as a parent in the importer, and reduce on
+  ingest if it misses.
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to
@@ -71,16 +78,6 @@ spec-required case:
   `TsonCompiledVocabularyRegistry.withStandardLibrary` already does, which is scoped to just the six bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
-- [ ] **A value entry read against a type declared beside it cannot read a field typed by an inline application.**
-  `holder => { r: meta.ref<meta.record> }` with `held => !holder { r: order }` in one schema is `NOT_IMPLEMENTED`
-  ("field 'r' is typed by the application 'meta.ref<meta.record>' written inline …"): the reader compiled from the
-  entries ready so far (`SchemaResolver.readySoFar`) meets the field still typed by the application, whose minted entry
-  materialisation makes only after every declaration is ready, and reads it with an `UnclosedApplicationReader`. Naming
-  the application (`records => meta.ref<meta.record>`, `holder => { r: records }`) reads. An open record applied
-  inline (`{ b: box<text> }`) is the same gap, and so is a value of a map or namespace type whose `value_type` is
-  `box<text>`. Make the application wait in the order, as a named one does -- close it on demand
-  (`TemplateMaterialiser.closeApplication`) and type the ready copy's field by the minted name -- and add a
-  `link/valid` vector writing it inline.
 - [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1's
   "Reading a resolved form"; the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
   `meta.schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
@@ -105,19 +102,11 @@ spec-required case:
   writers of its own.
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
   so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest re-runs the
-  family checks (no member minted at a use site) over the ingested map and its closure, the §5.11 group
+  family checks (no record written in place a member of anything) over the ingested map and its closure, the §5.11 group
   declaration rules over every `meta.field_group`, and every kind-typed slot's name against its kind, which a resolved
   form's read checks for grammar alone ([TSON-SCHEMA] §4.2, `TsonReadContext.readsSchemaNames`). A resolved
   form is read today only where a caller says it is one (`TsonDataParser.parseResolvedForm`, a reader's
   `readAs(text, "schema")`), with nothing verified.
-- [ ] **An application is not yet unified with an imported library's entry for it** ([TSON-SCHEMA] §8.1, §8.2). A
-  library declaring `int_box => box<int32>` writes `@meta.application:"box<int32>"` on that
-  key, and a schema importing it that writes `box<int32>` still closes the application to an entry of its own rather
-  than resolving to `int_box`. The lookup runs application to entry, so it needs an index over imported keys keyed by
-  `DerivedName.canonicalApplication`; `TemplateMaterialiser.ownedBy` is that index for local declarations and
-  `SchemaResolver` already reads every import's `@meta.application` into the map the applied-parent fold uses, so the
-  index belongs in `ownedBy`, seeded from that map before the driving loop. Decide what a local declaration of an
-  application an import already owns then is: the same entry, an alias of it, or two entries §2.2.3 unifies.
 
 - [ ] **An entry reached by two import routes keeps only the first route's `subtypes`** ([TSON-SCHEMA] §3.3.4, §8.2).
   `SchemaResolver.mergeImports` and `TsonSchemaLinker.mergeImports` keep the first copy of an entry several imports
@@ -158,7 +147,7 @@ spec-required case:
   reached lazily. When a record holding a dependent field compiles in bind mode, check every type the sibling's
   reference admits (narrowed by a pin or by a discriminator's members) and refuse the schema there, naming the field
   and the first unbound type. The schema narrows that set by refining the reference (`meta.ref<meta.record>` under
-  `meta.ref<meta.type>`). A free `meta.type_ref` sibling admits the kernel's records and every minted entry, so it
+  `meta.ref<meta.type>`). A free `meta.type_ref` sibling admits the kernel's records and every declared type, so it
   compiles in bind mode only where it is refined. The same set, as an accessor on the compiled schema, is what a
   consumer checking it at startup assembles by hand today (`ltr8-io-tson-java-http`'s `ChosenTypes`). Do the same in
   `tson-json`'s bind path.
@@ -189,10 +178,6 @@ spec-required case:
   field type's own equality (§5.5, so `= 255` over `= 0xFF` is the identity case), in composition and refinement
   bodies alike, at the restating declaration. Add `schema/invalid` vectors for both operators and a `schema/valid` one
   for the identity restatement.
-- [ ] **An author-written `@meta.synthetic` is accepted** ([TSON-SCHEMA] §6). `@meta.synthetic x => { a: text }`
-  loads; §6 makes an author's spelling of either resolver-attached annotation a resolver error, and
-  `DefinitionResolver` refuses `@meta.application` but not its sibling. Refuse it at the same point, at both
-  declaration positions, and add a `schema/invalid` vector.
 - [ ] **A nested schema map declared twice in one document is accepted** ([TSON-SCHEMA] §2.1, §2.2.3;
   [TSON-DATA] §2.6). `geo => !schema { a => … }` beside `geo => !schema { b => … }` in one schema map loads, its
   members merged. The schema body is a map "in syntax and in semantics" (§2.1), so the repeated key is a duplicate
@@ -319,9 +304,9 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   exactly that when compiling for reading), and the target's reader carries the target's name — so a refusal at
   `day => date` says `date`. The schema *location* is already right, because the entry point seeds the root
   declaration (`JsonCompiledSchema.rootDeclaration`), but the name in the message is not. `tson-compiler` solves
-  it with `UseSite.named` over `EntryDisplayName`, which also renders a minted entry as the sugar, the record body
-  or the application that produced it; this stack has no counterpart. Owed with the facade, which is what will seed
-  the root for a real read rather than a test doing it.
+  it with `UseSite.named` over `EntryDisplayName`, which also renders a type written in place as the form written;
+  this stack has no counterpart. Owed with the facade, which is what will seed the root for a real read rather than
+  a test doing it.
 
 - [ ] **No "can this type receive JSON" answer for a schema author.** Which of an author's types a JSON document can
   validate against is discoverable only by sending one and reading the failure. The facts that decide it are all
@@ -398,17 +383,15 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   and needs nothing new.
 
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
-  through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
-  `@meta.synthetic` — reaches `TsonSchema.entries()` as key annotations (`Namespace.getAnnotations`) and survives
+  through: §6's name-position channel — `@doc` before a declared name, and the resolver's own
+  `@meta.application` — reaches `TsonSchema.entries()` as key annotations (`Namespace.getAnnotations`) and survives
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
-  `{type_name => top}` document back binds the map with no key annotations at all, and nothing
-  writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the fixtures carry `@meta.synthetic` on the keys the resolver minted and `@atom.ordering`/`@atom.bounded`/
-  `@atom.exact` on the libraries', and the bound side renders none of them, so the entries would compare equal for
-  the wrong reason; `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read
-  side lets that test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest`
-  is the only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
-  discarded and recomputed, author-written key annotations preserved as data.
+  `{type_name => top}` document back binds the map with no key annotations at all, and nothing writes them, so
+  `ResolvedFixtureTest` cannot compare the fixtures' `@meta.application` and `@atom.ordering`/`@atom.bounded`/
+  `@atom.exact` key annotations and the entries compare equal for the wrong reason. Fixing the read side lets that
+  test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the only
+  consumer, and the emit side behind it has none. §8.1 settles the shape: `@meta.application` read as stated,
+  author-written key annotations preserved as data.
 
 - [ ] **No schema-aware (Class 2) writer — `TsonValueWriter`.** Only the schemaless `TsonObjectWriter`
   (object → TSON) and `TsonTreeWriter` (`TsonValue` → TSON) exist, both with documented lossy spots
@@ -485,13 +468,10 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   (`my_record => record - { groups }`) resolves with an empty chain, so it is no constructor, and `!my_record {
   … }` is read as a value of it, a value entry, rather than building a type; nothing in the suite or the corpus
   exercises it. Add a vector stating the outcome §5.9 rule 8 gives.
-- [ ] **The §7.2 refusal names a synthetic by its key.** `VariantSchemaReader` builds its `SubsumptionDiagnostics`
-  from the entry name and keeps it through `renamed`, so beside `text_list => [text]` and `r => { t: [text] }`,
-  `!r { t: !text_list [a] }` reads "'text_list' is not admissible at a 'array_text_4cc4a482' position". The position
-  is to be named as `EntryDisplayName` names it everywhere else (`[text]`), in the message and in `admissible()`'s
-  list; the JSON readers (`DispatchTagReader`, `RecordPlan`) already pass a display name. Pin it with a tree-mode
-  test on that schema. A kind's member list leaks internal names the same way: a `meta.type_ref` refusal lists
-  `[array_text_1_c67f2b5e; 1..]`, a sugar form over a synthetic rendered by the synthetic's key.
+- [ ] **No test pins a tag at a position typed in place** ([TSON-SCHEMA] §7.2). Beside `text_list => [text]` and
+  `r => { t: [text] }`, `!r { t: !text_list [a] }` is a validation error at `r.t`: a type written in place admits no
+  tag, and the message names the position by its field path and its form (`[text]`), never a name it does not have.
+  Pin it with a tree-mode, a bind-mode and a JSON test (`"$type": "text_list"`), and a `class2/data/invalid` vector.
 
 - [ ] **Whether a closed set of text binds to a host enum.** [TSON-SCHEMA] §7.4 lets an enum bind to "a host enum by a
   mapping the binder owns". `text_enum` is gone from the kernel, and a closed set of text that is no name is now

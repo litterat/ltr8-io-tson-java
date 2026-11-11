@@ -4,11 +4,7 @@ import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ReferenceValue;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
@@ -17,6 +13,7 @@ import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
+import io.ltr8.tson.compiler.ast.schema.InlineConstruction;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
@@ -38,17 +35,13 @@ import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.base.SourcePosition;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.UnaryOperator;
 
 /**
@@ -141,6 +134,9 @@ final class SchemaDesugarer {
     private static final String ELEMENTS = "elements";
     private static final String VARIANTS = "variants";
 
+    /** {@code meta.type_inline.of}: the wrapper a nested construction takes at a type slot. */
+    private static final String OF = "of";
+
 
     /**
      * What a declaration whose sugar form was reported is replaced with: a fresh, zero-field record. The
@@ -169,32 +165,13 @@ final class SchemaDesugarer {
         return new StructuralTypeDef(typeParams(declaration.typeDef()), new RecordDef(List.of()));
     }
 
-    /**
-     * Names already in scope from {@code !!import}. A sugar form that generates a name an import already
-     * declares is <em>referenced</em> rather than redeclared: the name is derived from the binding record
-     * itself, so an identical form in an imported schema has produced the same type. Without this, a schema
-     * writing {@code [text; 1..]} would redeclare the one it imports from the kernel and be rejected as a
-     * local-vs-import collision. The declaration it would have injected is kept in {@link #reused}, so that
-     * {@code SchemaResolver} can hold the import's entry to the form ({@code ImportedSynthetics.requireForm}).
-     */
-    private final Set<String> imported;
-
-    /** The declaration each reference to an imported synthetic stands for, keyed by its derived name. */
-    private final Map<String, SchemaMap.Declaration> reused = new LinkedHashMap<>();
-
-    /** Declarations synthesised for sugar forms encountered during the walk, keyed by their generated name. */
-    private final Map<String, SchemaMap.Declaration> injected = new LinkedHashMap<>();
-
-    /** §8.2's freshness MUST over the names this pass mints -- see {@link MintedNames}. */
-    private final MintedNames minted = new MintedNames();
-
     /** This document's own declarations, for {@link #checkTemplateApplication} -- set before the walk starts. */
     private Map<String, SchemaMap.Declaration> local = Map.of();
 
     /**
      * The type parameters of the declaration currently being walked, or empty outside a template. A sugar form
-     * naming one of these is no lift: it is the reference it spells, or refused ({@link #openForm}). Every other form
-     * in the same declaration lifts exactly as it would outside a template (§5.3's one lift rule).
+     * naming one of these is the reference it spells, or refused ({@link #openForm}). Every other form in the same
+     * declaration is written in place exactly as it would be outside a template.
      */
     private List<String> currentParameters = List.of();
 
@@ -210,75 +187,36 @@ final class SchemaDesugarer {
      */
     private final SchemaPositions positions;
 
-    private SchemaDesugarer(Set<String> imported, DesugarFailureReporter reporter,
-            SchemaPositions positions) {
-        this.imported = imported;
+    private SchemaDesugarer(DesugarFailureReporter reporter, SchemaPositions positions) {
         this.reporter = reporter;
         this.positions = positions;
     }
 
     /**
-     * {@link #desugar(SchemaDocument, Set, DesugarFailureReporter, SchemaPositions)}, throwing at the first
-     * invalid sugar form and keeping no positions -- a caller with no source text behind the document.
+     * {@link #desugar(SchemaDocument, DesugarFailureReporter, SchemaPositions)}, throwing at the first invalid sugar
+     * form and keeping no positions -- a caller with no source text behind the document.
      */
-    static SchemaDocument desugar(SchemaDocument document, Set<String> imported) {
-        return desugar(document, imported, null, SchemaPositions.none());
+    static SchemaDocument desugar(SchemaDocument document) {
+        return desugar(document, null, SchemaPositions.none());
     }
 
     /**
-     * The names {@code desugared} holds that {@code original} did not: the entries this phase lifted, and so
-     * exactly the schema's <b>synthetic entries</b> ([TSON-SCHEMA] §5.3's lift rule -- closed for a concrete
-     * form, open for a parameter-bearing one). Both callers of {@link #desugar} need the set: one to mark
-     * each of them {@code @meta.synthetic} at its key (§8.2), and {@code SchemaResolver} also to tell a generated
-     * head closing its own intermediate form from an authored one.
-     *
-     * <p>A set difference rather than a field on the pass, because {@link #hoist} does not inject a form an
-     * {@code !!import} already declares -- the imported entry <em>is</em> the same form, resolved by the
-     * schema that owns it, and marking it here would put this schema's own derived marker on someone else's
-     * key. What the difference reports is what this document gained.
-     */
-    static Set<String> lifted(SchemaDocument original, SchemaDocument desugared) {
-        Set<String> lifted = new LinkedHashSet<>(desugared.body().declarations().keySet());
-        lifted.removeAll(original.body().declarations().keySet());
-        return lifted;
-    }
-
-    /**
-     * The document with every expandable sugar form hoisted into its own declaration, or the same instance
-     * when there was nothing to expand.
+     * The document with every sugar form rewritten in place into the construction it denotes, or the same instance
+     * when there was nothing to rewrite. No declaration is added: the declarations out are the declarations in.
      *
      * <p>A declaration whose sugar form is invalid is reported to {@code reporter} and replaced with {@link
      * #absorbed}, so the declarations around it still expand and go on to resolve -- see {@link
      * #desugarOrReport}. With a {@code null} {@code reporter} the first such form throws instead.
      */
-    static SchemaDocument desugar(SchemaDocument document, Set<String> imported,
-            DesugarFailureReporter reporter, SchemaPositions positions) {
-        return desugar(document, imported, reporter, positions, new LinkedHashMap<>());
-    }
-
-    /**
-     * {@link #desugar(SchemaDocument, Set, DesugarFailureReporter, SchemaPositions)}, putting into {@code reused}
-     * the declaration each lift whose name an import already declares would have injected: the form the import's
-     * entry must be.
-     */
-    static SchemaDocument desugar(SchemaDocument document, Set<String> imported,
-            DesugarFailureReporter reporter, SchemaPositions positions, Map<String, SchemaMap.Declaration> reused) {
-        SchemaDesugarer pass = new SchemaDesugarer(imported, reporter, positions);
+    static SchemaDocument desugar(SchemaDocument document, DesugarFailureReporter reporter,
+            SchemaPositions positions) {
+        SchemaDesugarer pass = new SchemaDesugarer(reporter, positions);
         pass.local = document.body().declarations();
         SchemaMap body = pass.schemaMap(document.body());
-        reused.putAll(pass.reused);
-        if (body == document.body() && pass.injected.isEmpty()) {
+        if (body == document.body()) {
             return document;
         }
-        Map<String, SchemaMap.Declaration> declarations = new LinkedHashMap<>(body.declarations());
-        for (Map.Entry<String, SchemaMap.Declaration> entry : pass.injected.entrySet()) {
-            if (declarations.putIfAbsent(entry.getKey(), entry.getValue()) != null) {
-                throw new IllegalStateException("desugared name '" + entry.getKey()
-                        + "' collides with a declaration already in this schema");
-            }
-        }
-        return new SchemaDocument(document.id(), document.imports(),
-                new SchemaMap(body.annotations(), declarations));
+        return new SchemaDocument(document.id(), document.imports(), body);
     }
 
     /**
@@ -325,13 +263,6 @@ final class SchemaDesugarer {
      * unimplemented construct and a document with three ordinary mistakes in it would report none of them.
      * The classification the exception policy draws is what picks the code, and does not decide whether the
      * pass survives. Fail-fast (a {@code null} reporter) rethrows the original exception untouched.
-     *
-     * <p><b>Anything already injected on behalf of a failed declaration stays injected</b>, and is not rolled
-     * back. Injected names are derived from the binding record itself, so a later declaration containing the
-     * same form finds and references the existing entry (§8.2's structural-equality rule, which is what makes
-     * the injection shared rather than per-use in the first place); removing one because the declaration that
-     * happened to reach it first went on to fail would break whichever declaration referenced it second. Left
-     * behind, it is an ordinary unreferenced declaration that resolves and links like any other.
      */
     private SchemaMap.Declaration desugarOrReport(SchemaMap.Declaration declaration) {
         try {
@@ -420,6 +351,8 @@ final class SchemaDesugarer {
             case TupleExpr tuple -> tuple.elementTypes()
                     .forEach(element -> siblingRefused(element.typeRef(), "a tuple element"));
             case ChoiceExpr choice -> choice.variants().forEach(variant -> siblingRefused(variant, "a choice variant"));
+            // This phase's own output: a declaration as written holds none.
+            case InlineConstruction ignored -> { }
         }
     }
 
@@ -549,6 +482,7 @@ final class SchemaDesugarer {
                     tuple.elementTypes().stream().map(SchemaDesugarer::spell).toList()) + "]";
             case ChoiceExpr choice -> "( " + String.join(" | ",
                     choice.variants().stream().map(SchemaDesugarer::spell).toList()) + " )";
+            case InlineConstruction inline -> "!" + inline.constructor() + " { ... }";
         };
     }
 
@@ -629,31 +563,36 @@ final class SchemaDesugarer {
     }
 
     /**
-     * A reference at a position where a sugar form <em>is</em> expandable: expands children first, so a
-     * nested form is already a plain name by the time the enclosing one is built (<code>{text =&gt;
-     * [integer]}</code> injects the inner array, then the outer map referring to it).
+     * A type at a field's or group member's slot, where a sugar form is written in place: children first, so a
+     * nested form is already its construction by the time the enclosing one is built, and lands in the enclosing
+     * binding as a {@code { of: … }} wrapper ({@code meta.type_inline}). A form over a parameter of the enclosing
+     * declaration is the application it spells, or refused ({@link #openForm}).
      */
     private TypeExpr typeRef(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> simple;
-            case SiblingRef sibling -> sibling; // a field's type, as written: it names no entry to lift
+            case SiblingRef sibling -> sibling; // a field's type, as written: a sibling, which no rewrite touches
             case ArrayExpr array -> container(ref, List.of(elementRef(array.elementType())));
             case MapExpr map -> container(ref, List.of(typeRef(map.keyType()), elementRef(map.valueType())));
             case TupleExpr tuple -> container(ref, tuple.elementTypes().stream().map(this::elementRef).toList());
             case ChoiceExpr choice -> container(ref, mapShared(choice.variants(), this::typeRef));
             case ApplicationRef generic -> applicationArguments(generic);
+            case InlineConstruction inline -> inline;
         };
     }
 
     /**
-     * A sugar form whose positions are {@code children}, already expanded: the reference it spells or refused where
-     * one of them names a parameter of the enclosing declaration ({@link #openForm}), and lifted closed otherwise.
+     * A sugar form whose positions are {@code children}, already rewritten: the application it spells or refused
+     * where one of them names a parameter of the enclosing declaration ({@link #openForm}), and the construction it
+     * denotes, in place, otherwise.
      */
     private TypeExpr container(TypeExpr ref, List<TypeExpr> children) {
         if (children.stream().anyMatch(child -> parameterIn(child).isPresent())) {
             return openForm(ref, children);
         }
-        return hoistOrKeep(binding(ref, children), ref);
+        Binding binding = binding(ref, children);
+        refuseParameterBound(binding);
+        return new InlineConstruction(construction(binding));
     }
 
     /** Expands only within a reference's arguments, leaving its own head in place. */
@@ -661,11 +600,26 @@ final class SchemaDesugarer {
         return ref instanceof ApplicationRef generic ? applicationArguments(generic) : ref;
     }
 
-    /** {@code generic} with its arguments expanded, the same node where none changes. */
+    /**
+     * {@code generic} with its arguments expanded, the same node where none changes. An argument is a name or a
+     * parameter ([TSON-SCHEMA] §5.10), so a sugar form as one is refused, naming what to declare.
+     */
     private ApplicationRef applicationArguments(ApplicationRef generic) {
         checkTemplateApplication(generic.name());
         List<TypeExpr> args = mapShared(generic.args(), this::typeRef);
+        for (int i = 0; i < args.size(); i++) {
+            if (args.get(i) instanceof InlineConstruction) {
+                throw constructionAsArgument(generic, generic.args().get(i));
+            }
+        }
         return args == generic.args() ? generic : new ApplicationRef(generic.name(), args);
+    }
+
+    /** {@code written}, a sugar form, standing as an argument of {@code generic}: refused, to be declared first. */
+    private SchemaValidationException constructionAsArgument(ApplicationRef generic, TypeExpr written) {
+        return new SchemaValidationException("'" + currentName + "': '" + spell(written) + "' is a construction "
+                + "passed as an argument of '" + generic.name() + "<...>', and an argument is a name or a parameter "
+                + "(§5.10): declare it under a name ('my_list => " + spell(written) + "') and pass that name");
     }
 
     /**
@@ -715,25 +669,29 @@ final class SchemaDesugarer {
 
     /**
      * A sugar form reduced to what it denotes: a fixed constructor head and the vocabulary fields the form
-     * binds, in the order the table above lists them. Everything downstream -- the emitted {@code !C { ... }},
-     * the derived entry name, the bound-coherence check -- reads this and nothing else.
+     * binds, in the order the table above lists them. Everything downstream -- the emitted {@code !C { ... }}
+     * and the bound-coherence check -- reads this and nothing else.
      */
     private record Binding(String head, List<RecordValue.Field> fields) {
     }
 
-    /** One scalar type slot as the wire field a construction writes -- see {@link #refValue}. */
-    private static void refSlot(String slot, TypeExpr ref, List<RecordValue.Field> fields) {
-        fields.add(new RecordValue.Field(slot, WireForm.plain(refValue(ref))));
+    /** One type slot as the wire field a construction writes -- see {@link #slotValue}. */
+    private static void slot(String slot, TypeExpr ref, List<RecordValue.Field> fields) {
+        fields.add(new RecordValue.Field(slot, WireForm.plain(slotValue(ref))));
     }
 
     /**
-     * What a type slot holds: a bare token for a plain name, and an application as the data grammar's reference,
-     * unquoted ({@link WireForm#refValue}). <b>One spelling per shape, produced in one place</b> -- a slot written two ways
-     * is a slot two phases disagree about, and {@link DerivedName#ofBinding} hashes what is written, so a second
-     * spelling of one reference would split one type across two entries.
+     * What a type slot holds in a binding record: a bare token for a plain name, an application as the data
+     * grammar's reference, unquoted ({@link WireForm#refValue}), and a nested construction in the wrapper a type
+     * written in place takes, {@code { of: !meta.array { … } }} ({@code meta.type_inline}), written untagged, the
+     * slot's choice being disjoint by class ([TSON-SCHEMA] §5.4). One spelling per shape, produced in one place.
      */
-    private static CoreValue refValue(TypeExpr ref) {
-        return WireForm.refValue(reference(ref));
+    private static CoreValue slotValue(TypeExpr ref) {
+        return switch (ref) {
+            case InlineConstruction inline -> new RecordValue(List.of(
+                    new RecordValue.Field(OF, inline.value())));
+            default -> WireForm.refValue(reference(ref));
+        };
     }
 
     /** A grammar-level reference as the reference value it spells: a name, or an application of references. */
@@ -749,31 +707,33 @@ final class SchemaDesugarer {
         return io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), arguments);
     }
 
-    /** One position of a tuple after expansion: the type it names, and whether it is marked voidable. */
+    /** One position of a tuple after expansion: the type it holds, and whether it is marked voidable. */
     private record Position(TypeExpr typeRef, boolean voidable) {
     }
 
     /**
-     * A declaration-level container as the binding record it denotes, or empty when a position holds a form
-     * this phase cannot reduce to a name -- which leaves the whole container unexpanded, since a partially
-     * reduced one would be a differently-broken shape rather than a recognisable sugar form.
+     * A declaration-level container as the binding record it denotes, or empty for a body that is no sugar form.
+     * A nested form among its positions is the construction it denotes, in its wrapper.
      */
     private Optional<Binding> binding(TypeExpr ref) {
         return switch (ref) {
-            case ArrayExpr array -> binding(ref, List.of(elementRef(array.elementType())));
-            case MapExpr map -> binding(ref, List.of(typeRef(map.keyType()), elementRef(map.valueType())));
-            case TupleExpr tuple -> binding(ref, tuple.elementTypes().stream().map(this::elementRef).toList());
-            case ChoiceExpr choice -> binding(ref, mapShared(choice.variants(), this::typeRef));
+            case ArrayExpr array -> Optional.of(binding(ref, List.of(elementRef(array.elementType()))));
+            case MapExpr map -> Optional.of(binding(ref,
+                    List.of(typeRef(map.keyType()), elementRef(map.valueType()))));
+            case TupleExpr tuple -> Optional.of(binding(ref,
+                    tuple.elementTypes().stream().map(this::elementRef).toList()));
+            case ChoiceExpr choice -> Optional.of(binding(ref, mapShared(choice.variants(), this::typeRef)));
             default -> Optional.empty();
         };
     }
 
-    /** {@link #binding(TypeExpr)} over the form's positions, {@code children}, already expanded. */
-    private static Optional<Binding> binding(TypeExpr ref, List<TypeExpr> children) {
+    /** The binding record of the sugar form {@code ref} over its positions, {@code children}, already rewritten. */
+    private Binding binding(TypeExpr ref, List<TypeExpr> children) {
         return switch (ref) {
             case ArrayExpr array -> arrayBinding(children.getFirst(), array.elementType().voidable(), array.size(),
                     shownElement(array.elementType()));
-            case MapExpr map -> mapBinding(children.get(0), children.get(1), map.valueType().voidable(), map.size());
+            case MapExpr map -> mapBinding(children.get(0), children.get(1), map.valueType().voidable(),
+                    map.size());
             case TupleExpr tuple -> {
                 List<Position> positions = new ArrayList<>();
                 for (int i = 0; i < children.size(); i++) {
@@ -782,7 +742,7 @@ final class SchemaDesugarer {
                 yield tupleBinding(positions);
             }
             case ChoiceExpr _ -> choiceBinding(children);
-            default -> Optional.empty();
+            default -> throw new IllegalStateException("'" + spell(ref) + "' is no sugar form");
         };
     }
 
@@ -795,131 +755,101 @@ final class SchemaDesugarer {
      * states nothing at all and lets §5.2's default injection supply it, exactly as an unmarked tuple
      * position omits its own {@code voidable}.
      */
-    private static Optional<Binding> arrayBinding(TypeExpr element, boolean voidable, Optional<SizeSpec> size,
+    private static Binding arrayBinding(TypeExpr element, boolean voidable, Optional<SizeSpec> size,
             String shown) {
-        if (!isReference(element)) {
-            return Optional.empty();
-        }
         List<RecordValue.Field> fields = new ArrayList<>();
-        refSlot(ELEMENT_TYPE, element, fields);
+        slot(ELEMENT_TYPE, element, fields);
         if (voidable) {
             fields.add(WireForm.nameField(WireForm.VOIDABLE, "true"));
         }
         size.ifPresent(spec -> fields.addAll(sizeFields(spec, "[" + shown + "; 0..]")));
-        return Optional.of(new Binding(ARRAY, fields));
-    }
-
-    /**
-     * Whether a position holds something this table can put in a type slot: a name, or a name carrying
-     * arguments. Anything else is a sugar form the caller was supposed to have expanded first, and leaves the
-     * enclosing container unexpanded rather than half-built.
-     */
-    private static boolean isReference(TypeExpr ref) {
-        return ref instanceof TypeRef;
+        return new Binding(ARRAY, fields);
     }
 
     /**
      * <code>!meta.map { key_type: K  value_type: V [voidable: true] [min_items: N] [max_items: M] }</code> --
      * the map row of the desugar table. The <b>value</b> carries {@code voidable} the way an array element
-     * does, written only when marked, for the reason {@link #arrayBinding} omits an unmarked element's: the
-     * kernel's default is false, so writing it would put a field at its default value into every map.
-     * The key carries none -- a key is never void ([TSON-DATA] §2.9), so the parser refuses the marker
-     * there rather than this table dropping it.
+     * does, written only when marked; the key carries none, a key never being void ([TSON-DATA] §2.9).
+     *
+     * <p><b>A key is a name</b> ([TSON-SCHEMA] §5.3): {@code key_type} is a {@code meta.type_ref}, and the grammar
+     * admits no sugar form at a key, so a key is a name or an application, written through {@link #slotValue} as
+     * every slot is.
      */
-    private static Optional<Binding> mapBinding(TypeExpr key, TypeExpr value, boolean voidable,
-            Optional<SizeSpec> size) {
-        if (!isReference(key) || !isReference(value)) {
-            return Optional.empty();
-        }
+    private static Binding mapBinding(TypeExpr key, TypeExpr value, boolean voidable, Optional<SizeSpec> size) {
         List<RecordValue.Field> fields = new ArrayList<>();
-        refSlot(KEY_TYPE, key, fields);
-        refSlot(VALUE_TYPE, value, fields);
+        slot(KEY_TYPE, key, fields);
+        slot(VALUE_TYPE, value, fields);
         if (voidable) {
             fields.add(WireForm.nameField(WireForm.VOIDABLE, "true"));
         }
         size.ifPresent(spec -> fields.addAll(
                 sizeFields(spec, "{" + shownRef(key) + " => " + shownRef(value) + "; 0..}")));
-        return Optional.of(new Binding(MAP, fields));
+        return new Binding(MAP, fields);
     }
 
     /** How a map side is quoted back in the one diagnostic that shows the form. */
     private static String shownRef(TypeExpr ref) {
-        return ref instanceof NameRef simple ? simple.name() : ((ApplicationRef) ref).name() + "<...>";
+        return switch (ref) {
+            case NameRef simple -> simple.name();
+            case ApplicationRef generic -> generic.name() + "<...>";
+            default -> "T";
+        };
     }
 
     /**
      * {@code !meta.tuple { elements: [{ element_type: T } { element_type: U }] }} -- the tuple row of the table.
      *
      * <p><b>Why this is not {@link #choiceBinding}.</b> Both are variadic and both fill one collection-typed
-     * vocabulary field. What differs is what one position <em>is</em>: a variant is a bare reference,
-     * while an element is a {@code meta.tuple_element} record carrying a type <em>and</em> its own {@code voidable},
-     * so each position needs a record built for it rather than a name token. {@code voidable} is written only
-     * for a marked position, for the reason {@link #arrayBinding} omits an unmarked element's.
-     *
-     * <p>What the two do share is that a position's type is written through {@link #refValue}: an element
-     * holding a §5.10 application is spelled as its reference and rewritten one pass later,
-     * exactly as a variant is.
+     * vocabulary field. What differs is what one position <em>is</em>: a variant is a type slot, while an element is
+     * a {@code meta.tuple_element} record carrying a type <em>and</em> its own {@code voidable}, so each position
+     * needs a record built for it. {@code voidable} is written only for a marked position, for the reason {@link
+     * #arrayBinding} omits an unmarked element's. Both write a position's type through {@link #slotValue}.
      */
-    private static Optional<Binding> tupleBinding(List<Position> positions) {
+    private static Binding tupleBinding(List<Position> positions) {
         List<DataValue> elements = new ArrayList<>();
         for (Position position : positions) {
             List<RecordValue.Field> members = new ArrayList<>();
-            members.add(new RecordValue.Field(ELEMENT_TYPE, WireForm.plain(refValue(position.typeRef()))));
+            members.add(new RecordValue.Field(ELEMENT_TYPE, WireForm.plain(slotValue(position.typeRef()))));
             if (position.voidable()) {
                 members.add(WireForm.nameField(WireForm.VOIDABLE, "true"));
             }
             elements.add(WireForm.plain(new RecordValue(members)));
         }
-        return Optional.of(new Binding(TUPLE,
-                List.of(new RecordValue.Field(ELEMENTS, WireForm.plain(new ArrayValue(elements))))));
+        return new Binding(TUPLE, List.of(new RecordValue.Field(ELEMENTS, WireForm.plain(new ArrayValue(elements)))));
     }
 
     /**
-     * {@code !meta.choice { variants: [A B ...] }} -- the choice row of the table. Variants arrive already
-     * expanded: a nested inline form is hoisted by the caller first, so what reaches here is a {@link
-     * NameRef} or -- for a §5.10 application, which has no entry to be hoisted to until materialisation
-     * mints one -- an {@code ApplicationRef}.
-     *
-     * <p><b>A variant is written through {@link #refValue}, like every other type slot.</b>
-     * A collection-valued slot is no different from a named one in what it holds: {@code variants} is a
-     * {@code [meta.type_ref]}, so an application standing in it is spelled as its reference and
-     * rewritten to the entry it denotes one pass later ({@code MetaRefs.mapRefsKeepingChain}, which maps
-     * a choice's variants like any other reference). Refusing the application here instead left the whole
-     * choice unlifted, and a form the desugar table did not reduce reaches {@code DefinitionResolver} as a
-     * {@code ChoiceExpr} it has no case for.
+     * {@code !meta.choice { variants: [A B ...] }} -- the choice row of the table. A variant is a type slot like any
+     * other ({@code variants: [meta.type_expr]}), written through {@link #slotValue}: a name, an application held
+     * for materialisation to close, or a nested form in its wrapper.
      *
      * <p>Distinctness of the variants (§5.4: "the resolver validates that each variant resolves to a distinct
      * type") is deliberately not checked here -- it is a question about what the names <em>resolve</em> to,
      * after alias flattening, which this phase has no answer to.
      */
-    private static Optional<Binding> choiceBinding(List<TypeExpr> variants) {
+    private static Binding choiceBinding(List<TypeExpr> variants) {
         List<DataValue> members = new ArrayList<>();
         for (TypeExpr variant : variants) {
-            members.add(WireForm.plain(refValue(variant)));
+            members.add(WireForm.plain(slotValue(variant)));
         }
-        return Optional.of(new Binding(CHOICE,
-                List.of(new RecordValue.Field(VARIANTS, WireForm.plain(new ArrayValue(members))))));
+        return new Binding(CHOICE, List.of(new RecordValue.Field(VARIANTS, WireForm.plain(new ArrayValue(members)))));
     }
 
     /**
      * §5.3's size specifier as the {@code min_items}/{@code max_items} pair it binds -- one rule for arrays
      * and maps alike, since both constructors declare the same two fields. An exact {@code N} pins both, so
-     * {@code [T; 3]} and {@code [T; 3..3]} land on the very same entry.
+     * {@code [T; 3]} and {@code [T; 3..3]} build one construction.
      *
      * <p><b>A zero floor is rejected</b> rather than desugared, which is §5.3's own rule: "a lower bound of
-     * {@code 0} with no upper bound ({@code 0..}) is a resolver error". More than a style nit --
-     * identity is structural (§8.2), so the form
-     * lands on an entry <em>distinct from</em> the unbounded one that means exactly the same thing. That is an
-     * identity trap, and the author's fix is the one §5.3 itself names.
+     * {@code 0} with no upper bound ({@code 0..}) is a resolver error", the form meaning exactly what the
+     * unbounded one means.
      */
     private static List<RecordValue.Field> sizeFields(SizeSpec size, String shown) {
         return switch (size) {
             case SizeSpec.Min min when min.lower().equals("0") ->
                     throw new SchemaValidationException("'" + shown + "' pins a floor of zero, which every "
                             + "container already satisfies -- drop the size specifier for the unconstrained "
-                            + "form (§5.3). The spelling is not merely redundant: identity is structural "
-                            + "(§8.2), so it lands on an entry distinct from the unconstrained one that means "
-                            + "the same thing");
+                            + "form (§5.3)");
             case SizeSpec.Min min -> List.of(WireForm.nameField(MIN_ITEMS, min.lower()));
             case SizeSpec.Max max -> List.of(WireForm.nameField(MAX_ITEMS, max.upper()));
             case SizeSpec.Ranged ranged ->
@@ -929,49 +859,24 @@ final class SchemaDesugarer {
         };
     }
 
-    // ── Hoisting: a sugar form becomes a declaration plus a reference to it ──────────────────────
+    // ── The construction a binding record denotes ────────────────────────────────────────────────
 
     /**
-     * {@code !head { field: value ... }} -- the construction a binding record denotes.
-     *
-     * <p><b>A slot holding an application is written as its reference</b>, {@code box<text>}, since an
-     * application has no bare-token spelling: the entry it denotes does not exist until materialisation, one
-     * phase later. The construction therefore names something that is not yet an entry, and that is fine --
-     * materialisation rewrites every closed entry's references afterwards, so {@code [box<text>]} resolves to
-     * an array whose {@code element_type} is {@code box<text>} and then, one pass on, to one whose element is
-     * the instantiation entry. The entry dangles for exactly the window an ordinary forward reference does.
+     * {@code !head { field: value ... }} -- the construction a binding record denotes. A slot holding an application
+     * is written as its reference, {@code box<text>}, for materialisation to close one phase later.
      */
+    private static DataValue construction(Binding binding) {
+        return new DataValue(List.of(), Optional.of(binding.head()), new RecordValue(binding.fields()));
+    }
+
+    /** A declaration whose body is a sugar form is the construction it denotes (§5.3). */
     private static TypeDef instance(Binding binding) {
-        return new Instance(new DataValue(List.of(), Optional.of(binding.head()), new RecordValue(binding.fields())));
-    }
-
-    /**
-     * A binding hoisted into its own declaration and replaced by a reference to it, or {@code unexpanded} when
-     * the form did not reduce.
-     */
-    private TypeExpr hoistOrKeep(Optional<Binding> binding, TypeExpr unexpanded) {
-        return binding.<TypeExpr>map(this::hoist).orElse(unexpanded);
-    }
-
-    /**
-     * Records an injected declaration under its derived name and yields the reference that replaces the sugar.
-     *
-     * <p><b>Which entry it lifts to is §5.3's one lift rule</b>: a closed construction referenced by a bare name,
-     * whether or not the declaration around it is a template. A form naming a parameter never reaches here: it is
-     * the reference it spells, or refused ({@link #openForm}).
-     */
-    private TypeExpr hoist(Binding binding) {
-        refuseParameterBound(binding);
-        String name = bindingName(binding);
-        claim(name, binding, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
-                Optional.empty(), instance(binding)));
-        return new NameRef(name);
+        return new Instance(construction(binding));
     }
 
     /**
      * A size bound naming one of the enclosing declaration's parameters, {@code [T; N]}, refused naming the slot: a
-     * parameter is a type, and a bound is a count (§5.3, §5.10). Refused here, before the form lifts closed with a
-     * parameter in it, so the refusal names the declaration that wrote it and not a synthetic.
+     * parameter is a type, and a bound is a count (§5.3, §5.10).
      */
     private void refuseParameterBound(Binding binding) {
         for (RecordValue.Field field : binding.fields()) {
@@ -984,17 +889,8 @@ final class SchemaDesugarer {
     }
 
     /**
-     * The type-ref an element or map-value position denotes: an ordinary reference expanded the usual way, or
-     * a <b>nested declaration-level form</b> hoisted into its own declaration and replaced by its name.
-     *
-     * <p>§5.3's declaration-level container syntax nests inside itself ({@code [[T; 2], U]},
-     * <code>{text =&gt; [order; 1..]}</code>), and the inner form desugars first. That is the bottom-up hoist
-     * {@link #typeRef} already performs for an inline form, one tier down: the inner container's own binding
-     * record is built and injected, and the position that held it becomes a bare reference, so the enclosing
-     * container routes a plain name like any other.
-     *
-     * <p>Empty when the position holds a form this phase cannot build, which leaves the enclosing container
-     * unexpanded and keeps its existing handling.
+     * The type an element or map-value position holds: an ordinary reference expanded the usual way, or a nested
+     * form rewritten into its construction ({@link #typeRef}), which the enclosing binding writes in its wrapper.
      */
     private TypeExpr elementRef(ElementType element) {
         return typeRef(element.typeRef());
@@ -1002,28 +898,10 @@ final class SchemaDesugarer {
 
     /**
      * How an element position was spelled, for the one diagnostic that quotes the sugar form back at its
-     * author: the position's own name when it has one, and a stand-in when it is an inline or nested form
-     * whose expansion carries a derived name the author never wrote.
+     * author: the position's own name when it has one, and a stand-in for a nested form.
      */
     private static String shownElement(ElementType element) {
         return element.typeRef() instanceof NameRef simple ? simple.name() : "T";
-    }
-
-    // ── Internal names (§8.2) ────────────────────────────────────────────────────────────────────
-
-    /**
-     * Mints {@code name} for {@code binding} (§8.2's freshness, {@link MintedNames}) and injects its declaration the
-     * first time, or records it in {@link #reused} where an import already declares the name: the import's entry
-     * stands for it, and is held to it once resolution can read the form.
-     */
-    private void claim(String name, Binding binding, Supplier<SchemaMap.Declaration> declaration) {
-        if (minted.claim(name, DerivedName.canonicalBinding(binding.head(), binding.fields()))) {
-            (imported.contains(name) ? reused : injected).put(name, declaration.get());
-        }
-    }
-
-    private static String bindingName(Binding binding) {
-        return DerivedName.ofBinding(binding.head(), binding.fields());
     }
 
     /**

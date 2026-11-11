@@ -31,8 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>What the assertions are for.</b> Every fixture entry must read back, must have a counterpart here,
  * and must resolve to the same thing: no category of difference is expected or tolerated. What is
- * normalised before comparing -- index order, a synthetic's content hash, this model's own source position
- * -- is {@link ResolvedForm}'s to state, and it states it once for this and for the Class 2 conformance
+ * normalised before comparing -- index order and this model's own source position -- is {@link ResolvedForm}'s to
+ * state, and it states it once for this and for the Class 2 conformance
  * runner, which asks the same question of a corpus vector's expected side.
  */
 class ResolvedFixtureTest {
@@ -73,11 +73,6 @@ class ResolvedFixtureTest {
     /** This schema's OWN entries -- the fixture is resolver output, from before an import merged anything in. */
     private static Map<String, Top> ourEntries(String id) {
         return ResolvedForm.ownEntries(tson(), id);
-    }
-
-    /** The keys a fixture marks {@code @meta.synthetic}, hashes normalised. */
-    private static Set<String> fixtureSynthetics(String file) throws Exception {
-        return ResolvedForm.markedSynthetics(Files.readString(specDirectory().resolve(file)));
     }
 
     /** {@code spec/fixtures}, found by walking up rather than assumed relative to a working directory. */
@@ -153,7 +148,8 @@ class ResolvedFixtureTest {
      *
      * <p>What the agreement rests on is worth knowing before changing any of it: {@code array}, {@code set}
      * and {@code map} carry no parameter lists ([TSON-SCHEMA] §4.2), so a container form is never an
-     * application of one, and every sugar form lifts to a synthetic entry instead (§5.3).
+     * application of one, and every sugar form is the construction written in place at the slot that wrote it,
+     * {@code { of: !meta.array { … } }} (§5.3).
      */
     @Test
     void everyEntryResolvesIdentically() throws Exception {
@@ -200,28 +196,5 @@ class ResolvedFixtureTest {
         assertTrue(ResolvedForm.fixtureValueAnnotations(Files.readString(specDirectory()
                 .resolve("meta-resolved.tn"))).get("doc").contains("@meta.annotation"),
                 "meta-resolved.tn marks doc's value @meta.annotation");
-    }
-
-    /**
-     * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
-     * {@code @meta.synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
-     * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark six keys
-     * in meta.tn and three in net.tn, each at its document's root; numeric.tn, temporal.tn and core.tn lift no inline
-     * form and have none, which is as much a statement as the others.
-     *
-     * <p>This is the one assertion here that does not go through the bound document -- see {@link
-     * ResolvedForm#markedSynthetics}.
-     */
-    @Test
-    void theSameEntriesAreMarkedSyntheticOnBothSides() throws Exception {
-        // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
-        // scan that stopped matching or a resolver that stopped marking.
-        assertEquals(6, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks six keys");
-        assertEquals(3, fixtureSynthetics("net-resolved.tn").size(), "net.tn marks three keys");
-
-        for (Map.Entry<String, String> fixture : FIXTURES.entrySet()) {
-            assertEquals(fixtureSynthetics(fixture.getKey()),
-                    ResolvedForm.ourSynthetics(tson(), fixture.getValue()), fixture.getKey());
-        }
     }
 }

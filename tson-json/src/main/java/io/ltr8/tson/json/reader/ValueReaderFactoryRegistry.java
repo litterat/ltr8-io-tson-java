@@ -98,7 +98,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      */
     public static ValueReaderFactoryRegistry bind(DataBindContext binding) {
         Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
-        factories.put("meta.record", DispatchFactories.over(BindRecordBuilder.factory(binding)));
+        factories.put("meta.record", DispatchFactories.over(BindRecordBuilder.inPlace(binding)));
         factories.put("meta.array", BindArrayBuilder.FACTORY);
         factories.put("meta.set_type", BindArrayBuilder.FACTORY);
         factories.put("meta.tuple", BindTupleBuilder.FACTORY);

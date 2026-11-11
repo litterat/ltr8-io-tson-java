@@ -4,7 +4,6 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.tree.TsonTuple;
@@ -25,11 +24,14 @@ import java.util.Optional;
 final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
 
     public TupleTreeReader(String name, String displayName, TupleBody body, TsonTypeReaderResolver resolver,
-                           SchemaLocation schemaLocation,
-                            AnnotationTypes annotationTypes) {
+                           SchemaLocation schemaLocation, AnnotationTypes annotationTypes, Optional<String> tag) {
         super(name, displayName, body, resolver, schemaLocation);
         this.annotationTypes = annotationTypes;
+        this.tag = tag;
     }
+
+    /** The tag the value carries: the entry's name, none for a type written in place ({@code tagOf}). */
+    private final Optional<String> tag;
 
     /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */
     private final AnnotationTypes annotationTypes;
@@ -43,8 +45,7 @@ final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition);
             }
             return new TupleTreeReader(name, context.displayName(name, typeDefinition), body, resolver,
-                    context.locationOf(name),
-                    AnnotationTypes.of(context));
+                    context.locationOf(name), AnnotationTypes.of(context), context.tagOf(name));
         }
     }
 
@@ -63,6 +64,6 @@ final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
         if (ConstructionGuard.abandoned(ctx, mark)) {
             return null;
         }
-        return new TsonTuple(elements, Optional.of(name), annotations);
+        return new TsonTuple(elements, tag, annotations);
     }
 }

@@ -16,7 +16,7 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
 - Coherence is hooked in `bindAtomInstance`, where `!C value` and `!I ^ { ... }` meet, and runs after binding.
 - Emptiness is the rule, not narrowness: `{ min: 5 max: 5 }` resolves; integer folds its `size`-derived range in first.
 - `Product.coherenceCheck` lives on the family, not with any one spelling, and `TsonSchemaLinker` asks every family
-  again for the entries materialisation mints.
+  again for the bodies materialisation produces, a declaration closing an application among them.
 - A bound, step or member of a bundled constructor is typed by its family's instance in the same document
   (`temporal.duration_type.min` is a `duration`, `net.ipv4_type.within` a `[cidr4]`), so it is read by that instance's
   reader and binds the family's host type; a float's bounds are `number`, validated before rounding. A refinement of a
@@ -51,7 +51,7 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
 
 Related: `design/schema-resolution.md` (the resolution phase and its exception boundary),
 `design/constructor-application.md` (what makes an entry an atom instance), `design/template-materialisation.md`
-(the minted entries the linker re-checks), `design/linking-and-compilation.md`.
+(the closed bodies the linker re-checks), `design/linking-and-compilation.md`.
 
 ## Atom refinement, narrowing and coherence (`tson-compiler/.../resolver/DefinitionResolver.java`)
 
@@ -116,8 +116,8 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the one rule since they carry the identical pair. Stating it on the family rather than with any one
   spelling is what makes `[text; 5..3]` and the `!meta.array { … min_items: 5 max_items: 3 }` body it denotes get
   the same verdict — they are one type, and a rule kept in the desugar phase would only ever see the
-  first. `TsonSchemaLinker` asks it a second time for the entries **materialisation** mints, which
-  resolution never produced: §8.2's "family coherence rules whose operands were parameters" is exactly a
+  first. `TsonSchemaLinker` asks it a second time for the bodies **materialisation** produces, which
+  resolution never saw closed: §8.2's "family coherence rules whose operands were parameters" is exactly a
   template whose bounds were `MIN`/`MAX` until an application supplied both. numeric.tn's and temporal.tn's header
   `@doc`s state the same obligation from the other side: bounds are field
   groups so an inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
@@ -125,7 +125,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   range — prefixes narrow "within the family range 0-32", and "bounds outside that range are invalid at the
   schema level" — so the CIDR pair is judged against its address width as well as against itself.
   - **The linker asks every family, and needs no list to do it.** `TsonSchemaLinker` asks **every** family the
-    same question again for the entries materialisation mints, which is how §8.2's "every family coherence rule
+    same question again for the bodies materialisation produces, which is how §8.2's "every family coherence rule
     ... asked once more of the closed record" is met without a list — "a resolver needs no list", as it puts it.
   - **Hooked in `bindAtomInstance`, not at either call site**, because that is where the `!C value` and `!I ^ { ... }`
     paths meet — one hook covers both. `checkCoherent` asks an `Atom`, `Product` or `Sum` body; any other passes

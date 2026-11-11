@@ -8,7 +8,8 @@ in git.
 
 - `displayName` is beside `name`, never instead of it: the entry name is what a type-ref resolves against and what a
   tree node carries as its `typeRef`.
-- A missing source position is what tells a minted entry from an authored one — exactly, not by the name's shape.
+- Every entry is declared, so a reader of an entry names itself by the entry's name; a type written in place, which is
+  no entry, names itself by its form as written (`TypeInline.text()`).
 - A position naming an alias gets a reader copy at compile time; a choice keeps naming the variant, since renaming
   there would allocate per read.
 - Both pointers are rendered from the `PathStep` chain only when a diagnostic is built; concatenating per step is
@@ -28,18 +29,16 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
 
 ## A reader names itself by what the author wrote
 
-- **A reader names itself by what the author wrote, not by its entry name** (`EntryDisplayName`, threaded to
-  every reader that puts its own name in a message as a `displayName` beside `name`). Sugar lifts each form
-  to an entry of its own and every §5.10 application materialises one, both named content-derived (§8.2), so
-  the entry name for `[order; 1..]` is `array_order_1_e9777a39` — a string in neither the author's file nor
-  the spec, and now travelling to readers who cannot open the schema at all. **A missing source position is
-  what tells the two apart**, exactly rather than by guessing at the name's shape: a parsed declaration
-  carries its own name token's position and a minted entry has none. So `tag_list => [text; 1..2]` keeps
-  `tag_list` and the anonymous form inside it renders as `[order; 1..]`, a map as `{text => order}`, a tuple
-  as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application it records
-  (`@meta.application` on its key, `TsonSchema.applicationOf`, stated as written: `paged<order>`, `pair<box<text>
-  int32>`). Anything with no sugar spelling falls
-  back to the entry name — honest rather than invented.
+- **A reader names itself by what the author wrote** (`EntryDisplayName`, threaded to every reader that puts its own
+  name in a message as a `displayName` beside `name`). Nothing is lifted or minted (§8.2), so an entry's name is an
+  author's, and an entry with a source position is named by it. A type written in place has no entry: its reader is
+  built under its form as written (`TypeInline.text()`: `[order; 1..]`, `{text => order}`, `[text, int32]`,
+  `(text | int32)`, a refined constructor's application, `pair_of<int32>` or `set<text>`, and a record in place as
+  the application it closes, `page<order>`, or its fields where a resolved form left that unknown), and
+  `ValueReaderContext.displayName`/`authoredName` pass a name that is no entry through unchanged, since a body alone
+  cannot say which constructor built it. An entry with no source position — one the kernel's bootstrap builds by hand,
+  or one read from a resolved form — is shown as the form its body is, and a declared application as the application
+  its key records (`@meta.application`, `TsonSchema.applicationOf`, `paged<order>`).
 - **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). A field
   declared `c: pct` over `pct => small` reads with `small`'s reader, that being the type at the end of the
   chain, and a message from it would otherwise name a declaration the author did write but did not write
@@ -51,19 +50,8 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
   reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only
   in its name, every other position gets the shared reader back unchanged and allocates nothing
   (`AllocationHarnessTest` is the guard).
-    - **An application nothing declares is named by the application that closed to it.** It is its expansion or
-      its construction (§5.10, §5.3): the position names the synthetic directly, so `e: pair_of<int32>` over the
-      refined constructor `pair_of => meta.array ^ { min_items?: = 1  max_items?: = 2 }` reads an array no author named,
-      which carries no `@meta.application`. Its
-      `TsonSchema.EntryFacts.closes` does record the application, so `EntryDisplayName` shows a synthetic with
-      none by `closes().getFirst().text()`: `'pair_of<int32>': …`, `unknown field 'nope'
-      on 'bx<int32>'`, `'set<text>' requires unique elements`, never the entry's content-derived key. One with
-      neither an application nor a sugar spelling leads with no name at all — the family's own sentence, located
-      by the diagnostic's position. An expansion that names its own application keeps an instantiation entry (an
-      `Alias` to the synthetic, recording the application), and that one is named like any other hop.
-    - **A kind's refusal lists its members the same way** (`ReferenceBody.shownMembers()`, the index's `shown`): a
-      minted member by its application, `meta.ref<net.uuid_type>`, never `reference_uuid_type_…`, and one with no spelling
-      left out.
+    - **A kind's refusal lists its members by name** (`ReferenceBody.shownMembers()`, the index's `shown`), each an
+      entry.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
       read — and the variant that rejected the value is the informative name anyway.

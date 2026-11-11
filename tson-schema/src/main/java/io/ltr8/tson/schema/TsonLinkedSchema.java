@@ -2,9 +2,11 @@ package io.ltr8.tson.schema;
 
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.unicode.Normalization;
 
@@ -96,6 +98,31 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     }
 
     /**
+     * What the record a reader is built for under {@code name} judges its field names by: an entry's as {@link
+     * #nameType(String)} gives it, and for a record written in place, which no entry holds, the name type its body
+     * states, past its alias hops. A record in place states its open record's (§5.10) and inherits none, being IS-A
+     * nothing.
+     */
+    public Optional<Top> nameType(String name, Top definition) {
+        if (schema.entries().containsKey(name) || !(definition instanceof RecordBody record)) {
+            return nameType(name);
+        }
+        return record.nameType().map(stated -> {
+            Top type = schema.entries().get(stated);
+            while (type instanceof Alias alias) {
+                type = schema.entries().get(alias.target().name());
+            }
+            return type;
+        });
+    }
+
+    /** {@link #nameForm(String)} for the record a reader is built for under {@code name} ({@link #nameType(String,
+     * Top)}). */
+    public Normalization nameForm(String name, Top definition) {
+        return nameForm(nameType(name, definition));
+    }
+
+    /**
      * The namespace type {@code entryName} is -- an instance of the kernel's {@code namespace}, whose values are read
      * as the map it describes -- or empty for any other entry.
      */
@@ -111,7 +138,11 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      * omits, the kernel's {@code meta.field_name} being NFC; no form compares lower than NFC.
      */
     public Normalization nameForm(String entryName) {
-        return nameType(entryName)
+        return nameForm(nameType(entryName));
+    }
+
+    private static Normalization nameForm(Optional<Top> nameType) {
+        return nameType
                 .filter(IdentifierType.class::isInstance)
                 .map(body -> ((IdentifierType) body).normalization())
                 .filter(form -> form != Normalization.NONE)

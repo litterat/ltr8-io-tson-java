@@ -57,8 +57,8 @@ including records, record groups, enums and some in-built types. The `2026/40` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/40/getting-started/person.tn?sha256=c6760ae7dd2411d06d0f81f953c49192b02e677b2d36c5277c07433b15095c29"
-!!import:"https://tson.io/2026/40/m/core.tn?sha256=e6445fb3886037fdd5d48c1623ee29e47e32b8ab567bcac70e2d21fd3b5d69eb"
+!!id:"https://example.com/2026/40/getting-started/person.tn?sha256=7cb1fc4d9eded120f90134d589ff533228351749bfbd4866bc1dcd67521aae3a"
+!!import:"https://tson.io/2026/40/m/core.tn?sha256=e669ac24808b05619b2ae41ea027a74f89811c20ced892173dc740ef0bfffe17"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 !schema {
   role => !enum [admin member guest]
@@ -546,8 +546,8 @@ vocabulary — parse → resolve → link → register → compile → read:
    a name is still just a name.
 2. **Desugar** (`SchemaDesugarer`) — an AST→AST rewrite turning every sugar form (`[T]`, `[T; 1..5]`,
    `[T, U]`, `{K => V}`, `(A | B)`) into the constructor application it denotes, off a fixed table. At a
-   declaration's own position the form simply *is* that application; anywhere else it becomes an injected
-   declaration plus a bare reference to it, so identical forms anywhere in the document share one entry.
+   declaration's own position the form simply *is* that application; at any other type slot it is that construction
+   written in place, `{ of: !meta.array { … } }`, with no entry of its own, and equal forms are one type.
 3. **Resolve** (`TsonSchemaResolver`) — one declaration at a time, the AST becomes a concrete
    value (`Top`): composition induces supertypes and flattens fields, refinement tightens an
    inherited field against a state-transition table, a constructor application (`!C value`) transfers

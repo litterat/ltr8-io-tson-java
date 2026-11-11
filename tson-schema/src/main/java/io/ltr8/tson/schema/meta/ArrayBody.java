@@ -26,7 +26,7 @@ import java.util.Optional;
  */
 @Typename(name = "meta.array")
 public record ArrayBody(TypeChain chain,
-        @Field("element_type") TypeRef elementType, boolean voidable, boolean ordered,
+        @Field("element_type") TypeExpr elementType, boolean voidable, boolean ordered,
                          @Field("unique_items") boolean uniqueItems,
                          @Field("min_items") Optional<Long> minItems,
                          @Field("max_items") Optional<Long> maxItems) implements Product {
@@ -37,7 +37,7 @@ public record ArrayBody(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public ArrayBody(TypeRef elementType, boolean voidable, boolean ordered, boolean uniqueItems,
+    public ArrayBody(TypeExpr elementType, boolean voidable, boolean ordered, boolean uniqueItems,
             Optional<Long> minItems, Optional<Long> maxItems) {
         this(TypeChain.EMPTY, elementType, voidable, ordered, uniqueItems, minItems, maxItems);
     }
@@ -51,7 +51,7 @@ public record ArrayBody(TypeChain chain,
      * The unconstrained shape every built-in array uses before size refinement: not voidable, ordered, non-unique,
      * unbounded.
      */
-    public static ArrayBody of(TypeRef elementType) {
+    public static ArrayBody of(TypeExpr elementType) {
         return new ArrayBody(elementType, false, true, false, Optional.empty(), Optional.empty());
     }
 

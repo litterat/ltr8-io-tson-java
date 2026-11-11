@@ -7,10 +7,8 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.EntryKind;
-import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
-import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -46,7 +44,8 @@ class ChoiceSugarResolutionTest {
     }
 
     private static List<String> variantNames(Top definition) {
-        return assertInstanceOf(ChoiceBody.class, definition).variants().stream().map(TypeRef::name).toList();
+        return assertInstanceOf(ChoiceBody.class, definition).variants().stream()
+                .map(io.ltr8.tson.schema.meta.TypeExpr::text).toList();
     }
 
     /** The one entry whose name starts with the given prefix -- an injected declaration carries a derived hash suffix. */
@@ -85,48 +84,4 @@ class ChoiceSugarResolutionTest {
         assertEquals(List.of("text", "integer", "boolean"), variantNames(schema.entries().get("scalar")));
     }
 
-    /**
-     * At a field position the choice is hoisted into its own declaration and the field refers to it by name.
-     * §8.2 requires it: every application materialises an entry, and a use site holds a bare reference to
-     * it -- nothing downstream reads a reference's arguments, so a structural form would resolve and
-     * then have nothing to compile against.
-     */
-    @Test
-    void anInlineChoiceIsHoistedAndReferredToByName() {
-        TsonSchema schema = resolve("  person => { contact: (text | integer) }");
-
-        Map.Entry<String, Top> choice = injected(schema, "choice_text_integer_");
-        assertEquals(List.of("text", "integer"), variantNames(choice.getValue()));
-
-        RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));
-        assertEquals(choice.getKey(), person.fields().values().iterator().next().typeRef().name());
-    }
-
-    /**
-     * The walk is bottom-up, so a variant that is itself a sugar form is already a plain name by the time the
-     * choice around it is built -- {@code [text]} becomes its own injected array entry, and the choice refers
-     * to that.
-     */
-    @Test
-    void aVariantThatIsItselfASugarFormIsHoistedFirst() {
-        TsonSchema schema = resolve("  contact => ([text] | integer)");
-
-        String array = injected(schema, "array_text_").getKey();
-        assertEquals(List.of(array, "integer"), variantNames(schema.entries().get("contact")));
-    }
-
-    /**
-     * The injected name is derived from the variants, so two structurally identical inline choices collapse
-     * to one declaration (§8.2's structural-equality rule) rather than injecting a near-duplicate per use.
-     */
-    @Test
-    void twoIdenticalInlineChoicesCollapseToOneDeclaration() {
-        TsonSchema schema = resolve("""
-                  person => { home: (text | integer)  work: (text | integer) }""");
-
-        String choice = injected(schema, "choice_text_integer_").getKey();
-        RecordBody person = assertInstanceOf(RecordBody.class, schema.entries().get("person"));
-        assertEquals(List.of(choice, choice),
-                person.fields().values().stream().map(field -> field.typeRef().name()).toList());
-    }
 }

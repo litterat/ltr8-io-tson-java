@@ -4,6 +4,7 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassMap;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.Ref;
@@ -31,7 +32,9 @@ import java.util.Optional;
  *   <li><b>A tuple</b> is read again for the target's own tuple class, each position bound to its element.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
  *       nothing is rebuilt -- except where the target is a bridged wrapper over that class ({@code ToData}, or
- *       {@code @Transparent} over a record), which the record's value is carried through.</li>
+ *       {@code @Transparent} over a record), which the record's value is carried through. A record written in
+ *       place has no name to bind by, and is read into the target's own record class ({@link
+ *       RecordInPlaceReader}).</li>
  * </ul>
  * Anything else -- a dispatcher, a choice, a gap -- is read as it is.
  */
@@ -103,6 +106,15 @@ final class BindTargets {
                 return reader;
             }
             return BindTupleBuilder.forTarget(tuple, positional, what, mismatches);
+        }
+        if (reader instanceof RecordInPlaceReader inPlace) {
+            if (!(target instanceof DataClassRecord record)) {
+                mismatches.add(what + " is a record written in place, and " + where + " binds "
+                        + target.typeClass().getName() + ", which is not a record class -- a record in place binds to "
+                        + "the record class its component declares");
+                return reader;
+            }
+            return inPlace.boundTo(record);
         }
         if (reader instanceof RecordReader record && record.builder() instanceof BindRecordBuilder bound) {
             Class<?> built = bound.typeClass();

@@ -19,7 +19,8 @@ import java.util.function.Function;
 /**
  * Construction sugar: {@code C<a₁ … aₙ>} over a constructor {@code C} is the construction
  * {@code !C { f₁: a₁ … fₙ: aₙ }}, where {@code f₁ … fₙ} are {@code C}'s <b>argument slots</b> -- its required fields
- * typed by a reference naming types and not pinned by its chain, in declaration order. It is a row of
+ * that hold a type, typed {@code meta.type_expr} or by a reference naming types, and not pinned by its chain, in
+ * declaration order. At a type slot the construction is written in place ({@code TypeInline}). It is a row of
  * [TSON-SCHEMA] §5.3's sugar table beside {@code [T]} and {@code {K => V}}, the same construction spelled by the
  * grammar, so {@code meta.array<text>}, {@code [text]} and {@code !meta.array { element_type: text }} build one
  * value, and nothing is written on a constructor to permit it.
@@ -46,6 +47,9 @@ public final class ConstructionSugar {
 
     private static final String TYPE = KernelNames.of("type");
 
+    /** The kernel's {@code meta.type_expr}: what a type slot holds, a type's name or a type written in place. */
+    private static final String TYPE_EXPR = KernelNames.of("type_expr");
+
     private ConstructionSugar() {
     }
 
@@ -70,11 +74,29 @@ public final class ConstructionSugar {
         for (Map.Entry<String, RecordField> field : constructor.fields().entrySet()) {
             RecordField declared = field.getValue();
             if (!declared.optional() && declared.role() == FieldRole.FREE && declared.type() instanceof TypeRef type
-                    && type.arguments().isEmpty() && namesTypes(type.name(), types)) {
+                    && type.arguments().isEmpty() && holdsAType(type.name(), types)) {
                 slots.add(field.getKey());
             }
         }
         return slots;
+    }
+
+    /**
+     * For each of {@code constructor}'s argument slots ({@link #slots}), in order, whether it holds a type written in
+     * place: typed {@code meta.type_expr}, where an application closes in place, and not by a reference naming types,
+     * which holds only a name ([TSON-SCHEMA] §4.2).
+     */
+    static List<Boolean> slotsInPlace(RecordBody constructor, Function<String, Top> types) {
+        return slots(constructor, types).stream().map(slot -> TYPE_EXPR.equals(AliasChain.terminal(
+                ((TypeRef) constructor.fields().get(slot).type()).name(), types))).toList();
+    }
+
+    /**
+     * Whether a field typed {@code name} holds a type: typed {@code meta.type_expr}, a type's name or a type written in
+     * place, or by a reference naming types ([TSON-SCHEMA] §5.3).
+     */
+    private static boolean holdsAType(String name, Function<String, Top> types) {
+        return TYPE_EXPR.equals(AliasChain.terminal(name, types)) || namesTypes(name, types);
     }
 
     /**
@@ -106,8 +128,7 @@ public final class ConstructionSugar {
     /**
      * The construction {@code written<arguments>} denotes, as the binding record {@code !C { … }} would write: each
      * argument at its slot, in the held spelling ({@link WireForm#refValue}), so an argument that is itself an
-     * application stays one for materialisation to close and the record names one entry with the sugar forms'
-     * ({@link DerivedName#ofBinding}).
+     * application stays one for materialisation to close where it lands.
      *
      * @param written the head as the author wrote it, for a refusal
      * @param slots the constructor's argument slots ({@link #slots})

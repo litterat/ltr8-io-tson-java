@@ -48,7 +48,7 @@ class AbstractTemplateFamilyTest {
               result_of => result<text>
               ok_of     => ok<text>
               err_of    => err<text>
-              holder    => { r: result<text> }
+              holder    => { r: result_of }
             """;
 
     private static TsonCompiledSchemaRegistry compile(String declarations) {

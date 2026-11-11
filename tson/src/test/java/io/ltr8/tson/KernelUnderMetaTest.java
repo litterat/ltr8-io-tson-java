@@ -100,14 +100,13 @@ class KernelUnderMetaTest {
                 "host_load => { at: host  load: float64  id: uuid }"));
     }
 
-    /** The names a document declares at its root, synthetics and its own maps aside. */
+    /** The names a document declares at its root, its own maps aside. */
     private static Set<String> rootNames(String id) {
         TsonLinkedSchema linked = linked(id);
         String own = CanonicalIdentity.canonicalize(id);
         Set<String> names = new java.util.TreeSet<>();
         linked.schema().entries().forEach((name, value) -> {
-            if (linked.originOf(name).equals(own) && !SchemaPaths.isPath(name) && !SchemaPaths.isNestedMap(value)
-                    && !linked.schema().factsOf(name).synthetic()) {
+            if (linked.originOf(name).equals(own) && !SchemaPaths.isPath(name) && !SchemaPaths.isNestedMap(value)) {
                 names.add(name);
             }
         });

@@ -8,12 +8,12 @@ import java.util.Optional;
 
 /**
  * The kernel's {@code choice} constructor's own vocabulary, resolved (Part 2 §4.1, §5.4,
- * §8.1): {@code variants: [meta.type_ref]} -- a SUM-kind body backing every declared choice type
+ * §8.1): {@code variants: [meta.type_expr]} -- a SUM-kind body backing every declared choice type
  * (`contact_method => (email | phone | address)` and similar).
  */
 @Typename(name = "meta.choice")
 public record ChoiceBody(TypeChain chain,
-        List<TypeRef> variants, Optional<Boolean> disjoint) implements Sum {
+        List<TypeExpr> variants, Optional<Boolean> disjoint) implements Sum {
 
     @Record
     public ChoiceBody {
@@ -23,8 +23,8 @@ public record ChoiceBody(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public ChoiceBody(List<TypeRef> variants, Optional<Boolean> disjoint) {
-        this(TypeChain.EMPTY, variants, disjoint);
+    public ChoiceBody(List<? extends TypeExpr> variants, Optional<Boolean> disjoint) {
+        this(TypeChain.EMPTY, List.<TypeExpr>copyOf(variants), disjoint);
     }
 
     @Override
@@ -33,7 +33,7 @@ public record ChoiceBody(TypeChain chain,
     }
 
     /** A choice as an author declares it -- the resolver derives {@link #disjoint} at link time. */
-    public ChoiceBody(List<TypeRef> variants) {
+    public ChoiceBody(List<? extends TypeExpr> variants) {
         this(variants, Optional.empty());
     }
 }

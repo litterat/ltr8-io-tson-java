@@ -66,56 +66,73 @@ final class BindRecordBuilder implements RecordBuilder {
                 throw new BindMismatchException("'" + name + "' is a record, and " + boundClass.typeClass().getName()
                         + ", which is bound to it, is not record-shaped");
             }
-            RecordPlan plan = new RecordPlan(name, definition, context);
-            int count = plan.names.length;
-            JsonTypeReader<?>[] readers = plan.schemaReaders.clone();
-            Object[] injected = new Object[count];
-            int[] argument = new int[count];
-            boolean[] filled = new boolean[descriptor.fields().length];
-            List<String> mismatches = new ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                Integer at = descriptor.fieldIndex().get(plan.declaredNames[i]);
-                if (at == null) {
-                    argument[i] = -1;
-                    // A FIXED field is exempt: the schema settles its value, so a component would hold a constant
-                    // the schema already knows. Every other field needs one -- an OPTIONAL one included, being
-                    // exactly the field that works in development and fails the first time a caller sends it.
-                    if (plan.fields[i].role() != FieldRole.FIXED) {
-                        mismatches.add("no component for field '" + plan.declaredNames[i] + "'");
-                    }
-                    continue;
-                }
-                DataClassField component = descriptor.fields()[at];
-                argument[i] = component.index();
-                filled[at] = true;
-                String deliversNull = deliversNull(plan.fields[i], plan.omitted[i]);
-                if (deliversNull != null && component.dataClass().typeClass().isPrimitive()) {
-                    mismatches.add("field '" + plan.declaredNames[i] + "' " + deliversNull + ", and component '"
-                            + component.name() + "' binds " + component.dataClass().typeClass().getName()
-                            + ", which has no null to hold it");
-                }
-                readers[i] = BindTargets.to(readers[i], component.dataClass(), "field '" + plan.declaredNames[i]
-                        + "'", "component '" + component.name() + "'", mismatches);
-                if (plan.stated[i] != null && component.dataClass() instanceof DataClassAtom bound) {
-                    injected[i] = statedValue(plan.stated[i], bound, plan.declaredNames[i], mismatches);
-                }
-            }
-            DataClassField carrier = descriptor.annotationsCarrier().orElse(null);
-            Set<String> unbound = unboundComponents(descriptor.typeClass());
-            for (int i = 0; i < descriptor.fields().length; i++) {
-                DataClassField component = descriptor.fields()[i];
-                if (!filled[i] && component != carrier && !unbound.contains(component.name())) {
-                    mismatches.add("component '" + component.name() + "' is filled by no field, so it reaches the "
-                            + "constructor as null on every document -- annotate it @Unbound if the class means to "
-                            + "own it");
-                }
-            }
-            if (!mismatches.isEmpty()) {
-                throw new BindMismatchException("'" + plan.displayName + "' and " + descriptor.typeClass().getName()
-                        + " do not agree: " + String.join("; ", mismatches));
-            }
-            return new RecordReader(plan, readers, injected, new BindRecordBuilder(descriptor, argument));
+            return boundTo(name, definition, context, descriptor);
         };
+    }
+
+    /**
+     * Bind mode's reader of a record written in place, which no binding map can name ([TSON-SCHEMA] §8.2): it reads
+     * into the record class the component holding it declares ({@link BindTargets}), and builds nothing on its own.
+     */
+    static ValueReaderFactory inPlace(DataBindContext binding) {
+        ValueReaderFactory named = factory(binding);
+        return (name, definition, context) -> context.schema().entries().containsKey(name)
+                ? named.create(name, definition, context)
+                : new RecordInPlaceReader(name, definition, context);
+    }
+
+    /** The record {@code name} read into {@code descriptor}, each field bound to the class's component. */
+    static JsonTypeReader<?> boundTo(String name, Top definition, ValueReaderContext context,
+                                     DataClassRecord descriptor) {
+        RecordPlan plan = new RecordPlan(name, definition, context);
+        int count = plan.names.length;
+        JsonTypeReader<?>[] readers = plan.schemaReaders.clone();
+        Object[] injected = new Object[count];
+        int[] argument = new int[count];
+        boolean[] filled = new boolean[descriptor.fields().length];
+        List<String> mismatches = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            Integer at = descriptor.fieldIndex().get(plan.declaredNames[i]);
+            if (at == null) {
+                argument[i] = -1;
+                // A FIXED field is exempt: the schema settles its value, so a component would hold a constant
+                // the schema already knows. Every other field needs one -- an OPTIONAL one included, being
+                // exactly the field that works in development and fails the first time a caller sends it.
+                if (plan.fields[i].role() != FieldRole.FIXED) {
+                    mismatches.add("no component for field '" + plan.declaredNames[i] + "'");
+                }
+                continue;
+            }
+            DataClassField component = descriptor.fields()[at];
+            argument[i] = component.index();
+            filled[at] = true;
+            String deliversNull = deliversNull(plan.fields[i], plan.omitted[i]);
+            if (deliversNull != null && component.dataClass().typeClass().isPrimitive()) {
+                mismatches.add("field '" + plan.declaredNames[i] + "' " + deliversNull + ", and component '"
+                        + component.name() + "' binds " + component.dataClass().typeClass().getName()
+                        + ", which has no null to hold it");
+            }
+            readers[i] = BindTargets.to(readers[i], component.dataClass(), "field '" + plan.declaredNames[i]
+                    + "'", "component '" + component.name() + "'", mismatches);
+            if (plan.stated[i] != null && component.dataClass() instanceof DataClassAtom bound) {
+                injected[i] = statedValue(plan.stated[i], bound, plan.declaredNames[i], mismatches);
+            }
+        }
+        DataClassField carrier = descriptor.annotationsCarrier().orElse(null);
+        Set<String> unbound = unboundComponents(descriptor.typeClass());
+        for (int i = 0; i < descriptor.fields().length; i++) {
+            DataClassField component = descriptor.fields()[i];
+            if (!filled[i] && component != carrier && !unbound.contains(component.name())) {
+                mismatches.add("component '" + component.name() + "' is filled by no field, so it reaches the "
+                        + "constructor as null on every document -- annotate it @Unbound if the class means to "
+                        + "own it");
+            }
+        }
+        if (!mismatches.isEmpty()) {
+            throw new BindMismatchException("'" + plan.displayName + "' and " + descriptor.typeClass().getName()
+                    + " do not agree: " + String.join("; ", mismatches));
+        }
+        return new RecordReader(plan, readers, injected, new BindRecordBuilder(descriptor, argument));
     }
 
     private final DataClassRecord descriptor;

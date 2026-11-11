@@ -12,7 +12,6 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.ConstructionSugar;
-import io.ltr8.tson.compiler.resolver.ImportedSynthetics;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.*;
@@ -68,6 +67,8 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.net.IriType;
@@ -88,6 +89,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.function.Predicate;
 
 /**
@@ -341,8 +343,10 @@ public final class TsonSchemaLinker {
                 checkFieldValues(receiver, schema, name, position,
                         record.fields().entrySet().stream()
                                 .filter(f -> f.getValue().value().isPresent() && f.getValue().sibling().isEmpty())
-                                .map(f -> new FieldValue(f.getKey(), f.getValue().typeRef(), f.getValue().role(),
-                                        f.getValue().value().get())).toList(), merged, identifiers);
+                                // A value is a name only at an identifier family, never written in place.
+                                .flatMap(f -> TypeExpr.named(f.getValue().typeExpr()).stream()
+                                        .map(type -> new FieldValue(f.getKey(), type, f.getValue().role(),
+                                                f.getValue().value().get()))).toList(), merged, identifiers);
             }
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
@@ -541,13 +545,23 @@ public final class TsonSchemaLinker {
 
         private static final long serialVersionUID = 1L;
 
+        private final String subject;
         private final String trail;
         private final String name;
+        private final boolean inPlace;
+        private final boolean formNamed;
 
         UnresolvedReference(String subject, String trail, String name) {
+            this(subject, trail, name, false, false);
+        }
+
+        private UnresolvedReference(String subject, String trail, String name, boolean inPlace, boolean formNamed) {
             super(sentence(subject, trail, name));
+            this.subject = subject;
             this.trail = trail;
             this.name = name;
+            this.inPlace = inPlace;
+            this.formNamed = formNamed;
         }
 
         /** The name that resolved to nothing -- what decides which declaration wrote it. */
@@ -555,9 +569,30 @@ public final class TsonSchemaLinker {
             return name;
         }
 
+        /**
+         * Whether it surfaced inside a record an application closes to in place, whose text an open record wrote
+         * ({@link #heldDeclarationNaming}).
+         */
+        boolean inPlace() {
+            return inPlace;
+        }
+
+        /** The same fact, surfaced inside a record in place. */
+        UnresolvedReference heldInPlace() {
+            return inPlace ? this : new UnresolvedReference(subject, trail, name, true, formNamed);
+        }
+
+        /**
+         * The same fact, surfaced inside a construction written in place and named by its form, which stays its
+         * subject whichever declaration it is stated against.
+         */
+        UnresolvedReference namedByForm() {
+            return inPlace || formNamed ? this : new UnresolvedReference(subject, trail, name, false, true);
+        }
+
         /** The same fact stated against a different declaration. */
         String against(String subject) {
-            return sentence(subject, trail, name);
+            return sentence(formNamed ? this.subject : subject, trail, name);
         }
 
         private static String sentence(String subject, String trail, String name) {
@@ -567,7 +602,7 @@ public final class TsonSchemaLinker {
 
     /**
      * The declaration a <b>deferred</b> defect belongs to: the open declaration whose body wrote the name, when
-     * the entry that failed is one this resolver derived.
+     * the failure surfaced inside a record an application closed to in place, or in an entry this resolver derived.
      *
      * <p><b>Deferral is what makes this necessary.</b> A closed declaration's references are checked where the
      * author wrote them. An open record's are not -- nothing about them can be settled until an application
@@ -575,30 +610,40 @@ public final class TsonSchemaLinker {
      * declaration and one verdict per applier instead, each against a line that is not wrong and does not
      * contain the name. Deferred checking is survivable only if the author is sent to the line they can edit.
      *
-     * <p><b>The offending name is the evidence, not the entry.</b> Walking back the derived entry's derivation
-     * cannot answer this: a sugar lift's constructor is no author's. Asking instead which open record <em>mentions
-     * the name</em> reaches the template directly, and reaches nothing at all when the name came from an argument the
-     * applier wrote -- {@code box<some_typo>} keeps its existing verdict at the application, which is where that
+     * <p><b>The offending name is the evidence.</b> Asking which open record <em>mentions the name</em>, a type it
+     * holds in place included, reaches the template directly, and reaches nothing at all when the name came from an
+     * argument the applier wrote -- {@code box<some_typo>} keeps its verdict at the application, which is where that
      * mistake is.
      *
-     * <p><b>Both filters are load-bearing.</b> Only a derived entry is retargeted, or a closed declaration's
-     * own typo would be blamed on any template that happens to name it; and only an open record is a candidate, since
-     * a defect no open record deferred is already located correctly.
+     * <p><b>Both filters are load-bearing.</b> Only a failure inside a record in place, or in a derived entry, is
+     * retargeted, or a closed declaration's own typo would be blamed on any template that happens to name it; and
+     * only an open record is a candidate, since a defect no open record deferred is already located correctly.
      *
      * @return the declaration to blame, or {@code null} to leave the failure where it surfaced
      */
-    private static String heldDeclarationNaming(String name, String failed, Map<String, Top> entries,
-                                                 Map<String, TsonSchema.EntryFacts> facts) {
-        if (at(facts, failed).isPresent()) {
-            return null; // the author's own declaration: it already names the line they wrote
+    private static String heldDeclarationNaming(UnresolvedReference failure, String failed,
+                                                 Map<String, Top> entries, Map<String, TsonSchema.EntryFacts> facts) {
+        if (at(facts, failed).isPresent() && !failure.inPlace()) {
+            return null; // the author's own text: it already names the line they wrote
         }
         for (Map.Entry<String, Top> candidate : entries.entrySet()) {
             if (at(facts, candidate.getKey()).isPresent() && OpenEntry.isOpen(candidate.getValue())
-                    && OpenEntry.names(candidate.getValue()).contains(name)) {
+                    && writes(candidate.getValue(), failure.name())) {
                 return candidate.getKey();
             }
         }
         return null;
+    }
+
+    /** Whether the open record {@code open} writes {@code name}, in a reference or inside a type it holds in place. */
+    private static boolean writes(Top open, String name) {
+        Set<String> named = new LinkedHashSet<>(OpenEntry.names(open));
+        ((RecordBody) open).fields().values().forEach(field -> {
+            if (field.type() instanceof TypeInline inline) {
+                collectBodyNames(inline.of(), named);
+            }
+        });
+        return named.contains(name);
     }
 
     /** One entry's failure, reported when there is a receiver and rethrown as a schema error when there is not. */
@@ -722,7 +767,7 @@ public final class TsonSchemaLinker {
                 return closure.get().entrySet();
             }
         });
-        merged = computeDisjointness(merged);
+        merged = computeDisjointness(merged, pending);
         // Before the name checks: a member that is not a value of its enum's name type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
         Set<String> refusedEnums = checkEnumTypes(schema, merged, facts, localNames, merged::get,
@@ -761,7 +806,7 @@ public final class TsonSchemaLinker {
                 if (pending.contains(e.name())) {
                     continue; // a declaration not yet ready: judged when the whole schema links
                 }
-                String author = heldDeclarationNaming(e.name(), entry.getKey(), merged, facts);
+                String author = heldDeclarationNaming(e, entry.getKey(), merged, facts);
                 if (author == null) { // the applier's own text, or a name no open record wrote: blame the entry
                     reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged, facts), facts,
                             e.getMessage(), e);
@@ -786,6 +831,7 @@ public final class TsonSchemaLinker {
 
         AnnotatedMap<String, Top> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
+        checkTaggedVariantsAreNamed(schema, annotated, facts, localNames, receiver);
         closure.set(annotated);
         reached.set(new ValuesByName(schema, annotated, facts, origins, values));
 
@@ -994,12 +1040,60 @@ public final class TsonSchemaLinker {
             if (choice.disjoint().equals(Optional.of(true))) {
                 continue; // verified -- the assertion holds, and says so
             }
-            List<String> variants = choice.variants().stream().map(TypeRef::name).toList();
+            List<String> variants = choice.variants().stream().map(TypeExpr::text).toList();
             report(receiver, schema, name, at(facts, name), "'" + name + "' asserts @meta.disjoint, but its variants "
                     + variants + " are not disjoint (§5.4) -- two of them occupy the same discrimination "
                     + "class (or one has no class at all), so no encoding's single form-resolution pass can "
                     + "tell them apart and every value keeps its !variant tag; drop the assertion, or use a "
                     + "field group (§5.11), which discriminates by label and needs no disjointness");
+        }
+    }
+
+    /**
+     * A choice that is not disjoint has every variant a name ([TSON-SCHEMA] §5.4): its values are selected by a tag, a
+     * tag names a variant by its name, and a variant written in place has none, so it could never be selected. Asked
+     * of every local choice, a declared one and one written in place at any depth; a choice whose {@code
+     * @meta.disjoint} fails is left to {@link #checkDisjointAssertions}, which reports it on its own terms.
+     */
+    private static void checkTaggedVariantsAreNamed(TsonSchema schema, AnnotatedMap<String, Top> entries,
+                                                    Map<String, TsonSchema.EntryFacts> facts,
+                                                    Set<String> localNames, DiagnosticsReceiver receiver) {
+        for (String name : localNames) {
+            Top entry = entries.get(name);
+            if (entry == null) {
+                continue;
+            }
+            boolean asserted = AliasChain.annotates(facts.getOrDefault(name, TsonSchema.EntryFacts.NONE)
+                    .annotations(), DISJOINT, entries) || AliasChain.annotates(entries.getAnnotations(name), DISJOINT,
+                    entries);
+            List<ChoiceBody> choices = new ArrayList<>();
+            if (entry instanceof ChoiceBody declared && !asserted) {
+                choices.add(declared);
+            }
+            mapInline(entry, body -> {
+                if (body instanceof ChoiceBody inPlace) {
+                    choices.add(inPlace);
+                }
+                return body;
+            });
+            for (ChoiceBody choice : choices) {
+                if (!choice.disjoint().equals(Optional.of(false))
+                        || Set.copyOf(choice.variants()).size() != choice.variants().size()) {
+                    continue; // disjoint, or a repeated variant, which distinctness has refused
+                }
+                List<String> inPlace = choice.variants().stream().filter(TypeInline.class::isInstance)
+                        .map(TypeExpr::text).toList();
+                if (inPlace.isEmpty()) {
+                    continue;
+                }
+                report(receiver, schema, name, at(facts, name), "'" + name + "': the choice '"
+                        + choice.variants().stream().map(TypeExpr::text).collect(java.util.stream.Collectors.joining(
+                                " | ", "(", ")")) + "' is not disjoint, so a value selects its variant by a "
+                        + "tag, which names a variant by its name -- and " + inPlace + " " + (inPlace.size() == 1
+                        ? "is a variant" : "are variants") + " written in place, with no name a tag could give "
+                        + "(§5.4): declare each as an entry and name it, or make the variants disjoint");
+                break;
+            }
         }
     }
 
@@ -1107,17 +1201,72 @@ public final class TsonSchemaLinker {
      *
      * <p><b>It is written on the body, which is the only thing that has variants to be disjoint over.</b>
      * An entry with no {@code !meta.choice} body has nowhere to put the fact, so "absent on every other
-     * definition" stops being a rule anyone can break.
+     * definition" stops being a rule anyone can break. A choice written in place has a body too, at the slot that
+     * holds it, and is derived there the same way ({@link #mapInline}).
+     *
+     * <p><b>A partial link ({@link #linkReady}) derives nothing over a variant still pending</b>: its class is not
+     * known until it is ready, so the choice keeps the fact as it stands, and the whole schema's link derives it. The
+     * kernel's hand-built {@code meta.type_expr} is read against before {@code meta.type_inline} is ready, and states
+     * the fact its {@code @meta.disjoint} asserts.
      */
-    private static Map<String, Top> computeDisjointness(Map<String, Top> merged) {
+    private static Map<String, Top> computeDisjointness(Map<String, Top> merged, Set<String> pending) {
         Map<String, Top> result = new LinkedHashMap<>(merged);
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
-            if (entry.getValue() instanceof ChoiceBody choice) {
-                result.put(entry.getKey(), new ChoiceBody(choice.chain(), choice.variants(),
-                        Optional.of(ChoiceDisjointness.derive(choice, merged))));
+            Top value = mapInline(entry.getValue(), body -> body instanceof ChoiceBody inline
+                    ? new ChoiceBody(inline.chain(), inline.variants(),
+                            Optional.of(ChoiceDisjointness.derive(inline, merged)))
+                    : body);
+            if (value instanceof ChoiceBody choice && choice.variants().stream()
+                    .noneMatch(variant -> variant instanceof TypeRef reference && pending.contains(reference.name()))) {
+                value = new ChoiceBody(choice.chain(), choice.variants(),
+                        Optional.of(ChoiceDisjointness.derive(choice, merged)));
+            }
+            if (value != entry.getValue()) {
+                result.put(entry.getKey(), value);
             }
         }
         return result;
+    }
+
+    /**
+     * {@code body} with {@code derive} applied to every type written in place inside it, at any depth, innermost
+     * first; the same instance where it holds none. What the link derives over an entry's own body -- a choice's
+     * {@code disjoint}, a reference's index -- it derives over a body written in place the same way, there being no
+     * entry to hold it.
+     */
+    static Top mapInline(Top body, UnaryOperator<io.ltr8.tson.schema.meta.Type> derive) {
+        return switch (body) {
+            case RecordBody record when record.fields().values().stream()
+                    .anyMatch(field -> field.type() instanceof TypeInline) -> record.withFields(record.mapFields(
+                            field -> field.type() instanceof TypeInline inline
+                                    ? field.withType(mapInline(inline, derive)) : field));
+            case ArrayBody array when array.elementType() instanceof TypeInline inline -> new ArrayBody(
+                    array.chain(), mapInline(inline, derive), array.voidable(), array.ordered(),
+                    array.uniqueItems(), array.minItems(), array.maxItems());
+            case MapBody map when map.valueType() instanceof TypeInline inline -> new MapBody(map.chain(),
+                    map.keyType(), mapInline(inline, derive), map.voidable(), map.ordered(),
+                    map.minItems(), map.maxItems());
+            case NamespaceBody namespace when namespace.valueType() instanceof TypeInline inline -> new NamespaceBody(
+                    namespace.chain(), namespace.keyType(), mapInline(inline, derive), namespace.ordered(),
+                    namespace.minItems(), namespace.maxItems());
+            case TupleBody tuple when tuple.elements().stream()
+                    .anyMatch(element -> element.elementType() instanceof TypeInline) -> new TupleBody(tuple.chain(),
+                    tuple.elements().stream().map(element -> element.elementType() instanceof TypeInline inline
+                            ? new TupleElement(mapInline(inline, derive), element.voidable())
+                            : element).toList());
+            case ChoiceBody choice when choice.variants().stream().anyMatch(TypeInline.class::isInstance) ->
+                    new ChoiceBody(choice.chain(), choice.variants().stream()
+                            .map(variant -> variant instanceof TypeInline inline
+                                    ? (TypeExpr) mapInline(inline, derive) : variant).toList(),
+                            choice.disjoint());
+            default -> body;
+        };
+    }
+
+    /** A type written in place, the types written inside it derived first, then its own body. */
+    private static TypeInline mapInline(TypeInline inline, UnaryOperator<io.ltr8.tson.schema.meta.Type> derive) {
+        Top inner = mapInline(inline.of(), derive);
+        return inline.withOf(derive.apply((io.ltr8.tson.schema.meta.Type) inner));
     }
 
     /**
@@ -1149,27 +1298,40 @@ public final class TsonSchemaLinker {
                                                  Function<String, Top> structure, Set<String> pending,
                                                  AtomicReference<ValuesByName> reached, Map<String, Top> entries) {
         Map<String, Top> result = null;
+        // A reference written in place is linked as an entry's is, at the slot that holds it.
+        UnaryOperator<io.ltr8.tson.schema.meta.Type> link = body -> body instanceof ReferenceBody reference
+                ? linkReference(reference, merged, facts, structure, pending, reached, entries) : body;
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
-            if (entry.getValue() instanceof ReferenceBody reference) {
-                boolean namesTypes = KindMembers.namesTypes(reference.of().name(), structure);
-                List<String> members = namesTypes ? KindMembers.of(reference, merged,
-                        name -> constructorOf(name, merged.get(name), facts), structure) : List.of();
-
+            Top value = mapInline(entry.getValue(), link);
+            if (value instanceof ReferenceBody reference) {
+                value = linkReference(reference, merged, facts, structure, pending, reached, entries);
+            }
+            if (value != entry.getValue()) {
                 if (result == null) {
                     result = new LinkedHashMap<>(merged);
                 }
-                // A message lists the members as an author writes them: by name, a minted one, named by nobody, left out.
-                List<String> shown = members.stream()
-                        .filter(name -> !facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).synthetic()).toList();
-                if (namesTypes && !pending.isEmpty()) {
-                    members = java.util.stream.Stream.concat(members.stream(), pending.stream()).distinct().toList();
-                }
-                result.put(entry.getKey(), reference.linked(namesTypes, members, entries, shown,
-                        namesTypes || !pending.isEmpty() ? Optional.empty()
-                                : Optional.of(valuesOf(reference.of().name(), reached))));
+                result.put(entry.getKey(), value);
             }
         }
         return result == null ? merged : result;
+    }
+
+    /** One reference's index: whether its {@code of} names types, and the members or the value reach it admits. */
+    private static ReferenceBody linkReference(ReferenceBody reference, Map<String, Top> merged,
+                                               Map<String, TsonSchema.EntryFacts> facts, Function<String, Top> structure,
+                                               Set<String> pending, AtomicReference<ValuesByName> reached,
+                                               Map<String, Top> entries) {
+        boolean namesTypes = KindMembers.namesTypes(reference.of().name(), structure);
+        List<String> members = namesTypes ? KindMembers.of(reference, merged,
+                name -> constructorOf(name, merged.get(name), facts), structure) : List.of();
+        // A message lists the members by name, before the pending ones a partial link adds.
+        List<String> shown = members;
+        if (namesTypes && !pending.isEmpty()) {
+            members = java.util.stream.Stream.concat(members.stream(), pending.stream()).distinct().toList();
+        }
+        return reference.linked(namesTypes, members, entries, shown,
+                namesTypes || !pending.isEmpty() ? Optional.empty()
+                        : Optional.of(valuesOf(reference.of().name(), reached)));
     }
 
     /**
@@ -1202,9 +1364,6 @@ public final class TsonSchemaLinker {
      * That is also what makes a revision mismatch (one route reaching {@code /2026/37/m/core.tn}, another
      * {@code /2026/40/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
      * conflict between two identically-spelled types much later.
-     *
-     * <p><b>A synthetic's identity is its form</b> (§8.2): two documents that each mint one synthetic, neither
-     * importing the other, declare one entry, which unifies like a diamond's ({@link ImportedSynthetics}).
      *
      * <p>Identity is the canonical one ([TSON-DATA] §2.2.1), so a pinned and an unpinned reference to one
      * schema unify -- which is what lets an author pin their own import while a peer's is unpinned.
@@ -1241,16 +1400,11 @@ public final class TsonSchemaLinker {
                 }
                 if (incumbent != null) {
                     if (!incumbent.equals(origin)) {
-                        // One synthetic minted by two documents is one entry (§8.2), whichever declared each.
-                        TsonSchema.EntryFacts arriving = imported.schema().factsOf(name);
-                        if (!ImportedSynthetics.areOne(name, facts.get(name), merged.get(name), incumbent, arriving,
-                                entry.getValue(), origin)) {
-                            throw new SchemaValidationException("'" + name + "' is declared by two different "
-                                    + "schemas reached through !!import ('" + incumbent + "' and '" + origin
-                                    + "') -- distinct types cannot share one name in the flat namespace; import "
-                                    + "one of them, or a version of each that agrees on where '" + name
-                                    + "' is declared");
-                        }
+                        throw new SchemaValidationException("'" + name + "' is declared by two different "
+                                + "schemas reached through !!import ('" + incumbent + "' and '" + origin
+                                + "') -- distinct types cannot share one name in the flat namespace; import "
+                                + "one of them, or a version of each that agrees on where '" + name
+                                + "' is declared");
                     }
                     merged.put(name, unified(merged.get(name), entry.getValue()));
                     continue;
@@ -1328,8 +1482,9 @@ public final class TsonSchemaLinker {
                 // field names a sibling, judged with its sibling by §5.2's rules, and carries no value.
                 DependentFields.check(entryName, r, namespace);
                 for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
-                    if (field.getValue().type() instanceof TypeRef type) {
-                        validateTypeRef(type, namespace, constructors, entryName, " field '" + field.getKey() + "'");
+                    if (field.getValue().ownType().isPresent()) {
+                        validateSlot(field.getValue().ownType().get(), namespace, constructors, entryName,
+                                " field '" + field.getKey() + "'", shown, byName);
                         checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors,
                                 byName);
                     }
@@ -1360,8 +1515,7 @@ public final class TsonSchemaLinker {
             case MapBody m -> {
                 validateTypeRef(m.keyType(), namespace, constructors, entryName,
                         " key_type");
-                validateTypeRef(m.valueType(), namespace, constructors,
-                        entryName, " value_type");
+                validateSlot(m.valueType(), namespace, constructors, entryName, " value_type", shown, byName);
             }
             case NamespaceBody n -> {
                 TypeRef key = n.keyType();
@@ -1375,23 +1529,23 @@ public final class TsonSchemaLinker {
                             + "is a member of meta.identifier_ref, a type built with identifier_type; a closed set "
                             + "of names is an identifier family with members");
                 }
-                validateTypeRef(n.valueType(), namespace, constructors,
-                        entryName, " value_type");
+                validateSlot(n.valueType(), namespace, constructors, entryName, " value_type", shown, byName);
             }
-            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, constructors, entryName, " element_type");
+            case ArrayBody a -> validateSlot(a.elementType(), namespace, constructors, entryName, " element_type",
+                    shown, byName);
             case TupleBody t -> {
                 int index = 0;
                 for (TupleElement element : t.elements()) {
-                    validateTypeRef(element.elementType(), namespace, constructors,
-                            entryName, " element[" + index + "]");
+                    validateSlot(element.elementType(), namespace, constructors, entryName,
+                            " element[" + index + "]", shown, byName);
                     index++;
                 }
             }
             case ChoiceBody c -> {
                 int index = 0;
-                for (TypeRef variant : c.variants()) {
-                    validateTypeRef(variant, namespace, constructors, entryName,
-                            " variant[" + index + "]");
+                for (TypeExpr variant : c.variants()) {
+                    validateSlot(variant, namespace, constructors, entryName, " variant[" + index + "]", shown,
+                            byName);
                     index++;
                 }
                 checkVariantsAreDistinct(entryName, c, namespace);
@@ -1495,24 +1649,27 @@ public final class TsonSchemaLinker {
      * merged. It runs after {@link #validateTypeRef} has accepted every variant, so an unresolved name is
      * already reported and never reaches the walk.
      *
-     * <p>Arguments are compared as written rather than flattened through: only the head name is walked. The
-     * gap is unreachable from the sugar -- {@code SchemaDesugarer} hoists any argument-bearing variant to a
-     * bare name -- and reaches only a hand-written {@code !meta.choice { variants: [...] } } naming two
-     * differently-spelled applications of one type.
+     * <p>A type written in place is compared by its constructor and fields, and never with a name: a name and a
+     * construction are two types, even a name for the construction written beside it ([TSON-SCHEMA] §8.2).
      */
     private static void checkVariantsAreDistinct(String entryName, ChoiceBody choice,
                                                   Map<String, Top> namespace) {
-        Map<TypeRef, String> seen = new LinkedHashMap<>();
-        for (TypeRef variant : choice.variants()) {
-            TypeRef flattened = TypeRef.of(AliasChain.terminal(variant.name(), namespace), variant.arguments());
-            String first = seen.putIfAbsent(flattened, variant.name());
+        // A type written in place is its own construction, compared by its body; a name by where its chain ends.
+        Map<TypeExpr, String> seen = new LinkedHashMap<>();
+        for (TypeExpr variant : choice.variants()) {
+            TypeExpr flattened = switch (variant) {
+                case TypeRef reference -> TypeRef.of(AliasChain.terminal(reference.name(), namespace),
+                        reference.arguments());
+                case TypeInline inline -> inline;
+            };
+            String first = seen.putIfAbsent(flattened, variant.text());
             if (first == null) {
                 continue;
             }
-            throw new SchemaValidationException("'" + entryName + "' " + (first.equals(variant.name())
-                    ? "lists the variant '" + variant.name() + "' twice"
-                    : "variants '" + first + "' and '" + variant.name() + "' both resolve to '"
-                            + flattened.name() + "'")
+            throw new SchemaValidationException("'" + entryName + "' " + (first.equals(variant.text())
+                    ? "lists the variant '" + variant.text() + "' twice"
+                    : "variants '" + first + "' and '" + variant.text() + "' both resolve to '"
+                            + flattened.text() + "'")
                     + " -- §5.4 requires each variant to resolve to a distinct type");
         }
     }
@@ -1526,7 +1683,8 @@ public final class TsonSchemaLinker {
      */
     private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
                                                  Map<String, Top> namespace) {
-        for (TypeRef variant : choice.variants()) {
+        // A type written in place is a container, a tuple, a choice, a reference or a record, never void.
+        for (TypeRef variant : choice.variants().stream().flatMap(v -> TypeExpr.named(v).stream()).toList()) {
             if (AliasChain.resolvesToVoid(variant.name(), namespace)) {
                 throw new SchemaValidationException("'" + entryName + "' has a variant"
                         + (variant.name().equals("void") ? "" : " '" + variant.name() + "'")
@@ -1591,9 +1749,7 @@ public final class TsonSchemaLinker {
         switch (body) {
             case RecordBody record -> record.fields().values().forEach(field -> {
                 // A sibling names a field of this record, never an entry, so it contributes no name.
-                if (field.type() instanceof TypeRef type) {
-                    collectNames(type, into);
-                }
+                field.ownType().ifPresent(type -> collectNames(type, into));
                 // A routed parameter rides `value` like any other token, so it is named here too -- which is
                 // what keeps `<S> base ^ { status: = S }` from reading as a template that never uses S.
                 field.value().map(Token::text).ifPresent(into::add);
@@ -1613,6 +1769,14 @@ public final class TsonSchemaLinker {
             case Atom ignored -> { } // an atom body names no type
             case DeclaredType ignored -> { } // its variants are the closure's, named by no field
             case ValueEntry ignored -> { } // a value names no type of its own
+        }
+    }
+
+    /** The names a type slot holds: a name's, or every name inside a type written in place. */
+    private static void collectNames(TypeExpr type, Set<String> into) {
+        switch (type) {
+            case TypeRef reference -> collectNames(reference, into);
+            case TypeInline inline -> collectBodyNames(inline.of(), into);
         }
     }
 
@@ -1715,9 +1879,14 @@ public final class TsonSchemaLinker {
                     violations.add(dependent.get());
                 } else if (!(restated.type() instanceof SiblingRef) && !narrows(inherited.getValue(), restated,
                         namespace)) {
+                    boolean oneIsANameOneInPlace = restated.typeExpr() instanceof TypeInline
+                            != inherited.getValue().typeExpr() instanceof TypeInline;
                     violations.add("field '" + inherited.getKey() + "' is typed '"
-                            + shown.apply(restated.typeRef().name()) + "', which is not '"
-                            + shown.apply(inherited.getValue().typeRef().name()) + "' or IS-A it");
+                            + shownType(restated.typeExpr(), shown) + "', which is not '"
+                            + shownType(inherited.getValue().typeExpr(), shown) + "' or IS-A it"
+                            + (oneIsANameOneInPlace ? " -- a name and a type written in place are never one type "
+                                    + "(§8.2), so write '" + shownType(inherited.getValue().typeExpr(), shown)
+                                    + "' as it is inherited" : ""));
                 }
             }
             if (!violations.isEmpty()) {
@@ -1727,10 +1896,26 @@ public final class TsonSchemaLinker {
         }
     }
 
-    /** Whether {@code restated}'s type narrows {@code inherited}'s, as {@link #checkRestatedFieldTypes} states it. */
+    /** What a slot holds as a message names it: a name as {@code shown} renders it, an inline type as written. */
+    private static String shownType(TypeExpr type, Function<String, String> shown) {
+        return switch (type) {
+            case TypeRef reference -> shown.apply(reference.name());
+            case TypeInline inline -> inline.text();
+        };
+    }
+
+    /**
+     * Whether {@code restated}'s type narrows {@code inherited}'s, as {@link #checkRestatedFieldTypes} states it. A
+     * type written in place IS-A nothing but itself, and a name and a construction are never one type ([TSON-SCHEMA]
+     * §8.2), even a name for the very construction written: two types written in place narrow exactly when they are
+     * one, the same constructor and fields, and a name never narrows to a construction nor a construction to a name.
+     */
     private static boolean narrows(RecordField inherited, RecordField restated, Map<String, Top> namespace) {
-        TypeRef from = inherited.typeRef();
-        TypeRef to = restated.typeRef();
+        if (inherited.typeExpr() instanceof TypeInline || restated.typeExpr() instanceof TypeInline) {
+            return inherited.typeExpr().equals(restated.typeExpr());
+        }
+        TypeRef from = (TypeRef) inherited.typeExpr();
+        TypeRef to = (TypeRef) restated.typeExpr();
         if (!from.arguments().isEmpty() || !to.arguments().isEmpty() || !namespace.containsKey(from.name())
                 || !namespace.containsKey(to.name())) {
             return true;
@@ -1785,13 +1970,18 @@ public final class TsonSchemaLinker {
         // The chain end is what has to be checked, not the hop: a field typed by an alias
         // (`a => text`, `f: a = hello`) states a value of whatever the alias names. Resolved output states
         // the chain rather than rewriting the use site past it, so the walk happens here.
-        String terminal = AliasChain.terminal(field.typeRef().name(), namespace);
-        Top target = namespace.get(terminal);
+        // A type written in place is its own body, and has no entry an enum's label form is recorded under.
+        String terminal = switch (field.typeExpr()) {
+            case TypeRef reference -> AliasChain.terminal(reference.name(), namespace);
+            case TypeInline inline -> null;
+        };
+        Top target = field.typeExpr() instanceof TypeInline inline ? inline.of() : namespace.get(terminal);
         // An unresolved reference is already reported by validateTypeRef; a target that is still open (or an
         // application of one) has no single body to check against until materialisation closes it. A body
         // still an Alias means the walk stopped on a cycle or an argument-bearing target, neither of
         // which has one either.
-        if (target == null || OpenEntry.isOpen(target) || !field.typeRef().arguments().isEmpty()
+        if (target == null || OpenEntry.isOpen(target)
+                || field.typeExpr() instanceof TypeRef reference && !reference.arguments().isEmpty()
                 || target instanceof Alias) {
             return;
         }
@@ -1807,8 +1997,8 @@ public final class TsonSchemaLinker {
                     TypeRef.of(value.text()), reference.of().name());
             return;
         }
-        Optional<AtomType<?>> parser = AtomParsers.forType(target,
-                EnumLabels.labelForm(target, constructors.apply(terminal), namespace, namespace::get));
+        Optional<AtomType<?>> parser = AtomParsers.forType(target, EnumLabels.labelForm(target,
+                terminal == null ? Optional.empty() : constructors.apply(terminal), namespace, namespace::get));
         if (parser.isEmpty()) {
             throw notAScalarType(entryName, fieldName, field, value, target);
         }
@@ -1820,7 +2010,7 @@ public final class TsonSchemaLinker {
             // so the author reads back their own line rather than a normalisation of it. The atom's own
             // message follows: it already states the rule and cites the section, so nothing here restates it.
             throw new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
-                    + "declared '" + field.typeRef().name() + "', but its "
+                    + "declared '" + field.typeExpr().text() + "', but its "
                     + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " "
                     + asWritten(value) + " is not a value of that type -- " + e.getMessage() + ". §5.2 makes "
                     + "a field's fixed or default value a value of the field's own declared type");
@@ -1842,7 +2032,7 @@ public final class TsonSchemaLinker {
             return;
         }
         throw new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
-                + "declared '" + field.typeRef().name() + "', but its "
+                + "declared '" + field.typeExpr().text() + "', but its "
                 + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " " + asWritten(value)
                 + " is not a value of that type -- " + (namespace.get(value.text()) == null
                         ? "it names nothing in scope"
@@ -1870,7 +2060,7 @@ public final class TsonSchemaLinker {
     private static SchemaValidationException notAScalarType(String entryName, String fieldName, RecordField field,
                                                                  Token value, Top body) {
         return new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
-                + "declared '" + field.typeRef().name() + "', which is " + describe(body) + ", so it cannot "
+                + "declared '" + field.typeExpr().text() + "', which is " + describe(body) + ", so it cannot "
                 + "have " + (field.role() == FieldRole.DEFAULT ? "a default" : "a fixed value")
                 + " -- " + asWritten(value) + " is a token, and §5.2 admits only a bare token there. A "
                 + "fixed or default value is available on a field typed by an atom or an enum, and nowhere "
@@ -1896,6 +2086,27 @@ public final class TsonSchemaLinker {
     /** A token echoed the way the schema spells it, so a quoted value is visibly quoted in the message. */
     private static String asWritten(Token token) {
         return token.form() == Token.Form.UNQUOTED ? token.text() : "\"" + token.text() + "\"";
+    }
+
+    /**
+     * What a type slot holds, validated: a name as {@link #validateTypeRef} judges it, and a type written in place
+     * as its body would be judged as an entry, named in a message by its form as written ({@code [some_typo]},
+     * {@code box<some_typo>}, [TSON-SCHEMA] §8.2) and reported against the entry that holds it. An unresolved name
+     * inside a record in place is marked so, its text being an open record's ({@link #heldDeclarationNaming}).
+     */
+    private static void validateSlot(TypeExpr type, Map<String, Top> namespace,
+                                     Function<String, Optional<String>> constructors, String subject, String trail,
+                                     Function<String, String> shown, ValuesByName byName) {
+        switch (type) {
+            case TypeRef reference -> validateTypeRef(reference, namespace, constructors, subject, trail);
+            case TypeInline inline -> {
+                try {
+                    validateBody(inline.text(), inline.of(), namespace, constructors, shown, byName);
+                } catch (UnresolvedReference e) {
+                    throw inline.of() instanceof RecordBody ? e.heldInPlace() : e.namedByForm();
+                }
+            }
+        }
     }
 
     /**

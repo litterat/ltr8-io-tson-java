@@ -17,7 +17,7 @@ import io.ltr8.annotation.Annotations;
  * <p><b>Identity</b> is the variant and its components, {@code annotations} excluded: {@code kind}, {@code kind<T>}
  * and {@code kind!} are three references.
  */
-public sealed interface Reference permits TypeRef, SiblingRef {
+public sealed interface Reference extends FieldTypeExpr permits TypeRef, SiblingRef {
 
     /** The annotations written on the reference itself; no part of its identity. */
     Annotations annotations();

@@ -12,8 +12,7 @@ is why they are the linker's. Current form only; history lives in git.
   constructor, names values (`ValuesByName`, `design/references.md`).
 - Every reference's derived `index` (`Index(namesTypes, members, entries, shown, values)`: the members sorted; the
   final namespace's entries, which a name read in data finds through `ReferenceBody.closure()`; and the members as a
-  message lists them, the names an author writes, a minted entry, `@meta.synthetic`, left out, since data names no
-  application and never a name nobody wrote) is recomputed for **every** reference in the
+  message lists them, by name, before the pending ones a partial link adds) is recomputed for **every** reference in the
   closure, imports included (`TsonSchemaLinker.computeKinds`), and never trusted from a body. It is `@Unbound` and
   never written: a resolved form states `!meta.reference_type { of: … }` alone, and a written `members:` is refused as an
   unknown field.
@@ -48,7 +47,7 @@ is why they are the linker's. Current form only; history lives in git.
 - `enumForms` and `nameTypes` are recorded on `TsonLinkedSchema` because no reader can recompute them.
 
 Related: `design/linking-and-compilation.md` (the link order), `design/references.md` (which slot is typed by a kind),
-`design/name-hygiene-and-minted-names.md` (the per-name rules a name type's profile feeds),
+`design/name-hygiene.md` (the per-name rules a name type's profile feeds),
 `design/namespace-types-and-value-entries.md`.
 
 **What a kind is not.** Eight shapes were tried before the atom of names, and each fell for one reason, so none is

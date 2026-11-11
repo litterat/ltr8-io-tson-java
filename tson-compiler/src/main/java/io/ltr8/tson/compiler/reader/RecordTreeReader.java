@@ -43,11 +43,15 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
             };
         }, schemaLocation, fieldNames);
         this.annotationTypes = annotationTypes;
+        this.tag = context.tagOf(name);
         CompiledReaders.afterEveryReader(resolver, this::settleHeldValues);
     }
 
     /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */
     private final AnnotationTypes annotationTypes;
+
+    /** The tag the value carries: the entry's name, none for a record written in place ({@code tagOf}). */
+    private final Optional<String> tag;
 
     public static final class Factory implements ValueReaderFactory {
 
@@ -94,7 +98,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
         if (ConstructionGuard.abandoned(ctx, mark)) {
             return null;   // tree mode is all-or-nothing too: no partial record to mistake for a valid one
         }
-        return new TsonRecord(result, Optional.of(name), annotations);
+        return new TsonRecord(result, tag, annotations);
     }
 
     /**

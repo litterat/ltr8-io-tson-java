@@ -14,10 +14,13 @@ import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 
@@ -63,6 +66,10 @@ final class ParameterTypes {
 
     /** The one slot of an open record a parameter may stand in as a whole token: a field's type. */
     private static final String FIELD_TYPE = RECORD_FIELD + "." + WireForm.TYPE;
+
+    /** The kernel's type slots that hold a name or a type written in place, {@code { of: … }}. */
+    private static final Set<String> IN_PLACE_SLOTS = Set.of(KernelNames.of("type_expr"),
+            KernelNames.of("field_type_expr"));
 
     /** A field's value, which is never a parameter. */
     private static final String FIELD_VALUE = RECORD_FIELD + "." + WireForm.VALUE;
@@ -144,7 +151,7 @@ final class ParameterTypes {
      * {@code record} and {@code record_field} name it.
      */
     static void checkSlots(List<String> parameters, DataValue payload, Function<String, Top> meta) {
-        Walk walk = new Walk(parameters, meta);
+        Walk walk = new Walk(parameters, meta, false);
         if (walk.resolve(RECORD) instanceof RecordBody vocabulary) {
             walk.payload(payload.coreValue(), RECORD, vocabulary);
         }
@@ -175,6 +182,7 @@ final class ParameterTypes {
             Top head = entries.get(application.name());
             List<Param> heads = OpenEntry.isOpen(head) && !refused.contains(application.name())
                     ? OpenEntry.parameters(head) : List.of();
+            requireNames(application);
             for (int i = 0; i < application.arguments().size(); i++) {
                 TypeRef argument = application.arguments().get(i);
                 Param mine = argument.arguments().isEmpty() ? parameterOf.apply(argument.name()) : null;
@@ -183,6 +191,33 @@ final class ParameterTypes {
                 } else if (i < heads.size()) {
                     Param theirs = heads.get(i);
                     theirs.bound().ifPresent(bound -> requireBound(mine, application.name(), theirs.name(), bound));
+                }
+            }
+        }
+
+        /**
+         * Refuses an argument of {@code application} that must be a name and is an application ([TSON-SCHEMA] §4.2,
+         * §5.3): any argument of an open record's application, and one of a constructor's that lands at a slot
+         * holding only a name ({@code meta.ref<box<T>>}). An argument at a constructor's type slot is held and closes
+         * there when the record is applied ({@code meta.array<box<T>>}).
+         */
+        private void requireNames(TypeRef application) {
+            Function<String, Top> lookup = name -> lookup(name, true, entries::get, meta);
+            String terminal = AliasChain.terminal(application.name(), lookup);
+            Top head = lookup.apply(terminal);
+            List<Boolean> inPlace = OpenEntry.isOpen(head) ? null
+                    : ConstructionSugar.constructs(terminal, head)
+                            ? ConstructionSugar.slotsInPlace((RecordBody) head, lookup) : List.of();
+            for (int i = 0; i < application.arguments().size(); i++) {
+                TypeRef argument = application.arguments().get(i);
+                if (argument.arguments().isEmpty()) {
+                    continue;
+                }
+                if (inPlace == null) {
+                    throw TemplateMaterialiser.argumentNotAName(argument, application);
+                }
+                if (i < inPlace.size() && !inPlace.get(i)) {
+                    throw TemplateMaterialiser.nameRequired(argument);
                 }
             }
         }
@@ -207,7 +242,8 @@ final class ParameterTypes {
     /**
      * A written bound names a type, so its name -- an application's head, where it is one -- resolves in the
      * schema's namespace and names no constructor: a type argument names a type, which IS-A no constructor
-     * (§4.1), so a bound naming one would admit no argument.
+     * (§4.1), so a bound naming one would admit no argument. A bound is a name, {@code meta.param.bound} being
+     * {@code meta.type_ref}, so an application there is refused (§4.2).
      */
     private static void requireType(TypeRef bound, Function<String, Top> local) {
         String name = bound.name();
@@ -220,6 +256,9 @@ final class ParameterTypes {
             throw new SchemaValidationException("the bound '" + spell(bound) + "' names '" + name + "', and '"
                     + name + "' is a constructor, not a type (§4.1); a bound names a type, which every argument "
                     + "must IS-A (§5.10)");
+        }
+        if (!bound.arguments().isEmpty()) {
+            throw TemplateMaterialiser.nameRequired(bound);
         }
     }
 
@@ -281,8 +320,17 @@ final class ParameterTypes {
      * An open record's explicit payload walked against {@code record}'s own vocabulary, whose one whole-token parameter
      * slot is a field's type; every walk below carries the slot it is in, as {@code constructor.field}, so a refusal
      * can name it.
+     *
+     * <p><b>A type written in place is walked into</b> ({@code inPlace}), its {@code { of: !C { … } }} body against
+     * {@code C}'s vocabulary. A parameter at a type slot there -- {@code type: { of: !meta.array { element_type: T }
+     * }} -- is no author's error, the slot holding a type, but is not yet supported: an open record's parameters are
+     * scoped and substituted at its field types and the applications there ({@link RecordBody}, {@code Substitution}),
+     * and neither reaches inside a type written in place, so the parameter would stand unbound. The sugar an author
+     * writes never puts one there, {@code [T]} over a parameter being the application {@code meta.array<T>} ({@code
+     * SchemaDesugarer}). A parameter at a slot that holds no type is refused for where it stands, inside the wrapper as
+     * outside it.
      */
-    private record Walk(List<String> parameters, Function<String, Top> meta) {
+    private record Walk(List<String> parameters, Function<String, Top> meta, boolean inPlace) {
 
         private boolean declares(String name) {
             return parameters.contains(name);
@@ -300,7 +348,7 @@ final class ParameterTypes {
             List<Map.Entry<String, RecordField>> unmarked = vocabulary.fields().entrySet().stream()
                     .filter(f -> !f.getValue().optional()).toList();
             if (unmarked.size() == 1) {
-                unmarked.getFirst().getValue().namedType().ifPresent(type -> value(payload, type,
+                unmarked.getFirst().getValue().ownType().ifPresent(type -> value(payload, type,
                         constructor + "." + unmarked.getFirst().getKey()));
             }
         }
@@ -317,25 +365,79 @@ final class ParameterTypes {
                         && value instanceof TokenValue token && declares(token.text())) {
                     throw at(token.text(), FIELD_VALUE);
                 }
-                Optional.ofNullable(vocabulary.fields().get(written.name())).flatMap(RecordField::namedType)
+                Optional.ofNullable(vocabulary.fields().get(written.name())).flatMap(RecordField::ownType)
                         .ifPresent(type -> value(value, type, constructor + "." + written.name()));
             }
         }
 
-        /** One written value at {@code slot}, against the type the slot declares. */
-        private void value(CoreValue written, TypeRef declared, String slot) {
-            Top type = resolve(declared.name());
+        /**
+         * One written value at {@code slot}, against the type the slot declares: a name's entry, or a type the
+         * vocabulary writes in place ({@code variants: [meta.type_expr]}), faced as its body.
+         */
+        private void value(CoreValue written, TypeExpr declared, String slot) {
+            String declaredName = declared instanceof TypeRef reference ? reference.name() : null;
+            Top type = switch (declared) {
+                case TypeRef reference -> resolve(reference.name());
+                case TypeInline inline -> inline.of();
+            };
             switch (written) {
+                case TokenValue token when declares(token.text()) && inPlace
+                        && (type instanceof ReferenceBody || IN_PLACE_SLOTS.contains(declaredName)) ->
+                        throw inPlace(token.text(), slot);
                 // A field written positionally, `item => T`, is its record_field's one unmarked slot, its type.
                 case TokenValue token when declares(token.text()) -> token(token.text(),
-                        RECORD_FIELD.equals(declared.name()) ? FIELD_TYPE : slot);
+                        RECORD_FIELD.equals(declaredName) ? FIELD_TYPE : slot);
+                case RecordValue wrapper when IN_PLACE_SLOTS.contains(declaredName) -> wrapped(wrapper);
                 case ArrayValue array -> elements(array, type, slot);
                 case MapValue map when type instanceof MapBody entries -> entries(map, entries, slot);
-                case RecordValue record when type instanceof RecordBody nested ->
-                        record(record, declared.name(), nested);
+                case RecordValue record when type instanceof RecordBody nested && declaredName != null ->
+                        record(record, declaredName, nested);
                 default -> {
                 }
             }
+        }
+
+        /**
+         * A type written in place, {@code { of: !C { … } }}, walked as the construction of {@code C} it holds. Where
+         * {@code C} is not yet a record this namespace can show -- a constructor of this schema still resolving -- no
+         * slot can be told from another, and a parameter anywhere inside is the gap.
+         */
+        private void wrapped(RecordValue wrapper) {
+            for (RecordValue.Field field : wrapper.fields()) {
+                if (!WireForm.OF.equals(field.name())) {
+                    continue; // a field the wrapper does not declare, which its own reader reports
+                }
+                DataValue construction = field.value();
+                String constructor = construction.typeRef().orElse(null);
+                Walk inside = new Walk(parameters, meta, true);
+                if (constructor != null && inside.resolve(constructor) instanceof RecordBody vocabulary) {
+                    inside.payload(construction.coreValue(), constructor, vocabulary);
+                } else {
+                    inside.anyParameter(construction.coreValue());
+                }
+            }
+        }
+
+        /** Refuses, as the gap it is, a parameter anywhere in {@code written}. */
+        private void anyParameter(CoreValue written) {
+            switch (written) {
+                case TokenValue token when declares(token.text()) -> throw inPlace(token.text(), "a type written in place");
+                case ArrayValue array -> array.elements().forEach(element -> anyParameter(element.coreValue()));
+                case MapValue map -> map.entries().forEach(entry -> {
+                    anyParameter(entry.key().coreValue());
+                    anyParameter(entry.value().coreValue());
+                });
+                case RecordValue record -> record.fields().forEach(field -> anyParameter(field.value().coreValue()));
+                default -> {
+                }
+            }
+        }
+
+        /** A parameter at {@code slot} inside a type written in place, which phase 1 cannot bind (see this walk). */
+        private static UnsupportedOperationException inPlace(String parameter, String slot) {
+            return new UnsupportedOperationException("parameter '" + parameter + "' stands at " + slot + ", inside "
+                    + "a type written in place: an open record's parameters are not yet substituted there -- write "
+                    + "the application the sugar spells, 'meta.array<" + parameter + ">' for '[" + parameter + "]'");
         }
 
         /**
@@ -357,7 +459,7 @@ final class ParameterTypes {
         }
 
         private void elements(ArrayValue array, Top type, String slot) {
-            TypeRef element = switch (type) {
+            TypeExpr element = switch (type) {
                 case ArrayBody arrayBody -> arrayBody.elementType();
                 default -> null;
             };
@@ -365,7 +467,7 @@ final class ParameterTypes {
                 return; // not a collection slot -- a shape error the constructor's own reader reports
             }
             for (int i = 0; i < array.elements().size(); i++) {
-                TypeRef declared = element != null ? element
+                TypeExpr declared = element != null ? element
                         : ((TupleBody) type).elements().get(Math.min(i, ((TupleBody) type).elements().size() - 1))
                                 .elementType();
                 value(array.elements().get(i).coreValue(), declared, slot);

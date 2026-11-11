@@ -21,8 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>[TSON-SCHEMA] §8.3 flattens a type position past an {@code ALIAS} entry and records the name the
  * author wrote as {@code @alias} on the type-ref, so {@code c: pct} over {@code pct => small} arrives at the
  * reader as {@code small} -- one shared reader, correctly named {@code small} for a position that names it
- * directly, and wrong for one that does not. A minted construction ({@code e: pair_of<int32>}) is an entry whose
- * content-derived key appears nowhere in the author's file, so its message names the application that closed to it.
+ * directly, and wrong for one that does not. A construction written in place ({@code e: pair_of<int32>}) has no
+ * entry, so its message names the application it was written as, its constructor and arguments.
  *
  * <p>The name is chosen where a composite reader wires
  * its children, which is <b>compile time</b>. Nothing is added to {@code TsonReadContext} and no per-read
@@ -84,25 +84,16 @@ class UseSiteNamingTest {
     }
 
     /**
-     * <b>An application nothing declares is named by the application as written</b> (§5.3, §8.2): {@code
-     * pair_of<int32>} constructs an array under a content-derived name no author wrote, and the message names the
-     * application that closed to it instead.
+     * <b>A construction written in place is named by the application as written</b> (§5.3): {@code pair_of<int32>}
+     * is the array written at the field under its refined constructor, which has no entry, and the message names it
+     * by that constructor rather than by the sugar its body would also fit.
      */
     @Test
-    void aMintedApplicationIsNamedByItsApplication() {
+    void aConstructionInPlaceIsNamedByItsConstructor() {
         List<String> found = messages("  r => { e: pair_of<int32> }", "!r { e: [1 2 3] }");
 
         assertEquals(1, found.size(), found::toString);
         assertTrue(found.getFirst().startsWith("'pair_of<int32>'"), found.getFirst());
-    }
-
-    /** A record application nothing declares is named by its application too, not by its body. */
-    @Test
-    void aMintedRecordIsNamedByItsApplication() {
-        List<String> found = messages("  bx => <T> { v: T }\n  r => { e: bx<int32> }", "!r { e: { v: 1  nope: 2 } }");
-
-        assertEquals(1, found.size(), found::toString);
-        assertTrue(found.getFirst().startsWith("unknown field 'nope' on 'bx<int32>'"), found.getFirst());
     }
 
     /** The same for a set: {@code set<text>} is named as the application, not as the array {@code [text]}. */

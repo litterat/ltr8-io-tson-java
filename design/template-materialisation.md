@@ -8,127 +8,129 @@ derived — and the static check that runs before any of it.
 
 - The pass order in `SchemaResolver` is fixed: the driving loop resolves every declaration, then
   `TemplateRegularity.check`, then `ParameterTypes.check` and `checkDeferred`, then `materialise`, then
-  `appliedParentEdges` and `closeChains`, then the synthetic merge. Every step reads what the one before it settled.
+  `appliedParentEdges` and `closeChains`. Every step reads what the one before it settled.
+- **Nothing is minted.** An application is closed where it stands, or closes into the declaration that names it, or
+  is reported; no entry is added under a name derived from content or from the application.
 - A template that fails the regularity check, or whose parameters stand where none may, is replaced with the
   error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
-  application's head resolves). The depth guard stays as a backstop for a hole in the check.
-- The pass runs over the **resolved** form. In an open record it closes only the field types that name none of its
-  parameters (`OpenEntry.parameterIn`, applied in `MetaRefs`).
-- An application's arguments are dereferenced before it is closed, and only a reference is dereferenced — a
-  refinement and a fresh instance keep their own applications.
-- `close` asks first whether the head, past its alias hops, is a constructor (`construction`,
-  `design/constructor-application.md`): construction sugar builds the binding record the braced form writes, its
-  arguments as written and not dereferenced, and names the content-keyed synthetic `[T]` and `{K => V}` land on. It
-  mints no instantiation entry, records no `@meta.application` and owns nothing; only `closedApplications` hears of it.
-- A declaration naming an application **is** that entry (`closeApplicationInto`): no internal name is derived or
-  claimed and nothing is published beside it; `ownedBy`, keyed on the canonical application, is what a use site
-  reuses.
-- The memo is registered before the body is substituted (knot-tying), arguments close innermost-first, and
-  substitution descends into arguments.
-- An application nothing declares is its expansion: the use site names the closed synthetic record, named for its
-  binding record (`mintedRecord`). The exception is an expansion that reaches its own application (`tied`), which keeps
-  an instantiation entry: the record itself, under the application-derived name.
-- Every instantiation — a declared one, a self-reaching one — records its application in the map `SchemaResolver`
-  shares with the materialiser, in its reduced form (each argument closed to the entry it names), which §8.2's
-  identity and the applied-parent fold key on. The entry's key carries it as `@meta.application` **as written**
-  (`asWritten`, `writtenApplications`): nested arguments unreduced and each stated the same way,
-  `@meta.application:pair<box<text> int32>`, a bare-name argument followed through its alias chain (§8.2). An
-  expansion carries no `@meta.application`.
-- Every application the pass closes, an expansion's included, is recorded against the entry it closed to
-  (`closedApplications`, as met, a construction's included), and `SchemaResolver` stores the
-  list on that entry as `TsonSchema.EntryFacts.closes`: held in memory, never written. It is what a message names a
-  minted entry by (`EntryDisplayName`). No read resolves an application against it: data holds a reference as a
-  name (§4.2, `design/references.md`).
-- A composition operand never closes, open or closed: it is absorbed by value and mints nothing. A closed refinement
-  source is closed on demand, through the same materialiser instance.
-- Which parents were applications is read off the open record's chain `parents`, not off the closed one, whose
-  `supertypes` are bare names; a closed type keeps no `parents` once `closeChains` has run, and an open record
-  keeps its parents as written.
-- A minted record is a member of nothing: one whose chain names a declared type is refused when it is minted
-  (`refuseMintedMember`), and the applied-parent fold skips synthetics.
+  application's head resolves).
+- The pass runs over the **resolved** form through `MetaRefs`, whose `Rewrite` tells a type slot (`atSlot`) from a
+  slot that holds a name (`atName`). In an open record it closes only the field types that name none of its
+  parameters (`OpenEntry.parameterIn`).
+- An application over a **constructor** (`construction`, `design/constructor-application.md`) is the construction
+  written in place at a type slot: construction sugar builds the binding record the braced form writes, the
+  constructor's reader reads it, the body is walked so each argument closes where it landed (a nested constructor's
+  application, which an open record holds for `{text => [T]}`, in place too), and the slot holds `TypeInline` of it,
+  under the head past its alias hops (`pair_of<int32>` under `pair_of`, `set<text>` under `meta.set_type`).
+  Only a container, a tuple, a choice or a reference is constructed in place (`TypeInline.constructible`); any other
+  construction is refused, to be declared.
+- **Where only a name may stand an application closes nowhere** (§4.2): at a slot `MetaRefs` walks with `atName` — a
+  map's key, a reference's `of`, an alias's target — a construction and an application of an open record are both
+  refused (`closeName`, `nameRequired`), and so is an application at a parameter's bound (`ParameterTypes.requireType`).
+  Each is a `SchemaValidationException` at the declaration that wrote it, naming the declaration to write.
+- An application of an **open record** closes into the declaration that names it (`closeApplicationInto`): the
+  record itself, recorded with its application. **At a type slot it closes in place** (`instantiate`) -- at a field of
+  a closed record, or left in another record's body by closing it: the substituted record, closed, its chain dropped,
+  held as `TypeInline.closing(application, record)`, the application as written kept for messages and nowhere else.
+  Nothing is minted, nothing records it, and it is never looked up to a declaration. A nested application equal to the
+  one a declaration is closing names that declaration (`closingInto`). One at a refinement source is absorbed, as a
+  composition operand is (below).
+- **Two refusals come before closing in place** (`instantiate`): one whose record in place would be IS-A a declared
+  type (`refuseMembership`, §5.2), and a recursion with no declaration to tie to (§5.10.1). Held in an open record,
+  either is reported at the declaration whose application closed it.
+  - *Membership* has two halves. A template's written parents reaching a declared type are judged at once. An applied
+    parent a declaration names (`dog_of => <T> animal_of<T> & { … }` beside `animal_text => animal_of<text>`) is known
+    only once every declaration has closed, so one asked while declarations are being made ready is deferred to
+    `checkDeferred` (`deferredMemberships`); asking then would depend on declaration order.
+  - *Recursion* is judged by closing, not by the template's shape. `closingInPlace` is a stack of the applications
+    closing in place, keyed on the canonical application: one reached again inside its own closing, with no
+    declaration closing it, is refused, naming it and the declaration to write. Mutual recursion through records in
+    place therefore ties to the declaration being closed (`a_text => a<text>` closing `b: b<T>` in place, whose
+    `a<text>` names `a_text`), and is refused at a slot (`f: b<text>`), with or without `a_text` declared, since an
+    application at a slot is never looked up. Regularity passes each parameter through unchanged and an argument is a
+    name, so every cycle repeats an application exactly and the closing ends.
+- An argument of an open record's application is a name or a parameter (§5.3): a construction or an application
+  there is refused (`closeArgument`, `argumentNotAName`), to be declared under a name and passed by it. Inside an open
+  record the held applications are judged at its declaration (`ParameterTypes`' `requireNames`): every argument of an
+  open record's application, and every argument of a constructor's that lands at a slot holding only a name
+  (`ConstructionSugar.slotsInPlace`); one at a constructor's type slot is held and closes there. An application's
+  arguments are dereferenced before it is closed, and only a reference is dereferenced.
+- Every instantiation records its application in the map `SchemaResolver` shares with the materialiser, in its reduced
+  form, which the applied-parent fold keys on; the entry's key carries it as `@meta.application` **as written**
+  (`asWritten`, `writtenApplications`).
+- A composition operand never closes, open or closed: it is absorbed by value. Which parents were applications is
+  read off the open record's chain `parents`; a closed type keeps no `parents` once `closeChains` has run.
 - No application is IS-A its template (§5.10): its edges are what its template's written parents reach, each closed
-  parent through `Ancestry`, and an applied parent through the fold to the entry that application denotes.
-- Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written. A record, open or
-  closed, takes the base kind its chain reaches; every other entry takes the branch of `Top` its body occupies.
+  parent through `Ancestry`, and an applied parent through the fold to the declaration that application denotes.
+- Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written.
 
 Related: `design/open-records.md` (what an open record is, where a parameter stands, bounds and argument
 checks), `design/schema-resolution.md` (chains, applied parents),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `DerivedName`, `MetaRefs`, `@meta.synthetic`),
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `DerivedName`, `MetaRefs`, `@meta.application`),
 `design/constructor-application.md`, `design/linking-and-compilation.md`.
 
 ## Materialisation (`tson-compiler/.../resolver/TemplateMaterialiser.java`)
 
 - **Arguments are dereferenced before an application closes** (`dereferenced`). A reference is a pure rename (§8.3:
   "a reference is the same type under another name"), so `box<user_id>` over `user_id => uuid` *is* `box<uuid>`
-  and must be one entry; otherwise the arguments would be interchangeable at a scalar position and the
+  and must be one application; otherwise the arguments would be interchangeable at a scalar position and the
   applications refused one layer up. A refinement (`!uuid ^ {}`) and a fresh instance (`!net.uuid_type {}`) are
   ordinary entries and keep their own applications, which is what makes those spellings mean something. **Identity
   is normalised, provenance is not**: the canonical application is what identity keys on, `@meta.application` states
   the application as written past its alias hops, and the use site still names what the author wrote, since no
   pass rewrites use sites (§8.3). It rests on nothing that changes how
   a value reads riding on a reference — a `bytes` alphabet is `binary.bytes_type`'s own selector (§5.5).
-  `AliasedArgumentIdentityTest` pins it. `closeApplicationInto` dereferences the same way, so the declared and the
-  minted path agree on the name, the ownership key and the recorded application.
+  `AliasedArgumentIdentityTest` pins it. `closeApplicationInto` and `closeApplicationOfRecord` dereference the same
+  way, so a declaration and a nested application agree on the canonical application.
 - **It runs over the resolved form, not the AST.** An application arrives as a `schema.meta.TypeRef` carrying
-  `arguments`, which is all that shape means (a closed form is always an entry named by a bare reference), so
-  substitution is a walk over values; and the entry records its application on its key, which an injected
-  `SchemaMap.Declaration` has no channel for. That rules out doing this in `SchemaDesugarer` and keeps that phase
-  purely syntactic.
+  `arguments`, so substitution is a walk over values, and a declared application records its application on its key.
+  That keeps `SchemaDesugarer` purely syntactic.
 - **An open body closes only what names none of its parameters.** `chain<T>` inside `chain` awaits substitution;
-  closing it would mint an entry per level keyed on the literal parameter name. A field type that names no
-  parameter at any depth (`tag: box<text>`, `tags: [box<text>]`) means the same in every application, so it is
-  closed in place and the base names the entry each member names — which is what `FamilySelectors` reads a
-  selector's type from, and what keeps the synthetic merge's renames reaching the base.
-- **A minted entry's identity is its content** (§8.2): its name derives from its binding record, so two `box<text>`
-  anywhere land on one entry, and so do `box<int32>` and `crate<int32>` over two templates with one field list. A
-  declared entry's identity is its name, and its key records its application, so an imported schema's
-  declared applications unify with a later schema's use sites (`ownedBy`).
+  closing it would close on the literal parameter name. A field type that names no parameter at any depth
+  (`tag: meta.ref<order>`, `tags: [text]`) means the same in every application, so it is closed at the declaration
+  and every application holds the same type — which is what `FamilySelectors` reads a selector's type from.
+- **Nothing is identified by its content.** A declared application's identity is its declaring document and its
+  name, its key recording the application (`@meta.application`); a construction closed at a slot is a `TypeInline`,
+  one type with an equal one by constructor and fields (§8.2). Nothing is minted, so nothing unifies across
+  schemas, and two declarations of one application are two entries.
 - **A declaration naming the application *is* that entry** (§8.2). `text_box => box<text>` resolves to the closed
   record under `text_box`, its key recording the application — not an `Alias` to an entry beside it.
-  `DefinitionResolver` reaches `closeApplicationInto`, which builds the body under the declared name, calls
-  `MintedNames.claim` for none of it and publishes nothing, so the synthetic is never created rather than created and
-  collapsed. It records `ownedBy` instead, which serves twice: as the knot-tie for recursion inside the closure, and
-  as what a use site writing the same application reuses. It returns `null` — the caller keeps the reference form —
-  for an unresolved or parameterless head and an arity mismatch, both the ordinary path's to report.
+  `DefinitionResolver` reaches `closeApplicationInto`, which builds the body under the declared name and, while it
+  closes, registers the canonical application in `closingInto`, the knot-tie for recursion inside the closure. It
+  returns `null` — the caller keeps the reference form — for an unresolved or parameterless head and an arity
+  mismatch, both the ordinary path's to report.
   - **Two declarations of one application are two entries**, each closing into its own name, with no privileged
     first — as two hand-written records with identical fields are. Where they are family members §5.2's
     pin-distinctness rule refuses them, the same verdict the hand-written pair gets.
   - **The parent edge is derived after the fact, order-independently** (`SchemaResolver.appliedParentEdges`). The
     entry an applied parent denotes is whichever declaration names that application, and asking during closing
     would make the answer depend on declaration order. The fold indexes entries by their recorded canonical
-    application, plus `expansionsByApplication` for the minted expansions that record none (`& box<int32>` reaches
-    the entry `box<int32>` at a use site expanded to), and folds each owner and its ancestors into `supertypes` to a
-    fixed point.
-  - **A use-site application still mints, and must** — it has no author-written name for identity to key on. One
-    whose chain names a declared type, through a supertype or a parent application a declaration owns, would be an
-    unnameable family member, and `refuseMintedMember` refuses it at minting, naming the application, against the
-    declaration that wrote it. A constructor (a record IS-A the kernel's `meta.top`) is exempt. The linker's check
-    (`RecordExtension`, `design/inhabitance-and-record-extension.md`) covers the instantiation entry a self-reaching
-    expansion keeps.
-- **Arguments close innermost-first**, so `box<box<text>>` builds the inner entry before the outer one names it.
+    application (`DerivedName.canonicalApplication`) and folds each owner and its ancestors into `supertypes` to a
+    fixed point. An application no declaration names contributes no edge: nobody declared that type.
+- **An argument of an open record's application closes nothing.** It is a name or a parameter (§5.3), so an
+  application or a construction there is refused (`closeArgument`); an argument of a constructor's application lands
+  at the construction's slot and closes there.
 - **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head abstraction),
   but it may be one *inside an argument list*, which is what recursion looks like; binding only the outer name
-  leaves `T` in `chain<T>` and mints an entry per level.
-- **Knot-tying** is the memo, registered before the body is substituted under the application-derived name: a
-  recursive application reached during substitution finds the entry under construction, is recorded in `tied`, and
-  references it by name. Only an open record is substituted, so every closing has an entry under construction to
-  name.
-- **The depth guard (`MAX_CLOSING_DEPTH`, 64) is a backstop.** Regular recursion ties the knot on its first repeat
-  and never nests, so nothing reaching this pass should run away; the guard exists so a hole in `TemplateRegularity`
-  ends as a diagnosis named for the outermost head rather than a `StackOverflowError`, which the exception policy
-  cannot classify.
-- **Substitution changes no field fact.** A field's value is never a parameter (§5.10), so replacing each
-  `ParamRef` with its argument is the whole of it (`Substitution`, in `closeOpenRecord`): every field's type is then
-  closed, the applications in it -- a held `meta.array<T>` or `box<T>` among them -- closed now that the parameter is
-  bound, and nothing is written out or read back. The result is a `RecordBody` without `parameters`; one left holding
-  a `ParamRef` would be refused by the record's constructor. A value that differs per application is pinned where
-  the application is declared (`created => response<order> & { status?: = 201 }`), by composition. The record-level
-  facts are kept as written too: `extension`, `discriminators`, groups and name type are each application's, so an
-  abstract template's application is an abstract record, the base of the declarations composing it (§5.10).
-- **A closed record is minted with no subtypes.** `subtypes` is linking's, derived over the closed namespace. Taking
+  leaves `T` in `chain<T>` unbound.
+- **Knot-tying is `closingInto`**, registered before the body is substituted and keyed on the canonical
+  application: a recursive application reached during substitution finds the declaration being closed and names it.
+  One reached again inside its own closing in place, with no declaration closing it, is refused (`closingInPlace`,
+  §5.10.1), so regular recursion ties on its first repeat or stops there, and nothing nests without bound.
+- **Substitution changes no field fact.** A field's value is never a parameter (§5.10), so replacing each `ParamRef`
+  with its argument is the whole of it (`Substitution`, in `closeOpenRecord`): every field's type is then closed, the
+  applications in it -- a held `meta.array<T>` or `box<T>` among them -- closed now that the parameter is bound, and
+  nothing is written out or read back. A type written in place in the template is walked too: it holds no parameter, but
+  may hold an application of an open record the materialise pass has not reached in the template's own entry
+  (`[box<text>; 2..]`), which closes where it stands. The result is a `RecordBody` without `parameters`; one left
+  holding a `ParamRef` would be refused by the record's constructor. A value that differs per application is pinned
+  where the application is declared (`created => response<order> & { status?: = 201 }`), by composition. The
+  record-level facts are kept as written too: `extension`, `discriminators`, groups and name type are each
+  application's, so an abstract template's application is an abstract record, the base of the declarations composing it
+  (§5.10).
+- **A closed record is built with no subtypes.** `subtypes` is linking's, derived over the closed namespace. Taking
   the template's list would hand each instantiation the whole family and, for a template imported already linked,
-  itself — and an entry shaped by *which* schema closed it is not a function of its form, so two schemas closing one
-  application would collide instead of unifying (§2.2.3, §8.2).
+  itself.
 - **An application whose head names nothing in scope is left whole, arguments and all.** The verdict is the linker's,
   as an unresolved reference; a head stripped of its arguments would instead be faulted for supplying none, the
   opposite of what the author wrote (`'box<some_typo>' field 'v' has an unresolved reference 'some_typo'`).
@@ -145,14 +147,13 @@ checks), `design/schema-resolution.md` (chains, applied parents),
 A composition operand (§5.8) and a refinement source (§5.7) both need the source's *fields* while a declaration
 resolves, before the batch pass runs. They are handled differently.
 
-- **A composition operand never closes, open or closed** (`DefinitionResolver.openOperand`). §8.2: "an application
-  there is subsumed as an operand and mints nothing". The operand, an open record, is substituted on the model with
+- **A composition operand never closes, open or closed** (`DefinitionResolver.openOperand`): it is absorbed by
+  value (§5.8). The operand, an open record, is substituted on the model with
   the arguments as written (`Substitution.fields`), an argument naming the absorbing declaration's own parameter
   landing as that declaration's name for it, which its own record holds as its parameter in turn; the fields are
   absorbed, the operand contributes its template's
   ancestors (`Ancestry.ofTemplate`) and not its own name, and the application is kept in the declaration's
-  `parents`, arguments and all. Minting an entry for it would give a form nothing names an entry with one subtype
-  and no referent. The arguments still need §5.10's bound check, which closing would have given them, so
+  `parents`, arguments and all. The arguments still need §5.10's bound check, which closing would have given them, so
   `openOperand` calls `ApplicationCloser.checkArguments`, deferred like every check asked for during resolution
   (`design/open-records.md`, "The call-site check").
   - **Open** (`vip => <T> customer & box<T>`): the open record writes `box<T>` as a parent, and it is substituted
@@ -167,22 +168,19 @@ resolves, before the batch pass runs. They are handled differently.
     typed `pet` dispatches to it), and the application kept in the chain is folded like any other, to the entry
     `pet_of<dog_type>` denotes where one exists. No edge is stated to the template: a template is no type (§5.10).
     A removal empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
-- **A closed refinement source is closed on demand** (`DefinitionResolver.closedApplication`, through the
-  `ApplicationCloser` hook): `^` re-emits and tightens the source's whole field set, which lives on the entry the
-  application denotes. The closing goes through `close`, so it reuses a declaration that owns the application or
-  mints the expansion. The hook is wired to the batch pass's own instance, so an on-demand closing and a later
-  closing of the same application land on one entry, and each entry is **published into the namespace as it is
-  built**: the source's fields are read through the namespace the very next step. A source applied to the
-  declaration's own parameters is absorbed by `openOperand` instead, as composition is.
+- **A refinement source is absorbed like an operand** (`DefinitionResolver.resolveRefinement`, through
+  `openOperand`): an application of an open record at `^`, closed (`x => box<text> ^ { … }`) or over the declaration's
+  own parameters, contributes the substituted field set `^` re-emits and tightens, and its template's ancestors, and
+  mints nothing. The application stays the written parent (`refineOnto`): an open record's, substituted when it closes,
+  and a closed declaration's, which the fold turns into the edge to the entry declared for it where one is, so `x` is
+  IS-A `box`'s written parents and `text_box` where `text_box => box<text>` is declared, and never `box`. Only a
+  refinement of a name records `refines`. `InlineTypeRulesTest` pins it.
 - **The cycle guard still applies.** An operand's or source's head resolves through the resolution's `WaitOrder`,
   where an entry waiting on itself is refused, so a cycle reached through an application
   (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on
   'a'`) rather than recursing (`RecordTemplateTest.aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle`).
-- **An argument that is itself an application survives whole.** Substitution writes a bound reference through
-  `WireForm.refValue` — a bare token with no arguments, a `ReferenceValue` with them — so `box<inner<T>>`
-  keeps `inner<T>` for the absorbing declaration's own materialisation to close. Sharing that producer is the
-  requirement: two spellings of one form would be two entries for one type, since a name derives from what is
-  written.
+- **An argument is a name or a parameter** (§5.3): an operand's argument list holds no application, which
+  `ParameterTypes`' `requireNames` refuses at the open record's declaration and `closeArgument` at a closed one.
 - **What an operand may not be.** Each is refused at the declaration that writes it:
   - a parameter as a head, `<T> { v: T<text> }` (`SchemaResolver.refuseHeadAbstraction`, over the open record's
     applications, `OpenEntry.applications`): §5.10 admits no head abstraction. The linker's arity check reads the
@@ -244,6 +242,5 @@ a recursive application — direct or mutual — must pass each parameter throug
 - **Arity is not checked here**; the linker checks it over an open record's references (`TsonSchemaLinker`, §5.10), so
   this compares positionally only where the arity already matches.
 - **A condemned template does not reach materialisation.** `check` returns the names it rejected and
-  `SchemaResolver.condemn` replaces each with the placeholder a failed declaration leaves, in both maps. Otherwise an
-  application of it would run to `MAX_CLOSING_DEPTH` and report the defect a second time, against whichever entry
-  applied it, with a 64-link chain of synthetic names attached.
+  `SchemaResolver.condemn` replaces each with the placeholder a failed declaration leaves, in both maps, so an
+  application of it reports nothing further.

@@ -10,5 +10,5 @@ package io.ltr8.tson.compiler.ast.schema;
  * <p><b>One tier.</b> A container admits a size specifier and an element {@code ?} wherever it stands, and a
  * declaration-level container arrives as {@code [type-params] type-ref} rather than through a production of its own.
  */
-public sealed interface TypeExpr permits Reference, ArrayExpr, ChoiceExpr, MapExpr, TupleExpr {
+public sealed interface TypeExpr permits Reference, ArrayExpr, ChoiceExpr, MapExpr, TupleExpr, InlineConstruction {
 }

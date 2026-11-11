@@ -5,11 +5,14 @@ import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.FieldTypeExpr;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Type;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
@@ -29,10 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>Inside an open record a container over a parameter is the reference it spells</b> ([TSON-SCHEMA] §5.10):
  * {@code [tree<T>]} is the application {@code meta.array<tree<T>>}, held as written until the record is applied, and
- * then constructed, the content-keyed entry {@code [tree<text>]} lifts to. A sized form over a parameter is no
- * reference and is refused. <b>A closed form</b> ({@code [box<text>]}) names the entry {@code box<text>} denotes,
- * which does not exist until materialisation runs a phase later: the lift writes the application as its reference,
- * and materialisation closes it.
+ * then constructed in place. A sized form over a parameter is no reference and is refused. <b>A closed form</b>
+ * ({@code [box<text>]}) is the array in place whose element holds the record {@code box<text>} closes to, in place
+ * too: nothing is lifted or minted.
  */
 class ApplicationInContainerPositionTest {
 
@@ -58,16 +60,19 @@ class ApplicationInContainerPositionTest {
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
-    private static String fieldType(TsonCompiledSchema compiled, String record, String field) {
-        RecordBody body = (RecordBody) compiled.schema().entries().get(record);
-        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
-                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeRef().name();
+    /** What field {@code field} of the record {@code record} holds: an entry's, or a record in place's. */
+    private static FieldTypeExpr slot(Top record, String field) {
+        return ((RecordBody) record).fields().get(field).type();
+    }
+
+    /** The body a slot holds written in place. */
+    private static Type inPlace(Object slot) {
+        return assertInstanceOf(TypeInline.class, slot).of();
     }
 
     /**
-     * The entries this schema derived rather than the author declaring them -- synthetics and instantiations, its
-     * closure's own left out.
+     * The entries this schema declares without a position of its own -- what a lift or a mint would add, its
+     * closure's own left out. Nothing is added: a form and an application close in place.
      */
     private static List<String> derived(TsonCompiledSchema compiled) {
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(compiled.schema().id());
@@ -77,29 +82,30 @@ class ApplicationInContainerPositionTest {
                 .map(java.util.Map.Entry::getKey).sorted().toList();
     }
 
+    private static Top entry(TsonCompiledSchema compiled, String name) {
+        return compiled.schema().entries().get(name);
+    }
+
     // ── A recursive template: the knot tied through a construction ──────────
 
     /**
-     * {@code tree => <T> { value: T  children?: [tree<T>] }} closed via {@code tree<text>}. The field holds the
-     * reference {@code meta.array<tree<T>>}; closing {@code tree<text>} substitutes it to {@code
-     * meta.array<tree<text>>}, whose argument reaches back to the entry still under construction, and the memo is
-     * what answers: the array's {@code element_type} names the instantiation entry, recorded before it completes.
+     * {@code tree => <T> { value: T  children?: [tree<T>] }} closed by {@code text_tree => tree<text>}. The field holds
+     * the reference {@code meta.array<tree<T>>}; closing substitutes it to {@code meta.array<tree<text>>}, whose
+     * argument is the application the declaration is closing, so the array's {@code element_type} names the
+     * declaration (§5.10.1).
      */
     @Test
     void aRecursiveTemplateTiesTheKnotThroughTheArray() {
         TsonCompiledSchema compiled = compile("""
-                  tree => <T> { value: T  children?: [tree<T>] }
-                  use  => { t: tree<text> }""");
+                  tree      => <T> { value: T  children?: [tree<T>] }
+                  text_tree => tree<text>
+                  use       => { t: text_tree }""");
 
-        String instantiation = fieldType(compiled, "use", "t");
-        ArrayBody children = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(fieldType(compiled, instantiation, "children")));
-
-        assertEquals(TypeRef.of(instantiation), children.elementType(), "the knot");
-        assertEquals("tree", compiled.schema().applicationOf(instantiation).orElseThrow().name(),
-                "an expansion naming itself keeps an entry recording its application");
-        assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries().get(instantiation))
-                .fields().get("value").type(), "T bound at the value field too");
+        ArrayBody children = assertInstanceOf(ArrayBody.class, inPlace(slot(entry(compiled, "text_tree"),
+                "children")));
+        assertEquals(TypeRef.of("text_tree"), children.elementType(), "the knot");
+        assertEquals("tree", compiled.schema().applicationOf("text_tree").orElseThrow().name());
+        assertEquals(TypeRef.of("text"), slot(entry(compiled, "text_tree"), "value"), "T bound at the value field too");
     }
 
     /** The template holds the array as the reference it spells, its parameter among the arguments. */
@@ -120,8 +126,9 @@ class ApplicationInContainerPositionTest {
     @Test
     void aTreeReadsRealData() {
         TsonCompiledSchema compiled = compile("""
-                  tree => <T> { value: T  children: [tree<T>] }
-                  use  => { t: tree<text> }""");
+                  tree      => <T> { value: T  children: [tree<T>] }
+                  text_tree => tree<text>
+                  use       => { t: text_tree }""");
 
         assertNotNull(compiled.get("use").read(TestDocuments.document(
                 "{ t: { value: \"root\"  children: [ { value: \"leaf\"  children: [] } ] } }")));
@@ -142,16 +149,15 @@ class ApplicationInContainerPositionTest {
                 + "reference"), thrown.getMessage());
     }
 
-    // ── One entry per form, whichever channel produced it ────────────────────
+    // ── One type per form, whichever channel produced it ─────────────────────
 
     /**
-     * {@code grid => <T> { x: [[T]] }} closed via {@code grid<pixel>} from two declarations derives one record and
-     * the two arrays it holds, and a declaration writing {@code [[pixel]]} directly lands on the same arrays: the
-     * construction and the lift name a form by its content (§8.2). Nothing records the application, an application
-     * nothing declares being its expansion.
+     * {@code grid => <T> { x: [[T]] }} closed by {@code grid<pixel>} at two fields closes to one type, and a field
+     * writing {@code [[pixel]]} directly holds the same arrays: equal constructions in place are one type (§8.2).
+     * Nothing is added to the schema, and nothing records the application.
      */
     @Test
-    void aHeldArrayClosesOntoTheFormItsSugarLiftsTo() {
+    void aHeldArrayClosesToTheFormItsSugarWrites() {
         TsonCompiledSchema compiled = compile("""
                   pixel  => { r: int32 }
                   grid   => <T> { x: [[T]] }
@@ -159,17 +165,16 @@ class ApplicationInContainerPositionTest {
                   b      => { g: grid<pixel> }
                   direct => { d: [[pixel]] }""");
 
-        String form = fieldType(compiled, "a", "g");
-        assertEquals(form, fieldType(compiled, "b", "g"), "one expansion");
-        assertEquals(fieldType(compiled, "direct", "d"), fieldType(compiled, form, "x"),
+        FieldTypeExpr a = slot(entry(compiled, "a"), "g");
+        assertEquals(a, slot(entry(compiled, "b"), "g"), "one type");
+        assertEquals(slot(entry(compiled, "direct"), "d"), slot(inPlace(a), "x"),
                 "the rows the grid builds are the rows written directly");
-        assertTrue(compiled.schema().applicationOf(form).isEmpty(), "no entry records the application");
-        assertEquals(3, derived(compiled).size(), () -> "one record and two arrays: " + derived(compiled));
+        assertEquals(List.of(), derived(compiled), "nothing added");
     }
 
     /**
      * <b>Templates are consulted, never modified, by closure.</b> Closing {@code grid<voxel>} after {@code
-     * grid<pixel>} leaves {@code grid} exactly as it was and adds the second application's forms beside the first's.
+     * grid<pixel>} leaves {@code grid} exactly as it was, and adds nothing to the schema.
      */
     @Test
     void closingASecondArgumentLeavesTheTemplateUntouched() {
@@ -185,10 +190,10 @@ class ApplicationInContainerPositionTest {
                   three => { g: grid<pixel> }
                   four  => { g: grid<voxel> }""");
 
-        Top grid = both.schema().entries().get("grid");
+        Top grid = entry(both, "grid");
         assertEquals(List.of("T"), OpenEntry.parameterNames(grid), "the declared template, unchanged");
-        assertEquals(one.schema().entries().get("grid"), grid);
-        assertEquals(6, derived(both).size(), () -> "three forms per closure: " + derived(both));
+        assertEquals(entry(one, "grid"), grid);
+        assertEquals(List.of(), derived(both));
     }
 
     /** The smallest form needing any of this: one array over one parameter, closed to an array of the argument. */
@@ -198,10 +203,10 @@ class ApplicationInContainerPositionTest {
                   box => <T> { a: [T] }
                   use => { u: box<uuid> }""");
 
-        ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
+        ArrayBody array = assertInstanceOf(ArrayBody.class, inPlace(slot(inPlace(slot(entry(compiled, "use"), "u")),
+                "a")));
         assertEquals(TypeRef.of("uuid"), array.elementType());
-        assertEquals(2, derived(compiled).size(), () -> derived(compiled).toString());
+        assertEquals(List.of(), derived(compiled));
     }
 
     // ── The nested form in miniature, and the closed case ─────────────────────
@@ -212,78 +217,60 @@ class ApplicationInContainerPositionTest {
                   tmpl => <T> { a: [[T]] }
                   use  => { u: tmpl<text> }""");
 
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
-        ArrayBody inner = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(outer.elementType().name()));
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, inPlace(slot(inPlace(slot(entry(compiled, "use"), "u")),
+                "a")));
+        ArrayBody inner = assertInstanceOf(ArrayBody.class, inPlace(outer.elementType()));
 
         assertEquals(TypeRef.of("text"), inner.elementType());
     }
 
     /**
-     * The closed counterpart, which needs no parameters anywhere: {@code [box<text>]} lifts to a synthetic
-     * whose {@code element_type} is the application itself, written as its reference, and
-     * materialisation rewrites it to the instantiation entry one pass later.
-     *
-     * <p><b>The synthetic names something that is not an entry yet, and that is the point.</b> The window is
-     * the same one an ordinary forward reference lives in -- `close()` walks every closed entry's references
-     * after the driving loop, so by the time anything reads this array its element is a real name.
+     * The closed counterpart, which needs no parameters anywhere: {@code [box<text>]} is an array in place whose
+     * {@code element_type} holds the record {@code box<text>} closes to, in place in turn.
      */
     @Test
-    void aClosedContainerHoldsAnApplicationUntilMaterialisationClosesIt() {
+    void aClosedContainerHoldsTheRecordInPlace() {
         TsonCompiledSchema compiled = compile("""
                   box         => <T> { a: T }
                   box_carrier => { a: [box<text>] }""");
 
-        ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, "box_carrier", "a")));
-        Top instantiation = compiled.schema().entries().get(array.elementType().name());
+        ArrayBody array = assertInstanceOf(ArrayBody.class, inPlace(slot(entry(compiled, "box_carrier"), "a")));
+        RecordBody record = assertInstanceOf(RecordBody.class, inPlace(array.elementType()));
 
-        assertEquals(List.of(), OpenEntry.parameterNames(instantiation), "closed");
-        assertEquals(TypeRef.of("text"), ((RecordBody) instantiation).fields()
-                .values().stream().toList().get(0).type(),
-                "T bound");
+        assertEquals(List.of(), OpenEntry.parameterNames(record), "closed");
+        assertEquals(TypeRef.of("text"), slot(record, "a"), "T bound");
         assertNotNull(compiled.get("box_carrier")
                 .read(TestDocuments.document("{ a: [ { a: \"x\" } ] }")));
     }
 
-    /** Arguments close innermost-first, so an application nested inside one needs no separate handling. */
+    /** An application as an argument of another is no name, and is refused where it is written (§5.3). */
     @Test
-    void aNestedArgumentInAClosedContainerClosesInnermostFirst() {
-        TsonCompiledSchema compiled = compile("""
+    void aNestedApplicationAsAnArgumentIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
                   pair => <T> { l: T  r: T }
                   box  => <T> { a: T }
-                  deep => { d: [box<pair<int32>>] }""");
+                  deep => { d: [box<pair<int32>>] }"""));
 
-        ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, "deep", "d")));
-        String inner = fieldType(compiled, array.elementType().name(), "a");
-
-        assertEquals(TypeRef.of("int32"),
-                ((RecordBody) compiled.schema().entries().get(inner)).fields()
-                        .values().stream().toList().get(0).type());
+        assertTrue(thrown.getMessage().contains("'pair<int32>' is passed as an argument of 'box<pair<int32>>'"),
+                thrown.getMessage());
     }
 
-    /** A map's value slot takes one the same way -- the table's scalar type slots are one rule, not three. */
+    /** A map's value slot takes one the same way -- the type slots are one rule, not three. */
     @Test
     void aMapValueSlotHoldsAnApplicationToo() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { a: T }
                   m   => { entries: {text => box<text>} }""");
 
-        MapBody map = assertInstanceOf(MapBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, "m", "entries")));
+        MapBody map = assertInstanceOf(MapBody.class, inPlace(slot(entry(compiled, "m"), "entries")));
 
-        assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries()
-                .get(map.valueType().name())).fields().values().stream().toList().get(0).type());
+        assertEquals(TypeRef.of("text"), slot(inPlace(map.valueType()), "a"));
     }
 
     /**
-     * A binding whose application names no parameter is fully bound already, so it closes where it is written.
-     *
-     * <p>Written as sugar, which expands to a binding whose slot holds the application as the data grammar's
-     * reference ([TSON-DATA] §7.4). The open and closed forms share one production, so this is the rule that
-     * governs a closed instance's payload.
+     * A binding whose application names no parameter is fully bound already, so it closes where it is written, in
+     * the open record's own declaration: {@code [box<text>; 2..]} is the sized array in place, holding the record in
+     * place.
      */
     @Test
     void aConcreteApplicationInABindingClosesAtTheDeclaration() {
@@ -292,11 +279,11 @@ class ApplicationInContainerPositionTest {
                   capped  => <T> { a: [box<text>; 2..]  b: T }
                   use     => { u: capped<int32> }""");
 
-        ArrayBody closed = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
+        ArrayBody closed = assertInstanceOf(ArrayBody.class, inPlace(slot(entry(compiled, "capped"), "a")));
 
         assertEquals(Optional.of(2L), closed.minItems());
-        assertInstanceOf(RecordBody.class,
-                compiled.schema().entries().get(closed.elementType().name()), "box<text>, closed");
+        assertInstanceOf(RecordBody.class, inPlace(closed.elementType()), "box<text>, closed in place");
+        assertEquals(slot(entry(compiled, "capped"), "a"), slot(inPlace(slot(entry(compiled, "use"), "u")), "a"),
+                "every application holds the same type");
     }
 }

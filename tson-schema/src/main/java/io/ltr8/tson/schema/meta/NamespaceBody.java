@@ -33,7 +33,7 @@ import java.util.Optional;
  */
 @Typename(name = "meta.namespace")
 public record NamespaceBody(TypeChain chain, @Field("key_type") TypeRef keyType,
-                            @Field("value_type") TypeRef valueType, @Field("ordered") boolean ordered,
+                            @Field("value_type") TypeExpr valueType, @Field("ordered") boolean ordered,
                             @Field("min_items") Optional<Long> minItems,
                             @Field("max_items") Optional<Long> maxItems) implements Product {
 
@@ -51,13 +51,13 @@ public record NamespaceBody(TypeChain chain, @Field("key_type") TypeRef keyType,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public NamespaceBody(TypeRef keyType, TypeRef valueType, boolean ordered, Optional<Long> minItems,
+    public NamespaceBody(TypeRef keyType, TypeExpr valueType, boolean ordered, Optional<Long> minItems,
                          Optional<Long> maxItems) {
         this(TypeChain.EMPTY, keyType, valueType, ordered, minItems, maxItems);
     }
 
     /** An unbounded namespace type in no chain. */
-    public static NamespaceBody of(TypeRef keyType, TypeRef valueType, boolean ordered) {
+    public static NamespaceBody of(TypeRef keyType, TypeExpr valueType, boolean ordered) {
         return new NamespaceBody(keyType, valueType, ordered, Optional.empty(), Optional.empty());
     }
 

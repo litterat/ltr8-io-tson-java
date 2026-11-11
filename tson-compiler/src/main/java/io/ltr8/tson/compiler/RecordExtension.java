@@ -17,6 +17,7 @@ import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
@@ -338,11 +339,22 @@ final class RecordExtension {
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, Top> merged, Map<String,
             TsonSchema.EntryFacts> facts,
                                                    Map<String, Normalization> enumForms) {
-        if (field.namedType().isEmpty() || !field.typeRef().arguments().isEmpty()) {
-            return Optional.empty();
+        String terminal;
+        Top target;
+        switch (field.type()) {
+            case TypeRef reference when reference.arguments().isEmpty() -> {
+                terminal = AliasChain.terminal(reference.name(), merged);
+                target = merged.get(terminal);
+            }
+            // A type written in place is read by its own body; only a reference among them reads a token.
+            case TypeInline inline -> {
+                terminal = "";
+                target = inline.of();
+            }
+            default -> {
+                return Optional.empty(); // a dependent field, or an application a resolution has not closed
+            }
         }
-        String terminal = AliasChain.terminal(field.typeRef().name(), merged);
-        Top target = merged.get(terminal);
         if (target == null || OpenEntry.isOpen(target) || target instanceof Alias) {
             return Optional.empty();
         }

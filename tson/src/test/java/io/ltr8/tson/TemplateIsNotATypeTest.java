@@ -3,17 +3,20 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.FieldTypeExpr;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.RecordField;
 
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeInline;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -53,8 +56,8 @@ class TemplateIsNotATypeTest {
     }
 
     private static boolean refusedAsATemplate(List<Diagnostic> problems, String template) {
-        return problems.stream().anyMatch(d -> d.message().contains("'" + template + "' is a template taking")
-                && d.message().contains("a template is not a type"));
+        return problems.stream().anyMatch(d -> d.message().contains("'" + template + "'")
+                && d.message().contains("is a template") && d.message().contains("a template is not a type"));
     }
 
     /** The family §5.10 declares with records: the base states the selector, the template composes it. */
@@ -68,12 +71,16 @@ class TemplateIsNotATypeTest {
               holder   => { p: pet }
             """;
 
-    /** The family whose base is an abstract template's application. */
+    /**
+     * The family whose base is an abstract template's declared application: a member reaches it through an applied
+     * parent's edge, which names the entry a declaration gives the application (§5.10).
+     */
     private static final String APPLIED_FAMILY = """
-              tpet   => abstract <B> { kind: text =?  name: text  extra?: B }
-              tdog   => tpet<text> & { kind?: = "dog"  breed: text }
-              tcat   => tpet<text> & { kind?: = "cat"  indoor: boolean }
-              holder => { p: tpet<text> }
+              tpet      => abstract <B> { kind: text =?  name: text  extra?: B }
+              tpet_text => tpet<text>
+              tdog      => tpet<text> & { kind?: = "dog"  breed: text }
+              tcat      => tpet<text> & { kind?: = "cat"  indoor: boolean }
+              holder    => { p: tpet_text }
             """;
 
     // ── No position names a template bare ─────────────────────────────────
@@ -184,13 +191,17 @@ class TemplateIsNotATypeTest {
                   box    => <T> boxed & { v: T }
                   holder => { k: box<text> }
                 """);
-        assertTrue(problems.stream().anyMatch(d -> d.message().contains("composes onto 'boxed'")),
-                problems::toString);
+        assertTrue(problems.stream().anyMatch(d -> d.message().contains("would close in place to a record IS-A "
+                + "'boxed'")), problems::toString);
     }
 
     // ── An abstract template's application is a family base ───────────────
 
-    /** {@code abstract} and the selector are each application's: {@code tpet<text>} dispatches on {@code kind}. */
+    /**
+     * {@code abstract} and the selector are each application's: {@code tpet_text => tpet<text>} dispatches on {@code
+     * kind} over the declarations composing {@code tpet<text>}, and the same application closed in place has no member
+     * (§5.10).
+     */
     @Test
     void anAbstractTemplatesApplicationDispatchesOverItsMembers() {
         assertEquals(List.of(), read("a1", APPLIED_FAMILY, "!holder { p: { kind: cat  name: Tom  indoor: true } }"));
@@ -198,12 +209,16 @@ class TemplateIsNotATypeTest {
         List<Diagnostic> problems = read("a3", APPLIED_FAMILY, "!holder { p: { kind: fish  name: x } }");
         assertEquals(1, problems.size(), problems::toString);
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.getFirst().code());
+        List<Diagnostic> inPlace = read("a3p", APPLIED_FAMILY.replace("{ p: tpet_text }", "{ p: tpet<text> }"),
+                "!holder { p: { kind: dog  name: Rex  breed: lab } }");
+        assertEquals(1, inPlace.size(), inPlace::toString);
+        assertEquals(Optional.of("/p"), inPlace.getFirst().path(), inPlace::toString);
     }
 
     /** The application closes to an abstract record carrying the template's selector; the template is no base. */
     @Test
     void theApplicationCarriesTheTemplatesExtensionAndSelector() {
-        TsonLinkedSchema schema = linked("a4", APPLIED_FAMILY + "  tpet_text => tpet<text>\n");
+        TsonLinkedSchema schema = linked("a4", APPLIED_FAMILY);
 
         RecordBody base = (RecordBody) schema.schema().entries().get("tpet_text");
         assertEquals(RecordExtensionType.ABSTRACT, base.extension());
@@ -233,27 +248,30 @@ class TemplateIsNotATypeTest {
                 .anyMatch(d -> d.message().contains("'final' is refused on a template")));
     }
 
-    // ── A field naming no parameter names one entry in every application ────
+    // ── A field naming no parameter is one type in every application ───────
 
-    private static String fieldType(TsonLinkedSchema schema, String entry, String field) {
+    private static FieldTypeExpr fieldType(TsonLinkedSchema schema, String entry, String field) {
         return switch (schema.schema().entries().get(entry)) {
-            case RecordBody record -> record.fields().get(field).typeRef().name();
+            case RecordBody record -> record.fields().get(field).type();
             default -> throw new AssertionError(entry + " is no record");
         };
     }
 
-    /** A field type naming none of the template's parameters is closed in the template, to the entry each names. */
+    /**
+     * A field type naming none of the template's parameters is closed in the template, in place, and every
+     * application holds the same type: nothing is added to the schema for it.
+     */
     @Test
-    void aClosedApplicationInATemplateIsTheEntryEveryApplicationNames() {
+    void aClosedApplicationInATemplateIsOneTypeInEveryApplication() {
         TsonLinkedSchema schema = linked("c1", """
                   box  => <T> { v: T }
                   pet  => <V> { tag: box<text>  tags: [box<text>]  name: V }
                   cat  => pet<text>
                 """);
 
-        assertEquals(fieldType(schema, "cat", "tag"), fieldType(schema, "pet", "tag"));
-        String tags = fieldType(schema, "pet", "tags");
-        assertEquals(fieldType(schema, "cat", "tags"), tags);
-        assertTrue(schema.schema().entries().containsKey(tags), () -> tags + " is not an entry of the schema");
+        assertInstanceOf(TypeInline.class, fieldType(schema, "pet", "tag"));
+        assertEquals(fieldType(schema, "pet", "tag"), fieldType(schema, "cat", "tag"));
+        assertInstanceOf(TypeInline.class, fieldType(schema, "pet", "tags"));
+        assertEquals(fieldType(schema, "pet", "tags"), fieldType(schema, "cat", "tags"));
     }
 }

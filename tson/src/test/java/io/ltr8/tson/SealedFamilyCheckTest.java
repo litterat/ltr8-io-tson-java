@@ -313,9 +313,9 @@ class SealedFamilyCheckTest {
             """;
 
     /**
-     * An application at a use site that composes onto a family would add a member nothing can name: a read
-     * reports the member it selects, a tag names it and a binding maps it, and a minted name is none of
-     * those (§3.3.4, §8.2). It is reported at the declaration that wrote it, naming the application.
+     * An application at a use site that composes onto a family would close in place to a member nothing can name: a
+     * read reports the member it selects, a tag names it and a binding maps it, and a record in place has no name for
+     * any of those (§5.2). It is reported at the declaration that wrote it, naming the application and the fix.
      */
     @Test
     void aMemberAppliedAtAUseSiteIsRefused() {
@@ -325,12 +325,16 @@ class SealedFamilyCheckTest {
 
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         Diagnostic refusal = diagnostics.getFirst();
-        assertTrue(refusal.message().contains("'dog_of<text>' composes onto 'pet'"), refusal.message());
-        assertTrue(refusal.message().contains("'my_name => dog_of<text>'"), refusal.message());
+        assertTrue(refusal.message().contains("'dog_of<text>' would close in place to a record IS-A 'pet'"),
+                refusal.message());
+        assertTrue(refusal.message().contains("declare it ('text_dog_of => dog_of<text>')"), refusal.message());
         assertEquals("/kennel", refusal.schemaPointer().orElse(""), refusal.toString());
     }
 
-    /** A template body applying a member mints one at each application, and is reported at the application. */
+    /**
+     * A template body applying a member would put one in place at each application, and is reported at the
+     * declaration whose application closed it.
+     */
     @Test
     void aMemberAppliedInsideATemplateIsRefusedAtItsApplication() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_TEMPLATE
@@ -340,7 +344,7 @@ class SealedFamilyCheckTest {
                 }"""));
 
         assertEquals(1, diagnostics.size(), diagnostics.toString());
-        assertTrue(diagnostics.getFirst().message().contains("composes onto 'pet'"), diagnostics.toString());
+        assertTrue(diagnostics.getFirst().message().contains("IS-A 'pet'"), diagnostics.toString());
         assertEquals("/kt", diagnostics.getFirst().schemaPointer().orElse(""), diagnostics.toString());
     }
 
@@ -353,7 +357,7 @@ class SealedFamilyCheckTest {
                 }""");
     }
 
-    /** A minted entry that joins no family is untouched -- an application of a family's base included. */
+    /** A record in place that joins no family loads -- an application of a family's base included. */
     @Test
     void anApplicationThatJoinsNoFamilyLoadsAtAUseSite() {
         isClean(Tson.standard(), "no-family", """

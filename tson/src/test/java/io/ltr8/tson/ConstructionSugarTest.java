@@ -6,6 +6,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeInline;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -47,7 +48,7 @@ class ConstructionSugarTest {
 
     /** The entry a record field's type names. */
     private static String fieldType(TsonLinkedSchema linked, String record, String field) {
-        return ((RecordBody) linked.schema().entries().get(record)).fields().get(field).typeRef().name();
+        return ((RecordBody) linked.schema().entries().get(record)).fields().get(field).typeExpr().text();
     }
 
     private static void assertRefused(List<Diagnostic> problems, String fragment) {
@@ -59,11 +60,10 @@ class ConstructionSugarTest {
     @Test
     void anArrayConstructionIsTheEntryItsSugarLiftsTo() {
         TsonLinkedSchema linked = resolve("array", "  post => { a: meta.array<uuid>  b: [uuid] }");
+        // A use-site construction is written in place, the same construction its sugar is, and no entry.
         String a = fieldType(linked, "post", "a");
         assertEquals(fieldType(linked, "post", "b"), a);
-        assertEquals(Optional.of("meta.array"), linked.schema().factsOf(a).constructor());
-        assertTrue(linked.schema().factsOf(a).synthetic(), "a use-site construction is a closed synthetic");
-        assertEquals(Optional.empty(), linked.schema().applicationOf(a), "a construction states no application");
+        assertEquals("[uuid]", a);
     }
 
     @Test
@@ -99,27 +99,52 @@ class ConstructionSugarTest {
         assertEquals(Optional.empty(), linked.schema().applicationOf("uuid_list"));
     }
 
-    /** A refined constructor's instance is its own kind: one entry apart from the sugar admitting the same data. */
+    /**
+     * A refined constructor's instance is its own type: written in place under its own constructor, and apart from the
+     * sugar admitting the same data, identity being the constructor and the fields (§1.2).
+     */
     @Test
-    void aRefinedConstructorAppliedIsItsOwnEntry() {
+    void aRefinedConstructorAppliedIsItsOwnType() {
         TsonLinkedSchema linked = resolve("refined", """
                   nonempty_type => meta.array ^ { min_items?: = 1 }
                   post => { a: nonempty_type<uuid>  b: [uuid; 1..] }
                 """);
-        String a = fieldType(linked, "post", "a");
-        String b = fieldType(linked, "post", "b");
+        TypeInline a = inlineAt(linked, "post", "a");
+        TypeInline b = inlineAt(linked, "post", "b");
+        assertEquals(b.of(), a.of(), "the same body, built by two constructors");
         assertNotEquals(b, a);
-        assertEquals(Optional.of("nonempty_type"), linked.schema().factsOf(a).constructor());
-        assertEquals(Optional.of("meta.array"), linked.schema().factsOf(b).constructor());
-        assertEquals(Optional.of(1L), ((ArrayBody) linked.schema().entries().get(a)).minItems());
+        assertNotEquals(b.hashCode(), a.hashCode());
+        assertEquals("nonempty_type", a.constructor());
+        assertEquals("meta.array", b.constructor());
+        assertEquals(Optional.of(1L), ((ArrayBody) a.of()).minItems());
+        assertEquals("nonempty_type<uuid>", a.text());
+    }
+
+    /** An alias of a refined constructor is written past its hop: {@code set<text>} is {@code meta.set_type}'s. */
+    @Test
+    void anAliasedConstructorIsRecordedPastItsAlias() {
+        TsonLinkedSchema linked = resolve("aliased", """
+                  bag => set
+                  post => { a: set<text>  b: bag<text>  c: [text] }
+                """);
+        assertEquals("meta.set_type", inlineAt(linked, "post", "a").constructor());
+        assertEquals(inlineAt(linked, "post", "a"), inlineAt(linked, "post", "b"));
+        assertNotEquals(inlineAt(linked, "post", "c"), inlineAt(linked, "post", "a"));
+    }
+
+    /** The type written in place at a record field. */
+    private static TypeInline inlineAt(TsonLinkedSchema linked, String record, String field) {
+        return assertInstanceOf(TypeInline.class,
+                ((RecordBody) linked.schema().entries().get(record)).fields().get(field).typeExpr());
     }
 
     /** Inside a record template the construction is held with the field and closed with each application. */
     @Test
     void aConstructionOverATemplateParameterClosesWithTheApplication() {
         TsonLinkedSchema linked = resolve("template", """
-                  page => <T> { items: meta.array<T> }
-                  post => { p: page<uuid>  b: [uuid] }
+                  page      => <T> { items: meta.array<T> }
+                  page_uuid => page<uuid>
+                  post      => { p: page_uuid  b: [uuid] }
                 """);
         String page = fieldType(linked, "post", "p");
         assertEquals(fieldType(linked, "post", "b"), fieldType(linked, page, "items"));

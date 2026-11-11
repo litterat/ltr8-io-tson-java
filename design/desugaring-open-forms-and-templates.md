@@ -17,13 +17,13 @@ to are in `design/schema-grammar-and-desugaring.md`; what an open record is, in 
   applied. A size or a `?` element (`[T; 1..]`, `{K => V; ..10}`, `[T?]`), a tuple (`[T, text]`) and a choice (`( T |
   error )`) over a parameter are refused at the declaration, naming the form; a choice's message points at field
   groups.
-- **Nothing is lifted for a form over a parameter.** There is no open synthetic entry: a form naming none of the
-  declaration's parameters lifts closed, as it would outside a template (§5.3's one lift rule), and a form naming one
-  is a reference or an error.
+- **A form over a parameter is a reference or an error.** A form naming none of the declaration's parameters is
+  written in place as its construction, as it would be outside a template (§5.3); a form naming one is held as the
+  application it spells, or refused.
 - **A size bound naming one of the declaration's parameters is refused** (`refuseParameterBound`), naming the slot,
-  before the form lifts closed with a parameter in it: a bound is a count, never a type.
-- `WireForm.refValue` is the single place a type slot's shape is decided: one producer, one spelling, because
-  `DerivedName.ofBinding` hashes what is written.
+  before the form is built with a parameter in it: a bound is a count, never a type.
+- `SchemaDesugarer.slotValue` is the single place a type slot's wire shape is decided -- a name, an application
+  through `WireForm.refValue`, or a `{ of: … }` wrapper -- one producer, one spelling.
 - A refused declaration is replaced with the absorbing stand-in, an open empty record keeping its parameters
   (`absorbed`), so an application of it closes against an empty body and says nothing further.
 
@@ -36,13 +36,13 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 
 - **The test is whether the form is a reference.** `container` expands a form's positions first, innermost-first, then
   asks whether any of them names a parameter of the enclosing declaration (`parameterIn`, through application
-  arguments at any depth). If none does, the form lifts closed by the table. If one does, `openForm` decides.
+  arguments at any depth). If none does, the form is written in place by the table. If one does, `openForm` decides.
 - **`[T]` and `{K => V}` are the grammar's spelling of a construction** (§5.3's sugar table, construction sugar), so
   over a parameter they are written as the construction's own application: `[box<T>]` becomes `meta.array<box<T>>`,
   `[[T]]` becomes `meta.array<meta.array<T>>` (the inner form already an application by the time the outer is built),
   `{text => T}` becomes `meta.map<text T>`. The open record holds that reference as written, a `ParamRef` among its
-  arguments, and when the record is applied the materialiser constructs it -- the same content-keyed entry the sugar
-  written over the argument lifts to (`design/template-materialisation.md`).
+  arguments, and when the record is applied the materialiser constructs it in place -- the same construction the
+  sugar written over the argument is (`design/template-materialisation.md`).
 - **A size or a `?` sets a field no argument list carries.** `meta.array<T>` fills `element_type` alone; admitting
   `[T; 1..]` would take a refined constructor nobody wrote, and would leave the line between it, `{text => T}` and `( T
   | text )` to be argued form by form. The author writes the constructor (`nonempty_type => meta.array ^ { min_items?:
@@ -61,7 +61,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
   no record, and names a partial application nothing could close (§5.10: there is no partial application). The
   remedy is restating the body as a record or writing the application at each use.
 - **A record body is not rewritten.** `<T> { x: T }` leaves this phase as the `StructuralTypeDef` it was parsed as, its
-  closed forms lifted and its forms over a parameter written as references, and the resolver builds it the way it
+  closed forms written in place and its forms over a parameter written as references, and the resolver builds it the way it
   builds a closed record (`DefinitionResolver.resolveRecordBody`). The explicit `<T> !meta.record { … }` passes through
   as the `Instance` it is. §5.11's uniqueness rule and the modifier-only refusal are therefore asked once, by the
   resolver, for a template and the closed record beside it alike (`FieldModifiers`).

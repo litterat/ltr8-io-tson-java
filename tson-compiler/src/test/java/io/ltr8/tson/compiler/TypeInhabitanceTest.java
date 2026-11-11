@@ -156,7 +156,9 @@ class TypeInhabitanceTest {
                   tree => <T> { value: T  children: nonempty<tree<T>> }
                   use  => tree<text>""");
 
-        assertTrue(message.contains("use needs nonempty<tree<text>> needs use"), message);
+        // The construction `nonempty<tree<text>>` closes to is written in place at `children`, no link of its own:
+        // the chain runs through the name inside it.
+        assertTrue(message.contains("use needs use"), message);
     }
 
     /** The other half of the same rule: unapplied, it is not judged, and that is not a warning either. */

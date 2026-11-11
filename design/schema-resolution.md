@@ -46,11 +46,12 @@ applications, field facts and refinement, groups, subtraction, and the exception
   parents (`SchemaResolver.appliedParentEdges`); `parents` is the one list holding applications, and a closed type keeps
   none (`closeChains`). A declaration never writes `chain`, and a constructor never declares a field of that
   name (`refuseWrittenChain`, `refuseDeclaredChain`).
-- `subtypes` is linking's throughout: no resolved entry, minted or declared, carries any.
+- `subtypes` is linking's throughout: no resolved entry carries any.
 - A kind and a constructor are judged by where `top` and the base kinds are defined, never by their spelling: the
   resolver's `kernel` predicates, `EntryKind.of(value, kernel)` and `TsonLinkedSchema.isKernel`.
 - No entry is IS-A a template (§5.10): an application's edges are its template's written parents'. A use-site
-  application whose chain would name a declared type is refused when it is minted (`refuseMintedMember`).
+  application whose record in place would be IS-A a declared type is refused (`TemplateMaterialiser.refuseMembership`,
+  §5.2).
 - Subtraction runs last and empties the chain (every supertype goes); nothing is kept in its place.
 - **A dependent field's rules are the link's, over the flattened record** (`DependentFields`, [TSON-SCHEMA] §5.2): the
   sibling declared before it, typed by a reference to types, there to read whenever it is, its pin or default no template;
@@ -64,7 +65,7 @@ applications, field facts and refinement, groups, subtraction, and the exception
 Related: `design/constructor-application.md` (what `!C { … }` may apply and how its head resolves),
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
 `design/template-materialisation.md` and `design/open-records.md` (§5.10 closing, applied-parent edges),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.synthetic`, the
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.application`, the
 kernel's bootstrap), `design/namespace-types-and-value-entries.md` (value entries),
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
 
@@ -150,7 +151,7 @@ position admits, which §6 makes the line between a kernel fact and an annotatio
 `abstract`, `final`, `sealed` or `discriminator` as annotation names: the meta declares none, so each written as
 one is the ordinary unknown-annotation error.
 
-**The mark is applied once, in `withExtension`.** A fresh record, a composition and a refinement each mint their
+**The mark is applied once, in `withExtension`.** A fresh record, a composition and a refinement each build their
 own `RecordBody`, and a mark read three times is a mark two of them can disagree about. Applying it there is also
 why extensibility is never inherited: a composition's body arrives OPEN from its operands. A mark on a non-record
 is the author's error.
@@ -205,16 +206,14 @@ them:
   IS-A `pet` because `pet_of` writes `pet`, at a closed operand and at a declared application alike.
 - **An applied parent** (§5.8's reference-valued parents). With `result => abstract <T> { payload: T }` and
   `ok => <T> result<T> & { note: text }`, `ok<text>`'s chain keeps `result<text>` in `parents` until
-  `appliedParentEdges` folds it into the edge to the entry that application denotes, a declaration naming it or its
-  minted expansion (`design/template-materialisation.md`); the linker inverts it, so `result<text>`'s `subtypes`
-  holds `ok<text>` and not `ok<int32>` (`SubtypeTemplateFamilyTest`, `OpenOperandCompositionTest`). A minted base's
-  name is non-normative (§8.2), which is why both record dispatchers follow aliases (`design/record-dispatch.md`).
+  `appliedParentEdges` folds it into the edge to the declaration naming that application, where one exists
+  (`design/template-materialisation.md`); the linker inverts it, so `result<text>`'s `subtypes` holds `ok<text>` and
+  not `ok<int32>` (`SubtypeTemplateFamilyTest`, `OpenOperandCompositionTest`).
 
-A use-site application whose chain would name a declared type is refused when it is minted (`refuseMintedMember`),
+A use-site application whose record in place would be IS-A a declared type is refused (`refuseMembership`, §5.2),
 so every family member is declared.
 
-A resolved entry's `subtypes` is empty, minted or declared: linking computes it one phase later, which keeps two
-schemas closing one application agreeing on the entry §2.2.3 unifies them by (`MintedEntryUnificationTest`).
+A resolved entry's `subtypes` is empty: linking computes it one phase later, over the closure that reads it.
 
 ## Value entries
 
@@ -233,16 +232,14 @@ other side of the line: `api => !meta.namespace { … }` applies the constructor
 `!schema`, the kernel root's alias the root's tag names, or `!meta.schema`, its target, as resolved output writes a
 nested map (`TsonSchemaParser` takes either, matched as a spelling, so no declaration captures it). The kernel's
 machinery is one such map, `meta`; the data-format libraries' constructors are three more, numeric.tn's `numeric`,
-temporal.tn's `temporal` and net.tn's `net`.
-`TsonSchemaParser`
-puts each member into the document's one declaration map under its path (`geo.address`, `geo.inner.deep`), and the
-entry `geo` itself is a `SchemaMapDef` holding its members' own names. So every phase reads a member as a root entry:
-the desugar phase lifts its sugar, the wait order readies it, and a reference to `geo.address` anywhere is a lookup
-of that key. `DefinitionResolver` resolves the `SchemaMapDef` to `ValueEntry("meta.schema", Namespace("meta.schema", {}))`,
-waiting on nothing, and `SchemaPaths.synced` fills it from the path entries wherever a `TsonSchema` is built,
-innermost map first, the members' key annotations kept. A schema built from a resolved form read back holds the
-nested map alone, and `synced` keys its members under their paths (`SchemaPaths.withPaths` does the same for a
-resolved form read as a plain map).
+temporal.tn's `temporal` and net.tn's `net`. `TsonSchemaParser` puts each member into the document's one declaration map
+under its path (`geo.address`, `geo.inner.deep`), and the entry `geo` itself is a `SchemaMapDef` holding its members'
+own names. So every phase reads a member as a root entry: the desugar phase rewrites its sugar in place, the wait order
+readies it, and a reference to `geo.address` anywhere is a lookup of that key. `DefinitionResolver` resolves the
+`SchemaMapDef` to `ValueEntry("meta.schema", Namespace("meta.schema", {}))`, waiting on nothing, and
+`SchemaPaths.synced` fills it from the path entries wherever a `TsonSchema` is built, innermost map first, the members'
+key annotations kept. A schema built from a resolved form read back holds the nested map alone, and `synced` keys its
+members under their paths (`SchemaPaths.withPaths` does the same for a resolved form read as a plain map).
 
 A member's identity is its declaring document plus its path: two maps may each declare `address`, and a diagnostic, a
 kind's member list, a chain and an `@meta.application` name it `geo.address`. A map of one path that several documents of a
@@ -259,7 +256,10 @@ one and adds only refusals — a default on an unmarked name, a pin on a voidabl
 "omitted or `_`" as `a?: void?`), and `=?` on anything but an unmarked name over a non-voidable type.
 An open record's fields are built by the same path, so the two cannot drift. A field's value is never a parameter
 (§5.10): an unquoted token naming one of the declaration's parameters in `value` is refused where the field resolves
-(`ParameterTypes.atValue`).
+(`ParameterTypes.atValue`). A value on a field typed by a type written in place that is no reference — a container, a
+tuple or a choice — is refused where the field resolves too (`resolveFieldEntry`, §5.2), as a declared container's is
+at link (`TsonSchemaLinker.notAScalarType`); one on an inline reference (`handler?: meta.ref<method> ~
+orders.place_order`) is admitted and judged at link as a declared reference's is (`checkFieldValue`).
 
 A tightening replaces the inherited field in place, keeping its position — supertypes' fields first, in their
 order, then the body's. A modifier-only entry has no type slot, so it inherits the tightened field's type and with

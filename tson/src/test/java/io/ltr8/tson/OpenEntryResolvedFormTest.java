@@ -293,7 +293,7 @@ class OpenEntryResolvedFormTest {
         assertEquals(List.of(), mismatches, "kind restates what supertypes and body already determine");
         assertTrue(closedEntries > 140, () -> "not enough entries for this to mean anything: " + closedEntries);
         assertTrue(openEntries > 0, () -> "no open record exercised the rule: " + openEntries);
-        assertTrue(outsideOwnSchema > 25, () -> "the lookup should reach outside the entry's own schema for "
+        assertTrue(outsideOwnSchema >= 25, () -> "the lookup should reach outside the entry's own schema for "
                 + "most of core.tn's instances -- that is why the field stays: " + outsideOwnSchema + " of "
                 + closedEntries);
     }

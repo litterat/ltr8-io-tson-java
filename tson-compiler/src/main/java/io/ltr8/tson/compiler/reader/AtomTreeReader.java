@@ -38,7 +38,7 @@ final class AtomTreeReader implements TsonTypeReader<TsonValue>, UseSite.Renamed
 
     AtomTreeReader(TsonTypeReader<?> delegate, String typeRef, AnnotationTypes annotationTypes) {
         this.delegate = delegate;
-        this.typeRef = Optional.of(typeRef);
+        this.typeRef = Optional.ofNullable(typeRef);
         this.annotationTypes = annotationTypes;
     }
 

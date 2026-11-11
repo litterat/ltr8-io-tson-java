@@ -26,8 +26,9 @@ import java.util.function.Function;
  * sibling value this instance holds -- written, defaulted or pinned -- and hands it to {@link #readAgainst}; {@link
  * #read} is reached only where no record stands around the field, which is an invariant broken.
  *
- * <p><b>The sibling's value names a type a value can be read against</b>, or the value is not read: a sibling
- * reference names a field and no type, a template is no type until it is applied and reading never starts a
+ * <p><b>The sibling's value is a type a value can be read against</b>, or the value is not read. A name is read
+ * through its entry's reader, and a type written in place ({@code { of: !meta.ref { of: method } }}) through its own;
+ * a sibling reference names a field and no type, a template is no type until it is applied and reading never starts a
  * materialisation, and an application names no entry. Each is refused naming the sibling,
  * since that is the value the author has to change; the dependent value is skipped unjudged. The rule is {@link
  * #typeNamed}, which a value's qualified name going on through a dependent field is judged by too ({@code
@@ -120,11 +121,12 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
     }
 
     /**
-     * The value at {@code ctx}'s cursor read against the type {@code named} names, {@code siblingCtx} being where a
+     * The value at {@code ctx}'s cursor read against the type {@code named} is, {@code siblingCtx} being where a
      * refusal of the sibling's value is reported, in {@code rules}' words. {@code named} is null where the sibling's
      * own read was refused, which has been reported: the value is then skipped unjudged.
      */
-    Object readAgainst(TsonReadContext ctx, Reference named, TsonReadContext siblingCtx, RecordDiagnostics rules) {
+    Object readAgainst(TsonReadContext ctx, io.ltr8.tson.schema.meta.FieldTypeExpr named, TsonReadContext siblingCtx,
+                       RecordDiagnostics rules) {
         if (ctx.readsSchemaNames()) {
             return HELD.read(ctx);
         }
@@ -132,7 +134,10 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
             TsonReadContext.skipUnjudged(ctx);
             return null;
         }
-        return switch (typeNamed(named, context == null ? null : context.schema().entries()::get)) {
+        if (named instanceof io.ltr8.tson.schema.meta.TypeInline inline) {
+            return readers.resolve(inline).read(ctx);
+        }
+        return switch (typeNamed((Reference) named, context == null ? null : context.schema().entries()::get)) {
             case TypeNamed.Entry entry -> readers.resolve(entry.name()).read(ctx);
             case TypeNamed.None none -> {
                 siblingCtx.report(rules.siblingNamesNoType(sibling, field, none.held(), named.text()));
@@ -143,11 +148,11 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
     }
 
     /**
-     * The reference a sibling's read produced, in whichever form the read built it: a tree's atom, the reference
-     * itself, a token held as written, a host's {@code Ref}, or the canonical text a string component holds; null
-     * where the read produced nothing.
+     * The type a sibling's read produced, in whichever form the read built it: a name -- a tree's atom, the reference
+     * itself, a token held as written, a host's {@code Ref}, or the canonical text a string component holds -- or a
+     * type written in place; null where the read produced nothing.
      */
-    public static Reference referenceIn(Object decoded) {
+    public static io.ltr8.tson.schema.meta.FieldTypeExpr typeIn(Object decoded) {
         if (decoded instanceof io.ltr8.tson.tree.TsonValue tree && !(tree instanceof TsonAtom)) {
             return null; // a tree's void or missing node: the read produced no reference
         }
@@ -158,8 +163,10 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
         return switch (value) {
             case null -> null;
             case Reference reference -> reference;
-            case io.ltr8.tson.schema.meta.Token token -> referenceIn(token.text());
-            case io.ltr8.tson.schema.meta.Ref<?> ref -> referenceIn(ref.name());
+            // A type written in place is read against as it stands, a reference among them (§5.2).
+            case io.ltr8.tson.schema.meta.TypeInline inline -> inline;
+            case io.ltr8.tson.schema.meta.Token token -> typeIn(token.text());
+            case io.ltr8.tson.schema.meta.Ref<?> ref -> typeIn(ref.name());
             case CharSequence text -> {
                 try {
                     yield ReferenceGrammar.parseReference(text.toString());

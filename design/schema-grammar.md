@@ -148,7 +148,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   of that kind.
 - **One production per container, reachable from `type-ref`** — `ArrayExpr`, `TupleExpr`, `MapExpr`, each
   admitting a size specifier after `;` and an element `?` at *every* position. §12.1 has one bracket
-  production and one map production: every form lifts to an entry (§5.3), so a sized form needs no
+  production and one map production: every form is its construction, written in place (§5.3), so a sized form needs no
   declaration-level tier to carry it, and `type-def` reaches each container through `type-ref` like anything
   else, with no tie-break between a declaration-level and an inline spelling to state.
   - **Nesting is the recursion in `ElementType`**, which holds a plain `TypeExpr` — `[[T; 2]; 3]` and

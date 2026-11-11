@@ -30,6 +30,8 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 
@@ -123,25 +125,41 @@ final class ValuesByName {
     }
 
     /** A type named in the schema's namespace. */
-    private record Typed(Space space, String name) {
+    private record Typed(Space space, String name, Optional<TypeInline> inline) {
+
+        Typed(Space space, String name) {
+            this(space, name, Optional.empty());
+        }
 
         String terminal() {
-            return AliasChain.terminal(name, space.entries()::get);
+            return inline.isPresent() ? name : AliasChain.terminal(name, space.entries()::get);
         }
 
         Top definition() {
-            return space.entries().get(terminal());
+            return inline.<Top>map(TypeInline::of).orElseGet(() -> space.entries().get(terminal()));
         }
 
         Typed of(String typeName) {
             return new Typed(space, typeName);
         }
 
+        /** What a field's type holds: a name's entry, or a type written in place, named by its written form. */
+        Typed of(TypeExpr type) {
+            return switch (type) {
+                case TypeRef reference -> of(reference.name());
+                case TypeInline written -> new Typed(space, written.text(), Optional.of(written));
+            };
+        }
+
         /**
          * Declaring schema and entry, which is what two spellings of one type agree on. Every entry of a linked
-         * namespace records its canonical origin, so the origin is compared as recorded.
+         * namespace records its canonical origin, so the origin is compared as recorded. A type written in place has
+         * no entry and is its own: no named type is it.
          */
         String identity() {
+            if (inline.isPresent()) {
+                return "#" + name;
+            }
             String terminal = terminal();
             return space.originOf().apply(terminal) + "#" + terminal;
         }
@@ -305,7 +323,7 @@ final class ValuesByName {
                                 + ", so the name reaches no value";
                         at = at.of(dependentType(naming, record, field.sibling().get(), holder, unreached));
                     } else {
-                        at = at.of(field.typeRef().name());
+                        at = at.of(field.typeExpr());
                     }
                 }
                 case MapBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
@@ -320,7 +338,7 @@ final class ValuesByName {
                         }
                         value = found.get();
                     }
-                    at = at.of(namespace.valueType().name());
+                    at = at.of(namespace.valueType());
                 }
                 case ArrayBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
                         + reached + "' is a list, whose elements have no names -- a segment selects a field of a "
@@ -398,10 +416,14 @@ final class ValuesByName {
         if (held == null && holder == null) {
             throw new SchemaValidationException(unreached);
         }
-        Reference named = DependentFieldReader.referenceIn(held);
-        if (named == null) {
+        io.ltr8.tson.schema.meta.FieldTypeExpr typed = DependentFieldReader.typeIn(held);
+        if (typed == null) {
             throw new SchemaValidationException(naming + ", which the value does not hold, so the name has no type "
                     + "to go on through");
+        }
+        if (!(typed instanceof Reference named)) {
+            throw new SchemaValidationException(naming + ", which holds the type written in place '" + typed.text()
+                    + "', and a name goes on through a value's declared type alone (§5.12)");
         }
         return switch (typeNamed(named, merged)) {
             case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
