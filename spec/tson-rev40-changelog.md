@@ -467,9 +467,9 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `42057db7…` (Revision 39 `c9b069b6…`), numeric `8435fe35…` (`dfa66c5d…`), temporal
-   `45147e9d…` (`fb4ada8f…`), net `9c088a3f…` (`371fc20c…`), core `0faef394…`
-   (`4e8d9c43…`), policy `7df7bcbe…` (`e9cb5b93…`), each re-stamped for #5's kernel. The chain is consistent — numeric,
+   `c3d71e31…` (Revision 39 `c9b069b6…`), numeric `4ff6ac2f…` (`dfa66c5d…`), temporal
+   `07864e40…` (`fb4ada8f…`), net `9285bfb1…` (`371fc20c…`), core `e669ac24…`
+   (`4e8d9c43…`), policy `d34d967e…` (`e9cb5b93…`), each re-stamped for #5's kernel. The chain is consistent — numeric,
    temporal, net and policy each pin the kernel; core pins the three libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of
