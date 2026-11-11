@@ -13,8 +13,7 @@
   written nested and tagged by its type's path, `!meta.schema`, each
   member named by its path (`meta.record`, `unicode.text_type`,
   `atom.ordering`); the vocabulary an author writes (`text`, `integer`,
-  `bytes`, `doc`, `enum`, `set`, ...) and the synthetics it mints are the
-  root's.
+  `bytes`, `doc`, `enum`, `set`, ...) is the root's.
 
   Conventions:
   - Every entry is its value: a name maps to the body it resolves
@@ -51,29 +50,37 @@
     alias is a hop, not a rewrite, so a use site naming an alias
     names the alias. A processor collapses the chain when it compiles
     readers, after linking, not in resolved output.
-  - A slot that names a type (`meta.record_field.type`,
-    `meta.tuple_element.element_type`, a container's type slots, choice
-    variants, a parameter's `bound`) is typed `meta.type_ref`,
-    the kind of the types, and holds a bare name: a type's name,
-    judged a member of the kind when the schema links. An
-    application is a reference with an argument list, written
-    unquoted in its canonical text, `result<T>`: no whitespace, and
-    one space between arguments. A closed one lifts to an entry and is
-    named bare, so one stands only where an application is still
-    open: an open record's `parents` and field types, and the
+  - A slot that holds the type of a value (`meta.record_field.type`,
+    `meta.array.element_type`, `meta.map.value_type`,
+    `meta.tuple_element.element_type`, choice variants) is typed
+    `meta.type_expr`, `meta.field_type_expr` at a record field, and
+    holds a type's name or a type written in place: the construction
+    the author's sugar or applied constructor denotes, tagged by its
+    constructor, `!meta.array { element_type: text  min_items: 1 }`,
+    and carrying no chain. A slot that names a type
+    (`meta.map.key_type`, a parameter's `bound`, an alias's `target`,
+    a reference's `of`, a chain's lists) is typed `meta.type_ref` and
+    holds a name. A name is judged a member of its kind when the
+    schema links. An application is a reference with an argument
+    list, written unquoted in its canonical text, `result<T>`: no
+    whitespace, and one space between arguments. A closed application
+    of an open record is named bare, so one stands only where an
+    application is still open: an open record's `parents`, its field
+    types and the constructions written in them, and the
     `application` annotation.
   - The container constructors carry no parameters: their type
-    slots are plain required `meta.type_ref`-typed fields, filled by the
-    construction (or by a sugar form's desugaring) like any other
-    required field. An application of a constructor is that
-    construction: `set<text>` is `!meta.set_type { element_type: text }`,
-    its arguments filling the required fields typed by a reference
-    naming types, in declaration order (Part 2 Section 5.3).
+    slots are plain required fields, filled by the construction (or
+    by a sugar form's desugaring) like any other required field. An
+    application of a constructor is that construction: `set<text>` is
+    `!meta.set_type { element_type: text }`, its arguments filling the
+    required fields that hold a type, in declaration order (Part 2
+    Section 5.3).
   - An open record is a `!meta.record` carrying `parameters` (Part 2
     Sections 5.10, 8.1), read as the vocabulary and never held as
     text. A parameter is a reference value: it stands as its name at a
-    field's `type`, or as an argument of an application there or in a
-    parent, and never at a field's `value`; it is read against the
+    field's `type`, at a type slot of a construction written there, or
+    as an argument of an application there or in a parent, and never
+    at a field's `value`; it is read against the
     record's `parameters` before the namespace (Part 2 Section 5.10's
     shadowing rule). Its `chain` holds
     `parents` as written, one of which may be an application. An
@@ -82,18 +89,10 @@
     `@meta.application` at its schema-map key, read as stated on
     ingest. None appear here: no kernel entry is an open record, and
     none applies one.
-  - Synthetic entries — the closed forms the sugar lifts to (Part 2
-    Section 5.3) — are instances of the constructor they build, are
-    referenced by the field that wrote the sugar, and carry the
-    derived `@meta.synthetic` marker at their schema-map keys (Part 2
-    Sections 6, 8.2); on ingest the marker is discarded and
-    recomputed. Their internal names here follow the
-    convention `<constructor>_<operands>_xxhash`, where the trailing
-    `xxhash` is a placeholder for a content hash of the resolved
-    binding record: the *shape* of the data — one internally named,
-    `@meta.synthetic`-marked entry per distinct concrete form — is the
-    conformance point; the hash spelling is an implementation's own
-    business and the placeholder is deliberately not a real digest.
+  - Nothing is lifted. A construction written at a use site, sugar
+    or an applied constructor, stands in place in the slot that wrote
+    it and is compared as a value, so every entry here is one the
+    source declares and the document holds no internal name.
   - Bare parameter names (e.g. T) in bodies are read against the
     enclosing record's `parameters` list.
   """
@@ -218,9 +217,9 @@
     }
 
     type_chain => !meta.record { fields: {
-      parents    => !meta.record_field { type: array_type_ref_xxhash  optional: true }
-      supertypes => !meta.record_field { type: array_type_ref_xxhash  optional: true }
-      subtypes   => !meta.record_field { type: array_type_ref_xxhash  optional: true }
+      parents    => !meta.record_field { type: !meta.array { element_type: meta.type_ref }  optional: true }
+      supertypes => !meta.record_field { type: !meta.array { element_type: meta.type_ref }  optional: true }
+      subtypes   => !meta.record_field { type: !meta.array { element_type: meta.type_ref }  optional: true }
     } }
 
     type => !meta.record {
@@ -286,12 +285,10 @@
 
     annotation => !meta.alias { target: void }
 
-    synthetic => @meta.annotation !meta.alias { target: void }
-
     application => @meta.annotation !meta.alias { target: meta.type_ref }
 
     record_field => !meta.record { fields: {
-      type     => !meta.record_field { type: meta.field_type_ref }
+      type     => !meta.record_field { type: meta.field_type_expr }
       optional => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       voidable => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       role     => !meta.record_field { type: meta.field_role  optional: true  role: DEFAULT  value: FREE }
@@ -299,8 +296,10 @@
     } }
 
     field_group => !meta.record { fields: {
-      members          => !meta.record_field { type: array_array_text_1_c67f2b5e_1_xxhash }
-      optional_members => !meta.record_field { type: array_text_1_xxhash  optional: true }
+      members          => !meta.record_field {
+        type: !meta.array { element_type: !meta.array { element_type: text  min_items: 1 }  min_items: 1 }
+      }
+      optional_members => !meta.record_field { type: !meta.array { element_type: text  min_items: 1 }  optional: true }
       optional         => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     } }
 
@@ -310,19 +309,21 @@
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: FIXED }
-      parameters     => !meta.record_field { type: array_param_1_xxhash  optional: true }
+      parameters     => !meta.record_field { type: !meta.array { element_type: meta.param  min_items: 1 }  optional: true }
       fields         => !meta.record_field { type: meta.field_map }
-      groups         => !meta.record_field { type: array_field_group_xxhash  optional: true }
+      groups         => !meta.record_field { type: !meta.array { element_type: meta.field_group }  optional: true }
       extension      => !meta.record_field { type: meta.record_extension_type  optional: true  role: DEFAULT  value: OPEN }
-      discriminators => !meta.record_field { type: array_text_1_xxhash  optional: true }
+      discriminators => !meta.record_field { type: !meta.array { element_type: text  min_items: 1 }  optional: true }
       name_type      => !meta.record_field { type: meta.identifier_ref  optional: true }
     } }
 
-    array => !meta.record { chain: { supertypes: [meta.product meta.top meta.type]  subtypes: [meta.set_type] }  fields: {
+    array => !meta.record {
+      chain: { supertypes: [meta.product meta.top meta.type meta.type_inline]  subtypes: [meta.set_type] }
+      fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: INDEX }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
-      element_type   => !meta.record_field { type: meta.type_ref }
+      element_type   => !meta.record_field { type: meta.type_expr }
       voidable       => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
       unique_items   => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
@@ -330,11 +331,13 @@
       max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
-    set_type => !meta.record { chain: { supertypes: [meta.array meta.product meta.top meta.type] }  fields: {
+    set_type => !meta.record {
+      chain: { supertypes: [meta.array meta.product meta.top meta.type meta.type_inline] }
+      fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: INDEX }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
-      element_type   => !meta.record_field { type: meta.type_ref }
+      element_type   => !meta.record_field { type: meta.type_expr }
       voidable       => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
       ordered        => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
       unique_items   => !meta.record_field { type: boolean  optional: true  role: FIXED  value: true }
@@ -342,24 +345,28 @@
       max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
-    map => !meta.record { chain: { supertypes: [meta.product meta.top meta.type]  subtypes: [meta.namespace] }  fields: {
+    map => !meta.record {
+      chain: { supertypes: [meta.product meta.top meta.type meta.type_inline]  subtypes: [meta.namespace] }
+      fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
       key_type       => !meta.record_field { type: meta.type_ref }
-      value_type     => !meta.record_field { type: meta.type_ref }
+      value_type     => !meta.record_field { type: meta.type_expr }
       voidable       => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       min_items      => !meta.record_field { type: numeric.count  optional: true }
       max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
-    namespace => !meta.record { chain: { supertypes: [meta.map meta.product meta.top meta.type] }  fields: {
+    namespace => !meta.record {
+      chain: { supertypes: [meta.map meta.product meta.top meta.type meta.type_inline] }
+      fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
       key_type       => !meta.record_field { type: meta.identifier_ref }
-      value_type     => !meta.record_field { type: meta.type_ref }
+      value_type     => !meta.record_field { type: meta.type_expr }
       voidable       => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
       ordered        => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       min_items      => !meta.record_field { type: numeric.count  optional: true }
@@ -367,15 +374,15 @@
     } }
 
     tuple_element => !meta.record { fields: {
-      element_type => !meta.record_field { type: meta.type_ref }
+      element_type => !meta.record_field { type: meta.type_expr }
       voidable     => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     } }
 
-    tuple => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
+    tuple => !meta.record { chain: { supertypes: [meta.product meta.top meta.type meta.type_inline] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: INDEX }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: FIXED }
-      elements       => !meta.record_field { type: array_tuple_element_xxhash }
+      elements       => !meta.record_field { type: !meta.array { element_type: meta.tuple_element } }
     } }
 
     enum_set => !meta.set_type { element_type: text  min_items: 1 }
@@ -386,9 +393,9 @@
       members   => !meta.record_field { type: meta.enum_set }
     } }
 
-    choice => !meta.record { chain: { supertypes: [meta.sum meta.top meta.type] }  fields: {
+    choice => !meta.record { chain: { supertypes: [meta.sum meta.top meta.type meta.type_inline] }  fields: {
       chain    => !meta.record_field { type: meta.type_chain  optional: true }
-      variants => !meta.record_field { type: array_type_ref_xxhash }
+      variants => !meta.record_field { type: !meta.array { element_type: meta.type_expr } }
       disjoint => !meta.record_field { type: boolean  optional: true }
     } }
 
@@ -400,13 +407,17 @@
 
     declared => !meta.declared_type {}
 
-    reference_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type]  subtypes: [meta.ref] }  fields: {
+    reference_type => !meta.record {
+      chain: { supertypes: [meta.atom meta.top meta.type meta.type_inline]  subtypes: [meta.ref] }
+      fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
       of            => !meta.record_field { type: meta.type_ref }
       allow_sibling => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
     } }
 
-    ref => !meta.record { chain: { supertypes: [meta.atom meta.reference_type meta.top meta.type] }  fields: {
+    ref => !meta.record {
+      chain: { supertypes: [meta.atom meta.reference_type meta.top meta.type meta.type_inline] }
+      fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
       of            => !meta.record_field { type: meta.type_ref }
       allow_sibling => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
@@ -425,6 +436,18 @@
       of: unicode.identifier_type
       allow_sibling: false
     }
+
+    type_inline => !meta.record {
+      chain: {
+        subtypes: [meta.array meta.choice meta.map meta.namespace meta.ref meta.reference_type meta.set_type meta.tuple]
+      }
+      fields: {}
+      extension: ABSTRACT
+    }
+
+    type_expr => @meta.disjoint !meta.choice { variants: [meta.type_ref meta.type_inline]  disjoint: true }
+
+    field_type_expr => @meta.disjoint !meta.choice { variants: [meta.field_type_ref meta.type_inline]  disjoint: true }
 
     schema => !meta.namespace { key_type: meta.type_name  value_type: meta.declared }
   }
@@ -479,16 +502,4 @@
   set => !meta.alias { target: meta.set_type }
 
   schema => !meta.alias { target: meta.schema }
-
-  @meta.synthetic array_param_1_xxhash => !meta.array { element_type: meta.param  min_items: 1 }
-
-  @meta.synthetic array_type_ref_xxhash => !meta.array { element_type: meta.type_ref }
-
-  @meta.synthetic array_array_text_1_c67f2b5e_1_xxhash => !meta.array { element_type: array_text_1_xxhash  min_items: 1 }
-
-  @meta.synthetic array_text_1_xxhash => !meta.array { element_type: text  min_items: 1 }
-
-  @meta.synthetic array_field_group_xxhash => !meta.array { element_type: meta.field_group }
-
-  @meta.synthetic array_tuple_element_xxhash => !meta.array { element_type: meta.tuple_element }
 }

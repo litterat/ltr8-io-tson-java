@@ -447,8 +447,9 @@
 
       Every parameter is a type. It is written where it stands as its name, a
       reference value (`meta.reference_type`), and stands at a field's `type`,
-      or as an argument of an application there or in a parent, and nowhere
-      else: a field's `value` is never a parameter. A parameter passed on as an
+      at a type slot of a construction written there, or as an argument of an
+      application there or in a parent, and nowhere else: a field's `value` is
+      never a parameter. A parameter passed on as an
       argument to a bounded parameter is written with a bound that IS-A that
       bound.
       """
@@ -530,23 +531,16 @@
     annotation => void
 
     @doc:"""
-      Resolver-attached and derived: discarded and recomputed on ingest
-      ([TSON-SCHEMA] §6, §8.1), and marks a resolver-materialised synthetic
-      entry at its schema-map key (§8.2).
-      """
-    synthetic => @meta.annotation void
-
-    @doc:"""
       Resolver-attached and derived: on an entry's schema-map key, the
       application of an open record the entry is the instantiation of
       ([TSON-SCHEMA] §8.2). The resolver writes it wherever an entry closes
       one: the entry's value is a record, which states its fields and its
       chain and not the head it was substituted from. A construction carries
       none, `!meta.set_type { element_type: text }` stating its constructor and
-      its arguments. On ingest it is read as stated, unlike `synthetic`, which
-      is recomputed: it is the one fact the entry's value does not state, and
-      what lets an imported schema's instantiations unify with a later
-      schema's. A declaration never writes it, as it never writes `chain`. Its
+      its arguments. On ingest it is read as stated: it is the one fact the
+      entry's value does not state, and what lets an imported schema's
+      instantiations unify with a later schema's. A declaration never writes
+      it, as it never writes `chain`. Its
       value is the application as the reference written, nested arguments
       unreduced, `@meta.application:foo<bar<text>>`.
       """
@@ -568,9 +562,10 @@
       at a field group's member, whose presence is the group's and which is
       never supplied.
 
-      `type` names a type, a sibling, or a parameter of the enclosing record
-      (`meta.param`), and no label says which: a parameter is a reference
-      value. `value` is a literal and never a parameter.
+      `type` holds a type's name, a type written in place (`meta.type_inline`),
+      a sibling, or a parameter of the enclosing record (`meta.param`), and no
+      label says which name it is: a parameter is a reference value. `value` is
+      a literal and never a parameter.
 
       A field whose `type` is a sibling reference, `kind!`, is a dependent
       field ([TSON-SCHEMA] §5.2): each instance's value is read against the
@@ -599,7 +594,7 @@
       container's part is never missing, so a container has no `optional`.
       """
     record_field => {
-      type:      meta.field_type_ref
+      type:      meta.field_type_expr
       optional?: boolean ~ false
       voidable?: boolean ~ false
       role?:     meta.field_role ~ FREE
@@ -695,16 +690,18 @@
     @doc:"""
       A sequence of elements of one type. The container constructors carry no
       parameters: a type slot (array's element_type, map's key_type and
-      value_type) is an ordinary required field typed `meta.type_ref`, filled
-      by the construction or by a sugar form's desugaring like any other
-      required field, and a closed application carries the bound reference as
-      the field's value (`!meta.array { element_type: person }`), its binding
-      record being ordinary data of this vocabulary. A constructor is applied
-      as it is constructed: `meta.array<person>` is that construction, its
-      arguments filling the required fields typed by a reference naming types,
-      in declaration order ([TSON-SCHEMA] §5.3), and inside an open record an
-      argument may be one of the record's parameters. `voidable` says whether an element may be void,
-      spelled `[T?]`.
+      value_type) is an ordinary required field, filled by the construction or
+      by a sugar form's desugaring like any other required field, its binding
+      record being ordinary data of this vocabulary. `element_type` is a
+      `meta.type_expr`: a type's name, `!meta.array { element_type: person }`,
+      or a type written in place, so `[[text]]` is
+      `!meta.array { element_type: !meta.array { element_type: text } }`. A
+      constructor is applied as it is constructed: `meta.array<person>` is that
+      construction, its arguments filling the required fields that hold a type
+      (typed `meta.type_expr` or by a reference naming types), in declaration
+      order ([TSON-SCHEMA] §5.3), and inside an open record an argument may be
+      one of the record's parameters. `voidable` says whether an element may be
+      void, spelled `[T?]`.
 
       `ordered` says whether order is part of a container's value: true for an
       array unless it says otherwise, false for a set. It never changes what a
@@ -712,10 +709,10 @@
       ([TSON-SCHEMA] §7.5) — the facet says whether two values differing only in
       order are one value.
       """
-    array => meta.product & {
+    array => meta.product & meta.type_inline & {
       access_pattern?: meta.product_access_type = INDEX
       size_type?:      meta.product_size_type = VARIABLE
-      element_type:    meta.type_ref
+      element_type:    meta.type_expr
       voidable?:       boolean ~ false
       ordered?:        boolean ~ true
       unique_items?:   boolean ~ false
@@ -740,7 +737,10 @@
     @doc:"""
       Entries keyed by distinct values of one type. `voidable` says whether an
       entry's value may be void, spelled `{K => V?}`, as array's says it of an
-      element; a key is never void.
+      element; a key is never void. `value_type` is a `meta.type_expr`, as
+      array's `element_type` is. `key_type` holds a type's name: a container,
+      tuple or choice that types a map's keys is declared under a name of its
+      own.
 
       `ordered` is false unless the map says otherwise, as for a JSON object:
       two maps holding the same entries in different orders are one value. An
@@ -749,11 +749,11 @@
       that keeps its order. Either way output keeps the order written
       ([TSON-SCHEMA] §7.5).
       """
-    map => meta.product & {
+    map => meta.product & meta.type_inline & {
       access_pattern?: meta.product_access_type = NAMED
       size_type?:      meta.product_size_type = VARIABLE
       key_type:        meta.type_ref
-      value_type:      meta.type_ref
+      value_type:      meta.type_expr
       voidable?:       boolean ~ false
       ordered?:        boolean ~ false
       min_items?:      numeric.count
@@ -785,7 +785,7 @@
       position is never missing, so `[A, B?]` admits `[a _]` and refuses `[a]`.
       """
     tuple_element => {
-      element_type: meta.type_ref
+      element_type: meta.type_expr
       voidable?:    boolean ~ false
     }
 
@@ -794,7 +794,7 @@
       sugar spells two or more, `[T]` being an array; a tuple of one position
       is constructed, `!meta.tuple [{ element_type: text }]`.
       """
-    tuple => meta.product & {
+    tuple => meta.product & meta.type_inline & {
       access_pattern?: meta.product_access_type = INDEX
       size_type?:      meta.product_size_type = FIXED
       elements:        [meta.tuple_element]
@@ -831,14 +831,16 @@
     }
 
     @doc:"""
-      Closed sum. `disjoint` is a resolver-derived index over the variant list,
-      parallel to `subtypes`: true or false by discrimination-class distinctness
-      ([TSON-SCHEMA] §5.4). Declarations never set it; on ingest it MUST be
-      discarded and recomputed. It carries the encoding-independent fact each
-      encoding's discrimination rules consume ([TSON-SCHEMA] §5.4, §7.2).
+      Closed sum, each of `variants` a `meta.type_expr`, a type's name or a type
+      written in place. `disjoint` is a resolver-derived index over the variant
+      list, parallel to `subtypes`: true or false by discrimination-class
+      distinctness ([TSON-SCHEMA] §5.4). Declarations never set it; on ingest
+      it MUST be discarded and recomputed. It carries the encoding-independent
+      fact each encoding's discrimination rules consume ([TSON-SCHEMA] §5.4,
+      §7.2).
       """
-    choice => meta.sum & {
-      variants:  [meta.type_ref]
+    choice => meta.sum & meta.type_inline & {
+      variants:  [meta.type_expr]
       disjoint?: boolean
     }
 
@@ -915,29 +917,32 @@
       ([TSON-DATA] §7.4), written unquoted wherever a value stands. An argument
       is a reference, and the list supplies every one: positional against the
       head's `parameters` where the head is an open record, each judged by
-      the parameter's `bound`, and against its required fields typed by a
-      reference naming types, in declaration order, where the head is a
-      constructor, each judged by the field's own `of` ([TSON-SCHEMA] §5.3,
-      §5.10). An argument is a type, `void` among them. The first substitutes
-      and the second constructs: `set<text>` is
+      the parameter's `bound`, and against its required fields that hold a
+      type, typed `meta.type_expr` or by a reference naming types, in
+      declaration order, where the head is a constructor, each judged by the
+      reference the field admits ([TSON-SCHEMA] §5.3, §5.10). An argument is a
+      type, `void` among them. The first substitutes and the second
+      constructs: `set<text>` is
       `!meta.set_type { element_type: text }`. Both are a schema document's:
       in a data document a reference is a name, and an application is
       refused. The canonical text has no
       whitespace but one space between arguments: `pair<text integer>`.
       Identity is the parsed form
       ([TSON-SCHEMA] §8.2), so whitespace inside an argument list is free.
-      Every application denotes an entry: a closed one lifts to the entry it
-      denotes and is named bare where it stands ([TSON-SCHEMA] §5.3), so a
-      value carries arguments only where an application is still open, in an
-      open record's `parents` and field types, and in the `application`
-      annotation.
+      A closed application of a constructor at a type slot is the construction,
+      written in place there, and a closed application of an open record
+      denotes an entry and is named bare where it stands ([TSON-SCHEMA] §5.3),
+      so a value carries arguments only where an application is still open, in
+      an open record's `parents`, its field types and the constructions written
+      in them, and in the `application` annotation.
 
       Inside an open record a value may be one of the record's parameters,
       written as its name, alone or among an application's arguments, and
       looked up before the namespace ([TSON-SCHEMA] §3.3). A parameter is a
-      type: it stands at a field's `type`, or as an argument of an application
-      there or in a parent, and never at a field's `value`. The slot judges
-      the argument that arrives when the record is applied.
+      type: it stands at a field's `type`, at a type slot of a construction
+      written there, or as an argument of an application there or in a parent,
+      and never at a field's `value`. The slot judges the argument that arrives
+      when the record is applied.
 
       A refinement narrows `of`: the refined `of` is the source's or IS-A it,
       so every name the refinement admits the source admits too, and the
@@ -956,7 +961,7 @@
       reference sets it false and refuses a sibling reference. Resolved output
       writes a sibling reference as it is written.
       """
-    reference_type => meta.atom & {
+    reference_type => meta.atom & meta.type_inline & {
       of:             meta.type_ref
       allow_sibling?: boolean ~ true
     }
@@ -972,8 +977,9 @@
     @doc:"""
       The type of a record field: the name of a type a value can have, or a
       sibling reference, `kind!`, naming the field of the same record whose
-      value names the field's type ([TSON-SCHEMA] §5.2). `record_field.type` is
-      typed by it, and no other slot is.
+      value names the field's type ([TSON-SCHEMA] §5.2). It is the reference
+      variant of `meta.field_type_expr`, which types `record_field.type` and no
+      other slot.
       """
     field_type_ref => !meta.reference_type { of: meta.type }
 
@@ -989,6 +995,35 @@
       refinement of `meta.type_ref`, an identifier family being a type.
       """
     identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }
+
+    @doc:"""
+      The structural constructors' parent: a type written where it is used.
+      `array`, `map`, `tuple`, `choice` and `reference_type` compose it, and
+      every constructor refining one of them inherits it, `set_type`, `ref` and
+      `namespace` among them. A construction of one of its members stands in a
+      slot typed `meta.type_expr` as the type itself, tagged by its constructor,
+      `!meta.array { element_type: text }`, and carries no chain. A record, an
+      enum and every other atom are declared and named, and their constructors
+      do not compose it. It has no fields and confers no kind.
+      """
+    type_inline => abstract {}
+
+    @doc:"""
+      What a type slot holds: a type's name (`meta.type_ref`), or a type written
+      in place (`meta.type_inline`), a construction tagged by its constructor. A
+      name is string-class and a construction brace-class, so the two are told
+      apart by form ([TSON-SCHEMA] §5.4). It types `array.element_type`,
+      `map.value_type`, `tuple_element.element_type` and each of
+      `choice.variants`.
+      """
+    type_expr => @meta.disjoint ( meta.type_ref | meta.type_inline )
+
+    @doc:"""
+      What a record field's `type` holds: a type's name or a sibling reference
+      (`meta.field_type_ref`), or a type written in place (`meta.type_inline`).
+      `record_field.type` is typed by it, and no other slot is.
+      """
+    field_type_expr => @meta.disjoint ( meta.field_type_ref | meta.type_inline )
 
     @doc:"""
       Resolver output: a schema map, from each name to the value its entry
