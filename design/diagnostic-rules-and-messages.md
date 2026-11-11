@@ -70,12 +70,10 @@ diagnostics parameterised over a "candidate noun" so one class serves a choice *
   `Rendered.value` answers from the host value.
 
 **A type names itself by what the author wrote, in both encodings.** `EntryDisplayName` lives in
-`schema.meta` — beside the model it renders, and depending on nothing else — so both stacks reach it. A
-resolver-minted entry shows as the sugar or application that produced it (`[text]`, `box<text>`), told apart
-from an authored one by having no source position. Kept in `tson-compiler`, it would leave a JSON diagnostic
-naming the synthetic entry by its content-derived hash — `'array_text_4cc4a482'`, a name in neither the
-author's schema nor the sender's document. The record reader carries the display name *beside* its own
-name rather than instead of it, because a `$type` resolves against the entry while a message names the
+`schema.meta` — beside the model it renders, and depending on nothing else — so both stacks reach it. An entry
+is named by its author's name, and a type written in place by its form as written (`TypeInline.text()`: `[text]`,
+`set<text>`, `pair_of<int32>`), never by a name the author did not write. The record reader carries the display name
+*beside* its own name rather than instead of it, because a `$type` resolves against the entry while a message names the
 author's spelling — one place the two genuinely differ.
 
 **What is deliberately not shared** is any rule one encoding has and the other has not: JSON's annotation

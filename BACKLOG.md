@@ -41,23 +41,12 @@ spec-required case:
 - [ ] **An application of an open record does not close in place** ([TSON-SCHEMA] §5.10, §5.10.1). At a type
   slot `f: page<order>` is `{ of: !meta.record { … } }`, the substituted record with no name, and so is a nested
   application a closing leaves at a slot (`cursor: box<T>` once `page => <T> { cursor: box<T> }` is applied). Both are
-  reported as `NOT_IMPLEMENTED` today (`TemplateMaterialiser`), and so is everything that waits on them: a recursive
-  application with no declaration to tie to, which §5.10.1 refuses as a resolver error naming the declaration to
-  write; an abstract template applied in place (`s: shape<circle>`), an abstract record nothing is a member of; and
-  an in-place record whose chain would name a declared type, which §5.2 refuses. What closing needs: substitution
-  into a `TypeInline` holding a `RecordBody` at the slot; readers, writers and bind targets built from a record
-  body with no name, in tree and bind mode and in `tson-json`, keyed by the construction as `CompiledReaders`
-  already keys the other inline bodies; diagnostics locating the record by field path; and the §5.2 membership
-  refusal at the declaration that wrote the application. Then restore the conformance vectors that wait on it
-  and add `schema/valid` vectors for `f: page<order>` beside `page_order => page<order>` (two types of one shape).
-- [ ] **An application of an open record as an argument, or where only a name may stand, is not refused**
-  ([TSON-SCHEMA] §4.2, §5.3). `pair<box<text> int32>` is refused, the author declaring `text_box => box<text>`; an
-  application at a slot typed `meta.type_ref` — a map's key (`{box<text> => V}`), a reference's `of`
-  (`meta.ref<box<text>>`), a parameter's bound, an alias's target — is refused, the form declared. Today
-  `TemplateMaterialiser.closeArgument` closes a nested open-record application as a name, to a declaration of it
-  where one exists, and the `meta.type_ref` slots are closed the same way. Refuse each at the declaration that wrote
-  it, naming the declaration to write, keeping a constructor's argument over a parameter inside an open record
-  (`meta.array<box<T>>`), and add `schema/invalid` vectors for each slot.
+  reported as `NOT_IMPLEMENTED` today (`TemplateMaterialiser`), and so is an abstract template applied in place
+  (`s: shape<circle>`), an abstract record nothing is a member of. What closing needs: substitution into a
+  `TypeInline` holding a `RecordBody` at the slot; readers, writers and bind targets built from a record body with no
+  name, in tree and bind mode and in `tson-json`, keyed by the construction as `CompiledReaders` already keys the
+  other inline bodies; and diagnostics locating the record by field path. Then restore the conformance vectors that
+  wait on it and add `schema/valid` vectors for `f: page<order>` beside `page_order => page<order>` (two types of one shape).
 - [ ] **An application at a refinement source that no declaration names is not absorbed** ([TSON-SCHEMA] §5.7).
   `x => box<text> ^ { … }` refines the substituted record and is IS-A its template's written parents and, where a
   declaration names `box<text>`, that entry, in either declaration order; with no such declaration
@@ -68,11 +57,6 @@ spec-required case:
   place, and the reference is declared (`method_ref => meta.ref<method>`). `DependentFieldReader.referenceIn` treats
   a `TypeInline` as naming no type, so check what the linker does with the field's `value` today, refuse it at the
   declaration if it loads, and add a `schema/invalid` vector.
-- [ ] **The naming machinery has no caller and is not deleted.** `DerivedName.ofBinding`, `ofApplication` and
-  `canonicalBinding`, `MintedNames`, `InternalName`, `ImportedSynthetics`, the synthetic fact on an entry and its
-  branches in `EntryDisplayName` and `TsonSchemaLinker` serve entries nothing mints any more ([TSON-SCHEMA] §8.2).
-  Delete them with their tests, and the `design/` notes' sections on minted names
-  (`name-hygiene-and-minted-names.md`, `template-materialisation.md`, `resolver-vocabulary-and-bootstrap.md`).
 - [ ] **A literal under a closed type in an open record is judged only when the template closes**
   ([TSON-SCHEMA] §5.10). `t => <T> { a: T  n?: int8 ~ 500 }` loads, the default held until an application closes the
   field; the type is closed, so its verdict cannot vary by application and §5.10 judges it at the declaration, as

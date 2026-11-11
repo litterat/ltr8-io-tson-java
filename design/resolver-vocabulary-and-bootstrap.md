@@ -14,7 +14,7 @@ meta.tn, itself. Current form only; history lives in git.
   it says which references it holds. It tells a type slot (`TypeExpr`: may take a construction in place) from a slot
   that holds a name alone (a map's key, a reference's `of`, an alias's target, a parent), and walks into a type
   written in place, which stays in place.
-- Nothing is named by its content: no lift, no minted entry, no `@meta.synthetic`. `DerivedName` keeps one caller,
+- Nothing is named by its content: every entry has an author-written name. `DerivedName` is one method,
   `canonicalApplication`, the comparison §8.2 keys an application on (the applied-parent fold, a recursion closing into
   its declaration).
 - Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
@@ -102,7 +102,7 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `AL
 - **`AliasChain` is that walk, stated once** (`resolver/AliasChain.java`). The linker's choice-variant
   distinctness and its §5.2 field-value check, `Subsumption`'s subtype naming and `DiscriminationClass`'s
   classification all use it, because the one decision inside — *stop at a non-reference, at an
-  **argument-bearing** target (an application, with no entry until materialisation mints one), or on a cycle*
+  **argument-bearing** target (an application, which names no entry), or on a cycle*
   — kept in four loops is four decisions that can drift. `terminal` answers with a name, `terminalDefinition` with the entry;
   they differ only on an undeclared name and a cycle, where the first has an answer its caller wants (a type
   parameter is its own terminal) and the second has none. **`ParameterTypes` keeps its own loop deliberately**:
@@ -151,10 +151,8 @@ one fact the entry's value does not state. An author writing it is a resolver er
   reachable through `Namespace.getAnnotations(name)`, never on the entry's value.
 - **It survives linking and the import merge**: the linker rebuilds its entry map several times and re-attaches key
   annotations at the one point every entry passes through (`withNameAnnotations`), imports included.
-- **There is no synthetic marker.** A sugar form is written in place at its slot and an application of an open record
-  closes only into a declaration, so every entry has an author-written name, and the kernel declares no
-  `meta.synthetic`. `ResolvedFixtureTest.noEntryIsMarkedSyntheticOnEitherSide` holds both sides to it, reading the
-  fixtures' keys from their *text*, a key-position annotation being dropped when a resolved-form document is bound.
+- **It is the one derived key annotation.** A sugar form is written in place at its slot and an application of an open
+  record closes only into a declaration, so every entry has an author-written name and nothing else marks a key.
 
 ## The compiled vocabulary (`SchemaResolver.Vocabulary`)
 
@@ -175,7 +173,7 @@ is read through the compile of the document that declared it — `!meta.record` 
   ready, and the read restarts; each declaration the read reaches is a wait of the entry being made ready
   (`TsonReadContext.HeldByName.reached`), which is what wait depth counts (`design/processor-policy.md`).
 - **A payload is a value body exactly when its head is no constructor**: a value entry's payload is read against the type,
-  under the loader's identifier policy, and lifts nothing; a construction's binding record is read under no policy
+  under the loader's identifier policy, and closes nothing; a construction's binding record is read under no policy
   (`SchemaResolver`'s `ConstructionReader`, `design/namespace-types-and-value-entries.md`). The value is bound where the
   context binds its type, and otherwise read in tree mode (the declaring schema's `treeVocabularyOf`, or a tree-mode compile
   of the entries ready so far) and held as a tree.

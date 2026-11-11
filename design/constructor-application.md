@@ -32,7 +32,7 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   constructor. Any schema may declare a constructor; nothing ties it to what the document imports.
 - `C<args>` over a constructor (a closed record IS-A `meta.type`) is the construction `!C { … }` over its argument
   slots (§5.3, `ConstructionSugar`), and resolves through the very path the braced form takes: a declaration through
-  `resolveInstance`, a use site through the constructor's reader into the content-keyed synthetic. No verdict is the
+  `resolveInstance`, a use site through the constructor's reader into a type written in place. No verdict is the
   sugar's own but the argument count and an argument that is no reference.
 
 Related: `design/schema-resolution.md` (the resolution phase around this), `design/atom-refinement-and-coherence.md`
@@ -76,7 +76,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   (§8.3), where a construction of any other head takes the head's kind and records the head as its constructor
   (`design/schema-resolution.md`); the path dispatches on the *body* being an `Alias`, having already read it. **A
   construction of `meta.record` writing `parameters` is refused** (`refuseWrittenParameters`, tested at the head's chain
-  end): admitted, it would mint an open record whose parameters no `<…>` put in scope, skipping every declaration-time
+  end): admitted, it would build an open record whose parameters no `<…>` put in scope, skipping every declaration-time
   check §5.10 makes of a template. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's question —
   *is this an atom instance?* — as **ATOM-kinded and not itself applicable**, which is exactly what an instance is: §4.1's
   "IS-A
@@ -132,12 +132,12 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   is goes by the constructor's chain (`meta.ref` IS-A `meta.reference_type`, `meta.set_type` IS-A `meta.array`).
 - **A declaration is the construction** (`DefinitionResolver.construction`): the payload is built and handed to
   `resolveInstance` as `!C { … }`, so `text_list => meta.array<text>` gets every check and fact the braced form does,
-  its tag the head as written, and records no application. **A use site names the synthetic**
-  (`TemplateMaterialiser.construction`): the payload, each application among its arguments closed first, is named by
-  `DerivedName.ofBinding` over the terminal constructor and read by its reader, so it lands on the entry `[text]` lifts
-  to and an application through an alias of the constructor on the same one. Arguments are written as the author
-  wrote them, not dereferenced, as the sugar forms write theirs. Nothing is owned: a use site names the content-keyed
-  entry whatever a declaration elsewhere constructs, as `[text]` does.
+  its tag the head as written, and records no application. **A use site writes the construction in place**
+  (`TemplateMaterialiser.construction`): the payload is read by the terminal constructor's reader, each application
+  among its arguments then closed where it landed, and the slot holds a `TypeInline` under that constructor, past its
+  alias hops, so `meta.array<text>` is the construction `[text]` is and an application through an alias of the
+  constructor the same one. Arguments are written as the author wrote them, not dereferenced, as the sugar forms
+  write theirs. A use site is never looked up to a declaration of the same construction (§8.2).
 - **The sugar decides where an argument lands and nothing else.** The arity (`requireArity`, also the linker's
   `checkArity` over a held reference such as `meta.array<T>` in an open record) is refused here; a literal
   argument (`meta.array<3>`) never arrives, the grammar refusing it where it is written (§5.10); an argument a slot's

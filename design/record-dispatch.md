@@ -72,8 +72,8 @@ said which member this is.
 (`Subsumption.admitting`), §7.2 comparing "after following both alias chains to their terminal entries":
 the base's own set, which decides the `tagNamesTheBase` refusal, and each
 member's, which decides selection. Skipping it is not a lost nicety: a family whose base is an **abstract
-template's application** has a minted base where no declaration names the application, and §8.2 makes a minted
-name non-normative, so an alias is the only spelling a tag naming it has. The dispatchers apply it on the same
+template's application** is based on the declaration naming that application, and an alias of the declaration is a
+spelling a tag naming the base may use. The dispatchers apply it on the same
 terms as the concrete record readers, or such a family would read in one encoding and be
 refused in the other — the same schema, the same document, two answers. `CrossEncodingParityTest` carries both
 ends of it. A resolved form's root reads as a value of `meta.schema` by the same rule and no other: its tag, `!schema`,
@@ -117,9 +117,8 @@ order — the selector may arrive after the fields it selects.
 constructor's binding record, a value entry's payload — reaches its declaring schema's compiled readers as a replay from
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
-bare value as that field — `meta.record_field`'s `type` is `meta.type_ref`, an atom whose value is a type's name
-(`KindSlotReader`, which also admits the application a sugar lift writes there before the closer mints its
-entry) — and where the field is a product or a sum, an unquoted token
+bare value as that field — `meta.record_field`'s `type` is `meta.field_type_expr`, whose name variant is an atom
+whose value is a type's name (`TypeNameSlotReader`) — and where the field is a product or a sum, an unquoted token
 (`ReferenceNameReader.nameIn`) is a **value by name** the record reader does not read as the field (`meta.record_field`'s
 own positional field being an atom, `fields: { p => x }` fills its `type`, as the sugar `p: x` does). Whether the token is
 a well-formed qualified name — each `.`-separated segment a [TSON-DATA] §7.7 identifier — is the linker's to judge,

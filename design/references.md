@@ -34,7 +34,7 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   `geo.address`, and a bare `address` is the root's or unresolved. There is no lexical scope, so no shadowing rule.
 - The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members, entries,
   shown, values)`: the final namespace's entries, which a name read here finds; the members as a message lists them, the
-  names an author writes, a minted entry left out; and, for a reference naming values in a whole link, `values`, a lookup
+  names an author writes; and, for a reference naming values in a whole link, `values`, a lookup
   (`ReferenceBody.Values`) that judges a qualified name over the final namespace by `ValuesByName`'s walk, empty in a link of
   a resolution in progress), and `ValuesByName` re-derives it from `of` over the final namespace whatever the read guessed;
   `TsonSchema.SlotType`'s `KIND` and `REFERENCE` roles are only how the read read the name. The index is never written: a
@@ -79,13 +79,14 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   `kind`, `kind<T>` and `kind!` are three references. The rules a sibling and its dependent field answer to, and the
   reading, are `design/schema-resolution.md`'s and `design/readers-and-diagnostics.md`'s.
 - A reference carries arguments only where an application is still open: an open record's `chain.parents` and field
-  `type`s, and the `application` annotation. A closed application lifts to the entry it denotes and is named bare
-  (§5.3). Its head is judged by resolution and arity, and every argument is judged as a type's name.
+  `type`s, and the `application` annotation. A closed application at a type slot is a type written in place there,
+  and where only a name may stand an application is refused (§4.2, §5.3). Its head is judged by resolution and arity,
+  and every argument is judged as a type's name.
 - **An application whose head is a constructor constructs** (§5.3's construction sugar, `ConstructionSugar`): past
   its alias hops, a closed record IS-A `meta.type` is applied by building `!C { f₁: a₁ … fₙ: aₙ }`, its **argument
   slots** `f₁ … fₙ` being its required fields (not optional, role `FREE`) typed by a reference naming types
   (`KindMembers.namesTypes` over the field type's `of`), in declaration order. `meta.array<uuid>` is the construction
-  `[uuid]` spells and names the same synthetic; `meta.map<text int32>` is `{text => int32}`'s; a declared
+  `[uuid]` spells, written in place the same way; `meta.map<text int32>` is `{text => int32}`'s; a declared
   `uuid_list => meta.array<uuid>` *is* `!meta.array { element_type: uuid }`, tag `meta.array`, no `@meta.application`.
   The arity is the slot count (`ConstructionSugar.requireArity`) and every argument a reference by the grammar; every
   other verdict is the construction's own, so `meta.namespace<int32 text>` is refused at link as `key_type: int32` is,
@@ -136,9 +137,9 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A `ReferenceEvent` is an application,
   its `TypeRef` taken as the stream parsed it; a malformed one (`box<text`) is a parse error, and a quoted token,
   `"box<text>"`, is text, a `TYPE_MISMATCH` at a reference-typed position. In a kernel body an application is a
-  value: resolved output holds one where an application is open, and
-  a sugar lift writes one into the slot it fills, which the closer mints an entry for afterwards. In a value body
-  (`TsonReadContext.readsValueBody`, a value entry's payload) nothing lifts or mints, so it is refused and the alias
+  value: resolved output holds one where an application is open, and the desugarer writes one into the slot it fills
+  for the materialiser to close in place afterwards. In a value body (`TsonReadContext.readsValueBody`, a value
+  entry's payload) nothing is closed, so it is refused and the alias
   spelling named: `order_box => box<order>`, then the bare name. The name itself is recorded by the kind's
   `AtomTypeReader`, in a schema document only, and name hygiene judges each name an application writes.
 - **In a data document a reference is a name** (§4.2). The kind's parser (`TypeNameRefParser`, shared by both
@@ -212,7 +213,7 @@ A name stands in a schema in one of five forms. Two are not references.
 |---|---|---|
 | **Key** | declares: the name an entry, field, parameter or namespace value is addressed by | the map's key type, which judges spelling and equality |
 | **Reference** | names something declared elsewhere, by its key | **store** (where the first segment resolves) and **judgement** (what the referent must be) |
-| **Application** | a reference carrying an argument list: names an open record and closes it with arguments, or names a constructor and constructs it over its argument slots; a use site then holds a reference to the minted entry | the head, and the arguments |
+| **Application** | a reference carrying an argument list: names an open record and closes it with arguments, or names a constructor and constructs it over its argument slots; at a type slot it closes in place, and a declaration naming it is the closed entry | the head, and the arguments |
 | **Tag** | names the type of the value it is written on, `!T v` | store and judgement, as a reference, and the payload is read under the referent |
 | **Index** | computed at link and written out: `supertypes`, `subtypes`, the `application` annotation | none; never read as a reference on ingest |
 

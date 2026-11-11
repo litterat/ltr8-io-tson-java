@@ -15,7 +15,7 @@ rules are walked. Current form only; history lives in git.
 - A record a fixture's value entries hold is bound to a host class of the runner's own (`SuiteBindings`, one record
   per fixture record in `io.ltr8.tson.suite.data`), the same binding in both runners and in `SidecarSchemasTest`.
 
-Related: `design/name-hygiene-and-minted-names.md`, `design/name-hygiene-read-path.md`, `design/json-unicode-policies.md`.
+Related: `design/name-hygiene.md`, `design/name-hygiene-read-path.md`, `design/json-unicode-policies.md`.
 
 Separate from the fine-grained unit tests, these run every vector in the sibling
 [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite) repo as JUnit 5 dynamic
@@ -102,16 +102,6 @@ are fields. In JSON the attack and a legitimate map of look-alike keys are spell
 be accepted — a deployment that will not accept it raises the **token** policy, which reaches every token
 including a key. `design/json-unicode-policies.md` has the worked comparison.
 
-**A minted name is judged by the same walk, and is built so it can be.** A derived name splices
-author-written content into its readable half, so `InternalName` restricts that half to **ASCII**: what §7.7
-admits is spliced, other ASCII keeps its admitted characters and gains a hash (`"/x"` → `x_h00000f2f`), and
-anything else is the hash alone. That satisfies §8.2's freshness MUST — an internal name is a valid
-`meta.identifier` — and, because an ASCII name is single-script and inside the identifier profile, it also passes
-all three hygiene rules at every level. Admitting `XID_Continue` instead would keep the name legal while
-letting a document's own text shape a namespace name, and would refuse any schema written outside Latin
-script; exempting minted names from the walk would answer that by leaving the hole open.
-`design/name-hygiene-and-minted-names.md` has the detail.
-
 **One place is the point, not a tidiness.** Run at the reading positions instead — spread over the schema
 parser, the definition resolver and the atom vocabulary — the restricted-character rule would have holes at
 exactly the positions only some of them reach, such as an enum member or a group's member labels. A scope
@@ -171,16 +161,17 @@ cannot fail on `{ a: 1  a: 2 }`; the parser accepts it by design. An error vecto
 `category: resolver` and its subject must parse, which `checkReaderVector` asserts before asking the reader
 for a verdict.
 
-**The `class2/` layers are the three answers a Class 2 processor gives.** `schema/` needs no invented expectation format:
-§1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a valid vector's subject is a schema
-document and its expected side is that document's resolved output in §8's own form, read back through `ResolvedForm` (shared
-with `ResolvedFixtureTest`, which asks the same question of `spec/fixtures/*-resolved.tn`) and compared entry for entry,
-`@meta.synthetic` key markers included. A nested schema map is walked into: `ResolvedForm.entries` keys each member under its
-path, `readResolved` adds the path keys a schema holds (`SchemaPaths.withPaths`), and the nested map's own entry compares as
-its member names. `link/` states individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived
-disjointness, §8.2's `subtypes` index, a kind's derived `members` (compared as a set, minted names normalised). `validate/`
-is a data document against a schema that loaded, where the expected side of a failure is §8.1's category plus the RFC 6901
-pointer into the data and nothing else.
+**The `class2/` layers are the three answers a Class 2 processor gives.** `schema/` needs no invented expectation
+format: §1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a valid vector's subject
+is a schema document and its expected side is that document's resolved output in §8's own form, read back through
+`ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question of `spec/fixtures/*-resolved.tn`) and
+compared entry for entry, `@meta.application` key annotations included. Names are compared as written: no entry has a
+derived name. A nested schema map is walked into: `ResolvedForm.entries` keys each member under its path, `readResolved`
+adds the path keys a schema holds (`SchemaPaths.withPaths`), and the nested map's own entry compares as its member
+names. `link/` states individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived
+disjointness, §8.2's `subtypes` index, a kind's derived `members` (compared as a set). `validate/` is a data document
+against a schema that loaded, where the expected side of a failure is §8.1's category plus the RFC 6901 pointer into the
+data and nothing else.
 
 **At the schema and link layers the category is the phase's, not the diagnostic code's.** §8.1 says every
 error that makes a schema fail to load or ingest is a resolver error "however value-like the violated rule",

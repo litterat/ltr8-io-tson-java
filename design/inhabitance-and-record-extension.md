@@ -10,8 +10,8 @@ check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extensi
 - Inhabitance is a least fixed point over the entry graph: exact, total and two-valued, with no third answer.
 - Every local entry is judged, referenced or not; imported entries are skipped, having been judged when their own
   schema linked.
-- An open record (a template, a `RecordBody` with `parameters`) is inhabited by fiat; the entries materialisation mints
-  from it are judged like any other, so a template nobody applies is judged nowhere.
+- An open record (a template, a `RecordBody` with `parameters`) is inhabited by fiat; the declarations closing its
+  applications are judged like any other entry, so a template nobody applies is judged nowhere.
 - An unresolved reference is inhabited by fiat, and the check runs after `validateEntry`, so one defect is reported
   once.
 - A kind is inhabited exactly when it has a member; a value entry and every atom are inhabited here. An atom whose
@@ -23,11 +23,12 @@ check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extensi
   template's application is a closed record carrying the template's selectors, judged as any base is.
 - Every family in the closure is judged; a pin collision only the merge produced is reported against the schema
   (`""`), naming both origins.
-- A family member is declared: a record a use-site application minted that composes onto another is refused.
+- A family member is declared: an application at a use site whose record in place would compose onto a declared type
+  is refused before linking (`TemplateMaterialiser.refuseMembership`).
 - Pins compare as values (`ValueIdentity`), read at the base's declared type.
 
 Related: `design/linking-and-compilation.md` (the link order), `design/schema-resolution.md` (marks and template
-families), `design/template-materialisation.md` (`refuseMintedMember`), `design/record-dispatch.md`,
+families), `design/template-materialisation.md` (`refuseMembership`), `design/record-dispatch.md`,
 `design/choice-disjointness.md`.
 
 ## The inhabitance check (`TypeInhabitance`)
@@ -35,7 +36,7 @@ families), `design/template-materialisation.md` (`refuseMintedMember`), `design/
 **An entry no finite document can satisfy is rejected.** `x => { y: y }` with `y => { x: x }` resolves and links
 cleanly otherwise, and fails at the first document as `missing required field 'x'`: blaming the data for a defect in
 the schema, at a line the data's author does not control. The diagnostic spells the chain that has to be broken
-(`cycleThrough`), each minted entry named as the form or application that produced it.
+(`cycleThrough`), each entry by its name.
 
 - **A least fixed point, not a search.** Every entry starts unknown; a round marks each one whose body is satisfied by
   what is already marked; rounds repeat until nothing changes, at most one per entry. Decidable because the graph is
@@ -55,9 +56,10 @@ the schema, at a line the data's author does not control. The diagnostic spells 
   (§5.10). So an uninhabited *variant* is rejected even where the choice around it still works. Repeating the verdict
   for imported entries would report one defect once per importer.
 - **An open record is not walked.** Its parameters mean nothing until an application supplies them, so it is inhabited
-  here, and the closure materialisation mints is an ordinary entry in the map by the time linking runs, judged like
-  any other. §8's own `tree` fixture is caught the moment anything applies it, and a template nobody applies is judged
-  nowhere, the same answer §5.10's deferred checking gives everywhere else. `TypeInhabitanceTest` pins both halves.
+  here, and a declaration closing one of its applications is an ordinary entry in the map by the time linking runs,
+  judged like any other. §8's own `tree` fixture is caught the moment anything applies it, and a template nobody applies
+  is judged nowhere, the same answer §5.10's deferred checking gives everywhere else. `TypeInhabitanceTest` pins both
+  halves.
 - **An unresolved reference is inhabited by fiat.** `validateEntry` has already reported it against this entry;
   calling it uninhabited too would report one defect twice, the second time naming a different problem.
 - **Scope is structural.** An atom whose facets admit nothing (`int8 ^ { min: 300 }`) is uninhabited too, but that is
@@ -80,7 +82,7 @@ usable and its members pin them distinctly, and every member is declared.
   body, so no annotation is left to consult.
 - **The FINAL check reads the entry's chain**, a template's as a closed type's: a template composing or refining a
   final record is refused at its own declaration, whether or not anything applies it, since every application IS-A
-  what the template's written parents reach. §5.9's subtraction leaves the chain empty, minting no IS-A edge, which is
+  what the template's written parents reach. §5.9's subtraction leaves the chain empty, adding no IS-A edge, which is
   the only thing FINAL constrains, so subtracting from a final type is admitted. No *invalid* case would show a
   regression there; the corpus carries a `valid` vector for that reason.
 - **The selectors are the base's statement.** A family dispatches on the fields its ABSTRACT base names in
@@ -95,15 +97,15 @@ usable and its members pin them distinctly, and every member is declared.
   cleanly can each add a member that collides with the other's. The second is the merge's own fault and is reported
   against the schema (`""`), naming both origins. A collision inside one import cannot reach here: that import was
   refused when it linked.
-- **Extending a family is a declaration.** A record a use-site template application minted that composes onto another
-  (`k: dog_of<text>`, or `dog_of<T>` in a template body) is refused, reported at the declaration that wrote it
-  (`reportedAgainst`). An expansion is refused where it is minted (`TemplateMaterialiser.refuseMintedMember`), with
-  the application in hand; what reaches here is the instantiation entry a self-reaching expansion keeps. A member is
-  what a read reports, a tag names and a binding maps, all by name, and a minted name is unwritable (§8.2). It also
-  keeps §8.2's content-derived duplicates harmless: two schemas minting one form hold two entries no value can tell
-  apart, and with members declared no duplicate is a family member. An undeclared member is skipped by the collision
-  check, so one mistake gets one verdict; and a template is in no `subtypes` index (the linker credits no open
-  entry), so a template composing a base is no member of it, its declared applications being the members.
+- **Extending a family is a declaration** (§5.2). An application at a use site whose record in place would compose
+  onto a declared type (`k: dog_of<text>`, or `dog_of<T>` held in a template body and closed by a declaration) is
+  refused before linking, with the application in hand (`TemplateMaterialiser.refuseMembership`), at the declaration
+  that wrote it or whose application closed it. A member is what a read reports, a tag names and a binding maps, all
+  by name. The linker keeps a check of its own over the entries it holds (`RecordExtension.isUndeclaredMember`: a
+  record with no source position that records an application and composes onto another), reported at the
+  declaration that wrote it (`reportedAgainst`) and skipped by the collision check, so one mistake gets one verdict.
+  A template is in no `subtypes` index (the linker credits no open entry), so a template composing a base is no
+  member of it, its declared applications being the members.
 - **Pins compare as values through `ValueIdentity`**, which is why that class is visible outside its package. §4.3
   makes `= 255` and `= 0xFF` one pin and §5.5 makes `= 1` and `= 1.0` one, so a comparison of tokens would accept a
   schema whose dispatch table is not a function. They are read **at the base's declared type**, an enum selector in
