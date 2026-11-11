@@ -125,12 +125,11 @@ final class MapBindReader extends MapAbstractReader<Object> {
      * document wrote is kept, and a {@code Map} otherwise -- making a real effort to
      * get the key/value types right: the schema's own {@code key_type}/{@code value_type} names are
      * each resolved to a real bound Java class the same way any other schema type name is (falling
-     * back to {@link String} only when a name has no real bound class at all, e.g. a synthesized,
-     * materialized entry) -- see {@link ArrayBindReader.Factory}'s own Javadoc for the identical
-     * reasoning, including why getting this right here doesn't actually change what a real consuming
-     * field ends up bound to ({@link RecordBindReader}'s own rebind step always takes over there) or
-     * what a direct read decodes (key/value narrowing never consults {@code descriptor} at all,
-     * Java's own generics being erased at runtime regardless).
+     * back to {@link String} only when a name has no real bound class at all) -- see {@link
+     * ArrayBindReader.Factory}'s own Javadoc for the identical reasoning, including why getting this right here
+     * doesn't actually change what a real consuming field ends up bound to ({@link RecordBindReader}'s own rebind
+     * step always takes over there) or what a direct read decodes (key/value narrowing never consults {@code
+     * descriptor} at all, Java's own generics being erased at runtime regardless).
      */
     public static final class Factory implements ValueReaderFactory {
 
@@ -165,7 +164,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
                     keysAreNames(body, context), namespace);
         }
 
-        /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */
+        /** {@code schemaTypeName} has no real bound Java class only where none is bound by that name. */
         private Class<?> resolveType(String schemaTypeName) {
             try {
                 return context.getDescriptor(schemaTypeName).typeClass();

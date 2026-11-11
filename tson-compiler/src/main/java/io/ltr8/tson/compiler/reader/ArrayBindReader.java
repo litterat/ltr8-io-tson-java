@@ -197,7 +197,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                     AnnotationTypes.of(context), elementsAreNames(body, context));
         }
 
-        /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */
+        /** {@code schemaTypeName} has no real bound Java class only where none is bound by that name. */
         private Class<?> resolveElementType(String schemaTypeName) {
             try {
                 return context.getDescriptor(schemaTypeName).typeClass();

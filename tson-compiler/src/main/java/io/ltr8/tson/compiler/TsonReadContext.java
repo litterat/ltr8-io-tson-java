@@ -262,8 +262,8 @@ public interface TsonReadContext {
 
     /**
      * Whether this reads a value body in a schema document -- a value entry's payload, a value of an ordinary type,
-     * which the resolver never lifts or mints in -- rather than a construction's binding record, where a
-     * sugar lift may leave an application in a slot for the closer to mint.
+     * where nothing is closed, so a kind-typed slot holds a bare name -- rather than a construction's binding record,
+     * where desugaring may leave an application in a slot for the materialiser to close.
      */
     boolean readsValueBody();
 

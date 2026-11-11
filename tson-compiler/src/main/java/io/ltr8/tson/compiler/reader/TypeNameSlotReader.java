@@ -25,12 +25,12 @@ import java.util.List;
  * on the {@code TypeRef}.
  *
  * <p><b>An application is a value here while a kernel body resolves</b>: resolved output holds one where an
- * application is still open (an open record's parents and field types), and a sugar form's lift writes one into the
- * slot it fills ({@code [meta.ref<record>]} fills {@code element_type} with {@code meta.ref<record>}), which the
- * resolver closes afterwards and judges the name that replaces it. In a value body
- * ({@link TsonReadContext#readsValueBody()}) nothing lifts or mints, so an application is refused and the alias
- * spelling named ([TSON-SCHEMA] §5.6). In a data document a reference is a name ([TSON-SCHEMA] §4.2): the kind's reader
- * refuses an application, whether or not the schema closes it. A quoted token is never a reference.
+ * application is still open (an open record's parents and field types), and a sugar form's construction writes one
+ * into the slot it fills ({@code [meta.ref<record>]} fills {@code element_type} with {@code meta.ref<record>}), which
+ * the resolver closes afterwards. In a value body ({@link TsonReadContext#readsValueBody()}) nothing is closed, so an
+ * application is refused and the declaration to write named ([TSON-SCHEMA] §5.6). In a data document a reference is
+ * a name ([TSON-SCHEMA] §4.2): the kind's reader refuses an application, whether or not the schema closes it. A quoted
+ * token is never a reference.
  *
  * <p><b>The component's class states the position rule</b> ([TSON-SCHEMA] §5.2), as the reference's {@code
  * allow_sibling} states it in tree mode: a sibling reference ({@code kind!}) stands only at a record field's type, the
@@ -84,13 +84,13 @@ final class TypeNameSlotReader implements TsonTypeReader<Reference> {
                 return reference.reference().withAnnotations(annotations);
             }
         }
-        // A value body is never lifted or minted, so an application here would have no entry to be the name of: the
-        // alias spelling gives it one, and the bare name then names it.
+        // Nothing in a value body is closed, so an application here would have no entry to be the name of: a
+        // declaration naming the application gives it one, and the bare name then names it.
         String found = TypeRefCheck.describe(ctx.peek());
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a type's name, found " + found
                 + " -- a position typed by a kind holds the name of a type, one bare token"
-                + (ctx.readsValueBody() ? "; to name an application here, declare an alias for it (order_box => "
-                        + "box<order>) and write its name" : ctx.readsSchemaNames() ? ", or an application (box<order>)"
+                + (ctx.readsValueBody() ? "; to name an application here, declare it under a name (order_box => "
+                        + "box<order>) and write that name" : ctx.readsSchemaNames() ? ", or an application (box<order>)"
                         : ""),
                 "a type's name", found);
         EventSkip.annotationsAndTypeRef(ctx);

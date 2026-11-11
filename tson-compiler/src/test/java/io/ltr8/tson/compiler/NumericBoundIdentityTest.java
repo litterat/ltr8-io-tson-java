@@ -46,8 +46,8 @@ class NumericBoundIdentityTest {
     }
 
     /**
-     * Every derived entry this schema declared, which is where two spellings of one number would show up as two --
-     * its closure's own derived entries, the kernel's and meta.tn's among them, left out.
+     * This schema's own entries named with a hash suffix, as an entry keyed by its content would be -- its closure's
+     * left out.
      */
     private static List<String> derivedEntries(TsonCompiledSchema compiled) {
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(compiled.schema().id());
@@ -70,7 +70,7 @@ class NumericBoundIdentityTest {
 
     /**
      * §4.3's equivalence in full: radix, digit separators and a redundant sign all fall away, so the two fields hold
-     * one construction in place, and nothing is lifted for either.
+     * one construction in place, and no entry is added for either.
      */
     @ParameterizedTest
     @ValueSource(strings = {"0xFF", "0b1111_1111", "0o377", "+255", "255"})

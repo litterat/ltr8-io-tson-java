@@ -15,7 +15,7 @@ import java.util.Optional;
  *
  * <p><b>The spelling is the slot's too.</b> What is no name -- a quoted token, a braced value, a framed name -- is
  * refused as the {@code TypeRef} host's reader refuses it ({@code refusing}): at a reference-typed slot in any schema
- * document, and at a kind-typed slot in a value body, where nothing lifts or mints. A data document's read is the
+ * document, and at a kind-typed slot in a value body, where nothing is closed. A data document's read is the
  * bound reader's alone.
  */
 final class RecordedNameReader implements TsonTypeReader<Object> {

@@ -24,8 +24,9 @@ import java.util.function.Function;
  * <p><b>The walk stops at three things</b>, and the second is the one worth knowing:
  * <ul>
  *   <li>an entry whose body is not an {@link Alias} -- the type at the end;
- *   <li>an <b>argument-bearing</b> target, which is an application rather than a hop to another entry:
- *       there is no entry at the end of one until materialisation mints it;
+ *   <li>an <b>argument-bearing</b> target, which is an application rather than a hop to another entry: a
+ *       declaration naming an application is that entry itself, so a target still carrying arguments is one that
+ *       did not close, and there is no entry at the end of it;
  *   <li>a name the namespace does not declare, and a cycle. {@link #terminal} answers both with the name it
  *       stopped at, since an undeclared name is a type parameter to its caller and a cycle's answer depends
  *       on where the walk began -- so no false equality follows. {@link #terminalDefinition} answers both

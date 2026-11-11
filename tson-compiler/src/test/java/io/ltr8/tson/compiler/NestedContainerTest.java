@@ -29,12 +29,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>[TSON-SCHEMA] §5.3 says declaration-level container syntax nests inside itself and fixes the order --
  * {@code grid => <T, N> [[T; N]; N]} nests with "the inner form desugaring first" -- and §12.1 says the
- * same from the grammar side. (Revision 32 spells that nesting as an {@code array_ranged} application; the
- * size templates are gone from the kernel and a sized form binds its bounds directly, so what nests here is
- * the injected {@code array} entry rather than an application of one.) {@code SchemaDesugarer} performs that
- * as a bottom-up hoist: the inner container becomes its own injected declaration and the position that held
- * it becomes a bare reference, so the outer container routes a plain name like any other. What these cover is
- * that the arrangement survives resolution, linking, compilation and a read.
+ * same from the grammar side. A sized form binds its bounds directly, so what nests here is the inner
+ * {@code meta.array} construction. {@code SchemaDesugarer} performs that bottom-up: the inner container is the
+ * construction it denotes, held in place in the outer's binding record as a type written in place
+ * (<code>{ of: !meta.array { … } }</code>). What these cover is that the arrangement survives resolution, linking,
+ * compilation and a read.
  *
  * <p>No §5.10 substitution is involved. A nested form carries no parameter its flat sibling does not, which is
  * why this closes independently of the template work.
@@ -67,7 +66,7 @@ class NestedContainerTest {
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
-    /** The entry a name resolves to in the compiled schema -- an injected one included. */
+    /** The entry a declared name resolves to in the compiled schema. */
     private static Top entry(TsonCompiledSchema compiled, String name) {
         Top definition = compiled.schema().entries().get(name);
         assertNotNull(definition, () -> "no entry '" + name + "' among " + compiled.schema().entries().keySet());

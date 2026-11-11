@@ -12,7 +12,6 @@ import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -48,18 +47,9 @@ class ChoiceSugarResolutionTest {
                 .map(io.ltr8.tson.schema.meta.TypeExpr::text).toList();
     }
 
-    /** The one entry whose name starts with the given prefix -- an injected declaration carries a derived hash suffix. */
-    private static Map.Entry<String, Top> injected(TsonSchema schema, String prefix) {
-        List<Map.Entry<String, Top>> matches = schema.entries().entrySet().stream()
-                .filter(entry -> entry.getKey().startsWith(prefix)).toList();
-        assertEquals(1, matches.size(), () -> "expected exactly one injected '" + prefix + "*' entry, got "
-                + matches.stream().map(Map.Entry::getKey).toList());
-        return matches.getFirst();
-    }
-
     /**
      * At declaration position the sugar <em>is</em> the construction, so the entry itself carries the
-     * {@code ChoiceBody} -- not an alias to an injected one. It resolves as the ordinary construction of
+     * {@code ChoiceBody}. It resolves as the ordinary construction of
      * {@code choice} it desugars to: its tag is the constructor, SUM kind comes from that
      * constructor, and {@code supertypes} stays empty because §5.5 transfers the target's kind and nothing
      * else -- which is also all §8.1's own Choice row claims.

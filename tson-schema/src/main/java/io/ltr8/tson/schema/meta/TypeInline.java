@@ -14,7 +14,7 @@ import java.util.function.Function;
 /**
  * A type written where it is used, the kernel's {@code meta.type_inline}: the construction a sugar form or an applied
  * constructor denotes, or the record an application of an open record closes to, held at the slot that wrote it,
- * {@code { of: !meta.array { element_type: text } }}. Nothing is lifted to an entry and nothing is named by its content.
+ * {@code { of: !meta.array { element_type: text } }}. It is no entry: it has no name, and nothing looks it up.
  *
  * <p><b>What may be inline</b> ([TSON-SCHEMA] §4.2, §5.2), and this constructor is the one place the line is kept --
  * the kernel types {@code of} by the abstract {@code meta.type}, which admits more:

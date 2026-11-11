@@ -100,10 +100,10 @@ public final class JsonCompiledSchema {
      *
      * <p>Two filters, each removing names the author would not recognise. The <b>origin index</b> records
      * the schema that actually declared each name, transitively, so a name an {@code !!import} flattened in
-     * carries the document it was written in. And an entry with <b>no source position</b> is one the
-     * resolver minted -- a sugar form or a closed template application -- which is the same test
-     * {@code tson-compiler} uses to tell a minted entry from an authored one. Both remain usable root types;
-     * this decides what to <em>show</em>, and the count that follows covers the rest.
+     * carries the document it was written in. And an entry with <b>no source position</b> is one no source
+     * text was read for -- the kernel's bootstrap entries, a resolved form read as data, a hand-built
+     * schema. Both remain usable root types; this decides what to <em>show</em>, and the count that follows
+     * covers the rest.
      */
     private List<String> declaredHere() {
         String own = CanonicalIdentity.canonicalize(schema().id());
@@ -116,9 +116,9 @@ public final class JsonCompiledSchema {
 
     /**
      * Where a read entering through {@code typeName} roots its schema pointer: the name the caller named, not
-     * the entry it resolves to. The two differ exactly when the name aliases something the resolver minted,
-     * and the minted entry's reader -- shared by every entry point -- cannot know which name a given read
-     * arrived through. Empty for a name this schema does not declare.
+     * the entry it resolves to. The two differ exactly when the name is an alias, and the target's reader --
+     * shared by every name that reaches it -- cannot know which name a given read arrived through. Empty for a
+     * name this schema does not declare.
      */
     Optional<JsonSchemaLocation> rootDeclaration(String typeName) {
         return Optional.ofNullable(schema().entries().get(typeName))

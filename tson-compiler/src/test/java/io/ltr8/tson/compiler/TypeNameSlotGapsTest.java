@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * by its slot's declared type.
  *
  * <ol>
- *   <li>An application at a type-name slot of a value body is refused with the alias spelling named: nothing lifts
- *       or mints in a value body, so an application there would have no entry to be the name of.
+ *   <li>An application at a type-name slot of a value body is refused, naming the declaration to write: the slot
+ *       holds a name, and an application is none.
  *   <li>A slot that only the subtype the value's tag selected declares, below a record family base, is judged by
  *       its declared type ({@code SubtypeBehindFieldTest} has the same one record field further down).
  *   <li>A slot's pointer writes the key for a map key that carries annotations.
@@ -114,16 +114,16 @@ class TypeNameSlotGapsTest {
     }
 
     /**
-     * A value body is never lifted or minted, so an application at a kind-typed slot has no entry to be the name
-     * of: it is refused, sound or not, and the alias spelling named ({@code order_box => box<order>}).
+     * A kind-typed slot holds the name of a type, and an application is no name: it is refused, sound or not, and
+     * the declaration to write named ({@code order_box => box<order>}).
      */
     @Test
-    void anApplicationAtAKindSlotIsRefusedNamingTheAlias() {
+    void anApplicationAtAKindSlotIsRefusedNamingTheDeclarationToWrite() {
         for (String application : List.of("box<order>", "box<no_such>", "no_box<order>", "box<order order>",
                 "box< other >")) {
             refused(schema("applied-" + application.hashCode(),
                             "op => !gap_operations { o => { request: " + application + " } }"),
-                    "a position typed by a kind holds the name of a type", "declare an alias");
+                    "a position typed by a kind holds the name of a type", "declare it under a name");
         }
     }
 

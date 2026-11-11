@@ -139,15 +139,10 @@ class TypeInhabitanceTest {
     }
 
     /**
-     * The chain names what the author wrote, at every link. A derived entry's name is content-derived and
-     * §8.2 makes it non-normative, so a chain reading {@code tree_text_a7f070f6 needs
-     * array_tree_text_a7f070f6_1_f3d1a035} would name two entries the author never wrote, about a recursion
-     * they did -- the same rule {@code EntryDisplayName} already applies on the read side, which is where
-     * this borrows its rendering from.
-     *
-     * <p>The chain is now one link shorter, and for the reason this test exists: {@code use} <em>is</em> the
-     * instantiation of {@code tree<text>} rather than a reference to it (§8.2), so
-     * there is no hop to render between the author's name and the recursion it names.
+     * The chain names what the author wrote, at every link -- the rule {@code EntryDisplayName} applies on the
+     * read side, which is where this borrows its rendering from. {@code use} <em>is</em> the instantiation of
+     * {@code tree<text>} rather than a reference to it (§8.2), and the recursive {@code tree<text>} inside it ties
+     * to that declaration, so there is no hop to render between the author's name and the recursion it names.
      */
     @Test
     void theChainIsSpelledTheWayTheAuthorWroteIt() {

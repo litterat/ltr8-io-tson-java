@@ -33,9 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code ok<text>} is a member of {@code result<text>}'s family and not of {@code result<int32>}'s. An
  * abstract template whose family was always empty would be a type nothing could ever stand at.
  *
- * <p><b>Every member's entry name is minted, which is what makes the alias half load-bearing.</b> §8.2 makes
- * a materialised name non-normative, so {@code ok_of => ok<text>} is the only name a document has for that
- * member -- and §7.2's "after alias flattening of both" is what lets a tag spell it.
+ * <p><b>Every member is the author's declaration.</b> {@code ok_of => ok<text>} is the record {@code ok<text>}
+ * closes to, under the name the author wrote (§8.2), so a tag names a member as it names any declared record.
  */
 class AbstractTemplateFamilyTest {
 
@@ -74,9 +73,8 @@ class AbstractTemplateFamilyTest {
     }
 
     /**
-     * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
-     * its instantiation (§8.2), or the entry it aliases where an earlier declaration
-     * already named the same application.
+     * The entry {@code alias} denotes, past one alias hop: a {@code name => head<args>} declaration is itself the
+     * record its application closes to (§8.2).
      */
     private static String target(TsonCompiledSchemaRegistry registry, String alias) {
         return registry.get(ID).schema().entries().get(alias)
@@ -132,12 +130,11 @@ class AbstractTemplateFamilyTest {
     // ── Reading against it ──────────────────────────────────────────────────
 
     /**
-     * The tag is the only selector at an abstract position, and an alias is the only name this document has
-     * for the member: §8.2 makes {@code ok<text>}'s minted entry name non-normative, and §12.1 gives a
-     * type annotation no argument list to write {@code !ok<text>} with.
+     * The tag is the only selector at an abstract position, and it spells the member's declared name: §12.1 gives
+     * a type annotation no argument list to write {@code !ok<text>} with.
      */
     @Test
-    void aTagSpellingAnAliasOfAMemberSelectsIt() {
+    void aTagSpellingAMembersDeclaredNameSelectsIt() {
         assertEquals(List.of(), read(compile(FAMILY), "holder", """
                 { r: !ok_of { payload: "p"  note: "n" } }
                 """));
@@ -156,11 +153,10 @@ class AbstractTemplateFamilyTest {
     }
 
     /**
-     * A tag naming the base gets its own rule, and it has to reach the alias too: the base's minted name is
-     * non-normative, so {@code !result_of} is the only spelling an author has for the thing being refused.
+     * A tag naming the base gets its own rule: the base is abstract, so {@code !result_of} selects nothing.
      */
     @Test
-    void aTagSpellingAnAliasOfTheBaseSelectsNothing() {
+    void aTagSpellingTheBasesDeclaredNameSelectsNothing() {
         Diagnostic refused = refusal(read(compile(FAMILY), "holder", """
                 { r: !result_of { payload: "p" } }
                 """));
@@ -180,7 +176,7 @@ class AbstractTemplateFamilyTest {
         assertTrue(refused.message().contains("is not admissible"), refused.message());
     }
 
-    /** The names a refusal offers are ones a document can write -- the aliases, beside the entries' own. */
+    /** The names a refusal offers are ones a document can write -- the members' declared names. */
     @Test
     void theRefusalOffersTheNamesADocumentCanWrite() {
         Diagnostic refused = refusal(read(compile(FAMILY), "holder", """

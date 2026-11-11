@@ -21,10 +21,9 @@ import java.util.function.BiPredicate;
  * {@code allow_sibling} pinned false by the refinement; the slot's meaning comes from {@link #of}, whichever of the
  * two built it, so a question of whether a body is a reference goes by the constructor's chain, never its name.
  *
- * <p><b>{@link #of} is a {@link TypeRef}</b>, the kernel typing it {@code meta.type_ref}, so a body may write an
- * application there: {@code !meta.reference_type { of: box<text> }} is {@code meta.ref<box<text>>}. Resolution closes
- * it to the entry it denotes, as it closes an application at any type position, so a resolved body's {@code of} is a
- * name; one that kept its arguments did not close, and the link refuses it.
+ * <p><b>{@link #of} is a {@link TypeRef}</b>, the kernel typing it {@code meta.type_ref}, and only a name stands there
+ * ([TSON-SCHEMA] §4.2): an application at {@code of}, {@code meta.ref<box<text>>}, closes nowhere and is refused, so
+ * the author declares it and names the declaration. A resolved body's {@code of} is a name.
  *
  * <p><b>{@link #allowSibling} says whether a sibling reference ({@code kind!}) is a value</b> ([TSON-SCHEMA] §5.2,
  * §8.1). The grammar reads one wherever a reference stands, and the facet admits or refuses it, as {@code allow_nan}
@@ -50,8 +49,7 @@ import java.util.function.BiPredicate;
  * that relation from the linker.
  *
  * <p><b>Equality is {@link #of}, {@link #allowSibling} and the chain, never the index.</b> Two schemas that both apply
- * {@code meta.ref<uuid_type>} hold one instance with different members, and an importer that re-derives an entry an
- * import already minted unifies with it rather than colliding (§8.2).
+ * {@code meta.ref<uuid_type>} hold equal bodies whatever members each closure admits.
  */
 @Typename(name = "meta.reference_type")
 public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling") boolean allowSibling,
@@ -61,7 +59,7 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling")
      * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are types,
      * and the members where it does -- the names of the closure the slot admits, sorted -- with the closure's entries,
      * which a name read here finds its referent in ({@link #closure}). {@code shown} is the members as a message lists
-     * them: the names an author writes, a minted entry, which no author named, left out. {@code values}, for a reference
+     * them, without the pending names a link of a resolution in progress adds. {@code values}, for a reference
      * that names values, is what a qualified name reaches in that closure ({@link Values}); empty for one that names
      * types, and for a link of a resolution in progress, whose pending entries hold no value yet.
      */

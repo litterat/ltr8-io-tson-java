@@ -117,10 +117,8 @@ final class MetaRefs {
                     choice.variants().stream().map(variant -> mapSlot(variant, map)).toList(), choice.disjoint());
             // An alias's target is a name, and maps as one: an application there is refused, to be declared.
             case Alias alias -> new Alias(map.atName(alias.target()));
-            // `of` is a type reference like any other, arguments and all: `!meta.reference_type { of: box<text> }`
-            // closes its application here as `meta.ref<box<text>>` closes its argument before substituting it,
-            // so either way `of` names the entry the application denotes (§4.2). The index is carried, derived at
-            // link.
+            // `of` holds a name (§4.2), and maps as one: an application there is refused, to be declared. The index
+            // is carried, derived at link.
             case ReferenceBody reference -> new ReferenceBody(reference.chain(), map.atName(reference.of()),
                     reference.allowSibling(), reference.index());
             // Every other atom's facets are values, never references; a declared type holds its chain alone.

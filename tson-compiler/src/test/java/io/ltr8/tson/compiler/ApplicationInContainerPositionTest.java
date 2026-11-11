@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code [tree<T>]} is the application {@code meta.array<tree<T>>}, held as written until the record is applied, and
  * then constructed in place. A sized form over a parameter is no reference and is refused. <b>A closed form</b>
  * ({@code [box<text>]}) is the array in place whose element holds the record {@code box<text>} closes to, in place
- * too: nothing is lifted or minted.
+ * too.
  */
 class ApplicationInContainerPositionTest {
 
@@ -71,10 +71,10 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * The entries this schema declares without a position of its own -- what a lift or a mint would add, its
-     * closure's own left out. Nothing is added: a form and an application close in place.
+     * The entries this schema holds without a position of its own, its closure's own left out: none, a form and an
+     * application closing in place.
      */
-    private static List<String> derived(TsonCompiledSchema compiled) {
+    private static List<String> unpositioned(TsonCompiledSchema compiled) {
         String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(compiled.schema().id());
         return compiled.schema().entries().entrySet().stream()
                 .filter(e -> compiled.schema().positionOf(e.getKey()).isEmpty())
@@ -118,8 +118,8 @@ class ApplicationInContainerPositionTest {
         assertTrue(tree.isOpen());
         assertEquals(TypeRef.of("meta.array", List.of(TypeRef.of("tree", List.of(ParamRef.of("T"))))),
                 tree.fields().get("children").type());
-        assertTrue(derived(compiled).isEmpty(), () -> "nothing lifted for a form over a parameter: "
-                + derived(compiled));
+        assertTrue(unpositioned(compiled).isEmpty(), () -> "no entry added for a form over a parameter: "
+                + unpositioned(compiled));
     }
 
     /** A recursive type terminates only if its recursive position can be empty, as this one can. */
@@ -169,7 +169,7 @@ class ApplicationInContainerPositionTest {
         assertEquals(a, slot(entry(compiled, "b"), "g"), "one type");
         assertEquals(slot(entry(compiled, "direct"), "d"), slot(inPlace(a), "x"),
                 "the rows the grid builds are the rows written directly");
-        assertEquals(List.of(), derived(compiled), "nothing added");
+        assertEquals(List.of(), unpositioned(compiled), "nothing added");
     }
 
     /**
@@ -193,7 +193,7 @@ class ApplicationInContainerPositionTest {
         Top grid = entry(both, "grid");
         assertEquals(List.of("T"), OpenEntry.parameterNames(grid), "the declared template, unchanged");
         assertEquals(entry(one, "grid"), grid);
-        assertEquals(List.of(), derived(both));
+        assertEquals(List.of(), unpositioned(both));
     }
 
     /** The smallest form needing any of this: one array over one parameter, closed to an array of the argument. */
@@ -206,7 +206,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody array = assertInstanceOf(ArrayBody.class, inPlace(slot(inPlace(slot(entry(compiled, "use"), "u")),
                 "a")));
         assertEquals(TypeRef.of("uuid"), array.elementType());
-        assertEquals(List.of(), derived(compiled));
+        assertEquals(List.of(), unpositioned(compiled));
     }
 
     // ── The nested form in miniature, and the closed case ─────────────────────

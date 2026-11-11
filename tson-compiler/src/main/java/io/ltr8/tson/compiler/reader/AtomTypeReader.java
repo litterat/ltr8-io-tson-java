@@ -96,9 +96,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * use instead (one {@code IntegerParser} serves {@code int8}..{@code int256} and every refinement of
      * them), so it has to come from the entry, which every {@link ValueReaderFactory} is handed anyway.
      *
-     * <p><b>{@code null} for a form no author named</b> -- an application nothing declares, expanded to an atom
-     * instance ({@link ValueReaderContext#authoredName}). The family's own sentence then stands alone, and the
-     * position the diagnostic carries says where.
+     * <p>Where it is {@code null} the family's own sentence stands alone, and the position the diagnostic carries
+     * says where.
      *
      * <p><b>It is not what a constraint violation reports as {@code expected}.</b> Naming the type there
      * says strictly less than the message already does -- a consumer wanting the bound has to recover it by

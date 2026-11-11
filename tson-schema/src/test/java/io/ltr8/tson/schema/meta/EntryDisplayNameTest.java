@@ -29,8 +29,8 @@ class EntryDisplayNameTest {
         }
     };
 
-    /** An entry the resolver minted, rendered: no position, because there is no declaration to have one. */
-    private static String minted(String name, Top value) {
+    /** An entry no source was read for, rendered: one the kernel's bootstrap builds, or one read from a resolved form. */
+    private static String unpositioned(String name, Top value) {
         return EntryDisplayName.of(name, value, TsonSchema.EntryFacts.NONE, Optional.empty());
     }
 
@@ -48,12 +48,12 @@ class EntryDisplayNameTest {
 
     @Test
     void anArrayRendersAsItsSugarWithEverySizeForm() {
-        assertEquals("[order]", minted("x", array(Optional.empty(), Optional.empty())));
-        assertEquals("[order; 1..]", minted("x", array(Optional.of(1L), Optional.empty())));
-        assertEquals("[order; ..5]", minted("x", array(Optional.empty(), Optional.of(5L))));
-        assertEquals("[order; 1..2]", minted("x", array(Optional.of(1L), Optional.of(2L))));
+        assertEquals("[order]", unpositioned("x", array(Optional.empty(), Optional.empty())));
+        assertEquals("[order; 1..]", unpositioned("x", array(Optional.of(1L), Optional.empty())));
+        assertEquals("[order; ..5]", unpositioned("x", array(Optional.empty(), Optional.of(5L))));
+        assertEquals("[order; 1..2]", unpositioned("x", array(Optional.of(1L), Optional.of(2L))));
         assertEquals("[order; 3]",
-                minted("x", array(Optional.of(3L), Optional.of(3L))));
+                unpositioned("x", array(Optional.of(3L), Optional.of(3L))));
     }
 
     @Test
@@ -61,7 +61,7 @@ class EntryDisplayNameTest {
         MapBody body = new MapBody(TypeRef.of("text"), TypeRef.of("order"), false, false,
                 Optional.of(1L), Optional.empty());
 
-        assertEquals("{text => order; 1..}", minted("x", body));
+        assertEquals("{text => order; 1..}", unpositioned("x", body));
     }
 
     @Test
@@ -70,19 +70,19 @@ class EntryDisplayNameTest {
                 TupleElement.required(TypeRef.of("int32"))));
         ChoiceBody choice = new ChoiceBody(List.of(TypeRef.of("text"), TypeRef.of("int32")));
 
-        assertEquals("[text, int32]", minted("x", tuple));
-        assertEquals("(text | int32)", minted("x", choice));
+        assertEquals("[text, int32]", unpositioned("x", tuple));
+        assertEquals("(text | int32)", unpositioned("x", choice));
     }
 
     /**
-     * An instantiation entry renders as the application it closes, from its key -- which is what §8.2 keys
-     * its identity on, so it is exactly what the author wrote at the site.
+     * An entry with no position that closes an application renders as the application, from its key's
+     * {@code @meta.application} -- the application as written ([TSON-SCHEMA] §8.2).
      */
     @Test
-    void anInstantiationEntryRendersAsTheApplication() {
+    void anEntryClosingAnApplicationRendersAsTheApplication() {
         TypeRef application = TypeRef.of("paged", List.of(TypeRef.of("order"), TypeRef.of("text")));
 
-        assertEquals("paged<order, text>", EntryDisplayName.of("paged_order_text_abc", RecordBody.of(RecordBody.fieldMap()),
+        assertEquals("paged<order, text>", EntryDisplayName.of("paged_order_text", RecordBody.of(RecordBody.fieldMap()),
                 TsonSchema.EntryFacts.NONE, Optional.of(application)));
     }
 
@@ -96,6 +96,6 @@ class EntryDisplayNameTest {
     /** No sugar spelling and no application: the name, honestly, rather than something invented. */
     @Test
     void anythingElseFallsBackToTheName() {
-        assertEquals("mystery", minted("mystery", RecordBody.of(RecordBody.fieldMap())));
+        assertEquals("mystery", unpositioned("mystery", RecordBody.of(RecordBody.fieldMap())));
     }
 }

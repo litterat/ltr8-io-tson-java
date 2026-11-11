@@ -21,10 +21,8 @@ import java.util.Set;
  * nothing asks whether a record is final and no reader carries a check for it.
  *
  * <p><b>Both dispatchers compare a written tag against flattened names</b> ({@link Subsumption#admitting}),
- * §7.2 comparing "after alias flattening of both". It is not a nicety here: a family whose base is an abstract
- * template's application has a minted base where no declaration names the application, and §8.2 makes a minted
- * name non-normative -- so an alias is the only name a document has for {@code outcome<text>}, and a dispatcher
- * matching raw names would refuse a tag naming it.
+ * §7.2 comparing "after alias flattening of both": a tag naming an alias of the base or of a member names that
+ * type, and a dispatcher matching raw names would refuse it.
  */
 final class RecordDispatch {
 

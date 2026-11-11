@@ -126,7 +126,7 @@ final class RecordExtension {
     }
 
     /**
-     * §5.9's subtraction leaves the chain empty and mints no IS-A edge, which is the only thing FINAL
+     * §5.9's subtraction leaves the chain empty and adds no IS-A edge, which is the only thing FINAL
      * constrains, so a subtracted record is not refused here: the one operation §5.9 admits against a final type
      * names no parent at all.
      */
@@ -139,7 +139,7 @@ final class RecordExtension {
                 violations.add(new Violation(name, "'" + name + "' names '" + supertype + "' as a supertype, "
                         + "but '" + supertype + "' is final and admits none -- composition and refinement are "
                         + "both refused, in the declaring schema and in any that imports it. Subtraction is "
-                        + "not: §5.9 empties the chain and mints no IS-A edge, which is the only "
+                        + "not: §5.9 empties the chain and adds no IS-A edge, which is the only "
                         + "thing final constrains (§5.2, §5.9)"));
             }
         }
@@ -218,10 +218,8 @@ final class RecordExtension {
     }
 
     /**
-     * A member named the way the author wrote it: a minted entry as the application that produced it, which
-     * is the same rule a reader's own messages follow. A family whose members are template applications
-     * collides under names the resolver chose ({@code pet_of_cat_int32_1c52dc45}, §8.2), and those name
-     * nothing an author can open.
+     * A member named the way the author wrote it, the rule a reader's own messages follow: its declared name,
+     * and for an entry with no source position the form or the application its key records.
      */
     private static String shown(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
                                 Map<String, TypeRef> applications) {

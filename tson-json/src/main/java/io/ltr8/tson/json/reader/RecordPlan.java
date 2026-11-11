@@ -47,9 +47,9 @@ final class RecordPlan {
     final JsonSchemaLocation schemaLocation;
 
     /**
-     * What this type is called in a message: the name the author wrote, where {@link #name} is the entry a
-     * {@code $type} resolves against. The two differ for a minted entry, which shows as {@code box<text>} rather
-     * than as a content-derived name in neither the schema nor the document.
+     * What this type is called in a message ({@link EntryDisplayName}), where {@link #name} is the entry a
+     * {@code $type} resolves against. The two differ for an entry no source was read for, which shows as the
+     * form its body is, {@code box<text>} for an application its key records.
      */
     final String displayName;
 

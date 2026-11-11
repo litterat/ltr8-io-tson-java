@@ -112,13 +112,11 @@ import java.util.function.Predicate;
  * link a schema before registering it, same as any other caller. Identities are canonicalized through
  * {@link CanonicalIdentity}, which lives in {@code tson-base}, shared with the registries that key on it.
  *
- * <p><b>No materialization.</b> A reference carrying arguments does not become a synthesized entry
- * here. {@code SchemaDesugarer} turns every sugar form into a real declaration plus a bare reference, where
- * the AST and the closure's constructor vocabulary are both still in hand -- which is what lets it
- * bind the constructor generically and so cover every shape, rather than the per-shape assemblers a
- * linker-side materialization would need -- and the resolver's {@code TemplateMaterialiser} closes every
- * template application into an entry. What survives into an entry the linker sees is therefore a bare name in
- * every position except one: an open record's own fields and parents, which legitimately reference its own
+ * <p><b>No materialization.</b> The linker builds no type. {@code SchemaDesugarer} writes every sugar form as the
+ * construction it denotes, in place, and the resolver binds it through the constructor's compiled reader, which
+ * covers every shape generically; the resolver's {@code TemplateMaterialiser} closes every application, in place or
+ * into the declaration naming it. What survives into an entry the linker sees is therefore a name or a type written
+ * in place in every position except one: an open record's own fields and parents, which legitimately reference its own
  * parameters ({@code box<T>}) and are checked only for what no argument changes -- the arity of the references it
  * writes ({@link #checkOpenArity}) -- never resolved against the schema. A
  * closed entry holds no parameter, so every name it holds resolves in the schema's own namespace or is unresolved.
@@ -464,7 +462,7 @@ public final class TsonSchemaLinker {
                 other -> Optional.ofNullable(applications.get(other)));
     }
 
-    /** Where {@code name} was declared, from the merged facts -- absent for an entry the resolver minted. */
+    /** Where {@code name} was declared, from the merged facts -- absent for an entry with no source position. */
     private static Optional<SourcePosition> at(Map<String, TsonSchema.EntryFacts> facts, String name) {
         return facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).position();
     }
@@ -494,8 +492,8 @@ public final class TsonSchemaLinker {
      * A reference resolving to nothing, carried in <b>parts</b> rather than as a finished sentence.
      *
      * <p>An open record defers every question about what its references resolve to, so an unresolved one
-     * surfaces on the entry materialisation minted -- {@code box<int32>} -- when the name was written in the
-     * template's own text. The two statements of that one fact differ in the subject alone, so the subject
+     * surfaces inside a record an application closes to in place -- {@code box<int32>} -- when the name was written
+     * in the template's own text. The two statements of that one fact differ in the subject alone, so the subject
      * is supplied at the point the fact is stated rather than baked in at the point it is discovered.
      *
      * <p><b>Linker-internal, and never escapes.</b> It is caught in the one place it is thrown from and
@@ -647,8 +645,9 @@ public final class TsonSchemaLinker {
         Map<String, Normalization> enumForms = new LinkedHashMap<>();
         Map<String, Top> nameTypes = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
-        // The application each instantiation closes (§8.2), off its key: an import's as its schema states it, a
-        // local one's as this schema's resolution wrote it. What a message shows in place of a minted name.
+        // The application each declared application closes (§8.2), off its key: an import's as its schema states
+        // it, a local one's as this schema's resolution wrote it. What a message shows for an entry with no
+        // source position.
         Map<String, TypeRef> applications = new LinkedHashMap<>();
         Map<String, Top> merged = mergeImports(schema, loader, origins, enumForms, nameTypes, facts,
                 applications);
@@ -726,9 +725,8 @@ public final class TsonSchemaLinker {
         ValuesByName byName = new ValuesByName(schema, merged, facts, origins, values);
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             try {
-                // Named by what the author wrote, not by the content-derived name a derived entry carries:
-                // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
-                // a name §8.2 makes non-normative and nobody ever typed.
+                // Named by what the author wrote: its declared name, or the form or application an entry with no
+                // source position records.
                 validateEntry(displayName(entry.getKey(), merged, facts, applications), entry.getValue(),
                         merged, constructors, other -> displayName(other, namespace, facts, applications), byName);
             } catch (UnsupportedOperationException gap) {
@@ -748,8 +746,8 @@ public final class TsonSchemaLinker {
                     continue;
                 }
                 // One mistake in a template is one mistake however many declarations apply it: each
-                // application mints its own entry and each fails identically, so the verdict that names the
-                // template would otherwise be repeated once per applier.
+                // application closes to its own record in place and each fails identically, so the verdict that
+                // names the template would otherwise be repeated once per applier.
                 String message = e.against(author);
                 if (blamedOnce.add(author + "\u0000" + message)) {
                     reportOrThrow(receiver, schema, author, facts, message, e);
@@ -860,10 +858,8 @@ public final class TsonSchemaLinker {
             if (inhabited.contains(name)) {
                 continue;
             }
-            // Rendered the way a read renders it: a derived entry is named by the form or application that
-            // produced it, never by the content-derived name §8.2 makes non-normative. A chain reading
-            // `tree_text_a7f070f6 needs array_tree_text_a7f070f6_1_f3d1a035` names two entries the author
-            // never wrote, about a recursion they did.
+            // Rendered the way a read renders it: an entry with no source position by the form or application
+            // that produced it.
             List<String> chain = TypeInhabitance.cycleThrough(name, merged, inhabited).stream()
                     .map(entry -> displayName(entry, merged, facts, applications)).toList();
             report(receiver, schema, name, at(facts, name), "'" + name + "' can never be satisfied by any "
@@ -1207,9 +1203,8 @@ public final class TsonSchemaLinker {
      * KindMembers}' construction walk. Every reference in the closure is recomputed, an imported one included: the
      * index is computed over the <em>governing</em> schema's closure, so one reference holds different members in two
      * schemas importing different sets, and whatever a body arrived carrying is discarded rather than trusted. A
-     * message lists the members an author can write: data holds a reference as a name (§4.2), so a minted entry, which
-     * no author named, is left out of the shown list. The index is never written: resolved output states {@code of}
-     * alone.
+     * message lists the members by name, as data holds a reference (§4.2). The index is never written: resolved
+     * output states {@code of} alone.
      *
      * <p>Before the name-type checks, {@code checkNames} and validation, and after {@link #computeSubtypes}, which
      * no member depends on: the walk reads each entry's constructor and the constructors' {@code supertypes}, both
@@ -1431,8 +1426,7 @@ public final class TsonSchemaLinker {
                 }
                 checkRestatedFieldTypes(entryName, r, namespace, shown);
             }
-            // The target in full: an alias naming an application states its arguments there, and a closed one
-            // names the entry materialisation minted for it.
+            // The target in full: an alias naming an application states its arguments there.
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
             // An alias naming a template bare names the template under another name (`ref_of => ref`),
             // applied as its target is, so it is no use of the template without its arguments.
@@ -1487,7 +1481,7 @@ public final class TsonSchemaLinker {
             // §5.12): what it admits is the names whose entries' values are of it, which is the slot's judgement
             // wherever a name is written. The index is the linker's own computation, so nothing else is validated.
             case ReferenceBody reference -> {
-                // An application in `of` closes during resolution to the entry it denotes; one that kept its
+                // `of` holds a name (§4.2), and resolution refuses an application there; one that kept its
                 // arguments did not close, and names nothing: its head is unresolved, applied or not.
                 boolean resolves = namespace.get(AliasChain.terminal(reference.of().name(), namespace)) != null;
                 if (!resolves || !reference.of().arguments().isEmpty()) {
@@ -1731,8 +1725,8 @@ public final class TsonSchemaLinker {
      * asking every body here covers the named case and its kin together. Anything §5.5 adds to a family later
      * arrives here for free.
      *
-     * <p><b>It runs on every entry, not only the materialised ones</b>, because this phase is the one place
-     * that sees them all exactly once however they were produced. A declared body was already asked at
+     * <p><b>It runs on every entry</b>, because this phase is the one place that sees them all exactly once
+     * however they were produced. A declared body was already asked at
      * resolution, beside its own constructor's vocabulary check -- and one that failed there is replaced by a
      * placeholder and never reaches this, so nothing is reported twice. What is left for this to catch is
      * exactly the set resolution never produced: the forms an application closes to.
@@ -1746,11 +1740,10 @@ public final class TsonSchemaLinker {
             case ValueEntry ignored -> List.of();
         };
         if (!violations.isEmpty()) {
-            // No name leads this one, deliberately. Only an entry resolution never produced can reach here --
-            // a declared body failed the same check one phase earlier, under its own declaration's name -- and
-            // a materialised entry's name is content-derived, which is the one thing a diagnostic may never
-            // put in front of an author. The location already names the declaration that wrote the
-            // application; what is left to say is what the application closed onto.
+            // No name leads this one, deliberately. Only a form an application closed to can reach here -- a
+            // declared body failed the same check one phase earlier, under its own declaration's name -- and the
+            // location already names the declaration that wrote the application; what is left to say is what the
+            // application closed onto.
             throw new SchemaValidationException("the constraints this application closes onto contradict "
                     + "each other: " + String.join("; ", violations) + " -- no value can satisfy them, so "
                     + "nothing could ever be a valid instance of the type it denotes");
@@ -2044,9 +2037,9 @@ public final class TsonSchemaLinker {
     /**
      * One reference validated. The entry it sits in is passed as {@code subject} and the path within that
      * entry as {@code trail} ({@code " field 'w'"}, {@code " element[1]"}) rather than pre-joined, because
-     * {@link UnresolvedReference} has to be able to re-state itself against a different subject: a defect a
-     * open record deferred surfaces on the entry materialisation minted and belongs to the declaration whose
-     * text wrote it, and only the subject differs between the two statements of it.
+     * {@link UnresolvedReference} has to be able to re-state itself against a different subject: a defect an
+     * open record deferred surfaces inside a record an application closes to in place and belongs to the open
+     * record whose text wrote it, and only the subject differs between the two statements of it.
      *
      * <p>A slot typed {@code meta.type_ref} holds the name of a type a value can have: resolved, then judged a member of
      * the kind ({@link KindMembers}) where {@code constructors} is given, and a value entry refused with its own
@@ -2114,10 +2107,9 @@ public final class TsonSchemaLinker {
      * ({@code use => { u: box } } naming a template without applying it, which is the common one).
      *
      * <p><b>The zero-argument case is why this check exists here rather than at an application site.</b> An
-     * unapplied template reference is not an application, so nothing on the materialisation path ever sees
-     * it: it linked, compiled, and then failed at <em>read</em> time with "no usable compiled reader" and a
-     * library-fault exit code, for what is plainly the author's error. The eager-rejection discipline
-     * guarded applications and never bare names.
+     * unapplied template reference is not an application, so nothing on the materialisation path sees it: left
+     * unchecked, it would link, compile and fail only at <em>read</em> time, as a library fault, for what is
+     * plainly the author's error.
      *
      * <p>By the time linking runs, {@code TemplateMaterialiser} has rewritten every application it could
      * close, so what reaches here is the set that genuinely needs checking: references inside template

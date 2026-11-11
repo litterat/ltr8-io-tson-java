@@ -120,8 +120,9 @@ class TypeNameRefReadTest {
     }
 
     /**
-     * A refusal lists the kind's members as an author writes them, by name: the entry {@code meta.ref<net.uuid_type>}
-     * closed to is minted under a name nobody wrote, and data cannot write the application, so the list leaves it out.
+     * A refusal lists the kind's members as an author writes them, by name: {@code meta.ref<net.uuid_type>} is written
+     * in place at {@code ledger}'s fields and is no entry, and data cannot write the application, so the list holds
+     * no form of it.
      */
     @Test
     void aRefusalListsOnlyTheNamesAnAuthorWrites() {

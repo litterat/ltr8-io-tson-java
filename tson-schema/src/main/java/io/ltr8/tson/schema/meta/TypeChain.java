@@ -9,8 +9,7 @@ import java.util.List;
  * The kernel's {@code meta.type_chain} ([TSON-SCHEMA] §4.1): where an entry sits in the
  * IS-A order. Carried by every {@link Type}, as {@code type}'s one field, and asked of any {@link Top} by the
  * statics here, which answer empty for a value that carries none. Which application an entry is the instantiation
- * of is no part of it: an entry of any kind can be one, so that fact sits on the entry's key ({@code
- * TsonSchema#applicationOf}).
+ * of is no part of it: that fact sits on the entry's key ({@code TsonSchema#applicationOf}).
  *
  * <p><b>Three states, one record.</b> {@link #parents} is what was written -- an open record's parents, one of which
  * may be an application ({@code <T> result<T> & { ... }}), and a closed declaration's applied parents until {@code

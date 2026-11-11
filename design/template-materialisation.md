@@ -170,11 +170,11 @@ resolves, before the batch pass runs. They are handled differently.
     A removal empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
 - **A refinement source is absorbed like an operand** (`DefinitionResolver.resolveRefinement`, through
   `openOperand`): an application of an open record at `^`, closed (`x => box<text> ^ { … }`) or over the declaration's
-  own parameters, contributes the substituted field set `^` re-emits and tightens, and its template's ancestors, and
-  mints nothing. The application stays the written parent (`refineOnto`): an open record's, substituted when it closes,
-  and a closed declaration's, which the fold turns into the edge to the entry declared for it where one is, so `x` is
-  IS-A `box`'s written parents and `text_box` where `text_box => box<text>` is declared, and never `box`. Only a
-  refinement of a name records `refines`. `InlineTypeRulesTest` pins it.
+  own parameters, contributes the substituted field set `^` re-emits and tightens, and its template's ancestors. The
+  application stays the written parent (`refineOnto`): an open record's, substituted when it closes, and a closed
+  declaration's, which the fold turns into the edge to the entry declared for it where one is, so `x` is IS-A `box`'s
+  written parents and `text_box` where `text_box => box<text>` is declared, and never `box`. Only a refinement of a
+  name records `refines`. `InlineTypeRulesTest` pins it.
 - **An operand's head is followed past its alias hops** (`Ancestry.templateHead`, §8.3): over `pet_of => pet_box`,
   `pet_of<text>` at `&` or `^`, and `<T> pet_of<T> & { … }`, apply `pet_box` and are absorbed as `pet_box<text>` is.
   The one rule serves every place an applied head is read: `openOperand` and `resolveRefinement`'s test for an open

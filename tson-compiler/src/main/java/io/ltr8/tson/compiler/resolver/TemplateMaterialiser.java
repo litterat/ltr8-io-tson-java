@@ -78,7 +78,7 @@ final class TemplateMaterialiser {
     private static final String RECORD = KernelNames.of("record");
 
     /**
-     * The application each instantiation this pass closed is the instantiation of, by entry name (§8.2) -- shared
+     * The application each declaration this pass closes an application into records, by entry name (§8.2) -- shared
      * with {@code SchemaResolver}, which keys the applied-parent fold on it and writes it on the entry's key.
      */
     private final Map<String, TypeRef> applications;
@@ -105,8 +105,9 @@ final class TemplateMaterialiser {
     private final Map<String, TypeRef> closingInPlace = new LinkedHashMap<>();
 
     /**
-     * Each instantiation entry's application as it was written, its nested arguments unreduced: what {@code
-     * @meta.application} states on the entry's key, so a reader and a message see the reference the author wrote.
+     * The application each declaration naming one closes into it, as written, its nested arguments unreduced: what
+     * {@code @meta.application} states on the entry's key, so a reader and a message see the reference the author
+     * wrote.
      */
     private final Map<String, TypeRef> writtenApplications = new LinkedHashMap<>();
 
@@ -631,7 +632,7 @@ final class TemplateMaterialiser {
         return TypeRef.of(reference.name(), reference.arguments());
     }
 
-    /** The application {@code name}'s entry closes, as written, where it is an instantiation entry. */
+    /** The application {@code name}'s entry closes, as written, where it is a declared application. */
     Optional<TypeRef> writtenApplication(String name) {
         return Optional.ofNullable(writtenApplications.get(name));
     }

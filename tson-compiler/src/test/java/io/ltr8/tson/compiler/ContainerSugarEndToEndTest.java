@@ -39,8 +39,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Sugar and the {@code !} form are the <b>only</b> two ways to build a container. A generic-application head
  * resolves in the schema's one namespace, where the kernel's {@code map} is a closed constructor taking no type
  * arguments -- so {@code map<text, text>} is refused and <code>{text =&gt; text}</code> is the spelling. What makes
- * every form work uniformly is that {@code SchemaDesugarer} rewrites each into a real {@code !C value} declaration
- * before resolution, off one fixed table.
+ * every form work uniformly is that {@code SchemaDesugarer} rewrites each into the {@code !C value} construction it
+ * denotes, in place, before resolution, off one fixed table.
  */
 class ContainerSugarEndToEndTest {
 

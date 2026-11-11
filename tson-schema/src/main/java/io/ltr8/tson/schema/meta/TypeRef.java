@@ -29,8 +29,9 @@ import java.util.Optional;
  * One built by hand, or read inside a schema document being resolved, carries {@link Closure#NONE}, and names nothing.
  *
  * <p>An argument-carrying reference survives only where an application is still open: an open record's
- * {@code chain.parents} and field types, and the {@code @meta.application} annotation. A closed application
- * lifts to an entry and is named bare where it stands (§5.3).
+ * {@code chain.parents} and field types, and the {@code @meta.application} annotation. A closed application is
+ * the record or construction it denotes, under a declaration's name or held in place at a type slot
+ * ({@link TypeInline}).
  *
  * <p><b>{@code annotations} carries the annotations written on the reference itself</b>: [TSON-SCHEMA] §8.3 attaches
  * {@code @alias:name} to the type value when a use site is flattened past an alias entry, so

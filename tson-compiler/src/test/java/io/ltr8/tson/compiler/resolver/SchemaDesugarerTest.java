@@ -314,8 +314,8 @@ class SchemaDesugarerTest {
 
     // ── Nested declaration-level forms (§5.3, §12.1) ─────────────────────
     //    Declaration-level container syntax nests inside itself, and the inner form desugars first: the
-    //    inner container is injected under its own derived name and the position that held it becomes a
-    //    bare reference -- the bottom-up hoist an inline form at a type-ref position already gets.
+    //    inner container is the construction it denotes, held in place in the outer's binding record as
+    //    `{ of: !C { ... } }`.
 
     // ── The element `?` on an array (§5.3) ───────────────────────────────
     //    `voidable: true` on the resolved array, bound directly alongside the bounds rather than routed
@@ -341,14 +341,14 @@ class SchemaDesugarerTest {
 
     /**
      * Inside an open record a container over one of its parameters is the reference it spells, {@code [T]} the
-     * application {@code meta.array<T>} and {@code {K => V}} the application {@code meta.map<K V>}, held as written:
-     * nothing is lifted for it (§5.10).
+     * application {@code meta.array<T>} and {@code {K => V}} the application {@code meta.map<K V>}, held as written
+     * in place (§5.10).
      */
     @Test
     void aContainerOverAParameterIsTheApplicationItSpells() {
         SchemaDocument document = desugar("  box => <T> { v: [T]  m: {text => T}  n: [[T]] }");
 
-        assertEquals(Set.of("box"), document.body().declarations().keySet(), "nothing lifted");
+        assertEquals(Set.of("box"), document.body().declarations().keySet(), "no declaration added");
         RecordDef box = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("box").typeDef()).body();
         assertEquals(new ApplicationRef("meta.array", List.of(new NameRef("T"))),
                 ((FieldDef) box.entries().get(0)).type().orElseThrow().typeRef());
@@ -505,7 +505,7 @@ class SchemaDesugarerTest {
         assertEquals(new SiblingRef("kind"), field.type().orElseThrow().typeRef());
     }
 
-    /** Anywhere else in sugar it is refused before any lift, naming the slot. */
+    /** Anywhere else in sugar it is refused before the form is rewritten, naming the slot. */
     @Test
     void aSiblingReferenceOffAFieldsTypeIsRefusedNamingTheSlot() {
         Map<String, String> slots = Map.of(

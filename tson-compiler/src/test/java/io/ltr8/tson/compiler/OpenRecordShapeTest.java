@@ -399,10 +399,10 @@ class OpenRecordShapeTest {
 
     /**
      * A container over a parameter, held as the application it spells, closes when the record is applied: the field
-     * of {@code page<uuid>} names the entry {@code [uuid]} lifts to, and reads as an array of it.
+     * of {@code page<int32>} holds the array written in place, the type a direct {@code [int32]} is, and reads as one.
      */
     @Test
-    void aHeldContainerClosesToTheEntryItsSugarLiftsTo() {
+    void aHeldContainerClosesToTheConstructionItsSugarDenotes() {
         TsonCompiledSchema compiled = compile("""
                   page  => <T> { items: [T] }
                   pages => page<int32>

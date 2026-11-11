@@ -8,7 +8,7 @@ package io.ltr8.tson.compiler.ast.schema;
  * application"), not a grammar fact, and this stage only builds the grammar's own AST.
  *
  * <p>Each bound is preserved as raw token text, not parsed to a number: the bound is read where the
- * lifted form binds it, against {@code array}'s own {@code min_items}/{@code max_items}, so a token that is
+ * desugared construction binds it, against {@code array}'s own {@code min_items}/{@code max_items}, so a token that is
  * no {@code decimal-natural} is refused there -- a template's parameter among them, which stands only where
  * a type is named (§5.10).
  */

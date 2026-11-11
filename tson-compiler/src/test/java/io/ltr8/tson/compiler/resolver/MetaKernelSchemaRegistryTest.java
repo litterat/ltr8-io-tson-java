@@ -52,8 +52,7 @@ class MetaKernelSchemaRegistryTest {
 
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
 
-        // Nothing left for the linker to materialize: the bootstrap desugars its own document, so every
-        // sugar form is already a declared entry by the time linking runs.
+        // The linker adds no entry: every entry is one the kernel declares.
         assertEquals(raw.entries().keySet(), linked.schema().entries().keySet());
 
         // Every §5.3 `[X]` at a field is the array written in place there, so no entry is added for one: the

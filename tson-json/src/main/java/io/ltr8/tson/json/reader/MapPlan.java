@@ -46,8 +46,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
 
     static MapPlan of(String name, Top definition, ValueReaderContext context) {
         MapBody body = (MapBody) definition;
-        // The name the author wrote, not the entry the resolver minted: `{text => int32}` rather than a
-        // content-derived `map_text_int32_...`, which appears in neither the schema nor the document.
+        // The name the author wrote, or, for an entry no source was read for, its form: `{text => int32}`.
         String displayName = EntryDisplayName.of(name, context.schema());
         AtomType<?> keyParser = scalarKeyParser(context.linked(), body.keyType().name()).orElse(null);
         return new MapPlan(displayName, context.locationOf(name),

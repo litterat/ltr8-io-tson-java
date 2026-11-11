@@ -7,27 +7,15 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * <b>What a declaration whose body directly denotes a type resolves to</b> -- and how the two lift channels
- * still differ at that one position (§8.2).
- *
- * <p><b>Both are the declared entry now, rather than a hop to one.</b> §5.3's lift leaves {@code text_list =>
- * [text]} as the entry, and a declared application is its own instantiation. What still differs is what a
- * <em>use site</em> writing the same form reaches. An application <b>unifies</b>: a field typed {@code
- * box&lt;text&gt;} resolves to the declaration that named it, so §8.2's "two fully-bound applications denote
- * the same entry" holds within the schema. A sugar form <b>duplicates</b>: a use-site {@code [text]} mints its
- * own closed synthetic beside {@code text_list}, because §8.2 gives a declared entry its name as identity and
- * a minted one its content, and nothing makes those two meet.
- *
- * <p><b>So the asymmetry moved rather than closing.</b> It is no longer "a hop versus an entry" but "unifies
- * versus duplicates", and that is the half of #15 still open. This pins the shape, so a further change to it
- * is a deliberate edit here rather than a surprise somewhere downstream.
+ * <b>What a declaration whose body directly denotes a type resolves to</b> ([TSON-SCHEMA] §8.2): the declared entry,
+ * whatever the form. {@code text_list => [text]} is the array entry under its name, and a declared application is
+ * the record it closes to. A use site writing the same form holds the type in place, and is never looked up to the
+ * declaration that names it.
  */
 class DirectDefinitionShapeTest {
 
@@ -39,13 +27,6 @@ class DirectDefinitionShapeTest {
                 !schema {
                 %s}
                 """.formatted(id, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID, declarations));
-    }
-
-    /** The entries with {@code prefix} this schema minted itself -- its closure's own left out. */
-    private static List<String> minted(TsonLinkedSchema linked, String prefix) {
-        String own = io.ltr8.tson.base.CanonicalIdentity.canonicalize(linked.schema().id());
-        return linked.schema().entries().keySet().stream().filter(name -> name.startsWith(prefix))
-                .filter(name -> linked.originOf(name).equals(own)).toList();
     }
 
     // ── A sugar form at declaration position is the entry ────────────────
@@ -60,13 +41,13 @@ class DirectDefinitionShapeTest {
         assertEquals(java.util.Optional.of("meta.array"), schema.constructorOf("text_list"));
     }
 
-    // ── An application at declaration position is a reference ────────────
+    // ── An application at declaration position is its own entry ──────────
 
     /**
      * <b>Two names for one family member are two members, and §5.2 refuses them.</b> Each declaration is its
-     * own entry (#15), so both pin {@code "dog"} and the family's mapping stops being a function -- the same
-     * verdict two hand-written members with one pin already get. The duplication is not a naming or dedup
-     * question at all: it is authored twice, and the pin rule is what catches it.
+     * own entry, so both pin {@code "dog"} and the family's mapping stops being a function -- the same
+     * verdict two hand-written members with one pin already get. The duplication is authored twice, and the
+     * pin rule is what catches it.
      */
     @Test
     void twoNamesForOneFamilyMemberCollideOnTheirPin() {

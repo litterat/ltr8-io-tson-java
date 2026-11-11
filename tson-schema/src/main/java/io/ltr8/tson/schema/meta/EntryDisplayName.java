@@ -12,11 +12,11 @@ import java.util.stream.Collectors;
  * What to call a schema entry in a diagnostic -- the author's own name for it wherever there is one, and
  * otherwise the form that produced it.
  *
- * <p><b>Every entry is declared</b> ([TSON-SCHEMA] §8.2): nothing is lifted or minted, so a name is an author's, and
- * an entry with a source position ({@link TsonSchema.EntryFacts#position}) is named by it. An entry with none -- one
- * the kernel's bootstrap builds by hand, or one read from a resolved form -- is shown as the form its body is where
- * there is one: {@code [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)},
- * and {@code paged<order>} for a declared application, which its key records. A type written in place is no entry,
+ * <p><b>Every entry is declared</b> ([TSON-SCHEMA] §8.2), so a name is an author's, and an entry with a source
+ * position ({@link TsonSchema.EntryFacts#position}) is named by it. An entry with none -- one the kernel's
+ * bootstrap builds by hand, or one read from a resolved form -- is shown as the form its body is where there is one:
+ * {@code [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)}, and
+ * {@code paged<order>} for a declared application, which its key records. A type written in place is no entry,
  * and is named by its own form ({@link TypeInline#text()}).
  */
 public final class EntryDisplayName {

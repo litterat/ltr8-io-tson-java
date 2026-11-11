@@ -50,19 +50,16 @@ class OpenOperandCompositionTest {
     private static final String ID = "https://example.test/open-operand.tn";
 
     /**
-     * <b>A closed application at an operand takes the same route, and mints nothing either.</b> The template
+     * <b>A closed application at an operand takes the same route: it is absorbed by value.</b> The template
      * is a macro at both ends: it contributes its fields and its own ancestors, and the type the composition
-     * produces is the composing declaration. What minting gave instead was an entry nothing else named --
-     * one subtype, no referent, no reader -- standing in this declaration's chain in place of the ancestors
-     * that are really there. An application some other position names is still minted by that
-     * position, §8.2 keying identity on the application, so both land on one entry.
+     * produces is the composing declaration (§5.8).
      *
      * <p><b>Neither {@code box<text>} nor {@code box} is a type to be IS-A here.</b> A template is no type (§5.10),
-     * so no edge runs to it; nothing names {@code box<text>}, so no entry is minted and no edge runs to one either.
-     * What {@code c} IS-A is what {@code box}'s written parents reach: {@code base}.
+     * so no edge runs to it; no declaration names {@code box<text>}, so there is no entry for an edge to reach
+     * either. What {@code c} IS-A is what {@code box}'s written parents reach: {@code base}.
      */
     @Test
-    void aClosedApplicationAtAnOperandMintsNothing() {
+    void aClosedApplicationAtAnOperandIsAbsorbedByValue() {
         TsonCompiledSchema compiled = compile("""
                   base => { tag: text }
                   box  => <V> base & { item: V }
@@ -70,7 +67,7 @@ class OpenOperandCompositionTest {
                 """);
 
         assertTrue(compiled.schema().entries().keySet().stream().noneMatch(n -> n.startsWith("box_")),
-                () -> "nothing names box<text>, so no entry is minted for it: "
+                () -> "no declaration names box<text>, so there is no entry for it: "
                         + compiled.schema().entries().keySet());
 
         Top c = compiled.schema().entries().get("c");
@@ -114,9 +111,8 @@ class OpenOperandCompositionTest {
             """;
 
     private static String aliasTarget(TsonCompiledSchema compiled, String alias) {
-        // A `name => head<args>` declaration *is* the instantiation entry (§8.2), so
-        // the entry every use site reaches is the declaration itself -- or, where an earlier declaration
-        // already named the same application, the one it aliases.
+        // A `name => head<args>` declaration is the record its application closes to (§8.2), so the entry
+        // every use site reaches is the declaration itself; an alias is followed one hop.
         return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
                 ? ref.target().name() : alias;
     }
@@ -173,9 +169,9 @@ class OpenOperandCompositionTest {
 
     /**
      * Row three, and the one that needs both sides closed. The hand-written {@code customer & box<text>}
-     * gets this edge at its declaration; here it is minted when {@code vip<text>} closes, off the
-     * application the held body kept -- and it lands on the same entry, which is what makes the two
-     * spellings one type rather than two that happen to have equal fields.
+     * gets this edge at its declaration; here it is derived when {@code vip<text>} closes, off the
+     * application the held body kept, to the declaration naming that application -- the same entry, which is
+     * what makes the two spellings one type rather than two that happen to have equal fields.
      */
     @Test
     void aClosedApplicationOfTheCompositionIsIndexedUnderTheClosedOperand() {

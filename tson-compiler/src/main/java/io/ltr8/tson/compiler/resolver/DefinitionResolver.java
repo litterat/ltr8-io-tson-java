@@ -81,14 +81,13 @@ import java.util.function.Predicate;
  *   fields and groups absorbed left to right, a body entry naming an inherited field being a
  *   <em>tightening</em> entry (§5.7, {@link #resolveTighteningField}) that replaces it in place, checked
  *   against §5.7's transition table ({@link #refines}), with an elided type-ref inheriting
- *   the source field's type. A supertype may be an application: a closed one is closed to the entry it
- *   denotes ({@link #closedApplication}), one naming the declaration's own parameters contributes its fields
- *   while still open ({@link #openOperand}).</li>
+ *   the source field's type. A supertype may be an application of an open record, absorbed by value whether its
+ *   arguments are concrete or the declaration's own parameters ({@link #openOperand}).</li>
  *   <li><b>Refinement</b> ({@code source ^ { ... }}, §5.7, {@link #resolveRefinement}) -- copies the source's
  *   whole field set and admits no new fields: every body entry tightens an inherited field or restates an
  *   inherited group ({@link #restatesInheritedGroup}: same member labels in the same order, state tightening
- *   OPTIONAL&#8594;REQUIRED only). A closed source heads the result's chain. The source takes an application
- *   on composition's terms.</li>
+ *   OPTIONAL&#8594;REQUIRED only). A closed source heads the result's chain. An application of an open record
+ *   as the source is absorbed on composition's terms.</li>
  *   <li><b>An alias</b> ({@code name => other_name}, §8.3) -- an {@code ALIAS}-kind entry whatever the
  *   name resolves to, carried unverified; the linker validates it. <b>An application</b>
  *   ({@code bx => box<text>}, {@link #resolveTemplateApplication}) is the same declaration carrying
@@ -115,7 +114,7 @@ import java.util.function.Predicate;
  * <p><b>The exception types are the classification.</b> A {@link io.ltr8.tson.base.SchemaValidationException}
  * says the author's schema is wrong and the spec says so; an {@link UnsupportedOperationException} says this
  * library could not do something, and travels as {@code NOT_IMPLEMENTED}; an {@link IllegalStateException}
- * says an internal invariant broke -- a container sugar form reaching resolution unlifted ({@link #unlifted}),
+ * says an internal invariant broke -- a container sugar form reaching resolution unrewritten ({@link #unlifted}),
  * which only a caller that skipped {@link SchemaDesugarer} can produce, or a resolved value no well-formed
  * pipeline builds. The test for which is which: <b>a schema error's verdict does not change
  * when this library improves; a gap's does.</b> Misfiling an author error as a gap tells the author their
@@ -139,9 +138,9 @@ import java.util.function.Predicate;
   *   <li><b>A failed write round-trip</b> -- re-serialising an atom refinement's source
  *   ({@link #sourceSerializedFields}). The value was bound by this library, so failing to write it back is
  *   no verdict on the schema.</li>
- *   <li><b>A closed application at a supertype or refinement-source position with no
- *   {@link ApplicationCloser}</b> ({@link #closedApplication}) -- a resolver built standalone, without the
- *   whole-schema materialiser {@link SchemaResolver} supplies.</li>
+ *   <li><b>A closed application at a refinement source with no {@link ApplicationCloser}</b> ({@link
+ *   #closedApplication}) -- a resolver built standalone, without the whole-schema materialiser {@link
+ *   SchemaResolver} supplies.</li>
  * </ul>
  * {@link #resolveTemplateApplication} and {@link #closedApplication} also rethrow one from below with the
  * declaration's name in front. What §5.7 leaves unchecked is not reported at all: a restated FIXED field
@@ -241,15 +240,14 @@ final class DefinitionResolver {
     private final boolean annotationsResolve;
 
     /**
-     * Closes a fully-bound template application into the entry it denotes, returning that entry's name.
-     * Needed at the two positions that absorb a supertype's <em>fields</em> -- a composition supertype and a
-     * refinement source -- because those resolve here, while the rest of §5.10 materialisation runs as a
-     * pass afterwards. Everywhere else an application is simply carried as a reference with arguments and
-     * closed later.
+     * The materialiser's on-demand half, for what a declaration needs of an application while it resolves, before
+     * the rest of §5.10 materialisation runs as a pass afterwards: a declaration naming an application closes into
+     * its own name ({@link ApplicationCloser#closeApplicationInto}), and a refinement source whose head is no open
+     * record is handed over ({@link #closedApplication}). Everywhere else an application is carried as a reference
+     * with arguments and closed by that pass.
      *
      * <p>Defaults to refusing, for the callers that resolve a declaration outside a whole-schema pass (the
-     * kernel bootstrap, and unit tests) -- there is no materialiser in those, and no schema for an
-     * instantiation entry to land in.
+     * kernel bootstrap, and unit tests) -- there is no materialiser in those.
      */
     private final ApplicationCloser applicationCloser;
 
@@ -746,7 +744,7 @@ final class DefinitionResolver {
     /**
      * {@code name => !T { ... }} where {@code T} is no constructor: a value entry, an instance of the ordinary type
      * {@code T} ([TSON-SCHEMA] §4.1), its payload read against {@code T} as a data value is and held as the value
-     * ({@link ValueEntry}). It is no type, so nothing is minted or lifted for it, and its tag is {@code T}.
+     * ({@link ValueEntry}). It is no type, and its tag is {@code T}.
      *
      * <p>Refused: a head that is itself a value, since a value has no instances; and a braced payload at an atom
      * type, which reads as no value of it and is almost always an atom refinement missing its {@code ^}.
@@ -1423,10 +1421,9 @@ final class DefinitionResolver {
     /**
      * A declaration whose body is an application, {@code bx => box<text>} or {@code text_list => meta.array<text>}.
      * Over a constructor it is the construction it spells ({@link #construction}); over an open record it <b>is</b> the
-     * entry it denotes (§8.2): the closed record itself, the canonical application among its facts, rather than an
-     * {@code ALIAS} at a content-derived entry. §8.2 makes a declared entry's identity its name, and a declaration that
-     * <em>constructs</em> a type already keeps it (§5.3's lift leaves {@code text_list => [text]} as the entry), so one
-     * that <em>denotes</em> a type obeys the same rule.
+     * entry it denotes (§8.2): the closed record itself, the canonical application among its facts. §8.2 makes a
+     * declared entry's identity its name, and a declaration that <em>constructs</em> a type keeps it ({@code
+     * text_list => [text]} is the entry), so one that <em>denotes</em> a type obeys the same rule.
      */
     private Top resolveTemplateApplication(String name, ApplicationRef generic) {
         List<io.ltr8.tson.schema.meta.TypeRef> arguments = new ArrayList<>();
@@ -1519,17 +1516,12 @@ final class DefinitionResolver {
                 // §5.8's "Parameterized references", open end and closed alike: an application at an operand
                 // denotes no entry of its own, whether its arguments are this declaration's parameters or
                 // concrete. A template is a macro here -- it contributes its fields and its own ancestors,
-                // and the type the composition produces is *this* declaration. Minting an entry for the
-                // application instead would give a form nothing else names an entry with one subtype, no
-                // referent and no reader, and put it in this declaration's chain in place of the ancestors that
-                // are really there. An application some *other* position names is minted by
-                // that position (§8.2 keys identity on the application, so both land on one entry); an
-                // operand mints nothing on its own account.
+                // and the type the composition produces is *this* declaration.
                 OpenOperand operand = openOperand(name, generic, parameters, "supertype");
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
                 }
-                // The application itself goes into the chain, arguments and all. It names no entry yet, and an
+                // The application itself goes into the chain, arguments and all. It names no entry, and an
                 // applied parent reaches the entry its arguments name, never its head (§5.8, §5.10: a template is
                 // no type, so nothing is IS-A one): an open record keeps it in
                 // `parents`, substituted when each application closes, and a closed declaration's is folded by
@@ -1579,21 +1571,20 @@ final class DefinitionResolver {
             }
             // §4.3 judges an operand at the end of its alias chain (§8.3), never at the name written: a
             // reference is the same type under another name (§5.7's table), so an alias of a record has that
-            // record's fields to contribute. The walk stops at an argument-bearing target, which is the entry
-            // that application denotes -- so the test below sees that entry's own body, and an alias is
-            // judged for the terminal's reason rather than by whichever body the written name happened to
-            // have.
+            // record's fields to contribute. The walk stops at an argument-bearing target (AliasChain), and an
+            // alias is judged for the terminal's reason rather than by whichever body the written name happened
+            // to have.
             String supertypeTerminal = AliasChain.terminal(supertypeName,
                     namespaceDefinitions::definition);
             boolean supertypeHops = !supertypeTerminal.equals(supertypeName);
             Top terminalSupertype = supertypeHops
                     ? namespaceDefinitions.definition(supertypeTerminal) : supertypeDef;
             // §4.3's rule is the body test and nothing beside it: an operand MUST be a definition whose body
-            // is a `!meta.record`. An open record's instantiation satisfies that -- `box<text>` closes to a
+            // is a `!meta.record`. A declared application satisfies that -- `text_box => box<text>` closes to a
             // `!meta.record` carrying fields -- so it composes exactly as the hand-written record of the same
             // shape does, and how the author spelled it is no part of the question (§8.2: what is
-            // canonicalised is identity, not provenance). Every other instantiation fails this same test on
-            // its own body: an array, a map or a choice has no fields to contribute (§4.3).
+            // canonicalised is identity, not provenance). Any other body fails this same test on its own: an
+            // array, a map or a choice has no fields to contribute (§4.3).
             refuseUnappliedTemplate(name, supertypeName, terminalSupertype, "supertype", "&");
             if (!(terminalSupertype instanceof RecordBody supertypeBody)) {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
@@ -1829,11 +1820,11 @@ final class DefinitionResolver {
                 || OpenEntry.isOpen(namespaceDefinitions.definition(
                         Ancestry.templateHead(generic.name(), namespaceDefinitions))))) {
             // §5.7 against an application of an open record, over this declaration's parameters or closed: the same
-            // absorption composition does (§5.8). The application names no entry and nothing is minted for it: its
-            // ancestors are types and its whole field set arrives, which is what `^` re-emits and then tightens, and
-            // the application stays the written parent -- an open record's, substituted when it closes, and a
-            // closed declaration's, which SchemaResolver folds into the edge to the entry declared for it where one
-            // is, so nothing is IS-A the template itself.
+            // absorption composition does (§5.8). The application names no entry: its ancestors are types and its
+            // whole field set arrives, which is what `^` re-emits and then tightens, and the application stays the
+            // written parent -- an open record's, substituted when it closes, and a closed declaration's, which
+            // SchemaResolver folds into the edge to the entry declared for it where one is, so nothing is IS-A the
+            // template itself.
             OpenOperand operand = openOperand(name, generic, parameters, "refinement source");
             return refineOnto(name, refined, parameters,
                     io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), namesOwnParameter(generic, parameters)
@@ -1855,17 +1846,17 @@ final class DefinitionResolver {
         // -- and §4.3 states it for both operator families. What is *finished* is a body with no vocabulary
         // to tighten: a top-level constructor application (§5.6), a choice, or an alias resolving to either.
         // What the walk adds is the case that is not finished: an alias of a record, which has that record's
-        // vocabulary to tighten -- an open record's instantiation included (§4.3).
+        // vocabulary to tighten -- a declaration naming an open record's application included (§4.3).
         String sourceTerminal = AliasChain.terminal(sourceName, namespaceDefinitions::definition);
         boolean sourceHops = !sourceTerminal.equals(sourceName);
         Top terminalSource = sourceHops
                 ? namespaceDefinitions.definition(sourceTerminal) : sourceDef;
         // §4.3's test is the body and nothing beside it, and §5.7 states the same of its own source: a
-        // definition whose body is a `!meta.record` has a vocabulary to tighten. An open record's
-        // instantiation has one -- `box<text>` closes to a `!meta.record` carrying fields -- so it refines like
-        // the hand-written record of the same shape, and what polices a value the substitution already fixed
+        // definition whose body is a `!meta.record` has a vocabulary to tighten. A declared application has
+        // one -- `text_box => box<text>` closes to a `!meta.record` carrying fields -- so it refines like the
+        // hand-written record of the same shape, and what polices a value the substitution already fixed
         // is §5.7's own per-field rule, which refuses re-fixing a FIXED field to a different value
-        // whoever wrote it. Every other instantiation fails on its own body (§4.3).
+        // whoever wrote it. Any other body fails on its own (§4.3).
         refuseUnappliedTemplate(name, sourceName, terminalSource, "refinement source", "^");
         if (!(terminalSource instanceof RecordBody sourceBody)) {
             throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName + "'"
@@ -1942,9 +1933,9 @@ final class DefinitionResolver {
     /**
      * A refinement's source ({@code target}) is always a {@link NameRef} or an {@link
      * ApplicationRef} by grammar (see {@code RefinedDef}'s own Javadoc) -- a bare name resolves to a
-     * reference without arguments; a generic application (e.g. {@code box<T>}, {@code T} shadowing the
-     * refining declaration's own parameter) resolves each argument the way every other application does
-     * ({@link #typeArgument}).
+     * reference without arguments; a generic application whose head is no open record is handed to the
+     * materialiser ({@link #closedApplication}), one of an open record being absorbed by {@link
+     * #resolveRefinement} before this is asked.
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeExpr target,
             List<String> typeParams) {
@@ -1952,10 +1943,8 @@ final class DefinitionResolver {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
         if (target instanceof ApplicationRef generic) {
-            // Closed, not carried, for the reason composition closes its supertypes: §5.7 re-emits the
-            // source's whole field set, and this phase needs that field set to flatten. Carrying the
-            // application instead copied the template's body with its parameters unbound, and the author was
-            // told about an unresolved reference to a parameter they never wrote.
+            // A construction is refused here, as at any slot that holds a name; any other application whose
+            // head is no open record is the materialiser's to judge (ApplicationCloser#closeApplication).
             return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, typeParams, "refinement source"));
         }
         // Not a gap and not the author's error: the two shapes above are the two §12.1's `atom-refinement`
@@ -2021,9 +2010,9 @@ final class DefinitionResolver {
 
     /**
      * Whether an application is applied to a parameter of the declaration that writes it, and so still open.
-     * <b>Through nesting</b>: {@code box<inner<T>>} is as open as {@code box<T>} is, and reading only the top
-     * level sent it down the closing path, where materialisation reported the author's own parameter as an
-     * unresolved reference -- a wrong verdict on a schema that is not wrong.
+     * <b>Through nesting</b>: {@code box<inner<T>>} is as open as {@code box<T>} is, and read only at the top level
+     * it would be taken as closed, the author's own parameter then reported as an unresolved reference -- a wrong
+     * verdict on a schema that is not wrong.
      */
     private static boolean namesOwnParameter(ApplicationRef application, List<String> typeParams) {
         return application.args().stream().anyMatch(ref -> ref instanceof NameRef simple
@@ -2052,10 +2041,11 @@ final class DefinitionResolver {
      * moment every other application in the absorbing declaration's body does. Both are the absorbing
      * declaration's own materialisation, one pass later.
      *
-     * <p><b>The IS-A edge to the operand itself is minted one pass later, not here.</b> This declaration
-     * cannot state it -- there is no instantiation of {@code box} yet to be IS-A -- so what it does instead
-     * is keep the application in the template's {@code parents}, substituted when each application closes, and
-     * {@code SchemaResolver} folds the closed application into the edge to the entry it denotes.
+     * <p><b>The IS-A edge to the operand's application is derived one pass later, not here.</b> This declaration
+     * cannot state it -- the entry a closed application denotes is whichever declaration names it, known only once
+     * every declaration has resolved -- so what it does instead is keep the application in the template's {@code
+     * parents}, substituted when each application closes, and {@code SchemaResolver} folds the closed application
+     * into the edge to the declaration naming it, where one does.
      * That is why the parent is carried as a reference and not as the head name §5.8 describes: an edge to
      * {@code box} would hold of {@code box&lt;int32&gt;} as much as of {@code box&lt;text&gt;}, and only one
      * of those admits a {@code vip&lt;text&gt;}.
@@ -2121,12 +2111,9 @@ final class DefinitionResolver {
     }
 
     /**
-     * A fully-bound application at one of the two field-absorbing positions, closed to the entry it denotes.
-     * Closing is what gives it both a name to index under and a field set to absorb.
-     *
-     * <p>Only reached once {@link #namesOwnParameter} has said the application is closed: one still open
-     * denotes no entry and goes to {@link #openOperand} instead, which absorbs its fields without closing
-     * anything.
+     * A fully-bound application at a refinement source whose head, past its alias hops, is no open record, handed
+     * to the materialiser ({@link ApplicationCloser#closeApplication}). An application of an open record goes to
+     * {@link #openOperand} instead, which absorbs its fields without closing anything.
      */
     private String closedApplication(String name, ApplicationRef application, List<String> typeParams, String position) {
         if (applicationCloser == null) {
@@ -2604,8 +2591,8 @@ final class DefinitionResolver {
 
     /**
      * The type a declaration's parameter list wrote after {@code parameter} ({@code <T: text>}, §5.10), as a
-     * type-ref. A written type names a type or an application of one; a container sugar form is not lifted at
-     * this position, so it has no entry to name and is refused here in those terms.
+     * type-ref. A written type names a type or an application of one; a container sugar form there names none,
+     * and is refused here in those terms.
      */
     private io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeExpr written) {
         if (written instanceof SiblingRef sibling) {

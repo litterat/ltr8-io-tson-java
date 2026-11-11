@@ -51,8 +51,8 @@ class AliasChainWalkTest {
     }
 
     /**
-     * <b>An argument-bearing target is an application, not a hop.</b> There is no entry at the end of one
-     * until materialisation mints it, so the walk stops <em>at</em> the entry holding the application rather
+     * <b>An argument-bearing target is an application, not a hop.</b> It names no entry, so the walk
+     * stops <em>at</em> the entry holding the application rather
      * than following it into a template.
      */
     @Test

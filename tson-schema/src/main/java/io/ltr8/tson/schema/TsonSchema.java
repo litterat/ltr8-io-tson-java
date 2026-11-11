@@ -40,8 +40,8 @@ import java.util.Optional;
  * names. None of it is a field of any constructor, so binding a value never fills it, and none of it is written.
  *
  * <p><b>An instantiation's application is a key annotation</b>, {@code @meta.application} ({@link #applicationOf}):
- * an entry of any kind can close a template application, so the fact is about the entry and sits beside it, where
- * resolved output writes it and ingest reads it as stated.
+ * the entry's value is the closed record, which states its fields and its chain and not the head it was substituted
+ * from, so the fact sits beside it, where resolved output writes it and ingest reads it as stated.
  *
  * <p><b>{@code id} is required, not {@code Optional}</b> -- the grammar itself marks {@code !!id} optional (a raw
  * parsed {@code SchemaDocument} can genuinely lack one), but a {@code TsonSchema} value -- the *resolved*,
@@ -312,15 +312,18 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
         return facts.getOrDefault(name, EntryFacts.NONE);
     }
 
-    /** Where {@code name} was declared -- absent for an entry the resolver minted. */
+    /**
+     * Where {@code name} was declared -- absent where no source text was read: the kernel's bootstrap entries, a
+     * resolved form read as data, a hand-built schema.
+     */
     public Optional<SourcePosition> positionOf(String name) {
         return factsOf(name).position();
     }
 
     /**
      * The application {@code name} is the instantiation of ([TSON-SCHEMA] §8.2): the {@code @meta.application} its key
-     * carries, which the resolver writes on the entry an open record's application closes to, a declared one or one
-     * whose expansion names itself. Empty for an entry that closes none, a construction among them.
+     * carries, which the resolver writes on a declaration that names an open record's application, {@code
+     * page_order => page<order>}. Empty for an entry that closes none, a construction among them.
      */
     public Optional<TypeRef> applicationOf(String name) {
         return applicationOf(entries.getAnnotations(name));

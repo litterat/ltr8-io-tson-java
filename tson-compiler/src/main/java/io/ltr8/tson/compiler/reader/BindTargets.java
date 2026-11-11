@@ -343,7 +343,7 @@ final class BindTargets {
     }
 
     /**
-     * A tuple written inline has a minted entry no author binds, so its own reader is unbound
+     * A tuple written in place has no name to bind a class to, so its own reader is unbound
      * ({@link TupleBindReader#unbound}) and the target's {@code @Tuple} class is the only one there is.
      */
     private static TsonTypeReader<?> tuple(TupleBindReader tuple, DataClass target, String what, String where,

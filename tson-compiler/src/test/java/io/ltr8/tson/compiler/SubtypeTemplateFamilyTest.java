@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <em>at the same argument</em>, which is the whole claim: {@code ok<text>} is IS-A {@code result<text>} and
  * has nothing to do with {@code result<int32>}.
  *
- * <p><b>The edge cannot be minted where the author writes it.</b> At {@code ok}'s declaration {@code
+ * <p><b>The edge cannot be stated where the author writes it.</b> At {@code ok}'s declaration {@code
  * result<T>} denotes no entry -- a template is not a type (§5.10) -- so there is nothing to name in a chain.
  * What the held body keeps is the application itself as a written parent, {@code parents} being a
  * {@code [meta.type_ref]} slot whose reference may carry arguments, and materialisation substitutes and closes it
@@ -59,9 +59,8 @@ class SubtypeTemplateFamilyTest {
     }
 
     /**
-     * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
-     * its instantiation (§8.2), or the entry it aliases where an earlier declaration
-     * already named the same application.
+     * The entry {@code alias} denotes, past one alias hop: a {@code name => head<args>} declaration is itself the
+     * record its application closes to (§8.2).
      */
     private static String target(TsonCompiledSchema compiled, String alias) {
         return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
@@ -157,7 +156,7 @@ class SubtypeTemplateFamilyTest {
                 () -> textBase + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(textBase)));
     }
 
-    /** Three levels deep, each hop minted as its own instantiation closes -- the chain is transitive. */
+    /** Three levels deep, each hop derived as its own instantiation closes -- the chain is transitive. */
     @Test
     void aChainOfSubtypeTemplatesAccumulatesTheWholeContract() {
         TsonCompiledSchema compiled = compile("""

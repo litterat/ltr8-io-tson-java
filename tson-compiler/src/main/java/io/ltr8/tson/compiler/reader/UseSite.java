@@ -13,11 +13,11 @@ import io.ltr8.tson.compiler.TsonTypeReader;
  * names the target's reader for the entry doing the referring ({@code TsonSchemaCompiler}), and a use site
  * naming {@code pct} gets a reader called {@code pct}.
  *
- * <p><b>A use site needs nothing of its own for that</b>, which it used to. Resolved output no longer
- * rewrites a type position past a reference, so a position reaches its child reader by resolving the name it
- * names and nothing more -- every container and record field calls the resolver directly. What is left here
- * is the {@link Renamed} seam a compiled reader offers a caller holding one, and the {@link #named} helper
- * the reference compile applies it through.
+ * <p><b>A use site needs nothing of its own for that.</b> Resolved output keeps a type position as written,
+ * past no reference, so a position reaches its child reader by resolving the name it names and nothing more --
+ * every container and record field calls the resolver directly. What is left here is the {@link Renamed} seam a
+ * compiled reader offers a caller holding one, and the {@link #named} helper the reference compile applies it
+ * through.
  *
  * <p>This is the naming twin of the rule {@code SchemaLocation} already follows for pointers: the pointer is
  * the path taken ({@code /person/age}), never the leaf it resolves to ({@code /int32} in numeric.tn), "because
@@ -27,7 +27,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
  * <p><b>It costs nothing at read time, which is the point of doing it here.</b> Every composite reader wires
  * its children once, when the schema is compiled; this runs there and nowhere else. A position with no alias
  * gets the shared reader back unchanged -- identity-equal, no allocation -- so a schema that names no type
- * twice compiles to exactly the readers it did before. A position with one gets a copy that shares the
+ * twice compiles to the shared readers alone. A position with one gets a copy that shares the
  * parser and the location and differs only in its name. Nothing is added to {@code TsonReadContext}, and no
  * per-read allocation changes.
  *
@@ -47,9 +47,7 @@ public final class UseSite {
      * nothing to give it to.
      *
      * <p><b>An {@code ALIAS} entry is the caller.</b> Its reader is its target's, so without this a
-     * message at a {@code pct}-typed position would name {@code small}. The same applies to an instantiation
-     * entry an expansion that names its own application keeps: the synthetic is named for its content, and
-     * the entry referring to it records the application, which {@code EntryDisplayName} renders.
+     * message at a {@code pct}-typed position would name {@code small}.
      */
     public static TsonTypeReader<?> named(TsonTypeReader<?> reader, String displayName) {
         return displayName != null && reader instanceof Renamed renameable
@@ -60,8 +58,8 @@ public final class UseSite {
      * A reader that leads its messages with a type name, and can be handed a different one.
      *
      * <p>Implemented by the families whose diagnostics name the type they were reading. A family that does
-     * not -- or one whose name is already the use site's, like an open record's single substituted entry
-     * -- simply does not implement it, and {@link #named} hands its reader straight back.
+     * not -- or one whose name is already the use site's -- simply does not implement it, and {@link #named} hands
+     * its reader straight back.
      */
     public interface Renamed {
 

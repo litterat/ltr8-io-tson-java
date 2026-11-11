@@ -719,9 +719,9 @@ public final class TsonObjectReader {
         if (root == null) {
             return null;
         }
-        // Rooted at the name the author wrote, so a pointer into a template-derived type says
-        // /order_response/items rather than naming the entry the resolver minted. TsonTreeReader does the
-        // same; see TsonCompiledSchema.rootDeclaration for why the reader itself cannot know this.
+        // Rooted at the name the author wrote, so a pointer read through an alias says /pct/... rather than
+        // naming the entry it reaches. TsonTreeReader does the same; see TsonCompiledSchema.rootDeclaration for
+        // why the reader itself cannot know this.
         ctx = root.rootDeclaration().map(ctx::underDeclaration).orElse(ctx);
         TsonTypeReader<?> reader = root.reader();
         Class<?> bound = boundClass(root.typeName());

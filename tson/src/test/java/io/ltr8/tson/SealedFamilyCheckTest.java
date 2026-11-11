@@ -173,7 +173,7 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * §5.9 leaves a subtracted record's chain empty and mints no IS-A edge, which is the only thing FINAL
+     * §5.9 leaves a subtracted record's chain empty and adds no IS-A edge, which is the only thing FINAL
      * constrains -- so subtracting from a final record is admissible where composing and refining are not.
      */
     @Test
@@ -253,14 +253,9 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * <b>A colliding member is named the way the author wrote it.</b> Both members here are declared
-     * applications, so each declaration <em>is</em> its instantiation (§8.2) and the
-     * names that collide are {@code a} and {@code b} -- names an author can open and edit.
-     *
-     * <p>The rule the message applies is unchanged; what changed is that there is no derived name left to
-     * render for this shape. While the declaration was a hop, the collision was between two content-named
-     * entries and the message depended on {@code EntryDisplayName} rendering each as the application that
-     * produced it. The negative assertion stays either way: no content-derived name reaches the author.
+     * <b>A colliding member is named the way the author wrote it.</b> Both members here compose a template's
+     * application, and each is the author's own declaration (§8.2), so the names that collide are {@code a} and
+     * {@code b} -- names an author can open and edit.
      */
     @Test
     void collidingMembersAreNamedByTheDeclarationsThatCollide() {
@@ -275,7 +270,7 @@ class SealedFamilyCheckTest {
         assertTrue(refusal.contains("'a'"), refusal);
         assertTrue(refusal.contains("'b'"), refusal);
         assertFalse(refusal.matches("(?s).*pet_of_cat_[a-z0-9]+_[0-9a-f]{8}.*"),
-                "no content-derived entry name reaches the author: " + refusal);
+                "the refusal names no entry the author did not write: " + refusal);
     }
 
     /**

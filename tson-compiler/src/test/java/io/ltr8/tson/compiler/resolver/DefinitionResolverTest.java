@@ -442,16 +442,16 @@ class DefinitionResolverTest {
         assertEquals("{ target: text }", write(doc));
     }
 
-    // ── A sugar form must be lifted before resolution ────────────────────
+    // ── A sugar form must be desugared before resolution ────────────────
 
     /**
      * The resolver builds no container type-ref of its own: a container sugar form reaching it is a broken
-     * invariant, not a gap. {@code SchemaDesugarer} lifts every one to an entry before the resolver runs, so only
-     * a caller resolving raw AST without that phase -- as this test does -- can produce one, at a declaration or
-     * inside a field. No author's schema can, which is what keeps it out of {@code NOT_IMPLEMENTED}.
+     * invariant, not a gap. {@code SchemaDesugarer} rewrites every one to its construction before the resolver
+     * runs, so only a caller resolving raw AST without that phase -- as this test does -- can produce one, at a
+     * declaration or inside a field. No author's schema can, which is what keeps it out of {@code NOT_IMPLEMENTED}.
      */
     @Test
-    void anUnliftedSugarFormIsABrokenInvariantNotAGap() {
+    void anUndesugaredSugarFormIsABrokenInvariantNotAGap() {
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema { names => [text]
@@ -472,9 +472,8 @@ class DefinitionResolverTest {
 
     /**
      * §8.2's own worked example, one bound apart -- and deliberately not the entry it prints. {@code [text;
-     * 1920]} closes by routing into a construction of {@code array} rather than materialising an
-     * instantiation entry, the kernel binding {@code array}'s fields directly with no size template in
-     * between. So the entry's tag is plain {@code array}, exactly as {@code [text]}'s is, and the bounds live in
+     * 1920]} is a construction of {@code array}, the kernel binding {@code array}'s fields directly. So the
+     * entry's tag is plain {@code array}, exactly as {@code [text]}'s is, and the bounds live in
      * the body where they constrain.
      *
      * <p>{@code supertypes} is empty for the same entry's reason: a constructor is a factory, not a type
@@ -663,8 +662,7 @@ class DefinitionResolverTest {
         // field_group => { members: [[meta.field_name; 1..]; 1..]  optional_members?: [meta.field_name; 1..]
         //                  optional?: boolean ~ false }
         // -- a fresh record combining sugar forms with an ordinary literal default modifier. Desugared first,
-        // as SchemaResolver does: each bracket form is lifted to its own entry, so what the resolver sees at
-        // each field is a bare name.
+        // as SchemaResolver does: each bracket form is the construction written in place at its field.
         SchemaMap schemaMap = SchemaDesugarer.desugar(
                 new TsonSchemaParser(readFixture("meta.tn")).parseSchemaDocument()).body();
 

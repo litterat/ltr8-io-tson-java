@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A type written where it is used, end to end: a user schema writing container sugar at its fields resolves to the
- * construction held in place at each field, {@code { of: !meta.array { … } }}, with no entry lifted or minted, and
+ * construction held in place at each field, {@code { of: !meta.array { … } }}, with no entry added for it, and
  * reads data in tree and bind mode through readers built from each construction's body.
  */
 class InlineTypeEndToEndTest {
@@ -114,7 +114,7 @@ class InlineTypeEndToEndTest {
     void everyFormResolvesToTheConstructionInPlace() {
         TsonSchema schema = tson().resolve(SCHEMA).schema();
         assertTrue(schema.entries().keySet().stream().noneMatch(name -> name.matches(".*_[0-9a-f]{8}")),
-                "nothing is lifted or minted under a name keyed by its content");
+                "no entry is added for a form written in place");
         RecordBody order = assertInstanceOf(RecordBody.class, schema.entries().get("order"));
 
         assertEquals(inline(ArrayBody.of(TypeRef.of("text"))), order.fields().get("tags").type());
