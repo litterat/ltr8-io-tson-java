@@ -2666,7 +2666,8 @@ final class DefinitionResolver {
         // against a type waits on the type.
         String constructor = resolveConstructorTarget("field '" + field + "'", inline.constructor()).name();
         Top body = bindAtomInstance("field '" + field + "'", inline.value());
-        if (!(body instanceof io.ltr8.tson.schema.meta.Type type) || !io.ltr8.tson.schema.meta.TypeInline.inlinable(type)) {
+        if (!(body instanceof io.ltr8.tson.schema.meta.Type type)
+                || !io.ltr8.tson.schema.meta.TypeInline.constructible(type)) {
             throw new IllegalStateException("field '" + field + "': the construction '!" + inline.constructor()
                     + " { ... }' written in place built " + body + ", which is no container, tuple, choice or "
                     + "reference -- SchemaDesugarer writes only those in place");

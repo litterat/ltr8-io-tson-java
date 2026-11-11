@@ -22,22 +22,33 @@ derived — and the static check that runs before any of it.
   constructor's reader reads it, the body is walked so each argument closes where it landed (a nested constructor's
   application, which an open record holds for `{text => [T]}`, in place too), and the slot holds `TypeInline` of it,
   under the head past its alias hops (`pair_of<int32>` under `pair_of`, `set<text>` under `meta.set_type`).
-  Only a container, a tuple, a choice or a reference is written in place; any other construction is refused, to be
-  declared.
+  Only a container, a tuple, a choice or a reference is constructed in place (`TypeInline.constructible`); any other
+  construction is refused, to be declared.
 - **Where only a name may stand an application closes nowhere** (§4.2): at a slot `MetaRefs` walks with `atName` — a
   map's key, a reference's `of`, an alias's target — a construction and an application of an open record are both
   refused (`closeName`, `nameRequired`), and so is an application at a parameter's bound (`ParameterTypes.requireType`).
   Each is a `SchemaValidationException` at the declaration that wrote it, naming the declaration to write.
 - An application of an **open record** closes into the declaration that names it (`closeApplicationInto`): the
-  record itself, recorded with its application. A nested application equal to the one a declaration is closing names
-  that declaration (`closingInto`), so a recursive open record closes into its declaration. Any other application of
-  an open record at a type slot — of a closed record, or left in another record's body by closing it — would close in
-  place, and is reported as not yet supported (`UnsupportedOperationException`, `NOT_IMPLEMENTED`). One at a
-  refinement source is absorbed, as a composition operand is (below). Two are refused first, being errors whatever
-  is supported (`instantiate`): one whose record in place would be IS-A a declared type, through its template's
-  written parents or an applied parent a declaration names (`refuseMembership`, §5.2), and one of a recursive open
-  record (`recursive`, §5.10.1). Held in an open record,
+  record itself, recorded with its application. **At a type slot it closes in place** (`instantiate`) -- at a field of
+  a closed record, or left in another record's body by closing it: the substituted record, closed, its chain dropped,
+  held as `TypeInline.closing(application, record)`, the application as written kept for messages and nowhere else.
+  Nothing is minted, nothing records it, and it is never looked up to a declaration. A nested application equal to the
+  one a declaration is closing names that declaration (`closingInto`). One at a refinement source is absorbed, as a
+  composition operand is (below).
+- **Two refusals come before closing in place** (`instantiate`): one whose record in place would be IS-A a declared
+  type (`refuseMembership`, §5.2), and a recursion with no declaration to tie to (§5.10.1). Held in an open record,
   either is reported at the declaration whose application closed it.
+  - *Membership* has two halves. A template's written parents reaching a declared type are judged at once. An applied
+    parent a declaration names (`dog_of => <T> animal_of<T> & { … }` beside `animal_text => animal_of<text>`) is known
+    only once every declaration has closed, so one asked while declarations are being made ready is deferred to
+    `checkDeferred` (`deferredMemberships`); asking then would depend on declaration order.
+  - *Recursion* is judged by closing, not by the template's shape. `closingInPlace` is a stack of the applications
+    closing in place, keyed on the canonical application: one reached again inside its own closing, with no
+    declaration closing it, is refused, naming it and the declaration to write. Mutual recursion through records in
+    place therefore ties to the declaration being closed (`a_text => a<text>` closing `b: b<T>` in place, whose
+    `a<text>` names `a_text`), and is refused at a slot (`f: b<text>`), with or without `a_text` declared, since an
+    application at a slot is never looked up. Regularity passes each parameter through unchanged and an argument is a
+    name, so every cycle repeats an application exactly and the closing ends.
 - An argument of an open record's application is a name or a parameter (§5.3): a construction or an application
   there is refused (`closeArgument`, `argumentNotAName`), to be declared under a name and passed by it. Inside an open
   record the held applications are judged at its declaration (`ParameterTypes`' `requireNames`): every argument of an
@@ -104,16 +115,19 @@ checks), `design/schema-resolution.md` (chains, applied parents),
   leaves `T` in `chain<T>` unbound.
 - **Knot-tying is `closingInto`**, registered before the body is substituted and keyed on the canonical
   application: a recursive application reached during substitution finds the declaration being closed and names it.
-  One reached with no declaration closing it is refused (`recursive`, §5.10.1), so regular recursion ties on its
-  first repeat and nothing nests without bound.
-- **Substitution changes no field fact.** A field's value is never a parameter (§5.10), so replacing each
-  `ParamRef` with its argument is the whole of it (`Substitution`, in `closeOpenRecord`): every field's type is then
-  closed, the applications in it -- a held `meta.array<T>` or `box<T>` among them -- closed now that the parameter is
-  bound, and nothing is written out or read back. The result is a `RecordBody` without `parameters`; one left holding
-  a `ParamRef` would be refused by the record's constructor. A value that differs per application is pinned where
-  the application is declared (`created => response<order> & { status?: = 201 }`), by composition. The record-level
-  facts are kept as written too: `extension`, `discriminators`, groups and name type are each application's, so an
-  abstract template's application is an abstract record, the base of the declarations composing it (§5.10).
+  One reached again inside its own closing in place, with no declaration closing it, is refused (`closingInPlace`,
+  §5.10.1), so regular recursion ties on its first repeat or stops there, and nothing nests without bound.
+- **Substitution changes no field fact.** A field's value is never a parameter (§5.10), so replacing each `ParamRef`
+  with its argument is the whole of it (`Substitution`, in `closeOpenRecord`): every field's type is then closed, the
+  applications in it -- a held `meta.array<T>` or `box<T>` among them -- closed now that the parameter is bound, and
+  nothing is written out or read back. A type written in place in the template is walked too: it holds no parameter, but
+  may hold an application of an open record the materialise pass has not reached in the template's own entry
+  (`[box<text>; 2..]`), which closes where it stands. The result is a `RecordBody` without `parameters`; one left
+  holding a `ParamRef` would be refused by the record's constructor. A value that differs per application is pinned
+  where the application is declared (`created => response<order> & { status?: = 201 }`), by composition. The
+  record-level facts are kept as written too: `extension`, `discriminators`, groups and name type are each
+  application's, so an abstract template's application is an abstract record, the base of the declarations composing it
+  (§5.10).
 - **A closed record is built with no subtypes.** `subtypes` is linking's, derived over the closed namespace. Taking
   the template's list would hand each instantiation the whole family and, for a template imported already linked,
   itself.

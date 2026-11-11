@@ -5,7 +5,6 @@ import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -129,15 +128,15 @@ class TemplateRegularityTest {
      * recursion is written {@code chain<T>}. {@code head: T} is not decoration: without it the parameter's only use
      * would have been the missing argument list, and the unused-parameter rule fires first.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aRecursiveBareReferenceIsRefused() {
         assertTrue(rejected("  chain => <T> { head: T  tail: chain? }")
                 .contains("'chain' is a template taking 1 type argument [T]"));
         assertNotNull(compile("""
-                  chain => <T> { head: T  tail?: chain<T>? }
-                  use   => { c: chain<text> }"""),
-                "the recursion written as an application closes");
+                  chain      => <T> { head: T  tail?: chain<T>? }
+                  text_chain => chain<text>
+                  use        => { c: text_chain }"""),
+                "the recursion written as an application closes into the declaration closing it");
     }
 
     /**

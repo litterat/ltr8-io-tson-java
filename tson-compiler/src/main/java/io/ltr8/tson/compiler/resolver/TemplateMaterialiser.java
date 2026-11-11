@@ -45,16 +45,16 @@ import java.util.function.Supplier;
  * reference held inside an open record, {@code meta.array<T>} or {@code box<T>}, closes the same way once the record
  * holding it is applied and its parameter substituted.
  *
- * <p><b>Nothing is minted.</b> An application of an open record closes only into the declaration that names it,
- * {@code page_order => page<order>} ({@link #closeApplicationInto}), the record under that name with the application
- * recorded ({@code @meta.application}, §8.2). Anywhere else -- at a slot of a closed record, left by substitution in
- * another record's body -- an application of an open record would close in place, which this library does not do
- * yet: it is reported as not yet supported ({@link UnsupportedOperationException}). The one nested application that
- * closes is the one a declaration is closing itself: {@code next: node<text>} inside {@code node_text => node<text>}
- * names {@code node_text}, so a recursive open record closes into its declaration. Two applications are refused
- * before the gap is reported, being the author's errors whatever this library supports (§5.2, §5.10.1): one that would
- * put in place a member of a declared type ({@code k: dog_of<text>} over {@code dog_of => <T> pet & { … }}), and a
- * recursive one with no declaration closing it ({@code f: node<text>}).
+ * <p><b>Nothing is minted.</b> A declaration naming an application of an open record, {@code page_order =>
+ * page<order>}, is the record under that name with the application recorded ({@link #closeApplicationInto}, {@code
+ * @meta.application}, §8.2). At a type slot -- of a closed record, or left by substitution in another record's body --
+ * an application closes in place to the substituted record, {@code { of: !meta.record { … } }} ({@link TypeInline}):
+ * no name, no chain, nothing recorded, and never looked up to a declaration ({@link #instantiate}). The one nested
+ * application that names a declaration is the one a declaration is closing itself: {@code next: node<text>} inside
+ * {@code node_text => node<text>} names {@code node_text}, so a recursion, direct or through records in place, ties to
+ * the declaration it closes (§5.10.1). Two applications are refused: one that would put in place a member of a
+ * declared type ({@code k: dog_of<text>} over {@code dog_of => <T> pet & { … }}, §5.2), and a recursive one with no
+ * declaration closing it ({@code f: node<text>}, §5.10.1).
  *
  * <p><b>Where a name is required</b> -- an argument of an open record's application, a map's key, a reference's {@code
  * of}, an alias's target -- an application closes nowhere: a construction and an application of an open record are
@@ -97,6 +97,14 @@ final class TemplateMaterialiser {
     private final Map<String, String> closingInto = new LinkedHashMap<>();
 
     /**
+     * Each application closing in place, keyed on its canonical application, against the application as written,
+     * for as long as it closes: one reached again inside its own closing is a recursion no declaration ties, and is
+     * refused (§5.10.1) rather than expanded without end. A stack, so two sibling slots closing one application are
+     * not a recursion.
+     */
+    private final Map<String, TypeRef> closingInPlace = new LinkedHashMap<>();
+
+    /**
      * Each instantiation entry's application as it was written, its nested arguments unreduced: what {@code
      * @meta.application} states on the entry's key, so a reader and a message see the reference the author wrote.
      */
@@ -130,6 +138,18 @@ final class TemplateMaterialiser {
     private record DeferredCheck(String declaration, String head, List<TypeRef> arguments) {
     }
 
+    /**
+     * The applied-parent half of {@link #refuseMembership} for each record put in place while declarations were being
+     * made ready, run by {@link #checkDeferred} once every one is: whether an applied parent is a declared application
+     * is known only once every declaration has closed, and asking earlier would make the verdict depend on the order
+     * the declarations stand in.
+     */
+    private final List<DeferredMembership> deferredMemberships = new ArrayList<>();
+
+    private record DeferredMembership(String declaration, RecordBody template, Map<String, TypeRef> bindings,
+                                      TypeRef written) {
+    }
+
     TemplateMaterialiser(DefinitionGetter namespace, ConstructionReader constructionReader,
                          Function<String, Top> importedTypes, Supplier<String> resolving,
                          Map<String, TsonSchema.EntryFacts> facts, Map<String, TypeRef> applications,
@@ -149,6 +169,16 @@ final class TemplateMaterialiser {
      */
     void checkDeferred(BiConsumer<String, SchemaValidationException> reporter) {
         Set<String> refused = new LinkedHashSet<>();
+        for (DeferredMembership check : deferredMemberships) {
+            try {
+                refuseAppliedMembership(check.template(), check.bindings(), check.written());
+            } catch (SchemaValidationException e) {
+                if (refused.add(check.declaration())) {
+                    reporter.accept(check.declaration(), e);
+                }
+            }
+        }
+        deferredMemberships.clear();
         for (DeferredCheck check : deferred) {
             Top template = namespace.definition(check.head());
             if (refused.contains(check.declaration()) || !OpenEntry.isOpen(template)) {
@@ -195,8 +225,9 @@ final class TemplateMaterialiser {
     /**
      * The entry a fully-bound application at a refinement source denotes -- the on-demand half, reached during
      * resolution rather than from the batch pass afterwards. A construction there is refused, as at any slot that
-     * holds a name; an application of an open record nothing declares would be absorbed by value, which is not yet
-     * supported.
+     * holds a name. An application of an open record is absorbed by value before it reaches here
+     * ({@code DefinitionResolver.openOperand}), except where its head is an alias of the open record, which is not
+     * yet supported.
      */
     String closeApplication(TypeRef application) {
         if (application.arguments().isEmpty()) {
@@ -205,7 +236,12 @@ final class TemplateMaterialiser {
         if (constructs(application)) {
             throw nameRequired(application);
         }
-        return closeApplicationOfRecord(application).name();
+        return switch (closeApplicationOfRecord(application)) {
+            case TypeRef named -> named.name();
+            case TypeInline ignored -> throw new UnsupportedOperationException("'" + application.text()
+                    + "' at a refinement source names its open record through an alias, and absorbing it that way "
+                    + "is not yet supported ([TSON-SCHEMA] §5.7): write the open record's own name as the head");
+        };
     }
 
     /**
@@ -247,7 +283,8 @@ final class TemplateMaterialiser {
 
     /**
      * What a reference at a type slot closes to: itself where it carries no arguments, the construction written in
-     * place where it applies a constructor, and otherwise an application of an open record ({@link #instantiate}).
+     * place where it applies a constructor, and otherwise an application of an open record, closed in place or into
+     * the declaration closing it ({@link #instantiate}).
      */
     private TypeExpr closeSlot(TypeRef ref) {
         if (ref.arguments().isEmpty()) {
@@ -333,13 +370,13 @@ final class TemplateMaterialiser {
      * nothing this pass can close: the list is the evidence the author supplied arguments, and the linker reports on
      * what it is handed.
      */
-    private TypeRef closeApplicationOfRecord(TypeRef ref) {
+    private TypeExpr closeApplicationOfRecord(TypeRef ref) {
         List<TypeRef> arguments = new ArrayList<>();
         for (TypeRef argument : ref.arguments()) {
             arguments.add(dereferenced(closeArgument(argument, ref)));
         }
-        String entry = instantiate(templateHead(ref.name()), arguments, ref);
-        return entry == null ? TypeRef.of(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
+        TypeExpr closed = instantiate(templateHead(ref.name()), arguments, ref);
+        return closed == null ? TypeRef.of(ref.name(), arguments, ref.annotations()) : closed;
     }
 
     /** Whether {@code application}'s head, past its alias hops, is a constructor ({@link ConstructionSugar}). */
@@ -373,7 +410,7 @@ final class TemplateMaterialiser {
                     "'" + application.text() + "' constructs '!" + constructor + " { ... }', which is not valid "
                             + "data for '" + constructor + "' -- " + e.getMessage(), e);
         }
-        if (!(body instanceof Type type) || !TypeInline.inlinable(type)) {
+        if (!(body instanceof Type type) || !TypeInline.constructible(type)) {
             throw new SchemaValidationException("'" + application.text() + "' constructs a "
                     + (body instanceof Type ? "type" : "value") + " that is no container, tuple, choice or reference, "
                     + "and only those are written where they are used (§5.2): declare it under a name ('my_"
@@ -426,12 +463,18 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * The entry a fully-bound application of an open record denotes, or {@code null} where the head names nothing in
-     * scope -- that is {@code TsonSchemaLinker}'s verdict to give as an unresolved reference, not this pass's to guess
-     * at. The one entry it can name is the declaration closing this very application (a recursion); anything else
-     * would close in place, not yet supported.
+     * What a fully-bound application of an open record at a type slot closes to ([TSON-SCHEMA] §5.10): the
+     * declaration closing this very application, where one is (a recursion, §5.10.1), and otherwise the substituted
+     * record in place, with no name, no chain and nothing recorded. {@code null} where the head names nothing in
+     * scope -- that is {@code TsonSchemaLinker}'s verdict to give as an unresolved reference, not this pass's to
+     * guess at.
+     *
+     * <p>Two applications are refused first, being what a record in place may not be: one that would be a member of a
+     * declared type (§5.2), and one that reaches itself while it closes in place, with no declaration to tie to
+     * (§5.10.1). Every recursion through records in place ends at a declaration being closed or is refused: regularity
+     * passes each parameter through unchanged, and an argument is a name, so a cycle repeats an application exactly.
      */
-    private String instantiate(String head, List<TypeRef> arguments, TypeRef written) {
+    private TypeExpr instantiate(String head, List<TypeRef> arguments, TypeRef written) {
         Top template = namespace.definition(head);
         if (template == null) {
             return null; // unresolved head -- the linker's verdict, not this pass's
@@ -448,69 +491,71 @@ final class TemplateMaterialiser {
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
         checkArguments(head, template, arguments);
-        String owner = closingInto.get(DerivedName.canonicalApplication(head, arguments));
+        String canonical = DerivedName.canonicalApplication(head, arguments);
+        String owner = closingInto.get(canonical);
         if (owner != null) {
             // The declaration closing this application reached it again while substituting: the recursion names
             // the declaration, so the record closes into it.
-            return owner;
+            return TypeRef.of(owner);
         }
-        // What a record in place may not be is judged before the gap is: a member of a declared type, and a
-        // recursion with no declaration to tie to.
-        refuseMembership(head, (RecordBody) template, bind(parameters, arguments), written);
-        if (recursive(head)) {
-            throw new SchemaValidationException("'" + written.text() + "' applies the recursive open record '" + head
-                    + "' where no declaration is closing it, so its recursion has nothing to tie to (§5.10.1): "
-                    + "declare it ('" + suggestedName(written) + " => " + written.text()
+        Map<String, TypeRef> bindings = bind(parameters, arguments);
+        refuseMembership(head, (RecordBody) template, bindings, written);
+        TypeRef repeated = closingInPlace.get(canonical);
+        if (repeated != null) {
+            throw new SchemaValidationException("'" + repeated.text() + "' applies the recursive open record '"
+                    + head + "' where no declaration is closing it, so its recursion has nothing to tie to "
+                    + "(§5.10.1): declare it ('" + suggestedName(repeated) + " => " + repeated.text()
                     + "') and write that name where it is used");
         }
-        throw new UnsupportedOperationException("'" + written.text() + "' applies the open record '" + head
-                + "' where no declaration is closing it, and closing an application in place is not yet supported "
-                + "([TSON-SCHEMA] §5.10): declare it ('" + suggestedName(written) + " => "
-                + written.text() + "') and write that name where it is used");
+        closingInPlace.put(canonical, written);
+        try {
+            RecordBody closed = closeOpenRecord((RecordBody) template, bindings);
+            return TypeInline.closing(plain(written), closed.withChain(TypeChain.EMPTY));
+        } finally {
+            closingInPlace.remove(canonical);
+        }
     }
 
     /**
      * Refuses an application of the open record {@code head} that would close in place to a member of a declared type
      * ([TSON-SCHEMA] §5.2): one whose template reaches a declared type through its written parents, or whose applied
      * parent, substituted, is an application a declaration names. A member is read, tagged and bound by name, so it is
-     * declared.
+     * declared. The second is judged once every declaration has closed ({@link #checkDeferred}) where this runs while
+     * declarations are being made ready.
      */
     private void refuseMembership(String head, RecordBody template, Map<String, TypeRef> bindings, TypeRef written) {
-        String member = TypeChain.supertypesOf(template).stream().findFirst().orElse(null);
-        for (TypeRef parent : Substitution.parents(template, bindings)) {
-            if (member == null && !parent.arguments().isEmpty()) {
-                TypeRef canonical = TypeRef.of(templateHead(parent.name()),
-                        parent.arguments().stream().map(this::dereferenced).toList());
-                member = applications.entrySet().stream().filter(entry -> entry.getValue().equals(canonical))
-                        .map(Map.Entry::getKey).findFirst().orElse(null);
-            }
+        TypeChain.supertypesOf(template).stream().findFirst().ifPresent(member -> {
+            throw notAMember(written, member);
+        });
+        String declaration = resolving.get();
+        if (declaration != null) {
+            deferredMemberships.add(new DeferredMembership(declaration, template, Map.copyOf(bindings), written));
+            return;
         }
-        if (member != null) {
-            throw new SchemaValidationException("'" + written.text() + "' would close in place to a record IS-A '"
-                    + member + "', a member of a declared type that no declaration names, and a member is read, "
-                    + "tagged and bound by its name (§5.2): declare it ('" + suggestedName(written) + " => "
-                    + written.text() + "') and write that name where it is used");
+        refuseAppliedMembership(template, bindings, written);
+    }
+
+    /** The applied-parent half of {@link #refuseMembership}. */
+    private void refuseAppliedMembership(RecordBody template, Map<String, TypeRef> bindings, TypeRef written) {
+        for (TypeRef parent : Substitution.parents(template, bindings)) {
+            if (parent.arguments().isEmpty()) {
+                continue;
+            }
+            TypeRef canonical = TypeRef.of(templateHead(parent.name()),
+                    parent.arguments().stream().map(this::dereferenced).toList());
+            Optional<String> member = applications.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(canonical)).map(Map.Entry::getKey).findFirst();
+            if (member.isPresent()) {
+                throw notAMember(written, member.get());
+            }
         }
     }
 
-    /**
-     * Whether the open record {@code head} applies itself, directly or through the open records its body applies
-     * ([TSON-SCHEMA] §5.10.1).
-     */
-    private boolean recursive(String head) {
-        Set<String> seen = new LinkedHashSet<>();
-        List<String> pending = new ArrayList<>(OpenEntry.names(namespace.definition(head)));
-        while (!pending.isEmpty()) {
-            String name = templateHead(pending.removeLast());
-            if (name.equals(head)) {
-                return true;
-            }
-            Top reached = namespace.definition(name);
-            if (OpenEntry.isOpen(reached) && seen.add(name)) {
-                pending.addAll(OpenEntry.names(reached));
-            }
-        }
-        return false;
+    private static SchemaValidationException notAMember(TypeRef written, String member) {
+        return new SchemaValidationException("'" + written.text() + "' would close in place to a record IS-A '"
+                + member + "', a member of a declared type that no declaration names, and a member is read, tagged "
+                + "and bound by its name (§5.2): declare it ('" + suggestedName(written) + " => " + written.text()
+                + "') and write that name where it is used");
     }
 
     /** Each parameter of the applied signature against the argument applied for it, in order. */
@@ -544,8 +589,10 @@ final class TemplateMaterialiser {
                         case TypeRef closed -> closed;
                         case TypeInline inline -> inline;
                     };
-                    // A type written in place holds no parameter and no application: it is closed already.
-                    case TypeInline inline -> inline;
+                    // A type written in place holds no parameter, and may still hold an application of an open
+                    // record this pass has not reached in the template (`[box<text>; 2..]`): closed where it stands.
+                    case TypeInline inline -> inline.withOf(
+                            (Type) MetaRefs.mapRefsKeepingChain(inline.of(), slotRewrite()));
                     // A sibling names a field of the record, and has no application to close.
                     case SiblingRef sibling -> sibling;
                 }).withPosition(Optional.empty()), substituted.getAnnotations(name)));

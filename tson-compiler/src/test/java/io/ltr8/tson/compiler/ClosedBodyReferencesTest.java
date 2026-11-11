@@ -9,7 +9,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.suite.SuiteBindings;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -82,11 +81,10 @@ class ClosedBodyReferencesTest {
     }
 
     /**
-     * {@code value_type: box<text>} names the record {@code box<text>} expands to, as a map type's does, so a value
-     * of the namespace type reads against it. Left unclosed, the value at {@code a} was judged against the family
-     * base {@code box}, which has no member to stand there.
+     * {@code value_type: box<text>} closes in place to the record {@code box<text>} closes to, as a map type's does
+     * (§5.10), so a value of the namespace type reads against it. Left unclosed, the value at {@code a} was judged
+     * against the template {@code box}, which is no type.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aNamespaceTypesValueTypeClosesItsApplication() {
         TsonCompiledSchema compiled = compiled("""
@@ -94,10 +92,8 @@ class ClosedBodyReferencesTest {
                 use => { f: api }""");
 
         NamespaceBody api = assertInstanceOf(NamespaceBody.class, compiled.schema().entries().get("api"));
-        assertTrue(((io.ltr8.tson.schema.meta.TypeRef) api.valueType()).arguments().isEmpty(),
-                () -> "closed to an entry: " + api.valueType());
         RecordBody closed = assertInstanceOf(RecordBody.class,
-                compiled.schema().entries().get(api.valueType().text()));
+                assertInstanceOf(io.ltr8.tson.schema.meta.TypeInline.class, api.valueType()).of());
         assertEquals(TypeRef.of("text"), closed.fields().get("v").type());
         assertNotNull(compiled.get("use").read(TestDocuments.document("{ f: { a => { v: \"s\" } } }")));
     }

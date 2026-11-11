@@ -4,6 +4,9 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.TypeInline;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
 import java.util.Map;
@@ -11,6 +14,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -48,17 +53,20 @@ class RecordTemplateSlotTest {
     }
 
     /**
-     * An application of an open record left in another's body by closing it is not closed in place yet, nor named by
-     * a declaration: a gap, reported as not yet supported, and never a verdict on the schema ([TSON-SCHEMA] §5.10).
+     * An application of an open record left in another's body by closing it closes in place there ([TSON-SCHEMA]
+     * §5.10): {@code bb}'s {@code items} holds the record {@code box<text>} closes to, with no name.
      */
     @Test
-    void aRecordWhoseBodyAppliesAnotherOpenRecordIsNotYetClosable() {
-        UnsupportedOperationException gap = assertThrows(UnsupportedOperationException.class, () -> compile("""
+    void aRecordWhoseBodyAppliesAnotherOpenRecordClosesItInPlace() {
+        TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   boxes => <T> { items: box<T> }
                   bb => boxes<text>
-                """));
-        assertTrue(gap.getMessage().contains("'box<text>'"), gap.getMessage());
+                """);
+        RecordBody bb = (RecordBody) compiled.schema().entries().get("bb");
+        TypeInline items = assertInstanceOf(TypeInline.class, bb.fields().get("items").type());
+        assertEquals("box<text>", items.text());
+        assertEquals(TypeRef.of("text"), ((RecordBody) items.of()).fields().get("v").type());
     }
 
     /**

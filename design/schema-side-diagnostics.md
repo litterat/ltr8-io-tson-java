@@ -98,16 +98,20 @@ distinction. They rethrow the original untouched (the linker re-states only an `
   Left in place, an application of one would report the same defect again, against whichever entry applied it.
 - **A defect an open record deferred is reported against the declaration whose text wrote it**
   (`TsonSchemaLinker.heldDeclarationNaming`). A template's references cannot be settled until an application supplies
-  arguments, so the verdict can arrive on an entry with no source position, and the walk to a positioned entry
-  (`reportedAgainst`) would find the *applier*, a line that is not wrong, once per applier. Deferred checking is
+  arguments, so the verdict arrives inside the record an application closes to in place, in the applier's entry --
+  a line that is not wrong, once per applier. Deferred checking is
   survivable only if the author is sent to the line they can edit.
   - **The offending name is the evidence, not the entry.** The entry's provenance cannot answer this. Asking which open
-    record *mentions the name* among its references (`OpenEntry.names`) reaches the template directly -- and reaches
-    nothing when the name came from the argument list, so `box<some_typo>` keeps its verdict at the application, where
-    that mistake is.
-  - **Both filters are load-bearing.** Only a *derived* entry (no position of its own) is retargeted, or a closed
-    declaration's own typo would be blamed on any template that names it; and only an authored open declaration
-    (`OpenEntry.isOpen`) is a candidate.
+    record *mentions the name* -- among its references (`OpenEntry.names`) or inside a type it holds in place
+    (`writes`) -- reaches the template directly, and reaches nothing when the name came from the argument list, so
+    `box<some_typo>` keeps its verdict at the application, where that mistake is.
+  - **Both filters are load-bearing.** Only a failure inside a record in place (`UnresolvedReference.inPlace`, marked
+    by `validateSlot`) or in an entry with no position of its own is retargeted, or a closed declaration's own typo
+    would be blamed on any template that names it; and only an authored open declaration (`OpenEntry.isOpen`) is a
+    candidate.
+  - **A type written in place is named by its form** (`validateSlot`): a failure inside one states its subject as the
+    form written, `'box<some_typo>' field 'v'` or `'[some_typo]' element_type`, reported against the declaration that
+    holds it. A construction's form stays the subject when the failure is retargeted (`namedByForm`).
   - **The subject moves with the location**, which is why `UnresolvedReference` carries the sentence in parts
     (subject, trail, name): `'box<text>' field 'w'` states the mistake against an application that is itself correct.
     It is linker-internal and re-stated as a `SchemaValidationException` — not a subclass of it, since that type is

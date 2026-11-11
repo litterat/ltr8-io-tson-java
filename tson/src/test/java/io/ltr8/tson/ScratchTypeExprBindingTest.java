@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -464,13 +465,19 @@ class ScratchTypeExprBindingTest {
                     TypeRef.of("uuid")))))), read);
         }
 
-        /** {@code of} is typed by the abstract meta.type, which admits a record; the wrapper itself refuses one. */
+        /**
+         * {@code of} is typed by the abstract meta.type, which admits an atom; the wrapper itself refuses one. A closed
+         * record is the one record in place, what an application closes to, so the wrapper reads it.
+         */
         @Test
-        void q5_real_aRecordInTheWrapperIsRefused() {
+        void q5_real_anAtomInTheWrapperIsRefusedAndARecordReads() {
             RuntimeException refused = assertThrows(RuntimeException.class, () -> model().objectReader().read(
-                    modelDoc("!slot_holder { slot: { of: !meta.record { fields: { a => { type: text } } } } }"),
-                    SlotHolder.class));
+                    modelDoc("!slot_holder { slot: { of: !meta.void_type {} } }"), SlotHolder.class));
             assertTrue(refused.getMessage().contains("declared and named"), refused::toString);
+            SlotHolder read = model().objectReader().read(
+                    modelDoc("!slot_holder { slot: { of: !meta.record { fields: { a => { type: text } } } } }"),
+                    SlotHolder.class);
+            assertInstanceOf(io.ltr8.tson.schema.meta.RecordBody.class, ((TypeInline) read.slot()).of());
         }
 
         @Test

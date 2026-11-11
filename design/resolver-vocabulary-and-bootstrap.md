@@ -151,8 +151,9 @@ one fact the entry's value does not state. An author writing it is a resolver er
   reachable through `Namespace.getAnnotations(name)`, never on the entry's value.
 - **It survives linking and the import merge**: the linker rebuilds its entry map several times and re-attaches key
   annotations at the one point every entry passes through (`withNameAnnotations`), imports included.
-- **It is the one derived key annotation.** A sugar form is written in place at its slot and an application of an open
-  record closes only into a declaration, so every entry has an author-written name and nothing else marks a key.
+- **It is the one derived key annotation.** A sugar form is written in place at its slot, and an application of an open
+  record closes into the declaration naming it or in place at its slot, so every entry has an author-written name and
+  nothing else marks a key.
 
 ## The compiled vocabulary (`SchemaResolver.Vocabulary`)
 

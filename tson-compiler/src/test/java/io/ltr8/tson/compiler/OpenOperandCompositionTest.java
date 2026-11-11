@@ -11,7 +11,6 @@ import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -227,36 +226,6 @@ class OpenOperandCompositionTest {
         assertEquals(List.of("tag", "note", "value"), closed.fields().keySet().stream().toList());
         assertEquals("text", closed.fields().values().stream().toList().get(2).typeExpr().text(),
                 "the parameter survived the refinement");
-    }
-
-    /**
-     * One template applied to another, at an absorbing position and still open. Substitution writes a bound
-     * reference through {@code WireForm.refValue}, which spells one carrying arguments as the data grammar's
-     * reference rather than as its head name, so {@code inner<T>} survives whole and the absorbing declaration's own
-     * materialisation closes it. Writing the head name alone would drop the argument list with no diagnostic.
-     */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
-    @Test
-    void anArgumentThatIsItselfAnApplicationSurvivesSubstitutionWhole() {
-        TsonCompiledSchema compiled = compile("""
-                  plain => { n: int32 }
-                  inner => <U> { u: U }
-                  box   => <T> { v: T }
-                  vip   => <T> plain & box<inner<T>>
-                  use   => vip<text>
-                """);
-
-        RecordBody closed = (RecordBody) compiled.schema().entries()
-                .get(aliasTarget(compiled, "use"));
-        String v = closed.fields().entrySet().stream().filter(f -> f.getKey().equals("v"))
-                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeExpr().text();
-
-        RecordBody held = (RecordBody) compiled.schema().entries().get(v);
-        assertEquals(List.of("u"), held.fields().keySet().stream().toList(),
-                () -> "'v' should name the inner<text> instantiation, not bare 'inner': " + v);
-        assertEquals("text", held.fields().values().stream().toList().get(0).typeExpr().text(),
-                "the argument list survived, so U closed to text");
     }
 
     /**

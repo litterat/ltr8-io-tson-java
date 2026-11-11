@@ -7,7 +7,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.tree.TsonValue;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -93,10 +92,12 @@ class DirectApplicationDeclarationTest {
                 () -> "the declaration is the only entry for this application: " + linked.schema().entries().keySet());
     }
 
-    /** A use site writing the same application reaches the declaration rather than a second entry. */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
+    /**
+     * A use site writing the same application is never looked up to the declaration (§5.10): it closes in place to a
+     * record of the same shape, with no name, and adds no entry.
+     */
     @Test
-    void aUseSiteWritingTheSameApplicationReachesTheDeclaration() {
+    void aUseSiteWritingTheSameApplicationClosesInPlace() {
         TsonLinkedSchema linked = resolve("dad4", """
                   box    => <V> { item: V }
                   bx     => box<text>
@@ -104,10 +105,11 @@ class DirectApplicationDeclarationTest {
                 """);
 
         assertEquals(List.of(), named(linked, "box_"),
-                () -> "one entry for one application: " + linked.schema().entries().keySet());
+                () -> "one entry for one declaration: " + linked.schema().entries().keySet());
         RecordBody holder = (RecordBody) linked.schema().entries().get("holder");
-        assertEquals("bx", holder.fields().values().stream().toList().get(0).typeExpr().text(),
-                "the field names the declaration, which is what the application denotes");
+        io.ltr8.tson.schema.meta.TypeInline f = assertInstanceOf(io.ltr8.tson.schema.meta.TypeInline.class,
+                holder.fields().get("f").type(), "the field holds the record in place, not the name 'bx'");
+        assertEquals(linked.schema().entries().get("bx"), f.of(), "one shape");
     }
 
     /**

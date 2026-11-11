@@ -545,13 +545,23 @@ public final class TsonSchemaLinker {
 
         private static final long serialVersionUID = 1L;
 
+        private final String subject;
         private final String trail;
         private final String name;
+        private final boolean inPlace;
+        private final boolean formNamed;
 
         UnresolvedReference(String subject, String trail, String name) {
+            this(subject, trail, name, false, false);
+        }
+
+        private UnresolvedReference(String subject, String trail, String name, boolean inPlace, boolean formNamed) {
             super(sentence(subject, trail, name));
+            this.subject = subject;
             this.trail = trail;
             this.name = name;
+            this.inPlace = inPlace;
+            this.formNamed = formNamed;
         }
 
         /** The name that resolved to nothing -- what decides which declaration wrote it. */
@@ -559,9 +569,30 @@ public final class TsonSchemaLinker {
             return name;
         }
 
+        /**
+         * Whether it surfaced inside a record an application closes to in place, whose text an open record wrote
+         * ({@link #heldDeclarationNaming}).
+         */
+        boolean inPlace() {
+            return inPlace;
+        }
+
+        /** The same fact, surfaced inside a record in place. */
+        UnresolvedReference heldInPlace() {
+            return inPlace ? this : new UnresolvedReference(subject, trail, name, true, formNamed);
+        }
+
+        /**
+         * The same fact, surfaced inside a construction written in place and named by its form, which stays its
+         * subject whichever declaration it is stated against.
+         */
+        UnresolvedReference namedByForm() {
+            return inPlace || formNamed ? this : new UnresolvedReference(subject, trail, name, false, true);
+        }
+
         /** The same fact stated against a different declaration. */
         String against(String subject) {
-            return sentence(subject, trail, name);
+            return sentence(formNamed ? this.subject : subject, trail, name);
         }
 
         private static String sentence(String subject, String trail, String name) {
@@ -571,7 +602,7 @@ public final class TsonSchemaLinker {
 
     /**
      * The declaration a <b>deferred</b> defect belongs to: the open declaration whose body wrote the name, when
-     * the entry that failed is one this resolver derived.
+     * the failure surfaced inside a record an application closed to in place, or in an entry this resolver derived.
      *
      * <p><b>Deferral is what makes this necessary.</b> A closed declaration's references are checked where the
      * author wrote them. An open record's are not -- nothing about them can be settled until an application
@@ -579,30 +610,40 @@ public final class TsonSchemaLinker {
      * declaration and one verdict per applier instead, each against a line that is not wrong and does not
      * contain the name. Deferred checking is survivable only if the author is sent to the line they can edit.
      *
-     * <p><b>The offending name is the evidence, not the entry.</b> Walking back the derived entry's derivation
-     * cannot answer this: a sugar lift's constructor is no author's. Asking instead which open record <em>mentions
-     * the name</em> reaches the template directly, and reaches nothing at all when the name came from an argument the
-     * applier wrote -- {@code box<some_typo>} keeps its existing verdict at the application, which is where that
+     * <p><b>The offending name is the evidence.</b> Asking which open record <em>mentions the name</em>, a type it
+     * holds in place included, reaches the template directly, and reaches nothing at all when the name came from an
+     * argument the applier wrote -- {@code box<some_typo>} keeps its verdict at the application, which is where that
      * mistake is.
      *
-     * <p><b>Both filters are load-bearing.</b> Only a derived entry is retargeted, or a closed declaration's
-     * own typo would be blamed on any template that happens to name it; and only an open record is a candidate, since
-     * a defect no open record deferred is already located correctly.
+     * <p><b>Both filters are load-bearing.</b> Only a failure inside a record in place, or in a derived entry, is
+     * retargeted, or a closed declaration's own typo would be blamed on any template that happens to name it; and
+     * only an open record is a candidate, since a defect no open record deferred is already located correctly.
      *
      * @return the declaration to blame, or {@code null} to leave the failure where it surfaced
      */
-    private static String heldDeclarationNaming(String name, String failed, Map<String, Top> entries,
-                                                 Map<String, TsonSchema.EntryFacts> facts) {
-        if (at(facts, failed).isPresent()) {
-            return null; // the author's own declaration: it already names the line they wrote
+    private static String heldDeclarationNaming(UnresolvedReference failure, String failed,
+                                                 Map<String, Top> entries, Map<String, TsonSchema.EntryFacts> facts) {
+        if (at(facts, failed).isPresent() && !failure.inPlace()) {
+            return null; // the author's own text: it already names the line they wrote
         }
         for (Map.Entry<String, Top> candidate : entries.entrySet()) {
             if (at(facts, candidate.getKey()).isPresent() && OpenEntry.isOpen(candidate.getValue())
-                    && OpenEntry.names(candidate.getValue()).contains(name)) {
+                    && writes(candidate.getValue(), failure.name())) {
                 return candidate.getKey();
             }
         }
         return null;
+    }
+
+    /** Whether the open record {@code open} writes {@code name}, in a reference or inside a type it holds in place. */
+    private static boolean writes(Top open, String name) {
+        Set<String> named = new LinkedHashSet<>(OpenEntry.names(open));
+        ((RecordBody) open).fields().values().forEach(field -> {
+            if (field.type() instanceof TypeInline inline) {
+                collectBodyNames(inline.of(), named);
+            }
+        });
+        return named.contains(name);
     }
 
     /** One entry's failure, reported when there is a receiver and rethrown as a schema error when there is not. */
@@ -765,7 +806,7 @@ public final class TsonSchemaLinker {
                 if (pending.contains(e.name())) {
                     continue; // a declaration not yet ready: judged when the whole schema links
                 }
-                String author = heldDeclarationNaming(e.name(), entry.getKey(), merged, facts);
+                String author = heldDeclarationNaming(e, entry.getKey(), merged, facts);
                 if (author == null) { // the applier's own text, or a name no open record wrote: blame the entry
                     reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged, facts), facts,
                             e.getMessage(), e);
@@ -1642,7 +1683,7 @@ public final class TsonSchemaLinker {
      */
     private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
                                                  Map<String, Top> namespace) {
-        // A type written in place is a container, a tuple, a choice or a reference, never void.
+        // A type written in place is a container, a tuple, a choice, a reference or a record, never void.
         for (TypeRef variant : choice.variants().stream().flatMap(v -> TypeExpr.named(v).stream()).toList()) {
             if (AliasChain.resolvesToVoid(variant.name(), namespace)) {
                 throw new SchemaValidationException("'" + entryName + "' has a variant"
@@ -2049,14 +2090,22 @@ public final class TsonSchemaLinker {
 
     /**
      * What a type slot holds, validated: a name as {@link #validateTypeRef} judges it, and a type written in place
-     * as its body would be judged as an entry, under the entry that holds it.
+     * as its body would be judged as an entry, named in a message by its form as written ({@code [some_typo]},
+     * {@code box<some_typo>}, [TSON-SCHEMA] §8.2) and reported against the entry that holds it. An unresolved name
+     * inside a record in place is marked so, its text being an open record's ({@link #heldDeclarationNaming}).
      */
     private static void validateSlot(TypeExpr type, Map<String, Top> namespace,
                                      Function<String, Optional<String>> constructors, String subject, String trail,
                                      Function<String, String> shown, ValuesByName byName) {
         switch (type) {
             case TypeRef reference -> validateTypeRef(reference, namespace, constructors, subject, trail);
-            case TypeInline inline -> validateBody(subject, inline.of(), namespace, constructors, shown, byName);
+            case TypeInline inline -> {
+                try {
+                    validateBody(inline.text(), inline.of(), namespace, constructors, shown, byName);
+                } catch (UnresolvedReference e) {
+                    throw inline.of() instanceof RecordBody ? e.heldInPlace() : e.namedByForm();
+                }
+            }
         }
     }
 

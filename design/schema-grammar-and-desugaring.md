@@ -72,7 +72,8 @@ does ([TSON-SCHEMA] §3.4.1).
   declares nor imports is the linker's unresolved reference, and a container sugar form over one of the enclosing
   template's own parameters is the application it spells, or refused (`design/desugaring-open-forms-and-templates.md`).
 - **Identity is structural.** Two constructions written in place are one type when their constructor and fields are
-  equal, compared as values (`TypeInline`'s record equality), so `[T; 3]` and `[T; 3..3]`, and a radix-spelled bound and
+  equal, compared as values (`TypeInline.equals`, which leaves out the application a record in place is named by and
+  the annotations on its field keys), so `[T; 3]` and `[T; 3..3]`, and a radix-spelled bound and
   its decimal, are one construction. Nothing is named, so nothing is hashed. The constructor is held on the
   `TypeInline` beside its body (`TypeInline.constructor`, `@Unbound`: the tag on `of`, no field of the wrapper), the
   entry the construction applies past its alias hops, so `nonempty_type<uuid>` and `[uuid; 1..]` are two types though

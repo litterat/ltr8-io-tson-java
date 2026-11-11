@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -353,7 +352,6 @@ class ImportedVocabularyTest {
      * template -- is a type of the schema importing it, and an application of a template there is judged by its
      * arity as any other.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void anImportedNameResolvesWhetherOrNotItIsApplied() {
         record Reference(String label, String declaration) {

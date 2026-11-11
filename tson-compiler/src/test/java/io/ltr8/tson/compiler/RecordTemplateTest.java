@@ -13,31 +13,32 @@ import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.util.List;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * §5.10 materialisation for <b>record</b> templates -- the form whose parameters occupy field types and
- * field values. Applying one closes it: the arguments are substituted into the template's recorded open
- * form and the application is replaced by a reference to the entry that results
- * ({@code TemplateMaterialiser}).
+ * §5.10 materialisation for <b>record</b> templates -- the form whose parameters occupy field types. Applying one
+ * closes it: the arguments are substituted into the open record, under the declaration that names the application,
+ * or in place at the type slot that wrote it ({@code TemplateMaterialiser}).
  *
- * <p>A template whose body writes a §5.3 container sugar form closes here too, by the other path: the form
- * lifts to an open synthetic and the application closes it into an ordinary container entry. The shape of
- * what it closes into is {@code ContainerSugarEndToEndTest}'s; what these fixtures pin is that applying such
- * a template works at all, and that a value parameter reaches the slot it was written for.
+ * <p>A template whose body writes a §5.3 container sugar form closes here too: a form over a parameter is held as the
+ * application it spells and closes to its construction in place when the template is applied. The shape of what it
+ * closes into is {@code ContainerSugarEndToEndTest}'s; what these fixtures pin is that applying such a template works
+ * at all, and that a parameter reaches the slot it was written for.
  */
 class RecordTemplateTest {
 
@@ -63,192 +64,215 @@ class RecordTemplateTest {
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
-    /** The entry a field's type names -- how every fixture here reaches the materialised instantiation. */
-    private static String fieldType(TsonCompiledSchema compiled, String record, String field) {
-        RecordBody body = (RecordBody) compiled.schema().entries().get(record);
-        return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
-                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeExpr().text();
-    }
-
     private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
         RecordBody body = (RecordBody) compiled.schema().entries().get(entry);
         return body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
-    /**
-     * The records this schema minted for applications of {@code head}: an application nothing declares is its
-     * expansion, a synthetic record (§5.10), and one whose expansion names itself keeps an instantiation entry
-     * recording {@code head}. The fixtures apply one record template each, so every synthetic record is one.
-     */
+    /** The record a field's type holds in place, where an application of an open record closed. */
+    private static TypeInline inPlace(TsonCompiledSchema compiled, String record, String field) {
+        return assertInstanceOf(TypeInline.class, fieldOf(compiled, record, field).type(), record + "." + field);
+    }
+
+    /** The field {@code field} of the record a type written in place holds. */
+    private static RecordField fieldOf(TypeInline inPlace, String field) {
+        return ((RecordBody) inPlace.of()).fields().get(field);
+    }
+
+    /** Every entry a schema holds that records an application of {@code head} on its key (§8.2). */
     private static List<String> instantiationsOf(TsonCompiledSchema compiled, String head) {
         var schema = compiled.schema();
         return schema.entries().keySet().stream()
-                .filter(n -> schema.entries().get(n) instanceof RecordBody && schema.positionOf(n).isEmpty()
-                        && schema.applicationOf(n).filter(applied -> applied.name().equals(head)).isPresent())
+                .filter(n -> schema.applicationOf(n).filter(applied -> applied.name().equals(head)).isPresent())
                 .sorted().toList();
     }
 
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
+    /**
+     * An application at a field closes in place (§5.10): the substituted record, closed, with no name and no chain,
+     * held at the field, and nothing added to the schema for it.
+     */
     @Test
-    void aFieldPositionApplicationMaterialisesAnEntryAndReferencesIt() {
+    void aFieldPositionApplicationClosesInPlace() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
 
-        List<String> made = instantiationsOf(compiled, "box");
-        assertEquals(1, made.size(), () -> "expected one instantiation, got " + made);
-        assertEquals(made.get(0), fieldType(compiled, "holder", "b"), "the field references it by name");
-
-        Top entry = compiled.schema().entries().get(made.get(0));
-        assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, made.get(0), "v").type(), "T := text");
+        TypeInline b = inPlace(compiled, "holder", "b");
+        RecordBody record = assertInstanceOf(RecordBody.class, b.of());
+        assertEquals(List.of(), OpenEntry.parameterNames(record), "closed -- §5.10");
+        assertEquals(TypeChain.EMPTY, record.chain(), "no chain");
+        assertEquals(TypeRef.of("text"), fieldOf(b, "v").type(), "T := text");
+        assertEquals("box<text>", b.text(), "named in a message by the application as written");
+        assertEquals(List.of(), instantiationsOf(compiled, "box"), "nothing minted, nothing recorded");
     }
 
     /**
-     * An application nothing declares is its expansion (§5.10): a synthetic record that records no
-     * application. A declaration naming the application records it, flattened, on its key (§8.2).
+     * A record in place records no application (§8.1); a declaration naming the application records it on its key
+     * (§8.2).
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
-    void aMintedRecordIsItsExpansionAndADeclaredOneRecordsItsApplication() {
+    void aRecordInPlaceRecordsNoApplicationAndADeclaredOneDoes() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   holder => { b: box<int32> }
                   tb     => box<text>""");
 
-        String minted = instantiationsOf(compiled, "box").get(0);
-        assertTrue(compiled.schema().applicationOf(minted).isEmpty(), "a minted expansion records no application");
+        assertEquals(List.of("tb"), instantiationsOf(compiled, "box"));
         TypeRef source = compiled.schema().applicationOf("tb").orElseThrow();
         assertEquals("box", source.name());
         assertEquals(List.of(TypeRef.of("text")), source.arguments());
     }
 
     /**
-     * A minted record is a member of nothing, so composing an application only a use site mints gives it no edge
-     * to refuse: {@code vip<text>} beside a use site's {@code box<text>} loads, IS-A neither.
+     * A record in place is a member of nothing, so composing an application no declaration names gives it no edge
+     * to refuse: {@code vip<text>} beside a use site's {@code box<text>} loads, carrying no chain.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
-    void aMintedRecordComposingAMintedApplicationIsAMemberOfNothing() {
+    void aRecordInPlaceComposingAnUndeclaredApplicationIsAMemberOfNothing() {
         TsonCompiledSchema compiled = compile("""
                   box    => <T> { v: T }
                   vip    => <T> box<T> & { extra: text }
                   holder => { u: vip<text>  w: box<text> }""");
 
-        RecordBody vip = (RecordBody) compiled.schema().entries().get(fieldType(compiled, "holder", "u"));
-        assertEquals(List.of(), vip.supertypes());
+        assertEquals(TypeChain.EMPTY, inPlace(compiled, "holder", "u").of().chain());
     }
 
-    /** Two record templates with one field list expand to one record: the application is its expansion. */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
+    /**
+     * Two open records with one field list close to equal records, one type by §8.2's structural identity, each
+     * named in a message by its own application.
+     */
     @Test
-    void twoTemplatesExpandingToOneRecordShareOneEntry() {
+    void twoOpenRecordsClosingToOneRecordAreOneType() {
         TsonCompiledSchema compiled = compile("""
                   box    => <T> { v: T }
                   crate  => <T> { v: T }
                   holder => { a: box<int32>  b: crate<int32> }""");
 
-        assertEquals(fieldType(compiled, "holder", "a"), fieldType(compiled, "holder", "b"));
+        TypeInline a = inPlace(compiled, "holder", "a");
+        TypeInline b = inPlace(compiled, "holder", "b");
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+        assertEquals("box<int32>", a.text());
+        assertEquals("crate<int32>", b.text());
     }
 
-    /** Two applications with the same arguments are one entry, wherever in the schema they appear (§8.2). */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
+    /** Two applications with the same arguments close to one type, wherever in the schema they appear (§8.2). */
     @Test
-    void twoIdenticalApplicationsShareOneEntry() {
+    void twoIdenticalApplicationsAreOneType() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   first  => { b: box<text> }
                   second => { c: box<text> }""");
 
-        assertEquals(1, instantiationsOf(compiled, "box").size());
-        assertEquals(fieldType(compiled, "first", "b"), fieldType(compiled, "second", "c"));
+        assertEquals(inPlace(compiled, "first", "b"), inPlace(compiled, "second", "c"));
+        assertEquals(List.of(), instantiationsOf(compiled, "box"));
     }
 
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
-    void differentArgumentsGiveDifferentEntries() {
+    void differentArgumentsGiveDifferentTypes() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   holder => { a: box<text>  b: box<int32> }""");
 
-        assertEquals(2, instantiationsOf(compiled, "box").size());
+        assertNotEquals(inPlace(compiled, "holder", "a"), inPlace(compiled, "holder", "b"));
     }
 
     /**
-     * A declaration naming the application <b>is</b> the instantiation entry, not a hop to a content-named
-     * one (§8.2) -- so a {@code box<text>} written elsewhere resolves to that
-     * declaration rather than minting a second entry, and one entry serves both under the author's name.
+     * An application at a slot is never looked up to a declaration (§5.10): {@code b: box<text>} beside {@code
+     * text_box => box<text>} closes in place, a type of the same shape that is not {@code text_box}.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
-    void aDeclarationPositionApplicationIsTheEntryEveryUseSiteReaches() {
+    void aUseSiteApplicationIsNeverLookedUpToItsDeclaration() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   text_box => box<text>
                   holder => { b: box<text> }""");
 
-        assertEquals(List.of(), instantiationsOf(compiled, "box"),
-                () -> "nothing is minted beside the declaration: " + instantiationsOf(compiled, "box"));
-        assertEquals("text_box", fieldType(compiled, "holder", "b"),
-                "the use site names the declaration the application denotes");
+        TypeInline b = inPlace(compiled, "holder", "b");
+        assertEquals(compiled.schema().entries().get("text_box"), b.of(), "one shape");
+        assertEquals(List.of("text_box"), instantiationsOf(compiled, "box"));
         assertEquals(TypeRef.of("text"), fieldOf(compiled, "text_box", "v").type(), "T := text");
     }
 
-    /** An inner application closes before the outer one names it, so nesting needs no special case. */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
-    @Test
-    void anApplicationMayBeAnArgumentToAnother() {
-        TsonCompiledSchema compiled = compile("""
-                  box => <T> { v: T }
-                  holder => { b: box<box<text>> }""");
-
-        assertEquals(2, instantiationsOf(compiled, "box").size());
-        String outer = fieldType(compiled, "holder", "b");
-        String inner = fieldOf(compiled, outer, "v").typeExpr().text();
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, inner, "v").type());
-    }
-
     /**
-     * Every position that can write an application resolves its arguments the same way -- a field, a
-     * declaration body, and a refinement source all share one resolver. Pinned because they did not: a
-     * nested-application argument resolved at a declaration position and was rejected at a field position.
+     * Regular recursion ties the knot at the declaration closing it (§5.10.1): the recursive application reached
+     * while substituting names that declaration, and the same application at a use site, with no declaration
+     * closing it, is refused.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
-    void aDeclarationPositionApplicationTakesTheSameArgumentFormsAsAFieldOne() {
+    void aRecursiveTemplateTiesTheKnotThroughItsDeclaration() {
         TsonCompiledSchema compiled = compile("""
-                  box     => <T> { v: T }
-                  nested  => box<box<text>>""");
+                  chain      => <T> { head: T  tail?: chain<T>? }
+                  text_chain => chain<text>
+                  use        => { c: text_chain }""");
 
-        // The outer application is the declaration itself (#15); only the inner `box<text>`, which no
-        // declaration names, is still minted.
-        assertEquals(1, instantiationsOf(compiled, "box").size(),
-                () -> "the inner box is minted, the outer is `nested`: " + instantiationsOf(compiled, "box"));
-        assertEquals(instantiationsOf(compiled, "box").get(0), fieldOf(compiled, "nested", "v").typeExpr().text(),
-                "the outer's field names the inner entry");
-    }
-
-    /**
-     * Regular recursion ties the knot: the recursive application reached while substituting denotes the
-     * entry currently under construction, referenced by its internal name before that entry is complete.
-     */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
-    @Test
-    void aRecursiveTemplateTiesTheKnotThroughTheEntryUnderConstruction() {
-        TsonCompiledSchema compiled = compile("""
+        assertEquals(TypeRef.of("text_chain"), fieldOf(compiled, "text_chain", "tail").type(),
+                "the tail names the declaration it sits in");
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
                   chain => <T> { head: T  tail?: chain<T>? }
-                  use => { c: chain<text> }""");
+                  use   => { c: chain<text> }"""));
+        assertTrue(thrown.getMessage().contains("'chain<text>' applies the recursive open record 'chain'"),
+                thrown.getMessage());
+    }
 
-        List<String> made = instantiationsOf(compiled, "chain");
-        assertEquals(1, made.size(), () -> "one entry, not an infinite family: " + made);
-        assertEquals(made.get(0), fieldOf(compiled, made.get(0), "tail").typeExpr().text(),
-                "the tail references the entry it sits in");
+    /**
+     * Mutual recursion through a record in place ties to the declaration being closed (§5.10.1): closing {@code
+     * a_text} closes {@code b: b<text>} in place, and the {@code a<text>} it holds names {@code a_text}. The same
+     * application at a slot, with nothing closing it, is refused however many declarations exist; the open records
+     * alone, applied nowhere, load.
+     */
+    @Test
+    void mutualRecursionTiesToTheDeclarationOrIsRefused() {
+        String templates = """
+                  a => <T> { v: T  b: b<T> }
+                  b => <T> { a?: a<T> }
+                """;
+        TsonCompiledSchema closed = compile(templates + "  a_text => a<text>");
+        TypeInline b = inPlace(closed, "a_text", "b");
+        assertEquals(TypeRef.of("a_text"), fieldOf(b, "a").type());
+        assertNotNull(closed.get("a_text").read(TestDocuments.document("{ v: x  b: { a: { v: y  b: {} } } }")));
+
+        SchemaValidationException atASlot = assertThrows(SchemaValidationException.class,
+                () -> compile(templates + "  a_text => a<text>\n  holder => { f: b<text> }"));
+        assertTrue(atASlot.getMessage().contains("'b<text>' applies the recursive open record 'b'"),
+                atASlot.getMessage());
+        assertNotNull(compile(templates));
+    }
+
+    /** A mutual recursion every step of which is required describes no finite value, and is refused (§5.10.1). */
+    @Test
+    void anUnguardedMutualRecursionThroughARecordInPlaceIsUnproductive() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
+                  a      => <T> { v: T  b: b<T> }
+                  b      => <T> { a: a<T> }
+                  a_text => a<text>"""));
+        assertTrue(thrown.getMessage().contains("a_text"), thrown.getMessage());
+    }
+
+    /**
+     * An application whose applied parent a declaration names would close in place to a member of that declaration
+     * (§5.2), and is refused, in whichever order the declarations stand and wherever the application is left.
+     */
+    @Test
+    void anApplicationJoiningADeclaredApplicationIsRefusedInEitherOrder() {
+        String templates = """
+                  animal_of => <T> { a: T }
+                  dog_of    => <T> animal_of<T> & { d: text }
+                  kennel_of => <T> { k: dog_of<T> }
+                """;
+        for (String declarations : List.of(
+                "  animal_text => animal_of<text>\n  kt => kennel_of<text>",
+                "  kt => kennel_of<text>\n  animal_text => animal_of<text>",
+                "  animal_text => animal_of<text>\n  kt => { k: dog_of<text> }",
+                "  kt => { k: dog_of<text> }\n  animal_text => animal_of<text>")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> compile(templates + declarations), declarations);
+            assertTrue(thrown.getMessage().contains("IS-A 'animal_text'"), thrown.getMessage());
+        }
     }
 
     /** The whole arc: a materialised template reads real data. */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aMaterialisedTemplateReadsRealData() {
         TsonCompiledSchema compiled = compile("""
@@ -267,7 +291,6 @@ class RecordTemplateTest {
     //    template, so the template that holds it applies like any other. Only a form written over one of
     //    the declaration's own parameters has to wait for the open representation.
 
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aConcreteSugarFormInsideATemplateLiftsAndTheTemplateApplies() {
         TsonCompiledSchema compiled = compile("""
@@ -275,14 +298,12 @@ class RecordTemplateTest {
                   tmpl  => <T> { a: T  b: [order] }
                   use   => { u: tmpl<text> }""");
 
-        assertEquals(1, instantiationsOf(compiled, "tmpl").size());
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, fieldType(compiled, "use", "u"), "a").type());
+        assertEquals(TypeRef.of("text"), fieldOf(inPlace(compiled, "use", "u"), "a").type());
         assertNotNull(compiled.get("use")
                 .read(TestDocuments.document("{ u: { a: \"x\"  b: [ { id: \"1\" } ] } }")));
     }
 
     /** Every sugar form, not just the array: choice, map, and a nested bracket form all lift concretely. */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void everyConcreteSugarFormLiftsFromATemplateBody() {
         for (String field : List.of("[order]", "(order | text)", "[[order]]", "{text => order}")) {
@@ -294,22 +315,18 @@ class RecordTemplateTest {
     }
 
     /**
-     * The lifted entry is an ordinary one, so it is the same entry a directly written `[order]` produces
-     * anywhere else in the schema -- the cross-channel dedup that makes lifting concrete forms eagerly the
-     * right move rather than merely a convenient one.
+     * A form closed in an open record is the same type a directly written {@code [order]} is anywhere else in the
+     * schema: two equal constructions written in place are one type (§8.2), with no entry for either.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
-    void aFormLiftedFromATemplateIsTheSameEntryADirectOneProduces() {
+    void aFormClosedInATemplateIsTheSameTypeADirectOneIs() {
         TsonCompiledSchema compiled = compile("""
                   order => { id: text }
                   tmpl  => <T> { a: T  b: [order] }
                   plain => { c: [order] }
                   use   => { u: tmpl<text> }""");
 
-        assertEquals(1, compiled.schema().entries().keySet().stream()
-                .filter(n -> n.startsWith("array_order_")).count(),
-                () -> "one array_order entry, shared: " + compiled.schema().entries().keySet());
+        assertEquals(fieldOf(compiled, "plain", "c").type(), fieldOf(inPlace(compiled, "use", "u"), "b").type());
     }
 
     /**
@@ -317,19 +334,20 @@ class RecordTemplateTest {
      * application: the field ends up naming an ordinary container entry. {@code ApplicationInContainerPositionTest}
      * carries the shape of what it closes into; here the point is only that applying the template is accepted.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aParameterBearingSugarFormClosesWithTheApplication() {
-        for (String field : List.of("[T]", "{text => T}", "nonempty<T>")) {
+        for (List<String> form : List.of(List.of("[T]", "[ \"x\" ]"), List.of("{text => T}", "{ k => \"x\" }"),
+                List.of("nonempty<T>", "[ \"x\" ]"))) {
+            String field = form.get(0);
             TsonCompiledSchema compiled = compile("""
                       nonempty => meta.array ^ { min_items?: = 1 }
                       tmpl     => <T> { a: %s }
                       use      => { u: tmpl<text> }""".formatted(field));
 
-            Top closed = compiled.schema().entries()
-                    .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a"));
-            assertEquals(List.of(), OpenEntry.parameterNames(closed), () -> field + " closes to a usable entry");
-            assertNotNull(compiled.get(fieldType(compiled, "use", "u")), field);
+            assertInstanceOf(TypeInline.class, fieldOf(inPlace(compiled, "use", "u"), "a").type(),
+                    () -> field + " closes to its construction in place");
+            assertNotNull(compiled.get("use").read(TestDocuments.document("{ u: { a: " + form.get(1) + " } }")),
+                    field);
         }
     }
 
@@ -337,7 +355,6 @@ class RecordTemplateTest {
      * The whole arc for a refined constructor applied over a parameter: held in the open record, constructed when the
      * record is applied, compiled, and reading real data -- and rejecting data the constructor's own pins refuse.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void anOpenFormClosedByAnApplicationReadsRealData() {
         TsonCompiledSchema compiled = compile("""
@@ -357,7 +374,6 @@ class RecordTemplateTest {
      * an identifier family -- and {@code keyed<int32>} is where it stops being one, because substitution is what
      * finally hands {@code key_type} something to judge.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void anArgumentTheSlotCannotTakeIsReportedAtTheApplication() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -402,7 +418,6 @@ class RecordTemplateTest {
      * tightens anything: the field carries the argument, never an unresolved reference to a parameter the
      * author did not write.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void refiningAnApplicationTightensTheClosedEntrysFields() {
         TsonCompiledSchema compiled = compile("""
@@ -413,17 +428,20 @@ class RecordTemplateTest {
         assertEquals("fixed", fieldOf(compiled, "pinned", "v").value().orElseThrow().text());
     }
 
-    /** Both positions reach the same entry the ordinary type positions do -- one application, one entry. */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
+    /**
+     * An absorbing position takes the fields and names nothing, and an ordinary position closes the same application
+     * in place: neither adds an entry.
+     */
     @Test
-    void anAbsorbingPositionSharesTheEntryWithAnOrdinaryOne() {
+    void anAbsorbingPositionAndAnOrdinaryOneAddNoEntry() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   vip => box<text> & { extra: text }
                   holder => { b: box<text> }""");
 
-        assertEquals(1, instantiationsOf(compiled, "box").size());
-        assertEquals(instantiationsOf(compiled, "box").get(0), fieldType(compiled, "holder", "b"));
+        assertEquals(List.of(), instantiationsOf(compiled, "box"));
+        assertEquals(TypeRef.of("text"), fieldOf(inPlace(compiled, "holder", "b"), "v").type());
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, "vip", "v").type());
     }
 
     /**
@@ -433,7 +451,6 @@ class RecordTemplateTest {
      * OpenOperandCompositionTest} carries the rest, including what such an operand does <em>not</em>
      * contribute -- its own name, a template being no type.
      */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void composingWithAnApplicationThatIsStillOpenAbsorbsItsFieldsAndKeepsTheParameter() {
         TsonCompiledSchema compiled = compile("""
@@ -441,10 +458,9 @@ class RecordTemplateTest {
                   vip => <T> box<T> & { extra: text }
                   holder => { u: vip<text> }""");
 
-        String use = fieldType(compiled, "holder", "u");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, use, "v").type(),
-                "absorbed from box<T> while open, closed with vip");
-        assertEquals(TypeRef.of("text"), fieldOf(compiled, use, "extra").type());
+        TypeInline use = inPlace(compiled, "holder", "u");
+        assertEquals(TypeRef.of("text"), fieldOf(use, "v").type(), "absorbed from box<T> while open, closed with vip");
+        assertEquals(TypeRef.of("text"), fieldOf(use, "extra").type());
     }
 
     /**
@@ -505,13 +521,13 @@ class RecordTemplateTest {
         assertTrue(thrown.getMessage().contains("does not pass 'T' through unchanged"), thrown.getMessage());
     }
 
-    /** Regular recursion, by contrast, closes at one entry -- the contrast is the point of the rule. */
-    @Disabled("Phase 2: an undeclared application of an open record closes in place")
+    /** Regular recursion, by contrast, closes into its declaration -- the contrast is the point of the rule. */
     @Test
     void regularRecursionClosesWhereNonRegularDoesNot() {
-        assertEquals(1, instantiationsOf(compile("""
-                  chain => <T> { head: T  tail?: chain<T>? }
-                  use => { c: chain<text> }"""), "chain").size());
+        assertEquals(List.of("text_chain"), instantiationsOf(compile("""
+                  chain      => <T> { head: T  tail?: chain<T>? }
+                  text_chain => chain<text>
+                  use        => { c: text_chain }"""), "chain"));
     }
 
     /** Applying arguments to something that declares none stays the author's error, wherever it is caught. */

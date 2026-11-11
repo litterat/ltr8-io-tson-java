@@ -134,16 +134,17 @@ class ApplicationWhereANameStandsTest {
         assertEquals(List.of(), problems("  text_node => node<text>\n  r => { f: text_node }"));
     }
 
-    // ── The gap that stays a gap ────────────────────────────────────────────────────────────────
+    // ── Where an application closes in place ──────────────────────────────────────────────────
 
-    /** An application of an open record at a type slot closes in place, which this library does not yet do. */
+    /**
+     * An application of an open record at a type slot closes in place ([TSON-SCHEMA] §5.10): at a field, inside a
+     * construction, and left in an open record's body by applying it. None is a refusal or a gap.
+     */
     @Test
-    void anApplicationAtATypeSlotIsStillNotImplemented() {
+    void anApplicationAtATypeSlotClosesInPlace() {
         for (String declarations : List.of("  r => { f: page<order> }", "  r => { f: [box<text>] }",
                 "  pg => <T> { cursor: box<T> }\n  pt => pg<text>")) {
-            List<Diagnostic> problems = problems(declarations);
-            assertEquals(1, problems.size(), problems::toString);
-            assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code(), problems::toString);
+            assertEquals(List.of(), problems(declarations), declarations);
         }
     }
 }
