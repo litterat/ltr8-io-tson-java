@@ -20,7 +20,8 @@ derived — and the static check that runs before any of it.
 - An application over a **constructor** (`construction`, `design/constructor-application.md`) is the construction
   written in place at a type slot: construction sugar builds the binding record the braced form writes, the
   constructor's reader reads it, the body is walked so each argument closes where it landed (a nested constructor's
-  application, which an open record holds for `{text => [T]}`, in place too), and the slot holds `TypeInline` of it.
+  application, which an open record holds for `{text => [T]}`, in place too), and the slot holds `TypeInline` of it,
+  under the head past its alias hops (`pair_of<int32>` under `pair_of`, `set<text>` under `meta.set_type`).
   Only a container, a tuple, a choice or a reference is written in place; any other construction is refused, to be
   declared. At a slot that holds a name, a construction is refused.
 - An application of an **open record** closes into the declaration that names it (`closeApplicationInto`): the

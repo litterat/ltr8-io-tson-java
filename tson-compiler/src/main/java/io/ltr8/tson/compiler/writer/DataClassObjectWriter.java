@@ -29,6 +29,7 @@ import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.SiblingRef;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -192,6 +193,16 @@ public final class DataClassObjectWriter {
                 } else {
                     writer.quotedString(reference.text());
                 }
+                return;
+            }
+            if (value instanceof TypeInline inline) {
+                // A type written in place is the untagged wrapper the kernel declares, `{ of: ... }`, and its body
+                // goes under the constructor that built it, which the body's class cannot say: `set<T>` is
+                // `{ of: !meta.set_type { ... } }`, not the `!meta.array` its class names.
+                writer.beginRecord();
+                writer.field("of");
+                write(inline.of(), context.getDescriptor(inline.of().getClass()), writer, inline.constructor());
+                writer.endRecord();
                 return;
             }
             if (value instanceof SiblingRef sibling) {
@@ -488,8 +499,10 @@ public final class DataClassObjectWriter {
      * flexibility doesn't obligate a writer to be equally flexible about its own single output.
      */
     private void writeUnion(Object value, DataClassUnion dataClass, TsonDataEmitter writer) throws Throwable {
-        if (value instanceof Namespace<?> || value instanceof ValueEntry) {
-            write(value, dataClass, writer, null); // names its own type, which no class does
+        if (value instanceof Namespace<?> || value instanceof ValueEntry || value instanceof TypeInline) {
+            // A namespace and a value entry name their own type, which no class does; a type written in place is
+            // untagged, recovered by its brace.
+            write(value, dataClass, writer, null);
             return;
         }
         Class<?> memberClass = value.getClass();

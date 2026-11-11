@@ -118,7 +118,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             // which collects a record's arguments through their bridges, is the step a schema-driven read replaces.
             TsonTypeReader<?> rebound = BindTargets.to(field.parser(), target.dataClass(),
                     "field '" + field.name() + "'", "component '" + target.name() + "'",
-                    new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches), true);
+                    new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches,
+                            written -> io.ltr8.tson.compiler.resolver.AliasChain.terminal(written,
+                                    context.schema().entries()::get)), true);
             if (rebound != field.parser()) {
                 fields.set(i, new CompiledField(field.name(), field.schema(), rebound));
             }

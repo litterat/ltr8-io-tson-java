@@ -28,13 +28,20 @@ choices. Current form only; history lives in git.
   `TsonTypeReaderResolver.resolve(TypeExpr)`, a name's entry reader or one built from the construction's body through
   its constructor's factory (`TsonSchemaCompiler.InlineReaders`), memoised by the construction in `CompiledReaders`
   (equal constructions share one, a cache and no entry) and buildable after the rebind, since the builder holds the
-  factories and the linked schema, never the `Compilation`. It is named for a message by its form (`[text]`), carries
-  no tag in a tree (`ValueReaderContext.tagOf`), and its §7.2 guard admits no tag. `tson-json` builds its own the
-  same way (`JsonSchemaCompiler.InlineReaders`).
-- In bind mode a component typed `TypeExpr` or `FieldTypeExpr` at a type slot's choice reads a name through the
-  `TypeNameSlotReader` a `TypeRef` component gets (`NamedDispatchReader.recoveringWith`), so the annotations written
-  on the name are kept; a natural reader's guess at an inline type's host class is its constructor's shape
-  (`BindTargets.hostType`).
+  factories and the linked schema, never the `Compilation`. Equality includes the constructor, so `pair_of<int32>` and
+  `[int32; 1..2]` are two readers. It is named for a message by its form as written (`TypeInline.text()`: `[text]`,
+  `set<text>`, `pair_of<int32>`), which `ValueReaderContext.displayName`/`authoredName` pass through for a name that
+  is no entry rather than re-render from the body, which cannot say which constructor built it. It carries no tag in
+  a tree (`ValueReaderContext.tagOf`), and its §7.2 guard admits no tag. `tson-json` builds its own the same way
+  (`JsonSchemaCompiler.InlineReaders`).
+- In bind mode a component typed `TypeExpr` or `FieldTypeExpr` at a type slot's choice reads an untagged value through
+  readers of its own (`NamedDispatchReader.recoveringWith`): a name through the `TypeNameSlotReader` a `TypeRef`
+  component gets, so the annotations written on the name are kept, and the `{ of: !C { … } }` wrapper through
+  `TypeInlineReader`, which looks ahead for `C` -- the tag on `of`, no field of the wrapper -- and records it, past its
+  alias hops, on the `TypeInline` the wrapper's own reader built. A natural reader's guess at an inline type's host
+  class is its constructor's shape (`BindTargets.hostType`).
+- The writer (`DataClassObjectWriter`) writes a `TypeInline` as the untagged wrapper with its body under the recorded
+  constructor, `{ of: !meta.set_type { … } }`, never under the `@Typename` of the body's class.
 - A bind lookup redirects through an alias only for a derived entry (one with no source position).
 
 Related: `design/linking-and-compilation.md`, `design/choice-disjointness.md`, `design/compiled-registries.md`,

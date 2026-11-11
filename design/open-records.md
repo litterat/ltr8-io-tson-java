@@ -86,7 +86,10 @@ open record, and the bodies refused), `design/schema-resolution.md` (`openRecord
 - **The explicit spelling** `<T> !meta.record { … }` is read through `record`'s own reader (`openRecord`): first the
   author's terms -- a binding `record` does not declare (`checkTemplateBindings`), a parameter at a slot that names no
   type (`ParameterTypes.checkSlots`, the one walk left over a payload; a positional field `item => T` is its
-  `record_field`'s type), a literal beside a parameter-typed field (`refuseLiteralOnParameter`) -- then the
+  `record_field`'s type; a `{ of: !C { … } }` wrapper is walked against `C`'s vocabulary, where a parameter at a type
+  slot is not yet supported, `UnsupportedOperationException`, since neither `RecordBody`'s scoping nor `Substitution`
+  reaches inside a type written in place, and one at a scalar slot is refused as anywhere else), a literal beside a
+  parameter-typed field (`refuseLiteralOnParameter`) -- then the
   declaration's parameters are added as `parameters` and the payload bound. A construction writing `parameters`
   itself is refused (`refuseWrittenParameters`): the list before the body is what puts them in scope and what every
   check reads.

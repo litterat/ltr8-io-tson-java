@@ -66,24 +66,26 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
     }
 
     /**
-     * This dispatch with an untagged value of {@code valueClass} read by {@code reader} rather than by its variant's
-     * own: how a bound slot reads a name at a type slot's choice through the reader a {@code TypeRef} component gets,
-     * which keeps the annotations written on the name ({@link BindTargets}).
+     * This dispatch with an untagged value of each class in {@code readers} read by that reader rather than by its
+     * variant's own: how a bound slot reads a type slot's choice ({@link BindTargets}) -- a name through the reader a
+     * {@code TypeRef} component gets, which keeps the annotations written on the name, and a type written in place
+     * through one that keeps the constructor its body is tagged with.
      */
-    Recovering recoveringWith(DiscriminationClass valueClass, TsonTypeReader<?> reader) {
-        return new Recovering(this, valueClass, reader);
+    Recovering recoveringWith(Map<DiscriminationClass, TsonTypeReader<?>> readers) {
+        return new Recovering(this, Map.copyOf(readers));
     }
 
-    /** {@link #recoveringWith}'s dispatch: an untagged value of {@code valueClass} to {@code reader}, else as is. */
-    record Recovering(NamedDispatchReader dispatch, DiscriminationClass valueClass, TsonTypeReader<?> reader)
+    /** {@link #recoveringWith}'s dispatch: an untagged value of a class it holds to its reader, else as is. */
+    record Recovering(NamedDispatchReader dispatch, Map<DiscriminationClass, TsonTypeReader<?>> readers)
             implements TsonTypeReader<Object> {
 
         @Override
         public Object read(TsonReadContext ctx) {
-            if (EventSkip.typeRefAhead(ctx).isEmpty() && classOf(EventSkip.aheadOfValue(ctx)) == valueClass) {
-                return reader.read(ctx);
-            }
-            return dispatch.read(ctx);
+            TsonEvent ahead = EventSkip.aheadOfValue(ctx);
+            DiscriminationClass valueClass = ahead instanceof io.ltr8.tson.compiler.stream.TypeRef ? null
+                    : classOf(ahead);
+            TsonTypeReader<?> reader = valueClass == null ? null : readers.get(valueClass);
+            return reader != null ? reader.read(ctx) : dispatch.read(ctx);
         }
     }
 

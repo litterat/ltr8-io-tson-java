@@ -146,20 +146,7 @@ public final class EntryDisplayName {
     private static String shown(TypeExpr expr, Lookup lookup) {
         return switch (expr) {
             case TypeRef ref -> shown(ref, lookup);
-            case TypeInline inline -> switch (inline.of()) {
-                case ArrayBody array when array.ordered() && !array.uniqueItems() -> "["
-                        + shown(array.elementType(), lookup) + (array.voidable() ? "?" : "")
-                        + size(array.minItems(), array.maxItems()) + "]";
-                case MapBody map -> "{" + shown(map.keyType(), lookup) + " => " + shown(map.valueType(), lookup)
-                        + (map.voidable() ? "?" : "") + size(map.minItems(), map.maxItems()) + "}";
-                case TupleBody tuple -> tuple.elements().stream()
-                        .map(element -> shown(element.elementType(), lookup) + (element.voidable() ? "?" : ""))
-                        .collect(Collectors.joining(", ", "[", "]"));
-                case ChoiceBody choice -> choice.variants().stream().map(variant -> shown(variant, lookup))
-                        .collect(Collectors.joining(" | ", "(", ")"));
-                // A set, a namespace type and a reference have no sugar of their own; the wrapper writes them.
-                default -> inline.text();
-            };
+            case TypeInline inline -> inline.text(slot -> shown(slot, lookup));
         };
     }
 

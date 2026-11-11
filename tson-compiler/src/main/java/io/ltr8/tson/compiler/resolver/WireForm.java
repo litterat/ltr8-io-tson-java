@@ -57,6 +57,9 @@ final class WireForm {
      */
     static final String NAME_TYPE = "name_type";
 
+    /** {@code meta.type_inline.of}: the construction a type written in place holds, tagged with its constructor. */
+    static final String OF = "of";
+
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
     /** A bare value in a field or element position -- no annotations and no type-ref of its own. */

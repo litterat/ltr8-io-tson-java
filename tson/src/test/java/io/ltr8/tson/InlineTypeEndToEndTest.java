@@ -29,7 +29,9 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -61,6 +63,16 @@ class InlineTypeEndToEndTest {
                 pair:   [text, int32]
                 labels: set<text>
                 grid:   [[text]]
+              }
+              nonempty_type => meta.array ^ { min_items?: = 1 }
+              bag => set
+              shapes => {
+                ids:    nonempty_type<uuid>
+                plain:  [uuid; 1..]
+                bagged: bag<text>
+                labels: set<text>
+                owner:  meta.ref<order>
+                nested: {text => nonempty_type<text>}
               }
             }""".formatted(ID, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
@@ -116,6 +128,7 @@ class InlineTypeEndToEndTest {
         ArrayBody labels = assertInstanceOf(ArrayBody.class,
                 assertInstanceOf(TypeInline.class, order.fields().get("labels").type()).of());
         assertTrue(labels.uniqueItems() && !labels.ordered(), "set<text> is the set constructor's array");
+        assertEquals("meta.set_type", ((TypeInline) order.fields().get("labels").type()).constructor());
         assertEquals(inline(ArrayBody.of(inline(ArrayBody.of(TypeRef.of("text"))))),
                 order.fields().get("grid").type());
     }
@@ -144,6 +157,97 @@ class InlineTypeEndToEndTest {
         Lines lines = tson().objectReader().read(data, Lines.class);
         assertEquals(new Lines(List.of("a", "b"), Map.of("eur", List.of(1, 2), "usd", List.of()), new Pair("x", 3),
                 Set.of("p", "q"), List.of(List.of("a", "b"), List.of("c"))), lines);
+    }
+
+    /**
+     * Each type written in place records the constructor that built it, past its alias hops, and two constructions
+     * of one body by two constructors are two types (§1.2).
+     */
+    @Test
+    void eachTypeInPlaceRecordsItsConstructor() {
+        RecordBody shapes = (RecordBody) tson().resolve(SCHEMA).schema().entries().get("shapes");
+        assertEquals("nonempty_type", inlineAt(shapes, "ids").constructor());
+        assertEquals("meta.array", inlineAt(shapes, "plain").constructor());
+        assertEquals(inlineAt(shapes, "plain").of(), inlineAt(shapes, "ids").of());
+        assertNotEquals(inlineAt(shapes, "plain"), inlineAt(shapes, "ids"));
+        assertEquals("meta.set_type", inlineAt(shapes, "bagged").constructor());
+        assertEquals(inlineAt(shapes, "labels"), inlineAt(shapes, "bagged"));
+        assertEquals("meta.ref", inlineAt(shapes, "owner").constructor());
+        MapBody nested = assertInstanceOf(MapBody.class, inlineAt(shapes, "nested").of());
+        assertEquals("nonempty_type", assertInstanceOf(TypeInline.class, nested.valueType()).constructor());
+        assertEquals("{text => nonempty_type<text>}", inlineAt(shapes, "nested").text());
+    }
+
+    /**
+     * Resolved output writes each constructor as the tag on {@code of} -- a schema's own refined constructor, and
+     * an aliased one past its alias -- and reading it back, in bind mode, keeps it: the record reads back equal.
+     */
+    @Test
+    void theResolvedFormRoundTripsEachConstructorInBindMode() {
+        Tson tson = tson();
+        RecordBody shapes = (RecordBody) tson.resolve(SCHEMA).schema().entries().get("shapes");
+        String written = tson.objectWriter().toTson(shapes);
+        assertTrue(written.contains("\"ids\" => { type: { of: !nonempty_type {"), written);
+        assertTrue(written.contains("\"plain\" => { type: { of: !meta.array {"), written);
+        assertTrue(written.contains("\"bagged\" => { type: { of: !meta.set_type {"), written);
+        assertTrue(written.contains("\"owner\" => { type: { of: !meta.ref {"), written);
+        assertTrue(written.contains("value_type: { of: !nonempty_type {"), written);
+        assertFalse(written.contains("!bag") || written.contains("!set ") || written.contains("meta.type_inline"),
+                written);
+
+        // Field by field: the record's own dump writes its empty `parameters` and `discriminators`, which a resolved
+        // form omits and `meta.record` refuses.
+        shapes.fields().forEach((field, declared) -> {
+            String one = tson.objectWriter().toTson(declared);
+            Object read = tson.objectReader().withImports(List.of(ID)).readAs(one, "meta.record_field", Object.class);
+            assertEquals(declared, read, one);
+            assertEquals(((TypeInline) declared.type()).constructor(),
+                    ((TypeInline) ((io.ltr8.tson.schema.meta.RecordField) read).type()).constructor(), one);
+        });
+    }
+
+    /** A constructor written through its alias is read as the entry the alias reaches, as resolution records it. */
+    @Test
+    void aConstructorTaggedThroughItsAliasReadsPastIt() {
+        Object read = tson().objectReader().withImports(List.of(ID))
+                .readAs("{ type: { of: !bag { element_type: text } } }", "meta.record_field", Object.class);
+        TypeInline type = assertInstanceOf(TypeInline.class,
+                assertInstanceOf(io.ltr8.tson.schema.meta.RecordField.class, read).type());
+        assertEquals("meta.set_type", type.constructor());
+    }
+
+    /** Each field's resolved form reads in tree mode with no diagnostic, its {@code of} under its constructor's tag. */
+    @Test
+    void theResolvedFormReadsInTreeModeUnderEachConstructor() {
+        Tson tson = tson();
+        RecordBody shapes = (RecordBody) tson.resolve(SCHEMA).schema().entries().get("shapes");
+        Map<String, String> constructors = Map.of("ids", "nonempty_type", "plain", "meta.array",
+                "bagged", "meta.set_type", "owner", "meta.ref", "nested", "meta.map");
+        constructors.forEach((field, constructor) -> {
+            String written = tson.objectWriter().toTson(shapes.fields().get(field));
+            List<Diagnostic> problems = new java.util.ArrayList<>();
+            TsonValue read = tson.treeReader().withImports(List.of(ID)).withDiagnostics(problems::add)
+                    .readAs(written, "meta.record_field");
+            assertEquals(List.of(), problems, written);
+            assertEquals(Optional.of(constructor), read.get("type").get("of").typeRef(), written);
+        });
+    }
+
+    /** A refined constructor's construction in place refuses data by its own rule and is named by its application. */
+    @Test
+    void aRefinedConstructorInPlaceNamesItselfInARefusal() {
+        String data = """
+                !!import:"%s"
+                !shapes { ids: []  plain: [%s]  bagged: []  labels: []  owner: o  nested: {} }"""
+                .formatted(ID, "123e4567-e89b-12d3-a456-426614174000");
+        List<Diagnostic> problems = tson().validate(data);
+        assertTrue(problems.stream().anyMatch(d -> d.message().startsWith("'nonempty_type<uuid>'")),
+                problems::toString);
+    }
+
+    /** The type written in place at a record field. */
+    private static TypeInline inlineAt(RecordBody record, String field) {
+        return assertInstanceOf(TypeInline.class, record.fields().get(field).type());
     }
 
     /** A value an inline type refuses is refused by the reader built from that type's body. */

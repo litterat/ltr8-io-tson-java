@@ -28,15 +28,14 @@ import java.util.function.UnaryOperator;
 /**
  * The {@code schema.meta} reference walk: every {@link TypeRef} an entry holds that a rewrite may move.
  *
- * <p><b>One walk, two callers.</b> {@code TemplateMaterialiser} closes an application through it, and {@code
- * SyntheticMerge} renames onto a merged entry (§8.2). Which body shape carries which references is a fact about the
- * value model, not about either caller, so it is stated once here.
+ * <p><b>The walk is the value model's.</b> {@code TemplateMaterialiser} closes an application through it; which body
+ * shape carries which references is a fact about the value model, not about the caller, so it is stated here.
  *
  * <p><b>Two kinds of slot.</b> A type slot ({@link TypeExpr}: an element, a map's value, a tuple position, a choice
  * variant, a record field's type) holds a name or a type written in place, so a rewrite there may put a construction
  * in the name's stead ({@link Rewrite#atSlot}); a slot that holds a name alone (a map's key, a reference's {@code of},
  * an alias's target, a parent) takes a name back ({@link Rewrite#atName}). A type written in place is walked into,
- * each slot inside it rewritten the same way, and stays in place.
+ * each slot inside it rewritten the same way, and stays in place under its constructor.
  *
  * <p><b>The switch over {@link Top} is exhaustive, with no default.</b> {@code Top} is sealed all the way down, so a
  * body shape added to {@code schema.meta} fails to compile here until someone says which references it holds; a
@@ -108,9 +107,9 @@ final class MetaRefs {
         };
     }
 
-    /** A type written in place with each slot inside it mapped; it stays in place, with no chain to map. */
+    /** A type written in place with each slot inside it mapped; it stays in place, its constructor and no chain. */
     private static TypeInline mapInline(TypeInline inline, Rewrite map) {
-        return new TypeInline((Type) mapBodyRefs(inline.of(), map, false));
+        return inline.withOf((Type) mapBodyRefs(inline.of(), map, false));
     }
 
     private static Top mapBodyRefs(Top body, Rewrite map, boolean mapChain) {
