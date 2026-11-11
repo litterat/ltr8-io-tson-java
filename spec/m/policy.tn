@@ -73,7 +73,7 @@
       limit is a `policy.limit`.
       The §11.5 limits bound the work resolution adds over a schema: the
       schemas one header reaches through `!!import`, the
-      declarations in one schema map (synthetic and instantiation entries
+      declarations in one schema map (instantiation entries
       included), the hops from a use site to a terminal entry, the length of
       one type's supertype chain, the nested applications closed for one
       application -- a resource cap, regular recursion closing on its first
