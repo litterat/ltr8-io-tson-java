@@ -119,7 +119,7 @@ class NestedContainerTest {
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
         assertEquals(Optional.of(3L), outer.minItems());
-        ArrayBody inner = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().name()));
+        ArrayBody inner = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementName().name()));
         assertEquals(TypeRef.of("integer"), inner.elementType());
         assertEquals(Optional.empty(), inner.maxItems(), "the inner array is unconstrained");
 
@@ -145,7 +145,7 @@ class NestedContainerTest {
         ArrayBody rows = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
         List<String> arrayEntries = compiled.schema().entries().keySet().stream()
                 .filter(name -> name.startsWith("array_integer_")).toList();
-        assertEquals(List.of(rows.elementType().name()), arrayEntries,
+        assertEquals(List.of(rows.elementName().name()), arrayEntries,
                 "one injected array<integer>, shared by every spelling of it");
     }
 
@@ -194,8 +194,8 @@ class NestedContainerTest {
         TsonCompiledSchema compiled = compile("  deep => [[[integer]]]");
 
         ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "deep"));
-        ArrayBody middle = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().name()));
-        ArrayBody innermost = assertInstanceOf(ArrayBody.class, entry(compiled, middle.elementType().name()));
+        ArrayBody middle = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementName().name()));
+        ArrayBody innermost = assertInstanceOf(ArrayBody.class, entry(compiled, middle.elementName().name()));
         assertEquals(TypeRef.of("integer"), innermost.elementType());
 
         assertNotNull((TsonValue) compiled.get("deep").read(TestDocuments.document("[ [ [1 2] [3] ] [] ]")));

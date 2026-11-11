@@ -14,7 +14,7 @@ import java.util.List;
  */
 @Typename(name = "meta.tuple")
 public record TupleBody(TypeChain chain,
-        List<TupleElement> elements) implements Product {
+        List<TupleElement> elements) implements Product, TypeInline {
 
     @Record
 

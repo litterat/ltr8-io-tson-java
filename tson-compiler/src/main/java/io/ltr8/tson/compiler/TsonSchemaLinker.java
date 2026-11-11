@@ -1378,7 +1378,7 @@ public final class TsonSchemaLinker {
                 validateTypeRef(n.valueType(), namespace, constructors,
                         entryName, " value_type");
             }
-            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, constructors, entryName, " element_type");
+            case ArrayBody a -> validateTypeRef(a.elementName(), namespace, constructors, entryName, " element_type");
             case TupleBody t -> {
                 int index = 0;
                 for (TupleElement element : t.elements()) {
@@ -1598,7 +1598,7 @@ public final class TsonSchemaLinker {
                 // what keeps `<S> base ^ { status: = S }` from reading as a template that never uses S.
                 field.value().map(Token::text).ifPresent(into::add);
             });
-            case ArrayBody array -> collectNames(array.elementType(), into);
+            case ArrayBody array -> collectNames(array.elementName(), into);
             case MapBody map -> {
                 collectNames(map.keyType(), into);
                 collectNames(map.valueType(), into);

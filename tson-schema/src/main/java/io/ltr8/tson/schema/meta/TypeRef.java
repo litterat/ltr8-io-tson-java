@@ -38,7 +38,7 @@ import java.util.Optional;
  * <b>Identity</b> is the variant, the name and the arguments: {@code annotations} and {@code closure} are excluded
  * from {@code equals}, as both are about where a reference came from, and §8.2 keys identity on where it points.
  */
-public sealed interface TypeRef extends Reference permits NameRef, ApplicationRef, ParamRef {
+public sealed interface TypeRef extends Reference, TypeExpr permits NameRef, ApplicationRef, ParamRef {
 
     /** Where a reference finds what it names: the closure it was read under. */
     @FunctionalInterface

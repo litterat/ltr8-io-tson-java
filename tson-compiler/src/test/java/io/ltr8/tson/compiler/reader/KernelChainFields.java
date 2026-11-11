@@ -43,7 +43,7 @@ final class KernelChainFields {
         entries.put(name, value);
         switch (value) {
             case RecordBody record -> record.fields().values().forEach(f -> copy(f.typeRef(), kernel, entries));
-            case ArrayBody array -> copy(array.elementType(), kernel, entries);
+            case ArrayBody array -> copy(array.elementName(), kernel, entries);
             case MapBody map -> {
                 copy(map.keyType(), kernel, entries);
                 copy(map.valueType(), kernel, entries);

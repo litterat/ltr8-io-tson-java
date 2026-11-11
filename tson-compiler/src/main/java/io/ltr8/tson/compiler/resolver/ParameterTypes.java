@@ -358,7 +358,7 @@ final class ParameterTypes {
 
         private void elements(ArrayValue array, Top type, String slot) {
             TypeRef element = switch (type) {
-                case ArrayBody arrayBody -> arrayBody.elementType();
+                case ArrayBody arrayBody -> arrayBody.elementName();
                 default -> null;
             };
             if (element == null && !(type instanceof TupleBody)) {

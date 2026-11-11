@@ -35,16 +35,19 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
     private final Set<String> candidateNames;
     private final TsonTypeReaderResolver resolver;
     private final Map<DiscriminationClass, String> untaggedRecovery;
+    private final java.util.function.Function<String, Optional<String>> variantOfSubtype;
 
     NamedDispatchReader(String positionName, String missingTypeRefMessage, String candidateNoun,
                          Set<String> candidateNames, TsonTypeReaderResolver resolver,
-                         Map<DiscriminationClass, String> untaggedRecovery) {
+                         Map<DiscriminationClass, String> untaggedRecovery,
+                         java.util.function.Function<String, Optional<String>> variantOfSubtype) {
         this.positionName = positionName;
         this.missingTypeRefMessage = missingTypeRefMessage;
         this.candidateNoun = candidateNoun;
         this.candidateNames = candidateNames;
         this.resolver = resolver;
         this.untaggedRecovery = untaggedRecovery;
+        this.variantOfSubtype = variantOfSubtype;
     }
 
     @Override
@@ -52,6 +55,11 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
         Optional<String> typeRef = EventSkip.typeRefAhead(ctx);
         if (typeRef.isPresent()) {
             String ref = typeRef.get();
+            // Spike (inline types): a tag naming a subtype of one variant is read at that variant.
+            Optional<String> variant = candidateNames.contains(ref) ? Optional.empty() : variantOfSubtype.apply(ref);
+            if (variant.isPresent()) {
+                return resolver.resolve(variant.get()).read(ctx);
+            }
             if (!candidateNames.contains(ref)) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'" + ref + "' is not a " + candidateNoun + " of '"
                                 + positionName + "' -- expected one of " + candidateNames,
@@ -76,13 +84,20 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
         // Past the annotations, which are still unread: they belong to the value, and the variant's own
         // reader takes the whole data-value from the cursor as it stands.
         TsonEvent event = EventSkip.aheadOfValue(ctx);
-        if (event instanceof TokenEvent token) {
-            DiscriminationClass valueClass = DiscriminationClass.ofValue(
+        // Spike (inline types): a reference and the opening delimiters are classed too.
+        DiscriminationClass valueClass = switch (event) {
+            case TokenEvent token -> DiscriminationClass.ofValue(
                     ValueParser.INSTANCE.read(new TokenValue(token.text(), token.form())));
-            String variant = untaggedRecovery.get(valueClass);
-            if (variant != null) {
-                return resolver.resolve(variant).read(ctx);
-            }
+            case io.ltr8.tson.compiler.stream.ReferenceEvent ignored -> DiscriminationClass.STRING;
+            case io.ltr8.tson.compiler.stream.RecordStart ignored -> DiscriminationClass.BRACE;
+            case io.ltr8.tson.compiler.stream.MapStart ignored -> DiscriminationClass.BRACE;
+            case io.ltr8.tson.compiler.stream.EmptyBraceEvent ignored -> DiscriminationClass.BRACE;
+            case io.ltr8.tson.compiler.stream.ArrayStart ignored -> DiscriminationClass.BRACKET;
+            case null, default -> null;
+        };
+        String variant = valueClass == null ? null : untaggedRecovery.get(valueClass);
+        if (variant != null) {
+            return resolver.resolve(variant).read(ctx);
         }
         ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                 "'" + positionName + "' has no variant matching this untagged value -- expected a value of one "

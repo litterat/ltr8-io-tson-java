@@ -102,7 +102,7 @@ public final class EntryDisplayName {
         return applied(application).or(() -> Optional.ofNullable(switch (value) {
             // `[T]` is an ordered array that admits repeats; a set is the same body with neither, and has no sugar.
             case ArrayBody array when array.ordered() && !array.uniqueItems() -> "["
-                    + shown(array.elementType(), lookup) + size(array.minItems(), array.maxItems()) + "]";
+                    + shown(array.elementName(), lookup) + size(array.minItems(), array.maxItems()) + "]";
             case MapBody map -> "{" + shown(map.keyType(), lookup) + " => "
                     + shown(map.valueType(), lookup) + size(map.minItems(), map.maxItems()) + "}";
             case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType)

@@ -13,7 +13,7 @@ import java.util.Optional;
  */
 @Typename(name = "meta.choice")
 public record ChoiceBody(TypeChain chain,
-        List<TypeRef> variants, Optional<Boolean> disjoint) implements Sum {
+        List<TypeRef> variants, Optional<Boolean> disjoint) implements Sum, TypeInline {
 
     @Record
     public ChoiceBody {

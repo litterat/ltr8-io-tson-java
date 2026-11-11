@@ -67,7 +67,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
 
     ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation, boolean elementsAreNames) {
-        this(name, displayName, body, resolver.resolve(body.elementType().name()), schemaLocation,
+        this(name, displayName, body, resolver.resolve(body.elementName().name()), schemaLocation,
                 elementsAreNames);
     }
 
@@ -95,7 +95,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      * admits repetition is not one.
      */
     static boolean elementsAreNames(ArrayBody body, ValueReaderContext context) {
-        return body.uniqueItems() && AliasChain.terminalDefinition(body.elementType().name(),
+        return body.uniqueItems() && AliasChain.terminalDefinition(body.elementName().name(),
                         context.schema().entries()::get)
                 .map(element -> element instanceof IdentifierType)
                 .orElse(false);

@@ -101,7 +101,7 @@ class AliasChainTest {
         Top injected = resolve("  a => text\n  holder => { f: [a] }",
                 fieldType(holder, "f").name());
         assertEquals("a", assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class,
-                injected).elementType().name());
+                injected).elementName().name());
     }
 
     /**

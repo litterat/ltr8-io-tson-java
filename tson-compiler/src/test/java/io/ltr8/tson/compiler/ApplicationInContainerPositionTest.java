@@ -215,7 +215,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody outer = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")));
         ArrayBody inner = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(outer.elementType().name()));
+                compiled.schema().entries().get(outer.elementName().name()));
 
         assertEquals(TypeRef.of("text"), inner.elementType());
     }
@@ -237,7 +237,7 @@ class ApplicationInContainerPositionTest {
 
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, "box_carrier", "a")));
-        Top instantiation = compiled.schema().entries().get(array.elementType().name());
+        Top instantiation = compiled.schema().entries().get(array.elementName().name());
 
         assertEquals(List.of(), OpenEntry.parameterNames(instantiation), "closed");
         assertEquals(TypeRef.of("text"), ((RecordBody) instantiation).fields()
@@ -257,7 +257,7 @@ class ApplicationInContainerPositionTest {
 
         ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
                 .get(fieldType(compiled, "deep", "d")));
-        String inner = fieldType(compiled, array.elementType().name(), "a");
+        String inner = fieldType(compiled, array.elementName().name(), "a");
 
         assertEquals(TypeRef.of("int32"),
                 ((RecordBody) compiled.schema().entries().get(inner)).fields()
@@ -297,6 +297,6 @@ class ApplicationInContainerPositionTest {
 
         assertEquals(Optional.of(2L), closed.minItems());
         assertInstanceOf(RecordBody.class,
-                compiled.schema().entries().get(closed.elementType().name()), "box<text>, closed");
+                compiled.schema().entries().get(closed.elementName().name()), "box<text>, closed");
     }
 }

@@ -18,7 +18,7 @@ import java.util.List;
  *
  * <p>Not a base kind: {@link EntryKind} has no {@code TYPE}, and a kind is read from the base kind below it.
  */
-public sealed interface Type extends Top permits Atom, Product, Sum {
+public sealed interface Type extends Top permits Atom, Product, Sum, TypeInline {
 
     Type withChain(TypeChain chain);
 
