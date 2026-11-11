@@ -271,3 +271,48 @@ refined constructor and the root's `set` with an alias of `meta.set_type`. The s
 body move to one: `result => <T> ( T | error )` becomes a discriminated family (`result_of => <T> result & { value?: T
 }`), and §5.10.1's and §8.2's `nested => <T> ( T | [nested<T>] )` becomes a record, `nested => <T> { value?: T  more?:
 [nested<T>] }`.
+
+## 4. [TSON-SCHEMA] §5.4, §5.2 — a tag at a choice names a variant; a choice with an abstract variant has no values
+
+**Problem.** §5.4's tagging rule says a value at a choice "carries a type annotation (`!variant`) selecting the
+variant", and §5.2's ABSTRACT rule refuses a tag naming an abstract record itself: a value at a position typed by it
+is a value of some subtype. Nothing says what a tag naming a **subtype** of a variant selects. Read as written, the
+tag names a variant exactly, and the two rules together leave an abstract variant without values:
+
+```
+shape  => abstract { name: text }
+circle => shape & { r: integer }
+item   => ( text | shape )
+```
+
+At a position typed `item`, `!shape { … }` is refused because `shape` is abstract, and `!circle { … }` is refused
+because `circle` is no variant of `item`. The choice derives `disjoint: true` (string-class beside brace-class), so
+the tag MAY be omitted, but an untagged record at an abstract position has no member to be read as unless the base
+declares selectors. At a position typed `shape` alone, `!circle { … }` is accepted (§7.2): a position typed by a type
+admits a value of a subtype, and a choice over that type does not.
+
+The same gap covers a concrete variant with subtypes: at `( text | base )`, a value tagged with a subtype of `base`
+is refused, where a field typed `base` admits it.
+
+**What is running.** The tag is matched against the variant names exactly. With the schema above, `!circle { … }`
+at `item` is reported "'circle' is not a declared variant of 'item'", and `!shape { … }` "a tag naming 'shape'
+selects nothing -- it is abstract and has no direct instances. Name the member this value is, one of (circle)" — the
+second message recommends the tag the first refuses. Separately, and a gap of this library, not of the text: an
+untagged value at a disjoint choice is recovered for scalar-class variants only, so an untagged record or list at a
+disjoint choice is refused for want of a tag, where §5.4 counts "the brace/bracket delimiter" as recovering it.
+
+**Why it matters now.** The inline-types proposal for Revision 40 types a type slot as a choice of a reference and
+an abstract family, `( meta.type_ref | meta.type_inline )`, whose values are tagged by their constructor
+(`!meta.array { … }`). That is this case in the kernel.
+
+**Resolution to decide.** In §5.4: a tag selects the variant it names, or the one variant its type IS-A (§7.2), and
+the value is then read at that variant as it would be at a position typed by it. Two points the rule has to state:
+
+- **A tag that IS-A two variants.** With composition a type can reach two variants. Either the tag is refused at
+  the data, or a choice whose variants share a subtype is a resolver error, as overlapping classes are for an
+  untagged choice. A spike of the first reads cleanly: no variant is selected and the tag is refused.
+- **Disjointness is unaffected.** `disjoint` is still derived over the variants' classes; a subtype has its
+  variant's class.
+
+The alternative is to keep the tag exact and refuse an abstract variant at the declaration, since it can hold no
+value. That keeps one rule for a tag and rules out the kernel shape above.
