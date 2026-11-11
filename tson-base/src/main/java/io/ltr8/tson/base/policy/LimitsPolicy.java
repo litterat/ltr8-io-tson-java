@@ -60,12 +60,11 @@ import java.util.List;
  * @param maxValues               all values in one document, containers and scalars alike -- an aggregate that
  *                                no per-container bound implies
  * @param maxImportClosure        the schema documents reachable from one header through {@code !!import}
- * @param maxSchemaEntries        the declarations in one schema map, synthetic and instantiation entries
- *                                included
+ * @param maxSchemaEntries        the declarations in one schema map
  * @param maxAliasChain           the hops from a use site to a terminal entry
  * @param maxSupertypeChain       the length of one type's {@code chain.supertypes}
- * @param maxMaterialisationDepth the nested applications closed for one template application -- a resource cap,
- *                                regular recursion closing on its first repeat
+ * @param maxMaterialisationDepth the nested applications closed for one application of an open record, which
+ *                                closing in place already bounds by the open records of the closure
  * @param maxWaitDepth            the longest chain of waits resolving one schema runs, each entry waiting on the
  *                                next being ready -- see {@link #maxWaitDepth()}
  */

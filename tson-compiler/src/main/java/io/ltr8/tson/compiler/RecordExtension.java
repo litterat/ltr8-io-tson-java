@@ -4,7 +4,6 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
@@ -22,9 +21,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.AliasChain;
-import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -34,7 +31,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
-import java.util.function.Predicate;
 
 /**
  * What each {@code record.extension} member obliges, checked over the linked closure ([TSON-SCHEMA] §5.2, §5.7,
@@ -57,18 +53,14 @@ import java.util.function.Predicate;
  * <p><b>Extending a family is a declaration.</b> A family's members are open across schemas (§3.3.4), so a
  * member changes what every position typed by its base does, in every schema that imports it; and a member is
  * something a read reports, a tag names (§6.1.5) and a binding maps, all by name. An application at a use site
- * has only a minted name, which nothing may write (§8.2), so a member it produced could be selected and never
- * named. It is refused, and the author declares it: {@code dogs => dog_of<text>}. A minted entry that joins no
- * family as a member -- an array, a set, a choice, an application composing no declared type, a family base
- * minted for an abstract template's application -- is untouched, and two schemas
- * minting one such form hold two entries that are the same type in every way a value can tell.
+ * whose record in place would be a member is refused before linking ({@code TemplateMaterialiser}), so every
+ * member this checks is a declaration.
  */
 final class RecordExtension {
 
     /**
-     * One problem, and the entry it is reported against: one this schema declares or minted -- the linker
-     * reports a minted one against the declaration that wrote it -- or {@code ""}, the schema itself, for what
-     * its imports brought together.
+     * One problem, and the entry it is reported against: one this schema declares, or {@code ""}, the schema itself,
+     * for what its imports brought together.
      */
     record Violation(String entry, String message) {
     }
@@ -91,19 +83,8 @@ final class RecordExtension {
                                  Map<String, TypeRef> applications, Set<String> localNames,
                                  Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
-        Predicate<String> kernel = name -> TsonBundledSchemas.isKernel(origins.get(name));
         for (String name : localNames) {
             Top def = merged.get(name);
-            if (def != null && isUndeclaredMember(name, def, facts, applications, kernel)) {
-                String base = nearest(TypeChain.supertypesOf(def), merged);
-                String shownName = shown(name, merged, facts, applications);
-                violations.add(new Violation(name, "'" + shownName + "' composes onto '"
-                        + shown(base, merged, facts, applications) + "', so it is a member of that family, and a "
-                        + "member is declared: a read reports the member it selects, a tag names it and a binding maps "
-                        + "it, all by a name an application at a use site does not have (§3.3.4, §8.2). Declare it -- "
-                        + "'my_name => " + shownName + "' -- and use that name in place of the application"));
-                continue;
-            }
             if (def instanceof RecordBody record) {
                 checkDeclaration(name, def, record, merged, facts, violations);
             } else if (OpenEntry.isOpen(def)) {
@@ -120,34 +101,6 @@ final class RecordExtension {
         }
         return violations;
     }
-
-    /**
-     * A record a use-site template application minted that composes onto another: a family member with no
-     * declared name. Refused at minting for an expansion ({@code TemplateMaterialiser}), where the application is
-     * in hand; what reaches here is the instantiation entry an expansion naming itself keeps, which has no source
-     * position and records its application. A constructor (IS-A the kernel's {@code top}) is no member of anything.
-     */
-    private static boolean isUndeclaredMember(String name, Top def, Map<String, TsonSchema.EntryFacts> facts,
-                                              Map<String, TypeRef> applications, Predicate<String> kernel) {
-        TsonSchema.EntryFacts known = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
-        TypeRef application = applications.get(name);
-        return known.position().isEmpty() && def instanceof RecordBody record
-                && application != null && !application.arguments().isEmpty()
-                && !record.supertypes().isEmpty() && !EntryKind.isConstructor(name, record, kernel);
-    }
-
-    /**
-     * The nearest of {@code chain}'s members -- the first that no other member IS-A, which is a parent the
-     * declaration wrote or reached through one hop -- for a message that names what an entry composes onto.
-     */
-    private static String nearest(List<String> chain, Map<String, Top> merged) {
-        return chain.stream()
-                .filter(member -> chain.stream().noneMatch(other -> !other.equals(member)
-                        && TypeChain.supertypesOf(merged.get(other)).contains(member)))
-                .findFirst().orElse(chain.getFirst());
-    }
-
-
 
     // ── The declaration's own obligations ────────────────────────────────
 
@@ -237,11 +190,8 @@ final class RecordExtension {
         Map<List<Object>, String> seen = new LinkedHashMap<>();
         for (String subtype : new LinkedHashSet<>(TypeChain.subtypesOf(def))) {
             Top sub = merged.get(subtype);
-            // Only a record is a member. An undeclared member is refused on its own, and judging its pins too
-            // would report one mistake twice.
-            if (!(sub instanceof RecordBody record)
-                    || isUndeclaredMember(subtype, sub, facts, applications,
-                    name -> TsonBundledSchemas.isKernel(origins.get(name)))) {
+            // Only a record is a member.
+            if (!(sub instanceof RecordBody record)) {
                 continue;
             }
             List<Object> pins = pinsOf(base, subtype, selectors, record, merged, facts, localNames, enumForms, violations);

@@ -36,7 +36,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -468,22 +467,14 @@ class TsonSchemaLinkerTest {
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(local, loader));
     }
 
-    @Test
-    void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
-        // A genuinely different type under the same name: two identical entries are one entry ([TSON-SCHEMA]
-        // §8.2), which is no collision.
-        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), textEntry()));
-    }
-
     /**
-     * And the other half of the same rule: an entry a local declaration and an import both reach, agreeing
-     * byte for byte, unifies rather than colliding. §8.2 names a materialised instantiation by a function of
-     * its resolved form alone -- "two {@code box<text>} anywhere share one entry" -- so a consumer that
-     * closes an application its import already closed must link, or exporting a template is exporting a trap.
+     * A local entry of a name an import declares collides ([TSON-SCHEMA] §2.2.3), whatever its body: two schemas
+     * declaring one name declare two entries, as the resolver refuses the same declaration from text.
      */
     @Test
-    void anImportedEntryAndAnIdenticalLocalOneUnify() {
-        assertDoesNotThrow(() -> link("shared_name", emptyRecord(), emptyRecord()));
+    void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
+        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), textEntry()));
+        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), emptyRecord()));
     }
 
     /** Links a schema declaring {@code name} locally against an import declaring the same name. */

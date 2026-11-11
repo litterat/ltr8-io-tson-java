@@ -203,7 +203,7 @@ final class TemplateMaterialiser {
         MetaRefs.Rewrite rewrite = slotRewrite();
         for (Map.Entry<String, Top> entry : entries.entrySet()) {
             try {
-                entry.setValue(MetaRefs.mapRefsKeepingChain(entry.getValue(), rewrite));
+                entry.setValue(MetaRefs.mapRefs(entry.getValue(), rewrite));
             } catch (SchemaValidationException | UnsupportedOperationException e) {
                 if (reporter == null) {
                     throw e;
@@ -419,7 +419,7 @@ final class TemplateMaterialiser {
         // body closes each one where it stands -- a nested constructor's application, which an open record holds
         // for a nested form over its parameter ({@code {text => [T]}}), in place at its type slot.
         return Optional.of(new TypeInline(constructor,
-                (Type) MetaRefs.mapRefsKeepingChain(type.withChain(TypeChain.EMPTY), slotRewrite())));
+                (Type) MetaRefs.mapRefs(type.withChain(TypeChain.EMPTY), slotRewrite())));
     }
 
     /** What {@link #materialise} applies to every reference: a slot's closed in place, a name's to a name. */
@@ -586,7 +586,7 @@ final class TemplateMaterialiser {
                     // A type written in place holds no parameter, and may still hold an application of an open
                     // record this pass has not reached in the template (`[box<text>; 2..]`): closed where it stands.
                     case TypeInline inline -> inline.withOf(
-                            (Type) MetaRefs.mapRefsKeepingChain(inline.of(), slotRewrite()));
+                            (Type) MetaRefs.mapRefs(inline.of(), slotRewrite()));
                     // A sibling names a field of the record, and has no application to close.
                     case SiblingRef sibling -> sibling;
                 }).withPosition(Optional.empty()), substituted.getAnnotations(name)));

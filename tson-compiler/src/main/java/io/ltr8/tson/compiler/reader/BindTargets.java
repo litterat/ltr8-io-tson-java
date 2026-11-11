@@ -185,6 +185,9 @@ final class BindTargets {
                 case MapBody map -> new io.ltr8.bind.DataParameterizedType(
                         map.ordered() ? java.util.LinkedHashMap.class : java.util.Map.class,
                         named.apply(map.keyType().name()), hostType(map.valueType(), named));
+                // Reached by an array or map holding a tuple, a choice, a reference or a record in place, read
+                // naturally. Nothing binds a type in place by name, so asking for its form lands on `named`'s
+                // answer for an unbound name; the component holding it declares the class it binds.
                 default -> named.apply(inline.text());
             };
         };

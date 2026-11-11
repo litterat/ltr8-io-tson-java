@@ -62,8 +62,8 @@ sugar form's binding record (a nested construction in its `{ of: … }` wrapper,
 a text slot holding `"box<T>"` is text whatever it spells. `TsonObjectWriter` cannot build a binding record: its
 output is canonical-explicit and fully quoted, a different language from the one a binding is written in.
 
-**`MetaRefs`** — the `schema.meta` reference walk: `mapRefs` maps an entry's chain too, `mapRefsKeepingChain` leaves
-the chain as written. Its one caller is materialisation, closing an application where it stands. No pass rewrites a
+**`MetaRefs`** — the `schema.meta` reference walk: `mapRefs` maps every reference an entry's value holds and leaves
+its chain as written. Its one caller is materialisation, closing an application where it stands. No pass rewrites a
 use site onto the end of an alias chain — see "References are hops" below. A walk is a `Rewrite` with two arms:
 `atSlot` for a reference at a type slot, which may come back as a construction written in place, and `atName` for one
 at a slot that holds a name alone. Which body shape carries which references is a fact about the value model, stated

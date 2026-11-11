@@ -526,9 +526,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   length** after escape processing, **numeric literal length** (annotated tokens included), **decoded binary size**
   per `!bytes` value, **document size**, **elements** per array or set, **entries** per map, **fields** per record,
   **annotations** on one value, and **total values**. Schema side: **import closure**, **entries** in one schema map,
-  **alias chain**, **supertype chain**, and **materialisation depth** — which `TemplateMaterialiser` enforces as
-  the bare constant `MAX_CLOSING_DEPTH` at the default, and which moves to reading `maxMaterialisationDepth`. (Wait
-  depth, the sixth §11.5 limit, is counted, by `WaitOrder`, with its `--max-wait-depth` flag.) What
+  **alias chain** and **supertype chain**. (Wait depth is counted, by `WaitOrder`, with its `--max-wait-depth` flag;
+  materialisation depth needs no counter, closing in place being bounded by the closure's open records.) What
   still needs deciding per limit is *where it is counted*: the ones that bound shape are per-container state the
   stream does not keep, where depth was a counter it already had, and the aggregate (total values) needs its own
   counter since §9.1 is explicit that the total is not bounded by the parts.
