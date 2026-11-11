@@ -116,7 +116,7 @@ footing:
 |---|---|---|
 | 1 | [TSON-DATA] §2.1's worked example says untagged tokens resolve by §4's base rules under an imported schema | **Carried.** Not among this revision's changes; the entry stays open against Revision 40 as written. [open] |
 | 2 | Whether a quoted token at a reference-typed position is a reference | **Carried**, narrowed by #3: an argument is a reference in both grammars, so a quoted argument is refused in a schema document and in data alike; the field-position half (`t: "int32"` at a `meta.type_ref` field in data) stays open as written. [open] |
-| 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–56), and Part 3 §3.3 (§3.4). **[editorial]** at four points, one question open (§5). [settled — implemented, but for closing an application of an open record in place] |
+| 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–56), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented, but for closing an application of an open record in place] |
 | 3 | Templates as open records | **Accept — the baseline above**, every step as the register states what runs. Part 2 §5.10 is rewritten around the three rules; §1.3, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow (§3.2). §1.6's example drops its value parameter. **[editorial]** at five points where the sources disagree or the text needed a reading (§5). [settled — implemented] |
 
 Counts: **2 accepted** (#3, in six steps, and #5), **0 declined**, **2 carried** (#1, #2). Revision
@@ -282,12 +282,13 @@ Items 34–56 carry #5, inline types. Each names the rule before and after.
     a type written in place"; an argument of an open record's application is a name or a
     parameter.
 42. **§4.3** — an open record's application is cited to §5.10.
-43. **§5.2** — a value modifier is refused on any type written in place, a reference among
-    them, where before `handler?: meta.ref<method> ~ …` carried one: the example declares
-    `method_ref`. The sibling-reference position rule names `meta.field_type_expr`, and
-    "before any lift" goes. A dependent field's sibling may be typed `meta.type_expr` or
-    `meta.field_type_expr` (before: a reference only); a sibling holding a type written in
-    place types no value. "A minted record is a member of nothing" becomes **a record written
+43. **§5.2** — a value modifier is admitted on an atom or an enum, a reference written in
+    place included (`handler?: meta.ref<method> ~ …` stands), and refused on a container,
+    tuple or choice whether named or written in place (before: named types only). The
+    sibling-reference position rule names `meta.field_type_expr`, and "before any lift" goes.
+    A dependent field's sibling may be typed `meta.type_expr` or `meta.field_type_expr`
+    (before: a reference only), and the field is read against a type its sibling holds
+    written in place as against a named one. "A minted record is a member of nothing" becomes **a record written
     in place is a member of nothing**, the `vip => customer & box<int32>` sentence on a
     synthetic gone. **Inline refinements and bare records are prohibited** becomes **What may
     be written in place**: a container, tuple, choice or reference, or a refining
@@ -307,15 +308,18 @@ Items 34–56 carry #5, inline types. Each names the rule before and after.
     and synthetic entries** and **A use-site application never resolves in place** are
     replaced by **Nested forms are written in place**.
 45. **§5.4** — an inline choice was "a *synthetic entry* … referenced by name"; it is a type
-    written in place carrying `disjoint`. A variant is a `meta.type_expr`; a variant written
-    in place is reached untagged alone.
+    written in place carrying `disjoint`. A variant is a `meta.type_expr`. New rule: a choice
+    that is not disjoint names every variant, `( [text] | [int32] )` being a resolver error, a
+    tag naming a variant by its name; a disjoint choice may hold variants written in place.
 46. **§5.6** — the positional form keeps a bare token at a field typed by the type-slot
     choice as at an atom-typed one (before: atom-typed only, which `record_field.type` no
     longer is); the applied spellings are "one construction", not "one entry"; a value
     body's application is refused as no name, not for lacking an entry; the end state's type
-    slot holds a bare token or a `{ of: … }` record, "after lifting" gone.
-47. **§5.7** — a type written in place narrows only to itself, a name compared by its
-    construction; a refinement source's application is absorbed as an operand's, IS-A the
+    slot holds a bare token or a `{ of: … }` record, "after lifting" gone; two declarations
+    of one construction are two entries, and neither is that construction written in place.
+47. **§5.7** — a type written in place narrows only to an equal one, and a name never to a
+    construction or the reverse (`tags: text_list` over `text_list => [text]` is not restated
+    as `tags: [text]`); a refinement source's application is absorbed as an operand's, IS-A the
     template's written parents and a declared entry for it.
 48. **§5.8** — an operand's application "mints no entry" becomes "is no entry"; an applied
     parent's edge names "the entry a declaration gives that application", and a parent
@@ -348,9 +352,9 @@ Items 34–56 carry #5, inline types. Each names the rule before and after.
     in place against §5.2. The body-patterns table: the use-site row is "written in place",
     the application row "declared application". Entries are declared entries alone.
 55. **§8.2** — retitled **Instantiation and Identity** and rewritten, from 17 KB to 6 KB: no
-    entry is lifted, minted or merged; a declared application; two identities, a type written
-    in place's structural, compared with a name by following it to its construction, a
-    declared record nominal; canonical applications over names; resolved forms compared as
+    entry is lifted, minted or merged; a declared application; when two types are one: a name
+    and a name naming one entry, past alias hops; two equal types written in place; and a
+    name and a type written in place never; canonical applications over names; resolved forms compared as
     values, "up to renaming of internal entries" gone; diagnostics by field path; no consumer
     contract names a type written in place. Gone: trigger positions, the expansion and the
     self-reaching exception, the merge pass, internal names and freshness, the derived name
@@ -452,11 +456,11 @@ carries no open questions.
 | #3 (reading) | A self-reaching expansion kept its closed record under a name derived from the canonical application. | **Superseded by #5**: a recursive application ties to the declaration closing it, and one with none is refused. |
 | #3 (reading) | A tag naming an open record in data is a validation error (Revision 39: a resolver error as a data annotation). | **[editorial]** — the running behaviour. |
 | #3 (remainder) | An open record is read at its declaration against `record`'s vocabulary, but a name in it that resolves to nothing is reported per application, and not at all while nothing applies the record. The proposal's reading at the declaration asks for more. | Open — outstanding work in the implementation; the text states the declaration-time checks it runs. |
-| #5 (reading) | An application at a refinement source (`x => box<text> ^ { … }`) is absorbed as one at a composition operand is, IS-A the template's written parents and a declaration of the application where one exists; the proposal names composition operands alone. | **[editorial]** — for confirmation; the first implementation closes it to the declared entry and reports one nothing declares as not implemented. |
-| #5 (reading) | A value modifier on a field typed by a reference written in place (`handler?: meta.ref<method> ~ …`) is refused, the reference declared, since a value is never read against a type written in place; the alternative admits it and reads the value against the inline reference. | **[editorial]** — for confirmation. |
-| #5 (reading) | A choice that is not disjoint leaves a variant written in place unreachable, a tag naming a variant by its name; stated as a consequence, not refused at the declaration. | **[editorial]** — for confirmation. |
-| #5 (reading) | A name and a type written in place compare by following the name to its construction, while two declarations of one construction (`a => [text]`, `b => [text]`) stay two entries for a tag (§5.6, §7.2), so the comparison is not transitive through an inline form. | **[editorial]** — for confirmation. |
-| #5 (open) | Whether an author's explicit `!C { … }` at a field becomes the wrapper for a structural constructor; the text keeps §5.6's "valid only as the top-level body of a declaration". | Open — to settle in the corpus. |
+| #5 (ruled) | An application at a refinement source (`x => box<text> ^ { … }`) is absorbed as one at a composition operand is, IS-A the template's written parents and a declaration of the application where one exists. | **[settled]** — the spec author's ruling; the first implementation closes a declared one to its declaration and reports one nothing declares as not implemented. |
+| #5 (ruled) | A value modifier on a field typed by a reference written in place (`handler?: meta.ref<method> ~ …`) is admitted, read against the reference as against a declared one; on a container, tuple or choice written in place it is refused, as on a declared one. | **[settled]** — the spec author's ruling. |
+| #5 (ruled) | A choice that is not disjoint names every variant: one holding a variant written in place is a resolver error, a tag naming a variant by its name. | **[settled]** — the spec author's ruling. |
+| #5 (ruled) | A name and a type written in place are never the same type, even where the name's construction is identical; a name is a name's type past alias hops, and a type written in place an equal one's. | **[settled]** — the spec author's ruling. |
+| #5 (ruled) | An author's explicit `!C { … }` at a field stays refused: §5.6's constructor application is valid only as a declaration's body, and §5.3 admits an applied constructor at a field where a `!` construction is not. | **[settled]** — the existing rule. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
 

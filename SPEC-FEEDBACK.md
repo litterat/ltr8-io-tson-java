@@ -360,8 +360,8 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   merged, and no name is derived from content. A user schema with inline forms reads data in tree and bind mode and
   through the JSON stack; the reader recovers an untagged value at a disjoint choice whose variant is a reference or
   a `{ of: … }` record.
-- *Identity.* A type written in place compares by its construction; a restated field's narrowing and a choice's
-  variant distinctness compare a name with an inline form by following the name to its declaration's construction.
+- *Identity.* A type written in place compares by its constructor and its fields, so `nonempty_type<uuid>` and
+  `[uuid; 1..]` are two types with two readers.
 - *Applications.* A declared application is its substituted record under its name, `@meta.application` on its key.
   An application at a composition operand is absorbed by value, an applied parent's edge naming the declared entry.
   Inside an open record an application over a parameter is held as written whatever its head, and a constructor's
@@ -384,12 +384,18 @@ applied in place (`s: shape<circle>`) is not reached. An application of another 
 (`pair<box<text> int32>`) is closed as a name is, to a declaration of it where one exists, rather than refused; an
 application of an open record at a slot typed `meta.type_ref` (a map's key, a reference's `of`, a bound) is likewise
 looked up rather than refused; and an application at a refinement source that no declaration names is reported as not
-implemented rather than absorbed.
+implemented rather than absorbed. A restated field's narrowing and a choice's variant distinctness still compare a
+name with a type written in place by following the name to its declaration's construction, where the text makes the
+two never one type. A dependent field whose sibling holds a type written in place, an inline reference among them, is
+not read against it (`DependentFieldReader.referenceIn`). A choice that is not disjoint holding a variant written in
+place is not refused.
 
 **Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 2 §1.3, §1.6, §2.2.3,
 §3.3.3, §3.4.1, §4.1, §4.2 (the type-slot choice), §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12,
 §6, §7.2, §8.1, §8.2 (rewritten as *Instantiation and Identity*), §8.3, §9, §10.1, §11.5, §12.1 and §12.2, and Part 3
-§3.3; `spec/tson-rev40-changelog.md` records each section's rule before and after. Three readings are this
-implementation's and are recorded there for confirmation: a refinement source's application is absorbed as an
-operand's is; a value modifier on a field typed by a reference written in place is refused, the reference declared;
-and a choice that is not disjoint leaves a variant written in place unreachable, a tag naming a variant by its name.
+§3.3; `spec/tson-rev40-changelog.md` records each section's rule before and after. Four points the
+design left open are settled there as ruled: a refinement source's application is absorbed as an operand's is; a
+value modifier on a field typed by a reference written in place is admitted and read against it, and refused on a
+container, tuple or choice written in place; a choice that is not disjoint names every variant, a variant written in
+place there being a resolver error; and a name and a type written in place are never the same type, even where the
+name's construction is identical.

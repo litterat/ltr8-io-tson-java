@@ -63,11 +63,13 @@ spec-required case:
   declaration names `box<text>`, that entry, in either declaration order; with no such declaration
   `TemplateMaterialiser.closeApplication` reports `NOT_IMPLEMENTED`. Absorb it as `ApplicationCloser` absorbs a
   composition operand, and add `schema/valid` vectors with and without a declaration, in both orders.
-- [ ] **A value modifier on a field typed by a reference written in place** ([TSON-SCHEMA] §5.2).
-  `handler?: meta.ref<method> ~ orders.place_order` is refused, a value never being read against a type written in
-  place, and the reference is declared (`method_ref => meta.ref<method>`). `DependentFieldReader.referenceIn` treats
-  a `TypeInline` as naming no type, so check what the linker does with the field's `value` today, refuse it at the
-  declaration if it loads, and add a `schema/invalid` vector.
+- [ ] **A value modifier on a field typed by a reference written in place is not read against it**
+  ([TSON-SCHEMA] §5.2). `handler?: meta.ref<method> ~ orders.place_order` is admitted, the value read against the
+  reference written in place as against a declared one, and a value on a container, tuple or choice written in place
+  is refused. `DependentFieldReader.referenceIn` treats a `TypeInline` as naming no type, so the kernel's
+  `value?: type!` reads nothing against an inline reference. Read the dependent value against the construction the
+  sibling holds, and add a `schema/valid` vector for the inline reference and a `schema/invalid` one for an inline
+  container.
 - [ ] **The naming machinery has no caller and is not deleted.** `DerivedName.ofBinding`, `ofApplication` and
   `canonicalBinding`, `MintedNames`, `InternalName`, `ImportedSynthetics`, the synthetic fact on an entry and its
   branches in `EntryDisplayName` and `TsonSchemaLinker` serve entries nothing mints any more ([TSON-SCHEMA] §8.2).
