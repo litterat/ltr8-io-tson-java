@@ -26,7 +26,7 @@ history lives in git.
 
 Related: `design/json-encoding.md`, `design/json-schema-directed-reading.md` (the record and choice readers that call the
 check), `design/json-facades-binding-writing.md` (`JsonObjectReader`), `design/json-lexer-stream-tree.md` (`JsonStream`),
-`design/name-hygiene-read-path.md`, `design/name-hygiene-and-minted-names.md` (the schema-side walk).
+`design/name-hygiene-read-path.md`, `design/name-hygiene.md` (the schema-side walk).
 
 ## The Unicode policies, and which reach JSON
 

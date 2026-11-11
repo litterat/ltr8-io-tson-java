@@ -10,33 +10,14 @@ import java.util.stream.Collectors;
 
 /**
  * What to call a schema entry in a diagnostic -- the author's own name for it wherever there is one, and
- * otherwise the form they wrote that produced it.
+ * otherwise the form that produced it.
  *
- * <p><b>Why an entry can have a name nobody wrote.</b> Every §5.3 sugar form lifts to an entry of its own
- * ({@code [order; 1..]} becomes {@code array_order_1_e9777a39}) and every §5.10 template application
- * materialises one ({@code paged<order>} becomes {@code paged_order_e0260dd4}), both named content-derived
- * so that two spellings of one type land on one entry (§8.2). Those names are internal and non-normative,
- * and a reader that puts one in a message names a thing that appears nowhere in the author's file -- against
- * this project's own rule that a diagnostic never names what the author did not write, and now doubly so
- * where diagnostics travel to a reader who cannot open the schema at all.
- *
- * <p><b>A missing source position is what tells them apart</b> ({@link TsonSchema.EntryFacts#position}), and it is exact
- * rather than a heuristic on
- * the name's shape: a declaration parsed from a document carries the position of its own name token, and an
- * entry the resolver mints has nothing to carry. So {@code tag_list => [text; 1..2]} keeps {@code tag_list},
- * which is what its author would look for, while the anonymous form inside it renders as the form.
- *
- * <p>The rendering is the sugar the author would have written, not a description of it: {@code
- * [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)}, and {@code
- * paged&lt;order&gt;} for an application that keeps an entry of its own, and a synthetic record as the body a
- * record is written with, <code>{ v: text }</code>. <b>An application nothing declares is its expansion</b>
- * (§5.10), minted under a name no author wrote and named by the application that closed to it, as written ({@link
- * TsonSchema.EntryFacts#closes}): {@code pair_of<int32>} over {@code pair_of => <T> [T; 1..2]} is shown as
- * {@code pair_of<int32>}, and {@code bx<int32>} as itself rather than its body. A synthetic form with no sugar spelling and
- * no application has no authored name ({@link #authored}, read off the key's {@code @meta.synthetic}, {@link
- * TsonSchema.EntryFacts#synthetic}), and a message leaves it unnamed, located by its position. An entry with no
- * position and no mark is a declaration, and keeps its name. {@link #of} falls back to the entry name for a caller
- * that must name something.
+ * <p><b>Every entry is declared</b> ([TSON-SCHEMA] §8.2): nothing is lifted or minted, so a name is an author's, and
+ * an entry with a source position ({@link TsonSchema.EntryFacts#position}) is named by it. An entry with none -- one
+ * the kernel's bootstrap builds by hand, or one read from a resolved form -- is shown as the form its body is where
+ * there is one: {@code [order; 1..]}, <code>{text =&gt; order}</code>, {@code [text, int32]}, {@code (text | int32)},
+ * and {@code paged<order>} for a declared application, which its key records. A type written in place is no entry,
+ * and is named by its own form ({@link TypeInline#text()}).
  */
 public final class EntryDisplayName {
 
@@ -54,8 +35,7 @@ public final class EntryDisplayName {
 
     /**
      * The same, resolving the names <em>inside</em> a form through {@code schema} as well, so a form built over
-     * another derived entry renders whole -- {@code [tree<text>; 1..]} rather than {@code [tree_text_a7f070f6;
-     * 1..]}.
+     * another entry with no position renders whole.
      */
     public static String of(String name, TsonSchema schema) {
         Top value = schema.entries().get(name);
@@ -80,8 +60,7 @@ public final class EntryDisplayName {
 
     /**
      * What the author wrote that names entry {@code name}: its own name, the sugar form, or the application it
-     * records -- or empty for a form with no spelling, which a message leaves unnamed. One level deep, as {@link
-     * #of(String, Top, TsonSchema.EntryFacts, Optional)} is.
+     * records. One level deep, as {@link #of(String, Top, TsonSchema.EntryFacts, Optional)} is.
      */
     public static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
                                             Optional<TypeRef> application) {
@@ -91,13 +70,8 @@ public final class EntryDisplayName {
 
     private static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
                                              Optional<TypeRef> application, Lookup lookup) {
-        if (facts.position().isPresent()) {
+        if (value == null || facts.position().isPresent()) {
             return Optional.of(name);
-        }
-        if (application.isEmpty() && facts.synthetic() && !facts.closes().isEmpty()) {
-            // An application nothing declares is its expansion, minted under a name no author wrote: it is named by
-            // the application that closed to it, as written.
-            return Optional.of(facts.closes().getFirst().text());
         }
         return applied(application).or(() -> Optional.ofNullable(switch (value) {
             // `[T]` is an ordered array that admits repeats; a set is the same body with neither, and has no sugar.
@@ -109,19 +83,7 @@ public final class EntryDisplayName {
                     .map(ref -> shown(ref, lookup)).collect(Collectors.joining(", ", "[", "]"));
             case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, lookup))
                     .collect(Collectors.joining(" | ", "(", ")"));
-            // A record application nothing declares is its expansion, a record no author named, shown as the
-            // body a record is written with.
-            case RecordBody record when facts.synthetic() && record.fields().isEmpty() -> "{}";
-            case RecordBody record when facts.synthetic() -> record.fields().entrySet().stream()
-                    .map(field -> field.getKey() + (field.getValue().optional() ? "?" : "") + ": "
-                            + switch (field.getValue().type()) {
-                                case TypeRef type -> shown(type, lookup);
-                                case TypeInline inline -> shown(inline, lookup);
-                                case SiblingRef sibling -> sibling.text();
-                            })
-                    .collect(Collectors.joining("  ", "{ ", " }"));
-            // An entry nobody marked as minted is declared, wherever its position went.
-            default -> facts.synthetic() ? null : name;
+            default -> name;
         }));
     }
 
@@ -150,7 +112,7 @@ public final class EntryDisplayName {
         };
     }
 
-    /** One name inside a form, itself display-rendered when the namespace knows it and it is derived. */
+    /** One name inside a form, itself display-rendered when the namespace knows it and it has no position. */
     private static String shown(TypeRef ref, Lookup lookup) {
         Top referenced = lookup.namespace().apply(ref.name());
         if (referenced == null || !lookup.rendering().add(ref.name())) {
@@ -165,8 +127,7 @@ public final class EntryDisplayName {
     }
 
     /**
-     * {@code head<arg, arg>} for an entry a template application materialised: an instantiation entry keys its
-     * identity on the application it closes (§8.2), which its key carries.
+     * {@code head<arg, arg>} for a declared application, which its key carries (§8.2).
      */
     private static Optional<String> applied(Optional<TypeRef> application) {
         return application

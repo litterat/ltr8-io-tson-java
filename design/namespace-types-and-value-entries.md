@@ -147,7 +147,7 @@ as the entry's constructor fact, so resolved output writes the tag. A payload th
 against the entry with the read's path.
 
 A value entry's payload is a **value body** (`TsonReadContext.readsValueBody`; a nested `!schema` map's is none, its
-members being declarations): nothing in it lifts or mints, so a
+members being declarations): nothing in it is closed or written in place, so a
 kind-typed slot holds one bare name and an application (`request: box<order>`) is refused with the alias spelling
 named (`order_box => box<order>`, then `request: order_box`). There is no template over an ordinary type: a template's
 body is a record, so `fetch => <T> !operations { … }` is refused at the declaration, and a value is declared once per
@@ -156,7 +156,7 @@ instantiation (`design/open-records.md`).
 **§8.2 reaches the payload at the read, not at the link.** The linker cannot see into a value -- its fields' types are
 left in the declaring schema -- so the payload is read under the loader's identifier policy (`SchemaResolver`'s `value`)
 and judged as a data document is: the keys of the namespace and of every identifier-keyed map in it are scopes, and an
-identifier-typed value is a name (`design/name-hygiene-and-minted-names.md`).
+identifier-typed value is a name (`design/name-hygiene.md`).
 
 ## Binding: one context, and a tree where nothing binds
 

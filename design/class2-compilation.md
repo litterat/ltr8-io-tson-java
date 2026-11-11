@@ -165,9 +165,8 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   the author-written name. That is what makes an erased component
   (`no valid data conversion for class java.lang.Object`) visible from an ordinary read.
 - **A family check names its members the same way.** `RecordExtension`'s pin-collision message renders each
-  colliding member through `EntryDisplayName`, so a family whose members are template applications reports
-  `pet_of<cat, int32>` rather than `pet_of_cat_int32_1c52dc45` — a name that points at no declaration an
-  author can open. The blame still rides the real entry name, which is what locates the violation.
+  colliding member through `EntryDisplayName`, so every member is named by its declaration, the line an author can
+  open. The blame rides the real entry name, which is what locates the violation.
 
 ## §7.2's subsumption guard (`Subsumption`, `VariantSchemaReader`)
 

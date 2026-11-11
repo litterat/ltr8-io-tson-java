@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=42057db740595e473b6144db0b87565645b2fcbbd3fbe945310a60c1045a8fb8"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=c3d71e31fc369d2c8074e86a3ec47e8aa7a090d8de03cc35d33b4638a9116c74"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -447,9 +447,10 @@
 
       Every parameter is a type. It is written where it stands as its name, a
       reference value (`meta.reference_type`), and stands at a field's `type`,
-      at a type slot of a construction written there, or as an argument of an
-      application there or in a parent, and nowhere else: a field's `value` is
-      never a parameter. A parameter passed on as an
+      or as an argument of an application there or in a parent, a form over it
+      being held as the application it spells (`meta.array<T>` for `[T]`), and
+      nowhere else: a field's `value` is never a parameter. A parameter passed
+      on as an
       argument to a bounded parameter is written with a bound that IS-A that
       bound.
       """
@@ -538,11 +539,9 @@
       chain and not the head it was substituted from. A construction carries
       none, `!meta.set_type { element_type: text }` stating its constructor and
       its arguments. On ingest it is read as stated: it is the one fact the
-      entry's value does not state, and what lets an imported schema's
-      instantiations unify with a later schema's. A declaration never writes
-      it, as it never writes `chain`. Its
-      value is the application as the reference written, nested arguments
-      unreduced, `@meta.application:foo<bar<text>>`.
+      entry's value does not state. A declaration never writes it, as it never
+      writes `chain`. Its value is the application as written, each argument a
+      name, `@meta.application:pair<text integer>`.
       """
     application => @meta.annotation meta.type_ref
 
@@ -570,8 +569,9 @@
       A field whose `type` is a sibling reference, `kind!`, is a dependent
       field ([TSON-SCHEMA] §5.2): each instance's value is read against the
       type that instance's `kind` names. The sibling is declared before it, is
-      typed by a reference whose `of` lies within `meta.type`, is never
-      voidable, and is there to read whenever the dependent field is: required,
+      typed by a reference naming types or by `meta.type_expr` or
+      `meta.field_type_expr`, is never voidable, and is there to read whenever
+      the dependent field is: required,
       defaulted, pinned, or a member of a field group with the dependent field
       optional, a group's own member counting as optional. Its default or pin
       names a type a value can be read against. A member is absent when another
@@ -929,20 +929,20 @@
       whitespace but one space between arguments: `pair<text integer>`.
       Identity is the parsed form
       ([TSON-SCHEMA] §8.2), so whitespace inside an argument list is free.
-      A closed application of a constructor at a type slot is the construction,
-      written in place there, and a closed application of an open record
-      denotes an entry and is named bare where it stands ([TSON-SCHEMA] §5.3),
-      so a value carries arguments only where an application is still open, in
-      an open record's `parents`, its field types and the constructions written
+      A closed application at a type slot is a type written in place there: a
+      constructor's is its construction, and an open record's the record it
+      closes to ([TSON-SCHEMA] §5.3, §5.10). Where only a name may stand, an
+      application closes nowhere and is refused ([TSON-SCHEMA] §4.2). So a
+      value carries arguments only where an application is still open, in an
+      open record's `parents`, its field types and the constructions written
       in them, and in the `application` annotation.
 
       Inside an open record a value may be one of the record's parameters,
       written as its name, alone or among an application's arguments, and
       looked up before the namespace ([TSON-SCHEMA] §3.3). A parameter is a
-      type: it stands at a field's `type`, at a type slot of a construction
-      written there, or as an argument of an application there or in a parent,
-      and never at a field's `value`. The slot judges the argument that arrives
-      when the record is applied.
+      type: it stands at a field's `type`, or as an argument of an application
+      there or in a parent, and never at a field's `value`. The slot judges the
+      argument that arrives when the record is applied.
 
       A refinement narrows `of`: the refined `of` is the source's or IS-A it,
       so every name the refinement admits the source admits too, and the

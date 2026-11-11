@@ -86,8 +86,7 @@ class RecordTemplateTest {
         var schema = compiled.schema();
         return schema.entries().keySet().stream()
                 .filter(n -> schema.entries().get(n) instanceof RecordBody && schema.positionOf(n).isEmpty()
-                        && (schema.factsOf(n).synthetic()
-                        || schema.applicationOf(n).filter(applied -> applied.name().equals(head)).isPresent()))
+                        && schema.applicationOf(n).filter(applied -> applied.name().equals(head)).isPresent())
                 .sorted().toList();
     }
 
@@ -120,7 +119,6 @@ class RecordTemplateTest {
                   tb     => box<text>""");
 
         String minted = instantiationsOf(compiled, "box").get(0);
-        assertTrue(compiled.schema().factsOf(minted).synthetic(), minted);
         assertTrue(compiled.schema().applicationOf(minted).isEmpty(), "a minted expansion records no application");
         TypeRef source = compiled.schema().applicationOf("tb").orElseThrow();
         assertEquals("box", source.name());

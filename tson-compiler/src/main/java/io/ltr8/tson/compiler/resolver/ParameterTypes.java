@@ -182,6 +182,7 @@ final class ParameterTypes {
             Top head = entries.get(application.name());
             List<Param> heads = OpenEntry.isOpen(head) && !refused.contains(application.name())
                     ? OpenEntry.parameters(head) : List.of();
+            requireNames(application);
             for (int i = 0; i < application.arguments().size(); i++) {
                 TypeRef argument = application.arguments().get(i);
                 Param mine = argument.arguments().isEmpty() ? parameterOf.apply(argument.name()) : null;
@@ -190,6 +191,33 @@ final class ParameterTypes {
                 } else if (i < heads.size()) {
                     Param theirs = heads.get(i);
                     theirs.bound().ifPresent(bound -> requireBound(mine, application.name(), theirs.name(), bound));
+                }
+            }
+        }
+
+        /**
+         * Refuses an argument of {@code application} that must be a name and is an application ([TSON-SCHEMA] §4.2,
+         * §5.3): any argument of an open record's application, and one of a constructor's that lands at a slot
+         * holding only a name ({@code meta.ref<box<T>>}). An argument at a constructor's type slot is held and closes
+         * there when the record is applied ({@code meta.array<box<T>>}).
+         */
+        private void requireNames(TypeRef application) {
+            Function<String, Top> lookup = name -> lookup(name, true, entries::get, meta);
+            String terminal = AliasChain.terminal(application.name(), lookup);
+            Top head = lookup.apply(terminal);
+            List<Boolean> inPlace = OpenEntry.isOpen(head) ? null
+                    : ConstructionSugar.constructs(terminal, head)
+                            ? ConstructionSugar.slotsInPlace((RecordBody) head, lookup) : List.of();
+            for (int i = 0; i < application.arguments().size(); i++) {
+                TypeRef argument = application.arguments().get(i);
+                if (argument.arguments().isEmpty()) {
+                    continue;
+                }
+                if (inPlace == null) {
+                    throw TemplateMaterialiser.argumentNotAName(argument, application);
+                }
+                if (i < inPlace.size() && !inPlace.get(i)) {
+                    throw TemplateMaterialiser.nameRequired(argument);
                 }
             }
         }
@@ -214,7 +242,8 @@ final class ParameterTypes {
     /**
      * A written bound names a type, so its name -- an application's head, where it is one -- resolves in the
      * schema's namespace and names no constructor: a type argument names a type, which IS-A no constructor
-     * (§4.1), so a bound naming one would admit no argument.
+     * (§4.1), so a bound naming one would admit no argument. A bound is a name, {@code meta.param.bound} being
+     * {@code meta.type_ref}, so an application there is refused (§4.2).
      */
     private static void requireType(TypeRef bound, Function<String, Top> local) {
         String name = bound.name();
@@ -227,6 +256,9 @@ final class ParameterTypes {
             throw new SchemaValidationException("the bound '" + spell(bound) + "' names '" + name + "', and '"
                     + name + "' is a constructor, not a type (§4.1); a bound names a type, which every argument "
                     + "must IS-A (§5.10)");
+        }
+        if (!bound.arguments().isEmpty()) {
+            throw TemplateMaterialiser.nameRequired(bound);
         }
     }
 

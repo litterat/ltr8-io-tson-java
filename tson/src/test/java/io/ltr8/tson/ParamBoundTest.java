@@ -107,7 +107,6 @@ class ParamBoundTest {
         String needs = "is passed to 'boxed', which declares 'T: text', and is written with no bound";
         assertRefused(BOXED + "  rebox => <T> { b: boxed<T> }", needs);
         assertRefused(BOXED + "  rebox => <T> { b: [boxed<T>] }", needs);
-        assertRefused(BOXED + "  pair  => <A, B> { a: A  b: B }\n  rebox => <T> { b: pair<boxed<T>, text> }", needs);
         assertRefused(BOXED + "  rebox => <T> boxed<T> & { c: text }", needs);
         assertRefused(BOXED + "  rebox => <T> { b: meta.array<boxed<T>> }", needs);
     }

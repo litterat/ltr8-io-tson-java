@@ -95,19 +95,16 @@ distinction. They rethrow the original untouched (the linker re-states only an `
 - **A template condemned by `TemplateRegularity` is replaced before materialisation**, on the same terms.
   `TemplateRegularity.check` returns the names it rejected and `SchemaResolver.condemn` puts a placeholder in both the
   entry map and the namespace (`materialise` walks the first, an application's head resolves through the second).
-  Left in place, an application of one runs to `MAX_CLOSING_DEPTH` and reports the same defect again, against
-  whichever entry applied it, with a 64-link chain of synthetic names. **The depth guard does not stand down**: it
-  guards a hole in the static check, not a template the check already condemned.
+  Left in place, an application of one would report the same defect again, against whichever entry applied it.
 - **A defect an open record deferred is reported against the declaration whose text wrote it**
   (`TsonSchemaLinker.heldDeclarationNaming`). A template's references cannot be settled until an application supplies
-  arguments, so the verdict arrives on the entry materialisation minted, and the walk to a positioned entry
-  (`reportedAgainst`) finds the *applier*: `box => <T> { v: T  w: no_such_type }` would be reported against
-  `holder => { b: box<text> }`, a line that is not wrong, once per applier. Deferred checking is survivable only if the
-  author is sent to the line they can edit.
-  - **The offending name is the evidence, not the entry.** A derived entry's provenance cannot answer this: a sugar
-    lift records only the constructor it applies. Asking which open record *mentions the name* among its references
-    (`OpenEntry.names`) reaches the template directly -- and reaches nothing when the name came from the argument
-    list, so `box<some_typo>` keeps its verdict at the application, where that mistake is.
+  arguments, so the verdict can arrive on an entry with no source position, and the walk to a positioned entry
+  (`reportedAgainst`) would find the *applier*, a line that is not wrong, once per applier. Deferred checking is
+  survivable only if the author is sent to the line they can edit.
+  - **The offending name is the evidence, not the entry.** The entry's provenance cannot answer this. Asking which open
+    record *mentions the name* among its references (`OpenEntry.names`) reaches the template directly -- and reaches
+    nothing when the name came from the argument list, so `box<some_typo>` keeps its verdict at the application, where
+    that mistake is.
   - **Both filters are load-bearing.** Only a *derived* entry (no position of its own) is retargeted, or a closed
     declaration's own typo would be blamed on any template that names it; and only an authored open declaration
     (`OpenEntry.isOpen`) is a candidate.
@@ -234,7 +231,7 @@ declares.** `RecordBindReader` refuses four disagreements; `BindTargets` carries
   (`ConcurrentHashMap`, `ArrayDeque`) is not refused here, since no JDK type says so; the read that meets one reports it
   (`design/readers-and-diagnostics.md`).
 - **A tuple field binds to its component's own `@Tuple` class**, which must have the tuple's arity
-  (`TupleBindReader.disagreements`). An inline tuple's minted entry has no author binding and no natural Java form, so
+  (`TupleBindReader.disagreements`). A tuple written in place has no entry, no author binding and no natural Java form, so
   its own reader is unbound (`TupleBindReader.unbound`, raising `MissingBindingException` if read directly) and
   `BindTargets` builds it into the component's class.
 - **An ordered map needs a component that keeps insertion order** (`DataClassMap.ordered()`: a `SequencedMap` that is

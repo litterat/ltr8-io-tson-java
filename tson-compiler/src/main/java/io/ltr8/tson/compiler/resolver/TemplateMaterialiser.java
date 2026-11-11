@@ -48,16 +48,20 @@ import java.util.function.Supplier;
  * <p><b>Nothing is minted.</b> An application of an open record closes only into the declaration that names it,
  * {@code page_order => page<order>} ({@link #closeApplicationInto}), the record under that name with the application
  * recorded ({@code @meta.application}, §8.2). Anywhere else -- at a slot of a closed record, left by substitution in
- * another record's body, at a refinement source -- an application of an open record would close in place, which this
- * library does not do yet: it is reported as not yet supported ({@link UnsupportedOperationException}). The one
- * nested application that closes is the one a declaration is closing itself: {@code next: node<text>} inside {@code
- * node_text => node<text>} names {@code node_text}, so a recursive open record closes into its declaration.
+ * another record's body -- an application of an open record would close in place, which this library does not do
+ * yet: it is reported as not yet supported ({@link UnsupportedOperationException}). The one nested application that
+ * closes is the one a declaration is closing itself: {@code next: node<text>} inside {@code node_text => node<text>}
+ * names {@code node_text}, so a recursive open record closes into its declaration. Two applications are refused
+ * before the gap is reported, being the author's errors whatever this library supports (§5.2, §5.10.1): one that would
+ * put in place a member of a declared type ({@code k: dog_of<text>} over {@code dog_of => <T> pet & { … }}), and a
+ * recursive one with no declaration closing it ({@code f: node<text>}).
  *
  * <p><b>Where a name is required</b> -- an argument of an open record's application, a map's key, a reference's {@code
- * of}, an alias's target -- a construction has nowhere to stand: it is refused, and declared under a name first. An
- * argument of a constructor's application lands at a type slot of the construction, so a construction there is
- * written in place in turn: {@code meta.map<text meta.array<T>>}, which an open record holds for {@code {text =>
- * [T]}}, closes to a map whose value is the array in place.
+ * of}, an alias's target -- an application closes nowhere: a construction and an application of an open record are
+ * each refused there, and declared under a name first ([TSON-SCHEMA] §4.2, §5.3). An argument of a constructor's
+ * application lands at a type slot of the construction, so a construction there is written in place in turn: {@code
+ * meta.map<text meta.array<T>>}, which an open record holds for {@code {text => [T]}}, closes to a map whose value is
+ * the array in place.
  */
 final class TemplateMaterialiser {
 
@@ -91,12 +95,6 @@ final class TemplateMaterialiser {
      * declaration instead of closing again ({@link #closeApplicationInto}).
      */
     private final Map<String, String> closingInto = new LinkedHashMap<>();
-
-    /**
-     * Every application this pass closed into a declaration, to that declaration. Held beside the entries, never
-     * written ({@link #closedApplications}).
-     */
-    private final Map<TypeRef, String> closedApplications = new LinkedHashMap<>();
 
     /**
      * Each instantiation entry's application as it was written, its nested arguments unreduced: what {@code
@@ -196,11 +194,18 @@ final class TemplateMaterialiser {
 
     /**
      * The entry a fully-bound application at a refinement source denotes -- the on-demand half, reached during
-     * resolution rather than from the batch pass afterwards. A source is a name, and an application of an open
-     * record nothing declares has none, so it is reported as not yet supported.
+     * resolution rather than from the batch pass afterwards. A construction there is refused, as at any slot that
+     * holds a name; an application of an open record nothing declares would be absorbed by value, which is not yet
+     * supported.
      */
     String closeApplication(TypeRef application) {
-        return closeName(application).name();
+        if (application.arguments().isEmpty()) {
+            return application.name();
+        }
+        if (constructs(application)) {
+            throw nameRequired(application);
+        }
+        return closeApplicationOfRecord(application).name();
     }
 
     /**
@@ -225,7 +230,7 @@ final class TemplateMaterialiser {
         checkArguments(head, template, application.arguments());
         List<TypeRef> arguments = new ArrayList<>();
         for (TypeRef argument : application.arguments()) {
-            arguments.add(dereferenced(closeArgument(argument)));
+            arguments.add(dereferenced(closeArgument(argument, application)));
         }
         String canonical = DerivedName.canonicalApplication(head, arguments);
         if (closingInto.putIfAbsent(canonical, declaredName) != null) {
@@ -234,7 +239,6 @@ final class TemplateMaterialiser {
         try {
             note(declaredName, RECORD);
             Top closed = closeOpenRecord((RecordBody) template, bind(parameters, arguments));
-            closedApplications.putIfAbsent(plain(application), declaredName);
             return instantiation(declaredName, closed, TypeRef.of(head, arguments), application);
         } finally {
             closingInto.remove(canonical);
@@ -257,33 +261,71 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * What a reference at a slot that holds a name closes to: itself where it carries no arguments, and otherwise an
-     * application of an open record ({@link #instantiate}). A construction has no name, so one here is refused.
+     * What a reference at a slot that holds only a name closes to ([TSON-SCHEMA] §4.2): itself. An application closes
+     * nowhere there -- a construction has no name, and an application of an open record closes in place only at a
+     * type slot -- so either is refused, and the form is declared and named. A head naming nothing is left for the
+     * linker to report as unresolved.
      */
     private TypeRef closeName(TypeRef ref) {
-        if (ref.arguments().isEmpty()) {
-            return ref;
+        if (!ref.arguments().isEmpty() && (constructs(ref) || appliesAnOpenRecord(ref))) {
+            throw nameRequired(ref);
         }
-        if (constructs(ref)) {
-            throw new SchemaValidationException("'" + ref.text() + "' is a construction, and it stands where a "
-                    + "name is required -- a map's key, a reference's 'of', an alias's target or a parent -- where "
-                    + "nothing is written in place (§5.3). Declare it under a name ('my_" + ref.segments().getLast()
-                    + " => " + ref.text() + "') and write that name");
-        }
-        return closeApplicationOfRecord(ref);
+        return ref;
     }
 
     /**
-     * An argument of an application, closed: a name or a parameter ([TSON-SCHEMA] §5.10). A construction is refused,
-     * to be declared under a name first, and an application of an open record is closed as at a name.
+     * An argument of an open record's application: a name or a parameter ([TSON-SCHEMA] §5.3). A construction and an
+     * application of an open record are refused, to be declared under a name first. A head naming nothing is left for
+     * the linker to report as unresolved.
      */
-    private TypeRef closeArgument(TypeRef argument) {
-        if (!argument.arguments().isEmpty() && constructs(argument)) {
-            throw new SchemaValidationException("'" + argument.text() + "' is a construction passed as an argument, "
-                    + "and an argument is a name or a parameter (§5.10): declare it under a name ('my_"
-                    + argument.segments().getLast() + " => " + argument.text() + "') and pass that name");
+    private TypeRef closeArgument(TypeRef argument, TypeRef application) {
+        if (!argument.arguments().isEmpty() && (constructs(argument) || appliesAnOpenRecord(argument))) {
+            throw argumentNotAName(argument, application);
         }
-        return closeName(argument);
+        if (argument.arguments().isEmpty() && appliesAnOpenRecord(argument)) {
+            // A template is no type, and no position names one bare, an argument included (§5.10).
+            throw new SchemaValidationException("'" + argument.name() + "', passed as an argument of '"
+                    + application.text() + "', is a template, and a template is not a type -- write it with its "
+                    + "arguments, declared under a name, and pass that name (§5.10)");
+        }
+        return argument;
+    }
+
+    /** Whether {@code application}'s head, past its alias hops, is an open record. */
+    private boolean appliesAnOpenRecord(TypeRef application) {
+        return OpenEntry.isOpen(lookup(AliasChain.terminal(application.name(), this::lookup)));
+    }
+
+    /**
+     * The refusal of an application where only a name may stand -- a map's key, a reference's {@code of}, a
+     * parameter's bound, an alias's target, a refinement source ([TSON-SCHEMA] §4.2) -- naming the declaration to
+     * write instead.
+     */
+    static SchemaValidationException nameRequired(TypeRef written) {
+        return new SchemaValidationException("'" + written.text() + "' is an application, and it stands where only a "
+                + "name may stand -- a map's key, a reference's 'of', a parameter's bound or an alias's target -- where "
+                + "an application closes nowhere (§4.2): declare it ('" + suggestedName(written) + " => "
+                + written.text() + "') and write that name");
+    }
+
+    /**
+     * The refusal of an application or a construction passed as an argument of an open record's {@code application}
+     * ([TSON-SCHEMA] §5.3), naming the declaration to write instead.
+     */
+    static SchemaValidationException argumentNotAName(TypeRef argument, TypeRef application) {
+        return new SchemaValidationException("'" + argument.text() + "' is passed as an argument of '"
+                + application.text() + "', and an argument of an open record's application is a name or a parameter "
+                + "(§5.3): declare it ('" + suggestedName(argument) + " => " + argument.text()
+                + "') and pass that name");
+    }
+
+    /** A name for a declaration of {@code application}, for a message: {@code text_box} for {@code box<text>}. */
+    static String suggestedName(TypeRef application) {
+        StringBuilder name = new StringBuilder();
+        for (TypeRef argument : application.arguments()) {
+            name.append(argument.arguments().isEmpty() ? argument.segments().getLast() : "my").append('_');
+        }
+        return name.append(application.segments().getLast()).toString();
     }
 
     /**
@@ -294,7 +336,7 @@ final class TemplateMaterialiser {
     private TypeRef closeApplicationOfRecord(TypeRef ref) {
         List<TypeRef> arguments = new ArrayList<>();
         for (TypeRef argument : ref.arguments()) {
-            arguments.add(dereferenced(closeArgument(argument)));
+            arguments.add(dereferenced(closeArgument(argument, ref)));
         }
         String entry = instantiate(templateHead(ref.name()), arguments, ref);
         return entry == null ? TypeRef.of(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
@@ -412,10 +454,63 @@ final class TemplateMaterialiser {
             // the declaration, so the record closes into it.
             return owner;
         }
+        // What a record in place may not be is judged before the gap is: a member of a declared type, and a
+        // recursion with no declaration to tie to.
+        refuseMembership(head, (RecordBody) template, bind(parameters, arguments), written);
+        if (recursive(head)) {
+            throw new SchemaValidationException("'" + written.text() + "' applies the recursive open record '" + head
+                    + "' where no declaration is closing it, so its recursion has nothing to tie to (§5.10.1): "
+                    + "declare it ('" + suggestedName(written) + " => " + written.text()
+                    + "') and write that name where it is used");
+        }
         throw new UnsupportedOperationException("'" + written.text() + "' applies the open record '" + head
                 + "' where no declaration is closing it, and closing an application in place is not yet supported "
-                + "([TSON-SCHEMA] §5.10): declare it ('my_" + head.substring(head.lastIndexOf('.') + 1) + " => "
+                + "([TSON-SCHEMA] §5.10): declare it ('" + suggestedName(written) + " => "
                 + written.text() + "') and write that name where it is used");
+    }
+
+    /**
+     * Refuses an application of the open record {@code head} that would close in place to a member of a declared type
+     * ([TSON-SCHEMA] §5.2): one whose template reaches a declared type through its written parents, or whose applied
+     * parent, substituted, is an application a declaration names. A member is read, tagged and bound by name, so it is
+     * declared.
+     */
+    private void refuseMembership(String head, RecordBody template, Map<String, TypeRef> bindings, TypeRef written) {
+        String member = TypeChain.supertypesOf(template).stream().findFirst().orElse(null);
+        for (TypeRef parent : Substitution.parents(template, bindings)) {
+            if (member == null && !parent.arguments().isEmpty()) {
+                TypeRef canonical = TypeRef.of(templateHead(parent.name()),
+                        parent.arguments().stream().map(this::dereferenced).toList());
+                member = applications.entrySet().stream().filter(entry -> entry.getValue().equals(canonical))
+                        .map(Map.Entry::getKey).findFirst().orElse(null);
+            }
+        }
+        if (member != null) {
+            throw new SchemaValidationException("'" + written.text() + "' would close in place to a record IS-A '"
+                    + member + "', a member of a declared type that no declaration names, and a member is read, "
+                    + "tagged and bound by its name (§5.2): declare it ('" + suggestedName(written) + " => "
+                    + written.text() + "') and write that name where it is used");
+        }
+    }
+
+    /**
+     * Whether the open record {@code head} applies itself, directly or through the open records its body applies
+     * ([TSON-SCHEMA] §5.10.1).
+     */
+    private boolean recursive(String head) {
+        Set<String> seen = new LinkedHashSet<>();
+        List<String> pending = new ArrayList<>(OpenEntry.names(namespace.definition(head)));
+        while (!pending.isEmpty()) {
+            String name = templateHead(pending.removeLast());
+            if (name.equals(head)) {
+                return true;
+            }
+            Top reached = namespace.definition(name);
+            if (OpenEntry.isOpen(reached) && seen.add(name)) {
+                pending.addAll(OpenEntry.names(reached));
+            }
+        }
+        return false;
     }
 
     /** Each parameter of the applied signature against the argument applied for it, in order. */
@@ -492,11 +587,6 @@ final class TemplateMaterialiser {
         return TypeRef.of(reference.name(), reference.arguments());
     }
 
-    /** Every application this pass closed into a declaration, to that declaration. */
-    Map<TypeRef, String> closedApplications() {
-        return new LinkedHashMap<>(closedApplications);
-    }
-
     /** The application {@code name}'s entry closes, as written, where it is an instantiation entry. */
     Optional<TypeRef> writtenApplication(String name) {
         return Optional.ofNullable(writtenApplications.get(name));
@@ -523,8 +613,8 @@ final class TemplateMaterialiser {
 
     /**
      * Each argument against the bound of the parameter it binds ({@code meta.param}, [TSON-SCHEMA] §5.10).
-     * An argument this cannot judge is left for the position to refuse after substitution: an application as an
-     * argument, and a name nothing declares (the linker's verdict).
+     * An argument this cannot judge is left for others to refuse: an application as an argument ({@link
+     * #closeArgument}), and a name nothing declares (the linker's verdict).
      */
     private void checkBounds(String head, Top template, List<TypeRef> arguments) {
         List<Param> parameters = OpenEntry.parameters(template);

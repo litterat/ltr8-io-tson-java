@@ -44,11 +44,16 @@ final class DependentReader implements JsonTypeReader<Object> {
      * reported at {@code siblingCtx} in {@code rules}' words; {@code named} null where the sibling's own read was
      * refused, which has been reported, and the member is skipped.
      */
-    Object readAgainst(JsonReadContext ctx, Reference named, JsonReadContext siblingCtx, RecordDiagnostics rules) {
-        if (named == null) {
+    Object readAgainst(JsonReadContext ctx, io.ltr8.tson.schema.meta.FieldTypeExpr typed, JsonReadContext siblingCtx,
+                       RecordDiagnostics rules) {
+        if (typed == null) {
             EventSkip.nextValue(ctx);
             return null;
         }
+        if (typed instanceof io.ltr8.tson.schema.meta.TypeInline inline) {
+            return context.readers().resolve(inline).read(ctx);
+        }
+        Reference named = (Reference) typed;
         String refusal = null;
         String entry = null;
         switch (named) {
