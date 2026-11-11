@@ -55,7 +55,7 @@ import java.util.function.BiPredicate;
  */
 @Typename(name = "meta.reference_type")
 public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling") boolean allowSibling,
-                            @Unbound Optional<Index> index) implements Atom {
+                            @Unbound Optional<Index> index) implements Atom, TypeInline {
 
     /**
      * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are types,

@@ -34,8 +34,8 @@ record ArrayPlan(String displayName, JsonSchemaLocation schemaLocation, boolean 
         String displayName = EntryDisplayName.of(name, context.schema());
         return new ArrayPlan(displayName, context.locationOf(name),
                 body.voidable(), body.uniqueItems(), body.minItems(), body.maxItems(),
-                context.readers().resolve(body.elementType().name()), new ArrayDiagnostics(displayName),
-                body.uniqueItems() && AliasChain.terminal(context.schema(), body.elementType().name())
+                context.readers().resolve(body.elementName().name()), new ArrayDiagnostics(displayName),
+                body.uniqueItems() && AliasChain.terminal(context.schema(), body.elementName().name())
                         .map(terminal -> terminal.definition() instanceof IdentifierType)
                         .orElse(false));
     }

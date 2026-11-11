@@ -43,7 +43,7 @@ class AliasedConstructorDispatchTest {
         Top definition = read("!meta.set_type { element_type: text }");
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, definition);
-        assertEquals("text", body.elementType().name());
+        assertEquals("text", body.elementName().name());
     }
 
     /** A name that is nobody's -- neither a class's own nor an alias -- is still not a member. */

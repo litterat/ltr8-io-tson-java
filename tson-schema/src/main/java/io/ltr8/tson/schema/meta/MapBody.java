@@ -28,7 +28,7 @@ public record MapBody(TypeChain chain,
         @Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
                        @Field("voidable") boolean voidable, @Field("ordered") boolean ordered,
                        @Field("min_items") Optional<Long> minItems,
-                       @Field("max_items") Optional<Long> maxItems) implements Product {
+                       @Field("max_items") Optional<Long> maxItems) implements Product, TypeInline {
     /** The chain normalised: absent and empty are one list. */
     @Record
     public MapBody {

@@ -56,8 +56,33 @@ final class ChoiceReader {
                 "is a choice -- a value at this position requires an explicit type annotation (!typeName) "
                         + "naming one of its declared variants to disambiguate",
                 "declared variant", variantNames, context.readers(),
-                untaggedRecovery(typeDefinition, body, context.linked()));
+                untaggedRecovery(typeDefinition, body, context.linked()),
+                tag -> variantOfSubtype(tag, variantNames, context.linked()));
     };
+
+    /**
+     * Spike (inline types): the one variant a tag naming no variant IS-A, by §7.2's subsumption, or empty where it
+     * reaches none or more than one -- so {@code !meta.array { … }} at {@code ( meta.type_ref | meta.type )} is read
+     * at the variant {@code meta.type}, whose own reader takes the tag.
+     */
+    private static Optional<String> variantOfSubtype(String tag, Set<String> variants, TsonLinkedSchema linked) {
+        var entries = linked.schema().entries().entries();
+        Optional<Top> definition = io.ltr8.tson.compiler.resolver.AliasChain.terminalDefinition(tag, entries);
+        if (definition.isEmpty() || !(definition.get() instanceof io.ltr8.tson.schema.meta.Type type)) {
+            return Optional.empty();
+        }
+        String found = null;
+        for (String variant : variants) {
+            String terminal = io.ltr8.tson.compiler.resolver.AliasChain.terminal(variant, entries);
+            if (type.supertypes().contains(terminal)) {
+                if (found != null) {
+                    return Optional.empty();
+                }
+                found = variant;
+            }
+        }
+        return Optional.ofNullable(found);
+    }
 
     /**
      * {@code discrimination class -> variant name} for untagged recovery, or empty (tag stays required)
@@ -75,11 +100,12 @@ final class ChoiceReader {
         for (TypeRef variant : body.variants()) {
             Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(),
                     linked.schema().entries()::get);
-            if (variantClass.isEmpty() || !variantClass.get().scalar()
-                    || byClass.putIfAbsent(variantClass.get(), variant.name()) != null) {
-                return Map.of(); // a classless or container variant, or two variants sharing a class -> keep the tag
+            if (variantClass.isEmpty() || byClass.putIfAbsent(variantClass.get(), variant.name()) != null) {
+                return Map.of(); // a classless variant, or two variants sharing a class -> keep the tag
             }
         }
+        // Spike (inline types): a container variant no longer withholds recovery from the scalar ones, and its own
+        // delimiter recovers it (§5.4: "plus the brace/bracket delimiter").
         return byClass;
     }
 }

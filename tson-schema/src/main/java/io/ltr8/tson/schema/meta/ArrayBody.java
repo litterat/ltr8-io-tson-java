@@ -26,10 +26,21 @@ import java.util.Optional;
  */
 @Typename(name = "meta.array")
 public record ArrayBody(TypeChain chain,
-        @Field("element_type") TypeRef elementType, boolean voidable, boolean ordered,
+        @Field("element_type") TypeExpr elementType, boolean voidable, boolean ordered,
                          @Field("unique_items") boolean uniqueItems,
                          @Field("min_items") Optional<Long> minItems,
-                         @Field("max_items") Optional<Long> maxItems) implements Product {
+                         @Field("max_items") Optional<Long> maxItems) implements Product, TypeInline {
+    /**
+     * Spike: the element type where it is a name, for the consumers not yet taught an inline one. An inline element
+     * type is a gap here, not a schema error.
+     */
+    public TypeRef elementName() {
+        if (elementType instanceof TypeRef reference) {
+            return reference;
+        }
+        throw new UnsupportedOperationException("an inline element type is not yet read here: " + elementType);
+    }
+
     /** The chain normalised: absent and empty are one list. */
     @Record
     public ArrayBody {
@@ -37,7 +48,7 @@ public record ArrayBody(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public ArrayBody(TypeRef elementType, boolean voidable, boolean ordered, boolean uniqueItems,
+    public ArrayBody(TypeExpr elementType, boolean voidable, boolean ordered, boolean uniqueItems,
             Optional<Long> minItems, Optional<Long> maxItems) {
         this(TypeChain.EMPTY, elementType, voidable, ordered, uniqueItems, minItems, maxItems);
     }
@@ -51,7 +62,7 @@ public record ArrayBody(TypeChain chain,
      * The unconstrained shape every built-in array uses before size refinement: not voidable, ordered, non-unique,
      * unbounded.
      */
-    public static ArrayBody of(TypeRef elementType) {
+    public static ArrayBody of(TypeExpr elementType) {
         return new ArrayBody(elementType, false, true, false, Optional.empty(), Optional.empty());
     }
 

@@ -100,7 +100,7 @@ final class TypeInhabitance {
             case RecordBody record -> recordInhabited(record, namespace, inhabited);
             case ArrayBody array -> array.voidable()
                     || isEmptyAllowed(array.minItems())
-                    || refInhabited(array.elementType(), namespace, inhabited);
+                    || refInhabited(array.elementName(), namespace, inhabited);
             case MapBody map -> isEmptyAllowed(map.minItems())
                     || (refInhabited(map.keyType(), namespace, inhabited)
                             && refInhabited(map.valueType(), namespace, inhabited));
@@ -286,8 +286,8 @@ final class TypeInhabitance {
         }
         return switch (definition) {
             case RecordBody record -> recordDependency(record, namespace, inhabited);
-            case ArrayBody array -> refInhabited(array.elementType(), namespace, inhabited)
-                    ? null : array.elementType().name();
+            case ArrayBody array -> refInhabited(array.elementName(), namespace, inhabited)
+                    ? null : array.elementName().name();
             case MapBody map -> refInhabited(map.valueType(), namespace, inhabited)
                     ? null : map.valueType().name();
             case io.ltr8.tson.schema.meta.NamespaceBody ignored -> null;

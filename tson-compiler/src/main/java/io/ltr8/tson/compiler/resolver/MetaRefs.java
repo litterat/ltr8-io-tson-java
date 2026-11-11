@@ -83,7 +83,7 @@ final class MetaRefs {
             case RecordBody record -> record.withFields(record.mapFields(field ->
                     OpenEntry.parameterIn(field.type()).isPresent() ? field
                             : field.withType(mapField(field.type(), map))));
-            case ArrayBody array -> new ArrayBody(array.chain(), map.apply(array.elementType()),
+            case ArrayBody array -> new ArrayBody(array.chain(), map.apply(array.elementName()),
                     array.voidable(), array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(mapBody.chain(),
                     map.apply(mapBody.keyType()), map.apply(mapBody.valueType()),

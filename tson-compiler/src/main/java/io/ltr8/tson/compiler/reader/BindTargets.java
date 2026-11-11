@@ -97,7 +97,9 @@ final class BindTargets {
             return reader;
         }
         TsonTypeReader<?> bound;
-        boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == Reference.class;
+        // Spike (inline types): a TypeExpr slot reached by a name reads as a TypeRef one does.
+        boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == Reference.class
+                || payload.typeClass() == io.ltr8.tson.schema.meta.TypeExpr.class;
         boolean byName = typeRef || payload.typeClass() == Ref.class;
         if (byName && readsARef(reader)) {
             // The name reader produces the host value itself -- the Ref the linker will deliver into, or the
@@ -232,7 +234,7 @@ final class BindTargets {
                     + collection.typeClass().getSimpleName() + ", which has no null to hold one");
         }
         String targetName = collection.typeClass().getSimpleName();
-        TsonTypeReader<?> element = to(site.resolver().resolve(array.body.elementType().name()),
+        TsonTypeReader<?> element = to(site.resolver().resolve(array.body.elementName().name()),
                 collection.arrayDataClass(), what + "'s element", targetName + "'s element", site, false);
         return new ArrayBindReader(top ? site.field() : array.name, top ? site.field() : array.displayName,
                 array.body, collection, element, array.schemaLocation, array.elementsAreNames);

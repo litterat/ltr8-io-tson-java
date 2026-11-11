@@ -503,7 +503,7 @@ class ContainerSugarEndToEndTest {
 
         String array = ((RecordBody) compiled.schema().entries().get("direct"))
                 .fields().values().iterator().next().typeRef().name();
-        String element = ((ArrayBody) compiled.schema().entries().get(array)).elementType().name();
+        String element = ((ArrayBody) compiled.schema().entries().get(array)).elementName().name();
 
         assertTrue(array.contains(element),
                 () -> "'" + array + "' should be derived from its element entry '" + element + "'");
