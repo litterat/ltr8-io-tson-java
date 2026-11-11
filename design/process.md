@@ -195,12 +195,8 @@ absorbs what survives of the argument and the document goes, git history keeping
 
 ## Conventions at full length
 
-**Javadoc documents current contract only, no change history.** Java source Javadoc describes an element's
-*current* behavior — never dates, "renamed from X", "used to do Y, now does Z", "on the user's direction",
-or similar changelog framing. If a design needs a WHY, state the current invariant and its rationale
-directly. When you edit a class, clean up its Javadoc in the same edit — remove stale narrative (even if
-you didn't write it), fix anything that no longer matches the code, tighten what's left. The `design/` notes
-and this file follow the same no-history rule; the dated log lives in git.
+**A comment says why, never what; a design note holds what the code cannot.** The root `CLAUDE.md` states both
+rules and their test in full, and they are not restated here. The dated log lives in git.
 
 **`BACKLOG.md` is a clean list of outstanding work and nothing else.** Every entry names something someone
 could pick up and do. Three things are therefore not entries, however true: **what was done** (an item that
@@ -211,10 +207,6 @@ Prose inside a live entry follows the same rule — say what is left and what co
 halves already work turns an item into a status report that goes stale silently. Where one of those facts has
 to survive its entry, it belongs in the `design/` note, the Javadoc, or the test that owns the area, where the
 person who trips over it will be looking. Git history is the log.
-
-**Keep the `design/` note current in the same session as the change.** When work alters behavior an area's
-design note describes, update that note the way you'd update the class's Javadoc — same edit, not a
-follow-up. A note that silently drifts is worse than no note.
 
 **`Tson` is a prefix, never an infix.** A class name containing `Tson` must lead with it (`TsonSchema`,
 `TsonDataParser`, `TsonCompiledSchema`) — never buried (`CompiledTsonSchema` is wrong). The prefix is

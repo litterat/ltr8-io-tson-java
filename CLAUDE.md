@@ -14,7 +14,7 @@ applies to all work in the repo.
 
 ## Design notes (`design/`)
 
-Forty-odd notes, each under ~25 KB and opening with its invariants. Pick by the class you are about to touch.
+Forty-odd notes, each under ~8 KB and opening with its invariants. Pick by the class you are about to touch.
 
 | Area | Notes (`design/…`) |
 |---|---|
@@ -121,12 +121,29 @@ record it — never silently pick an interpretation.
 
 ## Conventions
 
-**Javadoc and notes document the current contract only.** No dates, no "renamed from", no "used to", no "on the user's
-direction". If a design needs a why, state the invariant and its rationale, once, in proportion to its logic. When you
-edit a class, clean its Javadoc in the same edit. `design/` and this file follow the same rule.
+**A comment says why, never what.** The code says what it does, a test's name says what must hold, and the spec
+states the rule. A comment earns its place by saying what none of those can: the invariant a reader would break, the
+reason the obvious alternative is wrong, or the section that requires the behaviour (`[TSON-SCHEMA] §5.10`).
 
-**Keep the `design/` note current in the same session as the change**, the way you would the Javadoc. A note that
-silently drifts is worse than no note.
+- No comment restates the code beneath it, a signature or a type. A method whose name and types say it has no Javadoc.
+- A comment describes its own class. Another class's mechanism is named by `{@link}`, never retold: when that class
+  changes, this file should not have to.
+- A fact is stated once, where it is enforced. Where an assertion, a sealed type or a test can hold the invariant,
+  write that and not the sentence.
+- Present tense, current contract: no dates, no "renamed from", no "used to", no "no longer".
+- When you edit a class, delete the comments the edit makes untrue or unnecessary, in the same edit. Adding prose is
+  never part of finishing a change.
+
+The one place a comment says what is public API (`Tson`, the facades, `tson-base`): what a caller may pass and what
+comes back.
+
+**A design note holds what the code cannot.** One per area: the invariants that are easy to break silently, each
+with its reason, and the decisions that lost and why. It does not walk through the code, list methods or restate the
+spec. A note is under ~8 KB; one that needs more is describing the implementation. Update a note when an invariant
+or a decision changes, not when code moves: a change that touches no invariant touches no note.
+
+**The test for both:** if this sentence were deleted, could a reader recover it from the code, the tests or the
+spec in a minute? If so, delete it.
 
 **`BACKLOG.md` is a list of outstanding work and nothing else.** Every entry is something someone could pick up. Not
 entries: what was done (a shipped item comes out entirely), what was decided against, what might become work later. A
