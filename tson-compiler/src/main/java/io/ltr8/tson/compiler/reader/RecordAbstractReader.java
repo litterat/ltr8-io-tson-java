@@ -432,6 +432,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             case VoidReader ignored -> true;
             case VoidTreeReader ignored -> true;
             case ErrorReader ignored -> true;
+            // A choice that recovers an untagged token reads it at its atom variant -- the kernel's
+            // `meta.field_type_expr`, where a name is the reference variant's -- so the token is that atom's value.
+            case NamedDispatchReader choice -> choice.recovers(DiscriminationClass.STRING);
+            case NamedDispatchReader.Recovering choice -> choice.dispatch().recovers(DiscriminationClass.STRING);
             default -> false;
         };
     }

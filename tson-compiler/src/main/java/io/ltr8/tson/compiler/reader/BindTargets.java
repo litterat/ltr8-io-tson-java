@@ -109,6 +109,18 @@ final class BindTargets {
         boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == Reference.class
                 || payload.typeClass() == TypeExpr.class || payload.typeClass() == FieldTypeExpr.class;
         boolean byName = typeRef || payload.typeClass() == Ref.class;
+        boolean slot = payload.typeClass() == TypeExpr.class || payload.typeClass() == FieldTypeExpr.class;
+        if (slot && RecordAbstractReader.unwrapped(reader) instanceof NamedDispatchReader choice
+                && choice.recovers(DiscriminationClass.STRING)) {
+            // A type slot's choice (meta.type_expr): a name at it is read as a TypeRef component reads one, so the
+            // annotations written on the name are kept; a type written in place is read by the choice as it is.
+            TsonTypeReader<?> named = site.resolver().resolve(choice.recoveredTo(DiscriminationClass.STRING));
+            if (readsAKind(named)) {
+                return AnnotationBoxing.wrap(choice.recoveringWith(DiscriminationClass.STRING,
+                        new TypeNameSlotReader(slotAtom(named), site.annotationTypes(), what,
+                                payload.typeClass() == FieldTypeExpr.class)), target, site.annotationTypes());
+            }
+        }
         if (byName && readsARef(reader)) {
             // The name reader produces the host value itself -- the Ref the linker will deliver into, or the
             // TypeRef -- so the atom's own bridge (Ref's name form) is not applied on top of it.

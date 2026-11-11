@@ -51,7 +51,8 @@ class SealedFactoryEncodingParityTest {
               pong_body => { seq: int32  latency: int32 }
 
               ping => msg_of<ping_body> & { kind?: = "ping" }
-              pong => msg_of<[pong_body]> & { kind?: = "pong" }
+              pong_bodies => [pong_body]
+              pong => msg_of<pong_bodies> & { kind?: = "pong" }
 
               channel => { m: msg }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);

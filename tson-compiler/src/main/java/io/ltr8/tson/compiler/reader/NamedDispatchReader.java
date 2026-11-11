@@ -55,6 +55,38 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
         this.untaggedRecovery = untaggedRecovery;
     }
 
+    /** Whether an untagged value of {@code valueClass} is recovered to a variant rather than refused. */
+    boolean recovers(DiscriminationClass valueClass) {
+        return untaggedRecovery.containsKey(valueClass);
+    }
+
+    /** The variant an untagged value of {@code valueClass} is recovered to, or {@code null} where none is. */
+    TypeExpr recoveredTo(DiscriminationClass valueClass) {
+        return untaggedRecovery.get(valueClass);
+    }
+
+    /**
+     * This dispatch with an untagged value of {@code valueClass} read by {@code reader} rather than by its variant's
+     * own: how a bound slot reads a name at a type slot's choice through the reader a {@code TypeRef} component gets,
+     * which keeps the annotations written on the name ({@link BindTargets}).
+     */
+    Recovering recoveringWith(DiscriminationClass valueClass, TsonTypeReader<?> reader) {
+        return new Recovering(this, valueClass, reader);
+    }
+
+    /** {@link #recoveringWith}'s dispatch: an untagged value of {@code valueClass} to {@code reader}, else as is. */
+    record Recovering(NamedDispatchReader dispatch, DiscriminationClass valueClass, TsonTypeReader<?> reader)
+            implements TsonTypeReader<Object> {
+
+        @Override
+        public Object read(TsonReadContext ctx) {
+            if (EventSkip.typeRefAhead(ctx).isEmpty() && classOf(EventSkip.aheadOfValue(ctx)) == valueClass) {
+                return reader.read(ctx);
+            }
+            return dispatch.read(ctx);
+        }
+    }
+
     @Override
     public Object read(TsonReadContext ctx) {
         Optional<String> typeRef = EventSkip.typeRefAhead(ctx);
@@ -79,15 +111,14 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
         return null;
     }
 
-    /** Recovers an untagged value to the variant of its own §4 base-type class (see the class Javadoc). */
-    private Object recoverUntagged(TsonReadContext ctx) {
-        // Past the annotations, which are still unread: they belong to the value, and the variant's own
-        // reader takes the whole data-value from the cursor as it stands.
-        TsonEvent event = EventSkip.aheadOfValue(ctx);
-        DiscriminationClass valueClass = switch (event) {
+    /**
+     * The class of the untagged value an event opens: a scalar token's §4 base-type class, a reference token's
+     * string class (one unquoted token, like a name, §5.4), a brace's or a bracket's; {@code null} for anything else.
+     */
+    private static DiscriminationClass classOf(TsonEvent event) {
+        return switch (event) {
             case TokenEvent token -> DiscriminationClass.ofValue(
                     ValueParser.INSTANCE.read(new TokenValue(token.text(), token.form())));
-            // A reference is one unquoted token, string-class like a name (§5.4).
             case ReferenceEvent ignored -> DiscriminationClass.STRING;
             case RecordStart ignored -> DiscriminationClass.BRACE;
             case MapStart ignored -> DiscriminationClass.BRACE;
@@ -95,6 +126,14 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
             case ArrayStart ignored -> DiscriminationClass.BRACKET;
             case null, default -> null;
         };
+    }
+
+    /** Recovers an untagged value to the variant of its own §4 base-type class (see the class Javadoc). */
+    private Object recoverUntagged(TsonReadContext ctx) {
+        // Past the annotations, which are still unread: they belong to the value, and the variant's own
+        // reader takes the whole data-value from the cursor as it stands.
+        TsonEvent event = EventSkip.aheadOfValue(ctx);
+        DiscriminationClass valueClass = classOf(event);
         TypeExpr variant = valueClass == null ? null : untaggedRecovery.get(valueClass);
         if (variant != null) {
             return resolver.resolve(variant).read(ctx);

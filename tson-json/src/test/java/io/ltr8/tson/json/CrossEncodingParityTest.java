@@ -75,6 +75,7 @@ class CrossEncodingParityTest {
               employee  => person & { department: text }
               robot     => { serial: text }
               holder    => { who: person  labels: [text] }
+              in_place  => { grid: [[text]]  prices: {text => [int32]}  pair: [text, int32]  id: ( int32 | text ) }
               scalars   => ( text | int32 | boolean )
               circle    => { radius: float64 }
               square    => { side: float64 }
@@ -109,7 +110,7 @@ class CrossEncodingParityTest {
               won        => <T> outcome<T> & { prize: text }
               outcome_of => outcome<text>
               won_of     => won<text>
-              ledger     => { o: outcome<text> }
+              ledger     => { o: outcome_of }
               boxed      => abstract { }
               box        => <T> boxed & { v: T }
               int_box    => box<int32>
@@ -123,7 +124,8 @@ class CrossEncodingParityTest {
               tpet       => abstract <B> { tk: text =?  extra?: B }
               tdog       => tpet<text> & { tk?: = "dog"  breed: text }
               tcat       => tpet<text> & { tk?: = "cat"  indoor: boolean }
-              tpen       => { t: tpet<text> }
+              tpet_of    => tpet<text>
+              tpen       => { t: tpet_of }
               local_box  => { v: meta.declared }
               fragment   => { ( include: text | name?: text  type?: text ) }
               endpoint   => { ( host: text  port: int32 | socket: text )? }
@@ -553,7 +555,8 @@ class CrossEncodingParityTest {
 
     /**
      * An abstract template's application is an abstract record carrying the template's selector (§5.10), so a
-     * position typed {@code tpet<text>} dispatches over the declarations composing it, in both encodings.
+     * position typed {@code tpet_of}, the declaration of {@code tpet<text>}, dispatches over the declarations composing
+     * it, in both encodings.
      */
     @Test
     void anAbstractTemplatesApplicationDispatchesOverItsMembersInBoth() {
@@ -971,6 +974,19 @@ class CrossEncodingParityTest {
         bothAccept("shaped", """
                 { outline: !circle { radius: 1.0 } }""", """
                 {"outline": {"$type": "circle", "radius": 1.0}}""");
+    }
+
+    // ── Types written in place: each read by a reader built from its construction ────────
+
+    /** Container sugar at a field is the construction in place, nested and in a choice, read alike in both. */
+    @Test
+    void typesWrittenInPlaceReadAlike() {
+        bothAccept("in_place", """
+                { grid: [[a] []]  prices: { eur => [1 2] }  pair: [x 3]  id: name }""", """
+                {"grid": [["a"], []], "prices": {"eur": [1, 2]}, "pair": ["x", 3], "id": "name"}""");
+        sameRule("in_place", """
+                { grid: []  prices: {}  pair: [x]  id: 1 }""", """
+                {"grid": [], "prices": {}, "pair": ["x"], "id": 1}""");
     }
 
     // ── §6.1.5 subsumption: `!employee` in text, `$type` in JSON ────────
