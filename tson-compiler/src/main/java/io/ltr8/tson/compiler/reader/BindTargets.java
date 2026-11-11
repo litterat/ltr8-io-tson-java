@@ -21,8 +21,11 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TupleElement;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 /**
  * A position's reader bound to what a Java target declares -- a record component, or, at any depth below one, a
@@ -76,9 +79,12 @@ final class BindTargets {
     private BindTargets() {
     }
 
-    /** What every rebuild at one record field shares: the field's name, the schema's readers, the mismatches. */
+    /**
+     * What every rebuild at one record field shares: the field's name, the schema's readers, the mismatches, and the
+     * entry a name reaches past its alias hops ([TSON-SCHEMA] §8.3).
+     */
     record Site(String field, TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes,
-                List<String> mismatches) {
+                List<String> mismatches, UnaryOperator<String> terminal) {
     }
 
     /**
@@ -112,12 +118,18 @@ final class BindTargets {
         if (slot && RecordAbstractReader.unwrapped(reader) instanceof NamedDispatchReader choice
                 && choice.recovers(DiscriminationClass.STRING)) {
             // A type slot's choice (meta.type_expr): a name at it is read as a TypeRef component reads one, so the
-            // annotations written on the name are kept; a type written in place is read by the choice as it is.
+            // annotations written on the name are kept; a type written in place is read by the choice's own variant,
+            // under the constructor its body is tagged with, which no field of the wrapper holds.
             TsonTypeReader<?> named = site.resolver().resolve(choice.recoveredTo(DiscriminationClass.STRING));
             if (readsAKind(named)) {
-                return AnnotationBoxing.wrap(choice.recoveringWith(DiscriminationClass.STRING,
-                        new TypeNameSlotReader(slotAtom(named), site.annotationTypes(), what,
-                                payload.typeClass() == FieldTypeExpr.class)), target, site.annotationTypes());
+                Map<DiscriminationClass, TsonTypeReader<?>> readers = new EnumMap<>(DiscriminationClass.class);
+                readers.put(DiscriminationClass.STRING, new TypeNameSlotReader(slotAtom(named),
+                        site.annotationTypes(), what, payload.typeClass() == FieldTypeExpr.class));
+                if (choice.recovers(DiscriminationClass.BRACE)) {
+                    readers.put(DiscriminationClass.BRACE, new TypeInlineReader(
+                            site.resolver().resolve(choice.recoveredTo(DiscriminationClass.BRACE)), site.terminal()));
+                }
+                return AnnotationBoxing.wrap(choice.recoveringWith(readers), target, site.annotationTypes());
             }
         }
         if (byName && readsARef(reader)) {

@@ -340,8 +340,8 @@ final class TemplateMaterialiser {
         // Each argument landed at a slot of the construction, read as the reference it was written as; closing the
         // body closes each one where it stands -- a nested constructor's application, which an open record holds
         // for a nested form over its parameter ({@code {text => [T]}}), in place at its type slot.
-        return Optional.of(new TypeInline((Type) MetaRefs.mapRefsKeepingChain(type.withChain(TypeChain.EMPTY),
-                slotRewrite())));
+        return Optional.of(new TypeInline(constructor,
+                (Type) MetaRefs.mapRefsKeepingChain(type.withChain(TypeChain.EMPTY), slotRewrite())));
     }
 
     /** What {@link #materialise} applies to every reference: a slot's closed in place, a name's to a name. */

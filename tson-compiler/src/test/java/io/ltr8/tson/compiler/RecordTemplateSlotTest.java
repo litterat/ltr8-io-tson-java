@@ -61,6 +61,40 @@ class RecordTemplateSlotTest {
         assertTrue(gap.getMessage().contains("'box<text>'"), gap.getMessage());
     }
 
+    /**
+     * A parameter at a type slot inside a type written in place, in an explicit payload, is no author's error but is
+     * not yet supported: the parameters are scoped and substituted at the field types and their applications, and
+     * neither reaches inside the wrapper. The sugar spelling, {@code [T]}, is the application and is admitted.
+     */
+    @Test
+    void aParameterInsideATypeWrittenInPlaceIsNotYetSupported() {
+        Map<String, String> gaps = Map.of(
+                "  arr => <T> !meta.record { fields: { v => { type: { of: !meta.array { element_type: T } } } } }",
+                "parameter 'T' stands at meta.array.element_type, inside a type written in place",
+                "  deep => <T> !meta.record { fields: { v => { type: { of: !meta.map { key_type: text  value_type: "
+                        + "{ of: !meta.array { element_type: T } } } } } } }",
+                "parameter 'T' stands at meta.array.element_type, inside a type written in place",
+                "  pick => <T> !meta.record { fields: { v => { type: { of: !meta.choice { variants: [text T] } } } } }",
+                "parameter 'T' stands at meta.choice.variants, inside a type written in place");
+        gaps.forEach((declaration, expected) -> {
+            UnsupportedOperationException gap = assertThrows(UnsupportedOperationException.class,
+                    () -> compile(declaration), declaration);
+            assertTrue(gap.getMessage().contains(expected), gap.getMessage());
+        });
+        assertDoesNotThrow(() -> compile("""
+                  arr => <T> { v: [T] }
+                  a => arr<text>
+                """));
+    }
+
+    /** A parameter at a slot that holds no type is the author's error inside a type written in place as outside it. */
+    @Test
+    void aParameterAtAScalarSlotInsideATypeWrittenInPlaceIsRefused() {
+        String message = rejected("  sized => <N> !meta.record { fields: { v => { type: { of: !meta.array { "
+                + "element_type: text  min_items: N } } } } }");
+        assertTrue(message.contains("parameter 'N' stands at meta.array.min_items"), message);
+    }
+
     /** The two places, each applied so the closing runs as well as the declaration. */
     @Test
     void aParameterStandsInAFieldsTypeAndAnApplicationsArguments() {

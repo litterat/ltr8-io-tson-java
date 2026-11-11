@@ -2647,13 +2647,14 @@ final class DefinitionResolver {
     private io.ltr8.tson.schema.meta.TypeInline inlineType(String field, InlineConstruction inline) {
         // The head is made ready first, as a declaration's `!C { ... }` makes its own (§3.4.1): reading a value
         // against a type waits on the type.
-        resolveConstructorTarget("field '" + field + "'", inline.constructor());
+        String constructor = resolveConstructorTarget("field '" + field + "'", inline.constructor()).name();
         Top body = bindAtomInstance("field '" + field + "'", inline.value());
         if (!(body instanceof io.ltr8.tson.schema.meta.Type type) || !io.ltr8.tson.schema.meta.TypeInline.inlinable(type)) {
             throw new IllegalStateException("field '" + field + "': the construction '!" + inline.constructor()
                     + " { ... }' written in place built " + body + ", which is no container, tuple, choice or "
                     + "reference -- SchemaDesugarer writes only those in place");
         }
-        return new io.ltr8.tson.schema.meta.TypeInline(type.withChain(io.ltr8.tson.schema.meta.TypeChain.EMPTY));
+        return new io.ltr8.tson.schema.meta.TypeInline(constructor,
+                type.withChain(io.ltr8.tson.schema.meta.TypeChain.EMPTY));
     }
 }

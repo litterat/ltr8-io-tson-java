@@ -161,7 +161,6 @@ final class DependentFields {
         }
     }
 
-    /** Whether a field typed {@code type} holds names of types: past its alias hops, a reference over a constructor. */
     /**
      * Whether a sibling typed {@code type} holds type names: a reference naming types, written by name or in place
      * ({@code meta.ref<C>}), or the kernel's {@code meta.type_expr} or {@code meta.field_type_expr}, whose names are

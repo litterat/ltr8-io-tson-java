@@ -1177,7 +1177,7 @@ public final class TsonSchemaLinker {
     /** A type written in place, the types written inside it derived first, then its own body. */
     private static TypeInline mapInline(TypeInline inline, UnaryOperator<io.ltr8.tson.schema.meta.Type> derive) {
         Top inner = mapInline(inline.of(), derive);
-        return new TypeInline(derive.apply((io.ltr8.tson.schema.meta.Type) inner));
+        return inline.withOf(derive.apply((io.ltr8.tson.schema.meta.Type) inner));
     }
 
     /**

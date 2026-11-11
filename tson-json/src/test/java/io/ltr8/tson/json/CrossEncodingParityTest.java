@@ -76,6 +76,8 @@ class CrossEncodingParityTest {
               robot     => { serial: text }
               holder    => { who: person  labels: [text] }
               in_place  => { grid: [[text]]  prices: {text => [int32]}  pair: [text, int32]  id: ( int32 | text ) }
+              pair_of   => meta.array ^ { min_items?: = 1  max_items?: = 2 }
+              refined   => { few: pair_of<int32>  many: [int32; 1..2] }
               scalars   => ( text | int32 | boolean )
               circle    => { radius: float64 }
               square    => { side: float64 }
@@ -987,6 +989,21 @@ class CrossEncodingParityTest {
         sameRule("in_place", """
                 { grid: []  prices: {}  pair: [x]  id: 1 }""", """
                 {"grid": [], "prices": {}, "pair": ["x"], "id": 1}""");
+    }
+
+    /**
+     * A refined constructor applied in place is named by its application in both encodings, and the sugar its body
+     * also fits by its own form: the two are two types (§1.2), whatever data they admit alike.
+     */
+    @Test
+    void aRefinedConstructorInPlaceIsNamedByItsApplication() {
+        sameRule("refined", "{ few: [1 2 3]  many: [1 2 3] }", """
+                {"few": [1, 2, 3], "many": [1, 2, 3]}""");
+        List<String> messages = jsonDiagnostics("refined", """
+                {"few": [1, 2, 3], "many": [1, 2, 3]}""").stream().map(Diagnostic::message).toList();
+        assertEquals(2, messages.size(), messages::toString);
+        assertTrue(messages.get(0).startsWith("'pair_of<int32>'"), messages.get(0));
+        assertTrue(messages.get(1).startsWith("'[int32; 1..2]'"), messages.get(1));
     }
 
     // ── §6.1.5 subsumption: `!employee` in text, `$type` in JSON ────────
