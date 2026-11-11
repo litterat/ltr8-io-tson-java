@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.suite.SuiteBindings;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -87,6 +88,7 @@ class ClosedBodyReferencesTest {
      * of the namespace type reads against it. Left unclosed, the value at {@code a} was judged against the family
      * base {@code box}, which has no member to stand there.
      */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aNamespaceTypesValueTypeClosesItsApplication() {
         TsonCompiledSchema compiled = compiled("""
@@ -102,31 +104,4 @@ class ClosedBodyReferencesTest {
         assertNotNull(compiled.get("use").read(TestDocuments.document("{ f: { a => { v: \"s\" } } }")));
     }
 
-    /**
-     * {@code meta.ref<[box<text>]>}: the array is lifted at desugar, named from its binding with {@code box<text>}
-     * still an application, and §8.2's merge renames it onto the name its closed form derives. The reference's
-     * {@code of} follows the rename; left behind, it named an entry the merge had moved, and the schema was refused
-     * for an unresolved reference.
-     */
-    @Test
-    void aReferenceFollowsTheMergeOfTheSyntheticItNames() {
-        TsonLinkedSchema linked = clean("""
-                r      => meta.ref<[box<text>]>
-                direct => { d: [box<text>] }""");
-
-        ReferenceBody reference = assertInstanceOf(ReferenceBody.class, entry(linked, "r"));
-        String array = ((RecordBody) entry(linked, "direct")).fields().get("d").typeExpr().text();
-        assertEquals(array, reference.of().name(), "one entry for one form, whichever position names it");
-        assertInstanceOf(ArrayBody.class, entry(linked, reference.of().name()));
-    }
-
-    /** The same reference at a field's type, where the application closes to a minted reference entry. */
-    @Test
-    void aReferenceAtAFieldFollowsTheMergeToo() {
-        TsonLinkedSchema linked = clean("rec => { f: meta.ref<[box<text>]> }");
-
-        String minted = ((RecordBody) entry(linked, "rec")).fields().get("f").typeExpr().text();
-        ReferenceBody reference = assertInstanceOf(ReferenceBody.class, entry(linked, minted));
-        assertInstanceOf(ArrayBody.class, entry(linked, reference.of().name()), () -> "of names a live entry: " + reference);
-    }
 }

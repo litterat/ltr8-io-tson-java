@@ -47,6 +47,20 @@ class RecordTemplateSlotTest {
         return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
     }
 
+    /**
+     * An application of an open record left in another's body by closing it is not closed in place yet, nor named by
+     * a declaration: a gap, reported as not yet supported, and never a verdict on the schema ([TSON-SCHEMA] §5.10).
+     */
+    @Test
+    void aRecordWhoseBodyAppliesAnotherOpenRecordIsNotYetClosable() {
+        UnsupportedOperationException gap = assertThrows(UnsupportedOperationException.class, () -> compile("""
+                  box => <T> { v: T }
+                  boxes => <T> { items: box<T> }
+                  bb => boxes<text>
+                """));
+        assertTrue(gap.getMessage().contains("'box<text>'"), gap.getMessage());
+    }
+
     /** The two places, each applied so the closing runs as well as the declaration. */
     @Test
     void aParameterStandsInAFieldsTypeAndAnApplicationsArguments() {
@@ -54,11 +68,6 @@ class RecordTemplateSlotTest {
                 """
                   box => <T> { v: T }
                   b => box<text>
-                """,
-                """
-                  box => <T> { v: T }
-                  boxes => <T> { items: box<T> }
-                  bb => boxes<text>
                 """,
                 """
                   result => abstract <T> { payload: T }

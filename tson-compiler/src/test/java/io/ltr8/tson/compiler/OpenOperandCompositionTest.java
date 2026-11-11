@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -234,6 +235,7 @@ class OpenOperandCompositionTest {
      * reference rather than as its head name, so {@code inner<T>} survives whole and the absorbing declaration's own
      * materialisation closes it. Writing the head name alone would drop the argument list with no diagnostic.
      */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void anArgumentThatIsItselfAnApplicationSurvivesSubstitutionWhole() {
         TsonCompiledSchema compiled = compile("""

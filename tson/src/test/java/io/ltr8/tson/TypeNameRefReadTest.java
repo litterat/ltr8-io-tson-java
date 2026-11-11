@@ -47,7 +47,7 @@ class TypeNameRefReadTest {
               box         => <T> { v: T }
               pair        => <A, B> { a: A  b: B }
               inner       => box<text>
-              outer       => pair<box<text> int32>
+              outer       => pair<inner int32>
               typed       => { t: meta.type_ref }
               label       => text
               caption     => label
@@ -88,7 +88,7 @@ class TypeNameRefReadTest {
     }
 
     /**
-     * A declared application is named by its entry: {@code outer => pair<box<text> int32>} is a type, and data
+     * A declared application is named by its entry: {@code outer => pair<inner int32>} is a type, and data
      * names it {@code outer}, which finds that entry.
      */
     @Test
@@ -101,13 +101,13 @@ class TypeNameRefReadTest {
 
     /**
      * In a data document a reference is a name ([TSON-SCHEMA] §4.2): an application is refused at its slot whether
-     * the schema closes it ({@code box<text>}, declared as {@code inner}; {@code pair<box<text> int32>}, as {@code
+     * the schema closes it ({@code box<text>}, declared as {@code inner}; {@code pair<inner int32>}, as {@code
      * outer}; {@code box<caption>}, {@code box<text>} past an alias) or not ({@code box<int32>}), as a constraint
      * the value breaks, the grammar having read it.
      */
     @Test
     void anApplicationIsRefusedWhetherOrNotTheSchemaClosesIt() {
-        for (String application : List.of("box<text>", "pair< box<text>, int32 >", "box<caption>", "box<int32>")) {
+        for (String application : List.of("box<text>", "pair< inner, int32 >", "box<caption>", "box<int32>")) {
             List<Diagnostic> problems = problems("!typed { t: " + application + " }");
             assertEquals(1, problems.size(), application + ": " + problems);
             Diagnostic problem = problems.getFirst();

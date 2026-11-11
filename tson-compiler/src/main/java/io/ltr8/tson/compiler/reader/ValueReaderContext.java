@@ -63,6 +63,14 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
+     * The tag a value read by entry {@code name}'s reader carries in a tree: the entry's name, or none for a type
+     * written in place, which has no entry and no name a document could write as a tag.
+     */
+    public java.util.Optional<String> tagOf(String name) {
+        return schema().entries().containsKey(name) ? java.util.Optional.of(name) : java.util.Optional.empty();
+    }
+
+    /**
      * What a message calls entry {@code name}, whose value is {@code definition}: its own name where an author
      * wrote it, and otherwise the form that produced it ({@link EntryDisplayName}).
      */

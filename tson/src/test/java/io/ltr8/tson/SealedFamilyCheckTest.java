@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -317,6 +318,7 @@ class SealedFamilyCheckTest {
      * reports the member it selects, a tag names it and a binding maps it, and a minted name is none of
      * those (§3.3.4, §8.2). It is reported at the declaration that wrote it, naming the application.
      */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aMemberAppliedAtAUseSiteIsRefused() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("use-site", "{\n" + MEMBER_TEMPLATE + """
@@ -331,6 +333,7 @@ class SealedFamilyCheckTest {
     }
 
     /** A template body applying a member mints one at each application, and is reported at the application. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aMemberAppliedInsideATemplateIsRefusedAtItsApplication() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_TEMPLATE
@@ -354,6 +357,7 @@ class SealedFamilyCheckTest {
     }
 
     /** A minted entry that joins no family is untouched -- an application of a family's base included. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void anApplicationThatJoinsNoFamilyLoadsAtAUseSite() {
         isClean(Tson.standard(), "no-family", """

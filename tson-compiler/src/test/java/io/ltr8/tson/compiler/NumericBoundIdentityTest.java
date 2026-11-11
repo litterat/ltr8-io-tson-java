@@ -71,16 +71,18 @@ class NumericBoundIdentityTest {
         assertTrue(thrown.getMessage().contains("§5.4"), thrown.getMessage());
     }
 
-    /** §4.3's equivalence in full: radix, digit separators and a redundant sign all fall away. */
+    /**
+     * §4.3's equivalence in full: radix, digit separators and a redundant sign all fall away, so the two fields hold
+     * one construction in place, and nothing is lifted for either.
+     */
     @ParameterizedTest
     @ValueSource(strings = {"0xFF", "0b1111_1111", "0o377", "+255", "255"})
-    void everyIntegerSpellingOfOneMagnitudeLandsOnOneEntry(String spelling) {
-        List<String> derived = derivedEntries(compile(
-                "  u => { a: [float32; 255]  b: [float32; %s] }".formatted(spelling)));
+    void everyIntegerSpellingOfOneMagnitudeIsOneConstruction(String spelling) {
+        TsonCompiledSchema compiled = compile("  u => { a: [float32; 255]  b: [float32; %s] }".formatted(spelling));
+        io.ltr8.tson.schema.meta.RecordBody u =
+                (io.ltr8.tson.schema.meta.RecordBody) compiled.schema().entries().get("u");
 
-        // The count is the assertion, not the hash: §8.2 makes a derived name non-normative, so pinning the
-        // digits would pin an implementation detail and break on any change to the canonical rendering.
-        assertEquals(1, derived.size(), () -> spelling + " -> " + derived);
-        assertTrue(derived.getFirst().startsWith("array_float32_255_255_"), () -> spelling + " -> " + derived);
+        assertEquals(u.fields().get("a").type(), u.fields().get("b").type(), spelling);
+        assertEquals(List.of(), derivedEntries(compiled), spelling);
     }
 }

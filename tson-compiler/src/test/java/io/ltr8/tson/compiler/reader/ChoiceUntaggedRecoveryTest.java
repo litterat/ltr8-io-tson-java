@@ -27,8 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * {@link ChoiceReader}'s untagged structural recovery (§5.4). A disjoint choice of scalars in distinct
- * base-type classes reads an untagged value by its own §4 class; a tag still works; a same-class or
- * non-scalar or not-proved-disjoint choice keeps the tag required. Exercised directly against a schema of
+ * classes reads an untagged value by its own §4 class -- a brace- or bracket-class variant by its delimiter, as
+ * [TSON-SCHEMA] §5.4 counts it -- and a tag still works; a same-class or not-proved-disjoint choice keeps the tag
+ * required. Exercised directly against a schema of
  * hand-built variant definitions (for classification) and a stub reader per variant (echoing its name), so
  * this isolates the dispatch logic from the full compile pipeline.
  */
@@ -105,13 +106,20 @@ class ChoiceUntaggedRecoveryTest {
         assertEquals("int32", read(reader, "!int32 42")); // tagged still works
     }
 
+    /**
+     * A record variant is brace-class, which §5.4 counts beside the scalar classes: a disjoint choice of a scalar and a
+     * record recovers each by its own class, the record by its opening brace. This is what lets {@code meta.type_expr}
+     * read a name and a {@code { of: … }} wrapper untagged.
+     */
     @Test
-    void aNonScalarVariantKeepsTheTagRequired() {
+    void aBraceClassVariantIsRecoveredByItsDelimiter() {
         variant("int32", EntryKind.ATOM, new IntegerType(new IntegerSize(32, true)));
         variant("point", EntryKind.PRODUCT, RecordBody.of(RecordBody.fieldMap()));
-        // Disjoint (different kinds), but a record isn't a base-type-class scalar -- no structural recovery here.
         TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "point");
 
-        assertThrows(ReadException.class, () -> read(reader, "42"));
+        assertEquals("int32", read(reader, "42"));
+        assertEquals("point", read(reader, "{ x: 1 }"));
+        assertEquals("point", read(reader, "{}"));
+        assertThrows(ReadException.class, () -> read(reader, "[1]"));
     }
 }

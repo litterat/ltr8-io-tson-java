@@ -44,7 +44,7 @@ class SyntheticEntryNamingTest {
                 ix:    {text => order; 1..}
                 pair:  [text, int32]
                 pick:  (text | int32)
-                page:  paged<order>
+                page:  order_response
               }
             }
             """;

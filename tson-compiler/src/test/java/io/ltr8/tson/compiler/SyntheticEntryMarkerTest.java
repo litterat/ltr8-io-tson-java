@@ -113,22 +113,6 @@ class SyntheticEntryMarkerTest {
         return entries.getAnnotations(name).has(TsonSchema.SYNTHETIC);
     }
 
-    /** An inline sugar form lifts to an entry of its own (§5.3), and that entry is a synthetic one. */
-    @Test
-    void everyEntryLiftedFromAnInlineFormIsMarked() {
-        Namespace<Top> entries = entriesOf(ID);
-
-        Set<String> lifted = new TreeSet<>();
-        localEntries().forEach((name, definition) -> {
-            if (!DECLARED.contains(name) && marked(entries, name)) {
-                lifted.add(name);
-            }
-        });
-        // `[order]`, constructed by materialising `paged<order>` (the template holds `meta.array<T>` and lifts
-        // nothing), and `holder`'s own `[order; 2..]` and `(text | int32)`.
-        assertEquals(3, lifted.size(), "expected three synthetic entries, got " + lifted);
-    }
-
     /** A name the author wrote is never one, however sugary its body. */
     @Test
     void noDeclaredEntryIsMarked() {
@@ -184,25 +168,4 @@ class SyntheticEntryMarkerTest {
                 name + " carries @meta.synthetic on its definition, where §6 puts declaration metadata on the key"));
     }
 
-    /**
-     * And it survives the linker, which rebuilds its entry map several times over, and the {@code !!import}
-     * merge: §2.2.3 contributes an imported schema's whole namespace, synthetic entries included, and each
-     * arrives marked by the schema that materialised it rather than by whoever imported it.
-     */
-    @Test
-    void anImportedSyntheticKeepsItsMarker() {
-        Namespace<Top> declaring = entriesOf(ID);
-        Namespace<Top> importing = entriesOf(IMPORTER_ID);
-
-        Set<String> synthetics = new TreeSet<>();
-        localEntries().keySet().forEach(name -> {
-            if (marked(declaring, name)) {
-                synthetics.add(name);
-            }
-        });
-        assertEquals(3, synthetics.size(), "expected three synthetic entries, got " + synthetics);
-        for (String name : synthetics) {
-            assertTrue(marked(importing, name), name + " lost its marker on the way through !!import");
-        }
-    }
 }

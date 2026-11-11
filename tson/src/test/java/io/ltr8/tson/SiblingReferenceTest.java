@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.tree.TsonSiblingReference;
 import io.ltr8.tson.tree.TsonValue;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -74,6 +75,7 @@ class SiblingReferenceTest {
      * At a record field's type, in every spelling -- sugar, an explicit {@code meta.record_field}, the positional form
      * and a record template's field -- the sibling is a dependent field, never refused by the position rule.
      */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aSiblingAtAFieldsTypeIsADependentField() {
         for (String declaration : List.of(

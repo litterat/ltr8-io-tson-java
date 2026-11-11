@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Top;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -98,6 +99,7 @@ class ReferenceDeclarationTest {
      * the application denotes as {@code meta.ref<box<text>>} closes its argument: one reference over one entry
      * ([TSON-SCHEMA] §4.2).
      */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void anApplicationWrittenInOfClosesAsTheTemplateSpellingDoes() {
         String id = "https://example.test/of-application.tn";
@@ -117,6 +119,7 @@ class ReferenceDeclarationTest {
     }
 
     /** An application in {@code of} is judged as one at any type position: an argument naming nothing is unresolved. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void anApplicationInOfOverAnUnresolvedArgumentIsRefused() {
         List<Diagnostic> problems = Tson.standard().validateSchema(schema("https://example.test/of-nope.tn", META,

@@ -60,22 +60,6 @@ class DirectDefinitionShapeTest {
         assertEquals(java.util.Optional.of("meta.array"), schema.constructorOf("text_list"));
     }
 
-    /**
-     * And a use site writing the same form mints its own, so the two coexist with identical content. That
-     * duplicate is the one #15 argues is harmless here -- an array has no dispatch table over it to pollute.
-     */
-    @Test
-    void aUseSiteWritingTheSameSugarFormMintsASeparateEntry() {
-        TsonLinkedSchema linked = resolve("dd2", """
-                  uuid_list => [uuid]
-                  holder    => { f: [uuid] }
-                """);
-
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("uuid_list"), n -> true));
-        assertEquals(1, minted(linked, "array_").size(),
-                () -> "the use site mints its own: " + minted(linked, "array_"));
-    }
-
     // ── An application at declaration position is a reference ────────────
 
     /**

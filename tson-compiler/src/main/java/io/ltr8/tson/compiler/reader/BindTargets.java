@@ -159,8 +159,9 @@ final class BindTargets {
     /**
      * The host type a natural reader guesses for what a slot holds: a name's bound class ({@code named}), and for a
      * type written in place, which has no bound class of its own, the shape its constructor reads to -- a {@code List}
-     * of its element's host type for an array, a {@code Map} of its key's and value's for a map, and {@code Object}
-     * for a tuple, a choice or a reference, whatever the host binds there being declared by the component holding it.
+     * of its element's host type for an array, a {@code Map} of its key's and value's for a map, and for a tuple, a
+     * choice or a reference whatever {@code named} gives a name it has no binding for -- what the host binds there is
+     * declared by the component holding it, which rebinds the reader ({@link #to}).
      */
     static java.lang.reflect.Type hostType(TypeExpr type, java.util.function.Function<String, Class<?>> named) {
         return switch (type) {
@@ -171,7 +172,7 @@ final class BindTargets {
                 case MapBody map -> new io.ltr8.bind.DataParameterizedType(
                         map.ordered() ? java.util.LinkedHashMap.class : java.util.Map.class,
                         named.apply(map.keyType().name()), hostType(map.valueType(), named));
-                default -> Object.class;
+                default -> named.apply(inline.text());
             };
         };
     }

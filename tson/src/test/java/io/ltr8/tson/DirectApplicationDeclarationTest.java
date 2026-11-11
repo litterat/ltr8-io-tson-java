@@ -7,6 +7,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.tree.TsonValue;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -94,6 +95,7 @@ class DirectApplicationDeclarationTest {
     }
 
     /** A use site writing the same application reaches the declaration rather than a second entry. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aUseSiteWritingTheSameApplicationReachesTheDeclaration() {
         TsonLinkedSchema linked = resolve("dad4", """

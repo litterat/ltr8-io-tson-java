@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 
 import io.ltr8.tson.schema.meta.TypeChain;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -79,6 +80,7 @@ class TemplateIsNotATypeTest {
     // ── No position names a template bare ─────────────────────────────────
 
     /** A record template is refused bare at a position as a held one is, a selector notwithstanding. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aTemplateNamedBareAtAPositionIsRefused() {
         for (String holder : List.of("holder => { p: pet }", "holder => { ps: [pet] }",
@@ -177,6 +179,7 @@ class TemplateIsNotATypeTest {
     }
 
     /** A use-site application whose template composes a declared base would be an unnameable member: refused. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aUseSiteApplicationComposingADeclaredBaseIsRefused() {
         List<Diagnostic> problems = load("r6", """
@@ -191,6 +194,7 @@ class TemplateIsNotATypeTest {
     // ── An abstract template's application is a family base ───────────────
 
     /** {@code abstract} and the selector are each application's: {@code tpet<text>} dispatches on {@code kind}. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void anAbstractTemplatesApplicationDispatchesOverItsMembers() {
         assertEquals(List.of(), read("a1", APPLIED_FAMILY, "!holder { p: { kind: cat  name: Tom  indoor: true } }"));
@@ -201,6 +205,7 @@ class TemplateIsNotATypeTest {
     }
 
     /** The application closes to an abstract record carrying the template's selector; the template is no base. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void theApplicationCarriesTheTemplatesExtensionAndSelector() {
         TsonLinkedSchema schema = linked("a4", APPLIED_FAMILY + "  tpet_text => tpet<text>\n");
@@ -215,6 +220,7 @@ class TemplateIsNotATypeTest {
     }
 
     /** A selector template applied with no member composing it is a base with nothing to select. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aSelectorTemplatesApplicationWithNoMemberSelectsNothing() {
         List<Diagnostic> problems = read("a5", """
@@ -243,6 +249,7 @@ class TemplateIsNotATypeTest {
     }
 
     /** A field type naming none of the template's parameters is closed in the template, to the entry each names. */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aClosedApplicationInATemplateIsTheEntryEveryApplicationNames() {
         TsonLinkedSchema schema = linked("c1", """

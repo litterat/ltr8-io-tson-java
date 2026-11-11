@@ -740,8 +740,8 @@ final class SchemaDesugarer {
         return switch (ref) {
             case ArrayExpr array -> arrayBinding(children.getFirst(), array.elementType().voidable(), array.size(),
                     shownElement(array.elementType()));
-            case MapExpr map -> mapBinding(map.keyType(), children.get(0), children.get(1),
-                    map.valueType().voidable(), map.size());
+            case MapExpr map -> mapBinding(children.get(0), children.get(1), map.valueType().voidable(),
+                    map.size());
             case TupleExpr tuple -> {
                 List<Position> positions = new ArrayList<>();
                 for (int i = 0; i < children.size(); i++) {
@@ -779,16 +779,11 @@ final class SchemaDesugarer {
      * the map row of the desugar table. The <b>value</b> carries {@code voidable} the way an array element
      * does, written only when marked; the key carries none, a key never being void ([TSON-DATA] §2.9).
      *
-     * <p><b>A key is a name</b> ([TSON-SCHEMA] §5.3): {@code key_type} is a {@code meta.type_ref}, so a container,
-     * tuple or choice that types a map's keys is declared under a name of its own, and one written here is refused.
+     * <p><b>A key is a name</b> ([TSON-SCHEMA] §5.3): {@code key_type} is a {@code meta.type_ref}, and the grammar
+     * admits no sugar form at a key, so a key is a name or an application, written through {@link #slotValue} as
+     * every slot is.
      */
-    private Binding mapBinding(TypeExpr writtenKey, TypeExpr key, TypeExpr value, boolean voidable,
-            Optional<SizeSpec> size) {
-        if (key instanceof InlineConstruction) {
-            throw new SchemaValidationException("'" + currentName + "': '" + spell(writtenKey) + "' types a "
-                    + "map's keys, and a key's type is a name, never a type written in place (§5.3): declare it "
-                    + "under a name ('my_key => " + spell(writtenKey) + "') and write that name as the key");
-        }
+    private static Binding mapBinding(TypeExpr key, TypeExpr value, boolean voidable, Optional<SizeSpec> size) {
         List<RecordValue.Field> fields = new ArrayList<>();
         slot(KEY_TYPE, key, fields);
         slot(VALUE_TYPE, value, fields);

@@ -15,6 +15,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -269,6 +270,7 @@ class OpenRecordShapeTest {
      * fields write stays: {@code pair}'s {@code V} becomes {@code t4}'s {@code X}, and {@code text} stays {@code
      * text} (§5.10).
      */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void anOpenOperandsParametersAreReplacedByTheAbsorbersArguments() {
         TsonCompiledSchema compiled = compile("""

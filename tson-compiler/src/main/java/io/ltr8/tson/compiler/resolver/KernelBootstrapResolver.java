@@ -63,13 +63,15 @@ import java.util.Set;
  *
  * <ul>
  *   <li><b>The pre-loaded set is hand-built</b> ({@link #instanceBody}, {@link #refinedBody}): the instances and the
- *       two refinements on the kernel's one wait cycle, the cycle holding {@code record} -- {@link #PRE_LOADED} and
- *       the arrays lifted over {@link #PRE_LOADED_ELEMENTS}. Rule 4 makes the set a measurement of the kernel, and
- *       {@code KernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle
- *       fails there rather than here.</li>
+ *       two refinements on the kernel's one wait cycle, the cycle holding {@code record} -- {@link #PRE_LOADED},
+ *       built before anything is read. Rule 4 makes the set a measurement of the kernel, and {@code
+ *       KernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle fails
+ *       there rather than here.</li>
  *   <li><b>A declaration no read produces is resolved from its grammar</b> by {@link DefinitionResolver}, as {@link
- *       SchemaResolver} resolves a record: a composition, a refinement of a record, an alias, a template. It reads
- *       nothing, so it is ready as soon as the entries it composes are.</li>
+ *       SchemaResolver} resolves a record: a composition, a refinement of a record, an alias, a template. A record
+ *       holding a type written in place reads it, through its constructor's reader, and waits on what that read
+ *       reaches; {@code meta.type_inline}, the wrapper a type slot's choice recovers a brace to, is made ready with
+ *       the pre-loaded set, so the first such read classifies both of the choice's variants.</li>
  *   <li><b>Every other instance and atom refinement is read through the ordinary path</b>, {@link
  *       DefinitionResolver}'s, whose {@link ConstructionReader} reads through readers compiled from the entries
  *       ready so far ({@link TsonSchemaLinker#linkReady}, {@link TsonSchemaCompiler#compileReady}). An entry not

@@ -25,10 +25,15 @@ import java.util.Optional;
 final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
 
     public ArrayTreeReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
-                           SchemaLocation schemaLocation, AnnotationTypes annotationTypes, boolean elementsAreNames) {
+                           SchemaLocation schemaLocation, AnnotationTypes annotationTypes, boolean elementsAreNames,
+                           Optional<String> tag) {
         super(name, displayName, body, resolver, schemaLocation, elementsAreNames);
         this.annotationTypes = annotationTypes;
+        this.tag = tag;
     }
+
+    /** The tag the value carries: the entry's name, none for a type written in place ({@code tagOf}). */
+    private final Optional<String> tag;
 
     /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */
     private final AnnotationTypes annotationTypes;
@@ -43,7 +48,7 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
             }
             return new ArrayTreeReader(name, context.authoredName(name, typeDefinition), body, resolver,
                     context.locationOf(name),
-                    AnnotationTypes.of(context), elementsAreNames(body, context));
+                    AnnotationTypes.of(context), elementsAreNames(body, context), context.tagOf(name));
         }
     }
 
@@ -61,6 +66,6 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
         if (ConstructionGuard.abandoned(ctx, mark)) {
             return null;
         }
-        return new TsonArray(elements, Optional.of(name), annotations);
+        return new TsonArray(elements, tag, annotations);
     }
 }

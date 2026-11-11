@@ -51,7 +51,7 @@ class BootstrapReferencesTest {
         Top recordField = KernelBootstrapResolver.kernelSchema()
                 .entries().get("meta.record_field");
 
-        assertEquals("meta.field_type_ref", field(recordField, "type").typeExpr().text());
+        assertEquals("meta.field_type_expr", field(recordField, "type").typeExpr().text());
         assertTrue(((io.ltr8.tson.schema.meta.Reference) field(recordField, "type").type()).annotations().isEmpty());
     }
 

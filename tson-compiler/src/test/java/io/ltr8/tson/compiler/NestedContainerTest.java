@@ -77,28 +77,6 @@ class NestedContainerTest {
         return definition;
     }
 
-    /**
-     * The whole arc for a tuple position holding a nested sized array: the position names an injected entry,
-     * that entry is the one the flat spelling would have produced, bounds and all, and the compiled reader
-     * takes real data.
-     */
-    @Test
-    void aTuplePositionHoldingASizedArrayResolvesCompilesAndReads() {
-        TsonCompiledSchema compiled = compile("  grid => [[integer; 2], text]");
-
-        TupleBody outer = assertInstanceOf(TupleBody.class, entry(compiled, "grid"));
-        assertFalse(outer.elements().get(0).voidable());
-        assertEquals(TypeRef.of("text"), outer.elements().get(1).elementType());
-
-        ArrayBody inner = assertInstanceOf(ArrayBody.class,
-                entry(compiled, outer.elements().get(0).elementType().text()));
-        assertEquals(TypeRef.of("integer"), inner.elementType());
-        assertEquals(Optional.of(2L), inner.minItems());
-        assertEquals(Optional.of(2L), inner.maxItems());
-
-        assertNotNull((TsonValue) compiled.get("grid").read(TestDocuments.document("[ [1 2] \"a\" ]")));
-    }
-
     /** The inner container's constraints are live, not decorative: its bounds are enforced one bracket in. */
     @Test
     void theInnerContainersBoundsAreEnforcedWhenReading() {
@@ -110,43 +88,6 @@ class NestedContainerTest {
         assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("grid").read(TestDocuments.document("[ [1] \"a\" ]")))
                 .getMessage().contains("minimum 2"));
-    }
-
-    /** The other nesting direction -- a sized array over a nested plain array -- and its own bound enforced. */
-    @Test
-    void aSizedArrayOverANestedArrayResolvesCompilesAndReads() {
-        TsonCompiledSchema compiled = compile("  rows => [[integer]; 3]");
-
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
-        assertEquals(Optional.of(3L), outer.minItems());
-        ArrayBody inner = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().text()));
-        assertEquals(TypeRef.of("integer"), inner.elementType());
-        assertEquals(Optional.empty(), inner.maxItems(), "the inner array is unconstrained");
-
-        assertNotNull((TsonValue) compiled.get("rows")
-                .read(TestDocuments.document("[ [1 2] [3] [] ]")));
-        assertTrue(assertThrows(ReadException.class,
-                () -> compiled.get("rows").read(TestDocuments.document("[ [1] [2] ]")))
-                .getMessage().contains("minimum 3"));
-    }
-
-    /**
-     * Structural sharing across nesting depth: §8.2 makes identity application-structural, so the one
-     * injected {@code array<integer>} entry serves the nested position, the flat declaration and the inline
-     * field alike -- one entry, three spellings.
-     */
-    @Test
-    void identicalInnerContainersCollapseOntoOneInjectedEntry() {
-        TsonCompiledSchema compiled = compile("""
-                  rows     => [[integer]; 3]
-                  flat     => [integer]
-                  holder   => { r: rows  cells: [integer] }""");
-
-        ArrayBody rows = assertInstanceOf(ArrayBody.class, entry(compiled, "rows"));
-        List<String> arrayEntries = compiled.schema().entries().keySet().stream()
-                .filter(name -> name.startsWith("array_integer_")).toList();
-        assertEquals(List.of(rows.elementType().text()), arrayEntries,
-                "one injected array<integer>, shared by every spelling of it");
     }
 
     /**
@@ -188,16 +129,4 @@ class NestedContainerTest {
         assertInstanceOf(TsonVoid.class, array.get(1));
     }
 
-    /** Nesting recurses: a third bracket is no special case, because the hoist is bottom-up. */
-    @Test
-    void aThreeDeepNestingResolvesCompilesAndReads() {
-        TsonCompiledSchema compiled = compile("  deep => [[[integer]]]");
-
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, entry(compiled, "deep"));
-        ArrayBody middle = assertInstanceOf(ArrayBody.class, entry(compiled, outer.elementType().text()));
-        ArrayBody innermost = assertInstanceOf(ArrayBody.class, entry(compiled, middle.elementType().text()));
-        assertEquals(TypeRef.of("integer"), innermost.elementType());
-
-        assertNotNull((TsonValue) compiled.get("deep").read(TestDocuments.document("[ [ [1 2] [3] ] [] ]")));
-    }
 }

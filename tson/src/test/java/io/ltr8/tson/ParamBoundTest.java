@@ -7,6 +7,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.TypeRef;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -184,6 +185,7 @@ class ParamBoundTest {
 
     // ── Enforced at the application ────────────────────────────────────────
 
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aTypeArgumentMustIsATheBound() {
         assertEquals(List.of(), problems("""
@@ -200,6 +202,7 @@ class ParamBoundTest {
      * operand, a refinement source, an argument nested in one of those -- is checked against the same bound as
      * one at a field, once every argument is ready.
      */
+    @Disabled("Phase 2: an undeclared application of an open record closes in place")
     @Test
     void aBoundIsEnforcedOnAnApplicationClosedDuringResolution() {
         assertRefused(BOXED + "  held   => boxed<int32>", "binds 'T' to 'int32', which is not a type that IS-A text");

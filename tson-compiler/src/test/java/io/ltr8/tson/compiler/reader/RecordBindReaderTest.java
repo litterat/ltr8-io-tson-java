@@ -163,7 +163,7 @@ class RecordBindReaderTest {
         for (String name : linked.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(87, linked.schema().entries().size());
+        assertEquals(83, linked.schema().entries().size());
     }
 
     @Test

@@ -88,7 +88,7 @@ class KindMembersTest {
     }
 
     @Test
-    void theInlineSpellingMaterialisesTheSameInstance() {
+    void theInlineSpellingIsTheSameInstanceInPlace() {
         TsonLinkedSchema linked = link("""
                 {
                   stock_id => !net.uuid_type {}
@@ -96,8 +96,9 @@ class KindMembersTest {
                 }
                 """);
         RecordBody order = assertInstanceOf(RecordBody.class, linked.schema().entries().get("order"));
-        ReferenceBody inline = kind(linked, AliasChain.terminal(order.fields().get("id").typeExpr().text(),
-                linked.schema().entries()::get));
+        // `meta.ref<C>` at a field is the reference written in place, linked where it stands.
+        ReferenceBody inline = assertInstanceOf(ReferenceBody.class,
+                assertInstanceOf(io.ltr8.tson.schema.meta.TypeInline.class, order.fields().get("id").type()).of());
 
         assertEquals(ReferenceBody.of("net.uuid_type"), inline);
         assertEquals(List.of("stock_id", "uuid"), inline.memberNames());

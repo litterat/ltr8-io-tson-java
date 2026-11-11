@@ -118,8 +118,9 @@ public final class TsonSchemaCompiler {
     /**
      * Builds the reader of a type written in place ({@link TypeInline}) from its body, through the factory its
      * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice or a reference, named
-     * for a message by the form as written. It has no entry, so it has no name a binding map or a schema location
-     * keys on, takes no part in §7.2's subsumption (nothing IS-A it), and is no alias. It holds the factories, the
+     * for a message by the form as written. It has no entry, so it has no name a binding map, a schema location or a
+     * tree's tag keys on, nothing IS-A it, so §7.2's guard at its position admits no tag, and it is no alias. It holds
+     * the factories, the
      * linked schema and the readers' handle, never the {@link Compilation}, so the handle may build one at read time.
      */
     private static final class InlineReaders {
@@ -140,7 +141,10 @@ public final class TsonSchemaCompiler {
         TsonTypeReader<?> build(TypeInline type) {
             Top read = type.of() instanceof NamespaceBody namespace ? namespace.read() : type.of();
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledVocabulary.typenameOf(read));
-            return factory.create(type.text(), read, new ValueReaderContext(linked, readers, namesMeaning, referrers));
+            TsonTypeReader<?> built = factory.create(type.text(), read,
+                    new ValueReaderContext(linked, readers, namesMeaning, referrers));
+            // §7.2 at the position: no tag names a type written in place, so the guard admits none.
+            return Subsumption.guard(type.text(), read, built, namesMeaning, readers);
         }
     }
 
