@@ -38,15 +38,13 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
-- [ ] **An application of an open record does not close in place** ([TSON-SCHEMA] §5.10, §5.10.1). At a type
-  slot `f: page<order>` is `{ of: !meta.record { … } }`, the substituted record with no name, and so is a nested
-  application a closing leaves at a slot (`cursor: box<T>` once `page => <T> { cursor: box<T> }` is applied). Both are
-  reported as `NOT_IMPLEMENTED` today (`TemplateMaterialiser`), and so is an abstract template applied in place
-  (`s: shape<circle>`), an abstract record nothing is a member of. What closing needs: substitution into a
-  `TypeInline` holding a `RecordBody` at the slot; readers, writers and bind targets built from a record body with no
-  name, in tree and bind mode and in `tson-json`, keyed by the construction as `CompiledReaders` already keys the
-  other inline bodies; and diagnostics locating the record by field path. Then restore the conformance vectors that
-  wait on it and add `schema/valid` vectors for `f: page<order>` beside `page_order => page<order>` (two types of one shape).
+- [ ] **An application whose head is an alias of an open record is not absorbed at an operand** ([TSON-SCHEMA]
+  §5.7, §5.8, §8.3). Over `box => <T> { v: T }` and `ref_of => box`, `z => { f: ref_of<text> }` closes in place, the
+  alias being the open record under another name, but `x => ref_of<text> ^ { … }` is reported `NOT_IMPLEMENTED`
+  (`TemplateMaterialiser.closeApplication`) and `y => ref_of<text> & { … }` is refused as applying arguments to an
+  entry that declares no parameters, a library gap reported as the author's error (`DefinitionResolver.openOperand`,
+  which reads the head without following its alias chain). Follow the head's alias chain in `openOperand` and in
+  `resolveRefinement`'s test for an open operand, and add `schema/valid` vectors for both operators.
 - [ ] **A tree read does not read a dependent value against a sibling written in place** ([TSON-SCHEMA] §5.2).
   `setting => { kind: meta.type_expr  v?: kind! }` with `kind: { of: !meta.array { element_type: int32 } }` reads `v`
   against the array in bind mode, where the sibling binds to its `TypeInline`; a tree read holds the sibling as the

@@ -116,7 +116,7 @@ footing:
 |---|---|---|
 | 1 | [TSON-DATA] §2.1's worked example says untagged tokens resolve by §4's base rules under an imported schema | **Carried.** Not among this revision's changes; the entry stays open against Revision 40 as written. [open] |
 | 2 | Whether a quoted token at a reference-typed position is a reference | **Carried**, narrowed by #3: an argument is a reference in both grammars, so a quoted argument is refused in a schema document and in data alike; the field-position half (`t: "int32"` at a `meta.type_ref` field in data) stays open as written. [open] |
-| 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–56), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented, but for closing an application of an open record in place] |
+| 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–56), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented] |
 | 3 | Templates as open records | **Accept — the baseline above**, every step as the register states what runs. Part 2 §5.10 is rewritten around the three rules; §1.3, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow (§3.2). §1.6's example drops its value parameter. **[editorial]** at five points where the sources disagree or the text needed a reading (§5). [settled — implemented] |
 
 Counts: **2 accepted** (#3, in six steps, and #5), **0 declined**, **2 carried** (#1, #2). Revision
@@ -507,11 +507,11 @@ carries no open questions.
    For Part 3: a string holding an application at a reference-typed position, a `$type`
    naming a template, and a root type supplied out of band naming one are each refused.
 2. **The pins** — §6 item 1.
-3. **#5's examples** — the examples #5 writes or changes that close an application of an
-   open record in place (§1.6's `history`, §5.10's `f: page<order>` and `cursor: box<T>`,
-   §5.10.1's `tree_text` and the refusal of an unnamed recursive application, §8.2's
-   `pair<text, text>` at a field) are not yet run: the first implementation reports that
-   closing as not implemented. Sugar in place, `node_text`, a sugar form refused as an
-   argument and the widened positional form run.
+3. **#5's examples** — the examples #5 writes or changes run: §1.6's schema, its `history`
+   closing `flagged<status>` in place, and its data document; §5.10's `f: page<order>` beside
+   `page_order` (a tag naming `page_order` refused at `f`) and `cursor: box<T>` closed in place;
+   §5.10.1's `node_text` and `tree_text`, and the refusal of an unnamed recursive application;
+   §8.2's `pair<text, text>` at a field; sugar in place, a sugar form refused as an argument and
+   the widened positional form.
 4. **The build** — the implementation's full build, with the conformance corpus's Revision
    40 branch required, passes over the revised text.

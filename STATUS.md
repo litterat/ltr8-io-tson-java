@@ -117,7 +117,8 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
       directives during resolution, closes each argument-bearing type reference into its declaration or in place
-      as a construction, merges every `!!import`'s namespace into one per schema
+      (a construction, or the record an open record's application closes to, with no name), merges every
+      `!!import`'s namespace into one per schema
       (Part 2 §2.2.3, §3.3), validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`
 - [x] Value entries (Part 2 §4.1) — an entry whose tag names an ordinary type
