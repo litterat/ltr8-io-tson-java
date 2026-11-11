@@ -25,15 +25,15 @@
     ipv4_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
       chain     => !meta.record_field { type: meta.type_chain  optional: true }
       spec      => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
-      within    => !meta.record_field { type: !meta.array { element_type: cidr4 }  optional: true }
-      excluding => !meta.record_field { type: !meta.array { element_type: cidr4 }  optional: true }
+      within    => !meta.record_field { type: { of: !meta.array { element_type: cidr4 } }  optional: true }
+      excluding => !meta.record_field { type: { of: !meta.array { element_type: cidr4 } }  optional: true }
     } }
 
     ipv6_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
       chain     => !meta.record_field { type: meta.type_chain  optional: true }
       spec      => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
-      within    => !meta.record_field { type: !meta.array { element_type: cidr6 }  optional: true }
-      excluding => !meta.record_field { type: !meta.array { element_type: cidr6 }  optional: true }
+      within    => !meta.record_field { type: { of: !meta.array { element_type: cidr6 } }  optional: true }
+      excluding => !meta.record_field { type: { of: !meta.array { element_type: cidr6 } }  optional: true }
     } }
 
     cidr4_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
@@ -41,8 +41,8 @@
       spec       => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
       min_prefix => !meta.record_field { type: numeric.count  optional: true }
       max_prefix => !meta.record_field { type: numeric.count  optional: true }
-      within     => !meta.record_field { type: !meta.array { element_type: cidr4 }  optional: true }
-      excluding  => !meta.record_field { type: !meta.array { element_type: cidr4 }  optional: true }
+      within     => !meta.record_field { type: { of: !meta.array { element_type: cidr4 } }  optional: true }
+      excluding  => !meta.record_field { type: { of: !meta.array { element_type: cidr4 } }  optional: true }
     } }
 
     cidr6_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
@@ -50,8 +50,8 @@
       spec       => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
       min_prefix => !meta.record_field { type: numeric.count  optional: true }
       max_prefix => !meta.record_field { type: numeric.count  optional: true }
-      within     => !meta.record_field { type: !meta.array { element_type: cidr6 }  optional: true }
-      excluding  => !meta.record_field { type: !meta.array { element_type: cidr6 }  optional: true }
+      within     => !meta.record_field { type: { of: !meta.array { element_type: cidr6 } }  optional: true }
+      excluding  => !meta.record_field { type: { of: !meta.array { element_type: cidr6 } }  optional: true }
     } }
 
     mac_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
@@ -74,8 +74,8 @@
       chain            => !meta.record_field { type: meta.type_chain  optional: true }
       spec             => !meta.record_field { type: iri      optional: true  role: FIXED    value: "https://www.rfc-editor.org/rfc/rfc6838" }
       allow_parameters => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
-      types            => !meta.record_field { type: !meta.array { element_type: text }  optional: true }
-      suffixes         => !meta.record_field { type: !meta.array { element_type: text }  optional: true }
+      types            => !meta.record_field { type: { of: !meta.array { element_type: text } }  optional: true }
+      suffixes         => !meta.record_field { type: { of: !meta.array { element_type: text } }  optional: true }
     } }
 
     uri_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type unicode.text_type] }  fields: {

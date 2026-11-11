@@ -54,10 +54,12 @@
     `meta.array.element_type`, `meta.map.value_type`,
     `meta.tuple_element.element_type`, choice variants) is typed
     `meta.type_expr`, `meta.field_type_expr` at a record field, and
-    holds a type's name or a type written in place: the construction
-    the author's sugar or applied constructor denotes, tagged by its
-    constructor, `!meta.array { element_type: text  min_items: 1 }`,
-    and carrying no chain. A slot that names a type
+    holds a type's name or a type written in place, a
+    `meta.type_inline`: the construction the author's sugar or applied
+    constructor denotes, at its `of`, tagged by its constructor and
+    carrying no chain,
+    `{ of: !meta.array { element_type: text  min_items: 1 } }`. A slot
+    that names a type
     (`meta.map.key_type`, a parameter's `bound`, an alias's `target`,
     a reference's `of`, a chain's lists) is typed `meta.type_ref` and
     holds a name. A name is judged a member of its kind when the
@@ -91,7 +93,8 @@
     none applies one.
   - Nothing is lifted. A construction written at a use site, sugar
     or an applied constructor, stands in place in the slot that wrote
-    it and is compared as a value, so every entry here is one the
+    it, in a `meta.type_inline`, and is compared as a value, so every
+    entry here is one the
     source declares and the document holds no internal name.
   - Bare parameter names (e.g. T) in bodies are read against the
     enclosing record's `parameters` list.
@@ -217,9 +220,9 @@
     }
 
     type_chain => !meta.record { fields: {
-      parents    => !meta.record_field { type: !meta.array { element_type: meta.type_ref }  optional: true }
-      supertypes => !meta.record_field { type: !meta.array { element_type: meta.type_ref }  optional: true }
-      subtypes   => !meta.record_field { type: !meta.array { element_type: meta.type_ref }  optional: true }
+      parents    => !meta.record_field { type: { of: !meta.array { element_type: meta.type_ref } }  optional: true }
+      supertypes => !meta.record_field { type: { of: !meta.array { element_type: meta.type_ref } }  optional: true }
+      subtypes   => !meta.record_field { type: { of: !meta.array { element_type: meta.type_ref } }  optional: true }
     } }
 
     type => !meta.record {
@@ -297,9 +300,12 @@
 
     field_group => !meta.record { fields: {
       members          => !meta.record_field {
-        type: !meta.array { element_type: !meta.array { element_type: text  min_items: 1 }  min_items: 1 }
+        type: { of: !meta.array { element_type: { of: !meta.array { element_type: text  min_items: 1 } }  min_items: 1 } }
       }
-      optional_members => !meta.record_field { type: !meta.array { element_type: text  min_items: 1 }  optional: true }
+      optional_members => !meta.record_field {
+        type: { of: !meta.array { element_type: text  min_items: 1 } }
+        optional: true
+      }
       optional         => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     } }
 
@@ -309,17 +315,18 @@
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: FIXED }
-      parameters     => !meta.record_field { type: !meta.array { element_type: meta.param  min_items: 1 }  optional: true }
+      parameters     => !meta.record_field {
+        type: { of: !meta.array { element_type: meta.param  min_items: 1 } }
+        optional: true
+      }
       fields         => !meta.record_field { type: meta.field_map }
-      groups         => !meta.record_field { type: !meta.array { element_type: meta.field_group }  optional: true }
+      groups         => !meta.record_field { type: { of: !meta.array { element_type: meta.field_group } }  optional: true }
       extension      => !meta.record_field { type: meta.record_extension_type  optional: true  role: DEFAULT  value: OPEN }
-      discriminators => !meta.record_field { type: !meta.array { element_type: text  min_items: 1 }  optional: true }
+      discriminators => !meta.record_field { type: { of: !meta.array { element_type: text  min_items: 1 } }  optional: true }
       name_type      => !meta.record_field { type: meta.identifier_ref  optional: true }
     } }
 
-    array => !meta.record {
-      chain: { supertypes: [meta.product meta.top meta.type meta.type_inline]  subtypes: [meta.set_type] }
-      fields: {
+    array => !meta.record { chain: { supertypes: [meta.product meta.top meta.type]  subtypes: [meta.set_type] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: INDEX }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
@@ -331,9 +338,7 @@
       max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
-    set_type => !meta.record {
-      chain: { supertypes: [meta.array meta.product meta.top meta.type meta.type_inline] }
-      fields: {
+    set_type => !meta.record { chain: { supertypes: [meta.array meta.product meta.top meta.type] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: INDEX }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
@@ -345,9 +350,7 @@
       max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
-    map => !meta.record {
-      chain: { supertypes: [meta.product meta.top meta.type meta.type_inline]  subtypes: [meta.namespace] }
-      fields: {
+    map => !meta.record { chain: { supertypes: [meta.product meta.top meta.type]  subtypes: [meta.namespace] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
@@ -359,9 +362,7 @@
       max_items      => !meta.record_field { type: numeric.count  optional: true }
     } }
 
-    namespace => !meta.record {
-      chain: { supertypes: [meta.map meta.product meta.top meta.type meta.type_inline] }
-      fields: {
+    namespace => !meta.record { chain: { supertypes: [meta.map meta.product meta.top meta.type] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: NAMED }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: VARIABLE }
@@ -378,11 +379,11 @@
       voidable     => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
     } }
 
-    tuple => !meta.record { chain: { supertypes: [meta.product meta.top meta.type meta.type_inline] }  fields: {
+    tuple => !meta.record { chain: { supertypes: [meta.product meta.top meta.type] }  fields: {
       chain          => !meta.record_field { type: meta.type_chain  optional: true }
       access_pattern => !meta.record_field { type: meta.product_access_type  optional: true  role: FIXED  value: INDEX }
       size_type      => !meta.record_field { type: meta.product_size_type    optional: true  role: FIXED  value: FIXED }
-      elements       => !meta.record_field { type: !meta.array { element_type: meta.tuple_element } }
+      elements       => !meta.record_field { type: { of: !meta.array { element_type: meta.tuple_element } } }
     } }
 
     enum_set => !meta.set_type { element_type: text  min_items: 1 }
@@ -393,9 +394,9 @@
       members   => !meta.record_field { type: meta.enum_set }
     } }
 
-    choice => !meta.record { chain: { supertypes: [meta.sum meta.top meta.type meta.type_inline] }  fields: {
+    choice => !meta.record { chain: { supertypes: [meta.sum meta.top meta.type] }  fields: {
       chain    => !meta.record_field { type: meta.type_chain  optional: true }
-      variants => !meta.record_field { type: !meta.array { element_type: meta.type_expr } }
+      variants => !meta.record_field { type: { of: !meta.array { element_type: meta.type_expr } } }
       disjoint => !meta.record_field { type: boolean  optional: true }
     } }
 
@@ -407,17 +408,13 @@
 
     declared => !meta.declared_type {}
 
-    reference_type => !meta.record {
-      chain: { supertypes: [meta.atom meta.top meta.type meta.type_inline]  subtypes: [meta.ref] }
-      fields: {
+    reference_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type]  subtypes: [meta.ref] }  fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
       of            => !meta.record_field { type: meta.type_ref }
       allow_sibling => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
     } }
 
-    ref => !meta.record {
-      chain: { supertypes: [meta.atom meta.reference_type meta.top meta.type meta.type_inline] }
-      fields: {
+    ref => !meta.record { chain: { supertypes: [meta.atom meta.reference_type meta.top meta.type] }  fields: {
       chain         => !meta.record_field { type: meta.type_chain  optional: true }
       of            => !meta.record_field { type: meta.type_ref }
       allow_sibling => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
@@ -437,13 +434,9 @@
       allow_sibling: false
     }
 
-    type_inline => !meta.record {
-      chain: {
-        subtypes: [meta.array meta.choice meta.map meta.namespace meta.ref meta.reference_type meta.set_type meta.tuple]
-      }
-      fields: {}
-      extension: ABSTRACT
-    }
+    type_inline => !meta.record { fields: {
+      of => !meta.record_field { type: meta.type }
+    } }
 
     type_expr => @meta.disjoint !meta.choice { variants: [meta.type_ref meta.type_inline]  disjoint: true }
 

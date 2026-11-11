@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=96255758272c330ef99d824659d5da428d5a3d9d786d0f6e3fdfd6d1d45a88b7"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=42057db740595e473b6144db0b87565645b2fcbbd3fbe945310a60c1045a8fb8"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -695,13 +695,13 @@
       record being ordinary data of this vocabulary. `element_type` is a
       `meta.type_expr`: a type's name, `!meta.array { element_type: person }`,
       or a type written in place, so `[[text]]` is
-      `!meta.array { element_type: !meta.array { element_type: text } }`. A
-      constructor is applied as it is constructed: `meta.array<person>` is that
-      construction, its arguments filling the required fields that hold a type
-      (typed `meta.type_expr` or by a reference naming types), in declaration
-      order ([TSON-SCHEMA] §5.3), and inside an open record an argument may be
-      one of the record's parameters. `voidable` says whether an element may be
-      void, spelled `[T?]`.
+      `!meta.array { element_type: { of: !meta.array { element_type: text } } }`.
+      A constructor is applied as it is constructed: `meta.array<person>` is
+      that construction, its arguments filling the required fields that hold a
+      type (typed `meta.type_expr` or by a reference naming types), in
+      declaration order ([TSON-SCHEMA] §5.3), and inside an open record an
+      argument may be one of the record's parameters. `voidable` says whether an
+      element may be void, spelled `[T?]`.
 
       `ordered` says whether order is part of a container's value: true for an
       array unless it says otherwise, false for a set. It never changes what a
@@ -709,7 +709,7 @@
       ([TSON-SCHEMA] §7.5) — the facet says whether two values differing only in
       order are one value.
       """
-    array => meta.product & meta.type_inline & {
+    array => meta.product & {
       access_pattern?: meta.product_access_type = INDEX
       size_type?:      meta.product_size_type = VARIABLE
       element_type:    meta.type_expr
@@ -749,7 +749,7 @@
       that keeps its order. Either way output keeps the order written
       ([TSON-SCHEMA] §7.5).
       """
-    map => meta.product & meta.type_inline & {
+    map => meta.product & {
       access_pattern?: meta.product_access_type = NAMED
       size_type?:      meta.product_size_type = VARIABLE
       key_type:        meta.type_ref
@@ -794,7 +794,7 @@
       sugar spells two or more, `[T]` being an array; a tuple of one position
       is constructed, `!meta.tuple [{ element_type: text }]`.
       """
-    tuple => meta.product & meta.type_inline & {
+    tuple => meta.product & {
       access_pattern?: meta.product_access_type = INDEX
       size_type?:      meta.product_size_type = FIXED
       elements:        [meta.tuple_element]
@@ -839,7 +839,7 @@
       fact each encoding's discrimination rules consume ([TSON-SCHEMA] §5.4,
       §7.2).
       """
-    choice => meta.sum & meta.type_inline & {
+    choice => meta.sum & {
       variants:  [meta.type_expr]
       disjoint?: boolean
     }
@@ -961,7 +961,7 @@
       reference sets it false and refuses a sibling reference. Resolved output
       writes a sibling reference as it is written.
       """
-    reference_type => meta.atom & meta.type_inline & {
+    reference_type => meta.atom & {
       of:             meta.type_ref
       allow_sibling?: boolean ~ true
     }
@@ -997,22 +997,21 @@
     identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }
 
     @doc:"""
-      The structural constructors' parent: a type written where it is used.
-      `array`, `map`, `tuple`, `choice` and `reference_type` compose it, and
-      every constructor refining one of them inherits it, `set_type`, `ref` and
-      `namespace` among them. A construction of one of its members stands in a
-      slot typed `meta.type_expr` as the type itself, tagged by its constructor,
-      `!meta.array { element_type: text }`, and carries no chain. A record, an
-      enum and every other atom are declared and named, and their constructors
-      do not compose it. It has no fields and confers no kind.
+      A type written where it is used. `of` holds the type, a construction
+      tagged by its constructor and carrying no chain:
+      `{ of: !meta.array { element_type: text } }`. The construction is one of
+      `array`, `map`, `tuple`, `choice` or `reference_type`, or of a constructor
+      refining one of them, `set_type`, `ref` and `namespace` among them. A
+      record, an enum and every other atom are declared and named. It is not
+      itself a type, so one never holds another directly.
       """
-    type_inline => abstract {}
+    type_inline => { of: meta.type }
 
     @doc:"""
       What a type slot holds: a type's name (`meta.type_ref`), or a type written
-      in place (`meta.type_inline`), a construction tagged by its constructor. A
-      name is string-class and a construction brace-class, so the two are told
-      apart by form ([TSON-SCHEMA] §5.4). It types `array.element_type`,
+      in place (`meta.type_inline`). A name is string-class and a
+      `meta.type_inline` brace-class, so the two are told apart by form
+      ([TSON-SCHEMA] §5.4). It types `array.element_type`,
       `map.value_type`, `tuple_element.element_type` and each of
       `choice.variants`.
       """
