@@ -25,7 +25,7 @@ class KindResolvedFormTest {
             !schema {
               stock_id    => !net.uuid_type {}
               customer_id => !net.uuid_type {}
-              any_id      => !meta.reference_type { of: net.uuid_type }
+              any_id      => !meta.ref { of: net.uuid_type }
             }""";
 
     private static Tson tson() {
@@ -44,7 +44,7 @@ class KindResolvedFormTest {
                 written, "of is a reference, written unquoted");
 
         ReferenceBody read = assertInstanceOf(ReferenceBody.class,
-                tson.objectReader().withSchema(TsonBundledSchemas.CORE_ID).readAs(written, "meta.reference_type",
+                tson.objectReader().withSchema(TsonBundledSchemas.CORE_ID).readAs(written, "meta.ref",
                         Object.class));
         assertEquals(Optional.empty(), read.index());
         assertEquals(linked, read);

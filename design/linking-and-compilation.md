@@ -146,7 +146,7 @@ are worth their place here, each catching what would otherwise link, compile, an
 
 **A chain's names resolve in the same namespace.** A refinement of a kernel constructor reaches one (`meta.set_type =>
 meta.array ^ {...}` carries `[meta.array, meta.product, meta.top, meta.type]`), and the defining schema's closure is inside
-the importer's, so every name on it is there. A `reference_type` body's `of` names any type or constructor, an application
+the importer's, so every name on it is there. A `meta.ref` body's `of` names any type or constructor, an application
 there having closed to its entry during resolution, never a value entry or an open record (`KindMembers.ofRefusal`); what it
 names decides whether the slot holds a type's name or a value's. A namespace type's stated `key_type` must be a member of
 `meta.identifier_ref`: its keys are names.
@@ -240,7 +240,7 @@ A value entry's payload may hold a name, `request: place_order_request` at a slo
 slot's declared type (`TsonSchema.SlotType`), and `checkValuesByName` judges each one over local entries after
 `validateEntry`, by what the slot's `of` names over `merged` (`KindMembers.namesTypes`), whatever the read guessed:
 over a constructor the name as a member (`judgeMember`), over any other type by the walk, the value it reaches
-delivered into the host's `Ref` cell. The walk itself, by key and by field through the binding's
+delivered into the read's `ValueRef` cell. The walk itself, by key and by field through the binding's
 descriptor, is `design/namespace-types-and-value-entries.md`'s; what is the linker's is below.
 
 The same walk judges two more names, so one rule decides what a value's name reaches wherever it is written:

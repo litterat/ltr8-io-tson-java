@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -18,7 +19,6 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -355,7 +355,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
-    public void heldByName(TypeRef reference, TsonSchema.SlotType type, io.ltr8.tson.schema.meta.Ref<?> cell) {
+    public void heldByName(TypeRef reference, TsonSchema.SlotType type, ValueRef<?> cell) {
         if (cursor.heldByName == null) {
             return;
         }

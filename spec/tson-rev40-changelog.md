@@ -675,6 +675,24 @@ Items 94–97 follow the argument list out of the data grammar (§3.1 items 20�
     wherever a reference is read" names the parse error; `meta.reference_type`'s
     documentation drops the argument list the data grammar parsed. Every pin changes (§6).
 
+Items 98–101 make `meta.ref` the one reference constructor. Each names the rule before and
+after.
+
+98. **§4.2, Kernel** — `reference_type => meta.atom & { of: meta.type_ref }` and `ref =>
+    meta.reference_type ^ {}`, a refined constructor kept so `meta.ref<T>` kept its spelling,
+    become one constructor, `ref => meta.atom & { of: meta.type_ref }`, and `type_ref =>
+    !meta.ref { of: meta.type }`. `meta.ref<T>` is still the construction `!meta.ref { of: T }`,
+    and whether a reference names types or values is still read from `of`. The kernel's
+    documentation of the two merges onto `meta.ref`. A schema naming `meta.reference_type` names
+    an unresolved entry.
+99. **§4.2, §9, §13** — every other mention: `meta.reference_type.of` is `meta.ref.of` among
+    the slots typed `meta.type_ref`, the example of an atom constructor and the kernel inventory
+    name `meta.ref`, the wait cycle's entries hold `meta.ref` in its place, and the
+    refined-constructor example of §4.2's type slot keeps `!meta.set_type` alone.
+100. **Header** — "`meta.ref` is a refined constructor" becomes "`meta.ref` is the one
+     reference constructor, `meta.reference_type` gone".
+101. **§13.2** — every pin changes (§6); the kernel measures 82 entries.
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Their entries are not edited by this
@@ -719,6 +737,9 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
    outside the kind's grammar and a resolver error, as any string outside an atom's grammar
    is. The text encoding refuses the unquoted form earlier, as a parse error, and its quoted
    token as JSON does. Item 8's "refused as the production refuses it" is superseded.
+10. **§1.6, §5.6** — item 16 and §5.6 named "the kernel's `meta.reference_type`, or its
+    refinement `meta.ref`"; they name `meta.ref`, the one reference constructor (§3.2 items
+    98–101).
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -779,6 +800,9 @@ Changes a Revision 39 implementer must act on:
     argument list and sibling form are both gone from it. `<` and `>` in a data value are
     parse errors, as in Revision 38, in a data document and a schema value's payload alike,
     and a JSON string at a reference holds a qualified name and nothing else.
+15. **One reference constructor** (§3.2 items 98–101): `meta.ref => meta.atom & { of:
+    meta.type_ref }`; `meta.reference_type` is gone, and a schema writing it names nothing.
+    `meta.ref<T>` keeps its spelling and its meaning.
 
 ---
 
@@ -819,14 +843,14 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `0853746e…` (Revision 39 `c9b069b6…`), numeric `383a9f3a…` (`dfa66c5d…`), temporal
-   `3c781a0d…` (`fb4ada8f…`), net `3d617292…` (`371fc20c…`), core `220c3e9f…`
-   (`4e8d9c43…`), policy `a96b94e2…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   `5d3259d6…` (Revision 39 `c9b069b6…`), numeric `b0f26fd6…` (`dfa66c5d…`), temporal
+   `64cb1d31…` (`fb4ada8f…`), net `f60bed4e…` (`371fc20c…`), core `a0e317b3…`
+   (`4e8d9c43…`), policy `85f90a35…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
    78–84's documentation of a parameter in a type written in place, for items 85–93's
    `meta.apply` and final constructors, and for items 94–97's documentation of a reference
-   with no argument list. The chain is
+   with no argument list, and for items 98–101's one reference constructor. The chain is
    consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
    libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
@@ -840,7 +864,8 @@ carries no open questions.
    `meta.apply`, retype `type_chain.parents` and `application`, mark `meta.dependent` final,
    and rewrite the documentation of `meta.type`, `meta.reference_type`, `meta.type_inline`,
    `meta.type_expr` and `meta.type_chain`: the kernel measures 83 entries. Items 94–97
-   rewrite `meta.reference_type`'s again. `meta-resolved.tn` follows; the four library fixtures change only their identities.
+   rewrite `meta.reference_type`'s again. Items 98–101 merge `meta.reference_type` into
+   `meta.ref`: the kernel measures 82 entries. `meta-resolved.tn` follows; the four library fixtures change only their identities.
 
 ---
 

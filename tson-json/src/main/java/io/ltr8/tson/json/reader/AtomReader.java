@@ -72,7 +72,8 @@ final class AtomReader<T> implements JsonTypeReader<T> {
 
     /**
      * Whether this reads a reference ({@code meta.ref<T>}, a kind or a value by name), whose value is the {@code
-     * TypeRef} itself: a component holding one is bound to it directly ({@link #readsAReference}).
+     * TypeRef} or the {@code ValueRef} itself: a component holding one is bound to it directly ({@link
+     * #readsAReference}).
      */
     private final boolean reference;
 
@@ -88,8 +89,8 @@ final class AtomReader<T> implements JsonTypeReader<T> {
 
     /**
      * Whether this reads a reference. A reference's value finds what it names ({@code TypeRef.referent}, and a {@code
-     * Ref} the value delivered), which a bridge over its text would drop, so a component holding a {@code TypeRef} or
-     * a {@code Ref} binds the family's own production rather than a bridge from its name.
+     * ValueRef} the value delivered), which a bridge over its text would drop, so a component holding a {@code TypeRef} or
+     * a {@code ValueRef} binds the family's own production rather than a bridge from its name.
      */
     boolean readsAReference() {
         return reference;
@@ -132,8 +133,12 @@ final class AtomReader<T> implements JsonTypeReader<T> {
         try {
             T value = parser.read(content);
             // Hygiene judges the name the value is, in its type's normalization form, not the spelling.
-            String named = value instanceof String name ? name
-                    : value instanceof io.ltr8.tson.schema.meta.TypeRef reference ? reference.text() : content;
+            String named = switch (value) {
+                case String name -> name;
+                case io.ltr8.tson.schema.meta.TypeRef reference -> reference.text();
+                case io.ltr8.tson.schema.meta.ValueRef<?> reference -> reference.name();
+                default -> content;
+            };
             return names != null && NameHygiene.refusesValue(ctx, named, names) ? null : value;
         } catch (UnsupportedOperationException gap) {
             // A value this library cannot judge yet, such as a type named by a qualified name (`geo.address<T>`).

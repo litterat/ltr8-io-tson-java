@@ -71,7 +71,7 @@ for what the same tokens would mean in a document with no `!!import`. Nothing in
 - *Form is not meaning.* §2.4 says a token's form "is consulted exactly once" — by base type resolution, and at a
   disjoint choice — and that "two tokens with the same text denote the same value regardless of form — identity is
   text". §5.2 says the same of every atom ("Content expressible unquoted may be written either way"), and a
-  reference is an atom (`meta.reference_type`). By these, `t: "int32"` at a field typed `meta.type_ref` is the
+  reference is an atom (`meta.ref`). By these, `t: "int32"` at a field typed `meta.type_ref` is the
   reference `int32`.
 - *A quoted token is never a name.* §7.4's grammar defines `qualified-name-token = unquoted-token` and says, at
   `type-arg`, "A quoted token is never a reference", and at `sibling-ref`, "A quoted token is never a sibling
@@ -190,8 +190,8 @@ that is not a record, and no `meta.template` or `meta.record_template`.
 - *§5.10, a template is an open record: running.* `meta.record` carries `parameters?: [meta.param; 1..]`, each
   `{ name, bound? }`; a record with parameters is open, a template, and the kernel declares no other template
   constructor and no template: `template`, `template_param`, `record_template`, `record_template_field`,
-  `record_template_field_map`, `tuple1` and `voidable_tuple1` are gone, `meta.ref` is the refined constructor
-  `meta.reference_type ^ {}` (#6) and the root's `set` an alias of `meta.set_type`, so
+  `record_template_field_map`, `tuple1` and `voidable_tuple1` are gone, `meta.ref` is the one reference constructor,
+  `meta.reference_type` gone, and the root's `set` an alias of `meta.set_type`, so
   `meta.ref<X>` and `set<text>` are constructions and carry no `@meta.application`. An open record is read at its
   declaration against `record`'s own vocabulary: a parameter is a reference value, written as its name and looked up
   in the record's `parameters` before the namespace, standing at a field's `type` or among an application's
@@ -462,10 +462,10 @@ application or a parameter.
 fixture (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`).
 
 - *The kernel.* `allow_sibling`, `meta.field_type_ref` and `meta.field_type_expr` are gone; `meta.dependent` is added;
-  `record_field.type` is a `meta.type_expr`, as every type slot is; `meta.type_ref` is `!meta.reference_type { of:
-  meta.type }`; and `meta.ref` is an empty refinement, `meta.reference_type ^ {}`, kept so `meta.ref<T>` keeps its
-  spelling. The kernel's own `record_field.value` is typed `type!`. `on` is `text` and names a declared field by its
-  declared spelling, as a `discriminators` entry does.
+  `record_field.type` is a `meta.type_expr`, as every type slot is; `meta.type_ref` is `!meta.ref { of: meta.type }`;
+  and `meta.ref` is the one reference constructor, `meta.atom & { of: meta.type_ref }`, so `meta.ref<T>` keeps its
+  spelling and `meta.reference_type` is gone. The kernel's own `record_field.value` is typed `type!`. `on` is `text`
+  and names a declared field by its declared spelling, as a `discriminators` entry does.
 - *The data grammar* ([TSON-DATA] §7.4, §7.5). `sibling-ref` and its adjacency row are gone, and with the argument
   list gone too (#3) so is `reference`; no tree node or writer case holds either form. A data document writing `kind!`
   — or a schema document writing it inside a construction's payload, which is data — gets the separation rule's syntax

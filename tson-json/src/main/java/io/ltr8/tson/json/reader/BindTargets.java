@@ -7,7 +7,7 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.json.JsonTypeReader;
-import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
@@ -22,9 +22,10 @@ import java.util.Optional;
  * <ul>
  *   <li><b>An atom</b> is bound to the target's wire class ({@link AtomReader#boundTo}) -- an {@code int32} into a
  *       {@code long} -- and through the target's bridge where it has one. A target that binds structurally
- *       cannot hold an atom. A reference's {@code TypeRef} or {@code Ref} target is bound to the family's own
- *       production, never through a bridge from its name, so the {@code TypeRef} keeps its referent and the {@code
- *       Ref} receives the value its name reaches ({@link AtomReader#readsAReference}).</li>
+ *       cannot hold an atom. A type's reference binds a {@code TypeRef} and a value's a {@code ValueRef}, each to the
+ *       family's own production, never through a bridge from its name, so the {@code TypeRef} keeps its referent and
+ *       the {@code ValueRef} receives the value its name reaches ({@link AtomReader#readsAReference}); either is the
+ *       other's mismatch.</li>
  *   <li><b>An array or set</b> is read again for the target's own collection or array class, its element bound to
  *       the target's element in turn -- so {@code List<Long>}, {@code long[]} and {@code Set<UUID>} each receive
  *       what they declare.</li>
@@ -67,13 +68,19 @@ final class BindTargets {
                         + " structurally");
                 return reader;
             }
-            if (atom.readsAReference() && (bound.typeClass() == TypeRef.class || bound.typeClass() == Ref.class)) {
-                // The reference itself, carrying what it names, or the cell holding the value it reaches: a bridge
-                // from the name would drop both.
+            if (atom.readsAReference() && (bound.typeClass() == TypeRef.class || bound.typeClass() == ValueRef.class)) {
+                // A type's reference, carrying what it names, or the cell holding the value a value's name reaches: a
+                // bridge from the name would drop both, and each is the other's mismatch.
                 Optional<AtomReader<?>> direct = atom.boundTo(bound.typeClass());
                 if (direct.isPresent()) {
                     return direct.get();
                 }
+                mismatches.add(bound.typeClass() == TypeRef.class
+                        ? what + " holds a value by name, and " + where + " binds a TypeRef -- a value is no type, so "
+                                + "declare it ValueRef, which receives the value its name reaches, or String, which "
+                                + "receives the name"
+                        : what + " holds a type's name, and " + where + " binds a ValueRef -- declare it TypeRef");
+                return reader;
             }
             Optional<AtomReader<?>> atTarget = atom.boundTo(bound.dataClass());
             if (atTarget.isEmpty()) {

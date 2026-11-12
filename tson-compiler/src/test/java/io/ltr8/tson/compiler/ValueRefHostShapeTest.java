@@ -24,10 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A name at a kind- or reference-typed slot of a value body is judged whatever the host component's Java type: the
  * slot declares the spelling and the linker judges the name by the slot's declared type, so a {@code String}
- * component receives the name as text and the name is judged exactly as under a {@code TypeRef} one. What is no name
- * -- a quoted token -- is refused at the read under either host.
+ * component receives the name as text and the name is judged exactly as under a {@code ValueRef} one at a value's
+ * reference, or a {@code TypeRef} one at a kind. What is no name -- a quoted token -- is refused at the read under
+ * either host.
  */
-class RefHostShapeTest {
+class ValueRefHostShapeTest {
 
     private static final String META = "https://example.test/ref-host-meta.tn";
 
@@ -40,11 +41,11 @@ class RefHostShapeTest {
                 !schema {
                   rh_method              => { request?: meta.ref<meta.record> }
                   rh_interface           => !meta.namespace { key_type: meta.identifier  value_type: rh_method }
-                  rh_ref_type_ref        => { method: meta.ref<rh_method> }
+                  rh_ref_value_ref       => { method: meta.ref<rh_method> }
                   rh_ref_text            => { method: meta.ref<rh_method> }
                   rh_type_name_type_ref  => { request: meta.ref<meta.record> }
                   rh_type_name_text      => { request: meta.ref<meta.record> }
-                  rh_ref_type_refs       => !meta.namespace { key_type: meta.identifier  value_type: rh_ref_type_ref }
+                  rh_ref_value_refs      => !meta.namespace { key_type: meta.identifier  value_type: rh_ref_value_ref }
                   rh_ref_texts           => !meta.namespace { key_type: meta.identifier  value_type: rh_ref_text }
                   rh_type_name_type_refs => !meta.namespace { key_type: meta.identifier  value_type: rh_type_name_type_ref }
                   rh_type_name_texts     => !meta.namespace { key_type: meta.identifier  value_type: rh_type_name_text }
@@ -104,11 +105,11 @@ class RefHostShapeTest {
         }
     }
 
-    // ── A TypeRef host ──────────────────────────────────────────────────────────────────────────────
+    // ── A ValueRef host at a value's reference, a TypeRef host at a kind ────────────────────────────
 
     @Test
-    void aReferenceWithATypeRefHostIsJudged() {
-        refused(schema("ref-type-ref", "b => !rh_ref_type_refs { one => { method: nobody.place } }"),
+    void aReferenceWithAValueRefHostIsJudged() {
+        refused(schema("ref-value-ref", "b => !rh_ref_value_refs { one => { method: nobody.place } }"),
                 "'nobody' is no entry of this schema or its imports");
     }
 

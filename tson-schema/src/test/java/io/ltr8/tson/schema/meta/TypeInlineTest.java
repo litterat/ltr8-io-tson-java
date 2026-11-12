@@ -19,7 +19,7 @@ class TypeInlineTest {
     @Test
     void withNoConstructorGivenItIsTheOneTheBodyIsAnInstanceOf() {
         assertEquals("meta.array", new TypeInline(AT_LEAST_ONE).constructor());
-        assertEquals("meta.reference_type", new TypeInline(ReferenceBody.of("order")).constructor());
+        assertEquals("meta.ref", new TypeInline(ReferenceBody.of("order")).constructor());
         assertEquals(new TypeInline("meta.array", AT_LEAST_ONE), new TypeInline(AT_LEAST_ONE));
     }
 

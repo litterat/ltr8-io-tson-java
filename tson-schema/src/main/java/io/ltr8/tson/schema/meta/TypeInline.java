@@ -22,8 +22,7 @@ import java.util.function.Function;
  * <ul>
  *   <li>a construction of a container, a tuple, a choice or a reference ({@link #constructible}): an {@link
  *       ArrayBody} ({@code meta.array}, and {@code meta.set_type} refining it), a {@link MapBody}, a {@link
- *       TupleBody}, a {@link ChoiceBody} or a {@link ReferenceBody} ({@code meta.reference_type}, and {@code
- *       meta.ref});</li>
+ *       TupleBody}, a {@link ChoiceBody} or a {@link ReferenceBody} ({@code meta.ref});</li>
  *   <li>a closed {@link RecordBody}, under {@code meta.record}: the record an application of an open record closes to
  *       at a type slot ([TSON-SCHEMA] §5.10), or one a resolved form states.</li>
  *   <li>an {@link ApplyBody}, {@code meta.apply}, an application written in place, which in resolved output stands

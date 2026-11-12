@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=0853746eb05d7ddcec2cc4cf1243f4456d955c4b67c6267a040fee4fd16a8528"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=5d3259d67c67b615d17eb182e6f5a2d46e9e904d2d5552735518d8a91cfb2e11"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -448,7 +448,7 @@
       Nothing about a parameter is derived: it is what its declaration writes.
 
       Every parameter is a type. It is written where it stands as its name, a
-      reference value (`meta.reference_type`), and stands at a field's `type`,
+      reference value (`meta.ref`), and stands at a field's `type`,
       at a slot naming a type of a type written in place there, at any depth
       (`[T]`, `{ cursor: T }`), or as an argument of an application at any of
       those or in a parent, and nowhere else: a field's `value` is never a
@@ -970,24 +970,20 @@
       refinement is IS-A its source. `meta.identifier_ref` is `meta.type_ref`
       narrowed to the identifier families.
 
-      A reference is a name or a parameter.
+      A reference is a name or a parameter. An author writes one as
+      `meta.ref<T>`, the construction `!meta.ref { of: T }`: where `T` is a
+      constructor it holds the names of the types built with it,
+      `meta.ref<net.uuid_type>`, and otherwise the names of values of `T`,
+      `meta.ref<method>`.
       """
-    reference_type => meta.atom & {
+    ref => meta.atom & {
       of: meta.type_ref
     }
 
     @doc:"""
-      The reference an author writes: `meta.ref<T>` is the construction
-      `!meta.ref { of: T }`. Where `T` is a constructor it holds the names of
-      the types built with it, `meta.ref<net.uuid_type>`, and otherwise the
-      names of values of `T`, `meta.ref<method>`.
-      """
-    ref => meta.reference_type ^ {}
-
-    @doc:"""
       The names of the types a value can have.
       """
-    type_ref => !meta.reference_type { of: meta.type }
+    type_ref => !meta.ref { of: meta.type }
 
     @doc:"""
       The names of the identifier families, which a `name_type` names: a
@@ -997,17 +993,17 @@
 
     @doc:"""
       A type written where it is used. `of` holds the type, a construction
-      tagged by its constructor and carrying no chain:
-      `{ of: !meta.array { element_type: text } }`. The construction is one of
-      `array`, `map`, `tuple`, `choice` or `reference_type`, or of a
-      constructor refining one of them, `set_type` and `ref` among them; a
-      `record` without `parameters`; an `apply`, only inside an open record
-      over one of its parameters; or a `dependent`, only directly at a
-      record field's `type`. An enum, every other atom and a namespace type,
-      whose values carry its name as their tag, are declared and named, and so
-      is a declared sum (`declared_type`). It is not itself a type, so one
-      never holds another directly. Inside an open record a slot in it may hold
-      one of the record's parameters, replaced when the record is applied.
+      tagged by its constructor and carrying no chain: `{ of: !meta.array {
+      element_type: text } }`. The construction is one of `array`, `map`,
+      `tuple`, `choice` or `ref`, or of a constructor refining one of them,
+      `set_type` among them; a `record` without `parameters`; an `apply`, only
+      inside an open record over one of its parameters; or a `dependent`, only
+      directly at a record field's `type`. An enum, every other atom and a
+      namespace type, whose values carry its name as their tag, are declared
+      and named, and so is a declared sum (`declared_type`). It is not itself
+      a type, so one never holds another directly. Inside an open record a
+      slot in it may hold one of the record's parameters, replaced when the
+      record is applied.
       """
     type_inline => { of: meta.type }
 

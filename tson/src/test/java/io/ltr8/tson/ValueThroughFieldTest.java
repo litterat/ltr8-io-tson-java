@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.ValueRef;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -30,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * with fields of its own and a map of members is a record holding both under a namespace key, and a {@code meta.ref<T>}
  * names a member through the record's field ({@code shop.orders.endpoints.place_order}). The walk reads the field of
  * the host object the read bound, through the binding's own descriptor, and delivers the value it reaches into the
- * {@code Ref}; a field the record does not declare, a key the map lacks, a member no value has, and an optional
+ * {@code ValueRef}; a field the record does not declare, a key the map lacks, a member no value has, and an optional
  * field the value does not hold are each refused at their step.
  */
 class ValueThroughFieldTest {
@@ -116,7 +117,7 @@ class ValueThroughFieldTest {
 
     /**
      * A field step, then a key step: {@code endpoints} is read where the binding put it, a component named {@code
-     * byName}, and {@code place_order} is a key of the map it holds. The {@code Ref} receives that very value.
+     * byName}, and {@code place_order} is a key of the map it holds. The {@code ValueRef} receives that very value.
      */
     @Test
     void aValueThroughARecordValuesFieldIsDelivered() {
@@ -212,7 +213,7 @@ class ValueThroughFieldTest {
                 .entries().entries());
         assertEquals("loose.x.endpoints.e", route.endpoint().name());
         // A tree delivered where the host's class is no tree: the schema holds it, and only a bound read refuses it.
-        Object delivered = ((io.ltr8.tson.schema.meta.Ref<?>) route.endpoint()).get();
+        Object delivered = ((ValueRef<?>) route.endpoint()).get();
         assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("order"), ((io.ltr8.tson.tree.TsonValue) delivered)
                 .get("response").as(io.ltr8.tson.schema.meta.TypeRef.class).orElseThrow());
 

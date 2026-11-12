@@ -21,10 +21,10 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.Ref;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
@@ -43,8 +43,8 @@ import java.util.function.Function;
 
 /**
  * The names a value entry holds ({@link ValueEntry}) resolved and judged by their slots
- * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code meta.ref<T>}, held as a {@link Ref} the
- * linker delivers into or a {@link TypeRef} carrying the name alone; and a type's name at a slot typed by a kind,
+ * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code meta.ref<T>}, held as a {@link ValueRef} the
+ * linker delivers into, or as the name alone where a host holds it as text; and a type's name at a slot typed by a kind,
  * judged a member ({@link #judgeMember}). The same walk judges every other value's name ({@link #reach}): a field's
  * default or pin at a reference, and a name a data document writes at one, which the linker leaves the reference a
  * lookup for ({@code ReferenceBody.Values}).
@@ -226,7 +226,7 @@ final class ValuesByName {
     }
 
     /**
-     * Judges one name by its slot, and returns what a {@code Ref} host receives: the value it reaches, or for a name
+     * Judges one name by its slot, and returns what a {@code ValueRef} host receives: the value it reaches, or for a name
      * at a slot that names types nothing.
      */
     private Object judge(String where, TypeRef reference, TsonSchema.SlotType slot) {

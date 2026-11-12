@@ -88,11 +88,11 @@ class KernelWaitGraphTest {
         assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
         assertEquals(31, cycle.size(), "the cycle");
         assertEquals(67, closure.size(), "the cycle's closure");
-        assertEquals(77, graph.entries().size(), "the kernel's entries");
+        assertEquals(76, graph.entries().size(), "the kernel's entries");
         assertTrue(closure.containsAll(List.of("meta.param", "meta.param_name")), "reached through record.parameters");
         assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application", "meta.apply",
                 "binary.bytes_encoding", "binary.bytes_type",
-                "meta.field_name", "meta.ref", "meta.tuple", "meta.tuple_element", "set")),
+                "meta.field_name", "meta.tuple", "meta.tuple_element", "set")),
                 new java.util.TreeSet<>(related), "the related concepts");
     }
 

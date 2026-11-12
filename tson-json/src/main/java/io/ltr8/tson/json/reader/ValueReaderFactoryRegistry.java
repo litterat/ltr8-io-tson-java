@@ -34,7 +34,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
             // meta.tn, under meta
             "numeric.integer_type", "unicode.text_type", "unicode.identifier_type", "unicode.regex_type", "net.iri_type",
-            "meta.reference_type", "binary.bytes_type",
+            "meta.ref", "binary.bytes_type",
             // numeric.tn, under numeric
             "numeric.float_type", "numeric.decimal_type", "numeric.rational_type", "numeric.complex_type",
             // temporal.tn, under temporal

@@ -29,7 +29,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Typed field names — `meta.record.name_type` names the identifier family a record's field names belong to, as
       `meta.enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
       judged under its own name type in both encodings (Part 2 §5.2)
-- [x] References (Part 2 §4.2) — one atom, `!meta.reference_type { of: T }`, spelled
+- [x] References (Part 2 §4.2) — one atom, `!meta.ref { of: T }`, spelled
       `meta.ref<T>` whatever `T` is, admits a name exactly when the named entry's value, past
       its alias hops, is of a type IS-A `T`. Over a constructor (`meta.ref<net.uuid_type>`) its values are the names of
       the types in the schema's closure built with it: computed at link, never listed or written, and judged by
@@ -40,7 +40,8 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] A reference is a name (Part 2 §4.2, §5.10) — an application is schema grammar, the construction `meta.apply`
       written in place, and an argument list is no data form ([TSON-DATA] §7.2.5): `t: set<text>` in a data document or
       a schema value's payload is a parse error, the grammar's ordinary one, whether or not the schema closes the
-      application. A name reads to a `TypeRef` whose `referent()` is the entry's value. In JSON a reference is the string
+      application. A type's name reads to a `TypeRef` whose `referent()` is the entry's value, and a value's name to a
+      `ValueRef` delivered with the value it reaches. In JSON a reference is the string
       of a qualified name, and `"set<text>"` is refused as a string outside its grammar
 - [x] A dependent field's type is a sum written in place (Part 2 §5.2, `SPEC-FEEDBACK.md` #6) —
       `{ of: !meta.dependent { on: kind } }` at a record field's type, `kind!` in schema-grammar sugar, which parses at

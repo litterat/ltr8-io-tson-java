@@ -27,7 +27,7 @@ import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
@@ -154,7 +154,7 @@ public final class DataClassObjectWriter {
                 write(boxed.value().invoke(value), boxed.valueClass(), writer, typeRef);
                 return;
             }
-            if (value instanceof Ref<?> reference) {
+            if (value instanceof ValueRef<?> reference) {
                 // A value held by name writes as the name, a bare token, as a type's name does: resolved output
                 // states the reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not wanted.
                 writeAnnotations(value, dataClass, writer);

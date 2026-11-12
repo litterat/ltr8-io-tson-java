@@ -232,7 +232,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   schema leaves no second vocabulary to bind separately. `Tson.of` builds the context the core resolves schemas through and
   the bind registry and object readers read data through, `SchemaModelNameBinder.over(configured)`: the configured binder,
   profile and atom registrations (`DataBindContext.toBuilder`, `nameBinder`), composed with `SchemaModelNameBinder.INSTANCE`,
-  and the schema model's own registrations (`Token`, `SourcePosition`, `Ref`, the atom host types) added where absent
+  and the schema model's own registrations (`Token`, `SourcePosition`, `ValueRef`, the atom host types) added where absent
   (`ResolverBindContext.registerAbsent`). The split is by name, not by a failed lookup: `INSTANCE` answers for exactly every
   entry of meta.tn, its root names and its members of `meta`, `atom`, `numeric`, `unicode`, `net` and `binary` by path, and
   the members numeric.tn, temporal.tn and net.tn declare under `numeric`, `temporal` and `net`, read from the bundled sources

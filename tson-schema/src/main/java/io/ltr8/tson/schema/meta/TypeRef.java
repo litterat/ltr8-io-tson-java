@@ -6,19 +6,19 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A type reference, what the kernel's {@code reference} atom reads to: the object every reference-typed position
- * delivers, in a tree read and a bound one alike ([TSON-SCHEMA] §4.2). It is a name, a {@link NameRef}; inside an open
- * record it may also be a {@link ParamRef}, one of the record's parameters, which only the record itself makes. {@code
- * name} is the qualified name, its {@link #segments} joined by {@code .}.
+ * A type reference, what the kernel's {@code ref} atom reads to where it names types: the object every type-naming
+ * position delivers, in a tree read and a bound one alike ([TSON-SCHEMA] §4.2). It is a name, a {@link NameRef};
+ * inside an open record it may also be a {@link ParamRef}, one of the record's parameters, which only the record
+ * itself makes. {@code name} is the qualified name, its {@link #segments} joined by {@code .}.
  *
  * <p><b>A reference holds a name and nothing else.</b> An application, {@code box<T>}, is no reference: it is the
  * construction {@link ApplyBody} written in place, and an argument list is no part of a value ([TSON-DATA] §7.2.5).
  *
  * <p><b>{@link #referent} is what the reference names</b> in the closure it was read under: the value of the entry its
  * name names. A reference read where a closure is known carries it ({@link #closure}), attached by the kind's parser
- * from the reference type's linked index ({@code ReferenceBody.closure}). One read in data at a position naming values
- * ({@code meta.ref<order>}) names the value its name reached in the governing schema ({@code ReferenceBody.Values}).
- * One built by hand, or read inside a schema document being resolved, carries {@link Closure#NONE}, and names nothing.
+ * from the reference type's linked index ({@code ReferenceBody.closure}). One built by hand, or read inside a schema
+ * document being resolved, carries {@link Closure#NONE}, and names nothing. A value's name is no {@code TypeRef}: it
+ * reads to a {@link ValueRef}.
  *
  * <p><b>{@code annotations} carries the annotations written on the reference itself</b>: [TSON-SCHEMA] §8.3 attaches
  * {@code @alias:name} to the type value when a use site is flattened past an alias entry, so

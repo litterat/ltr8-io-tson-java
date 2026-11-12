@@ -8,13 +8,14 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.Optional;
 
 /**
- * A kind- or reference-typed slot whose host component is neither a {@link TypeRef} nor a {@code Ref} -- a {@code
+ * A kind- or reference-typed slot whose host component is neither a {@link TypeRef} nor a {@code ValueRef} -- a {@code
  * String}, say: the host receives what its bound atom reader produces, and in a schema document that reader records
  * the name read there with the slot's declared type ({@link TsonReadContext#heldByName}), so the linker judges it as it
- * judges the same name under a {@code TypeRef} host. Whether a name is judged is the slot's to say, never the host's.
+ * judges the same name under a {@code TypeRef} or {@code ValueRef} host. Whether a name is judged is the slot's to
+ * say, never the host's.
  *
  * <p><b>The spelling is the slot's too.</b> What is no name -- a quoted token, a braced value, a framed name -- is
- * refused as the {@code TypeRef} host's reader refuses it ({@code refusing}): at a reference-typed slot in any schema
+ * refused as the slot's own host's reader refuses it ({@code refusing}): at a reference-typed slot in any schema
  * document, and at a kind-typed slot in a value body, where nothing is closed. A data document's read is the
  * bound reader's alone.
  */
@@ -27,7 +28,7 @@ final class RecordedNameReader implements TsonTypeReader<Object> {
     /**
      * @param inner    the slot's reader bound to the host
      * @param type     the slot's declared type, each name read here recorded with it
-     * @param refusing the reader a {@code TypeRef} host would have, which reports what is no name
+     * @param refusing the reader the slot's own host would have, which reports what is no name
      */
     RecordedNameReader(TsonTypeReader<?> inner, TsonSchema.SlotType type, TsonTypeReader<?> refusing) {
         this.inner = inner;

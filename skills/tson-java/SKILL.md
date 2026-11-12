@@ -204,7 +204,9 @@ value of the entry it names in the schema it was read under. A quoted `"set<text
 qualified name, refused as outside the reference's grammar (`ATOM_FORM_INVALID`), as the JSON string is. `kind!` is schema
 sugar for a dependent field's type and no data form: written in data it is a syntax error. A position typed by a
 reference over a type that is no constructor (`meta.ref<order>`) holds a value's qualified name (`o1`, `book.first`),
-judged by what it reaches in the schema, and its `TypeRef`'s `referent()` is that value.
+judged by what it reaches in the schema, and reads to a `schema.meta.ValueRef` (`as(ValueRef.class)`, bound as
+`ValueRef<T>` or as a `String` name; a `TypeRef` component there is a bind mismatch): `name()`, and `get()`, that
+value.
 
 **A dependent field, `v?: kind!`, is read against the type its sibling names in each instance** (Part 2 §5.2): `{ kind:
 point  v: { x: 1  y: 2 } }`. Write a free sibling before its dependent field (a pinned or discriminator sibling may come

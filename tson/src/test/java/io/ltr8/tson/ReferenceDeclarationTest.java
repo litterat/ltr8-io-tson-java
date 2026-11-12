@@ -73,7 +73,7 @@ class ReferenceDeclarationTest {
         assertEquals(List.of(), Tson.standard().validateSchema(schema("https://example.test/picks.tn", META, CORE,
                 """
                   order => { id: text }
-                  oref  => !meta.reference_type { of: order }
+                  oref  => !meta.ref { of: order }
                   rpick => { m: oref }""")));
     }
 

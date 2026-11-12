@@ -9,6 +9,7 @@ import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.ValueRef;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -155,11 +156,11 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * One reference a value body holds by name: {@code slot} is the path from the body to the position it
      * fills -- a field name at a record, a key at a map, an index at an array, as the read descended --, {@code
      * type} that position's declared type, as the reader that read the name knows it, and {@code reference} the
-     * reference read there, its {@code name} the qualified name as written; {@code cell} is the host's {@code Ref}
+     * reference read there, its {@code name} the qualified name as written; {@code cell} is the host's {@code ValueRef}
      * where the host holds one.
      */
     public record ValueByName(List<String> slot, SlotType type, TypeRef reference,
-                              Optional<io.ltr8.tson.schema.meta.Ref<?>> cell) {
+                              Optional<ValueRef<?>> cell) {
 
         public ValueByName {
             slot = List.copyOf(slot);

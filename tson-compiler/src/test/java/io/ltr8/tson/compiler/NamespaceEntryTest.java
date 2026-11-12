@@ -147,7 +147,7 @@ class NamespaceEntryTest {
 
     /**
      * {@code handler: myapi.get_orders}: the first segment names the entry, the second a key of the namespace value,
-     * whose type is {@code api}'s value type, {@code method} -- and the {@code Ref} receives the value at the link.
+     * whose type is {@code api}'s value type, {@code method} -- and the {@code ValueRef} receives the value at the link.
      */
     @Test
     void aQualifiedNameSelectsAKeyOfANamespaceEntry() {
