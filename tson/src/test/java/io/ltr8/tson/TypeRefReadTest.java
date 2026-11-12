@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the governing schema's type-name namespace, to a member. {@code meta.ref<uuid_type>} holds {@code stock_id}, never a
  * uuid.
  */
-class TypeNameRefReadTest {
+class TypeRefReadTest {
 
     private static final String IDS = "https://example.test/kind-ids.tn";
 

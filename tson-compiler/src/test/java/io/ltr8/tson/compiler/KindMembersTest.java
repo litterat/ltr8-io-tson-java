@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.resolver.KindMembers;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -63,8 +63,8 @@ class KindMembersTest {
         }).resolveLinked(ID);
     }
 
-    private static ReferenceBody kind(TsonLinkedSchema linked, String name) {
-        return assertInstanceOf(ReferenceBody.class, linked.schema().entries().get(name));
+    private static RefBody kind(TsonLinkedSchema linked, String name) {
+        return assertInstanceOf(RefBody.class, linked.schema().entries().get(name));
     }
 
     private static final String IDS = """
@@ -79,7 +79,7 @@ class KindMembersTest {
 
     @Test
     void aConstructionAndARefinementOfOneAreMembersAndTheConstructorAndAnotherFamilyAreNot() {
-        ReferenceBody ids = kind(link(IDS), "any_id");
+        RefBody ids = kind(link(IDS), "any_id");
 
         // core's own `uuid` is a member too: the closure is the schema's, imports included.
         assertEquals(List.of("customer_id", "stock_id", "uuid", "v4_stock_id"), ids.memberNames());
@@ -96,16 +96,16 @@ class KindMembersTest {
                 """);
         RecordBody order = assertInstanceOf(RecordBody.class, linked.schema().entries().get("order"));
         // `meta.ref<C>` at a field is the reference written in place, linked where it stands.
-        ReferenceBody inline = assertInstanceOf(ReferenceBody.class,
+        RefBody inline = assertInstanceOf(RefBody.class,
                 assertInstanceOf(io.ltr8.tson.schema.meta.TypeInline.class, order.fields().get("id").type()).of());
 
-        assertEquals(ReferenceBody.of("net.uuid_type"), inline);
+        assertEquals(RefBody.of("net.uuid_type"), inline);
         assertEquals(List.of("stock_id", "uuid"), inline.memberNames());
     }
 
     @Test
     void aBraceRecordIsBuiltWithRecordAndAnAbstractBaseIsAMember() {
-        ReferenceBody records = kind(link("""
+        RefBody records = kind(link("""
                 {
                   pet     => abstract { name: text }
                   dog     => pet & { breed: text }
@@ -142,7 +142,7 @@ class KindMembersTest {
 
     @Test
     void aBaseKindTakesEveryConstructionBelowIt() {
-        ReferenceBody atoms = kind(link("""
+        RefBody atoms = kind(link("""
                 {
                   stock_id => !net.uuid_type {}
                   atoms    => !meta.ref { of: meta.atom }
@@ -156,7 +156,7 @@ class KindMembersTest {
 
     @Test
     void anAliasOfAMemberIsAMemberThroughItsHop() {
-        ReferenceBody ids = kind(link("""
+        RefBody ids = kind(link("""
                 {
                   stock_id => !net.uuid_type {}
                   sku_id   => stock_id
@@ -183,7 +183,7 @@ class KindMembersTest {
                 }
                 """);
 
-        ReferenceBody atoms = kind(linked, "atoms");
+        RefBody atoms = kind(linked, "atoms");
         assertTrue(atoms.memberNames().containsAll(List.of("atoms", "kinds", "ids")), atoms.memberNames().toString());
         assertTrue(!atoms.memberNames().contains("shape"), atoms.memberNames().toString());
         assertTrue(kind(linked, "kinds").memberNames().containsAll(List.of("atoms", "ids", "kinds", "meta.type_ref")),
@@ -256,7 +256,7 @@ class KindMembersTest {
      */
     @Test
     void aKindOfNamespaceHoldsEveryNamespaceType() {
-        ReferenceBody namespaces = kind(link("""
+        RefBody namespaces = kind(link("""
                 !!id:"https://example.test/kinds.tn"
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
@@ -408,7 +408,7 @@ class KindMembersTest {
      */
     @Test
     void ofNamingATypeThatIsNoConstructorNamesValues() {
-        ReferenceBody ids = kind(link("""
+        RefBody ids = kind(link("""
                 {
                   stock_id => !net.uuid_type {}
                   ids      => !meta.ref { of: stock_id }
@@ -462,7 +462,7 @@ class KindMembersTest {
         Namespace<Top> entries = link(IDS).schema().entries();
 
         assertEquals(List.of("customer_id", "stock_id", "uuid", "v4_stock_id"),
-                ((ReferenceBody) entries.get("any_id")).memberNames());
+                ((RefBody) entries.get("any_id")).memberNames());
     }
 
     /** A default at a kind-typed field is a type name, judged a member at link (§5.2's field-value rule). */

@@ -109,7 +109,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
             return true;
         }
         TsonEvent e = ctx.peek();
-        ctx.report(rules.notATuple(TypeRefCheck.describe(e)));
+        ctx.report(rules.notATuple(TypeTagCheck.describe(e)));
         EventSkip.coreValue(ctx);
         return false;
     }

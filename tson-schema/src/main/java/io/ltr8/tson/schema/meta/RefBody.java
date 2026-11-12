@@ -41,7 +41,7 @@ import java.util.function.BiPredicate;
  * {@code meta.ref<uuid_type>} hold equal bodies whatever members each closure admits.
  */
 @Typename(name = "meta.ref")
-public record ReferenceBody(TypeChain chain, TypeRef of, @Unbound Optional<Index> index) implements Atom {
+public record RefBody(TypeChain chain, TypeRef of, @Unbound Optional<Index> index) implements Atom {
 
     /**
      * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are types,
@@ -89,37 +89,37 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Unbound Optional<Index
     }
 
     @Record
-    public ReferenceBody {
+    public RefBody {
         chain = TypeChain.orEmpty(chain);
         Objects.requireNonNull(of, "of");
         index = index == null ? Optional.empty() : index;
     }
 
     /** A reference as an author declares it, placed in no chain -- the linker derives its {@link #index}. */
-    public ReferenceBody(TypeRef of) {
+    public RefBody(TypeRef of) {
         this(TypeChain.EMPTY, of, Optional.empty());
     }
 
     /** A reference over the entry {@code of} names, as {@code meta.ref<T>} declares it. */
-    public static ReferenceBody of(String of) {
-        return new ReferenceBody(TypeRef.of(of));
+    public static RefBody of(String of) {
+        return new RefBody(TypeRef.of(of));
     }
 
     @Override
-    public ReferenceBody withChain(TypeChain chain) {
-        return new ReferenceBody(chain, of, index);
+    public RefBody withChain(TypeChain chain) {
+        return new RefBody(chain, of, index);
     }
 
     /** This reference with its derived index: {@code namesTypes}, the members sorted, its entries and the shown names. */
-    public ReferenceBody linked(boolean namesTypes, List<String> members, Map<String, Top> entries,
-                                List<String> shown) {
+    public RefBody linked(boolean namesTypes, List<String> members, Map<String, Top> entries,
+                          List<String> shown) {
         return linked(namesTypes, members, entries, shown, Optional.empty());
     }
 
     /** {@link #linked(boolean, List, Map, List)} with what a name this reference holds reaches ({@link Values}). */
-    public ReferenceBody linked(boolean namesTypes, List<String> members, Map<String, Top> entries,
-                                List<String> shown, Optional<Values> values) {
-        return new ReferenceBody(chain, of, Optional.of(new Index(namesTypes,
+    public RefBody linked(boolean namesTypes, List<String> members, Map<String, Top> entries,
+                          List<String> shown, Optional<Values> values) {
+        return new RefBody(chain, of, Optional.of(new Index(namesTypes,
                 members.stream().sorted().toList(), entries, shown.stream().sorted().toList(), values)));
     }
 
@@ -169,7 +169,7 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Unbound Optional<Index
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
-        return refined instanceof ReferenceBody ? List.of()
+        return refined instanceof RefBody ? List.of()
                 : List.of("refines a reference with " + refined.getClass().getSimpleName());
     }
 
@@ -179,7 +179,7 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Unbound Optional<Index
      * IS-A its second in the namespace both resolve in, a name being IS-A itself; an empty list means {@code refined}
      * narrows. A widening, and an {@code of} unrelated to the source's, is refused.
      */
-    public List<String> ofNarrowing(ReferenceBody refined, BiPredicate<String, String> isA) {
+    public List<String> ofNarrowing(RefBody refined, BiPredicate<String, String> isA) {
         return isA.test(refined.of.name(), of.name()) ? List.of() : List.of("of '" + refined.of.text() + "' is not '"
                 + of.text()
                 + "' or IS-A it, so the refinement admits names the source refuses -- a refinement narrows 'of' (§5.7)");
@@ -188,7 +188,7 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Unbound Optional<Index
     /** Compares {@link #of} and the chain, never the index -- see this class's Javadoc. */
     @Override
     public boolean equals(Object o) {
-        return o instanceof ReferenceBody other && of.equals(other.of) && chain.equals(other.chain);
+        return o instanceof RefBody other && of.equals(other.of) && chain.equals(other.chain);
     }
 
     /** {@link #of} and the chain, as {@link #equals} compares them. */
@@ -200,6 +200,6 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Unbound Optional<Index
     /** What {@link #equals} compares: the derived index is no part of what this is. */
     @Override
     public String toString() {
-        return "ReferenceBody[chain=" + chain + ", of=" + of + "]";
+        return "RefBody[chain=" + chain + ", of=" + of + "]";
     }
 }

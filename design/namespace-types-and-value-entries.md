@@ -198,7 +198,7 @@ reader built from the slot's declaration, so it is right however the value was r
 record field, through the subtype a tag selected -- and the path serves only to say where.
 
 **One host shape for every reference.** A kind-typed slot binds a `TypeRef`, and any other reference-typed slot a
-`ValueRef<T>`, each the other's bind mismatch; `BindTargets` sets a `TypeNameSlotReader` or `ReferenceNameReader` for
+`ValueRef<T>`, each the other's bind mismatch; `BindTargets` sets a `TypeRefSlotReader` or `ValueRefSlotReader` for
 them, and a `ValueRef` receives the value the name reaches when the schema links (`ValueRef.deliver`): the bound
 object, the `Namespace`, or the tree. A tree read holds the same `ValueRef`. In a
 data document the same reader hands the name to the reference's atom bound to the component, which judges it and
@@ -211,7 +211,7 @@ refused under a `String` exactly as under a `TypeRef`.
 importing only temporal.tn that writes `!meta.record_field { type: int32 }` is refused, `int32` being numeric.tn's
 (`design/kinds-and-name-types.md`). **A value's qualified name is judged by what it reaches in the governing schema**,
 by the same walk (`ValuesByName`): the link that indexed the reference leaves it a lookup over its final namespace
-(`ReferenceBody.Values`), and the reference's atom (`RefParser`) asks it. So `which: o2` at `meta.ref<order>` reads
+(`RefBody.Values`), and the reference's atom (`ValueRefParser`) asks it. So `which: o2` at `meta.ref<order>` reads
 where `o2` is a value of `order` or a subtype, through a nested map, a namespace value's key or a record value's field
 included, and a name reaching nothing, a type, or a value of another type is `ATOM_CONSTRAINT_VIOLATION`. What a host
 receives is the slot's one shape: a `ValueRef` delivered with the value reached at the read (a tree read's `TsonAtom`

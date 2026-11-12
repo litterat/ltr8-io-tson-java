@@ -23,7 +23,7 @@ import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 
-import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
+import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -44,6 +44,7 @@ import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Token;
@@ -506,15 +507,15 @@ final class DefinitionResolver {
                     case RefinedDef refined -> resolveRefinement(name, refined, parameters);
                 }).finish(parameters);
             }
-            case ReferenceTypeDef referenceTypeDef -> {
+            case TypeExprDef typeExprDef -> {
                 // A parameter list before a reference -- an alias template -- is refused by SchemaDesugarer
                 // (§5.10: a template's body is a record), so one here is that phase not having run.
-                if (!referenceTypeDef.typeParams().isEmpty()) {
+                if (!typeExprDef.typeParams().isEmpty()) {
                     throw new IllegalStateException("'" + name + "': a parameter list before a reference reached "
                             + "resolution -- SchemaDesugarer refuses one (§5.10), so this declaration was resolved "
                             + "from raw AST without that phase");
                 }
-                yield switch (referenceTypeDef.ref()) {
+                yield switch (typeExprDef.ref()) {
                     case NameRef simple -> new io.ltr8.tson.schema.meta.Alias(
                             io.ltr8.tson.schema.meta.TypeRef.of(simple.name()));
                     case ApplicationRef generic -> resolveTemplateApplication(name, generic);
@@ -522,7 +523,7 @@ final class DefinitionResolver {
                     // `!meta.array { ... }` (or map, tuple, choice) construction it denotes (§5.3), and a construction
                     // in place stands only at a field's type -- so one here is that phase not having run.
                     case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, RecordExpr _, InlineConstruction _ ->
-                            throw unlifted("'" + name + "'", referenceTypeDef.ref());
+                            throw unlifted("'" + name + "'", typeExprDef.ref());
                 };
             }
             // A parameter list admits only an open record's explicit spelling, `<T> !meta.record { ... }` (§5.10).
@@ -2505,7 +2506,7 @@ final class DefinitionResolver {
             io.ltr8.tson.schema.meta.TypeExpr type = resolveFieldType(field.name(), field.type().get().typeRef());
             // An application is judged by what it closes to, once materialisation has closed it.
             if (value.isPresent() && type instanceof io.ltr8.tson.schema.meta.TypeInline inline
-                    && !(inline.of() instanceof io.ltr8.tson.schema.meta.ReferenceBody)
+                    && !(inline.of() instanceof RefBody)
                     && !(inline.of() instanceof ApplyBody)) {
                 // §5.2: a value is admitted at a field typed by an atom or an enum, and a type written in place is one
                 // only as a reference; a container, a tuple or a choice in place carries none, as a declared one

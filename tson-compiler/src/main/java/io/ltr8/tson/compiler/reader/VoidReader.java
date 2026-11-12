@@ -39,8 +39,8 @@ final class VoidReader implements TsonTypeReader<Object> {
         TsonEvent e = ctx.peek();
         if (!(e instanceof VoidEvent)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "expected the void sentinel '_' for void, found " + TypeRefCheck.describe(e),
-                    "the void sentinel '_'", TypeRefCheck.describe(e));
+                    "expected the void sentinel '_' for void, found " + TypeTagCheck.describe(e),
+                    "the void sentinel '_'", TypeTagCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }

@@ -250,7 +250,7 @@ The same walk judges two more names, so one rule decides what a value's name rea
   opening `'rpick': field 'which''s default …`. A FIXED-field step reported as a gap is `NOT_IMPLEMENTED` against that
   entry too.
 - **A name a data document writes** at one: `computeKinds` gives every reference naming values a lookup
-  (`ReferenceBody.Values`, `valuesOf`) over a `ValuesByName` built once the link has assembled its final namespace
+  (`RefBody.Values`, `valuesOf`) over a `ValuesByName` built once the link has assembled its final namespace
   (the `reached` holder, set beside `closure`), so the governing schema's compiled readers judge the name at the read
   (`design/references.md`). A link of a resolution in progress (`linkReady`) gives none: its pending entries hold no
   value, and a reference there reads its grammar alone, a held value at one being judged when the whole schema links.

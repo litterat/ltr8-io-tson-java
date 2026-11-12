@@ -100,7 +100,7 @@ class TsonTreeReaderTest {
         assertThrows(RuntimeException.class, () -> READER.read("{ unterminated"));
     }
 
-    // ── Type-ref checking (TypeRefCheck's rules) ─────────────────────────
+    // ── Type-ref checking (TypeTagCheck's rules) ─────────────────────────
 
     @Test
     void aBuiltInTypeRefOnAContainerIsAMismatch() {

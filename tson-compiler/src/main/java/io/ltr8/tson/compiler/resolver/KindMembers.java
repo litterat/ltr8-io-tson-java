@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.OpenEntry;
 
@@ -66,12 +66,12 @@ public final class KindMembers {
 
     /**
      * Every entry of {@code merged} whose name {@code reference}, one that names types, admits, in the map's own
-     * order -- {@link ReferenceBody#linked} sorts them.
+     * order -- {@link RefBody#linked} sorts them.
      *
      * @param constructorOf the constructor an entry of {@code merged} applies, from its recorded facts
      * @param structure where a constructor is looked up first; the linker hands it the schema's one namespace
      */
-    public static List<String> of(ReferenceBody reference, Map<String, Top> merged,
+    public static List<String> of(RefBody reference, Map<String, Top> merged,
                                   Function<String, Optional<String>> constructorOf, Function<String, Top> structure) {
         List<String> members = new ArrayList<>();
         for (String name : merged.keySet()) {
@@ -135,7 +135,7 @@ public final class KindMembers {
      * caller's resolution, reported as an unresolved reference), an open entry, which denotes no type until it is
      * applied (§5.10), and a value entry, which is a value and no type.
      */
-    public static Optional<String> ofRefusal(ReferenceBody reference, Function<String, Top> structure) {
+    public static Optional<String> ofRefusal(RefBody reference, Function<String, Top> structure) {
         String of = reference.of().name();
         Optional<Found> found = reached(of, structure);
         if (found.isEmpty()) {

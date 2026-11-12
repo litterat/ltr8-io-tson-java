@@ -7,16 +7,14 @@ import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ValueRef;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.stream.EventSkip;
@@ -55,8 +53,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             .forRead(definition, context.linked().enumForm(name))
             .<TsonTypeReader<?>>map(parser -> new AtomTypeReader<>(context.authoredName(name, definition), parser,
                     context.locationOf(name), namesProfile(definition),
-                    definition instanceof ReferenceBody kind && kind.namesTypes() ? kind.of().name() : null,
-                    definition instanceof ReferenceBody reference && !reference.namesTypes() ? reference.of().name() : null,
+                    definition instanceof RefBody kind && kind.namesTypes() ? kind.of().name() : null,
+                    definition instanceof RefBody reference && !reference.namesTypes() ? reference.of().name() : null,
                     AtomParsers.inSchemaDocument(definition).orElse(null)))
             .orElseThrow(() -> new IllegalStateException(
                     "'" + name + "' is registered as an atom but its body has no parser: " + definition));
@@ -227,7 +225,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         if (!(e instanceof TokenEvent event)) {
             String expected = name == null ? "a token" : "a token for " + name;
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected " + (name == null ? "a token" : "a token for '"
-                    + name + "'") + ", found " + TypeRefCheck.describe(e), expected, TypeRefCheck.describe(e));
+                    + name + "'") + ", found " + TypeTagCheck.describe(e), expected, TypeTagCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }

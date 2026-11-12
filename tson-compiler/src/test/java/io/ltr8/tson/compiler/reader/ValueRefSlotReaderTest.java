@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link ValueRef} in a schema document, whose link judges it and delivers into it, and read by the reference's atom
  * in a data document.
  */
-class ReferenceNameReaderTest {
+class ValueRefSlotReaderTest {
 
     private static final TsonSchema.SlotType METHOD = TsonSchema.SlotType.valueName("method", null);
 
@@ -36,7 +36,7 @@ class ReferenceNameReaderTest {
     };
 
     private static Optional<String> in(String text, TokenForm form) {
-        return ReferenceNameReader.nameIn(new TokenEvent(text, form, new Position(1, 1, 0)));
+        return ValueRefSlotReader.nameIn(new TokenEvent(text, form, new Position(1, 1, 0)));
     }
 
     @Test
@@ -55,7 +55,7 @@ class ReferenceNameReaderTest {
     void aSchemaDocumentsNameIsKeptAsWrittenAndHeld() {
         List<TypeRef> held = new ArrayList<>();
         List<ValueRef<?>> cells = new ArrayList<>();
-        Object read = new ReferenceNameReader("a 'method' value", METHOD, NEVER).read(TestDocuments.schemaDocument(
+        Object read = new ValueRefSlotReader("a 'method' value", METHOD, NEVER).read(TestDocuments.schemaDocument(
                 "orders.methods.place_order", (slot, type, reference, cell) -> {
                     held.add(reference);
                     cells.add(cell);
@@ -70,14 +70,14 @@ class ReferenceNameReaderTest {
     @Test
     void aDataDocumentsNameIsReadByTheAtom() {
         TsonTypeReader<?> atom = ctx -> "judged " + ((TokenEvent) ctx.next()).text();
-        assertEquals("judged o1", new ReferenceNameReader("a 'method' value", METHOD, atom)
+        assertEquals("judged o1", new ValueRefSlotReader("a 'method' value", METHOD, atom)
                 .read(TestDocuments.document("o1")));
     }
 
     @Test
     void aBracedValueIsNoName() {
         List<Diagnostic> reported = new ArrayList<>();
-        assertNull(new ReferenceNameReader("a 'method' value", METHOD, NEVER)
+        assertNull(new ValueRefSlotReader("a 'method' value", METHOD, NEVER)
                 .read(TestDocuments.document("{ a: 1 }", reported::add)));
         assertEquals(1, reported.size(), reported.toString());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, reported.getFirst().code());

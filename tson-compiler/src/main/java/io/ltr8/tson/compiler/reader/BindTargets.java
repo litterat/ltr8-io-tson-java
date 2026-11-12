@@ -50,11 +50,11 @@ import java.util.function.UnaryOperator;
  *       record class ({@link RecordInPlaceBindReader}).</li>
  *   <li><b>A name at a reference- or kind-typed slot</b> is recorded with the slot's declared type for the linker
  * to judge, whatever the target holds. A {@code ValueRef} target at a reference-typed slot naming values ({@code
- * meta.ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}, and receives the value the name
+ * meta.ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ValueRefSlotReader}, and receives the value the name
  * reaches -- when the schema links, for a name a schema document writes, and at the read for one in a data document.
  * A {@code TypeRef} target there is a mismatch, a value being no type; a {@code String} receives the name. A {@code
  * TypeRef} target at a kind-typed slot (a name at {@code meta.record_field.type} is a {@code meta.type_ref}, a meta's
- * {@code request: meta.ref<record>}) reads through a {@link TypeNameSlotReader}: a type's name. Any other target
+ * {@code request: meta.ref<record>}) reads through a {@link TypeRefSlotReader}: a type's name. Any other target
  * there is bound as at an atom and wrapped in a {@link RecordedNameReader}, which records the name it read. The slot
  * declares the spelling, so a {@code TypeRef} or {@code ValueRef} target is a mismatch at a record-typed slot, which
  * holds the record's value inline, and at any other atom, where a token is a literal and never a reference.</li>
@@ -118,7 +118,7 @@ final class BindTargets {
             TsonTypeReader<?> named = site.resolver().resolve(choice.recoveredTo(DiscriminationClass.STRING));
             if (readsAKind(named)) {
                 Map<DiscriminationClass, TsonTypeReader<?>> readers = new EnumMap<>(DiscriminationClass.class);
-                readers.put(DiscriminationClass.STRING, new TypeNameSlotReader(slotAtom(named),
+                readers.put(DiscriminationClass.STRING, new TypeRefSlotReader(slotAtom(named),
                         site.annotationTypes()));
                 if (choice.recovers(DiscriminationClass.BRACE)) {
                     readers.put(DiscriminationClass.BRACE, new TypeInlineReader(
@@ -136,14 +136,14 @@ final class BindTargets {
             // The name reader produces the host value itself, the ValueRef a schema's link delivers into, so the
             // atom's own bridge (ValueRef's name form) is not applied on top of it.
             AtomTypeReader<?> atom = slotAtom(reader);
-            TsonTypeReader<?> named = new ReferenceNameReader(expectedAt(reader, what), atom.slotType(),
+            TsonTypeReader<?> named = new ValueRefSlotReader(expectedAt(reader, what), atom.slotType(),
                     atom.boundTo(ValueRef.class).orElseThrow(() -> new IllegalStateException(
                             what + " reads a reference, whose atom binds no ValueRef")));
             return AnnotationBoxing.wrap(named, target, site.annotationTypes());
         } else if (typeRef && readsAKind(reader)) {
             // The same for a type's name or an application: the reader produces the TypeRef itself, so the atom's
             // own bridge (the reference's text form) is not applied on top of it.
-            return AnnotationBoxing.wrap(new TypeNameSlotReader(slotAtom(reader), site.annotationTypes()), target,
+            return AnnotationBoxing.wrap(new TypeRefSlotReader(slotAtom(reader), site.annotationTypes()), target,
                     site.annotationTypes());
         } else if (byName && (recordHeldByName(reader) || readsAnAtom(reader))) {
             site.mismatches().add(what + " is not a reference, and " + where + " holds a "
@@ -158,8 +158,8 @@ final class BindTargets {
                 // and the name is recorded as a TypeRef host's would be.
                 AtomTypeReader<?> atom = slotAtom(reader);
                 TsonTypeReader<?> refusing = readsARef(reader)
-                        ? new ReferenceNameReader(expectedAt(reader, what), atom.slotType(), bound)
-                        : new TypeNameSlotReader(atom, site.annotationTypes());
+                        ? new ValueRefSlotReader(expectedAt(reader, what), atom.slotType(), bound)
+                        : new TypeRefSlotReader(atom, site.annotationTypes());
                 bound = new RecordedNameReader(bound, atom.slotType(), refusing);
             }
         }

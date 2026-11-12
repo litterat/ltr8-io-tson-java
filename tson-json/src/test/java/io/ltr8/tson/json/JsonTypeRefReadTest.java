@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * token in TSON text is. It is never a discrimination case: {@code meta.ref<uuid_type>} takes {@code "stock_id"}
  * and refuses a uuid.
  */
-class JsonTypeNameRefReadTest {
+class JsonTypeRefReadTest {
 
     private static final String ID = "https://example.test/json-kinds.tn";
 

@@ -22,7 +22,7 @@ form only; history lives in git.
   value's annotations.
 - The whole-document entry points own framing, including the `requireDocumentEnd` pull that makes the lazy
   stream check for trailing content.
-- A schemaless read checks type-refs by `TypeRefCheck`'s three rules. Rule 2 (a tag naming the bound class or
+- A schemaless read checks type-refs by `TypeTagCheck`'s three rules. Rule 2 (a tag naming the bound class or
   a union member) applies only under `withHostTypes()`; `preservingUnknownTypeRefs()` opts out of rule 3 only;
   an atom position takes `declares` (`@Typename` only), never the loose `names` match.
 - Reporting never abandons the value: a reported type-ref still yields its node and its children are read.
@@ -153,7 +153,7 @@ admit UTS #39's own `Toys-Я-Us`.
   `schemaPointer`. The registry caches nothing for a schema that reported, so a second read reports again
   rather than appearing to succeed. Distinct from the bullet above: a schema that can't be *reached* (no
   such URI, malformed, wrong `!!id`) is still one diagnostic, because there is nothing to enumerate.
-- **A schemaless read checks its type-refs, and `TypeRefCheck` (in `reader`) states the rules once** for
+- **A schemaless read checks its type-refs, and `TypeTagCheck` (in `reader`) states the rules once** for
   both engines. Given `!X` on a value: (1) `X` **is** a `BuiltinTypeVocabulary` name → it must sit on a
   token (`TYPE_MISMATCH` otherwise) and that token must satisfy the atom
   (`ATOM_FORM_INVALID` for a token of the wrong form, `ATOM_CONSTRAINT_VIOLATION` for a value out of
@@ -179,10 +179,10 @@ admit UTS #39's own `Toys-Я-Us`.
   reaches delivered into it at the read in data and at link in a schema document; a `TypeRef` host there is a bind
   mismatch. A `String` host receives the name at either. A schemaless read
   has no closure: it keeps a name as a token (`design/tree-model.md`).
-- **Rule 2 is looser for a container than for an atom, deliberately.** `TypeRefCheck.names` (a `@Typename`,
+- **Rule 2 is looser for a container than for an atom, deliberately.** `TypeTagCheck.names` (a `@Typename`,
   else the simple class name case-insensitively — the same match `bindUnion` gives union members) is what
   lets `!point { x: 3  y: 4 }` bind to a Java `Point` with nothing annotated. An atom position takes
-  `TypeRefCheck.declares` (`@Typename` only), because the loose match would accept a `UUID`-targeted
+  `TypeTagCheck.declares` (`@Typename` only), because the loose match would accept a `UUID`-targeted
   `!Uuid` on the strength of the class being *called* `UUID`. Consequence worth knowing: a collection
   target answers to no wire name, so `!tags [ "a" ]` into a `List<String>` is `UNKNOWN_TYPE_REF`.
 - **Reporting never stops the read, and the facade returns nothing for a document that reported.** A

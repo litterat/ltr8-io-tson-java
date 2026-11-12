@@ -6,7 +6,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.EntryKind;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Alias;
@@ -297,7 +297,7 @@ class NamespaceEntryTest {
     private static List<String> members(TsonLinkedSchema linked, String kind) {
         String terminal = linked.schema().entries().get(kind) instanceof Alias alias
                 ? alias.target().name() : kind;
-        return assertInstanceOf(ReferenceBody.class, linked.schema().entries().get(terminal)).memberNames();
+        return assertInstanceOf(RefBody.class, linked.schema().entries().get(terminal)).memberNames();
     }
 
     // ── Resolved output ───────────────────────────────────────────────────────────────────────────────

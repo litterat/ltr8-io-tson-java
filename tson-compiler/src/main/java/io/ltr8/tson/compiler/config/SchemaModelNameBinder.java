@@ -79,7 +79,7 @@ public final class SchemaModelNameBinder {
             Map.entry("meta.choice", "meta.choice_body"),
             Map.entry("meta.dependent", "meta.dependent_body"),
             Map.entry("meta.apply", "meta.apply_body"),
-            Map.entry("meta.ref", "meta.reference_body"),
+            Map.entry("meta.ref", "meta.ref_body"),
             Map.entry("meta.enum_type", "meta.enum_body"),
 
             Map.entry("temporal.datetime_type", "temporal.date_time_type"));

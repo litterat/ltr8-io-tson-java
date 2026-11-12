@@ -34,7 +34,7 @@ import java.util.Optional;
  * name ({@code @doc:"x" orders}, {@code !meta.record x}) are refused: a name's type is its referent's, and an annotation
  * would have nowhere to go.
  */
-final class ReferenceNameReader implements TsonTypeReader<Object> {
+final class ValueRefSlotReader implements TsonTypeReader<Object> {
 
     /** What the position holds, as a message names it: {@code a 'method' value}. */
     private final String expected;
@@ -45,7 +45,7 @@ final class ReferenceNameReader implements TsonTypeReader<Object> {
     /** The reference's atom bound to the component, which reads and judges a name a data document writes. */
     private final TsonTypeReader<?> inData;
 
-    ReferenceNameReader(String expected, TsonSchema.SlotType type, TsonTypeReader<?> inData) {
+    ValueRefSlotReader(String expected, TsonSchema.SlotType type, TsonTypeReader<?> inData) {
         this.expected = expected;
         this.type = type;
         this.inData = inData;
@@ -85,7 +85,7 @@ final class ReferenceNameReader implements TsonTypeReader<Object> {
             case AnnotationStart annotation -> "the annotation '@" + annotation.name() + "', and a name carries none";
             case TypeRef typeRef -> "the type-ref '!" + typeRef.name() + "', and a name carries none: its type is "
                     + "its referent's";
-            default -> TypeRefCheck.describe(event);
+            default -> TypeTagCheck.describe(event);
         };
     }
 }

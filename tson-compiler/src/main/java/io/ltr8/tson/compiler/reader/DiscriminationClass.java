@@ -24,7 +24,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.numeric.FloatType;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.numeric.IntegerType;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.net.HostType;
 import io.ltr8.tson.schema.net.HostnameType;
 import io.ltr8.tson.schema.net.MediaTypeType;
@@ -118,7 +118,7 @@ public enum DiscriminationClass {
             case FloatType f -> f.allowNan() || f.allowInfinity() ? Optional.empty() : Optional.of(NUMBER);
             case TextType ignored -> Optional.of(STRING);
             case IdentifierType ignored -> Optional.of(STRING);
-            case ReferenceBody ignored -> Optional.of(STRING); // a name, written as a token
+            case RefBody ignored -> Optional.of(STRING); // a name, written as a token
             case UriType ignored -> Optional.of(STRING);
             case IriType ignored -> Optional.of(STRING);
             case RegexType ignored -> Optional.of(STRING);

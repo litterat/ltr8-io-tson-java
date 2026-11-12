@@ -24,13 +24,13 @@ JSON inputs are in `design/cli-config-hashing.md`.
   never a discrimination case ([TSON-JSON] §5.6). A JSON document is always data, so the name is judged a member over the
   reading document's closure, whatever it imports (`AtomParsers.forType`). JSON has no unquoted form, so a string
   is read by `atom.ReferenceGrammar`, the production TSON reads unquoted, and judged as TSON judges it by the shared
-  `TypeNameRefParser`: a data document's reference is a name, so a string holding an application, `"set<text>"`, is
+  `TypeRefParser`: a data document's reference is a name, so a string holding an application, `"set<text>"`, is
   refused (`ATOM_CONSTRAINT_VIOLATION`) whether or not the closure closes it ([TSON-JSON] §5.6). A string holding
   `kind!` spells no reference, schema-grammar sugar having no data form, and is refused as malformed
   (`ATOM_FORM_INVALID`). A tree read keeps the `JsonString` as written.
 - A reference over a type that is no constructor (`meta.ref<order>`) is an atom too, read from a string holding a
   value's qualified name and judged by what it reaches in the governing schema, as the TSON reader judges it
-  (`AtomParsers.forRead`, `RefParser` over the lookup the link left on the reference, `ReferenceBody.Values`). A
+  (`AtomParsers.forRead`, `ValueRefParser` over the lookup the link left on the reference, `RefBody.Values`). A
   schema-stated value at one (`FieldValue`) is decoded the same way. `AtomParsers.forType` is the pre-link callers'
   and refuses such a reference as a gap, so no JSON reader asks it for an atom position.
 - A dependent field (`v?: kind!`, [TSON-SCHEMA] §5.2) is read by `DependentReader` through its record, against the

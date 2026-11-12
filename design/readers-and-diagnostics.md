@@ -272,11 +272,11 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   `IllegalStateException` then fires on ordinary caller input with the diagnostics lost inside it. Where the skip goes
   is the caller's question: `DataClassObjectReader.read` has taken nothing and skips a whole data value, while
   `bindUnion` has consumed the framing to find the member and skips the core-value alone.
-- **A reference-typed position reads a token** (`AtomTypeReader`, `TypeNameSlotReader`) into one `TypeRef`, its text
+- **A reference-typed position reads a token** (`AtomTypeReader`, `TypeRefSlotReader`) into one `TypeRef`, its text
   a qualified name (`ReferenceGrammar`); an argument list never reaches it, being no data form ([TSON-DATA]
   §7.2.5). In a data document the name is judged
-  where it is read, whichever `of` names: a kind's members over the closure (`TypeNameRefParser`), a value's qualified
-  name by what it reaches in the governing schema (`RefParser`, `design/references.md`); in a schema document both
+  where it is read, whichever `of` names: a kind's members over the closure (`TypeRefParser`), a value's qualified
+  name by what it reaches in the governing schema (`ValueRefParser`, `design/references.md`); in a schema document both
   read the grammar alone and record the name for the link.
 - **`ListEventSource`** replays a pre-built event list: a schema default (`settleHeldValues` wraps the literal `Token`
   as one synthetic event, under `IdentifierPolicy.none()` since the real stream already judged it), an annotation probe,

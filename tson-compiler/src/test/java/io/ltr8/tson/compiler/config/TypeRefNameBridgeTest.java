@@ -8,13 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** A reference bound from its text, a JSON string's among them. */
-class TypeRefTextBridgeTest {
+class TypeRefNameBridgeTest {
 
     @Test
     void aReferenceIsReadFromItsTextAndAMarkedNameIsNone() {
-        assertEquals(TypeRef.of("text"), new TypeRefTextBridge().toObject("text"));
-        assertThrows(AtomParseException.class, () -> new TypeRefTextBridge().toObject("box<text>"));
-        assertThrows(AtomParseException.class, () -> new TypeRefTextBridge().toObject("kind!"));
-        assertThrows(AtomParseException.class, () -> new TypeRefTextBridge.ForName().toObject("kind!"));
+        assertEquals(TypeRef.of("text"), new TypeRefNameBridge().toObject("text"));
+        assertThrows(AtomParseException.class, () -> new TypeRefNameBridge().toObject("box<text>"));
+        assertThrows(AtomParseException.class, () -> new TypeRefNameBridge().toObject("kind!"));
+        assertThrows(AtomParseException.class, () -> new TypeRefNameBridge.ForName().toObject("kind!"));
     }
 }

@@ -612,7 +612,7 @@ a namespace type (`operations => !meta.namespace { key_type: meta.identifier  va
 } }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a member of
 no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind context binds one
 (by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its references. A slot
-typed by a reference (`ReferenceBody`, spelled `meta.ref<T>`) holds what its `T` decides: over a constructor
+typed by a reference (`RefBody`, spelled `meta.ref<T>`) holds what its `T` decides: over a constructor
 (`request: meta.ref<meta.record>`) it binds a `TypeRef` holding a type's name (its path from the root, `geo.address`
 for a member of a nested `!schema` map; an argument list, `set<text>`, is no data form and does not parse there, and a
 document names the entry the schema declares for it), whose `referent()` is the value of the entry it names — a tree

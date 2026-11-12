@@ -55,7 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       real model does not meet it -- {@code meta.type_ref}'s own reader produces the {@code TypeRef} -- see
  *       {@link RealModel}.</li>
  *   <li><b>G4, annotations on a name through a choice</b>: closed for the kernel's slots. A {@code TypeExpr}
- *       component at a type slot's choice reads a name through the {@code TypeNameSlotReader} a {@code TypeRef}
+ *       component at a type slot's choice reads a name through the {@code TypeRefSlotReader} a {@code TypeRef}
  *       component gets, which keeps the annotations written on it ({@code BindTargets}); a choice in general still
  *       reads its variants as they are.</li>
  * </ul>

@@ -20,7 +20,7 @@ import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordExpr;
-import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
+import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -29,7 +29,6 @@ import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
-import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -66,7 +65,7 @@ class TsonSchemaParserTest {
 
     /** The {@link MapExpr} one declaration's body is, for the map-grammar fixtures. */
     private static MapExpr mapOf(String declaration) {
-        ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, declOf(declaration).typeDef());
+        TypeExprDef ref = assertInstanceOf(TypeExprDef.class, declOf(declaration).typeDef());
         return assertInstanceOf(MapExpr.class, ref.ref());
     }
 
@@ -241,7 +240,7 @@ class TsonSchemaParserTest {
                 !schema { a => text  b => integer  a => uuid }""");
         assertEquals(List.of("a", "b"), List.copyOf(doc.body().declarations().keySet()));
         assertEquals(new NameRef("uuid"),
-                ((ReferenceTypeDef) doc.body().declarations().get("a").typeDef()).ref());
+                ((TypeExprDef) doc.body().declarations().get("a").typeDef()).ref());
     }
 
     // ── §5.1's own worked examples ────────────────────────────────────────
@@ -324,14 +323,14 @@ class TsonSchemaParserTest {
     @Test
     void plainTypeReference() {
         TypeDef def = declOf("id => uuid").typeDef();
-        ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
+        TypeExprDef ref = assertInstanceOf(TypeExprDef.class, def);
         assertEquals(new NameRef("uuid"), ref.ref());
     }
 
     @Test
     void declarationLevelArrayWithSize() {
         TypeDef def = declOf("scores => [integer; 1..]").typeDef();
-        ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
+        TypeExprDef ref = assertInstanceOf(TypeExprDef.class, def);
         ArrayExpr array = assertInstanceOf(ArrayExpr.class, ref.ref());
         assertEquals(new NameRef("integer"),
                 array.elementType().typeRef());
@@ -341,7 +340,7 @@ class TsonSchemaParserTest {
     @Test
     void declarationLevelTuple() {
         TypeDef def = declOf("point => [number, number]").typeDef();
-        ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
+        TypeExprDef ref = assertInstanceOf(TypeExprDef.class, def);
         TupleExpr tuple = assertInstanceOf(TupleExpr.class, ref.ref());
         assertEquals(2, tuple.elementTypes().size());
     }
@@ -349,7 +348,7 @@ class TsonSchemaParserTest {
     @Test
     void choiceType() {
         TypeDef def = declOf("contact_method => (email | phone | address)").typeDef();
-        ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
+        TypeExprDef ref = assertInstanceOf(TypeExprDef.class, def);
         ChoiceExpr choice = assertInstanceOf(ChoiceExpr.class, ref.ref());
         assertEquals(List.of(new NameRef("email"), new NameRef("phone"), new NameRef("address")), choice.variants());
     }
@@ -574,7 +573,7 @@ class TsonSchemaParserTest {
     @Test
     void genericApplication() {
         TypeDef def = declOf("translations => map<text, text>").typeDef();
-        ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
+        TypeExprDef ref = assertInstanceOf(TypeExprDef.class, def);
         assertEquals(new ApplicationRef("map", List.of(
                 new NameRef("text"), new NameRef("text"))), ref.ref());
     }

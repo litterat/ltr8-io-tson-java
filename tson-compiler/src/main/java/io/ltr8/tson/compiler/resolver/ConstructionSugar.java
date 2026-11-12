@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -154,7 +154,7 @@ public final class ConstructionSugar {
     /** Whether the type {@code name} is a reference naming types, past its alias hops. */
     private static boolean namesTypes(String name, Function<String, Top> types) {
         Top type = types.apply(AliasChain.terminal(name, types));
-        return type instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of().name(), types);
+        return type instanceof RefBody reference && KindMembers.namesTypes(reference.of().name(), types);
     }
 
     /**

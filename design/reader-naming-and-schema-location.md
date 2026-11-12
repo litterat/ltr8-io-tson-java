@@ -50,7 +50,7 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
   reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only
   in its name, every other position gets the shared reader back unchanged and allocates nothing
   (`AllocationHarnessTest` is the guard).
-    - **A kind's refusal lists its members by name** (`ReferenceBody.shownMembers()`, the index's `shown`), each an
+    - **A kind's refusal lists its members by name** (`RefBody.shownMembers()`, the index's `shown`), each an
       entry.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per

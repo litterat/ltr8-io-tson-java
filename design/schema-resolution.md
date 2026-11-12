@@ -304,7 +304,7 @@ judged once its application closes it:
 - **Declared before it.** The fields are a telescope, each depending only on those before it in `fields`' order, so
   no cycle can form and none is looked for; flattening puts inherited fields first. An `on` naming no field of the
   record is refused; it never names an entry.
-- **Typed by a reference to types**: past its alias hops a `ReferenceBody` whose `of` is a constructor or `top`
+- **Typed by a reference to types**: past its alias hops a `RefBody` whose `of` is a constructor or `top`
   (`KindMembers.namesTypes`), or `meta.type_expr`.
 - **There to read whenever the dependent field is**: required, defaulted, pinned, or a field group's member with the
   dependent field optional; never voidable, and never optional with no default. A group's members are declared
@@ -423,7 +423,7 @@ is a `TypeInline` over a `DependentBody`: a consumer that needs a field's own ty
 for a dependent field), and `RecordField.typeExpr()` on one is a broken invariant (`IllegalStateException`). `TypeRef`
 and each variant are
 registered as atom host types, since a value written by its own class is described by the variant
-(`TypeRefTextBridge` and its nested bridges, in `ResolverBindContext`). A context without those registrations
+(`TypeRefNameBridge` and its nested bridges, in `ResolverBindContext`). A context without those registrations
 describes `TypeRef` as a union of two records,
 so the schema model's classes bind only through a context that carries them (`ResolverBindContext.registerAbsent`, which
 `SchemaModelNameBinder.over` applies).

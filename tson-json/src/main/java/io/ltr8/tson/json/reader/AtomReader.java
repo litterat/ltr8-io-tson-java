@@ -2,7 +2,6 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
@@ -13,7 +12,7 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -102,7 +101,7 @@ final class AtomReader<T> implements JsonTypeReader<T> {
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition));
         IdentifierProfile names = definition instanceof IdentifierType identifier ? identifier.profile() : null;
         return new AtomReader<>(name, parser, AtomForm.of(definition), context.locationOf(name),
-                names, definition instanceof ReferenceBody);
+                names, definition instanceof RefBody);
     }
 
     /**

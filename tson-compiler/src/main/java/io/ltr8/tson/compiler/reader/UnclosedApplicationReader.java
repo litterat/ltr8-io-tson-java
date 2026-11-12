@@ -31,7 +31,7 @@ record UnclosedApplicationReader(String field, ApplyBody application) implements
     @Override
     public Object read(TsonReadContext ctx) {
         if (ctx.readsSchemaDocument()) {
-            String found = TypeRefCheck.describe(ctx.peek());
+            String found = TypeTagCheck.describe(ctx.peek());
             ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, "field '" + field + "' is typed by the application '"
                     + application.text() + "' written inline, which closes in place only once every declaration "
                     + "is ready, and this library does not yet read a value entry against it before then -- declare "

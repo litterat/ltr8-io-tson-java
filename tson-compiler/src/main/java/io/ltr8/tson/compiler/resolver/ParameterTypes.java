@@ -15,7 +15,7 @@ import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Top;
@@ -24,9 +24,7 @@ import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
-import io.ltr8.tson.schema.meta.TypeSlots;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -370,7 +368,7 @@ final class ParameterTypes {
             };
             switch (written) {
                 case TokenValue token when declares(token.text()) && inPlace
-                        && (type instanceof ReferenceBody || TYPE_EXPR.equals(declaredName)) -> {
+                        && (type instanceof RefBody || TYPE_EXPR.equals(declaredName)) -> {
                 }
                 // A field written positionally, `item => T`, is its record_field's one unmarked slot, its type.
                 case TokenValue token when declares(token.text()) -> token(token.text(),

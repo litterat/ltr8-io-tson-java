@@ -137,7 +137,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             validateSize(0, ctx);
             return Shape.EMPTY;
         }
-        ctx.report(rules.notAMap(TypeRefCheck.describe(e)));
+        ctx.report(rules.notAMap(TypeTagCheck.describe(e)));
         EventSkip.coreValue(ctx);
         return Shape.MISMATCH;
     }

@@ -56,7 +56,7 @@ class TopKindHierarchyTest {
     /** A reference is an atom whose values are names (Part 2 §4.2), as an enum is: a set of names, not a sum. */
     @Test
     void aReferenceIsAnAtom() {
-        ReferenceBody reference = ReferenceBody.of("uuid_type");
+        RefBody reference = RefBody.of("uuid_type");
         assertInstanceOf(Atom.class, reference);
         assertInstanceOf(Type.class, reference);
     }
@@ -64,26 +64,26 @@ class TopKindHierarchyTest {
     /**
      * A reference's identity is its {@code of}: its index is derived over a closure, and one reference holds
      * different members in two schemas. A refinement's {@code of} is the source's or IS-A it, a question the
-     * namespace answers ({@link ReferenceBody#ofNarrowing}); a reference refines only a reference.
+     * namespace answers ({@link RefBody#ofNarrowing}); a reference refines only a reference.
      */
     @Test
     void aReferenceIsItsOf() {
-        ReferenceBody linked = ReferenceBody.of("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of(),
+        RefBody linked = RefBody.of("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of(),
                 List.of("stock_id", "customer_id"));
 
-        assertEquals(ReferenceBody.of("uuid_type"), linked);
+        assertEquals(RefBody.of("uuid_type"), linked);
         assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
         assertTrue(linked.namesTypes());
-        assertEquals(List.of(), linked.constraintsCheck(ReferenceBody.of("uuid_type")));
-        assertEquals(List.of(), linked.constraintsCheck(ReferenceBody.of("text_type")));
+        assertEquals(List.of(), linked.constraintsCheck(RefBody.of("uuid_type")));
+        assertEquals(List.of(), linked.constraintsCheck(RefBody.of("text_type")));
         assertEquals(1, linked.constraintsCheck(new EnumBody(List.of("A"))).size());
 
         BiPredicate<String, String> isA = (sub, sup) -> sub.equals(sup)
                 || sub.equals("uuid_v4_type") && sup.equals("uuid_type");
-        assertEquals(List.of(), linked.ofNarrowing(ReferenceBody.of("uuid_type"), isA));
-        assertEquals(List.of(), linked.ofNarrowing(ReferenceBody.of("uuid_v4_type"), isA));
-        assertEquals(1, linked.ofNarrowing(ReferenceBody.of("text_type"), isA).size());
-        assertEquals(1, ReferenceBody.of("uuid_v4_type").ofNarrowing(ReferenceBody.of("uuid_type"), isA).size());
+        assertEquals(List.of(), linked.ofNarrowing(RefBody.of("uuid_type"), isA));
+        assertEquals(List.of(), linked.ofNarrowing(RefBody.of("uuid_v4_type"), isA));
+        assertEquals(1, linked.ofNarrowing(RefBody.of("text_type"), isA).size());
+        assertEquals(1, RefBody.of("uuid_v4_type").ofNarrowing(RefBody.of("uuid_type"), isA).size());
     }
 
     /**
@@ -93,12 +93,12 @@ class TopKindHierarchyTest {
     @Test
     void aReadReferenceFindsTheEntryItsNameNames() {
         Top boxed = new Alias(TypeRef.of("text"));
-        TypeRef.Closure closure = ReferenceBody.of("type").linked(true, List.of("boxed"), Map.of("boxed", boxed),
+        TypeRef.Closure closure = RefBody.of("type").linked(true, List.of("boxed"), Map.of("boxed", boxed),
                 List.of("boxed")).closure();
 
         assertEquals(Optional.of(boxed), closure.referentOf(TypeRef.of("boxed")));
         assertEquals(Optional.empty(), closure.referentOf(TypeRef.of("nowhere")));
-        assertEquals(Optional.empty(), ReferenceBody.of("type").closure().referentOf(TypeRef.of("boxed")));
+        assertEquals(Optional.empty(), RefBody.of("type").closure().referentOf(TypeRef.of("boxed")));
     }
 
     @Test

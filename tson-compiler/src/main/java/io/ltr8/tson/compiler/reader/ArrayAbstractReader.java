@@ -116,7 +116,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
             return true;
         }
         TsonEvent e = ctx.peek();
-        ctx.report(rules.notAnArray(TypeRefCheck.describe(e)));
+        ctx.report(rules.notAnArray(TypeTagCheck.describe(e)));
         EventSkip.coreValue(ctx);
         return false;
     }

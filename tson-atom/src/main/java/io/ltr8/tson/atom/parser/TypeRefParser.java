@@ -3,7 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.ReferenceGrammar;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -17,7 +17,7 @@ import java.util.Optional;
  * reference's linked members. The value is the reference, never a value of the type it names.
  *
  * <p><b>The value finds what it names.</b> A reference read here carries the closure the members were computed over
- * ({@link ReferenceBody#closure}), so {@link TypeRef#referent} answers with the entry it names.
+ * ({@link RefBody#closure}), so {@link TypeRef#referent} answers with the entry it names.
  *
  * <p>A type's name is its path from the root, {@code order} or {@code geo.address} for a member of a schema map
  * nested as an entry, and is judged as one name.
@@ -31,16 +31,16 @@ import java.util.Optional;
  * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link EnumParser}: the members are the
  * closure's.
  */
-public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) implements AtomTypeParser<TypeRef> {
+public record TypeRefParser(RefBody kind, boolean judgesMembers) implements AtomTypeParser<TypeRef> {
 
     /** A kind read under the schema whose closure its members were computed over. */
-    public TypeNameRefParser(ReferenceBody kind) {
+    public TypeRefParser(RefBody kind) {
         this(kind, true);
     }
 
     /** {@code kind}, read where a name resolves in the document being read: the grammar alone. */
-    public static TypeNameRefParser namesOnly(ReferenceBody kind) {
-        return new TypeNameRefParser(kind, false);
+    public static TypeRefParser namesOnly(RefBody kind) {
+        return new TypeRefParser(kind, false);
     }
 
     @Override
