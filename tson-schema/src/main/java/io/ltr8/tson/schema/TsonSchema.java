@@ -7,6 +7,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.Collections;
@@ -324,17 +325,17 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * carries, which the resolver writes on a declaration that names an open record's application, {@code
      * page_order => page<order>}. Empty for an entry that closes none, a construction among them.
      */
-    public Optional<TypeRef> applicationOf(String name) {
+    public Optional<ApplyBody> applicationOf(String name) {
         return applicationOf(entries.getAnnotations(name));
     }
 
     /** The application a key's {@code annotations} name, if they carry {@code @meta.application}. */
-    public static Optional<TypeRef> applicationOf(Annotations annotations) {
-        return annotations.value(APPLICATION, TypeRef.class);
+    public static Optional<ApplyBody> applicationOf(Annotations annotations) {
+        return annotations.value(APPLICATION, ApplyBody.class);
     }
 
     /** {@code annotations} with {@code @meta.application:application} added -- the key of an instantiation. */
-    public static Annotations withApplication(Annotations annotations, TypeRef application) {
+    public static Annotations withApplication(Annotations annotations, ApplyBody application) {
         List<io.ltr8.annotation.Annotation> values = new java.util.ArrayList<>(annotations.values());
         values.removeIf(annotation -> annotation.name().equals(APPLICATION));
         values.add(io.ltr8.annotation.Annotation.of(APPLICATION, application));

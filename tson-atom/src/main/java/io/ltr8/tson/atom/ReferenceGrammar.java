@@ -10,6 +10,10 @@ import java.util.List;
  * a JSON string at a reference-typed position holds, JSON having no unquoted form, and the text form
  * {@link TypeRef#text} writes. The TSON text reader builds the same tree from tokens ({@code TsonDataStream}).
  *
+ * <p><b>A reference is a name</b> ([TSON-SCHEMA] §4.2). The grammar still parses an argument list, so a value
+ * carrying one is read whole and then refused, as a validation error naming how an application is written: in data
+ * by the entry a declaration gives it, in a schema as a type written in place.
+ *
  * <pre>
  *   reference   = qualified-name ["&lt;" ws type-args ws "&gt;"]   ; "&lt;" adjacent to the name
  *   type-args   = type-arg *(separator type-arg) [ws ","]         ; separator = ws "," ws / ws1
@@ -28,46 +32,56 @@ public final class ReferenceGrammar {
     }
 
     /**
-     * {@code text} as the type reference it spells: a name or an application.
+     * {@code text} as the name it spells.
      *
-     * @throws AtomParseException where it spells none, naming what failed
+     * @throws AtomParseException where it spells no reference, naming what failed
+     * @throws AtomValidationException where it spells an application, which no reference is
      */
     public static TypeRef parse(String text) {
+        Spelled spelled = spelled(text);
+        if (!spelled.arguments().isEmpty()) {
+            throw new AtomValidationException("'" + spelled.text() + "' is an application, and a reference is a name "
+                    + "([TSON-SCHEMA] §4.2): in a data document, write the name a declaration gives it ('my_"
+                    + spelled.head() + " => " + spelled.text() + "', then 'my_" + spelled.head() + "'); in a schema, "
+                    + "write it at a type slot, where it is the type written in place '{ of: !meta.apply { head: "
+                    + spelled.head() + "  arguments: [...] } }'", "a name");
+        }
+        return TypeRef.of(spelled.head());
+    }
+
+    /**
+     * {@code text} as the grammar reads it, an argument list included: what a reference spells before a position
+     * judges it.
+     *
+     * @throws AtomParseException where it spells no reference, naming what failed
+     */
+    public static Spelled spelled(String text) {
         Cursor cursor = new Cursor(text);
-        TypeRef reference = cursor.reference();
+        Spelled reference = cursor.reference();
         if (!cursor.atEnd()) {
             throw cursor.error("'" + cursor.rest() + "' follows the reference");
         }
         return reference;
     }
 
-    /**
-     * The names {@code reference} writes -- its head and every reference among its arguments, at any depth -- which a
-     * position's name hygiene judges one by one, as it judges a bare name ([TSON-DATA] §8.2).
-     */
-    public static List<String> names(TypeRef reference) {
-        List<String> names = new ArrayList<>();
-        names.add(reference.name());
-        for (TypeRef argument : reference.arguments()) {
-            names.addAll(names(argument));
-        }
-        return names;
-    }
+    /** A reference as the grammar spells it: a qualified name, and the argument list written after it, if any. */
+    public record Spelled(String head, List<Spelled> arguments) {
 
-    /**
-     * Whether a position's name hygiene refuses the value it read: each name an application writes where the value
-     * is one, the value itself otherwise.
-     */
-    public static boolean anyRefused(String value, java.util.function.Predicate<String> refuses) {
-        if (value.indexOf('<') < 0) {
-            return refuses.test(value);
+        public Spelled {
+            arguments = List.copyOf(arguments);
         }
-        for (String name : names(parse(value))) {
-            if (refuses.test(name)) {
-                return true;
+
+        /** The canonical text: no whitespace but one space between arguments. */
+        public String text() {
+            if (arguments.isEmpty()) {
+                return head;
             }
+            StringBuilder out = new StringBuilder(head).append('<');
+            for (int i = 0; i < arguments.size(); i++) {
+                out.append(i == 0 ? "" : " ").append(arguments.get(i).text());
+            }
+            return out.append('>').toString();
         }
-        return false;
     }
 
     /** Whether {@code text} is a qualified name: segments joined by {@code .}, each an identifier (§7.7). */
@@ -97,7 +111,7 @@ public final class ReferenceGrammar {
             return text.substring(at);
         }
 
-        TypeRef reference() {
+        Spelled reference() {
             int start = at;
             String head = word();
             if (head.isEmpty()) {
@@ -107,10 +121,10 @@ public final class ReferenceGrammar {
             segments(head);
             int afterHead = at;
             if (atEnd() || text.charAt(at) != '<') {
-                return TypeRef.of(head);
+                return new Spelled(head, List.of());
             }
             at++;
-            List<TypeRef> arguments = new ArrayList<>();
+            List<Spelled> arguments = new ArrayList<>();
             skipSeparators();
             while (true) {
                 if (atEnd()) {
@@ -121,7 +135,7 @@ public final class ReferenceGrammar {
                         throw error("an argument list holds at least one argument, and '" + head + "<>' holds none");
                     }
                     at++;
-                    return TypeRef.of(head, arguments);
+                    return new Spelled(head, arguments);
                 }
                 arguments.add(argument());
                 int beforeSeparator = at;
@@ -132,7 +146,7 @@ public final class ReferenceGrammar {
             }
         }
 
-        private TypeRef argument() {
+        private Spelled argument() {
             if (text.charAt(at) == '"') {
                 throw error("an argument is a reference, a name or an application, and a quoted token is neither");
             }

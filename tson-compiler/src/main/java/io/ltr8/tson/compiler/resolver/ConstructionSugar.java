@@ -3,6 +3,10 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.KernelNames;
+import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.TypeSlots;
+import io.ltr8.tson.schema.meta.TypeInline;
+import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -13,6 +17,8 @@ import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -73,7 +79,8 @@ public final class ConstructionSugar {
      * @param types where the constructor's slots are looked up, for the declaration the message suggests
      * @throws SchemaValidationException where it builds one
      */
-    static void refuseNamespaceInPlace(TypeRef application, String name, Top definition, Function<String, Top> types) {
+    static void refuseNamespaceInPlace(ApplyBody application, String name, Top definition,
+                                       Function<String, Top> types) {
         if (!NAMESPACE.equals(name) && !TypeChain.supertypesOf(definition).contains(NAMESPACE)) {
             return;
         }
@@ -84,8 +91,8 @@ public final class ConstructionSugar {
         }
         throw new SchemaValidationException("'" + application.text() + "' constructs a namespace type where it is "
                 + "used, and a namespace value carries its type's name as its tag, which a type written in place does "
-                + "not have (§4.2, §5.2): declare it ('my_" + application.segments().getLast() + " => !"
-                + application.name() + " { " + String.join("  ", written) + " }') and write that name");
+                + "not have (§4.2, §5.2): declare it ('my_" + application.head().segments().getLast() + " => !"
+                + application.head().name() + " { " + String.join("  ", written) + " }') and write that name");
     }
 
     /**
@@ -99,7 +106,7 @@ public final class ConstructionSugar {
         for (Map.Entry<String, RecordField> field : constructor.fields().entrySet()) {
             RecordField declared = field.getValue();
             if (!declared.optional() && declared.role() == FieldRole.FREE && declared.type() instanceof TypeRef type
-                    && type.arguments().isEmpty() && holdsAType(type.name(), types)) {
+                    && holdsAType(type.name(), types)) {
                 slots.add(field.getKey());
             }
         }
@@ -152,8 +159,7 @@ public final class ConstructionSugar {
 
     /**
      * The construction {@code written<arguments>} denotes, as the binding record {@code !C { … }} would write: each
-     * argument at its slot, in the held spelling ({@link WireForm#refValue}), so an argument that is itself an
-     * application stays one for materialisation to close where it lands.
+     * argument, a name, at its slot.
      *
      * @param written the head as the author wrote it, for a refusal
      * @param slots the constructor's argument slots ({@link #slots})
@@ -168,8 +174,64 @@ public final class ConstructionSugar {
         return new RecordValue(fields);
     }
 
-    /** The binding record {@code application} denotes over {@code constructor}, its argument slots read by {@code types}. */
-    static RecordValue payload(TypeRef application, RecordBody constructor, Function<String, Top> types) {
-        return payload(application.name(), slots(constructor, types), application.arguments());
+    /**
+     * The arguments of a constructor's application as its binding record writes them, and how the construction read
+     * from it gets back those written in place. A reference reads a name and nothing else, so an argument written in
+     * place -- an application ({@code meta.array<box<T>>}) or a construction a nested one closed to -- stands in the
+     * binding record as a name of its own, which {@link #placed} replaces at the slot it landed at. One landing at a
+     * slot that holds only a name is refused there, as an application written at that slot is ([TSON-SCHEMA] §4.2).
+     */
+    record StandIns(List<TypeRef> written, Map<String, TypeInline> inPlace, Map<String, TypeExpr> asWritten) {
+
+        /** {@code arguments}, each a name or written in place, as the binding record writes them. */
+        static StandIns of(List<TypeExpr> arguments) {
+            return of(arguments, arguments);
+        }
+
+        /** The same, a refusal naming each argument as {@code asWritten} spells it, before it closed. */
+        static StandIns of(List<TypeExpr> arguments, List<TypeExpr> asWritten) {
+            Map<String, TypeInline> inPlace = new LinkedHashMap<>();
+            Map<String, TypeExpr> shown = new LinkedHashMap<>();
+            List<TypeRef> written = new ArrayList<>();
+            for (int i = 0; i < arguments.size(); i++) {
+                switch (arguments.get(i)) {
+                    case TypeRef name -> written.add(name);
+                    case TypeInline inline -> {
+                        String standIn = "in_place_" + UUID.randomUUID().toString().replace("-", "");
+                        inPlace.put(standIn, inline);
+                        shown.put(standIn, i < asWritten.size() ? asWritten.get(i) : inline);
+                        written.add(TypeRef.of(standIn));
+                    }
+                }
+            }
+            return new StandIns(written, inPlace, shown);
+        }
+
+        /** Stand-ins already made, {@code inPlace} by name, each shown as it is. */
+        static StandIns of(Map<String, TypeInline> inPlace) {
+            return new StandIns(List.of(), inPlace, Map.copyOf(inPlace));
+        }
+
+        /** {@code body} with each stand-in replaced by the argument it stands for. */
+        Top placed(Top body) {
+            if (inPlace.isEmpty()) {
+                return body;
+            }
+            return TypeSlots.mapBody(body, new TypeSlots.Rewrite() {
+                @Override
+                public TypeRef atName(TypeRef reference) {
+                    if (inPlace.containsKey(reference.name())) {
+                        throw TemplateMaterialiser.nameRequired(asWritten.get(reference.name()));
+                    }
+                    return reference;
+                }
+
+                @Override
+                public TypeExpr atSlot(TypeRef reference) {
+                    TypeInline argument = inPlace.get(reference.name());
+                    return argument != null ? argument : reference;
+                }
+            });
+        }
     }
 }

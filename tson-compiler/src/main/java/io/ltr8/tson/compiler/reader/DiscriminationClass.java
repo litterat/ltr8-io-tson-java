@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.NamespaceBody;
@@ -144,6 +145,7 @@ public enum DiscriminationClass {
             case NamespaceBody ignored -> Optional.of(BRACE); // its keys are names
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
+            case ApplyBody ignored -> Optional.empty(); // an application stands only inside an open record
             case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
             case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
             case Alias ignored -> Optional.empty();

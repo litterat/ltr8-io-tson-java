@@ -80,7 +80,7 @@ class EntryDisplayNameTest {
      */
     @Test
     void anEntryClosingAnApplicationRendersAsTheApplication() {
-        TypeRef application = TypeRef.of("paged", List.of(TypeRef.of("order"), TypeRef.of("text")));
+        ApplyBody application = ApplyBody.of("paged", "order", "text");
 
         assertEquals("paged<order, text>", EntryDisplayName.of("paged_order_text", RecordBody.of(RecordBody.fieldMap()),
                 TsonSchema.EntryFacts.NONE, Optional.of(application)));

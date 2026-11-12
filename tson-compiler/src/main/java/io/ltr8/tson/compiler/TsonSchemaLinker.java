@@ -33,6 +33,8 @@ import io.ltr8.tson.schema.numeric.ComplexType;
 import io.ltr8.tson.schema.temporal.DateTimeType;
 import io.ltr8.tson.schema.temporal.DateType;
 import io.ltr8.tson.schema.meta.DeclaredType;
+import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.TypeSlots;
 import io.ltr8.tson.schema.meta.DependentBody;
 import io.ltr8.tson.schema.numeric.DecimalType;
 import io.ltr8.tson.schema.temporal.DurationType;
@@ -473,7 +475,7 @@ public final class TsonSchemaLinker {
 
     /** What a message calls {@code name} -- its author's own name, or the form that produced it. */
     private static String displayName(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                      Map<String, TypeRef> applications) {
+                                      Map<String, ApplyBody> applications) {
         return EntryDisplayName.of(name, merged.get(name), facts.getOrDefault(name, TsonSchema.EntryFacts.NONE),
                 Optional.ofNullable(applications.get(name)), merged::get,
                 other -> facts.getOrDefault(other, TsonSchema.EntryFacts.NONE),
@@ -660,7 +662,7 @@ public final class TsonSchemaLinker {
         // The application each declared application closes (§8.2), off its key: an import's as its schema states
         // it, a local one's as this schema's resolution wrote it. What a message shows for an entry with no
         // source position.
-        Map<String, TypeRef> applications = new LinkedHashMap<>();
+        Map<String, ApplyBody> applications = new LinkedHashMap<>();
         Map<String, Top> merged = mergeImports(schema, loader, origins, enumForms, nameTypes, facts,
                 applications);
         schema.entries().keySet().forEach(name -> schema.applicationOf(name)
@@ -863,7 +865,7 @@ public final class TsonSchemaLinker {
      */
     private static void checkEveryEntryIsInhabited(TsonSchema schema, Map<String, Top> merged,
                                                     Map<String, TsonSchema.EntryFacts> facts,
-                                                    Map<String, TypeRef> applications,
+                                                    Map<String, ApplyBody> applications,
                                                     Set<String> localNames, DiagnosticsReceiver receiver) {
         Set<String> inhabited = TypeInhabitance.derive(merged);
         for (String name : localNames) {
@@ -932,7 +934,7 @@ public final class TsonSchemaLinker {
      */
     private static void checkRecordExtension(TsonSchema schema, Map<String, Top> merged,
                                               Map<String, TsonSchema.EntryFacts> facts,
-                                              Map<String, TypeRef> applications,
+                                              Map<String, ApplyBody> applications,
                                               Set<String> localNames, Map<String, String> origins,
                                               Map<String, Normalization> enumForms, DiagnosticsReceiver receiver) {
         for (RecordExtension.Violation violation
@@ -1000,7 +1002,8 @@ public final class TsonSchemaLinker {
                                                     Set<String> localNames, DiagnosticsReceiver receiver) {
         for (String name : localNames) {
             Top entry = entries.get(name);
-            if (entry == null) {
+            // An open record's choices are judged where each application closes, their variants known (§5.4).
+            if (entry == null || OpenEntry.isOpen(entry)) {
                 continue;
             }
             boolean asserted = AliasChain.annotates(facts.getOrDefault(name, TsonSchema.EntryFacts.NONE)
@@ -1312,7 +1315,7 @@ public final class TsonSchemaLinker {
                                                  Map<String, Normalization> enumForms,
                                                  Map<String, Top> nameTypes,
                                                  Map<String, TsonSchema.EntryFacts> facts,
-                                                 Map<String, TypeRef> applications) {
+                                                 Map<String, ApplyBody> applications) {
         Map<String, Top> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : importer.namespaceSources()) {
@@ -1438,12 +1441,10 @@ public final class TsonSchemaLinker {
                 }
                 checkRestatedFieldTypes(entryName, r, namespace, shown);
             }
-            // The target in full: an alias naming an application states its arguments there.
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
             // An alias naming a template bare names the template under another name (`ref_of => ref`),
             // applied as its target is, so it is no use of the template without its arguments.
-            case Alias ref when ref.target().arguments().isEmpty()
-                    && OpenEntry.isOpen(namespace.get(AliasChain.terminal(ref.target().name(), namespace))) -> {
+            case Alias ref when OpenEntry.isOpen(namespace.get(AliasChain.terminal(ref.target().name(), namespace))) -> {
                 if (!namespace.containsKey(ref.target().name())) {
                     throw new UnresolvedReference(entryName, "", ref.target().name());
                 }
@@ -1493,12 +1494,9 @@ public final class TsonSchemaLinker {
             // §5.12): what it admits is the names whose entries' values are of it, which is the slot's judgement
             // wherever a name is written. The index is the linker's own computation, so nothing else is validated.
             case ReferenceBody reference -> {
-                // `of` holds a name (§4.2), and resolution refuses an application there; one that kept its
-                // arguments did not close, and names nothing: its head is unresolved, applied or not.
-                boolean resolves = namespace.get(AliasChain.terminal(reference.of().name(), namespace)) != null;
-                if (!resolves || !reference.of().arguments().isEmpty()) {
-                    throw new UnresolvedReference(entryName, " of",
-                            resolves ? reference.of().text() : reference.of().name());
+                // `of` holds a name (§4.2).
+                if (namespace.get(AliasChain.terminal(reference.of().name(), namespace)) == null) {
+                    throw new UnresolvedReference(entryName, " of", reference.of().name());
                 }
                 KindMembers.ofRefusal(reference, namespace::get).ifPresent(refusal -> {
                     throw new SchemaValidationException("'" + entryName + "' is a reference, but " + refusal);
@@ -1570,6 +1568,18 @@ public final class TsonSchemaLinker {
                     + dependent.text() + "' stands only directly at a record field's type, written in place: it names "
                     + "a field of that record, '" + dependent.on() + "', and a declaration or any other slot has none "
                     + "(§5.2)");
+            // Every application closes where it is written but one inside an open record over its parameters, and an
+            // open record is validated as its applications, so one here is no closing left undone: it was written so.
+            case ApplyBody apply -> {
+                String head = apply.head().name();
+                if (!namespace.containsKey(head)) {
+                    throw new UnresolvedReference(entryName, "", head);
+                }
+                checkArity(head, apply.arguments().size(), namespace, List.of(), "'" + entryName + "'");
+                throw new SchemaValidationException("the application '" + apply.text() + "' stands written in "
+                        + "place outside an open record: an application stays in place only inside an open record, "
+                        + "with one of its parameters among its arguments, and closes everywhere else (§5.10)");
+            }
             // A value entry was read against its type, so the read judged its shape; every reference it holds is at a
             // slot typed by a kind or a reference, recorded by the read and judged by its slot (ValuesByName), so
             // nothing is asked of the host class a value binds to.
@@ -1603,8 +1613,7 @@ public final class TsonSchemaLinker {
         Map<TypeExpr, String> seen = new LinkedHashMap<>();
         for (TypeExpr variant : choice.variants()) {
             TypeExpr flattened = switch (variant) {
-                case TypeRef reference -> TypeRef.of(AliasChain.terminal(reference.name(), namespace),
-                        reference.arguments());
+                case TypeRef reference -> TypeRef.of(AliasChain.terminal(reference.name(), namespace));
                 case TypeInline inline -> inline;
             };
             String first = seen.putIfAbsent(flattened, variant.text());
@@ -1713,6 +1722,10 @@ public final class TsonSchemaLinker {
             case Atom ignored -> { } // an atom body names no type
             case DeclaredType ignored -> { } // its variants are the closure's, named by no field
             case DependentBody ignored -> { } // it names a field of the enclosing record, never an entry
+            case ApplyBody apply -> {
+                into.add(apply.head().name());
+                apply.arguments().forEach(argument -> collectNames(argument, into));
+            }
             case ValueEntry ignored -> { } // a value names no type of its own
         }
     }
@@ -1727,9 +1740,6 @@ public final class TsonSchemaLinker {
 
     private static void collectNames(TypeRef ref, Set<String> into) {
         into.add(ref.name());
-        for (TypeRef argument : ref.arguments()) {
-            collectNames(argument, into);
-        }
     }
 
     /**
@@ -1755,6 +1765,7 @@ public final class TsonSchemaLinker {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
             case Sum sum -> sum.coherenceCheck();
+            case ApplyBody ignored -> List.of();
             case Alias ignored -> List.of();
             case ValueEntry ignored -> List.of();
         };
@@ -1860,8 +1871,7 @@ public final class TsonSchemaLinker {
         }
         TypeRef from = (TypeRef) inherited.typeExpr();
         TypeRef to = (TypeRef) restated.typeExpr();
-        if (!from.arguments().isEmpty() || !to.arguments().isEmpty() || !namespace.containsKey(from.name())
-                || !namespace.containsKey(to.name())) {
+        if (!namespace.containsKey(from.name()) || !namespace.containsKey(to.name())) {
             return true;
         }
         return isA(to.name(), from.name(), namespace) || restated.voidable()
@@ -1924,9 +1934,7 @@ public final class TsonSchemaLinker {
         // application of one) has no single body to check against until materialisation closes it. A body
         // still an Alias means the walk stopped on a cycle or an argument-bearing target, neither of
         // which has one either.
-        if (target == null || OpenEntry.isOpen(target)
-                || field.typeExpr() instanceof TypeRef reference && !reference.arguments().isEmpty()
-                || target instanceof Alias) {
+        if (target == null || OpenEntry.isOpen(target) || target instanceof ApplyBody || target instanceof Alias) {
             return;
         }
         Token value = field.value().get();
@@ -2085,17 +2093,14 @@ public final class TsonSchemaLinker {
         if (!namespace.containsKey(ref.name())) {
             throw new UnresolvedReference(subject, trail, ref.name());
         }
-        checkArity(ref, namespace, List.of(), context);
+        checkArity(ref.name(), 0, namespace, List.of(), context);
         // Membership walks construction to `type`, so it is judged only where `type` is in reach: a namespace built
         // without the kernel (a test's, a fragment's) gets resolution alone, as a kind with no meta gets no verdict.
-        if (constructors != null && ref.arguments().isEmpty()
+        if (constructors != null
                 && (namespace.containsKey(TYPE) || namespace.containsKey(TYPE))
                 && !KindMembers.isMember(ref.name(), TYPE, namespace::get, constructors, namespace::get)) {
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is no type a value "
                     + "can have -- a slot typed 'meta.type_ref' holds the name of an entry whose value is of 'type'");
-        }
-        for (TypeRef nested : ref.arguments()) {
-            validateTypeRef(nested, namespace, constructors, subject, trail);
         }
     }
 
@@ -2113,15 +2118,48 @@ public final class TsonSchemaLinker {
      */
     private static void checkOpenArity(String entryName, RecordBody open,
             Map<String, Top> namespace, List<String> ownParameters) {
-        open.references().forEach(reference ->
-                checkArityThroughout(reference, namespace, ownParameters, "'" + entryName + "'"));
+        String context = "'" + entryName + "'";
+        // A head is checked with its application's arguments, and every other name with none.
+        Set<TypeRef> heads = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        TypeSlots.Rewrite arity = new TypeSlots.Rewrite() {
+            @Override
+            public TypeRef atName(TypeRef reference) {
+                if (!heads.contains(reference)) {
+                    checkArity(reference.name(), 0, namespace, ownParameters, context);
+                }
+                return reference;
+            }
+
+            @Override
+            public io.ltr8.tson.schema.meta.Type inPlace(io.ltr8.tson.schema.meta.Type body) {
+                if (body instanceof ApplyBody application) {
+                    heads.add(application.head());
+                    checkArity(application.head().name(), application.arguments().size(), namespace, ownParameters,
+                            context);
+                    requireOpen(context, application, namespace);
+                }
+                return body;
+            }
+        };
+        open.fields().values().forEach(field -> TypeSlots.map(field.type(), arity));
+        open.parents().forEach(parent -> TypeSlots.map(parent, arity));
     }
 
-    /** {@link #checkArity} over {@code ref} and every argument it carries, at any depth. */
-    private static void checkArityThroughout(TypeRef ref, Map<String, Top> namespace, List<String> ownParameters,
-                                             String context) {
-        checkArity(ref, namespace, ownParameters, context);
-        ref.arguments().forEach(argument -> checkArityThroughout(argument, namespace, ownParameters, context));
+    /**
+     * An application stays written in place only over a parameter of the open record holding it, and only an open
+     * record's: a constructor's is its construction and one over names alone has closed ([TSON-SCHEMA] §5.10). A
+     * resolved form read as output is held to it here, where its open records are linked.
+     */
+    private static void requireOpen(String context, ApplyBody application, Map<String, Top> namespace) {
+        boolean overAParameter = application.arguments().stream().anyMatch(ParamRef.class::isInstance);
+        Top head = namespace.get(AliasChain.terminal(application.head().name(), namespace));
+        if (head != null && (!overAParameter || !OpenEntry.isOpen(head))) {
+            throw new SchemaValidationException(context + ": the application '" + application.text() + "' stands "
+                    + "written in place, and an application stays in place only inside an open record, over one of "
+                    + "its parameters, applying an open record; " + (OpenEntry.isOpen(head)
+                    ? "over names alone it closes to the record it denotes" : "a constructor's is its construction")
+                    + " (§5.10)");
+        }
     }
 
     /**
@@ -2145,34 +2183,32 @@ public final class TsonSchemaLinker {
      * Left to run, {@code <T> { v: T<text> }} would substitute whatever {@code T} binds into an application's
      * head, which names none of what the author did.
      */
-    private static void checkArity(TypeRef ref, Map<String, Top> namespace,
+    private static void checkArity(String name, int supplied, Map<String, Top> namespace,
                                     List<String> ownParameters, String context) {
-        if (ownParameters.contains(ref.name())) {
-            if (!ref.arguments().isEmpty()) {
-                throw new SchemaValidationException(context + ": '" + ref.name() + "' is a type parameter "
+        if (ownParameters.contains(name)) {
+            if (supplied > 0) {
+                throw new SchemaValidationException(context + ": '" + name + "' is a type parameter "
                         + "applied to arguments -- a parameter stands for a type, never for a template, and "
-                        + "§5.10 admits no head abstraction, so '" + ref.name() + "<...>' is no form. Name the "
+                        + "§5.10 admits no head abstraction, so '" + name + "<...>' is no form. Name the "
                         + "template and apply that, or take the applied type as the parameter instead");
             }
             return;
         }
         // An application through an alias of a template applies the template ([TSON-SCHEMA] §8.3).
-        Top referenced = namespace.get(ref.arguments().isEmpty() ? ref.name()
-                : AliasChain.terminal(ref.name(), namespace));
+        Top referenced = namespace.get(supplied == 0 ? name : AliasChain.terminal(name, namespace));
         if (referenced == null) {
             return; // a name no entry holds is resolution's to refuse, not arity's
         }
         List<String> parameters = OpenEntry.parameterNames(referenced);
         int declared = parameters.size();
-        int supplied = ref.arguments().size();
         if (declared == supplied) {
             return;
         }
-        String head = AliasChain.terminal(ref.name(), namespace);
+        String head = AliasChain.terminal(name, namespace);
         if (supplied > 0 && ConstructionSugar.constructs(head, referenced)) {
             // Construction sugar (§5.3): one argument per argument slot of the constructor.
             try {
-                ConstructionSugar.requireArity(ref.name(),
+                ConstructionSugar.requireArity(name,
                         ConstructionSugar.slots((RecordBody) referenced, namespace::get), supplied);
             } catch (SchemaValidationException e) {
                 throw new SchemaValidationException(context + ": " + e.getMessage());
@@ -2180,17 +2216,17 @@ public final class TsonSchemaLinker {
             return;
         }
         if (declared == 0) {
-            throw new SchemaValidationException(context + ": '" + ref.name() + "' declares no type "
-                    + "parameters, so '" + ref.name() + "<...>' applies arguments to something that takes "
+            throw new SchemaValidationException(context + ": '" + name + "' declares no type "
+                    + "parameters, so '" + name + "<...>' applies arguments to something that takes "
                     + "none (§5.10); drop the argument list");
         }
         if (supplied == 0) {
-            throw new SchemaValidationException(context + ": '" + ref.name() + "' is a template taking "
+            throw new SchemaValidationException(context + ": '" + name + "' is a template taking "
                     + declared + " type argument" + (declared == 1 ? "" : "s") + " " + parameters
-                    + ", and a template is not a type -- write '" + ref.name() + "<...>' with its arguments, or, "
+                    + ", and a template is not a type -- write '" + name + "<...>' with its arguments, or, "
                     + "for any member of a family, name the abstract record its applications compose (§5.10)");
         }
-        throw new SchemaValidationException(context + ": '" + ref.name() + "' takes " + declared
+        throw new SchemaValidationException(context + ": '" + name + "' takes " + declared
                 + " type argument" + (declared == 1 ? "" : "s") + " " + parameters + ", but "
                 + supplied + " " + (supplied == 1 ? "was" : "were") + " applied (§5.10)");
     }

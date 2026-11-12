@@ -128,6 +128,9 @@ final class SchemaDesugarer {
     /** §5.4's desugar target for {@code (A | B)}. */
     private static final String CHOICE = KernelNames.of("choice");
 
+    /** §5.10's construction an application at a slot is written in place as. */
+    private static final String APPLY = KernelNames.of("apply");
+
     /** §5.2's desugar target for {@code kind!} at a field's type. */
     private static final String DEPENDENT = KernelNames.of("dependent");
 
@@ -150,6 +153,8 @@ final class SchemaDesugarer {
     private static final String OPTIONAL_MEMBERS = "optional_members";
     private static final String DISCRIMINATORS = "discriminators";
     private static final String EXTENSION = "extension";
+    private static final String HEAD = "head";
+    private static final String ARGUMENTS = "arguments";
 
     /** {@code meta.type_inline.of}: the wrapper a nested construction takes at a type slot. */
     private static final String OF = "of";
@@ -634,21 +639,22 @@ final class SchemaDesugarer {
         return switch (ref) {
             case InlineConstruction inline -> new RecordValue(List.of(
                     new RecordValue.Field(OF, inline.value())));
-            default -> WireForm.refValue(reference(ref));
+            case ApplicationRef generic -> new RecordValue(List.of(new RecordValue.Field(OF, application(generic))));
+            default -> WireForm.refValue(io.ltr8.tson.schema.meta.TypeRef.of(((NameRef) ref).name()));
         };
     }
 
-    /** A grammar-level reference as the reference value it spells: a name, or an application of references. */
-    private static io.ltr8.tson.schema.meta.TypeRef reference(TypeExpr ref) {
-        if (ref instanceof NameRef simple) {
-            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-        }
-        ApplicationRef generic = (ApplicationRef) ref;
-        List<io.ltr8.tson.schema.meta.TypeRef> arguments = new ArrayList<>();
+    /**
+     * {@code generic} as the construction it is, {@code !meta.apply { head: H  arguments: [...] }}: a reference holds a
+     * name, so an application at a slot is written in place ([TSON-SCHEMA] §5.10), each argument a slot value in turn.
+     */
+    private static DataValue application(ApplicationRef generic) {
+        List<DataValue> arguments = new ArrayList<>();
         for (TypeExpr argument : generic.args()) {
-            arguments.add(reference(argument));
+            arguments.add(WireForm.plain(slotValue(argument)));
         }
-        return io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), arguments);
+        return construction(new Binding(APPLY, List.of(WireForm.nameField(HEAD, generic.name()),
+                new RecordValue.Field(ARGUMENTS, WireForm.plain(new ArrayValue(arguments))))));
     }
 
     /** One position of a tuple after expansion: the type it holds, and whether it is marked voidable. */
@@ -720,6 +726,11 @@ final class SchemaDesugarer {
      * every slot is.
      */
     private static Binding mapBinding(TypeExpr key, TypeExpr value, boolean voidable, Optional<SizeSpec> size) {
+        if (key instanceof ApplicationRef generic) {
+            throw new SchemaValidationException("'" + spell(generic) + "' is an application, and a map's key holds "
+                    + "only a name, where an application closes nowhere (§4.2): declare it ('my_" + generic.name()
+                    + " => " + spell(generic) + "') and write that name");
+        }
         List<RecordValue.Field> fields = new ArrayList<>();
         slot(KEY_TYPE, key, fields);
         slot(VALUE_TYPE, value, fields);

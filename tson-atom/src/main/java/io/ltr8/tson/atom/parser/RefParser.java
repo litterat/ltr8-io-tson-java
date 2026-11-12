@@ -43,10 +43,6 @@ public record RefParser(ReferenceBody reference, boolean judgesValues) implement
     @Override
     public TypeRef read(String text) {
         TypeRef read = ReferenceGrammar.parse(text);
-        if (!read.arguments().isEmpty()) {
-            throw new AtomParseException("'" + text + "' is no qualified name -- a value is named, never applied, "
-                    + "so it takes no argument list", "a qualified name");
-        }
         Optional<ReferenceBody.Values> values = judgesValues ? reference.values() : Optional.empty();
         if (values.isEmpty()) {
             return read;

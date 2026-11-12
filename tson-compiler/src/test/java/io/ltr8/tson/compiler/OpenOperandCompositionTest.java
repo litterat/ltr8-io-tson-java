@@ -151,8 +151,8 @@ class OpenOperandCompositionTest {
                 () -> "customer directly, base through the open operand: " + TypeChain.supertypesOf(vip));
         assertFalse(TypeChain.supertypesOf(vip).contains("box"),
                 () -> "a template is not a type, so nothing is IS-A one: " + TypeChain.supertypesOf(vip));
-        assertEquals(List.of("customer", "box"), TypeChain.parentsOf(vip).stream().map(TypeRef::name).toList(),
-                "and it keeps its parents as written");
+        assertEquals(List.of("customer", "box<T>"), TypeChain.parentsOf(vip).stream()
+                .map(io.ltr8.tson.schema.meta.TypeExpr::text).toList(), "and it keeps its parents as written");
     }
 
     /** Rows one and two of the membership table, read off the index a schema-driven read actually consults. */

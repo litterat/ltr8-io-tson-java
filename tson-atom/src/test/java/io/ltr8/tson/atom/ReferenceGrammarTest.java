@@ -23,17 +23,29 @@ class ReferenceGrammarTest {
     void aNameIsAReferenceWithNoArguments() {
         assertEquals(TypeRef.of("order"), ReferenceGrammar.parse("order"));
         assertEquals(TypeRef.of("orders.place_order"), ReferenceGrammar.parse("orders.place_order"));
-        assertTrue(ReferenceGrammar.parse("order").arguments().isEmpty());
-        assertEquals(List.of("geo", "address"), ReferenceGrammar.parse("geo.address<T>").segments());
+        assertEquals(List.of("geo", "address"), ReferenceGrammar.parse("geo.address").segments());
     }
 
-    /** An argument is a reference, a qualified name or an application, nested ones included. */
+    /** The grammar spells an argument list, each argument a reference, nested ones included. */
     @Test
     void anArgumentIsAReference() {
-        assertEquals(TypeRef.of("response", List.of(ref("order"), ref("geo.address"))),
-                ReferenceGrammar.parse("response<order geo.address>"));
-        assertEquals(TypeRef.of("box", List.of(TypeRef.of("pair", List.of(ref("text"), ref("int32"))))),
-                ReferenceGrammar.parse("box<pair<text int32>>"));
+        assertEquals(new ReferenceGrammar.Spelled("response", List.of(spelled("order"), spelled("geo.address"))),
+                ReferenceGrammar.spelled("response<order geo.address>"));
+        assertEquals(new ReferenceGrammar.Spelled("box", List.of(new ReferenceGrammar.Spelled("pair",
+                List.of(spelled("text"), spelled("int32"))))), ReferenceGrammar.spelled("box<pair<text int32>>"));
+    }
+
+    /** A reference is a name ([TSON-SCHEMA] §4.2): one spelling an application is refused, saying how to write it. */
+    @Test
+    void anApplicationIsNoReference() {
+        AtomValidationException refused = assertThrows(AtomValidationException.class,
+                () -> ReferenceGrammar.parse("box<text>"));
+        assertTrue(refused.getMessage().contains("a reference is a name"), refused.getMessage());
+        assertTrue(refused.getMessage().contains("!meta.apply"), refused.getMessage());
+    }
+
+    private static ReferenceGrammar.Spelled spelled(String name) {
+        return new ReferenceGrammar.Spelled(name, List.of());
     }
 
     /** A token that is no reference -- a number, a quoted token -- is no argument ([TSON-SCHEMA] §5.10). */
@@ -41,20 +53,20 @@ class ReferenceGrammarTest {
     void aLiteralTokenIsNoArgument() {
         for (String text : List.of("maxint<10>", "response<order 201>", "p<-1>", "p<1box>", "box<\"a b\">",
                 "box<pair<text \"a b\">>")) {
-            assertThrows(AtomParseException.class, () -> ReferenceGrammar.parse(text), text);
+            assertThrows(AtomParseException.class, () -> ReferenceGrammar.spelled(text), text);
         }
         AtomParseException refused = assertThrows(AtomParseException.class,
-                () -> ReferenceGrammar.parse("maxint<10>"));
+                () -> ReferenceGrammar.spelled("maxint<10>"));
         assertTrue(refused.getMessage().contains("never a literal token"), refused.getMessage());
     }
 
     /** Identity is the parsed form: whitespace and a comma between arguments are free, and the text is one. */
     @Test
     void twoSpellingsAreOneReferenceWithOneCanonicalText() {
-        TypeRef canonical = ReferenceGrammar.parse("map<text integer>");
+        ReferenceGrammar.Spelled canonical = ReferenceGrammar.spelled("map<text integer>");
         for (String spelling : List.of("map< text integer >", "map<text, integer>", "map<text\tinteger,>")) {
-            assertEquals(canonical, ReferenceGrammar.parse(spelling), spelling);
-            assertEquals("map<text integer>", ReferenceGrammar.parse(spelling).text(), spelling);
+            assertEquals(canonical, ReferenceGrammar.spelled(spelling), spelling);
+            assertEquals("map<text integer>", ReferenceGrammar.spelled(spelling).text(), spelling);
         }
     }
 
@@ -62,13 +74,7 @@ class ReferenceGrammarTest {
     void aMalformedReferenceIsRefusedWithTheGrammarsReason() {
         for (String text : List.of("box<text", "box<>", "box<text>>", "box<<text>", ".box", "box..x", "box<text>x",
                 "", "1box", "box<\"open>", "box <text>", "box<1x<y>>")) {
-            assertThrows(AtomParseException.class, () -> ReferenceGrammar.parse(text), text);
+            assertThrows(AtomParseException.class, () -> ReferenceGrammar.spelled(text), text);
         }
-    }
-
-    @Test
-    void theNamesAReferenceWritesAreItsHeadAndItsReferenceArguments() {
-        assertEquals(List.of("response", "box", "order"),
-                ReferenceGrammar.names(ReferenceGrammar.parse("response<box<order>>")));
     }
 }

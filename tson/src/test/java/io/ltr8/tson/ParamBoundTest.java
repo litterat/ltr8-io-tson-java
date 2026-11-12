@@ -178,7 +178,7 @@ class ParamBoundTest {
     void aWrittenBoundNamesAType() {
         assertRefused("  boxed => <T: unicode.text_type> { a: T }", "'unicode.text_type' is a constructor, not a type");
         assertRefused("  boxed => <T: no_such_type> { a: T }", "'no_such_type' names no type");
-        assertRefused("  boxed => <T: no_such<text>> { a: T }", "'no_such' names no type");
+        assertRefused("  boxed => <T: no_such<text>> { a: T }", "'no_such<text>' is an application");
     }
 
     // ── Enforced at the application ────────────────────────────────────────

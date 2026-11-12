@@ -47,25 +47,14 @@ final class TypeNameSlotReader implements TsonTypeReader<TypeRef> {
             // The kind's reader records the name in a schema document, as it does whatever the host holds.
             return withAnnotations(kind.read(ctx), annotations);
         }
-        if (ctx.peek() instanceof ReferenceEvent reference) {
-            if (!ctx.readsSchemaNames()) {
-                // A data document: the kind's reader refuses the application, as the encodings share that rule.
-                return withAnnotations(kind.read(ctx), annotations);
-            }
-            if (!ctx.readsValueBody()) {
-                ctx.next();
-                return reference.reference().withAnnotations(annotations);
-            }
+        if (ctx.peek() instanceof ReferenceEvent) {
+            // A reference is a name, in a schema as in data: the kind's reader refuses the application, saying how
+            // one is written, as the encodings share that rule.
+            return withAnnotations(kind.read(ctx), annotations);
         }
-        // Nothing in a value body is closed, so an application here would have no entry to be the name of: a
-        // declaration naming the application gives it one, and the bare name then names it.
         String found = TypeRefCheck.describe(ctx.peek());
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a type's name, found " + found
-                + " -- a position typed by a kind holds the name of a type, one bare token"
-                + (ctx.readsValueBody() ? "; to name an application here, declare it under a name (order_box => "
-                        + "box<order>) and write that name" : ctx.readsSchemaNames() ? ", or an application (box<order>)"
-                        : ""),
-                "a type's name", found);
+                + " -- a position typed by a kind holds the name of a type, one bare token", "a type's name", found);
         EventSkip.annotationsAndTypeRef(ctx);
         EventSkip.coreValue(ctx);
         return null;
@@ -76,7 +65,7 @@ final class TypeNameSlotReader implements TsonTypeReader<TypeRef> {
         return switch (read) {
             case null -> null; // a refusal is reported by the kind
             case TypeRef reference -> reference.withAnnotations(annotations);
-            default -> TypeRef.of(read.toString(), List.of(), annotations);
+            default -> TypeRef.of(read.toString(), annotations, TypeRef.Closure.NONE);
         };
     }
 }

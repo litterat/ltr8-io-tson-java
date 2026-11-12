@@ -98,12 +98,7 @@ class TopKindHierarchyTest {
 
         assertEquals(Optional.of(boxed), closure.referentOf(TypeRef.of("boxed")));
         assertEquals(Optional.empty(), closure.referentOf(TypeRef.of("nowhere")));
-        assertEquals(Optional.empty(), closure.referentOf(box(TypeRef.of("text"))));
         assertEquals(Optional.empty(), ReferenceBody.of("type").closure().referentOf(TypeRef.of("boxed")));
-    }
-
-    private static TypeRef box(TypeRef argument) {
-        return TypeRef.of("box", List.of(argument));
     }
 
     @Test

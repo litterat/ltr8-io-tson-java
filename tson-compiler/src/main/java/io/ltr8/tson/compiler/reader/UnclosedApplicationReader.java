@@ -8,7 +8,7 @@ import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.ApplyBody;
 
 /**
  * The reader of a record field typed by an application written inline ({@code r: meta.ref<order>}, {@code b:
@@ -26,7 +26,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
  *       reported as one: the application does not yet wait in the order as a named one does.</li>
  * </ul>
  */
-record UnclosedApplicationReader(String field, TypeRef application) implements TsonTypeReader<Object> {
+record UnclosedApplicationReader(String field, ApplyBody application) implements TsonTypeReader<Object> {
 
     @Override
     public Object read(TsonReadContext ctx) {

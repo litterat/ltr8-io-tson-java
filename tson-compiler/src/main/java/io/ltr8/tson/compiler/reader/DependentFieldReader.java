@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.atom.AtomParseException;
+import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -75,12 +75,11 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
         return switch (named) {
             case TypeInline inline when inline.dependentOn().isPresent() -> new TypeNamed.None("the dependent type '"
                     + inline.text() + "', which names a field and no type");
+            case TypeInline inline when inline.of() instanceof io.ltr8.tson.schema.meta.ApplyBody ->
+                    new TypeNamed.None("'" + inline.text() + "', an application, where a value names the entry "
+                            + "declared for one");
             case TypeInline inline -> new TypeNamed.InPlace(inline);
             case TypeRef reference -> {
-                if (!reference.arguments().isEmpty()) {
-                    yield new TypeNamed.None("'" + reference.text() + "', an application, where a value names the "
-                            + "entry declared for one");
-                }
                 String entry = reference.name();
                 Top body = entries == null ? null : entries.apply(AliasChain.terminal(entry, entries));
                 if (entries != null && body == null) {
@@ -173,7 +172,7 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
             case CharSequence text -> {
                 try {
                     yield ReferenceGrammar.parse(text.toString());
-                } catch (AtomParseException e) {
+                } catch (AtomTypeException e) {
                     yield null;
                 }
             }

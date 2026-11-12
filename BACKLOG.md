@@ -38,6 +38,19 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
+- [ ] **An entry whose chain reaches no base kind reports PRODUCT** ([TSON-SCHEMA] §4.2, §8.1). `EntryKind.ofChain`
+  answers PRODUCT where a record's chain names none of the kernel's `atom`, `product` and `sum`, which is right for
+  an ordinary record and wrong for `meta.top`, `meta.type`, `meta.alias` and `meta.apply`: none of them describes a
+  product. Decide what such an entry's kind is (a kind of its own, or none), state it in §8.1, and give
+  `EntryKind` that answer; check every caller that switches on the kind.
+
+- [ ] **A constructor's application passes an argument written in place through a generated name.** A
+  constructor's application is built by reading a binding record of its arguments, and a reference there reads a
+  name, so an argument that is an application or a type in place (`meta.array<box<T>>`) travels as
+  `in_place_<uuid>` and is swapped back (`ConstructionSugar.StandIns`, `DefinitionResolver.argumentStandingIn`).
+  Build the construction from the model's arguments directly, so no name is invented and nothing random is in
+  the pipeline.
+
 - [ ] **A tree read does not read a dependent value against a sibling written in place** ([TSON-SCHEMA] §5.2).
   `setting => { kind: meta.type_expr  v?: kind! }` with `kind: { of: !meta.array { element_type: int32 } }` reads `v`
   against the array in bind mode, where the sibling binds to its `TypeInline`; a tree read holds the sibling as the
@@ -91,10 +104,10 @@ spec-required case:
   record `box<text>` closes to), and one through an alias of a constructor constructs (`ref_of<order>` over `ref_of =>
   meta.ref`); no test or vector pins either. Add a `schema/valid` vector for each, with the expected resolved form.
 - [ ] **An aliased application across imports is untested at the IS-A edge fold.** An imported schema's
-  `@meta.application` is the application as written (`box<user_id>`), and reaches the importer's edge fold in that
-  form, where the fold compares canonical applications ([TSON-SCHEMA] §8.2), arguments past their aliases. Add a link
-  vector with an aliased application declared in an import and composed as a parent in the importer, and reduce on
-  ingest if it misses.
+  `@meta.application` is the application as written (`{ head: box  arguments: [user_id] }`), and reaches the importer's
+  edge fold in that form, where the fold compares canonical applications ([TSON-SCHEMA] §8.2), arguments past their
+  aliases. Add a link vector with an aliased application declared in an import and composed as a parent in the
+  importer, and reduce on ingest if it misses.
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to

@@ -1,9 +1,7 @@
 package io.ltr8.tson.compiler.config;
 
 import io.ltr8.annotation.DataBridge;
-import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.ReferenceGrammar;
-import io.ltr8.tson.schema.meta.ApplicationRef;
 import io.ltr8.tson.schema.meta.NameRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -15,9 +13,9 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * records the name for the linker), and the writers write a reference themselves; this serves a reference bound
  * from its text anywhere else, a JSON string's among them.
  *
- * <p><b>Each variant is an atom as well</b> ({@link ForName}, {@link ForApplication}): a value written where no
- * component declares its type -- an annotation's value, a value entry's -- is described by its own class, which is
- * the variant, never the interface.
+ * <p><b>Each variant is an atom as well</b> ({@link ForName}): a value written where no component declares its type --
+ * an annotation's value, a value entry's -- is described by its own class, which is the variant, never the
+ * interface.
  */
 public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
 
@@ -35,7 +33,7 @@ public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
         return ReferenceGrammar.parse(text);
     }
 
-    /** {@link NameRef} as an atom host: the reference's text, which must spell a name. */
+    /** {@link NameRef} as an atom host: the reference's text. */
     public static final class ForName implements DataBridge<String, NameRef> {
 
         /** The bridge; it holds nothing. */
@@ -49,31 +47,7 @@ public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
 
         @Override
         public NameRef toObject(String text) {
-            if (ReferenceGrammar.parse(text) instanceof NameRef name) {
-                return name;
-            }
-            throw new AtomParseException("'" + text + "' is an application, not a name", "a name");
-        }
-    }
-
-    /** {@link ApplicationRef} as an atom host: the reference's text, which must spell an application. */
-    public static final class ForApplication implements DataBridge<String, ApplicationRef> {
-
-        /** The bridge; it holds nothing. */
-        public ForApplication() {
-        }
-
-        @Override
-        public String toData(ApplicationRef reference) {
-            return reference.text();
-        }
-
-        @Override
-        public ApplicationRef toObject(String text) {
-            if (ReferenceGrammar.parse(text) instanceof ApplicationRef application) {
-                return application;
-            }
-            throw new AtomParseException("'" + text + "' is a name, not an application", "an application");
+            return (NameRef) ReferenceGrammar.parse(text);
         }
     }
 }

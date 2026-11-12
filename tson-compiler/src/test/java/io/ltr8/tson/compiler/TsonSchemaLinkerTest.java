@@ -6,6 +6,7 @@ import io.ltr8.tson.schema.*;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.numeric.IntegerSize;
@@ -135,7 +136,7 @@ class TsonSchemaLinkerTest {
         entries.put("token", textEntry());
         entries.put("set", emptyRecord());
         entries.put("container", RecordBody.of(RecordBody.fieldMap(Map.entry("members",
-                RecordField.required(TypeRef.of("set", List.of(TypeRef.of("token"))))))));
+                RecordField.required(new ApplyBody(TypeRef.of("set"), List.of(TypeRef.of("token"))).inPlace())))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
@@ -201,7 +202,7 @@ class TsonSchemaLinkerTest {
         entries.put("token", textEntry());
         entries.put("other",
                 recordTemplate("U", "v"));
-        TypeRef otherOfToken = TypeRef.of("other", List.of(TypeRef.of("token")));
+        ApplyBody otherOfToken = new ApplyBody(TypeRef.of("other"), List.of(TypeRef.of("token")));
         entries.put("generic", RecordBody.of(RecordBody.fieldMap()));
 
         AnnotatedMap<String, Top> annotated = AnnotatedMap.of(entries)

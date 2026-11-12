@@ -39,9 +39,13 @@ application of one closes is `design/template-materialisation.md`'s. Current for
   (`SchemaResolver.OnDemand.refuseShadowingParameters`): a parameter spelled like an entry the schema's namespace
   holds, a type or a value entry, its own or an import's, is refused at the declaration. With every argument a
   reference, a name an absorbed field's type writes is an entry, so this one rule covers absorbed fields too.
-- **An application where a type in place holds only a name is refused at the declaration** (`ParameterTypes`'
-  `requireNamesInPlace`): `{box<T> => text}` is refused at the open record, as `meta.map<box<T> text>` is, rather than
+- **An application where a type in place holds only a name is refused at the declaration**: `{box<T> => text}` by the
+  desugarer (a map's key holds a name), and `meta.map<box<T> text>` by `ParameterTypes`' `requireNames`, rather than
   only at each application.
+- **An open record's application over a parameter is `meta.apply` written in place** (`ApplyBody`), at any slot of a
+  field's type and among `chain.parents`; its arguments are scoped like any reference, and substitution replaces them.
+  The linker holds an open record to where one may stand (`TsonSchemaLinker.requireOpen`): over one of its parameters,
+  applying an open record, which is how a resolved form read as output is checked.
 - **A bound is written, never inherited.** `<T: text>` puts `Param.bound` on where the declaration resolves
   (`DefinitionResolver.withBounds`); nothing about a parameter is inferred. `ParameterTypes.check` runs once every
   declaration is ready and before anything closes: each written bound names a type, and each parameter passed to a

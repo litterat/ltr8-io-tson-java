@@ -5,7 +5,6 @@ import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -76,11 +75,8 @@ final class WireForm {
         return new RecordValue.Field(name, plain(new TokenValue(text, TokenForm.UNQUOTED)));
     }
 
-    /**
-     * A reference in the wire spelling: a bare name an unquoted token, and an application a {@link ReferenceValue},
-     * written unquoted as data grammar ([TSON-DATA] §7.4). One spelling per shape, which every producer goes through.
-     */
+    /** A reference in the wire spelling: its name, an unquoted token. */
     static CoreValue refValue(TypeRef ref) {
-        return ref.arguments().isEmpty() ? new TokenValue(ref.name(), TokenForm.UNQUOTED) : new ReferenceValue(ref);
+        return new TokenValue(ref.name(), TokenForm.UNQUOTED);
     }
 }

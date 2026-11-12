@@ -53,12 +53,12 @@ Related: `design/schema-resolution.md` (definition resolution), `design/template
 Leaf classes the phases share. Each owns a fact that belongs to none of them individually; stated inside whichever
 phase happens to need it first, such a fact ends up stated more than once.
 
-**`WireForm`** — how schema vocabulary is spelled as data: the vocabulary member names, the `plain`/`nameField`
-builders every producer goes through, and `refValue`, which writes a reference as a bare token or, carrying arguments,
-as a `ReferenceValue`, the data grammar's reference ([TSON-DATA] §7.4). Its producers are `SchemaDesugarer`, writing a
-sugar form's binding record (a nested construction in its `{ of: … }` wrapper, `SchemaDesugarer.slotValue`), and
-`ConstructionSugar`, writing an applied constructor's arguments at its slots. A quoted token is never a reference, so
-a text slot holding `"box<T>"` is text whatever it spells. `TsonObjectWriter` cannot build a binding record: its
+**`WireForm`** — how schema vocabulary is spelled as data: the vocabulary member names, the `plain`/`nameField` builders
+every producer goes through, and `refValue`, which writes a reference as a bare token; an application at a slot is
+written by `SchemaDesugarer` as the `{ of: !meta.apply { … } }` construction it is. Its producers are `SchemaDesugarer`,
+writing a sugar form's binding record (a nested construction in its `{ of: … }` wrapper, `SchemaDesugarer.slotValue`),
+and `ConstructionSugar`, writing an applied constructor's arguments at its slots. A quoted token is never a reference,
+so a text slot holding `"box<T>"` is text whatever it spells. `TsonObjectWriter` cannot build a binding record: its
 output is canonical-explicit and fully quoted, a different language from the one a binding is written in.
 
 **`TypeSlots`** (`tson-schema`, beside the model it walks) — every reference a value holds, at any depth of types
@@ -83,9 +83,9 @@ walked:
 §5.10's regularity check does not use the walk: every entry with parameters is an open record, and reads its
 applications off its references (`OpenEntry.applications`).
 
-**`CanonicalApplication`** — §8.2's canonical rendering of an application, `of`, which compares two
-applications after their arguments' alias chains are followed: the applied-parent fold keys on it, and the
-materialiser asks it whether a nested application is the one a declaration is closing. Nothing is named by it.
+**`CanonicalApplication`** — §8.2's canonical application, `of`: an `ApplyBody` of plain names, its arguments past
+their alias chains, compared as a value (head and arguments), never as text. The applied-parent fold keys on it, and
+the materialiser asks it whether a nested application is the one a declaration is closing. Nothing is named by it.
 
 ## References are hops, not rewrites (`tson-compiler/.../TsonSchemaCompiler.java`)
 
@@ -140,9 +140,9 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `AL
 ## The derived key annotation: `@meta.application` (`tson-compiler/.../resolver/SchemaResolver.java`)
 
 **`@meta.application`** (§6, §8.1) goes on the key of every declaration that closes an application of an open
-record, the application it is the instantiation of, `@meta.application:box<int32>`, a `meta.type_ref` reference
-carrying arguments, written unquoted and stated as written: nested arguments unreduced, a bare-name argument past its
-alias hops (`TemplateMaterialiser.asWritten`). A construction carries none, its value stating its constructor and its
+record, the application it is the instantiation of, `@meta.application:{ head: box  arguments: [int32] }`, a value of
+`meta.apply` (`ApplyBody`), its head as written and each argument a name past its alias hops
+(`TemplateMaterialiser.asWritten`). A construction carries none, its value stating its constructor and its
 arguments. It is a fact about the entry and not about its chain -- the record does not state the head it was
 substituted from -- which is why it is no field of `meta.type_chain`. The materialiser records each application in a
 map it shares with `SchemaResolver` (the applied-parent fold keys on it), and `SchemaResolver` writes it where it

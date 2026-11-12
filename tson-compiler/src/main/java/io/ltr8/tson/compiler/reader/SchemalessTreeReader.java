@@ -16,6 +16,7 @@ import io.ltr8.tson.tree.TsonValue;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -252,15 +253,16 @@ public final class SchemalessTreeReader {
      * argument a name read by the schemaless rule a token is read by, a nested application a reference of its own.
      * Nothing resolves.
      */
-    private static TsonApplicationReference reference(io.ltr8.tson.schema.meta.TypeRef reference, Optional<String> typeRef,
-                                           List<TsonAnnotation> annotations) {
+    private static TsonApplicationReference reference(ReferenceGrammar.Spelled reference, Optional<String> typeRef,
+                                                      List<TsonAnnotation> annotations) {
         List<TsonValue> arguments = new ArrayList<>(reference.arguments().size());
-        for (io.ltr8.tson.schema.meta.TypeRef argument : reference.arguments()) {
+        for (ReferenceGrammar.Spelled argument : reference.arguments()) {
             arguments.add(argument.arguments().isEmpty()
-                    ? TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(argument.name(), TokenForm.UNQUOTED)))
+                    ? TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(argument.head(), TokenForm.UNQUOTED)))
                     : reference(argument, Optional.empty(), List.of()));
         }
-        return new TsonApplicationReference(reference.segments(), arguments, typeRef, annotations);
+        return new TsonApplicationReference(List.of(reference.head().split("\\.", -1)), arguments, typeRef,
+                annotations);
     }
 
     /** A map key's own path segment: its scalar text, or {@code ?} for a key with no single text form. */

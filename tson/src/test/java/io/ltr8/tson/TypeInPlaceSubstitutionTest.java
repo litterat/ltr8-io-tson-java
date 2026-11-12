@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.ParamRef;
@@ -218,19 +219,23 @@ class TypeInPlaceSubstitutionTest {
         assertEquals(entries.get("g"), entries.get("e"));
     }
 
-    /** In resolved output an application stands only where its head is an open record, inside another (§8.1). */
+    /**
+     * In resolved output an application stands only inside an open record, written in place, its head an open record
+     * and one of the record's parameters among its arguments (§5.10).
+     */
     @Test
     void noConstructorsApplicationStandsInResolvedOutput() {
         var entries = Tson.standard().resolve(SPELLINGS).schema().entries();
         for (String name : entries.keySet()) {
             Top value = entries.get(name);
-            List<TypeRef> held = new ArrayList<>();
-            TypeSlots.forEachIn(value, held::add);
-            for (TypeRef reference : held) {
-                if (!reference.arguments().isEmpty()) {
-                    assertTrue(OpenEntry.isOpen(entries.get(reference.name()))
-                            && OpenEntry.isOpen(value), name + " holds " + reference.text());
-                }
+            List<ApplyBody> held = new ArrayList<>();
+            if (value instanceof RecordBody record) {
+                record.fields().values().forEach(field -> TypeSlots.applications(field.type(), held::add));
+            }
+            for (ApplyBody application : held) {
+                assertTrue(OpenEntry.isOpen(entries.get(application.head().name())) && OpenEntry.isOpen(value)
+                        && OpenEntry.parameterIn(application.inPlace()).isPresent(), name + " holds "
+                        + application.text());
             }
         }
     }
@@ -284,7 +289,7 @@ class TypeInPlaceSubstitutionTest {
     /** Where a name is required inside a type in place an application is refused at the declaration. */
     @Test
     void anApplicationAtAMapKeyInPlaceIsRefused() {
-        refused("  k => <T> { m: {box<T> => text} }", "only a name may stand");
+        refused("  k => <T> { m: {box<T> => text} }", "a map's key holds only a name");
     }
 
     /** A choice over a parameter is judged disjoint at each application, where its variants are known. */

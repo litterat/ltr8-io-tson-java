@@ -123,7 +123,7 @@ class TypeNameSlotGapsTest {
                 "box< other >")) {
             refused(schema("applied-" + application.hashCode(),
                             "op => !gap_operations { o => { request: " + application + " } }"),
-                    "a position typed by a kind holds the name of a type", "declare it under a name");
+                    "a reference is a name", "write the name a declaration gives it");
         }
     }
 
@@ -135,7 +135,7 @@ class TypeNameSlotGapsTest {
                   request: order
                   replies: [ { status: 200  body: box<no_such> } ]
                 } }"""),
-                "a position typed by a kind holds the name of a type");
+                "a reference is a name");
     }
 
     /** The alias gives the application an entry, and the bare name then names it and is judged. */

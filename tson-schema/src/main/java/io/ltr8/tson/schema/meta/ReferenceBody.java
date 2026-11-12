@@ -152,12 +152,12 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Unbound Optional<Index
 
     /**
      * The closure a reference read against this one finds its referent in ({@link TypeRef#referent}): the value of the
-     * entry its name names, over the entries the linker indexed. Data holds a reference as a name ([TSON-SCHEMA] §4.2),
-     * so one carrying arguments names nothing here. {@link TypeRef.Closure#NONE} where this reference is not linked.
+     * entry its name names, over the entries the linker indexed. {@link TypeRef.Closure#NONE} where this reference is
+     * not linked.
      */
     public TypeRef.Closure closure() {
-        return index.<TypeRef.Closure>map(found -> reference -> reference.arguments().isEmpty()
-                ? Optional.<Object>ofNullable(found.entries().get(reference.name())) : Optional.empty())
+        return index.<TypeRef.Closure>map(found -> reference ->
+                        Optional.<Object>ofNullable(found.entries().get(reference.name())))
                 .orElse(TypeRef.Closure.NONE);
     }
 

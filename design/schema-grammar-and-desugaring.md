@@ -13,8 +13,10 @@ The schema grammar itself is in `design/schema-grammar.md`.
 - At a declaration's own body a sugar form *is* the construction (`!meta.array { … }`, an `Instance`); at a field's or
   group member's type it is an `InlineConstruction` holding that binding record; nested inside a binding record it is
   the `{ of: !C { … } }` wrapper (`meta.type_inline`), written untagged, a type slot's choice being disjoint by class.
-- `TypeRef.arguments` non-empty means an application, an open record's or a constructor's, which materialisation
-  closes: a constructor's to the construction in place, an open record's into the declaration that names it.
+- An `ApplicationRef` in the AST is an application, an open record's or a constructor's. At a sugar slot it is written
+  as the `meta.apply` record in place, since a reference is a name; resolution makes it an `ApplyBody`, which
+  materialisation closes: a constructor's to the construction in place, an open record's into the declaration that
+  names it.
 - An argument of an application is a name or a parameter ([TSON-SCHEMA] §5.10): a sugar form there is refused, to be
   declared under a name and passed by it. A map's key is a name; the grammar admits no sugar form there.
 - The phase is purely syntactic and consults no other schema: the sugar table is fixed, its targets the kernel's

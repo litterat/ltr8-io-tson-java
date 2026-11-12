@@ -70,7 +70,7 @@ class DirectApplicationDeclarationTest {
                   bx  => box<text>
                 """).schema().applicationOf("bx");
 
-        assertEquals("box", application.orElseThrow().name());
+        assertEquals("box", application.orElseThrow().head().name());
         assertEquals(1, application.orElseThrow().arguments().size(),
                 () -> "the canonical application, arguments included: " + application);
     }
@@ -112,8 +112,8 @@ class DirectApplicationDeclarationTest {
 
         assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("bx"), n -> true));
         assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("by"), n -> true));
-        assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().name());
-        assertEquals("box", linked.schema().applicationOf("by").orElseThrow().name());
+        assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().head().name());
+        assertEquals("box", linked.schema().applicationOf("by").orElseThrow().head().name());
         assertEquals(java.util.List.of(), TypeChain.subtypesOf(linked.schema().entries().get("box")),
                 "a template is no type, and indexes neither");
     }

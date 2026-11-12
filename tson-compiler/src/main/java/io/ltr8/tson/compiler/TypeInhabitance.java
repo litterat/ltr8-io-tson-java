@@ -121,6 +121,8 @@ final class TypeInhabitance {
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
             case io.ltr8.tson.schema.meta.DependentBody ignored -> true; // as a declared type, chosen by its sibling
+            // Only inside an open record, which is not walked; one anywhere else is the linker's refusal.
+            case io.ltr8.tson.schema.meta.ApplyBody ignored -> true;
             case ValueEntry ignored -> true; // a value, which nothing is typed by
         };
     }
@@ -335,6 +337,7 @@ final class TypeInhabitance {
             case MapBody map -> slotInhabited(map.valueType(), namespace, inhabited)
                     ? null : slotDependency(map.valueType(), namespace, inhabited);
             case io.ltr8.tson.schema.meta.NamespaceBody ignored -> null;
+            case io.ltr8.tson.schema.meta.ApplyBody ignored -> null;
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .filter(element -> !positionInhabited(element, namespace, inhabited))
                     .map(element -> slotDependency(element.elementType(), namespace, inhabited))

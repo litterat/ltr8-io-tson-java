@@ -279,18 +279,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                 return token;
             }
             T value = delegate.read(tokenValue.text());
-            // Hygiene judges the name the value is, in its type's normalization form, not the spelling -- each name
-            // a reference writes, where the value is one.
+            // Hygiene judges the name the value is, in its type's normalization form, not the spelling.
             if (names == null) {
                 return value;
             }
             if (value instanceof io.ltr8.tson.schema.meta.TypeRef reference) {
-                for (String each : ReferenceGrammar.names(reference)) {
-                    if (ctx.refusesName(each, names)) {
-                        return null;
-                    }
-                }
-                return value;
+                return ctx.refusesName(reference.name(), names) ? null : value;
             }
             return ctx.refusesName(value instanceof String named ? named : text, names) ? null : value;
         } catch (UnsupportedOperationException gap) {

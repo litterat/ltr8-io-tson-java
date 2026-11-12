@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.atom.AtomParseException;
+import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.resolver.AliasChain;
@@ -141,11 +141,8 @@ final class DependentFields {
         TypeRef type;
         try {
             type = ReferenceGrammar.parse(value.text());
-        } catch (AtomParseException e) {
+        } catch (AtomTypeException e) {
             return; // not a reference at all: the field-value check refuses it as a value of the wrong type
-        }
-        if (!type.arguments().isEmpty()) {
-            return; // an application is judged a member, through the entry it denotes, by the field-value check
         }
         Top target = namespace.get(AliasChain.terminal(type.name(), namespace));
         if (target != null && OpenEntry.isOpen(target)) {
@@ -163,8 +160,6 @@ final class DependentFields {
      */
     private static boolean namesTypes(TypeExpr type, Map<String, Top> namespace) {
         Top target = switch (type) {
-            // A closed record names no application bare; an open one is judged when it closes.
-            case TypeRef reference when !reference.arguments().isEmpty() -> null;
             case TypeRef reference -> {
                 String terminal = AliasChain.terminal(reference.name(), namespace);
                 if (SLOT_CHOICES.contains(terminal)) {

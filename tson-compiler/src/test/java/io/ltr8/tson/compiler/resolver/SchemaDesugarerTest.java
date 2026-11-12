@@ -611,12 +611,6 @@ class SchemaDesugarerTest {
         assertEquals("meta.dependent", constructorOf(field.type().orElseThrow().typeRef()));
     }
 
-    /** An application in a slot: the data grammar's reference, {@code head<arg>}. */
-    private static CoreValue applicationValue(String head, String argument) {
-        return new ReferenceValue(io.ltr8.tson.schema.meta.TypeRef.of(head,
-                List.of(io.ltr8.tson.schema.meta.TypeRef.of(argument))));
-    }
-
     private static DataValue plain(CoreValue value) {
         return new DataValue(List.of(), Optional.empty(), value);
     }

@@ -259,7 +259,8 @@ class InlineTypeRulesTest {
     @Test
     void aDeclaredNamespaceIsUnchanged() {
         assertEquals(List.of(),
-                problems("  tagged => !meta.namespace { key_type: meta.identifier  value_type: box<text> }"));
+                problems("  tagged => !meta.namespace { key_type: meta.identifier  value_type: { of: !meta.apply { "
+                        + "head: box  arguments: [text] } } }"));
         assertEquals(List.of(), problems("  ns => meta.namespace<meta.identifier method>\n  r => { f: ns }"));
     }
 

@@ -42,9 +42,4 @@ class QualifiedNameSegmentsTest {
         assertTrue(refused.getMessage().contains("'1x' is not"), refused.getMessage());
     }
 
-    @Test
-    void aReferenceWithArgumentsIsNoName() {
-        TypeRef applied = TypeRef.of("box", List.of(TypeRef.of("text")));
-        assertThrows(SchemaValidationException.class, () -> ValuesByName.segments("'x' at /m", applied));
-    }
 }

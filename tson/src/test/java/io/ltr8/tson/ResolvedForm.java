@@ -163,15 +163,28 @@ final class ResolvedForm {
         return marked;
     }
 
-    /** A written application, the data grammar's reference, as its canonical text. */
+    /**
+     * A written application, {@code { head: pair  arguments: [text integer] }}, as its canonical text, {@code
+     * pair<text integer>}.
+     */
     private static String writtenApplication(CoreValue value) {
-        return value instanceof io.ltr8.tson.compiler.ast.ReferenceValue reference ? reference.reference().text()
-                : ((TokenValue) value).text();
+        RecordValue application = (RecordValue) value;
+        String head = "";
+        List<String> arguments = List.of();
+        for (RecordValue.Field field : application.fields()) {
+            if (field.name().equals("head")) {
+                head = ((TokenValue) field.value().coreValue()).text();
+            } else if (field.name().equals("arguments")) {
+                arguments = ((ArrayValue) field.value().coreValue()).elements().stream()
+                        .map(element -> ((TokenValue) element.coreValue()).text()).toList();
+            }
+        }
+        return head + "<" + String.join(" ", arguments) + ">";
     }
 
     /** A bound application as its canonical text, on the same terms. */
-    private static String application(TypeRef ref) {
-        return ref.text();
+    private static String application(io.ltr8.tson.schema.meta.ApplyBody application) {
+        return application.text();
     }
 
     /**

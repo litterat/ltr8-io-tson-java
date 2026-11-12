@@ -330,6 +330,7 @@ class OpenEntryResolvedFormTest {
             case Atom atom -> atom.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Product product -> product.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case Sum sum -> sum.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
+            case io.ltr8.tson.schema.meta.ApplyBody apply -> "meta.apply";
             case Alias alias -> "alias";
             case io.ltr8.tson.schema.meta.ValueEntry value -> value.type();
         };

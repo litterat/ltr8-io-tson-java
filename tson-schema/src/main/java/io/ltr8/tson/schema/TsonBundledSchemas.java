@@ -61,22 +61,22 @@ public final class TsonBundledSchemas {
      * pre-loaded schema can be verified, and so the shipped resource can be checked against its own published digest
      * ({@link #declaredSha256}).
      */
-    public static final String META_SHA256 = "8c3cbece074056221cc28a40a6c6a91b205a8dd274d411d91dd304a303bf0356";
+    public static final String META_SHA256 = "32b894ac4793468f9f68325c69827605afd4b3d405ca77bdeb869f34fc9b329b";
 
     /** numeric's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/numeric.tn}'s !!id. */
-    public static final String NUMERIC_SHA256 = "75198ff6131f041490d9de7b46d18c992aa5ba3888db4f7b3710e8880001af9b";
+    public static final String NUMERIC_SHA256 = "640679c8bdfdc1dc5712ba7c818bbd4eddb25c2dc7c2b8ddc75ffb6ed3303107";
 
     /** temporal's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/temporal.tn}'s !!id. */
-    public static final String TEMPORAL_SHA256 = "1233d1998ae7b8af62ec1b3fe49ad557f5cbf25a0deec66179ca4b4c4f2ea05c";
+    public static final String TEMPORAL_SHA256 = "9f21273a31ecfeba14917f8f125b4a9fd7552ec885b5a9e4aa599385282f95c6";
 
     /** net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code !!id}. */
-    public static final String NET_SHA256 = "7f06ca43082dd63bf83ccfeac1665eef0f27c34bf2a63cf3695d1b27af5beebd";
+    public static final String NET_SHA256 = "0426eaff4e0a22fdb79c77eee6af39a97b7d75052e241394779d70d733442ee2";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. */
-    public static final String CORE_SHA256 = "edf3beb1146b19472f294a93290b170986da123b40b73aba175cb5b0b2382354";
+    public static final String CORE_SHA256 = "f1b7ddcdedd9de4f94fbc4d6e5c8e552a241b76a1dffe136902b277553210dfe";
 
     /** policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s !!id. */
-    public static final String POLICY_SHA256 = "3a789b50ee0b8a9366317993e4e1038f871451dd532b154e33f6b71c0c9ffea3";
+    public static final String POLICY_SHA256 = "150ecaacfd1804bbe1bd610b8386e8adba2a624d789631f0499fba76c753504b";
 
     /**
      * The six identities in dependency order: the kernel, the three libraries importing it alone, core importing the

@@ -2,12 +2,11 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Annotations;
 
-import java.util.List;
 import java.util.Objects;
 
 /**
- * A reference that is a qualified name alone, {@code geo.address}: a {@link TypeRef} with no arguments. Built through
- * {@link TypeRef#of}, which chooses it for an empty argument list.
+ * A reference that is a qualified name, {@code geo.address}: a {@link TypeRef} naming an entry. Built through {@link
+ * TypeRef#of}.
  *
  * <p>{@code annotations} normalises {@code null} to empty and {@code closure} to {@link TypeRef.Closure#NONE}.
  * Identity is the name alone; see {@link TypeRef}.
@@ -18,12 +17,6 @@ public record NameRef(String name, Annotations annotations, TypeRef.Closure clos
         Objects.requireNonNull(name, "name");
         annotations = annotations == null ? Annotations.empty() : annotations;
         closure = closure == null ? Closure.NONE : closure;
-    }
-
-    /** Always empty: a name carries no arguments. */
-    @Override
-    public List<TypeRef> arguments() {
-        return List.of();
     }
 
     @Override
@@ -42,15 +35,15 @@ public record NameRef(String name, Annotations annotations, TypeRef.Closure clos
         return o instanceof NameRef other && name.equals(other.name);
     }
 
-    /** The hash of the name and the empty argument list -- see {@link #equals}. */
+    /** The hash of the name -- see {@link #equals}. */
     @Override
     public int hashCode() {
-        return Objects.hash(name, List.of());
+        return Objects.hash(NameRef.class, name);
     }
 
-    /** The name, the empty arguments and the annotations; the closure is no part of the value. */
+    /** The name and the annotations; the closure is no part of the value. */
     @Override
     public String toString() {
-        return "TypeRef[name=" + name + ", arguments=" + List.of() + ", annotations=" + annotations + "]";
+        return "TypeRef[name=" + name + ", annotations=" + annotations + "]";
     }
 }

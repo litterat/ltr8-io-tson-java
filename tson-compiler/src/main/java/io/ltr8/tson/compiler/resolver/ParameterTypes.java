@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
@@ -113,13 +114,12 @@ final class ParameterTypes {
     static Set<String> check(Map<String, Top> entries, Set<String> local, Function<String, Top> meta,
                              FailureReporter reporter) {
         Set<String> refused = new LinkedHashSet<>();
-        Map<String, List<TypeRef>> written = new LinkedHashMap<>();
+        Map<String, List<ApplyBody>> written = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
             if (!OpenEntry.isOpen(definition) || !local.contains(name)) {
                 return;
             }
             try {
-                requireNamesInPlace((RecordBody) definition);
                 written.put(name, OpenEntry.applications(definition));
                 for (Param parameter : OpenEntry.parameters(definition)) {
                     parameter.bound().ifPresent(bound -> requireType(bound, entries::get));
@@ -134,7 +134,7 @@ final class ParameterTypes {
             Map<String, Param> mine = new LinkedHashMap<>();
             OpenEntry.parameters(entries.get(name)).forEach(p -> mine.put(p.name(), p));
             try {
-                for (TypeRef application : applications) {
+                for (ApplyBody application : applications) {
                     callees.passedOn(application, mine::get);
                 }
             } catch (SchemaValidationException e) {
@@ -159,29 +159,6 @@ final class ParameterTypes {
         }
     }
 
-    /**
-     * Refuses an application at a slot of a type in place that holds only a name -- a map's key, a reference's {@code
-     * of} ([TSON-SCHEMA] §4.2) -- at the open record's declaration, as {@link Callees#requireNames} refuses one among a
-     * constructor's arguments: closing would refuse it only at each application, and never where none is written.
-     */
-    private static void requireNamesInPlace(RecordBody open) {
-        TypeSlots.Rewrite names = new TypeSlots.Rewrite() {
-            @Override
-            public TypeRef atName(TypeRef reference) {
-                if (!reference.arguments().isEmpty()) {
-                    throw TemplateMaterialiser.nameRequired(reference);
-                }
-                return reference;
-            }
-
-            @Override
-            public TypeExpr atSlot(TypeRef reference) {
-                return reference;
-            }
-        };
-        open.fields().values().forEach(field -> TypeSlots.map(field.type(), names));
-    }
-
     /** Where a declaration whose parameters are refused is reported, entry by entry. */
     @FunctionalInterface
     interface FailureReporter {
@@ -199,23 +176,22 @@ final class ParameterTypes {
 
         /**
          * Each argument of {@code application} that is one of the declaration's parameters ({@code parameterOf}
-         * maps a name to it, or to {@code null}), against the head's parameter at that position; a nested
-         * application is judged in turn. A head that is no open record -- a constructor's construction sugar --
-         * has no parameters to bound.
+         * maps a name to it, or to {@code null}), against the head's parameter at that position. A head that is no
+         * open record -- a constructor's construction sugar -- has no parameters to bound. An application nested in
+         * the arguments is one of the declaration's own, judged in its turn.
          */
-        void passedOn(TypeRef application, Function<String, Param> parameterOf) {
-            Top head = entries.get(application.name());
-            List<Param> heads = OpenEntry.isOpen(head) && !refused.contains(application.name())
+        void passedOn(ApplyBody application, Function<String, Param> parameterOf) {
+            String name = application.head().name();
+            Top head = entries.get(name);
+            List<Param> heads = OpenEntry.isOpen(head) && !refused.contains(name)
                     ? OpenEntry.parameters(head) : List.of();
             requireNames(application);
-            for (int i = 0; i < application.arguments().size(); i++) {
-                TypeRef argument = application.arguments().get(i);
-                Param mine = argument.arguments().isEmpty() ? parameterOf.apply(argument.name()) : null;
-                if (mine == null) {
-                    passedOn(argument, parameterOf);
-                } else if (i < heads.size()) {
+            for (int i = 0; i < application.arguments().size() && i < heads.size(); i++) {
+                Param mine = application.arguments().get(i) instanceof TypeRef argument
+                        ? parameterOf.apply(argument.name()) : null;
+                if (mine != null) {
                     Param theirs = heads.get(i);
-                    theirs.bound().ifPresent(bound -> requireBound(mine, application.name(), theirs.name(), bound));
+                    theirs.bound().ifPresent(bound -> requireBound(mine, name, theirs.name(), bound));
                 }
             }
         }
@@ -223,12 +199,12 @@ final class ParameterTypes {
         /**
          * Refuses an argument of {@code application} that must be a name and is an application ([TSON-SCHEMA] §4.2,
          * §5.3): any argument of an open record's application, and one of a constructor's that lands at a slot
-         * holding only a name ({@code meta.ref<box<T>>}). An argument at a constructor's type slot is held and closes
-         * there when the record is applied ({@code meta.array<box<T>>}).
+         * holding only a name ({@code meta.ref<box<T>>}). An argument at a constructor's type slot is written in place
+         * there ({@code meta.array<box<T>>}).
          */
-        private void requireNames(TypeRef application) {
+        private void requireNames(ApplyBody application) {
             Function<String, Top> lookup = name -> lookup(name, true, entries::get, meta);
-            String terminal = AliasChain.terminal(application.name(), lookup);
+            String terminal = AliasChain.terminal(application.head().name(), lookup);
             Top head = lookup.apply(terminal);
             boolean constructs = !OpenEntry.isOpen(head) && ConstructionSugar.constructs(terminal, head);
             if (constructs) {
@@ -237,8 +213,8 @@ final class ParameterTypes {
             List<Boolean> inPlace = OpenEntry.isOpen(head) ? null
                     : constructs ? ConstructionSugar.slotsInPlace((RecordBody) head, lookup) : List.of();
             for (int i = 0; i < application.arguments().size(); i++) {
-                TypeRef argument = application.arguments().get(i);
-                if (argument.arguments().isEmpty()) {
+                TypeExpr argument = application.arguments().get(i);
+                if (argument instanceof TypeRef) {
                     continue;
                 }
                 if (inPlace == null) {
@@ -285,9 +261,6 @@ final class ParameterTypes {
                     + name + "' is a constructor, not a type (§4.1); a bound names a type, which every argument "
                     + "must IS-A (§5.10)");
         }
-        if (!bound.arguments().isEmpty()) {
-            throw TemplateMaterialiser.nameRequired(bound);
-        }
     }
 
     /**
@@ -301,9 +274,6 @@ final class ParameterTypes {
     private static boolean isA(Use a, Use b, Function<String, Top> local, Function<String, Top> meta) {
         if (a.bound().equals(b.bound())) {
             return true;
-        }
-        if (!a.bound().arguments().isEmpty() || !b.bound().arguments().isEmpty()) {
-            return false;
         }
         // An alias is a hop and no second type (§8.3): `text` over `text => text` IS-A what `text` is.
         String aTerminal = terminal(a, local, meta);
@@ -330,16 +300,9 @@ final class ParameterTypes {
         return first != null ? first : (preferLocal ? meta : local).apply(name);
     }
 
-    /** A type-ref as the schema spells it -- {@code text}, {@code box<int32, text>} -- for a message. */
+    /** A type-ref as the schema spells it, for a message: its name. */
     static String spell(TypeRef ref) {
-        if (ref.arguments().isEmpty()) {
-            return ref.name();
-        }
-        List<String> arguments = new ArrayList<>();
-        for (TypeRef argument : ref.arguments()) {
-            arguments.add(spell(argument));
-        }
-        return ref.name() + "<" + String.join(", ", arguments) + ">";
+        return ref.name();
     }
 
     // ── The walk ─────────────────────────────────────────────────────────────────────────────────

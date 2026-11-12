@@ -2,10 +2,10 @@
 
 Design notes for every position in a schema that holds a name: which are references, what a reference's store and
 judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The running shape
-is one reference atom with a constructor an ordinary record type (§4.1, §4.2); an application is a value of that
-atom, a reference carrying an argument list and written as data grammar ([TSON-DATA] §7.4; §4.2). Inside an open record
+is one reference atom with a constructor an ordinary record type (§4.1, §4.2). A reference is a name: an application
+is no value of that atom but the construction `meta.apply` (`ApplyBody`) written in place (§5.10). Inside an open record
 a reference may also be one of the record's parameters, written as its name and looked up in `parameters` before the
-namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or among an application's arguments.
+namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an application's arguments.
 
 **Invariants**
 
@@ -47,28 +47,29 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   admits nothing, no entry past its hops being an alias, and a required field typed by it is refused by §5.10.1's
   productivity check (`TypeInhabitance`). A reference is not a bound: `meta.param.bound` still refuses a constructor
   (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
-- **A reference may carry an argument list** (§4.2), and that is what an application is in a slot.
-  It is data grammar ([TSON-DATA] §7.4): `reference = qualified-name "<" ws type-args ws ">"`, the `<` adjacent to the
-  name (§7.5), arguments separated by whitespace or a comma, each a reference (a qualified name, with or without
-  arguments) or any other token, a number or a quoted token, which is a value. **A quoted token is never a
-  reference**: a reference is written unquoted wherever it stands, `!meta.alias { target: result<T> }`,
-  `@meta.application:response<order 201>`, `parents: [result<T>]`, and a reference without arguments is one token. The
-  stream assembles one into a single `ReferenceEvent` and the AST into a `ReferenceValue`, each holding the parsed
-  `TypeRef` (`design/lexer-and-data-parsing.md`); JSON, which has no unquoted form, holds the same text in a string,
-  read by `io.ltr8.tson.atom.ReferenceGrammar`. The canonical text (`TypeRef.text()`) has no whitespace and one space
-  between arguments, no comma, `map<text integer>`. Identity is the parsed form, never the text, so `result< T >` is
-  `result<T>`. A qualified head (`geo.box<T>`) names a member of a nested schema map as a bare head names a root
-  entry. An argument is a reference, a name or an application, and a literal token is no argument (§5.10): the grammar
-  refuses `maxint<10>` and `box<"a">` where they are written.
+- **A reference is a name, and a value carrying an argument list is refused wherever one is read** (§4.2), in data
+  and in a schema value alike (`ReferenceGrammar.parse`, an `AtomValidationException` naming how an application is
+  written). The data grammar still parses the list ([TSON-DATA] §7.4) until it leaves the grammar: the stream assembles
+  a `ReferenceEvent` and the AST a `ReferenceValue`, each holding `ReferenceGrammar.Spelled`, and a schemaless read keeps
+  it as `TsonApplicationReference`. A **quoted token is never a reference**.
+- **An application is `meta.apply` written in place** (`ApplyBody`): `head` a name, `arguments` names, and while a
+  schema resolves an argument may be an application in place, which a constructor's construction lands at its slot
+  (`ConstructionSugar.StandIns`). The schema grammar's `head<args>` at a type slot is its sugar, and the explicit
+  `{ of: !meta.apply { … } }` means the same. In resolved output one stands only inside an open record, over one of its
+  parameters, applying an open record; the linker refuses one anywhere else (`TsonSchemaLinker.validateBody`'s
+  apply arm, `requireOpen`), which is how a resolved form read as output is held to it. `meta.apply` composes
+  `meta.type` alone and is final: it has no kind (`EntryKind.of` refuses one), and no constructor refines it. Identity
+  is the head and the arguments (`ApplyBody.equals`), so `CanonicalApplication` and the applied-parent fold compare
+  structure, never text.
 - **A dependent field's type is no reference** (§5.2): `kind!` is schema-grammar sugar for `{ of: !meta.dependent { on:
   kind } }`, a type written in place at the field's type (`design/schema-resolution.md`). No reference production,
   data or JSON, reads a marked name, so `kind`, `kind<T>` and a type written in place are the only shapes a type slot
   holds. A slot typed by a reference refuses `kind!` as the syntax error it is in data, and `"kind!"` in JSON as a
   string spelling no name.
-- A reference carries arguments only where an application is still open: an open record's `chain.parents` and field
-  `type`s, and the `application` annotation. A closed application at a type slot is a type written in place there,
-  and where only a name may stand an application is refused (§4.2, §5.3). Its head is judged by resolution and arity,
-  and every argument is judged as a type's name.
+- An application stays in place only where it is still open: an open record's `chain.parents` and field types, at
+  any depth, and the `application` annotation's value. A closed application at a type slot is a type written in place
+  there, and where only a name may stand an application is refused (§4.2, §5.3). Its head is judged by resolution and
+  arity, and every argument is judged as a type's name.
 - **An application whose head is a constructor constructs** (§5.3's construction sugar, `ConstructionSugar`): past
   its alias hops, a closed record IS-A `meta.type` is applied by building `!C { f₁: a₁ … fₙ: aₙ }`, its **argument
   slots** `f₁ … fₙ` being its required fields (not optional, role `FREE`) typed by a reference naming types
@@ -83,18 +84,18 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   substitutes (§5.10) -- an open record is never constructed, whatever its chain reaches -- and a head that is neither
   takes no arguments.
 - A slot that names the type of a value is typed `meta.type_ref` (`meta.tuple_element.element_type`,
-  `meta.array.element_type`, `meta.map.key_type` and `value_type`,
-  `meta.namespace.value_type`, `meta.choice.variants`, `meta.param.bound`, `meta.alias.target`,
-  `meta.type_chain.parents`, and the `application` annotation), and so are `meta.reference_type.of` and the
-  `meta.type_chain.supertypes` and `subtypes` indexes. Its value is a type's name, its path from the root, or, where an
-  application is still open, a reference with arguments. `meta.type_name`, one identifier, is the schema map's key type and
-  types no reference. In a schema document (a construction's or a value entry's payload, or a resolved form read as data) the
-  reader reads its grammar alone and the name is judged a member where that schema links, or at ingest ([TSON-SCHEMA] §4.2,
-  §8.1); in a data document the reader judges membership over the reading document's closure. `meta.namespace.key_type` is
-  typed `meta.identifier_ref`: a namespace's keys are names, which is what a qualified name's segment selects, so an
-  enum-keyed map is no namespace. `key_type` is required, the family every key is read and judged under. A record's fields
-  are no namespace: `meta.field_map` is an ordered map keyed by `text`, each key judged by the record's `name_type`, its
-  supertypes' where it states none, and `meta.field_name` where neither does.
+  `meta.array.element_type`, `meta.map.key_type` and `value_type`, `meta.namespace.value_type`, `meta.choice.variants`,
+  `meta.param.bound`, `meta.alias.target`, and `meta.apply.head` and `arguments`), and so are `meta.reference_type.of`
+  and the `meta.type_chain.supertypes` and `subtypes` indexes. Its value is a type's name, its path from the root.
+  `meta.type_chain.parents` is typed by the type-slot choice, a parent being a name or an application in place, and the
+  `application` annotation by `meta.apply`. `meta.type_name`, one identifier, is the schema map's key type and types no
+  reference. In a schema document (a construction's or a value entry's payload, or a resolved form read as data) the
+  reader reads its grammar alone and the name is judged a member where that schema links, or at ingest ([TSON-SCHEMA]
+  §4.2, §8.1); in a data document the reader judges membership over the reading document's closure.
+  `meta.namespace.key_type` is typed `meta.identifier_ref`: a namespace's keys are names, which is what a qualified
+  name's segment selects, so an enum-keyed map is no namespace. `key_type` is required, the family every key is read and
+  judged under. A record's fields are no namespace: `meta.field_map` is an ordered map keyed by `text`, each key judged
+  by the record's `name_type`, its supertypes' where it states none, and `meta.field_name` where neither does.
 - **A constructor is an ordinary record type** (§4.1). A constructor whose declaration is a record
   (`net.uuid_type => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
   `meta.ref<meta.product>` hold it, and `meta.record`, `meta.top`, `meta.alias`, `meta.namespace`,
@@ -166,7 +167,7 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   host receives its canonical text). Only the judgement differs by slot, and it is the slot's, never the host's.
 - **A reference read in data finds what it names.** `TypeRef.referent()` is the value of the entry its name names in
   the closure it was read under: `TypeNameRefParser` attaches `ReferenceBody.closure()`, which looks the name up in the
-  index's `entries`; a reference with arguments names nothing there. Read
+  index's `entries`. Read
   in data at a slot naming values, its referent is the value its name reached (`RefParser`), the governing schema's
   own value, bound or tree-held as the value entry is. The closure is a component excluded from `equals`, `hashCode`
   and `toString`. A reference read in a schema document, or built by hand, carries `Closure.NONE` and names nothing.
@@ -200,7 +201,7 @@ A name stands in a schema in one of five forms. Two are not references.
 |---|---|---|
 | **Key** | declares: the name an entry, field, parameter or namespace value is addressed by | the map's key type, which judges spelling and equality |
 | **Reference** | names something declared elsewhere, by its key | **store** (where the first segment resolves) and **judgement** (what the referent must be) |
-| **Application** | a reference carrying an argument list: names an open record and closes it with arguments, or names a constructor and constructs it over its argument slots; at a type slot it closes in place, and a declaration naming it is the closed entry | the head, and the arguments |
+| **Application** | `meta.apply` written in place, no reference: names an open record and closes it with arguments, or names a constructor and constructs it over its argument slots; at a type slot it closes in place, and a declaration naming it is the closed entry | the head, and the arguments |
 | **Tag** | names the type of the value it is written on, `!T v` | store and judgement, as a reference, and the payload is read under the referent |
 | **Index** | computed at link and written out: `supertypes`, `subtypes`, the `application` annotation | none; never read as a reference on ingest |
 

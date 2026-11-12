@@ -28,10 +28,4 @@ class TypeRefWriteTest {
         assertEquals("orders.methods.place_order", written(TypeRef.of("orders.methods.place_order")));
     }
 
-    @Test
-    void anApplicationIsItsUnquotedText() {
-        assertEquals("box<text>", written(TypeRef.of("box", List.of(TypeRef.of("text")))));
-        assertEquals("map<text box<int32>>", written(TypeRef.of("map", List.of(
-                TypeRef.of("text"), TypeRef.of("box", List.of(TypeRef.of("int32")))))));
-    }
 }

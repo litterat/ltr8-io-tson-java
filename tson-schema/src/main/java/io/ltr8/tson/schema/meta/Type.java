@@ -5,7 +5,9 @@ import java.util.List;
 /**
  * The kernel's {@code type => abstract top & { chain?: meta.type_chain }} (Part 2 §4.1): the
  * kind of the kinds that describe the shape of a data value. {@link Atom}, {@link Product} and {@link Sum} each
- * {@code extends Type}, as {@code atom}, {@code product} and {@code sum} compose with {@code type}; {@link Alias}
+ * {@code extends Type}, as {@code atom}, {@code product} and {@code sum} compose with {@code type}, and {@link
+ * ApplyBody}, an application standing for a type that exists only once its open record is applied, composes {@code
+ * type} directly and has no kind; {@link Alias}
  * and {@link Namespace} do not, as their kernel entries compose with {@code top} directly. So a body describes a
  * type exactly when it is an {@code instanceof Type}, and every type body carries its chain ({@link TypeChain}).
  *
@@ -18,7 +20,7 @@ import java.util.List;
  *
  * <p>Not a base kind: {@link EntryKind} has no {@code TYPE}, and a kind is read from the base kind below it.
  */
-public sealed interface Type extends Top permits Atom, Product, Sum {
+public sealed interface Type extends Top permits Atom, Product, Sum, ApplyBody {
 
     Type withChain(TypeChain chain);
 
@@ -34,7 +36,7 @@ public sealed interface Type extends Top permits Atom, Product, Sum {
     TypeChain chain();
 
     /** The parents as written, an open record's included ({@link TypeChain#parents}). */
-    default List<TypeRef> parents() {
+    default List<TypeExpr> parents() {
         return chain().parents();
     }
 
