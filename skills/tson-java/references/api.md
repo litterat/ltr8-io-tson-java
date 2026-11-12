@@ -187,7 +187,7 @@ public record ProcessorPolicy(IdentifierPolicy identifierPolicy,    // io.ltr8.t
 }
 
 public record LimitsPolicy(int maxDepth, /* … §9.1's other ten, then §11.5's … */
-                           int maxMaterialisationDepth, int maxWaitDepth) {   // io.ltr8.tson.base.policy
+                           int maxWaitDepth) {   // io.ltr8.tson.base.policy
     public static final int DEFAULT_MAX_DEPTH = 64;
     public static final int DEFAULT_MAX_WAIT_DEPTH = 64;
     public static LimitsPolicy defaults();
@@ -196,7 +196,7 @@ public record LimitsPolicy(int maxDepth, /* … §9.1's other ten, then §11.5's
 }
 ```
 
-`LimitsPolicy` is §9.1's and §11.5's bounds, seventeen components; two are enforced. Nesting depth is counted by the
+`LimitsPolicy` is §9.1's and §11.5's bounds, sixteen components; two are enforced. Nesting depth is counted by the
 event stream, and a document past it is reported as `LIMIT_EXCEEDED` — not a verdict, the document perhaps being
 valid and readable by a processor configured for more. Wait depth is counted as a schema resolves, and a schema past
 it is refused with `LIMIT_EXCEEDED` (a `SchemaRefusalException` on a fail-fast resolve).

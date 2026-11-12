@@ -118,16 +118,13 @@ that changed one has said nothing about the other. The three arguments above tra
 sender needs it before it writes, and a number a caller can act on beats a refusal after the fact.
 
 **The whole table is stated; nesting depth and wait depth are counted.** §9.1 states its limits as one table with a
-default each — eleven on the document side — and [TSON-SCHEMA] §11.5 adds six on the schema side under the same policy
+default each — eleven on the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under the same policy
 and the same reporting surfaces.
 `LimitsPolicy` has a component per limit, in the table's order, each defaulting to the spec's value and refused below 1,
-and `policy.tn`'s `policy.limits` and `CliPolicy.CliLimits` carry the same seventeen, so `tson policy` and every
+and `policy.tn`'s `policy.limits` and `CliPolicy.CliLimits` carry the same sixteen, so `tson policy` and every
 envelope state each threshold. Nesting depth is counted at §9.1's default of 64, the tightest in common use, so a
-document that fits travels; wait depth at §11.5's default of 64 (below). The other fifteen are configured and reported
+document that fits travels; wait depth at §11.5's default of 64 (below). The other fourteen are configured and reported
 but not counted, so nothing past one of them is refused for it; `BACKLOG.md` carries where each is counted.
-Materialisation depth has nothing left to count: closing in place holds one application per open record on its stack
-(`TemplateMaterialiser.closingInPlace`, a repeat being tied to a declaration or refused), so its depth is bounded by the
-open records of the closure.
 
 **It is a component of `ProcessorPolicy`** — `Tson.limitsPolicy()` is `processorPolicy().limits()` in one call. A
 deployment states one policy, and the CLI envelope nests `limits` under `policy`. What the grouping keeps is the

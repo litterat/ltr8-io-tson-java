@@ -104,9 +104,10 @@ footing:
 
 - **Every identity moves to `/2026/40/`**, and each header comment reads "2026 Revision 40
   draft".
-- **`policy.limits.max_materialisation_depth`'s doc** counts the nested applications closed
-  for one application, a resource cap, regular recursion closing on its first repeat; Part 2
-  §11.5's row follows.
+- **`policy.limits.max_materialisation_depth` goes**, with the clause of the `limits` doc
+  that described it: closing in place holds each open record of the closure at most once on
+  its path, so the limit guarded nothing. Part 2 §11.5's row and Part 1 §9.1's mention
+  follow.
 
 ---
 
@@ -149,7 +150,8 @@ Open questions are recorded here and are NOT reflected as open text in the speci
 7. **§7.4** — `type-arg = application / qualified-name-token`; the value-argument comment
    goes, and a number or a quoted token among the arguments is a parse error.
 8. **§8.1** — the parse-error list gains an argument that is no reference.
-9. **§9.1** — "template materialisation depth" reads "materialisation depth".
+9. **§9.1** — the schema limits it names lose "template materialisation depth", the limit
+   being gone (§11.5).
 10. **§10.2** — `TSON-SCHEMA` and `TSON-JSON` at `/2026/40/`; `TSON-GUIDE` stays at
     `/2026/39/`, the Developer Guide not being revised.
 
@@ -237,7 +239,9 @@ Open questions are recorded here and are NOT reflected as open text in the speci
     construction in place; the alias-template bullet goes; no `!meta.alias` carries
     `@meta.application`.
 29. **§9** — the kernel row lists `meta.param` and drops the seven removed entries.
-30. **§11.5** — the materialisation-depth row counts nested applications.
+30. **§11.5** — the materialisation-depth row goes, and §3.4.1 rule 7 says what bounds
+    closing instead: each open record of the closure at most once on a path, a repeat tied
+    or refused (§5.10.1).
 31. **§12.1** — `type-arg = type-expr`, a number or a quoted token being no argument in
     either grammar; `value-literal` goes; `size-bound` is decimal-natural; the `type-param`
     comment reads "the written type is the parameter's bound"; `type-def` and `instance`
@@ -491,7 +495,8 @@ carries no open questions.
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
    `8cf5710e…` (Revision 39 `c9b069b6…`), numeric `47503916…` (`dfa66c5d…`), temporal
    `19b98a9d…` (`fb4ada8f…`), net `a16522c5…` (`371fc20c…`), core `4815bf2e…`
-   (`4e8d9c43…`), policy `482b787b…` (`e9cb5b93…`), each re-stamped for #5's kernel and its declared namespace type. The chain is consistent — numeric,
+   (`4e8d9c43…`), policy `be1d4505…` (`e9cb5b93…`), each re-stamped for #5's kernel and its declared namespace type, policy again for the
+   materialisation depth's removal. The chain is consistent — numeric,
    temporal, net and policy each pin the kernel; core pins the three libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of

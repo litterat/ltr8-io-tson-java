@@ -321,7 +321,7 @@ Schema resolution proceeds per schema as **Parse → Desugar → Pass 1 → Pass
 4. **A cycle is refused.** Entries waiting on each other through rule 1 are a resolver error naming the entries on the cycle in wait order (`'a' waits on 'b' waits on 'a'`). A composition cycle (`a => b & {}`, `b => a & {}`), a constructor applying a constructor that applies it (`c1 => !c2 {}`, `c2 => !c1 {}`) and a type annotated with itself on its value (`note => @note:"x" text`) are each this rule. A loop of aliases is not a cycle under this rule; §8.3 refuses an alias chain with no terminal. The entries built by hand (§3.4) are ready before any declaration is read.
 5. **Order independence.** Every order consistent with rule 1 gives one verdict and one resolved output, and the order entries are written in is not consulted. Forward references within a schema need no rule: a definition may reference any other declaration in the same schema, declared earlier or later.
 6. **Everything closes at load.** Every entry is ready, every reference and held value judged and every reader built before the schema is used. No wait is left for a data read to discharge, and every type is known open or closed and usable in data once the schema has loaded. A judgement that walks a name to what it names — §5.8's one name type over a composition's supertypes, a reference's membership — waits for every entry to be ready, so walking it never makes an entry wait on one that waits on it.
-7. **Limits.** The wait depth of an entry is none where it waits on nothing of its own document and one more than the deepest entry it waits on otherwise, an import being ready before the resolution starts; §11.5's wait-depth row bounds the longest chain in one document, default 64, a refusal and not a verdict. Closing an application needs no bound of its own: §5.10.1's regular recursion and §11.5's materialisation depth bound it.
+7. **Limits.** The wait depth of an entry is none where it waits on nothing of its own document and one more than the deepest entry it waits on otherwise, an import being ready before the resolution starts; §11.5's wait-depth row bounds the longest chain in one document, default 64, a refusal and not a verdict. Closing an application needs no bound of its own: closing in place holds each open record of the closure at most once on its path, a repeat tying to the declaration being closed or refused (§5.10.1).
 
 With `count => !integer ^ { min: 0 }`:
 
@@ -1618,7 +1618,6 @@ A data document's *field names* need no scope of their own under a schema: a dat
 | entries (`max_schema_entries`) | declarations in one schema map, nested maps' members included | 65,536 |
 | alias chain (`max_alias_chain`) | hops from a use site to a terminal entry (§8.3) | 64 |
 | supertype chain (`max_supertype_chain`) | length of one type's `chain.supertypes` (§8.1) | 64 |
-| materialisation depth (`max_materialisation_depth`) | nested applications closed for one application, innermost-first (§5.10, §8.2) | 64 |
 | wait depth (`max_wait_depth`) | the longest chain of rule-1 waits in one document's resolution, an entry waiting on the next being ready (§3.4.1) | 64 |
 
 Exceeding one is a limit refusal, not a resolver error: the schema may be well-formed, load cleanly on the next processor along, and be refused here because *this* deployment declined to spend the resources, and the diagnostic names the limit and the configured threshold. The defaults are set at the tight end on [TSON-DATA] §9.1's argument — a schema that fits them loads everywhere — and a deployment raises them; the bundled documents resolve under the defaults whatever a deployment sets. A processor holding a limit in a narrower type than `int64` caps a larger configured value at the widest it holds ([TSON-DATA] §9.1).
@@ -2081,7 +2080,7 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=19b98a9df00c065f3f7d92bb46cce4289d897a9d449e1955b1bc347047a554a2 |
 | net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=a16522c59b928b07a89e1cde4a7e83e437276ae48eead94300780b6c615175dd |
 | core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=4815bf2e6c88e47bb58747a126d82cfdf231774e53048639dc9f5f162f50e2ab |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=482b787b308dc21b86e60050addc37afea4b8b1e5c085d104081d261d2aad7a3 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=be1d45051296ebc2615ebc1fc2b04eccc44d08ac70daff3dd3138a63bc162554 |
 
 ### 13.3 Informative References
 

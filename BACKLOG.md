@@ -518,7 +518,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   [TSON-DATA] §8.1 gives to the layer that detects them -- the resolver, following the reference.
 
 - [ ] **Counting the rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** The whole table is
-  stated: `spec/m/policy.tn`'s `policy.limits` declares all seventeen, optional with the spec's defaults, and `LimitsPolicy`
+  stated: `spec/m/policy.tn`'s `policy.limits` declares all sixteen, optional with the spec's defaults, and `LimitsPolicy`
   and `CliPolicy.CliLimits` carry each one, so every limit is configured and reported. Nesting depth and wait depth
   are counted.
   What is left, per limit, is the counter, a `LIMIT_EXCEEDED` refusal naming the limit and the configured threshold,
@@ -526,8 +526,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   length** after escape processing, **numeric literal length** (annotated tokens included), **decoded binary size**
   per `!bytes` value, **document size**, **elements** per array or set, **entries** per map, **fields** per record,
   **annotations** on one value, and **total values**. Schema side: **import closure**, **entries** in one schema map,
-  **alias chain** and **supertype chain**. (Wait depth is counted, by `WaitOrder`, with its `--max-wait-depth` flag;
-  materialisation depth needs no counter, closing in place being bounded by the closure's open records.) What
+  **alias chain** and **supertype chain**. (Wait depth is counted, by `WaitOrder`, with its `--max-wait-depth` flag.) What
   still needs deciding per limit is *where it is counted*: the ones that bound shape are per-container state the
   stream does not keep, where depth was a counter it already had, and the aggregate (total values) needs its own
   counter since §9.1 is explicit that the total is not bounded by the parts.

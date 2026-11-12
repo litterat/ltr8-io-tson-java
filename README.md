@@ -666,7 +666,6 @@ max import closure:         64
 max schema entries:         65536
 max alias chain:            64
 max supertype chain:        64
-max materialisation depth:  64
 max wait depth:             64
 ```
 

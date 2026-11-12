@@ -195,7 +195,7 @@ name the way to write the thing today, and a trace and a bug-report banner would
 **What §8.2 requires a refusal to name rides on the envelope**, as `policy` on both `validation_run` and
 `validation_report`: `CliPolicy`, the shape of `policy.tn`'s `policy.processor` — `identifier_policy` (level, `per_segment`,
 `skeleton_distinctness`, `permitting` combinations with each script by its UAX #24 alias), `token_policy` (level,
-`permitting`), `unicode_data_version`, and `limits` (all seventeen of §9.1's and §11.5's, `max_depth` and
+`permitting`), `unicode_data_version`, and `limits` (all sixteen of §9.1's and §11.5's, `max_depth` and
 `max_wait_depth` among them, each a `long`, as `policy.limit` is an `int64`: a report states the limits its producer ran
 under, which this processor's own `LimitsPolicy` need not hold). It is on the envelope rather than each
 diagnostic because it is a fact about the processor: constant for the run, and needed by a sender *before* it writes
