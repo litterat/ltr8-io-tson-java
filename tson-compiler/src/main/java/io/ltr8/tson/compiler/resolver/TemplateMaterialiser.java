@@ -118,6 +118,9 @@ final class TemplateMaterialiser {
      */
     private final ConstructionReader constructionReader;
 
+    /** Which open records are refused at their own declaration for a recursion they hold (§5.10.1). */
+    private final HeldRecursion heldRecursion;
+
     /** Whether a name is the kernel's own, for telling a constructor from a family member. */
     private final Predicate<String> kernel;
 
@@ -154,7 +157,8 @@ final class TemplateMaterialiser {
     TemplateMaterialiser(DefinitionGetter namespace, ConstructionReader constructionReader,
                          Function<String, Top> importedTypes, Supplier<String> resolving,
                          Map<String, TsonSchema.EntryFacts> facts, Map<String, TypeRef> applications,
-                         Predicate<String> kernel) {
+                         Predicate<String> kernel, HeldRecursion heldRecursion) {
+        this.heldRecursion = Objects.requireNonNull(heldRecursion, "heldRecursion");
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.facts = Objects.requireNonNull(facts, "facts");
@@ -252,7 +256,7 @@ final class TemplateMaterialiser {
      */
     Top closeApplicationInto(String declaredName, TypeRef application) {
         String head = templateHead(application.name());
-        Top template = namespace.definition(head);
+        Top template = closable(head, namespace.definition(head));
         if (!OpenEntry.isOpen(template)) {
             return null; // unresolved, or a head taking no parameters -- reported through the ordinary path
         }
@@ -404,6 +408,7 @@ final class TemplateMaterialiser {
         if (!ConstructionSugar.constructs(constructor, definition)) {
             return Optional.empty();
         }
+        ConstructionSugar.refuseNamespaceInPlace(application, constructor, definition, this::lookup);
         RecordValue wire = ConstructionSugar.payload(application, (RecordBody) definition, this::lookup);
         Top body;
         try {
@@ -473,7 +478,7 @@ final class TemplateMaterialiser {
      * passes each parameter through unchanged, and an argument is a name, so a cycle repeats an application exactly.
      */
     private TypeExpr instantiate(String head, List<TypeRef> arguments, TypeRef written) {
-        Top template = namespace.definition(head);
+        Top template = closable(head, namespace.definition(head));
         if (template == null) {
             return null; // unresolved head -- the linker's verdict, not this pass's
         }
@@ -512,6 +517,16 @@ final class TemplateMaterialiser {
         } finally {
             closingInPlace.remove(canonical);
         }
+    }
+
+    /**
+     * {@code template}, or its placeholder where the open record is refused at its own declaration for a recursion it
+     * holds: the refusal is reported there once, and closing an application of it would only report it again against
+     * the applier, whose remedy it is not (§5.10.1).
+     */
+    private Top closable(String head, Top template) {
+        return OpenEntry.isOpen(template) && heldRecursion.refusedLocally(head)
+                ? SchemaResolver.unresolved(OpenEntry.parameterNames(template)) : template;
     }
 
     /**

@@ -53,7 +53,7 @@ import java.util.function.Function;
  * {@code rebox => <T> { b: boxed<T> }} over {@code boxed => <T: text> { v: T }} is refused at {@code rebox}. Each
  * declaration is checked once, against the bounds its callees wrote, so no order among templates is needed. A
  * constructor's slot judges the argument that arrives when the record is applied, so a parameter passed to one
- * ({@code meta.namespace<K text>}, {@code [boxed<T>]} as {@code meta.array<boxed<T>>}) needs no bound, the
+ * ({@code meta.map<K text>}, {@code [boxed<T>]} as {@code meta.array<boxed<T>>}) needs no bound, the
  * applications nested in its arguments being judged in turn.
  */
 final class ParameterTypes {
@@ -205,9 +205,12 @@ final class ParameterTypes {
             Function<String, Top> lookup = name -> lookup(name, true, entries::get, meta);
             String terminal = AliasChain.terminal(application.name(), lookup);
             Top head = lookup.apply(terminal);
+            boolean constructs = !OpenEntry.isOpen(head) && ConstructionSugar.constructs(terminal, head);
+            if (constructs) {
+                ConstructionSugar.refuseNamespaceInPlace(application, terminal, head, lookup);
+            }
             List<Boolean> inPlace = OpenEntry.isOpen(head) ? null
-                    : ConstructionSugar.constructs(terminal, head)
-                            ? ConstructionSugar.slotsInPlace((RecordBody) head, lookup) : List.of();
+                    : constructs ? ConstructionSugar.slotsInPlace((RecordBody) head, lookup) : List.of();
             for (int i = 0; i < application.arguments().size(); i++) {
                 TypeRef argument = application.arguments().get(i);
                 if (argument.arguments().isEmpty()) {

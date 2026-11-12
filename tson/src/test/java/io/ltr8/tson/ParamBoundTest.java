@@ -131,7 +131,7 @@ class ParamBoundTest {
      */
     @Test
     void aParameterPassedToAConstructorsSlotNeedsNoBound() {
-        assertEquals(List.of(), problems("  keyed => <K> { m: meta.namespace<K text> }"));
+        assertEquals(List.of(), problems("  keyed => <K> { m: meta.map<K text> }"));
         assertEquals(List.of(), problems("  listed => <T> { m: meta.array<T> }"));
     }
 

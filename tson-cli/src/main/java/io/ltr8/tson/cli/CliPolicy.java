@@ -96,7 +96,6 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
                             @Field("max_schema_entries") long maxSchemaEntries,
                             @Field("max_alias_chain") long maxAliasChain,
                             @Field("max_supertype_chain") long maxSupertypeChain,
-                            @Field("max_materialisation_depth") long maxMaterialisationDepth,
                             @Field("max_wait_depth") long maxWaitDepth) {
 
         static CliLimits from(LimitsPolicy limits) {
@@ -105,7 +104,7 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
                     limits.maxElements(), limits.maxEntries(), limits.maxFields(), limits.maxAnnotations(),
                     limits.maxValues(), limits.maxImportClosure(),
                     limits.maxSchemaEntries(), limits.maxAliasChain(), limits.maxSupertypeChain(),
-                    limits.maxMaterialisationDepth(), limits.maxWaitDepth());
+                    limits.maxWaitDepth());
         }
     }
 

@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/40/m/policy.tn?sha256=d34d967e988eb0d06e8ebf4d4a13533115aec9c05d02b50367620ff8bbd280f3"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=c3d71e31fc369d2c8074e86a3ec47e8aa7a090d8de03cc35d33b4638a9116c74"
+!!id:"https://tson.io/2026/40/m/policy.tn?sha256=be1d45051296ebc2615ebc1fc2b04eccc44d08ac70daff3dd3138a63bc162554"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=8cf5710ef573a031c118095db3444757bd4b8eb2b1cd2aa45257eabbd846e67e"
 @doc:"""
   TSON processor policy — what a processor admits and spends (2026 Revision 40
   draft).
@@ -75,10 +75,8 @@
       schemas one header reaches through `!!import`, the
       declarations in one schema map (instantiation entries
       included), the hops from a use site to a terminal entry, the length of
-      one type's supertype chain, the nested applications closed for one
-      application -- a resource cap, regular recursion closing on its first
-      repeat -- and the longest chain of waits one schema's resolution
-      runs, an entry waiting on the next being ready.
+      one type's supertype chain, and the longest chain of waits one schema's
+      resolution runs, an entry waiting on the next being ready.
       """
     limits => {
       max_depth?:                  policy.limit ~ 64
@@ -96,7 +94,6 @@
       max_schema_entries?:         policy.limit ~ 65536
       max_alias_chain?:            policy.limit ~ 64
       max_supertype_chain?:        policy.limit ~ 64
-      max_materialisation_depth?:  policy.limit ~ 64
       max_wait_depth?:             policy.limit ~ 64
     }
 

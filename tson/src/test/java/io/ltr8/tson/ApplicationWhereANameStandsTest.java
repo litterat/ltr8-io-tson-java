@@ -28,7 +28,6 @@ class ApplicationWhereANameStandsTest {
               pet       => abstract { kind: text =?  name: text }
               dog_of    => <T> pet & { kind?: = "dog"  breed: T }
               kennel_of => <T> { d: dog_of<T> }
-              holder    => <T> { n: node<T> }
               page      => <T> { items: [T] }
               order     => { id: text }
             %s
@@ -130,7 +129,6 @@ class ApplicationWhereANameStandsTest {
     @Test
     void aRecursiveApplicationWithNoDeclarationIsRefused() {
         refused("  r => { f: node<text> }", "r", "recursive open record 'node'", "'node_text => node<text>'");
-        refused("  h => holder<text>", "h", "recursive open record 'node'");
         assertEquals(List.of(), problems("  text_node => node<text>\n  r => { f: text_node }"));
     }
 

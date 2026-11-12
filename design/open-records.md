@@ -112,7 +112,7 @@ stands is only ever checked, never derived from.
   parameter is an argument -- a field's type, a nested application, an applied parent -- and each declaration is
   judged against the bounds its callees *wrote*, so no order among templates is needed and nothing iterates. An
   imported template's recorded bound is what its author wrote, and binds the same way.
-- **A constructor's slot needs no bound.** A head that is no open record -- construction sugar, `meta.namespace<K
+- **A constructor's slot needs no bound.** A head that is no open record -- construction sugar, `meta.map<K
   text>`, `[boxed<T>]` held as `meta.array<boxed<T>>` -- has no parameters to bound; its slot judges the argument that
   arrives when the record is applied, and the applications nested in its arguments are judged in turn.
 - **The call-site check** (`TemplateMaterialiser.checkArguments`): each argument must name a type that IS-A its

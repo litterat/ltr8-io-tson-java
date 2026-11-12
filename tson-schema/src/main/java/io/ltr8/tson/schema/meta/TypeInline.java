@@ -21,14 +21,15 @@ import java.util.function.Function;
  * <ul>
  *   <li>a construction of a container, a tuple, a choice or a reference ({@link #constructible}): an {@link
  *       ArrayBody} ({@code meta.array}, and {@code meta.set_type} refining it), a {@link MapBody}, a {@link
- *       NamespaceBody}, a {@link TupleBody}, a {@link ChoiceBody} or a {@link ReferenceBody} ({@code
- *       meta.reference_type}, and {@code meta.ref});</li>
+ *       TupleBody}, a {@link ChoiceBody} or a {@link ReferenceBody} ({@code meta.reference_type}, and {@code
+ *       meta.ref});</li>
  *   <li>a closed {@link RecordBody}, under {@code meta.record}: the record an application of an open record closes to
  *       at a type slot ([TSON-SCHEMA] §5.10), the one record in place. Only closing an application produces one: an
  *       author's record or {@code !meta.record { … }} at a slot is refused before it reaches the model, and a
  *       resolved form read as data states the record an application closed to.</li>
  * </ul>
- * An enum and every other atom, and any other record, are declared and named.
+ * An enum and every other atom, any other record, and a namespace type ({@link NamespaceBody}), whose values carry
+ * its name as their tag, are declared and named.
  *
  * <p><b>{@code constructor} is the tag on {@code of}</b>, the entry the construction applies, past its alias hops
  * ([TSON-SCHEMA] §8.3): {@code set<T>} is {@code { of: !meta.set_type { element_type: T } }}, {@code meta.ref<T>} is
@@ -61,7 +62,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
         if (!constructible(of) && !(of instanceof RecordBody record && !record.isOpen())) {
             throw new IllegalArgumentException("a type written in place is a container, a tuple, a choice, a "
                     + "reference or the record an application closes to, and a " + of.getClass().getSimpleName()
-                    + " is none: an enum and an atom are declared and named ([TSON-SCHEMA] §5.2)");
+                    + " is none: an enum, an atom and a namespace type are declared and named ([TSON-SCHEMA] §5.2)");
         }
         if (!of.chain().equals(TypeChain.EMPTY)) {
             throw new IllegalArgumentException("a type written in place carries no chain: " + of.chain());
@@ -99,12 +100,12 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
 
     /**
      * Whether {@code type} is a construction that may be written in place: a container, a tuple, a choice or a
-     * reference. A record in place is no construction, and only closing an application produces one ({@link
-     * #closing}).
+     * reference. A namespace type is no such container: its values are tagged by its name. A record in place is no
+     * construction, and only closing an application produces one ({@link #closing}).
      */
     public static boolean constructible(Type type) {
-        return type instanceof ArrayBody || type instanceof MapBody || type instanceof NamespaceBody
-                || type instanceof TupleBody || type instanceof ChoiceBody || type instanceof ReferenceBody;
+        return type instanceof ArrayBody || type instanceof MapBody || type instanceof TupleBody
+                || type instanceof ChoiceBody || type instanceof ReferenceBody;
     }
 
     /** The application this record in place closes, as written, where it is known. */
@@ -196,7 +197,6 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
         return switch (of) {
             case ArrayBody array -> slot.apply(array.elementType());
             case MapBody map -> slot.apply(map.keyType()) + ", " + slot.apply(map.valueType());
-            case NamespaceBody namespace -> slot.apply(namespace.keyType()) + ", " + slot.apply(namespace.valueType());
             case TupleBody tuple -> String.join(", ",
                     tuple.elements().stream().map(element -> slot.apply(element.elementType())).toList());
             case ChoiceBody choice -> String.join(", ", choice.variants().stream().map(slot).toList());

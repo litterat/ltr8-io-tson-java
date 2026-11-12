@@ -104,9 +104,10 @@ footing:
 
 - **Every identity moves to `/2026/40/`**, and each header comment reads "2026 Revision 40
   draft".
-- **`policy.limits.max_materialisation_depth`'s doc** counts the nested applications closed
-  for one application, a resource cap, regular recursion closing on its first repeat; Part 2
-  §11.5's row follows.
+- **`policy.limits.max_materialisation_depth` goes**, with the clause of the `limits` doc
+  that described it: closing in place holds each open record of the closure at most once on
+  its path, so the limit guarded nothing. Part 2 §11.5's row and Part 1 §9.1's mention
+  follow.
 
 ---
 
@@ -149,7 +150,8 @@ Open questions are recorded here and are NOT reflected as open text in the speci
 7. **§7.4** — `type-arg = application / qualified-name-token`; the value-argument comment
    goes, and a number or a quoted token among the arguments is a parse error.
 8. **§8.1** — the parse-error list gains an argument that is no reference.
-9. **§9.1** — "template materialisation depth" reads "materialisation depth".
+9. **§9.1** — the schema limits it names lose "template materialisation depth", the limit
+   being gone (§11.5).
 10. **§10.2** — `TSON-SCHEMA` and `TSON-JSON` at `/2026/40/`; `TSON-GUIDE` stays at
     `/2026/39/`, the Developer Guide not being revised.
 
@@ -237,7 +239,9 @@ Open questions are recorded here and are NOT reflected as open text in the speci
     construction in place; the alias-template bullet goes; no `!meta.alias` carries
     `@meta.application`.
 29. **§9** — the kernel row lists `meta.param` and drops the seven removed entries.
-30. **§11.5** — the materialisation-depth row counts nested applications.
+30. **§11.5** — the materialisation-depth row goes, and §3.4.1 rule 7 says what bounds
+    closing instead: each open record of the closure at most once on a path, a repeat tied
+    or refused (§5.10.1).
 31. **§12.1** — `type-arg = type-expr`, a number or a quoted token being no argument in
     either grammar; `value-literal` goes; `size-bound` is decimal-natural; the `type-param`
     comment reads "the written type is the parameter's bound"; `type-def` and `instance`
@@ -248,7 +252,7 @@ Open questions are recorded here and are NOT reflected as open text in the speci
 33. **§13.2** — `TSON-DATA` and `TSON-JSON` at `/2026/40/`, `TSON-GUIDE` left at
     `/2026/39/`; the six artifact rows carry the Revision 40 pins (§6).
 
-Items 34–56 carry #5, inline types. Each names the rule before and after.
+Items 34–58 carry #5, inline types. Each names the rule before and after.
 
 34. **Header** — the summary gains a sentence: a type slot holds a name or a type written in
     place, nothing is lifted or minted, and `@meta.synthetic` is gone.
@@ -367,6 +371,22 @@ Items 34–56 carry #5, inline types. Each names the rule before and after.
     §12.1's `map-key`, `element-type` and `type-arg` comments state the new rules and the
     `type-name` note on internal names goes; §12.2's generic-key dispatch notes the refusal.
     **§13.2** — the six artifact pins follow the re-stamped kernel (§6).
+57. **§5.10, §5.10.1** — an open record holding an application of a recursive open record
+    it is not on a cycle of (`wrap => <T> { n: node<T> }`) was accepted, and the refusal fell
+    on whoever applied it (`wrap_text => wrap<text>`), where its remedy, declare
+    `node_text` and write it, could not be followed. It is a resolver error at its own
+    declaration, applied or not: the held applications that would close in place are
+    followed, the fields absorbed through an applied parent or a refinement source among
+    them, and a recursive record reached on a cycle the declaration is not on means no
+    application of it could close. The remedy is the closed type taken as a parameter,
+    `wrap => <N> { n: N }` applied to `node_text`.
+58. **§4.2, §5.2, §5.10** — a namespace type could be written in place
+    (`f: meta.namespace<meta.identifier method>`), the kernel's `type_inline` doc naming
+    `namespace` among the constructors admitted there. A namespace value carries its type's
+    name as its tag, and a type written in place has none, so a namespace type is declared
+    and named, as a record and an enum are; one written in place is a resolver error at the
+    declaration that wrote it. §5.10's example of a parameter passed to a constructor's slot
+    reads `<K> { m: {K => text} }`.
 
 ### 3.3 Companion artifacts
 
@@ -434,7 +454,9 @@ Changes a Revision 39 implementer must act on:
     `type: { of: !meta.array { element_type: text } }`. Nothing is lifted, minted or merged;
     `@meta.synthetic`, internal names and comparison up to renaming are gone. An application
     of an open record at a type slot closes in place to a record with no name; a recursive
-    one ties to the declaration closing it, and is refused where none does. An argument of
+    one ties to the declaration closing it, and is refused where none does; an open record
+    holding a recursive one it is not on a cycle of could never close, and is refused at its
+    declaration. An argument of
     an open record's application is a name or a parameter, and a map's key is a name.
 12. **Every bundled pin changes** (§6).
 
@@ -471,9 +493,10 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `c3d71e31…` (Revision 39 `c9b069b6…`), numeric `4ff6ac2f…` (`dfa66c5d…`), temporal
-   `07864e40…` (`fb4ada8f…`), net `9285bfb1…` (`371fc20c…`), core `e669ac24…`
-   (`4e8d9c43…`), policy `d34d967e…` (`e9cb5b93…`), each re-stamped for #5's kernel. The chain is consistent — numeric,
+   `8cf5710e…` (Revision 39 `c9b069b6…`), numeric `47503916…` (`dfa66c5d…`), temporal
+   `19b98a9d…` (`fb4ada8f…`), net `a16522c5…` (`371fc20c…`), core `4815bf2e…`
+   (`4e8d9c43…`), policy `be1d4505…` (`e9cb5b93…`), each re-stamped for #5's kernel and its declared namespace type, policy again for the
+   materialisation depth's removal. The chain is consistent — numeric,
    temporal, net and policy each pin the kernel; core pins the three libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of
@@ -488,7 +511,7 @@ carries no open questions.
 1. **The examples.** Every Part 2 example written or changed by this revision was run
    through the first implementation's command line against the bundled `/2026/40/` schemas:
    §1.6's schema and data document validate; §5.10's declarations, the family and its data,
-   `outcome<text>`, `rebox`, `<K> { m: meta.namespace<K text> }`, `page<[uuid; 1..]>`,
+   `outcome<text>`, `rebox`, `<K> { m: {K => text} }`, `page<[uuid; 1..]>`,
    `created`, `text_pair`, `nested`, the one-position tuples (`[a]` admitted, `[_]` refused,
    and admitted with `voidable: true`), `nonempty<uuid>`, `meta.array<user_id>`,
    `x => box<text> ^ { … }`, `<T> !meta.record { … }` and a parameterised subtraction
@@ -510,7 +533,8 @@ carries no open questions.
 3. **#5's examples** — the examples #5 writes or changes run: §1.6's schema, its `history`
    closing `flagged<status>` in place, and its data document; §5.10's `f: page<order>` beside
    `page_order` (a tag naming `page_order` refused at `f`) and `cursor: box<T>` closed in place;
-   §5.10.1's `node_text` and `tree_text`, and the refusal of an unnamed recursive application;
+   §5.10.1's `node_text` and `tree_text`, the refusal of an unnamed recursive application,
+   `wrap` refused at its declaration applied or not, and the parameter remedy;
    §8.2's `pair<text, text>` at a field; sugar in place, a sugar form refused as an argument and
    the widened positional form.
 4. **The build** — the implementation's full build, with the conformance corpus's Revision

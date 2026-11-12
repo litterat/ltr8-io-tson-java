@@ -234,4 +234,30 @@ class InlineTypeRulesTest {
             assertFalse(supertypes.contains("pet_box") || supertypes.contains("pet_of"), name + " " + supertypes);
         }
     }
+
+    // ── A namespace type is declared (§4.2, §5.2) ───────────────────────────────────────────────
+
+    /**
+     * A namespace value carries its type's name as its tag, and a type written in place has none, so every route to a
+     * namespace written in place is refused at the declaration that wrote it, naming the declaration to write.
+     */
+    @Test
+    void aNamespaceWrittenInPlaceIsRefused() {
+        refused("  r => { f: meta.namespace<meta.identifier method> }",
+                "'meta.namespace<meta.identifier method>' constructs a namespace type where it is used");
+        refused("  r => { f: meta.namespace<meta.identifier method> }",
+                "('my_namespace => !meta.namespace { key_type: meta.identifier  value_type: method }')");
+        refused("  r => { f: [meta.namespace<meta.identifier method>] }", "constructs a namespace type");
+        refused("  ns => meta.namespace\n  r => { f: ns<meta.identifier method> }", "constructs a namespace type");
+        refused("  o => <K> { m: meta.namespace<K text> }", "'meta.namespace<K text>' constructs a namespace type");
+        refused("  o => <T> { v: T  m: {text => meta.namespace<meta.identifier T>} }", "constructs a namespace type");
+    }
+
+    /** A declared namespace type is unchanged, a type written in place at its value type included. */
+    @Test
+    void aDeclaredNamespaceIsUnchanged() {
+        assertEquals(List.of(),
+                problems("  tagged => !meta.namespace { key_type: meta.identifier  value_type: box<text> }"));
+        assertEquals(List.of(), problems("  ns => meta.namespace<meta.identifier method>\n  r => { f: ns }"));
+    }
 }
