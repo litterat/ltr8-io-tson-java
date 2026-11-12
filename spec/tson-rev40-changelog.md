@@ -3,7 +3,7 @@ title: "TSON 2026 Revision 40 — Change Log"
 against: "TSON 2026 Revision 39 (Working Draft)"
 status: "Proposed, not adjudicated. The six normative artifacts and five resolved fixtures are at `/2026/40/` identities, each pin verified over the shipped bytes and listed in Part 2 §13.2 (§6). Parts 1, 2 and 3 are revised against them (§3.1, §3.2, §3.4); the Developer Guide is not revised and keeps its `/2026/39/` reference. A verification pass over the examples and the build is recorded in §7."
 inputs:
-  - "SPEC-FEEDBACK.md (entries open against Revision 39; #3 and #5 are the proposals this revision carries)"
+  - "SPEC-FEEDBACK.md (entries open against Revision 39; #3, #5 and #6 are the proposals this revision carries)"
   - "Revised companion artifacts at /2026/40/ identities: meta.tn (the kernel), numeric.tn, temporal.tn, net.tn, core.tn, policy.tn and five resolved fixtures (implementing #3)"
   - "tson-part3-json.md, edited directly as the proposal's steps landed (carrying the Part 3 half of #3)"
 ---
@@ -15,8 +15,10 @@ series. Its one input of substance is the implementation's spec-feedback registe
 *templates as open records*, whose six steps are built and merged on the Revision 40 proposal
 branch of the first implementation and of the conformance corpus. Its second is entry #5,
 *inline types*: a type slot holds a name or a type written in place, and no entry is lifted
-or minted. The register's entries #1 and #2 are carried unchanged (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and
-is not modified by this revision; each of its entries receives a disposition here.
+or minted. Its third is entry #6, *a dependent field's type is a sum in place*: the sibling
+leaves the reference, and `kind!` leaves the data grammar. The register's entries #1 and #2
+are carried unchanged (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
+modified by this revision; each of its entries receives a disposition here.
 
 Provenance markers used in the disposition table:
 
@@ -27,11 +29,13 @@ Provenance markers used in the disposition table:
   dictates, or a reading the editor took where the sources disagree or admit more than one.
   Each is the spec author's to confirm; collected in §5 beside the open questions.
 
-**This revision does not change the lexer**, and the schema grammar's productions are
-unchanged: `type-params` still parses before any body, and the resolver admits it before a
-record body alone. It narrows the **data grammar at one position**: a reference's argument
-is a reference, so a number or a quoted token in a data document's argument list is a parse
-error ([TSON-DATA] §7.4).
+**This revision does not change the lexer.** The schema grammar's productions change at one
+point: a record field's or a group member's type may be a `dependent-type`, `kind!`, which
+no other production admits (#6, [TSON-SCHEMA] §12.1); `type-params` still parses before any
+body, and the resolver admits it before a record body alone. It narrows the **data grammar
+at two positions**: a reference's argument is a reference, so a number or a quoted token in
+a data document's argument list is a parse error; and `sibling-ref` is gone, `reference =
+application`, so `kind!` in a data value is a parse error ([TSON-DATA] §7.4).
 
 What it changes is **templates, and with them the kernel**. Revision 39 gave a template two
 representations and a parameter two kinds: a record template was its own constructor and a
@@ -98,6 +102,14 @@ as its baseline. Summarising the normative effect:
   whether or not the schema's closure closes it, in both encodings, its message naming the
   remedy, the entry the schema declares for the application. (Part 1 §2.3, §3.2, §4.1;
   Part 2 §3.3.4, §4.2, §7.2, §7.7; Part 3 §1.6, §5, §5.6.)
+- **#6 — a dependent field's type is a sum written in place.** `allow_sibling`,
+  `meta.field_type_ref` and `meta.field_type_expr` are gone; `meta.dependent => meta.sum &
+  { on: text }` is new; `meta.record_field.type` is a `meta.type_expr`, as every type slot
+  is; `meta.type_ref` is `!meta.reference_type { of: meta.type }`; and `meta.ref` is the
+  empty refinement `meta.reference_type ^ {}`, kept for its spelling. The kernel's own
+  `record_field.value` is typed `type!`, resolving to
+  `{ of: !meta.dependent { on: type } }`. (Part 1 §7.4; Part 2 §4.2, §5.2, §8.1, §12.1;
+  Part 3 §5.6; meta, fixtures.)
 
 The artifacts also carry housekeeping the register did not raise, adopted on the same
 footing:
@@ -119,8 +131,9 @@ footing:
 | 2 | Whether a quoted token at a reference-typed position is a reference | **Carried**, narrowed by #3: an argument is a reference in both grammars, so a quoted argument is refused in a schema document and in data alike; the field-position half (`t: "int32"` at a `meta.type_ref` field in data) stays open as written. [open] |
 | 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–56), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented] |
 | 3 | Templates as open records | **Accept — the baseline above**, every step as the register states what runs. Part 2 §5.10 is rewritten around the three rules; §1.3, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow (§3.2). §1.6's example drops its value parameter. **[editorial]** at five points where the sources disagree or the text needed a reading (§5). [settled — implemented] |
+| 6 | A dependent field's type is a sum in place | **Accept** — the kernel's `meta.dependent`, the retyped `meta.record_field.type`, `meta.type_ref` and `meta.ref`, and the hand-written resolved fixture are the baseline (§1); Part 1 §1.3, §1.5, §2.3, §2.5, §2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4, §7.5, §7.7 and §8.1 follow (§3.1, items 11–19), Part 2 §1.4, §4.2, §5.2, §5.3, §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9 and §12 (§3.2, items 59–70), and Part 3 §1.6 and §5.6 (§3.4). Four readings the spec author ruled on; one point stays open (§5). [settled — implemented] |
 
-Counts: **2 accepted** (#3, in six steps, and #5), **0 declined**, **2 carried** (#1, #2). Revision
+Counts: **3 accepted** (#3, in six steps, #5 and #6), **0 declined**, **2 carried** (#1, #2). Revision
 39's open remainders on templates close with #3: #13's (whether a value argument narrows
 below `token`) by the removal of value arguments, #19's (a shared parent for `record` and
 `record_template`) by the removal of `record_template`, and #21's (a sibling in a template
@@ -154,6 +167,34 @@ Open questions are recorded here and are NOT reflected as open text in the speci
    being gone (§11.5).
 10. **§10.2** — `TSON-SCHEMA` and `TSON-JSON` at `/2026/40/`; `TSON-GUIDE` stays at
     `/2026/39/`, the Developer Guide not being revised.
+
+Items 11–19 carry #6, a dependent field's type in place. Each names the rule before and after.
+
+11. **§1.3** — the lexer-freeze paragraph's Revision 40 sentence narrows the data grammar at
+    two positions, the second being an unquoted token with an adjacent `!`, which is no core
+    value; Revision 39's clause describes that form without naming it "a sibling reference".
+12. **§1.5** — a Class 1 processor MUST read "a reference carrying an argument list, and a
+    sibling reference" as structured values; it reads the reference alone.
+13. **§2.3** — "two scalar forms stand beside the token", a reference and a sibling
+    reference; one does, the reference.
+14. **§2.5** — the field-order exception is unchanged; its example `value?: type!` is marked
+    as the schema grammar's.
+15. **§2.8** — a field name is no token where it is "a reference carrying arguments or a
+    sibling reference"; the sibling reference goes.
+16. **§4.1** — a schemaless read kept a sibling reference "as its field name and the mark";
+    the sentence goes.
+17. **§7.2, §7.2.4, §7.2.5, §7.3** — `!` was the type prefix "or the suffix of a sibling
+    reference", told apart by adjacency; it is the type prefix. The suffix goes from the
+    token-position paragraph, the directive rule, the special-character table and the
+    `special-char` comment, and the paragraph on `!`'s postfix role goes. The lexer is
+    unchanged: `!` is the token it was.
+18. **§7.4, §7.5** — `reference = sibling-ref / application` becomes `reference =
+    application`; `sibling-ref` and its comment go, and so do its adjacency row and the
+    paragraph on the two `!` roles. `kind!` in a data value is a parse error by the
+    separator rule (§2.4), and no rule names the mark.
+19. **§7.7, §8.1** — the positions the identifier grammar holds at a parse error lose
+    `sibling-ref` and "the token of a sibling reference"; the parse-error list loses "a
+    sibling reference's `!` not followed by whitespace".
 
 ### 3.2 Part 2 — Type System and Schema
 
@@ -388,6 +429,78 @@ Items 34–58 carry #5, inline types. Each names the rule before and after.
     declaration that wrote it. §5.10's example of a parameter passed to a constructor's slot
     reads `<K> { m: {K => text} }`.
 
+Items 59–70 carry #6, a dependent field's type in place. Each names the rule before and after.
+
+59. **Header** — the summary gains a sentence: a dependent field's type is a sum written in
+    place, `kind!` its sugar at a record field's type alone, and `allow_sibling`,
+    `meta.field_type_ref` and `meta.field_type_expr` are gone.
+60. **§1.4** — a reference was "a type's name, a value's qualified name, an application, a
+    sibling reference, or … a parameter"; the sibling reference goes.
+61. **§4.2** — the reference listing loses `allow_sibling` and `field_type_ref`:
+    `reference_type => meta.atom & { of: meta.type_ref }`, `ref => meta.reference_type ^ {}`,
+    `type_ref => !meta.reference_type { of: meta.type }`. The bullet **A value may be a
+    sibling reference** goes, and the type-slot bullet's "a record field's `type` admits a
+    sibling reference too". The type-slot listing loses `field_type_expr`. What `of` holds
+    gains a dependent type, `!meta.dependent { on: kind }`, directly at a record field's
+    `type` and at no other slot; a namespace type and a declared sum are never written in
+    place (before: a declared sum was refused only by its absence from the list), a
+    dependent type is never declared, and each is a resolver error at the declaration. A
+    type written in place's identity is structural "but for a dependent type's, which is its
+    field's".
+62. **§5.2** — **Dependent fields**: a field's type was "a sibling reference, `kind!`"; it
+    is a dependent type, `dependent => meta.sum & { on: text }` written
+    `{ of: !meta.dependent { on: kind } }`, `kind!` its schema-grammar sugar, the sum in
+    which a field of the record names the type as `meta.declared` is the one in which a tag
+    does. **The position rule** (the permission kept at `meta.field_type_ref`, the list of
+    refused slots, the facet refusing a sibling reference in data, the quoted name) becomes:
+    the sugar parses only at a field's or a group member's type, `kind!?` included among the
+    parse errors; the canonical form declared, or in place at another slot, is a resolver
+    error at the declaration; the form is no data grammar; and a dependent type has no
+    identity apart from the field holding it. The sibling's typing loses
+    `meta.field_type_ref` and `meta.field_type_expr`; "and so is a sibling reference" leaves
+    the pin-or-default rule; a sibling naming no type reads "a dependent type, an open
+    record"; a restatement's body keeps "the dependent type", not `type: kind!`, beside the
+    pin. Field names: "a sibling reference" becomes "a dependent type's `on`". Resolution:
+    `type` is a `meta.type_expr` value, a dependent type among the types written in place.
+    **What may be written in place** gains the dependent type at a record field's type and
+    states that a declared sum is never written in place.
+63. **§5.3** — the sugar table gains `kind!`, a record field's type: `!meta.dependent { on:
+    kind }`, written in place at the field.
+64. **§5.5** — the example of a refined reference instance was `meta.type_ref =>
+    !meta.field_type_ref ^ { allow_sibling: false }`; it is `meta.identifier_ref =>
+    !meta.type_ref ^ { of: unicode.identifier_type }`.
+65. **§5.6** — the positional form keeps a bare token at a `meta.type_expr` slot;
+    "or `meta.field_type_expr`" goes.
+66. **§5.7** — `meta.reference_type`'s `allow_sibling` leaves the permission facets; a
+    restated dependent field's body keeps "the dependent type", not `type: kind!`.
+67. **§5.10, §5.11** — what a slot can say of a name it holds loses "which sibling's value
+    names it", a field instead taking its type from a sibling's value; a group member was a
+    `field-name`/`type-expr` pair whose type "may be a sibling reference", and is a
+    `field-name`/`field-type` pair, its type a type expression or a dependent type.
+68. **§7.4** — "a sibling reference is refused by the facet where `allow_sibling` is false"
+    goes.
+69. **§8.1, §8.2** — `record_field.type` was "a `meta.field_type_expr` value — a type's
+    name, a sibling reference `kind!` written as written, or a type written in place"; it is
+    a `meta.type_expr` value, a dependent type among the types written in place. "A sibling"
+    leaves what a field's type holds, and "a sibling reference where `allow_sibling` admits
+    it" the positional-form paragraph. **§8.2** gains: a dependent type is the type of its
+    field and of no other, so two records holding equal
+    `{ of: !meta.dependent { on: kind } }` hold two types.
+70. **§9, §12** — the kernel row's references lose `meta.field_type_ref`, its type slots
+    `meta.field_type_expr`, and `meta.dependent` joins; the wait cycle loses both; the
+    guidance's first rule loses "a slot that holds a sibling reference by
+    `meta.field_type_ref`". §12's introduction: the reference production no longer carries
+    the sibling reference, and `dependent-type` is the schema grammar's alone. **§12.1** —
+    `sibling-ref` leaves the imported productions, `refined-def`, `supertype-ref`,
+    `type-expr`, `map-key` and the comments of `field-type`, `element-type` and `type-arg`;
+    `field-type = type-expr ["?"] / dependent-type`, `dependent-type = unquoted-token "!"`,
+    and `group-member` takes a `field-type`. The `sibling-ref` note, under which `[ kind! ]`,
+    `box< kind! >`, `( kind! | text )` and `x => kind!` parsed and the resolver refused them,
+    becomes the `dependent-type` note, under which each is a parse error. **§12.2** —
+    `name!` at a declaration's body and `name !` at a type expression are parse errors but as
+    a field's or a member's whole type. **§12.3** — a row for the suffix `!`: adjacent to the
+    token before it and followed by whitespace, `a!b`, `kind!}` and `kind!?` parse errors.
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Their entries are not edited by this
@@ -415,6 +528,16 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
 6. **§3.3** (#5) — "an entry a resolver *minted* for an application no declaration names
    also has a name … It is not refused" becomes: a type written in place has no name, no
    `$type` names it, and a value at a position it types admits none.
+
+7. **§1.6** (#6) — item 16: `meta.ref` refines `meta.reference_type`, "with `allow_sibling`
+   pinned false" gone. Item 21: the kernel's `allow_sibling` sentence and its consumption by
+   §5.6, "where a sibling reference is a string holding the text encoding's `kind!`", become:
+   the field's type is a sum written in place and no reference, so no value of this encoding
+   spells it as a string. §6.1.6's consumption, the member-order exception, stands.
+8. **§5.6** (#6) — a sibling reference was a string holding the text encoding's `kind!`,
+   admitted at a record field's type and refused elsewhere by the facet; the string form is
+   gone, and `"kind!"` at a kind's position is no reference, refused as the production
+   refuses it. A reference naming values loses "and no sibling reference".
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -459,6 +582,11 @@ Changes a Revision 39 implementer must act on:
     declaration. An argument of
     an open record's application is a name or a parameter, and a map's key is a name.
 12. **Every bundled pin changes** (§6).
+13. **A dependent field's type is a sum written in place** (#6): `payload: kind!` is
+    schema-grammar sugar for `type: { of: !meta.dependent { on: kind } }`, admitted at a
+    record field's type alone. `kind!` is no reference value, no data grammar and no JSON
+    string; `allow_sibling`, `meta.field_type_ref` and `meta.field_type_expr` are gone, and
+    `meta.record_field.type` is a `meta.type_expr`.
 
 ---
 
@@ -483,6 +611,11 @@ carries no open questions.
 | #5 (ruled) | A choice that is not disjoint names every variant: one holding a variant written in place is a resolver error, a tag naming a variant by its name. | **[settled]** — the spec author's ruling. |
 | #5 (ruled) | A name and a type written in place are never the same type, even where the name's construction is identical; a name is a name's type past alias hops, and a type written in place an equal one's. | **[settled]** — the spec author's ruling. |
 | #5 (ruled) | An author's explicit `!C { … }` at a field stays refused: §5.6's constructor application is valid only as a declaration's body, and §5.3 admits an applied constructor at a field where a `!` construction is not. | **[settled]** — the existing rule. |
+| #6 (ruled) | `kind!` in a data document is refused by the separator rule's parse error, the token before it read as the position reads any token. A targeted rule naming the mark would put the form back in the data grammar. | **[settled]** — the spec author's ruling. |
+| #6 (ruled) | `meta.ref` withdraws nothing once `allow_sibling` is gone. It stays, as the empty refinement `meta.reference_type ^ {}`, so `meta.ref<T>` keeps its spelling. | **[settled]** — the spec author's ruling. |
+| #6 (ruled) | `meta.dependent.on` is `text`, naming a field of the record by its declared spelling, declared before the dependent field, as a `discriminators` entry names one. | **[settled]** — the spec author's ruling. |
+| #6 (ruled) | A declared sum written in place was refused only by its absence from Part 2 §4.2's list of what `of` holds. §4.2 states it, beside a namespace type. | **[settled]** — the spec author's ruling. |
+| #6 (open) | A data document typed by the kernel can write a type in place that §4.2's list refuses (`!meta.array { element_type: { of: !meta.dependent { on: kind } } }` reads with no diagnostic): `meta.type_inline.of` is typed `meta.type`, and the list is a resolver rule. It predates `meta.dependent`, which adds one entry to the list. | Open — carried. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
 
@@ -493,16 +626,20 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `8cf5710e…` (Revision 39 `c9b069b6…`), numeric `47503916…` (`dfa66c5d…`), temporal
-   `19b98a9d…` (`fb4ada8f…`), net `a16522c5…` (`371fc20c…`), core `4815bf2e…`
-   (`4e8d9c43…`), policy `be1d4505…` (`e9cb5b93…`), each re-stamped for #5's kernel and its declared namespace type, policy again for the
-   materialisation depth's removal. The chain is consistent — numeric,
+   `cc877a3b…` (Revision 39 `c9b069b6…`), numeric `cdb9876c…` (`dfa66c5d…`), temporal
+   `71a40b2a…` (`fb4ada8f…`), net `3db97e90…` (`371fc20c…`), core `4b427e8c…`
+   (`4e8d9c43…`), policy `e45bfa03…` (`e9cb5b93…`), each re-stamped for #5's kernel and its
+   declared namespace type and for #6's, policy again for the materialisation depth's
+   removal. The chain is consistent — numeric,
    temporal, net and policy each pin the kernel; core pins the three libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of
    `meta.record`, `meta.record_field`, `meta.reference_type`, `meta.alias`, `meta.array`
-   and `meta.application` is rewritten for the open record. `meta-resolved.tn` follows; the
-   four library fixtures change only their identities.
+   and `meta.application` is rewritten for the open record. #6 removes `allow_sibling`,
+   `meta.field_type_ref` and `meta.field_type_expr`, adds `meta.dependent`, and rewrites the
+   documentation of `meta.record_field`, `meta.reference_type`, `meta.ref`, `meta.type_ref`,
+   `meta.type_inline` and `meta.type_expr`. `meta-resolved.tn` follows; the four library
+   fixtures change only their identities.
 
 ---
 

@@ -446,8 +446,8 @@ fixture (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`).
 - *The kernel.* `allow_sibling`, `meta.field_type_ref` and `meta.field_type_expr` are gone; `meta.dependent` is added;
   `record_field.type` is a `meta.type_expr`, as every type slot is; `meta.type_ref` is `!meta.reference_type { of:
   meta.type }`; and `meta.ref` is an empty refinement, `meta.reference_type ^ {}`, kept so `meta.ref<T>` keeps its
-  spelling. The kernel's own `record_field.value` is typed `type!`. `on` is `text`, and is not judged by the record's
-  `name_type`, as `discriminators` is not.
+  spelling. The kernel's own `record_field.value` is typed `type!`. `on` is `text` and names a declared field by its
+  declared spelling, as a `discriminators` entry does.
 - *The data grammar* ([TSON-DATA] §7.4, §7.5). `sibling-ref` and its adjacency row are gone, and `reference =
   application`; no tree node or writer case holds the form. A data document writing `kind!` — or a schema document
   writing it inside a construction's payload, which is data — gets the separation rule's syntax error at the `!`
@@ -474,15 +474,21 @@ fixture (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`).
 
 **Open against the text.**
 
-- *`meta.declared_type` in place is refused only by omission.* §4.2 lists what `of` may hold, and `meta.declared` is
-  not in the list; nothing says so. The implementation refuses it at resolution, where the model's type for a type in
-  place admits only what the list names, so the diagnostic reads as the schema and the bound class disagreeing.
-  Proposed: say in §4.2 that a declared sum is named, as a namespace type is.
 - *A kernel-typed data document can write what the list refuses.* `meta.type_inline.of` is typed `meta.type`, and
   §4.2's list is a resolver rule, so a data document typed by the kernel (`!meta.array { element_type: { of:
   !meta.dependent { on: kind } } }`) reads with no diagnostic. This predates `meta.dependent`, which only adds an entry
   to the list; it is not solved here.
+- *A declared sum in place is refused with the wrong diagnostic.* The text now says a declared sum
+  (`meta.declared_type`) is never written in place (§4.2, §5.2). The implementation refuses it at resolution, where the
+  model's type for a type in place admits only what the list names, so the diagnostic reads as the schema and the
+  bound class disagreeing rather than naming the rule.
 
-**Resolution proposed.** Part 1 §7.2's comment, §7.4, §7.5 and §7.7's mention; Part 2 §4.2 (the sibling bullet, the
-three reference entries, the type-slot choice and the list of what `of` holds), §5.2 (the position rule), §5.3 (the
-sugar table), §8.1, §8.2 and §12.1; Part 3 §1.6 (item 21) and §5.6; and the change log.
+**Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 1 §1.3, §1.5, §2.3, §2.5,
+§2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4, §7.5, §7.7 and §8.1; Part 2's header, §1.4, §4.2 (the reference
+listing, the sibling bullet, the type-slot choice, and the list of what `of` holds, which gains `meta.dependent` at a
+record field's type alone and states that a declared sum is never written in place), §5.2 (the opening and the
+position rule), §5.3 (the sugar table), §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9, §12.1, §12.2 and §12.3;
+Part 3 §1.6 (items 16 and 21) and §5.6; `spec/tson-rev40-changelog.md` records each section's rule before and after.
+Four points the design left open are settled there as ruled: `kind!` in data takes the separator rule's parse error
+and no targeted one; `meta.ref` stays as an empty refinement; `on` names a field by its declared spelling; and a
+declared sum is named, as a namespace type is.
