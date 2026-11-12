@@ -334,10 +334,11 @@ types every type slot, a record field's included (#6). `tags: [text]` resolves t
 `type: { of: !meta.array { element_type: text } }`; a refined constructor's construction carries its own tag
 (`!meta.set_type`, `!meta.ref`). The slots are a record field's `type`, `array.element_type`, `map.value_type`,
 `tuple_element.element_type` and each of `choice.variants`. What may be written in place is a container, a tuple, a
-choice or a reference, or a construction of a constructor refining one; a record, an enum and every other atom are
-declared and named, as §5.2 already requires, and the record an application of an open record closes to is the one
-record in place. A map's key is a name. A type written in place is no entry: structural identity (same constructor,
-same fields, names as the leaves, annotations taking no part), no chain, a member of no kind, named by no tag.
+choice or a reference, or a construction of a constructor refining one, or a record: a record body written at the
+slot or the record an application of an open record closes to, one form. An enum and every other atom are declared
+and named, as §5.2 already requires. A map's key is a name. A type written in place is no entry: structural
+identity (same constructor, same fields, names as the leaves, annotations taking no part), no chain, a member of no
+kind, named by no tag.
 Nothing is lifted, minted or merged, and `@meta.application` stays on a declared application's key alone. An
 application of an open record is the substituted record under a declaration's name, absorbed by value at a
 composition operand or refinement source, where an applied parent's edge is the one lookup of a declaration by its
@@ -402,13 +403,26 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   closed it, judged before the record is closed. A recursive application with no declaration closing it (`f:
   node<text>`, §5.10.1) is one at the closed record that wrote it; held in an open record, the open record is refused
   at its declaration (*Recursion*, above).
+- *A record body at a slot.* `at: { x: int32 }` parses at a field's type, a group member's, an array's element, a
+  map's value, a tuple's element and a choice's variant, by the brace dispatch a declaration's body uses, `{}` the
+  empty record, and desugars to `{ of: !meta.record { fields: { … } } }`, nested records innermost first. It holds
+  what a declared body holds -- marks, modifiers, groups, dependent fields, annotations resolved in the schema's
+  namespace -- and answers a declared record's checks at the declaration, its field names under its own name type and
+  as a name-hygiene scope of their own; a selector makes it abstract, and so empty.
+  It is the same type as an application closing to equal fields. It reads untagged in tree and bind mode and through
+  the JSON stack, each diagnostic at its field path and its field's source line. A map's key, an argument and a
+  parameter's bound refuse it; `at: point & { z: int32 }`, `^` and `-` at a slot are parse errors naming the
+  declaration to write.
 - *The three widened rules.* A dependent field's sibling typed by the type-slot choice, a constructor's argument
   slot typed by it (`meta.array<text>` constructs), and the positional `fields: { p => text }` all run.
 - *Kinds.* A construction in place is a member of no kind; a kind over a refined constructor whose only member was a
   lifted construction now needs the member declared.
 
 **What is not yet running.** A tree read reports a dependent value whose sibling holds a type written in place as not
-implemented, holding the sibling as the record it is written as rather than as the type.
+implemented, holding the sibling as the record it is written as rather than as the type. A record written in place over
+a parameter of the open record holding it (`page => <T> { meta: { cursor: T } }`) is reported as not implemented: the
+open record's parameters are substituted at its own field types and the applications there, and not yet inside a
+record in place.
 
 **Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 2 §1.3, §1.6, §2.2.3,
 §3.3.3, §3.4.1, §4.1, §4.2 (the type-slot choice), §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12,

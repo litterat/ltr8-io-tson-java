@@ -10,6 +10,9 @@ git.
 - What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`); `IdentifierGrammar.hygiene`
   returns a verdict rather than throwing.
 - A template's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
+- A record written in place is a scope of its own, its field names judged under its own name type, at any depth
+  (`FieldNames.inPlace`), and reported against the declaration holding it; the record holding it is another scope. A
+  record an application closes to is skipped with all it holds: its names are its open record's, judged there once.
 - Each schema map is a scope of its own, the root and each nested `!schema` map, grouped by `SchemaPaths.parent`; the
   per-name rules judge a member's own name, its path's last segment, never the dotted path.
 - A value entry's payload and an annotation value are judged at the payload read (`SchemaResolver`, under the

@@ -26,6 +26,7 @@ import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
+import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
@@ -132,7 +133,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      * chain threads -- see {@link SchemaPositions}.
      */
     public SchemaPositions schemaPositions() {
-        return new SchemaPositions(new IdentityHashMap<>(declarationPositions), new IdentityHashMap<>(fieldPositions));
+        return new SchemaPositions(new IdentityHashMap<>(declarationPositions), new IdentityHashMap<>(fieldPositions),
+                new IdentityHashMap<>());
     }
 
     /** Parses fail-fast: the first syntax error anywhere in the document leaves as a {@link ParseException}. */
@@ -432,42 +434,41 @@ public final class TsonSchemaParser extends TsonDataParser {
         return new ReferenceTypeDef(typeParams, head);
     }
 
-    /**
-     * §12.2's brace dispatch at a type-def position, where a {@code '{'} opens either a record body or the
-     * map sugar. The token is consumed and the decision made on what follows -- the consume-one-then-inspect
-     * idiom [TSON-DATA] §2.8 already fixes for the data grammar's own brace, within the same budget of one
-     * consumed token plus one of lookahead. {@code '}'} (the empty record, {@code top}'s shape), {@code '('}
-     * (a leading field group) and {@code '@'} (§6 annotations, which the map sugar admits nowhere inside its
-     * braces) commit to a record; a name followed by {@code '=>'}, or by {@code '<'} opening a generic key's
-     * arguments, commits to a map, and so does an adjacent {@code '!'}, so the key refuses {@code kind!} by name
-     * rather than as a field missing its {@code ':'}. A name followed by anything else is a record whose field is
-     * missing its {@code ':'}, and {@link #parseFieldDef} names it as one.
-     */
+    /** A brace at a type-def position: a record body is the declaration's structural-def, a map its type-expr. */
     private TypeDef braceTypeDef(List<String> typeParams) {
-        expect(TokenType.LBRACE, "a record body's or map type's opening '{'");
-        if (braceOpensMap()) {
-            return new ReferenceTypeDef(typeParams, parseMapBody());
-        }
-        return new StructuralTypeDef(typeParams, parseRecordBody());
+        TypeExpr form = parseBraceType();
+        return form instanceof RecordExpr record ? new StructuralTypeDef(typeParams, record.body())
+                : new ReferenceTypeDef(typeParams, form);
     }
 
-    /** The dispatch decision itself, with the {@code '{'} already consumed -- see {@link #braceTypeDef}. */
+    /**
+     * §12.2's brace dispatch, one rule at every position a brace opens a type: a record body or the map sugar. The
+     * token is consumed and the decision made on what follows -- the consume-one-then-inspect idiom [TSON-DATA] §2.8
+     * already fixes for the data grammar's own brace, within the same budget of one consumed token plus one of
+     * lookahead. {@code '}'} (the empty record), {@code '('} (a leading field group) and {@code '@'} (§6 annotations,
+     * which the map sugar admits nowhere inside its braces) commit to a record; a name followed by {@code '=>'}, or by
+     * {@code '<'} opening a generic key's arguments, commits to a map, and so does an adjacent {@code '!'}, so the key
+     * refuses {@code kind!} by name rather than as a field missing its {@code ':'}. A name followed by anything else is
+     * a record whose field is missing its {@code ':'}, and {@link #parseFieldDef} names it as one. A brace or bracket
+     * opens neither, a key being a name.
+     */
+    private TypeExpr parseBraceType() {
+        expect(TokenType.LBRACE, "a record body's or map type's opening '{'");
+        if (check(TokenType.LBRACE) || check(TokenType.LBRACKET)) {
+            throw parseError("a map type's key is a type name (§5.3), and " + describe(peek()) + " opens a type "
+                    + "written in place, which no key is: declare the key type under a name and write that name");
+        }
+        if (braceOpensMap()) {
+            return parseMapBody();
+        }
+        return new RecordExpr(parseRecordBody());
+    }
+
+    /** The dispatch decision itself, with the {@code '{'} already consumed -- see {@link #parseBraceType}. */
     private boolean braceOpensMap() {
         return check(TokenType.UNQUOTED)
                 && (peekSecond().type() == TokenType.MAP_ARROW || peekSecond().type() == TokenType.LESS_THAN
                         || peekSecond().type() == TokenType.BANG && peek().adjacentTo(peekSecond()));
-    }
-
-    /**
-     * The two brace meanings, distinguished (§12.2). Everywhere except a type-def position a {@code '{'} opens
-     * the map sugar and nothing else: a bare record body is not spellable at a type position (§5.2), so a
-     * field name behind the brace is answered by saying which of the two constructs the author reached for.
-     */
-    private void requireMapBrace() {
-        if (!braceOpensMap()) {
-            throw parseError("'{' here opens the map sugar '{K => V}'; a record body is not permitted at a "
-                    + "type position (§5.2), so declare a named record type and reference it by name");
-        }
     }
 
     /**
@@ -597,7 +598,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * {@link #parseRecordDef} past its opening {@code '{'} -- {@link #braceTypeDef} consumes that token
+     * {@link #parseRecordDef} past its opening {@code '{'} -- {@link #parseBraceType} consumes that token
      * before it knows which construct it opened.
      */
     private RecordDef parseRecordBody() {
@@ -810,7 +811,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             return parseBracket();
         }
         if (check(TokenType.LBRACE)) {
-            return parseMap();
+            return parseBraceType();
         }
         if (check(TokenType.BANG)) {
             throw parseError("an atom refinement or constructor application is not permitted at a type-ref "
@@ -833,7 +834,36 @@ public final class TsonSchemaParser extends TsonDataParser {
             throw parseError("a dependent field's '!' follows the name of a field of the same record, one unquoted "
                     + "identifier, and a quoted token is none (§12.1)");
         }
-        return parseTypeRef();
+        return inPlace(parseTypeRef());
+    }
+
+    /**
+     * A type at a slot, past which nothing composes, refines or subtracts: those are written at a declaration and
+     * never in place (§5.2), since what they make would be named by nothing. {@code at: point & { z: int32 }} and
+     * {@code at: point ^ { x?: = 0 }} are each refused naming the declaration to write, and so is a name followed by
+     * {@code '{'}, the same reach without the operator, or a definition mark, which marks a declaration alone.
+     */
+    private TypeExpr inPlace(TypeExpr written) {
+        String operator = check(TokenType.AMPERSAND) ? "&" : check(TokenType.CARET) ? "^"
+                : check(TokenType.MINUS) ? "-" : null;
+        if (operator != null) {
+            String what = switch (operator) {
+                case "&" -> "composes a type, and a composition";
+                case "^" -> "refines a type, and a refinement";
+                default -> "removes fields from a type, and a subtraction";
+            };
+            throw parseError("'" + operator + "' " + what + " is declared, never written in place (§5.2): declare it "
+                    + "under a name ('my_type => base " + operator + " { ... }') and write that name");
+        }
+        if (written instanceof NameRef name && check(TokenType.LBRACE)) {
+            throw parseError(DefinitionMark.of(name.name()).isPresent()
+                    ? "'" + name.name() + "' marks how a declared record may be realised (§5.2), and a record "
+                            + "written in place is its bare body, '{ ... }': declare the record to mark it"
+                    : "'" + name.name() + "' followed by '{' is no type: a record written in place is its bare body, "
+                            + "'{ ... }', and a refinement ('^') or composition ('&') of a named type is declared "
+                            + "(§5.2)");
+        }
+        return written;
     }
 
     /**
@@ -890,13 +920,13 @@ public final class TsonSchemaParser extends TsonDataParser {
         Position start = peek().start();
         expect(TokenType.LPAREN, "a choice type's opening '('");
         List<TypeExpr> variants = new ArrayList<>();
-        variants.add(parseTypeRef());
+        variants.add(inPlace(parseTypeRef()));
         if (!check(TokenType.PIPE)) {
             throw new ParseException("a choice type requires at least two variants separated by '|' (§5.4)", start);
         }
         while (check(TokenType.PIPE)) {
             advance();
-            variants.add(parseTypeRef());
+            variants.add(inPlace(parseTypeRef()));
         }
         expect(TokenType.RPAREN, "a choice type's closing ')'");
         return new ChoiceExpr(variants);
@@ -927,13 +957,6 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
         expect(TokenType.RBRACKET, "an array or tuple type's closing ']'");
         return elements.size() == 1 ? new ArrayExpr(first, Optional.empty()) : new TupleExpr(elements);
-    }
-
-    /** {@code map-type} (§12.1) including its opening brace -- {@link #braceTypeDef} reaches the body directly, having consumed one already. */
-    private TypeExpr parseMap() {
-        expect(TokenType.LBRACE, "a map type's opening '{'");
-        requireMapBrace();
-        return parseMapBody();
     }
 
     /**
@@ -974,9 +997,9 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private List<TypeExpr> parseTypeArgs() {
         List<TypeExpr> args = new ArrayList<>();
-        args.add(parseTypeArg());
+        args.add(inPlace(parseTypeArg()));
         while (consumeSeparatorOrCloseCheck(TokenType.GREATER_THAN)) {
-            args.add(parseTypeArg());
+            args.add(inPlace(parseTypeArg()));
         }
         return args;
     }
@@ -1002,7 +1025,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             return parseBracket();
         }
         if (t.type() == TokenType.LBRACE) {
-            return parseMap();
+            return parseBraceType();
         }
         if (t.type() == TokenType.VOID) {
             throw parseError("the void sentinel '_' is not valid in a type argument position (§7.6)");
@@ -1042,7 +1065,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * <em>is</em> a type-ref, so {@code [[T; 2]; 3]} is the recursion here and not a second production.
      */
     private ElementType parseElementType() {
-        TypeExpr ref = parseTypeRef();
+        TypeExpr ref = inPlace(parseTypeRef());
         return new ElementType(ref, consumeAdjacentQuestion());
     }
 

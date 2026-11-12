@@ -86,6 +86,10 @@ class SchemaDesugarerTest {
                     .collect(java.util.stream.Collectors.joining("  ", "{ ", " }"));
             case io.ltr8.tson.compiler.ast.ArrayValue array -> array.elements().stream()
                     .map(SchemaDesugarerTest::rendered).collect(java.util.stream.Collectors.joining(" ", "[", "]"));
+            case io.ltr8.tson.compiler.ast.MapValue map -> map.entries().stream()
+                    .map(e -> rendered(e.key()) + " => " + rendered(e.value()))
+                    .collect(java.util.stream.Collectors.joining("  ", "{ ", " }"));
+            case io.ltr8.tson.compiler.ast.EmptyBrace ignored -> "{}";
             default -> String.valueOf(value.coreValue());
         };
     }
@@ -151,6 +155,113 @@ class SchemaDesugarerTest {
                   orders => { p: page<[text]> }"""));
         assertTrue(thrown.getMessage().contains("'[text]' is a construction passed as an argument"),
                 thrown.getMessage());
+    }
+
+    // ── A record body at a slot is the meta.record construction in place (§5.2) ─────────────────────
+
+    /** Each field is the {@code meta.record_field} its marks state, a fact written only where it is no default. */
+    @Test
+    void aFieldsRecordIsTheConstructionInPlace() {
+        assertEquals("!meta.record { fields: { x => { type: int32 }  y => { type: text  optional: true  voidable: true"
+                        + "  role: DEFAULT  value: a }  z => { type: int32  role: FIXED  value: 3 } } }",
+                firstFieldConstruction(desugar("  holder => { at: { x: int32  y?: text? ~ a  z: int32 = 3 } }"),
+                        "holder"));
+    }
+
+    /**
+     * A group's members are fields, optional, beside the group; a selector is the record's discriminators, and makes
+     * it abstract, as {@code =?} makes a declared record (§5.2).
+     */
+    @Test
+    void aRecordInPlaceStatesItsGroupsAndDiscriminators() {
+        assertEquals("!meta.record { fields: { kind => { type: text }  p => { type: int32  optional: true }  "
+                        + "q => { type: text  optional: true } }  groups: [{ members: [[p] [q]]  optional: true }]  "
+                        + "extension: ABSTRACT  discriminators: [kind] }",
+                firstFieldConstruction(desugar("  holder => { at: { kind: text =?  ( p: int32 | q: text )? } }"),
+                        "holder"));
+    }
+
+    @Test
+    void anEmptyBraceAtASlotIsTheEmptyRecord() {
+        assertEquals("!meta.record { fields: {} }", firstFieldConstruction(desugar("  holder => { at: {} }"), "holder"));
+    }
+
+    /** A record nested in a record or a container is its construction in the wrapper, innermost first. */
+    @Test
+    void aNestedRecordIsItsConstructionInTheWrapper() {
+        assertEquals("!meta.array { element_type: { of: !meta.record { fields: { a => { type: { of: !meta.record { "
+                        + "fields: { b => { type: int32 } } } } } } } } }",
+                firstFieldConstruction(desugar("  holder => { at: [{ a: { b: int32 } }] }"), "holder"));
+    }
+
+    /** A declaration's own choice holds a record variant in place, as it holds a container. */
+    @Test
+    void aDeclarationLevelChoiceHoldsARecordInPlace() {
+        assertEquals("{ variants: [{ of: !meta.record { fields: { a => { type: int32 } } } } text] }",
+                instanceBody(desugar("  c => ( { a: int32 } | text )"), "c").replaceFirst("^!meta.choice ", ""));
+    }
+
+    /**
+     * What a field's value cannot carry -- its annotations, which resolve in the schema's namespace, and where it was
+     * written -- is kept against it, and the value carries none.
+     */
+    @Test
+    void aFieldsAnnotationsAndPositionAreKeptAgainstItsValue() {
+        TsonSchemaParser parser = new TsonSchemaParser("""
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !schema {
+                  holder => { at: {
+                    @doc:"d" x: int32
+                  } }
+                }""");
+        SchemaDocument parsed = parser.parseSchemaDocument();
+        SchemaPositions positions = parser.schemaPositions();
+        SchemaDocument document = SchemaDesugarer.desugar(parsed, null, positions);
+        InlineConstruction at = assertInstanceOf(InlineConstruction.class, ((FieldDef) ((RecordDef) ((StructuralTypeDef)
+                document.body().declarations().get("holder").typeDef()).body()).entries().getFirst()).type()
+                .orElseThrow().typeRef());
+        var fields = (io.ltr8.tson.compiler.ast.MapValue) ((RecordValue) at.value().coreValue()).fields().getFirst()
+                .value().coreValue();
+        DataValue x = fields.entries().getFirst().value();
+        assertEquals(List.of(), x.annotations());
+        SchemaPositions.WrittenField written = positions.inPlace(x).orElseThrow();
+        assertEquals("doc", written.annotations().getFirst().name());
+        assertEquals(4, written.position().orElseThrow().line());
+    }
+
+    /** A record in place over a parameter of its open record is a gap, reported as one. */
+    @Test
+    void aRecordInPlaceOverAParameterIsNotImplemented() {
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> desugar("  page => <T> { meta: { cursor: T  total: int32 } }"));
+        assertTrue(thrown.getMessage().contains("'{ cursor: T  total: int32 }' stands over the parameter 'T'"),
+                thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("declare the record as an open record of its own"),
+                thrown.getMessage());
+    }
+
+    /** One that names no parameter is closed, inside an open record as anywhere. */
+    @Test
+    void aRecordInPlaceNamingNoParameterIsClosedInsideAnOpenRecord() {
+        assertEquals("!meta.record { fields: { total => { type: int32 } } }",
+                firstFieldConstruction(desugar("  page => <T> { meta: { total: int32 }  items: [T] }"), "page"));
+    }
+
+    /** As an argument a record in place is refused, an argument being a name or a parameter (§5.10). */
+    @Test
+    void aRecordInPlaceAsAnArgumentIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> desugar("""
+                  page => <T> { items: T }
+                  orders => { p: page<{ id: text }> }"""));
+        assertTrue(thrown.getMessage().contains("'{ id: text }' is a construction passed as an argument"),
+                thrown.getMessage());
+    }
+
+    @Test
+    void aFieldRepeatedInARecordInPlaceIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> desugar("  holder => { at: { x: int32  ( x: text | y: text ) } }"));
+        assertTrue(thrown.getMessage().contains("field 'x' is declared more than once"), thrown.getMessage());
     }
 
     /** The body of a declaration whose body is sugar, the construction it is, rendered. */

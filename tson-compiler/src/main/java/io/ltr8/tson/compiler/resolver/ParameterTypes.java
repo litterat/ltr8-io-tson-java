@@ -438,8 +438,10 @@ final class ParameterTypes {
         /** A parameter at {@code slot} inside a type written in place, which phase 1 cannot bind (see this walk). */
         private static UnsupportedOperationException inPlace(String parameter, String slot) {
             return new UnsupportedOperationException("parameter '" + parameter + "' stands at " + slot + ", inside "
-                    + "a type written in place: an open record's parameters are not yet substituted there -- write "
-                    + "the application the sugar spells, 'meta.array<" + parameter + ">' for '[" + parameter + "]'");
+                    + "a type written in place: an open record's parameters are not yet substituted there -- write a "
+                    + "container over it as the application its sugar spells, 'meta.array<" + parameter + ">' for '["
+                    + parameter + "]', and a record over it as an open record of its own, applied to '" + parameter
+                    + "'");
         }
 
         /**

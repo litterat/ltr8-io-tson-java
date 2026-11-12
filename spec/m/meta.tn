@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=1c114ed6d78b326ee884327fd2ca016620945f90af75f7c52dadef326a794134"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=3052b4617a1febcecf7f69f194325a6563bd20ca34202a856efbd822ac8261e9"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -990,13 +990,13 @@
       A type written where it is used. `of` holds the type, a construction
       tagged by its constructor and carrying no chain:
       `{ of: !meta.array { element_type: text } }`. The construction is one of
-      `array`, `map`, `tuple`, `choice`, `reference_type` or `dependent`, or of
-      a constructor refining one of them, `set_type` and `ref` among them; a
-      `dependent` only directly at a record field's `type`. A record, an enum,
-      every other atom and a namespace type, whose values carry its name as
-      their tag, are declared and named, and so is a declared sum
-      (`declared_type`). It is not itself a type, so one never holds another
-      directly.
+      `array`, `map`, `tuple`, `choice` or `reference_type`, or of a
+      constructor refining one of them, `set_type` and `ref` among them; a
+      `record` without `parameters`; or a `dependent`, only directly at a
+      record field's `type`. An enum, every other atom and a namespace type,
+      whose values carry its name as their tag, are declared and named, and so
+      is a declared sum (`declared_type`). It is not itself a type, so one
+      never holds another directly.
       """
     type_inline => { of: meta.type }
 

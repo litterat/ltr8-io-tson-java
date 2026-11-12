@@ -20,6 +20,7 @@ import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
+import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -51,11 +52,13 @@ import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -517,7 +520,7 @@ final class DefinitionResolver {
                     // A declaration-level container form is rewritten by SchemaDesugarer before resolution into the
                     // `!meta.array { ... }` (or map, tuple, choice) construction it denotes (§5.3), and a construction
                     // in place stands only at a field's type -- so one here is that phase not having run.
-                    case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, InlineConstruction _ ->
+                    case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, RecordExpr _, InlineConstruction _ ->
                             throw unlifted("'" + name + "'", referenceTypeDef.ref());
                 };
             }
@@ -723,7 +726,7 @@ final class DefinitionResolver {
         // shape
         // comes with an empty chain, since IS-A stops at construction (§4.1), and so is read as a value entry.
         // Parameters empty and IS-A `top` therefore imply a record body.
-        Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
+        Top body = asWritten(bindAtomInstance(name, readAs(instance.value(), head.name())), instance.value());
         if (body instanceof io.ltr8.tson.schema.meta.Alias) {
             // `!meta.alias { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
             // denotes the same entry: `kind: ALIAS` (§4.1 -- a meta.type_ref, not one the supertype chain
@@ -2591,9 +2594,9 @@ final class DefinitionResolver {
      */
     private io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeExpr written) {
         if (!(written instanceof NameRef) && !(written instanceof ApplicationRef)) {
-            throw new SchemaValidationException("parameter '" + parameter + "' is written with the type "
-                    + written + ", and a parameter's written type names a declared type or an application of one "
-                    + "(§5.10); declare the form under a name and write that name");
+            throw new SchemaValidationException("parameter '" + parameter + "' is written with the type '"
+                    + SchemaDesugarer.spell(written) + "', and a parameter's written type names a declared type or an "
+                    + "application of one (§5.10); declare the form under a name and write that name");
         }
         return resolveTypeRef(written);
     }
@@ -2616,7 +2619,7 @@ final class DefinitionResolver {
                 }
                 yield io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), args);
             }
-            case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, InlineConstruction _ ->
+            case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, RecordExpr _, InlineConstruction _ ->
                     throw unlifted("a type-ref position", ref);
         };
     }
@@ -2637,9 +2640,9 @@ final class DefinitionResolver {
     }
 
     /**
-     * The type a construction written in place at field {@code field} denotes. Only a container, a tuple, a choice or
-     * a reference is written in place ({@link io.ltr8.tson.schema.meta.TypeInline}): the desugarer writes nothing
-     * else, so another body here is a broken invariant.
+     * The type a construction written in place at field {@code field} denotes: a container, a tuple, a choice, a
+     * reference, a dependent type or a record ({@link io.ltr8.tson.schema.meta.TypeInline}). The desugarer writes
+     * nothing else, so another body here is a broken invariant.
      */
     private io.ltr8.tson.schema.meta.TypeInline inlineType(String field, InlineConstruction inline) {
         // The head is made ready first, as a declaration's `!C { ... }` makes its own (§3.4.1): reading a value
@@ -2648,12 +2651,105 @@ final class DefinitionResolver {
         Top body = bindAtomInstance("field '" + field + "'", inline.value());
         if (!(body instanceof io.ltr8.tson.schema.meta.Type type)
                 || !io.ltr8.tson.schema.meta.TypeInline.constructible(type)
-                        && !(type instanceof io.ltr8.tson.schema.meta.DependentBody)) {
+                        && !(type instanceof io.ltr8.tson.schema.meta.DependentBody) && !(type instanceof RecordBody)) {
             throw new IllegalStateException("field '" + field + "': the construction '!" + inline.constructor()
                     + " { ... }' written in place built " + body + ", which is no container, tuple, choice, "
-                    + "reference or dependent type -- SchemaDesugarer writes only those in place");
+                    + "reference, dependent type or record -- SchemaDesugarer writes only those in place");
         }
         return new io.ltr8.tson.schema.meta.TypeInline(constructor,
-                type.withChain(io.ltr8.tson.schema.meta.TypeChain.EMPTY));
+                ((Type) asWritten(type, inline.value())).withChain(io.ltr8.tson.schema.meta.TypeChain.EMPTY));
+    }
+
+    /**
+     * {@code body}, read from {@code written}, with each field of a record written in place in it as its source wrote
+     * it: desugaring writes a record in place as the value of its construction, which has no room for where a field
+     * was written or for annotations that resolve in this schema's namespace, so each is found against the field's
+     * {@code meta.record_field} value ({@link SchemaPositions#inPlace}) and restored here, at any depth.
+     */
+    private Top asWritten(Top body, DataValue written) {
+        if (positions.inPlace().isEmpty() || !(written.coreValue() instanceof RecordValue binding)) {
+            return body;
+        }
+        return switch (body) {
+            case RecordBody record -> record.withFields(fieldsAsWritten(record, member(binding, WireForm.FIELDS)));
+            case io.ltr8.tson.schema.meta.ArrayBody array -> new io.ltr8.tson.schema.meta.ArrayBody(array.chain(),
+                    slotAsWritten(array.elementType(), member(binding, "element_type")), array.voidable(),
+                    array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());
+            case io.ltr8.tson.schema.meta.MapBody map -> new io.ltr8.tson.schema.meta.MapBody(map.chain(),
+                    map.keyType(), slotAsWritten(map.valueType(), member(binding, "value_type")), map.voidable(),
+                    map.ordered(), map.minItems(), map.maxItems());
+            case TupleBody tuple -> {
+                List<DataValue> elements = elements(member(binding, "elements"));
+                List<io.ltr8.tson.schema.meta.TupleElement> restored = new ArrayList<>();
+                for (int i = 0; i < tuple.elements().size(); i++) {
+                    io.ltr8.tson.schema.meta.TupleElement element = tuple.elements().get(i);
+                    restored.add(new io.ltr8.tson.schema.meta.TupleElement(slotAsWritten(element.elementType(),
+                            i < elements.size() && elements.get(i).coreValue() instanceof RecordValue position
+                                    ? member(position, "element_type") : Optional.empty()), element.voidable()));
+                }
+                yield new TupleBody(tuple.chain(), restored);
+            }
+            case io.ltr8.tson.schema.meta.ChoiceBody choice -> {
+                List<DataValue> variants = elements(member(binding, "variants"));
+                List<io.ltr8.tson.schema.meta.TypeExpr> restored = new ArrayList<>();
+                for (int i = 0; i < choice.variants().size(); i++) {
+                    restored.add(slotAsWritten(choice.variants().get(i),
+                            i < variants.size() ? Optional.of(variants.get(i)) : Optional.empty()));
+                }
+                yield new io.ltr8.tson.schema.meta.ChoiceBody(choice.chain(), restored, choice.disjoint());
+            }
+            default -> body;
+        };
+    }
+
+    /** A record's fields, each written by a record in place restored from its {@code meta.record_field} value. */
+    private AnnotatedMap<String, RecordField> fieldsAsWritten(RecordBody record, Optional<DataValue> written) {
+        Map<String, DataValue> values = new HashMap<>();
+        if (written.isPresent() && written.get().coreValue() instanceof MapValue map) {
+            for (MapValue.MapEntry entry : map.entries()) {
+                if (entry.key().coreValue() instanceof TokenValue key) {
+                    values.put(key.text(), entry.value());
+                }
+            }
+        }
+        AnnotatedMap<String, RecordField> fields = new AnnotatedMap<>();
+        record.fields().forEach((name, field) -> {
+            DataValue value = values.get(name);
+            RecordField restored = field;
+            if (value != null) {
+                Optional<SchemaPositions.WrittenField> source = positions.inPlace(value);
+                if (source.isPresent()) {
+                    restored = restored.withPosition(source.get().position())
+                            .withAnnotations(annotationsOf(name, source.get().annotations()));
+                }
+                restored = restored.withType(slotAsWritten(field.type(), value.coreValue() instanceof RecordValue facts
+                        ? member(facts, WireForm.TYPE) : Optional.empty()));
+            }
+            fields.put(name, restored, record.fields().getAnnotations(name));
+        });
+        return AnnotatedMap.copyOf(fields);
+    }
+
+    /** A type slot read from {@code written}: a type written in place, {@code { of: … }}, restored within. */
+    private io.ltr8.tson.schema.meta.TypeExpr slotAsWritten(io.ltr8.tson.schema.meta.TypeExpr slot,
+                                                            Optional<DataValue> written) {
+        if (!(slot instanceof io.ltr8.tson.schema.meta.TypeInline inline) || written.isEmpty()
+                || !(written.get().coreValue() instanceof RecordValue wrapper)) {
+            return slot;
+        }
+        return member(wrapper, WireForm.OF).<io.ltr8.tson.schema.meta.TypeExpr>map(
+                of -> inline.withOf((Type) asWritten(inline.of(), of))).orElse(slot);
+    }
+
+    /** The value {@code binding} writes for its member {@code name}, if it writes one. */
+    private static Optional<DataValue> member(RecordValue binding, String name) {
+        return binding.fields().stream().filter(field -> name.equals(field.name())).map(RecordValue.Field::value)
+                .findFirst();
+    }
+
+    /** The elements of an array value, none where {@code written} is no array. */
+    private static List<DataValue> elements(Optional<DataValue> written) {
+        return written.map(DataValue::coreValue).filter(ArrayValue.class::isInstance)
+                .map(array -> ((ArrayValue) array).elements()).orElse(List.of());
     }
 }

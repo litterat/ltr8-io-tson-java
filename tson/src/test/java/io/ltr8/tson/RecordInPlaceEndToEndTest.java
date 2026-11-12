@@ -9,8 +9,11 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeInline;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -202,6 +205,138 @@ class RecordInPlaceEndToEndTest {
                 List.of(new Page(List.of(), 10, null, null)), Map.of("k", new Page(List.of(), 1, null, new Order("z"))));
         String written = tson.objectWriter().toTson(holder);
         assertEquals(holder, tson.objectReader().read(document("holder", written), Holder.class), written);
+    }
+
+    // ── A record body written at a type slot (§5.2) ─────────────────────────────────────────────
+
+    private static final String WRITTEN_ID = "https://example.test/records-written-in-place.tn";
+
+    private static final String WRITTEN = """
+            !!id:"%s"
+            !!import:"%s"
+            !!import:"%s"
+            !schema {
+              note => text
+              xy   => <T> { x: T  y: T }
+              shipment => {
+                at:      { x: int32  y: int32 }
+                again?:  { x: int32  y: int32 }
+                closed?: xy<int32>
+                lines:   [{ @note:"a line" sku: text  qty: int32 }]
+                byName?: {text => { n: int32 }}
+                by:      ( text | { name: text  email: text } )
+                pair?:   [{ a: int32 }, text]
+                empty?:  {}
+                deep?:   { a: { b: { c: int32 } } }
+                picked?: { ( p: int32 | q: text )  w?: text ~ "w" }
+                cell?:   { kind: meta.type_ref  v?: kind! }
+              }
+              placed => {
+                at:      { x: int32  y: int32 }
+                closed?: xy<int32>
+                lines:   [{ sku: text  qty: int32 }]
+              }
+            }""".formatted(WRITTEN_ID, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
+
+    public record Point(int x, int y) {
+    }
+
+    public record Line(String sku, int qty) {
+    }
+
+    public record Placed(Point at, Point closed, List<Line> lines) {
+    }
+
+    private static Tson written() {
+        SchemaSource source = uri -> WRITTEN;
+        DataBindContext context = DataBindContext.builder()
+                .nameBinder(DataNameBinder.ofMap(Map.of("placed", Placed.class))
+                        .orElse(SchemaModelNameBinder.INSTANCE))
+                .registerAtoms(AtomContext.hostTypes())
+                .build();
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
+                .withDataBindContext(context));
+    }
+
+    private static final String SHIPPED = "at: { x: 1  y: 2 }  lines: [ { sku: a  qty: 1 } ]  by: b";
+
+    private static List<Diagnostic> shipped(String more) {
+        return written().validate("!!import:\"" + WRITTEN_ID + "\"\n!shipment { " + SHIPPED + "  " + more + " }");
+    }
+
+    private static TypeInline writtenAt(String field) {
+        RecordBody shipment = (RecordBody) written().resolve(WRITTEN).schema().entries().get("shipment");
+        return assertInstanceOf(TypeInline.class, shipment.fields().get(field).type());
+    }
+
+    /** The body at a slot is the record in place, named by its form, and the schema holds no entry for it. */
+    @Test
+    void aRecordBodyAtASlotIsTheRecordInPlace() {
+        TypeInline at = writtenAt("at");
+        assertEquals(new TypeInline("meta.record", RecordBody.of(RecordBody.fieldMap(
+                Map.entry("x", RecordField.required(TypeRef.of("int32"))),
+                Map.entry("y", RecordField.required(TypeRef.of("int32")))))), at);
+        assertEquals("{ x: int32  y: int32 }", at.text());
+    }
+
+    /** Two equal bodies are one type, and one equal to what an application closes to is that application's type. */
+    @Test
+    void equalBodiesAreOneTypeAndOneWithAnApplicationsRecord() {
+        assertEquals(writtenAt("at"), writtenAt("again"));
+        assertEquals(writtenAt("at"), writtenAt("closed"));
+    }
+
+    /** A field's annotations resolve in the schema's namespace and land on the field, as a declared field's do. */
+    @Test
+    void aFieldsAnnotationsLandOnTheField() {
+        ArrayBody lines = assertInstanceOf(ArrayBody.class, writtenAt("lines").of());
+        RecordBody line = (RecordBody) ((TypeInline) lines.elementType()).of();
+        assertEquals(Optional.of("a line"), line.fields().get("sku").annotations().value("note", String.class));
+    }
+
+    @Test
+    void aValueAtEachSlotReadsInTreeMode() {
+        assertEquals(List.of(), shipped("byName: { k => { n: 1 } }  pair: [ { a: 1 } t ]  empty: {}  "
+                + "deep: { a: { b: { c: 3 } } }  picked: { p: 1 }  cell: { kind: int32  v: 7 }"));
+        assertEquals(List.of(), written().validate("!!import:\"" + WRITTEN_ID + "\"\n!shipment { at: { x: 1  y: 2 }  "
+                + "lines: []  by: { name: n  email: e } }"));
+        TsonValue read = written().treeReader().read("!!import:\"" + WRITTEN_ID + "\"\n!shipment { " + SHIPPED
+                + "  picked: { q: z } }");
+        assertEquals(Optional.of("w"), read.get("picked").get("w").asString(), "the default supplied");
+    }
+
+    /** A refusal inside a record in place is located by its path, at every slot, as in a declared record. */
+    @Test
+    void aRefusalInsideARecordInPlaceIsLocatedByItsPath() {
+        assertEquals(Optional.of("/at/x"), only(written().validate("!!import:\"" + WRITTEN_ID + "\"\n!shipment { "
+                + "at: { x: one  y: 2 }  lines: []  by: b }")).path());
+        assertEquals(Optional.of("/lines/0/qty"), only(written().validate("!!import:\"" + WRITTEN_ID
+                + "\"\n!shipment { at: { x: 1  y: 2 }  lines: [ { sku: a } ]  by: b }")).path());
+        assertEquals(Optional.of("/byName/k/n"), only(shipped("byName: { k => { n: z } }")).path());
+        assertEquals(Optional.of("/pair/0/a"), only(shipped("pair: [ { a: z } t ]")).path());
+        assertEquals(Optional.of("/deep/a/b/c"), only(shipped("deep: { a: { b: { c: z } } }")).path());
+        assertEquals(Optional.of("/cell/v"), only(shipped("cell: { kind: int32  v: seven }")).path());
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, only(shipped("empty: { a: 1 }")).code());
+        assertEquals(1, shipped("picked: { p: 1  q: z }").size());
+    }
+
+    /** A diagnostic inside a record in place carries the line its field was written on, inside a container too. */
+    @Test
+    void aRefusalInsideARecordInPlaceIsPositionedAtItsField() {
+        Diagnostic deep = only(shipped("deep: { a: { b: { c: z } } }"));
+        assertEquals(16, deep.schemaPosition().orElseThrow().line(), deep::toString);
+        assertEquals(26, deep.schemaPosition().orElseThrow().column(), deep::toString);
+        Diagnostic line = only(written().validate("!!import:\"" + WRITTEN_ID + "\"\n!shipment { at: { x: 1  y: 2 }  "
+                + "lines: [ { sku: a  qty: z } ]  by: b }"));
+        assertEquals(11, line.schemaPosition().orElseThrow().line(), line::toString);
+    }
+
+    /** In bind mode a record in place binds to the component's record class, at a field and an element. */
+    @Test
+    void aRecordInPlaceBindsByTheComponentHoldingIt() {
+        Placed placed = written().objectReader().read("!!import:\"" + WRITTEN_ID + "\"\n!placed { at: { x: 1  y: 2 }  "
+                + "closed: { x: 3  y: 4 }  lines: [ { sku: a  qty: 1 } ] }", Placed.class);
+        assertEquals(new Placed(new Point(1, 2), new Point(3, 4), List.of(new Line("a", 1))), placed);
     }
 
     private static Diagnostic only(List<Diagnostic> problems) {

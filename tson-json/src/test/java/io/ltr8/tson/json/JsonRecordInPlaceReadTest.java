@@ -136,6 +136,53 @@ class JsonRecordInPlaceReadTest {
         assertTrue(mismatch.getMessage().contains("is a record written in place"), mismatch.getMessage());
     }
 
+    // ── A record body written at a type slot (§5.2) ─────────────────────────────────────────────
+
+    private static final TsonLinkedSchema WRITTEN = Tson.standard().resolve("""
+            !!id:"https://example.test/json-records-written-in-place.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
+            !schema {
+              shipment => {
+                at:      { x: int32  y: int32 }
+                lines?:  [{ sku: text  qty: int32 }]
+                byName?: {text => { n: int32 }}
+                by?:     ( text | { name: text  email: text } )
+              }
+            }
+            """);
+
+    private static Read shipment(String json) {
+        List<Diagnostic> problems = new ArrayList<>();
+        DiagnosticsReceiver receiver = problems::add;
+        try (ByteSource bytes = ByteSource.of(json)) {
+            JsonReadContext ctx = JsonReadContext.of(new JsonStream(bytes, ProcessorPolicy.defaults(), receiver),
+                    receiver);
+            return new Read(JsonSchemaCompiler.compile(WRITTEN).get("shipment").read(ctx), List.copyOf(problems));
+        }
+    }
+
+    /** A record written as sugar at a field, an element, a map's value and a choice's variant reads untagged. */
+    @Test
+    void aRecordWrittenAtEachSlotReads() {
+        Read read = shipment("""
+                {"at": {"x": 1, "y": 2}, "lines": [{"sku": "a", "qty": 1}], "byName": {"k": {"n": 3}},
+                 "by": {"name": "n", "email": "e"}}""");
+        assertEquals(List.of(), read.problems());
+        JsonObject at = assertInstanceOf(JsonObject.class, ((JsonObject) read.value()).get("at"));
+        assertEquals(2, at.get("y").asInt());
+        assertEquals(List.of(), shipment("{\"at\": {\"x\": 1, \"y\": 2}, \"by\": \"b\"}").problems());
+    }
+
+    @Test
+    void aRefusalInsideARecordWrittenInPlaceIsLocatedByItsPath() {
+        assertEquals(Optional.of("/at/x"), only(shipment("{\"at\": {\"x\": \"one\", \"y\": 2}}")).path());
+        assertEquals(Optional.of("/lines/0/qty"),
+                only(shipment("{\"at\": {\"x\": 1, \"y\": 2}, \"lines\": [{\"sku\": \"a\"}]}")).path());
+        assertEquals(Optional.of("/byName/k/n"),
+                only(shipment("{\"at\": {\"x\": 1, \"y\": 2}, \"byName\": {\"k\": {\"n\": \"z\"}}}")).path());
+    }
+
     private static Diagnostic only(List<Diagnostic> problems) {
         assertEquals(1, problems.size(), problems::toString);
         return problems.getFirst();

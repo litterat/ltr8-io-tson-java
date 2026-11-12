@@ -15,7 +15,7 @@ description: >
 
 **Status:** Working revision. The 2026 revision series is subject to change without compatibility guarantees. When finalised, this specification will be published as **TSON version 1** and frozen; until then, revisions are released under the 2026 series.
 
-**This revision:** a template is an open record. `meta.record` carries `parameters`, each a type standing at a field's type or as an argument of an application there or in a parent; an application of a constructor constructs it (`set<text>` is `!meta.set_type { element_type: text }`); a bound is written and never inherited; no template is a type a position names; a template's body is a record body; and in a data document a reference is a name, an application there being a validation error (§4.2, §5.3, §5.10). The kernel declares no template: `meta.template`, `meta.template_param`, `meta.record_template` and its field records, `meta.tuple1` and `meta.voidable_tuple1` are gone, `meta.param` is new, `meta.ref` is a refined constructor and the root's `set` an alias of `meta.set_type` (§9). A type slot holds a name or a type written in place: container sugar, a constructor applied at a use site and an application of an open record at a slot stay where they are written, held in a `meta.type_inline`, so nothing is lifted to an entry, no entry is named by its content, and `@meta.synthetic` is gone (§4.2, §5.3, §8.2). A dependent field's type is a sum written in place, `{ of: !meta.dependent { on: kind } }`, whose schema-grammar sugar `kind!` stands at a record field's type alone; a reference is a name, an application or a parameter, and `allow_sibling`, `meta.field_type_ref` and `meta.field_type_expr` are gone (§4.2, §5.2, §12.1).
+**This revision:** a template is an open record. `meta.record` carries `parameters`, each a type standing at a field's type or as an argument of an application there or in a parent; an application of a constructor constructs it (`set<text>` is `!meta.set_type { element_type: text }`); a bound is written and never inherited; no template is a type a position names; a template's body is a record body; and in a data document a reference is a name, an application there being a validation error (§4.2, §5.3, §5.10). The kernel declares no template: `meta.template`, `meta.template_param`, `meta.record_template` and its field records, `meta.tuple1` and `meta.voidable_tuple1` are gone, `meta.param` is new, `meta.ref` is a refined constructor and the root's `set` an alias of `meta.set_type` (§9). A type slot holds a name or a type written in place: container sugar, a record body, a constructor applied at a use site and an application of an open record at a slot stay where they are written, held in a `meta.type_inline`, so nothing is lifted to an entry, no entry is named by its content, and `@meta.synthetic` is gone (§4.2, §5.3, §8.2). A dependent field's type is a sum written in place, `{ of: !meta.dependent { on: kind } }`, whose schema-grammar sugar `kind!` stands at a record field's type alone; a reference is a name, an application or a parameter, and `allow_sibling`, `meta.field_type_ref` and `meta.field_type_expr` are gone (§4.2, §5.2, §12.1).
 
 **Series:** TSON Specification, Part 2 of 3
 
@@ -432,7 +432,7 @@ type_inline => { of: meta.type }                                   -- a type wri
 type_expr   => @meta.disjoint ( meta.type_ref | meta.type_inline ) -- a type slot
 ```
 
-`tags: [text]` holds `type: { of: !meta.array { element_type: text } }`: a `meta.type_inline` whose `of` is the construction, tagged by its constructor — a refined constructor's own tag, `!meta.set_type` for `set<text>` and `!meta.ref` for `meta.ref<method>` — and a name inside it is a reference as at any slot. A name is string-class and a `meta.type_inline` brace-class (§5.4), so a slot's value is written untagged; `meta.type_inline` is no type, so `of` never holds another directly. What `of` holds is narrower than its type: a container, a tuple, a choice or a reference, a construction of a constructor refining one other than a namespace type, the record an application of an open record closes to (§5.2, §5.10), or, directly at a record field's `type` and at no other slot, a dependent type, `!meta.dependent { on: kind }` (§5.2). A namespace type and a declared sum (`meta.declared_type`) are never written in place, and a dependent type is never declared; each, and a dependent type at any other slot, is a resolver error at the declaration that writes it. A type written in place is **no entry**: it has no name, carries no `chain`, is IS-A nothing, is named by no tag, and is a member of no kind, a kind's members being entries. A record written in place takes no `parameters`, an open record being applied by its name, and `parameters`, or a `chain` stated on any type written in place, is a resolver error at the declaration that writes it. An abstract record written in place is empty, nothing being able to name it as a parent (§5.10.1). Its identity is structural, but for a dependent type's, which is its field's (§8.2).
+`tags: [text]` holds `type: { of: !meta.array { element_type: text } }`: a `meta.type_inline` whose `of` is the construction, tagged by its constructor — a refined constructor's own tag, `!meta.set_type` for `set<text>` and `!meta.ref` for `meta.ref<method>` — and a name inside it is a reference as at any slot. A name is string-class and a `meta.type_inline` brace-class (§5.4), so a slot's value is written untagged; `meta.type_inline` is no type, so `of` never holds another directly. What `of` holds is narrower than its type: a container, a tuple, a choice or a reference, a construction of a constructor refining one other than a namespace type, a record — a record body written at the slot, or the record an application of an open record closes to (§5.2, §5.10) — or, directly at a record field's `type` and at no other slot, a dependent type, `!meta.dependent { on: kind }` (§5.2). A namespace type and a declared sum (`meta.declared_type`) are never written in place, and a dependent type is never declared; each, and a dependent type at any other slot, is a resolver error at the declaration that writes it. A type written in place is **no entry**: it has no name, carries no `chain`, is IS-A nothing, is named by no tag, and is a member of no kind, a kind's members being entries. A record written in place takes no `parameters`, an open record being applied by its name, and `parameters`, or a `chain` stated on any type written in place, is a resolver error at the declaration that writes it. An abstract record written in place is empty, nothing being able to name it as a parent (§5.10.1). Its identity is structural, but for a dependent type's, which is its field's (§8.2).
 
 The `~` character has one use in the type-definition grammar: the **default-value modifier** in a field definition after a type expression (`port?: integer ~ 8080`, §5.2), beside `=` for a fixed value and `=?` for a selector the members pin (§5.2). Constructor refinement — a constructor refining another, as `meta.set_type` refines `meta.array` — is written with `^` like any refinement and follows §5.7's rules (§5.7).
 
@@ -631,7 +631,9 @@ The base cannot pin the field itself: §5.7's identity rule forbids a FIXED rest
 
 **Type-name resolution.** Names used at type expression positions (field positions, arguments, choice variants, composition targets, refinement sources) and application heads resolve against the document's namespace per §3.3.2; constructor-application heads and the desugar targets of the sugar forms resolve per §3.3.1. Bare names always refer to entries — there is no field-name shadowing of type names.
 
-**What may be written in place.** A type slot holds a name or a type written in place (§4.2), and what may be written in place is a container, a tuple, a choice or a reference, or a construction of a constructor refining one (`set<text>`, `meta.ref<method>`, a schema's own `nonempty<uuid>`) — the structural types, a value at the slot that uses them — and, at a record field's type alone, a dependent type (above). A declared sum, an instance of `meta.declared_type`, is never written in place. A record, an enum, every other atom and a namespace type are nominal, a namespace value carrying its type's name as its tag, which a type written in place has none of: value refinements (`!number ^ { min: -273.15 max: 10000 }`), atom and enum constructions (`!enum [A B]`), namespace types (`api => !meta.namespace { key_type: meta.identifier  value_type: method }`, never `f: meta.namespace<meta.identifier method>`) and bare records (`{ name: text }`) MUST be introduced via named declarations and referenced by name; they MAY NOT appear inline in field-type, field-group-member, tuple-element, array-element, map-value, choice-variant, type-argument, or composition positions. The one record in place is the one an application of an open record closes to (§5.10). The kernel types `meta.type_inline.of` by `meta.type`, so this line is the resolver's rule, a resolver error at the declaration that wrote the form. The container sugar forms carry no positional restriction (§5.3): a size specifier or an element/position `?` is legal wherever the bracket or map form is, a map's key excepted. Implementations MAY enforce a configurable nesting-depth limit on inline forms as a resource bound in the manner of [TSON-DATA] §9.1; where such a limit is enabled, exceeding it is an error.
+**What may be written in place.** A type slot holds a name or a type written in place (§4.2), and what may be written in place is a container, a tuple, a choice or a reference, or a construction of a constructor refining one (`set<text>`, `meta.ref<method>`, a schema's own `nonempty<uuid>`) — the structural types, a value at the slot that uses them — a record, and, at a record field's type alone, a dependent type (above). A declared sum, an instance of `meta.declared_type`, is never written in place. An enum, every other atom and a namespace type are nominal, a namespace value carrying its type's name as its tag, which a type written in place has none of: value refinements (`!number ^ { min: -273.15 max: 10000 }`), atom and enum constructions (`!enum [A B]`) and namespace types (`api => !meta.namespace { key_type: meta.identifier  value_type: method }`, never `f: meta.namespace<meta.identifier method>`) MUST be introduced via named declarations and referenced by name; they MAY NOT appear inline in field-type, field-group-member, tuple-element, array-element, map-value, choice-variant, type-argument, or composition positions. The kernel types `meta.type_inline.of` by `meta.type`, so this line is the resolver's rule, a resolver error at the declaration that wrote the form. The container sugar forms carry no positional restriction (§5.3): a size specifier or an element/position `?` is legal wherever the bracket or map form is, a map's key excepted. Implementations MAY enforce a configurable nesting-depth limit on inline forms as a resource bound in the manner of [TSON-DATA] §9.1; where such a limit is enabled, exceeding it is an error.
+
+**A record written in place.** A record body at a type slot is a record written in place, `at: { x: int32  y: int32 }`, wherever a container may be written: a field's type, a group member's, an array's element, a map's value, a tuple's element and a choice's variant. It is the form an application of an open record closes to at a slot (§5.10), and the two are one form: structural, with no name, carrying no `chain` and no `parameters`, a member of nothing and named by no tag, so two with equal fields are one type (§8.2). It holds what a declared record's body holds — fields with their marks and modifiers, field groups, annotations, dependent fields, and types written in place — and is judged as a declared record is, at the declaration that writes it; a selector makes it abstract (above), and an abstract record written in place is empty (§5.10.1). It is not written where only a name stands — a map's key, an argument, a parameter's bound, an alias's target (§4.2) — and composition, refinement and subtraction are declared, never written in place: `at: point & { z: int32 }` and `at: point ^ { x?: = 0 }` are parse errors, whose diagnostic SHOULD name the declaration to write, `point_3d => point & { z: int32 }` then `at: point_3d`. A record that something must name — a tag, a family member, a recursion, an import — is declared.
 
 
 ### 5.3 Type Expressions
@@ -683,7 +685,7 @@ A tuple position answers one question — may its value be void? — recorded as
 
 | Source form                  | Desugaring                                                                     |
 |------------------------------|--------------------------------------------------------------------------------|
-| `{ fields }`                 | `!meta.record { fields: { … } }`                                               |
+| `{ fields }`                 | `!meta.record { fields: { … } }`, in place at a type slot (§5.2)               |
 | `[T]`                        | `!meta.array { element_type: T }`                                              |
 | `[T; N]`                     | `!meta.array { element_type: T  min_items: N  max_items: N }`                  |
 | `[T; N..]`                   | `!meta.array { element_type: T  min_items: N }`                                |
@@ -702,7 +704,7 @@ A tuple position answers one question — may its value be void? — recorded as
 
 Array forms record `element_type`, `voidable` from the element's `?` suffix, and `min_items`/`max_items` from the size specifier; tuple forms record `elements` with a `meta.tuple_element` per position, each carrying its own `voidable`; map forms record `key_type`, `value_type`, `voidable` from the value's `?` suffix, and the bounds.
 
-**Nested forms are written in place.** A sugar form or an applied constructor at a type slot is its construction, held at the slot in a `meta.type_inline` (§4.2): `tags: [text]` is `type: { of: !meta.array { element_type: text } }`, `{text => [money]}` holds one construction inside the other's `value_type`, and `set<text>` is `{ of: !meta.set_type { element_type: text } }`. A declaration's own body is the construction itself, the entry's value with no wrapper (`ids => [order]`, §5.6). Nothing is lifted to an entry and nothing is named for its content, so desugaring is a local rewrite and nesting needs no special channel: an inner form's marks, sizes and bindings live in its own construction, and a size specifier or `?` is legal wherever the form is, except over a parameter (§5.10). Inside an open record a form over a parameter is held as the application it spells, `[T]` as `meta.array<T>` and `{K => V}` as `meta.map<K V>`, and any other form over a parameter is a resolver error (§5.10); a form over no parameter there, `[order]` in `<T> { a: T  b: [order] }`, is written in place like any other. An application of an open record at a slot closes in place too (§5.10). An application with arguments therefore appears in resolver output only where it is still *open* — in an open record's field types, the constructions written there, and `chain.parents` (§4.1, §5.10) — and in the `meta.application` annotation on a declaration that names one (§8.2), and means "an application", nothing else.
+**Nested forms are written in place.** A sugar form or an applied constructor at a type slot is its construction, held at the slot in a `meta.type_inline` (§4.2): `tags: [text]` is `type: { of: !meta.array { element_type: text } }`, `{text => [money]}` holds one construction inside the other's `value_type`, `set<text>` is `{ of: !meta.set_type { element_type: text } }`, and `at: { x: int32 }` is `type: { of: !meta.record { fields: { x => !meta.record_field { type: int32 } } } }`. A declaration's own body is the construction itself, the entry's value with no wrapper (`ids => [order]`, §5.6). Nothing is lifted to an entry and nothing is named for its content, so desugaring is a local rewrite and nesting needs no special channel: an inner form's marks, sizes and bindings live in its own construction, and a size specifier or `?` is legal wherever the form is, except over a parameter (§5.10). Inside an open record a form over a parameter is held as the application it spells, `[T]` as `meta.array<T>` and `{K => V}` as `meta.map<K V>`, and any other form over a parameter is a resolver error (§5.10); a form over no parameter there, `[order]` in `<T> { a: T  b: [order] }`, is written in place like any other. An application of an open record at a slot closes in place too (§5.10). An application with arguments therefore appears in resolver output only where it is still *open* — in an open record's field types, the constructions written there, and `chain.parents` (§4.1, §5.10) — and in the `meta.application` annotation on a declaration that names one (§8.2), and means "an application", nothing else.
 
 
 ### 5.4 Choice Types
@@ -976,11 +978,11 @@ box      => <T> { v: T }
 
 **The body is a record body.** `<…>` precedes braces, a composition or a refinement — the explicit `<T> !meta.record { … }` among them — and before anything else is a resolver error at the declaration, whether or not anything applies it, the diagnostic naming the remedy: before container sugar or a container construction (`<T> [T]`, `<T> !meta.array { element_type: T  min_items: 1 }`), the application at the use site, or a refined constructor applied (`nonempty => meta.array ^ { min_items?: = 1 }`, then `nonempty<text>`); before a choice or a tuple, a discriminated record family (below) or a field group; before an instance of an ordinary type (`<T> !api { … }`), one value per instantiation; before a bare reference (`<B> pair<uuid, B>`, `<T> T`), a record restating the body, or the application written at each use — there is no alias template and no partial application. `parameters` is the list before the body: a construction of `meta.record` writing it as a binding is a resolver error.
 
-**Forms over a parameter.** Inside an open record a form over a parameter is admitted only where it is a reference: `[T]` is `meta.array<T>` and `{K => V}` is `meta.map<K V>`, held as written until the record is applied and then constructed in place (§5.3). A size or a `?` (`[T; 1..]`, `[T?]`, `{K => V; ..10}`) sets a field no argument list carries, a tuple (`[T, text]`) is no construction over reference fields, and an untagged choice over a parameter (`( T | error )`) cannot be judged disjoint until it is applied (§5.4): each is a resolver error at the declaration, naming the form. The remedy is a refined constructor applied, the container declared and passed as the argument (`uuids => [uuid; 1..]`, then `page<uuids>` over `page => <T> { items: T }`), or, for a labelled alternative, a field group (`( body: T | problem: problem )`).
+**Forms over a parameter.** Inside an open record a form over a parameter is admitted only where it is a reference: `[T]` is `meta.array<T>` and `{K => V}` is `meta.map<K V>`, held as written until the record is applied and then constructed in place (§5.3). A size or a `?` (`[T; 1..]`, `[T?]`, `{K => V; ..10}`) sets a field no argument list carries, a tuple (`[T, text]`) is no construction over reference fields, and an untagged choice over a parameter (`( T | error )`) cannot be judged disjoint until it is applied (§5.4): each is a resolver error at the declaration, naming the form. The remedy is a refined constructor applied, the container declared and passed as the argument (`uuids => [uuid; 1..]`, then `page<uuids>` over `page => <T> { items: T }`), or, for a labelled alternative, a field group (`( body: T | problem: problem )`). A record written in place over a parameter (`page => <T> { meta: { cursor: T } }`) is a record body, whose fields' types are slots a parameter stands at, and is substituted with the open record holding it when that record is applied.
 
 **Application.** At a reference slot of a schema document `H<args>` is a reference. Where `H` is an open record, resolving it **substitutes**: each parameter is replaced by its argument wherever it stands, and the result is a closed `!meta.record` without `parameters`, its chain computed from its substituted parents (§5.8), no field fact changing since no value is a parameter. Where `H` is a constructor, it **constructs** (§5.3). An argument may be any type, `void` among them, and a field typed by its parameter is then `void`-typed, admitting the void sentinel or nothing as its own marks say (§5.2). In a data document a reference is a name, and an application is a validation error (§4.2).
 
-**Where an application closes.** Declared, `page_order => page<order>`, an application of an open record is the substituted record under that name, `@meta.application` on its key (§5.6, §8.2). At a composition operand or a refinement source it is absorbed by value (§5.7, §5.8). **At a type slot it closes in place**: `f: page<order>` holds `{ of: !meta.record { … } }`, the substituted record with no name — structural, a member of nothing, never tagged and carrying no chain — and one whose chain would name a declared type is refused (§5.2). An application at a slot is never looked up to a declaration, so `f: page<order>` and `f: page_order` are two types of one shape, the first structural and the second nominal. With a parameter among its arguments an application is held as written, whichever its head (`meta.array<T>`, `box<T>`), until the open record holding it is applied, and then closes where it stands by the same rules: a constructor's to its construction in place, one nested in another constructor's arguments included (`meta.map<text meta.array<T>>` closes to a map whose `value_type` holds the array in place), and an open record's to its record in place, `cursor: box<T>` in `page => <T> { cursor: box<T> }` holding `{ of: !meta.record { … } }` once `page` is applied. Only an application produces a record in place: an author's bare record at a slot stays refused (§5.2). A recursive application closes by §5.10.1, which refuses at its declaration an open record that could never be closed.
+**Where an application closes.** Declared, `page_order => page<order>`, an application of an open record is the substituted record under that name, `@meta.application` on its key (§5.6, §8.2). At a composition operand or a refinement source it is absorbed by value (§5.7, §5.8). **At a type slot it closes in place**: `f: page<order>` holds `{ of: !meta.record { … } }`, the substituted record with no name — structural, a member of nothing, never tagged and carrying no chain — and one whose chain would name a declared type is refused (§5.2). An application at a slot is never looked up to a declaration, so `f: page<order>` and `f: page_order` are two types of one shape, the first structural and the second nominal. With a parameter among its arguments an application is held as written, whichever its head (`meta.array<T>`, `box<T>`), until the open record holding it is applied, and then closes where it stands by the same rules: a constructor's to its construction in place, one nested in another constructor's arguments included (`meta.map<text meta.array<T>>` closes to a map whose `value_type` holds the array in place), and an open record's to its record in place, `cursor: box<T>` in `page => <T> { cursor: box<T> }` holding `{ of: !meta.record { … } }` once `page` is applied. The record it closes to is the record written in place with the same fields, one type with it (§5.2, §8.2). A recursive application closes by §5.10.1, which refuses at its declaration an open record that could never be closed.
 
 **A bound is written.** `<T: text>` writes a bound, the kernel's `meta.param.bound`; an unwritten one is absent, and nothing about a parameter is derived from where it stands, so a parameter is known in full at its declaration. An argument MUST name a type that IS-A the bound, past its alias hops (§8.3): `labelled<int32>` is refused at the application. A bound follows IS-A edges only — `date`, which has a text form without being `text`, fails `<T: text>` — and names a type, never a constructor: `<T: unicode.text_type>` admits nothing and is refused at the declaration, construction creating peers and not subtypes (§5.5). A parameter passed as an argument to a bounded parameter MUST be written with a bound that IS-A it, wherever it is that argument — a field's type, inside sugar or a constructor's application (`[labelled<T>]`), an applied parent: `rebox => <T: text> { b: labelled<T> }` resolves, and `rebox => <T> { b: labelled<T> }` is a resolver error at `rebox`, naming `labelled`'s `T: text`. An imported template's recorded bound binds the same way. A parameter passed to a constructor's argument slot needs no bound: the slot's `of` judges the argument that arrives when the record is applied (`<K> { m: {K => text} }`). An argument of an application closed while declarations are still being made ready is judged once every declaration is, an argument being a name at a type position, which orders nothing (§3.4.1), and a refusal is reported at the declaration that wrote the argument.
 
@@ -1425,7 +1427,7 @@ Four things a reader might expect are deliberately not on the entry. There is no
 | Namespace type `!meta.namespace { key_type: K  value_type: V }` | PRODUCT; `!meta.namespace { … }`; no supertypes | `meta.schema`, `api` |
 | Sugar, constructor-application or applied-constructor body | construction in place; binding-record value; no supertypes (§5.6) | `lookup => {text => integer}`, `meta.field_map`, `tags => set<text>` |
 | Open record `<T> { ... }` | PRODUCT; `!meta.record { parameters: [!meta.param { name: T }]  fields: { … } }`, named only as an application's head, `chain.parents` as written (§5.10) | `pair`, `box` |
-| Sugar form, construction or application of an open record at a type slot | written in place: `{ of: !C { … } }` at the slot, with no chain and no entry; over a parameter, the application held in the open record until it is applied (§5.3, §5.10) | `[text]`, `{text => integer}`, `set<text>`, `f: page<order>`, `[T]` in an open record |
+| Sugar form, construction or application of an open record at a type slot | written in place: `{ of: !C { … } }` at the slot, with no chain and no entry; over a parameter, the application held in the open record until it is applied (§5.3, §5.10) | `[text]`, `{text => integer}`, `set<text>`, `at: { x: int32 }`, `f: page<order>`, `[T]` in an open record |
 | Declared application of an open record | the substituted `!meta.record` under the declared name, `@meta.application` on its key (§8.2) | `text_pair => pair<text, text>` |
 | Value entry `!T { … }`, `T` an ordinary type | the value as read against `T`, `T`'s tag on it; no chain (§4.1) | `orders => !api { … }`, `create_order => !operation { … }` |
 | Nested map `!schema { … }` | `!meta.schema { … }`, its members resolved and keyed by name, each an entry of the document by path (§4.1) | `geo => !schema { … }` |
@@ -1785,7 +1787,7 @@ group-member = *annotation field-name ["?"] ws ":" ws field-type
 
 type-expr = paren-type
           / bracket-type
-          / map-type
+          / brace-type
           / type-ref
           ; one token of lookahead after a name ("<" or neither)
           ; picks an application or a name
@@ -1802,13 +1804,21 @@ paren-type = "(" type-expr "|" type-expr *("|" type-expr) ")"   ; choice, 2+ var
 bracket-type = "[" element-type [ ws ";" ws size-spec ] ws "]"           ; array
              / "[" element-type 1*(separator element-type) "]"           ; tuple
 
+brace-type   = map-type / record-def
+             ; one dispatch at every position a brace opens a type
+             ; (§12.2). A record-def is the declaration's own
+             ; structural-def at type-def position, and at a type
+             ; slot a record written in place (§5.2), which the
+             ; resolver refuses where only a name stands: an
+             ; argument, a parameter's bound
+
 map-type     = "{" ws map-key ws "=>" ws element-type
                [ ws ";" ws size-spec ] ws "}"                            ; map sugar (§5.3)
 
 map-key      = type-ref
              ; a name: an application parses and the resolver
              ; refuses it, a key being declared and named, and
-             ; paren, bracket and map forms do not parse (§5.3)
+             ; paren, bracket and brace forms do not parse (§5.3)
 
 element-type = type-expr [ "?" ]
              ; nesting is this recursion: [[T; N]; N] and
@@ -1833,12 +1843,12 @@ type-args  = type-arg *(separator type-arg) [ ws "," ]
 type-arg   = type-expr
            ; wider than the data grammar's in what parses: of
            ; an open record's application, an argument is a name
-           ; or a parameter, and a sugar form or an application
-           ; parses and the resolver refuses it, the form being
-           ; declared first; of a constructor's, inside an open
-           ; record, a form over a parameter is held (§5.3); a
-           ; number or a quoted string is no type-expr, an
-           ; argument being a type (§5.3)
+           ; or a parameter, and a sugar form, a record body or
+           ; an application parses and the resolver refuses it,
+           ; the form being declared first; of a constructor's,
+           ; inside an open record, a form over a parameter is
+           ; held (§5.3); a number or a quoted string is no
+           ; type-expr, an argument being a type (§5.3)
 size-bound = unquoted-token
            ; text MUST match the decimal-natural production
            ; of [TSON-DATA] §7.6; a parameter's name here is a
@@ -1875,7 +1885,7 @@ Notes:
 - `instance` is decidable on one token after the optional parameter list: `!` opens an `instance`, with or without a preceding `<…>`; `<` only ever starts `type-params`, so consuming it first costs no lookahead. Inside the `!` branch a following `^` separates `value-refinement` from `instance`; `value-refinement` admits no parameter list — a parameterised refinement of an instance is no form, and `<…> ! name ^` is a parse error.
 - A `!` head naming an ordinary type declares a value entry (§4.1); one naming `schema` or `meta.schema` is `nested-map`, and the payload is the schema grammar.
 - The trailing record-def in `construction-def` is optional (`customer => address & contact` is valid). When a `{` follows a `&`-chain, it always belongs to the construction's record-def.
-- The refined-def target and every `supertype-ref` operand are restricted to a named reference — a `type-ref`, a name optionally with type-args; inline structural forms cannot precede `^`, `&`, or `-` by grammar (§4.3). A `^` whose resolved target states no refinement rule for a field the body names (a container instance, for example) is a resolver error reported with the target's type.
+- The refined-def target and every `supertype-ref` operand are restricted to a named reference — a `type-ref`, a name optionally with type-args; inline structural forms cannot precede `^`, `&`, or `-` by grammar (§4.3). Nor does any follow a type at a type slot: `at: point & { z: int32 }` is a parse error, composition, refinement and subtraction being declared (§5.2). A `^` whose resolved target states no refinement rule for a field the body names (a container instance, for example) is a resolver error reported with the target's type.
 - The removal clause attaches to construction heads only; a refinement head admits none — `T ^ { ... } - { ... }` is a parse error (§5.7, §5.9).
 - After a bare type-ref in type-def position, `{` is a parse error; the diagnostic SHOULD suggest `^` (refinement) or `&` (composition).
 - Parameters and type arguments inside `<>` alike separate by comma or whitespace — the general separator convention ([TSON-DATA] §7.4): `<T, MIN>` and `<T MIN>`, `meta.map<text, integer>` and `meta.map<text integer>` are all valid. Canonical resolved output writes one space and no comma.
@@ -1918,9 +1928,11 @@ This section is informative.
 ;   name -         → construction-def (subtraction, §5.9)
 ;   name {         → parse error (write ^ or &)
 ;   name!          → parse error (a dependent type is a field's, §5.2)
-;   {              → brace form; consume "{" and dispatch on
-;                    content (reusing [TSON-DATA] §2.8's
-;                    consume-one-then-inspect machinery):
+;   {              → brace form, the one dispatch for every
+;                    position a brace opens a type; consume "{"
+;                    and dispatch on content (reusing
+;                    [TSON-DATA] §2.8's consume-one-then-inspect
+;                    machinery):
 ;     "}"            → empty record ({}, meta.top's shape)
 ;     "("            → record-def (leading field group)
 ;     "@"            → record-def (annotations precede field
@@ -1941,11 +1953,11 @@ This section is informative.
 ; type-expr position (field types, array elements, etc.):
 ;   (              → paren-type (choice)
 ;   [              → bracket-type (full syntax at every position)
-;   {              → map-type: "{" name … "=>" required;
-;                    "{" name ":" remains a parse error — bare
-;                    records must be declared (§5.2); the
-;                    diagnostic SHOULD say so and distinguish
-;                    the two brace meanings
+;   {              → brace form, dispatched as at type-def
+;                    position (above): a record-def, a record
+;                    written in place (§5.2), or a map-type;
+;                    "{" "{" and "{" "[" are parse errors, a
+;                    map's key being a name
 ;   name <         → application ("<" adjacent, [TSON-DATA] §7.5)
 ;   name !         → dependent-type, as a field's or a group member's
 ;                    whole type ("!" adjacent, whitespace after,
@@ -1968,6 +1980,8 @@ This section is informative.
 ;   ~ token        → default
 ;   = token        → fixed
 ;   = ?            → selector (§5.2); no value follows
+;   & / ^ / -      → parse error (composition, refinement and
+;                    subtraction are declared, §5.2)
 ;   name "=>"      → parse error ("record body expected; =>
 ;                    begins a map type only at type positions")
 ;
@@ -1988,7 +2002,7 @@ This section is informative.
 ;   [type ]         → unconstrained array
 ;   [type ? ...     → element "?"
 ;   [[ ...          → nested bracket-type (full syntax)
-;   [{ ...          → nested map-type
+;   [{ ...          → nested brace form (map-type or record-def)
 ;
 ; after a construction body "}":
 ;   -              → removal clause (§5.9)
@@ -2079,12 +2093,12 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/40/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/40/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/39/tson-guide |
-| meta.tn | TSON Kernel (companion artifact, pre-loaded) | https://tson.io/2026/40/m/meta.tn?sha256=1c114ed6d78b326ee884327fd2ca016620945f90af75f7c52dadef326a794134 |
-| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/40/m/numeric.tn?sha256=5865606d1b86e5bc2f344894b89ede87348dab6874436a6600fbc753e320202d |
-| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=eea528225e443bf3abea057e519b5695276098ab9838f4c5dc48d631ec81af32 |
-| net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=eee3fc0c04026dcf1e7973f68e64a77655ece9a9319172a4667dbafff9181e8b |
-| core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=c79bfb226953cd8e02543d2079741a5f2ed0458f5148fcc4f8d6051e9697a5f6 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=8e20328258d6d1d76f46050540bc2b5d40b7664c1a6ce1c8f46f35e67b2088e5 |
+| meta.tn | TSON Kernel (companion artifact, pre-loaded) | https://tson.io/2026/40/m/meta.tn?sha256=3052b4617a1febcecf7f69f194325a6563bd20ca34202a856efbd822ac8261e9 |
+| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/40/m/numeric.tn?sha256=2094f34c48af23ebf0ff072b5d76f7abe2125a3a6b1cd30cc754672b22fe50bb |
+| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=71330b39b946bd9c0114e11a7067960f999068c00f758ce79d5c5d21373c7ddd |
+| net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=8c21f7b8e4ba971985f7f484d8f1961829fa2e34a6ea2e66855ee99afd800ab1 |
+| core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=aef0be3402f539d3d493e624a9ad4ffae6ec5baa27edbad73dc3ab5025ed0781 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=d3d885126a5562b18a930ee977d7d52d369ed88c59c5612e6270e98b3e9df18e |
 
 ### 13.3 Informative References
 

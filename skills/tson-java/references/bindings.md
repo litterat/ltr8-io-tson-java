@@ -37,10 +37,11 @@ natural reading (an `int32` to `Integer`, an array to a `List`), and a component
 specific is met when the reader is built: `List<Long>` under `int32` elements holds `Long`s, and `long[]`,
 `List<int[]>` and `Map<String, SequencedMap<String, Long>>` each receive what they declare. A tuple position binds
 the same way, so a tuple written inline at a field binds to the component's `@Tuple` record, nested ones included.
-So does a record an application of an open record closes to in place (`p: page<order>`, `ps: [page<order>]`): it has
-no name a binding map could hold, so it binds to the record class its component declares, at any depth, and a
-component that is no record class is a `BindMismatchException`; a declaration (`order_page => page<order>`) gives it
-a name to bind by.
+So does a record written in place, a record body at a slot (`at: { x: int32 }`, `lines: [{ sku: text }]`) or the
+record an application of an open record closes to (`p: page<order>`, `ps: [page<order>]`): it has no name a binding
+map could hold, so it binds to the record class its component declares, at any depth, and a
+component that is no record class is a `BindMismatchException`; a declaration (`order_page => page<order>`,
+`point => { x: int32 }`) gives it a name to bind by.
 Most atom families also bind to `String` or `CharSequence`, as the spelling they validated.
 
 A cyclic type graph resolves: `getDescriptor` hands a re-entrant call a deferred supplier and each

@@ -129,7 +129,7 @@ footing:
 |---|---|---|
 | 1 | [TSON-DATA] §2.1's worked example says untagged tokens resolve by §4's base rules under an imported schema | **Carried.** Not among this revision's changes; the entry stays open against Revision 40 as written. [open] |
 | 2 | Whether a quoted token at a reference-typed position is a reference | **Carried**, narrowed by #3: an argument is a reference in both grammars, so a quoted argument is refused in a schema document and in data alike; the field-position half (`t: "int32"` at a `meta.type_ref` field in data) stays open as written. [open] |
-| 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–56), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented] |
+| 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–58, 71 and 72–77), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented] |
 | 3 | Templates as open records | **Accept — the baseline above**, every step as the register states what runs. Part 2 §5.10 is rewritten around the three rules; §1.3, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow (§3.2). §1.6's example drops its value parameter. **[editorial]** at five points where the sources disagree or the text needed a reading (§5). [settled — implemented] |
 | 6 | A dependent field's type is a sum in place | **Accept** — the kernel's `meta.dependent`, the retyped `meta.record_field.type`, `meta.type_ref` and `meta.ref`, and the hand-written resolved fixture are the baseline (§1); Part 1 §1.3, §1.5, §2.3, §2.5, §2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4, §7.5, §7.7 and §8.1 follow (§3.1, items 11–19), Part 2 §1.4, §4.2, §5.2, §5.3, §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9 and §12 (§3.2, items 59–70), and Part 3 §1.6 and §5.6 (§3.4). Four readings the spec author ruled on; one point stays open (§5). [settled — implemented] |
 
@@ -512,6 +512,36 @@ Item 71 completes #5's line on a record written in place. It names the rule befo
     productivity rule, as one typed by `meta.ref<meta.alias>` is, and an optional one can
     only be missing; a declared abstract record stays open to its importers' members.
 
+Items 72–77 carry #5's record written at a type slot. Each names the rule before and after.
+
+72. **§5.2** — "bare records (`{ name: text }`) MUST be introduced via named declarations" and
+    "the one record in place is the one an application of an open record closes to": a
+    record body may be written at a type slot. New paragraph **A record written in place**:
+    a record body at a field's type, a group member's, an array's element, a map's value, a
+    tuple's element or a choice's variant is one form with the record an application closes
+    to — structural, no name, no `chain`, no `parameters`, a member of nothing and named by
+    no tag, two with equal fields one type. It holds what a declared body holds and is judged
+    as one is; a selector makes it abstract, and so empty. It is not written where only a
+    name stands, and composition, refinement and subtraction are declared, `at: point & { z:
+    int32 }` a parse error. An enum, every other atom and a namespace type stay declared.
+73. **§4.2** — what `of` holds named "the record an application of an open record closes to";
+    it is a record, written at the slot or closed to by an application.
+74. **§5.3** — the sugar table's `{ fields }` row is the construction in place at a type
+    slot; **Nested forms are written in place** shows `at: { x: int32 }`.
+75. **§5.10** — "Only an application produces a record in place: an author's bare record at a
+    slot stays refused" becomes: the record an application closes to is the record written
+    in place with the same fields, one type with it. **Forms over a parameter** gains the
+    record written in place over a parameter, a record body substituted with the open record
+    holding it when that record is applied.
+76. **§12.1, §12.2** — `type-expr` admitted `map-type` where a brace opens a type; it admits
+    `brace-type = map-type / record-def`, and §12.2 states one brace dispatch for a
+    declaration's body and a type slot, where a type slot's `{` was "map-type, `{` name `:` a
+    parse error — bare records must be declared". `{` `{` and `{` `[` are parse errors, a
+    map's key being a name; `&`, `^` or `-` after a field's type is a parse error. The
+    `map-key` and `type-arg` comments name the brace forms.
+77. **Header, §8.1** — the summary's list of what stays where it is written gains a record
+    body, and §8.1's row for a type at a slot gains `at: { x: int32 }` among its examples.
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Their entries are not edited by this
@@ -591,7 +621,9 @@ Changes a Revision 39 implementer must act on:
     one ties to the declaration closing it, and is refused where none does; an open record
     holding a recursive one it is not on a cycle of could never close, and is refused at its
     declaration. An argument of
-    an open record's application is a name or a parameter, and a map's key is a name.
+    an open record's application is a name or a parameter, and a map's key is a name. A
+    record body may be written at a type slot, `at: { x: int32 }`, the same form an
+    application closes to; composition and refinement stay declared.
 12. **Every bundled pin changes** (§6).
 13. **A dependent field's type is a sum written in place** (#6): `payload: kind!` is
     schema-grammar sugar for `type: { of: !meta.dependent { on: kind } }`, admitted at a
@@ -637,11 +669,11 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `1c114ed6…` (Revision 39 `c9b069b6…`), numeric `5865606d…` (`dfa66c5d…`), temporal
-   `eea52822…` (`fb4ada8f…`), net `eee3fc0c…` (`371fc20c…`), core `c79bfb22…`
-   (`4e8d9c43…`), policy `8e203282…` (`e9cb5b93…`), each re-stamped for #5's kernel and its
-   declared namespace type and for #6's, policy again for the materialisation depth's
-   removal. The chain is consistent — numeric,
+   `3052b461…` (Revision 39 `c9b069b6…`), numeric `2094f34c…` (`dfa66c5d…`), temporal
+   `71330b39…` (`fb4ada8f…`), net `8c21f7b8…` (`371fc20c…`), core `aef0be34…`
+   (`4e8d9c43…`), policy `d3d88512…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   declared namespace type and its record written at a slot and for #6's, policy again for
+   the materialisation depth's removal. The chain is consistent — numeric,
    temporal, net and policy each pin the kernel; core pins the three libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of
@@ -649,8 +681,9 @@ carries no open questions.
    and `meta.application` is rewritten for the open record. #6 removes `allow_sibling`,
    `meta.field_type_ref` and `meta.field_type_expr`, adds `meta.dependent`, and rewrites the
    documentation of `meta.record_field`, `meta.reference_type`, `meta.ref`, `meta.type_ref`,
-   `meta.type_inline` and `meta.type_expr`. `meta-resolved.tn` follows; the four library
-   fixtures change only their identities.
+   `meta.type_inline` and `meta.type_expr`; #5's record written at a slot rewrites
+   `meta.type_inline`'s again, a record no longer declared and named. `meta-resolved.tn`
+   follows; the four library fixtures change only their identities.
 
 ---
 

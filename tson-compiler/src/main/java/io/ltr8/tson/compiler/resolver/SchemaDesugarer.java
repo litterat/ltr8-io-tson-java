@@ -4,7 +4,10 @@ import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.EmptyBrace;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
@@ -21,6 +24,7 @@ import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
+import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -35,12 +39,16 @@ import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.FieldRole;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 
 /**
@@ -64,6 +72,7 @@ import java.util.function.UnaryOperator;
  * (A | B)          !meta.choice { variants: [A B] }
  * {K =&gt; V}         !meta.map   { key_type: K  value_type: V }
  * {K =&gt; V; N..M}   the same, with min_items/max_items
+ * { a: T  b?: U }  !meta.record { fields: { a =&gt; { type: T }  b =&gt; { type: U  optional: true } } }
  * kind!            !meta.dependent { on: kind }, at a field's type alone
  * </pre>
  *
@@ -124,6 +133,9 @@ final class SchemaDesugarer {
     /** §5.2's desugar target for {@code kind!} at a field's type. */
     private static final String DEPENDENT = KernelNames.of("dependent");
 
+    /** §5.2's desugar target for a record body at a type slot. */
+    private static final String RECORD = WireForm.RECORD;
+
 
     /** The vocabulary fields the desugar table binds -- fixed by the table, not looked up in a governing meta. */
     private static final String ELEMENT_TYPE = "element_type";
@@ -133,6 +145,13 @@ final class SchemaDesugarer {
     private static final String MAX_ITEMS = "max_items";
     private static final String ELEMENTS = "elements";
     private static final String VARIANTS = "variants";
+    private static final String OPTIONAL = "optional";
+    private static final String ROLE = "role";
+    private static final String GROUPS = "groups";
+    private static final String MEMBERS = "members";
+    private static final String OPTIONAL_MEMBERS = "optional_members";
+    private static final String DISCRIMINATORS = "discriminators";
+    private static final String EXTENSION = "extension";
 
     /** {@code meta.type_inline.of}: the wrapper a nested construction takes at a type slot. */
     private static final String OF = "of";
@@ -399,7 +418,7 @@ final class SchemaDesugarer {
     }
 
     /** A form as the author spells it, for a message. */
-    private static String spell(TypeExpr ref) {
+    static String spell(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> simple.name();
             case ApplicationRef generic -> generic.name() + "<" + String.join(", ",
@@ -412,7 +431,41 @@ final class SchemaDesugarer {
                     tuple.elementTypes().stream().map(SchemaDesugarer::spell).toList()) + "]";
             case ChoiceExpr choice -> "( " + String.join(" | ",
                     choice.variants().stream().map(SchemaDesugarer::spell).toList()) + " )";
+            case RecordExpr record -> spell(record.body());
             case InlineConstruction inline -> "!" + inline.constructor() + " { ... }";
+        };
+    }
+
+    /** A record body as the author spells it, each field's marks and type, a group's options. */
+    private static String spell(RecordDef record) {
+        List<String> entries = new ArrayList<>();
+        for (RecordEntry entry : record.entries()) {
+            entries.add(switch (entry) {
+                case FieldDef field -> field.name() + (field.omittable() ? "?" : "") + ":" + field.type()
+                        .map(type -> " " + spell(type.typeRef()) + (type.voidable() ? "?" : "")).orElse("")
+                        + field.modifier().map(SchemaDesugarer::spell).orElse("");
+                case GroupDef group -> "( " + String.join(" | ", group.options().stream().map(option -> String.join(
+                        "  ", option.stream().map(member -> member.name() + (member.omittable() ? "?" : "") + ": "
+                                + spell(member.typeRef()) + (member.voidable() ? "?" : "")).toList())).toList())
+                        + " )" + switch (group.quantifier()) {
+                            case AT_MOST_ONE -> "?";
+                            case AT_LEAST_ONE -> "+";
+                            case EXACTLY_ONE -> "";
+                        };
+            });
+        }
+        return entries.isEmpty() ? "{}" : "{ " + String.join("  ", entries) + " }";
+    }
+
+    private static String spell(FieldTypeExpr type) {
+        return type instanceof DependentType dependent ? dependent.on() + "!" : spell((TypeExpr) type);
+    }
+
+    private static String spell(FieldDef.Modifier modifier) {
+        return (modifier.kind() == FieldDef.Modifier.Kind.DEFAULT ? " ~ " : " = ") + switch (modifier.value()) {
+            case FieldDef.Modifier.Value.Deferred _ -> "?";
+            case FieldDef.Modifier.Value.Absent _ -> "_";
+            case FieldDef.Modifier.Value.Literal literal -> literal.token().text();
         };
     }
 
@@ -514,9 +567,36 @@ final class SchemaDesugarer {
             case MapExpr map -> container(ref, List.of(typeRef(map.keyType()), elementRef(map.valueType())));
             case TupleExpr tuple -> container(ref, tuple.elementTypes().stream().map(this::elementRef).toList());
             case ChoiceExpr choice -> container(ref, mapShared(choice.variants(), this::typeRef));
+            case RecordExpr record -> recordInPlace(record);
             case ApplicationRef generic -> applicationArguments(generic);
             case InlineConstruction inline -> inline;
         };
+    }
+
+    /**
+     * A record body at a type slot, written in place as the {@code meta.record} construction it denotes, its own
+     * forms already theirs ({@link #recordDef}). Over a parameter of the enclosing open record it is a gap: an open
+     * record's parameters are substituted at its own field types and the applications there ({@code Substitution}),
+     * and a record in place is neither.
+     */
+    private TypeExpr recordInPlace(RecordExpr written) {
+        RecordDef record = recordDef(written.body());
+        for (RecordEntry entry : record.entries()) {
+            List<FieldTypeExpr> types = switch (entry) {
+                case FieldDef field -> field.type().map(FieldDef.FieldType::typeRef).stream().toList();
+                case GroupDef group -> group.members().stream().map(GroupDef.Member::typeRef).toList();
+            };
+            for (FieldTypeExpr type : types) {
+                if (type instanceof TypeExpr ref && parameterIn(ref).isPresent()) {
+                    throw new UnsupportedOperationException("'" + currentName + "': the record written in place '"
+                            + spell(written) + "' stands over the parameter '" + parameterIn(ref).get() + "', and an "
+                            + "open record's parameters are not yet substituted inside a record written in place -- "
+                            + "declare the record as an open record of its own ('my_record => <"
+                            + parameterIn(ref).get() + "> " + spell(written) + "') and apply it");
+                }
+            }
+        }
+        return new InlineConstruction(construction(recordBinding(record)));
     }
 
     /**
@@ -544,6 +624,11 @@ final class SchemaDesugarer {
      */
     private ApplicationRef applicationArguments(ApplicationRef generic) {
         checkTemplateApplication(generic.name());
+        for (TypeExpr arg : generic.args()) {
+            if (arg instanceof RecordExpr) {
+                throw constructionAsArgument(generic, arg);
+            }
+        }
         List<TypeExpr> args = mapShared(generic.args(), this::typeRef);
         for (int i = 0; i < args.size(); i++) {
             if (args.get(i) instanceof InlineConstruction) {
@@ -557,7 +642,7 @@ final class SchemaDesugarer {
     private SchemaValidationException constructionAsArgument(ApplicationRef generic, TypeExpr written) {
         return new SchemaValidationException("'" + currentName + "': '" + spell(written) + "' is a construction "
                 + "passed as an argument of '" + generic.name() + "<...>', and an argument is a name or a parameter "
-                + "(§5.10): declare it under a name ('my_list => " + spell(written) + "') and pass that name");
+                + "(§5.10): declare it under a name ('my_type => " + spell(written) + "') and pass that name");
     }
 
     /**
@@ -771,6 +856,111 @@ final class SchemaDesugarer {
             members.add(WireForm.plain(slotValue(variant)));
         }
         return new Binding(CHOICE, List.of(new RecordValue.Field(VARIANTS, WireForm.plain(new ArrayValue(members)))));
+    }
+
+    /**
+     * {@code !meta.record { fields: { … }  groups: [ … ]  discriminators: [ … ] }} -- the record row of the table, its
+     * forms already written in place. Each field is the {@code meta.record_field} {@link FieldModifiers} makes of its
+     * marks, a fact written only where it is no default; a group member is a field, optional, its presence the group's.
+     * What the value cannot carry, its annotations and position, is kept against it ({@link
+     * SchemaPositions.WrittenField}).
+     */
+    private Binding recordBinding(RecordDef record) {
+        List<MapValue.MapEntry> fields = new ArrayList<>();
+        List<DataValue> groups = new ArrayList<>();
+        List<DataValue> discriminators = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (RecordEntry entry : record.entries()) {
+            switch (entry) {
+                case FieldDef field -> {
+                    FieldDef.FieldType type = field.type().orElseThrow(() -> new SchemaValidationException("field '"
+                            + field.name() + "' states only a modifier and no type, and a record written in place "
+                            + "declares every field with its type -- a modifier-only entry is a tightening, written "
+                            + "in a refinement or composition body (§5.7)"));
+                    FieldModifiers.Resolved facts = FieldModifiers.of(field.name(), field.omittable(),
+                            type.voidable(), field.modifier());
+                    facts.value().filter(token -> token.form() == TokenForm.UNQUOTED
+                            && currentParameters.contains(token.text())).ifPresent(token -> {
+                                throw ParameterTypes.atValue(token.text(), field.name());
+                            });
+                    if (FieldModifiers.discriminates(field)) {
+                        discriminators.add(WireForm.plain(new TokenValue(field.name(), TokenForm.SINGLE_LINE_QUOTED)));
+                    }
+                    DataValue value = fieldValue((TypeExpr) type.typeRef(), facts);
+                    positions.inPlace().put(value, new SchemaPositions.WrittenField(field.annotations(),
+                            positions.of(field)));
+                    fields.add(fieldEntry(field.name(), value, seen));
+                }
+                case GroupDef group -> {
+                    for (GroupDef.Member member : group.members()) {
+                        DataValue value = fieldValue((TypeExpr) member.typeRef(),
+                                new FieldModifiers.Resolved(true, member.voidable(), FieldRole.FREE, Optional.empty()));
+                        positions.inPlace().put(value, new SchemaPositions.WrittenField(member.annotations(),
+                                Optional.empty()));
+                        fields.add(fieldEntry(member.name(), value, seen));
+                    }
+                    groups.add(groupValue(group.fieldGroup()));
+                }
+            }
+        }
+        List<RecordValue.Field> binding = new ArrayList<>();
+        binding.add(new RecordValue.Field(WireForm.FIELDS,
+                WireForm.plain(fields.isEmpty() ? new EmptyBrace() : new MapValue(fields))));
+        if (!groups.isEmpty()) {
+            binding.add(new RecordValue.Field(GROUPS, WireForm.plain(new ArrayValue(groups))));
+        }
+        if (!discriminators.isEmpty()) {
+            // `=?` implies ABSTRACT (§5.2), and a record in place nothing can be a member of is empty (§5.10.1).
+            binding.add(WireForm.nameField(EXTENSION, "ABSTRACT"));
+            binding.add(new RecordValue.Field(DISCRIMINATORS, WireForm.plain(new ArrayValue(discriminators))));
+        }
+        return new Binding(RECORD, binding);
+    }
+
+    /** One entry of a record in place's {@code fields}, its name refused where the record already declares it. */
+    private static MapValue.MapEntry fieldEntry(String name, DataValue value, Set<String> seen) {
+        if (!seen.add(name)) {
+            throw new SchemaValidationException("field '" + name + "' is declared more than once in a record written "
+                    + "in place -- a field name is unique across a record's plain fields and all its groups' members "
+                    + "(§5.11)");
+        }
+        return new MapValue.MapEntry(WireForm.plain(new TokenValue(name, TokenForm.SINGLE_LINE_QUOTED)), value);
+    }
+
+    /** A field's {@code meta.record_field} value: its type, and each fact its marks state. */
+    private static DataValue fieldValue(TypeExpr type, FieldModifiers.Resolved facts) {
+        List<RecordValue.Field> members = new ArrayList<>();
+        slot(WireForm.TYPE, type, members);
+        if (facts.optional()) {
+            members.add(WireForm.nameField(OPTIONAL, "true"));
+        }
+        if (facts.voidable()) {
+            members.add(WireForm.nameField(WireForm.VOIDABLE, "true"));
+        }
+        if (facts.role() != FieldRole.FREE) {
+            members.add(WireForm.nameField(ROLE, facts.role().name()));
+        }
+        facts.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.plain(token))));
+        return WireForm.plain(new RecordValue(members));
+    }
+
+    /** A group's {@code meta.field_group} value, its member names as text. */
+    private static DataValue groupValue(FieldGroup group) {
+        List<RecordValue.Field> members = new ArrayList<>();
+        members.add(new RecordValue.Field(MEMBERS, WireForm.plain(new ArrayValue(group.members().stream()
+                .map(option -> WireForm.plain(names(option))).toList()))));
+        if (!group.optionalMembers().isEmpty()) {
+            members.add(new RecordValue.Field(OPTIONAL_MEMBERS, WireForm.plain(names(group.optionalMembers()))));
+        }
+        if (group.optional()) {
+            members.add(WireForm.nameField(OPTIONAL, "true"));
+        }
+        return WireForm.plain(new RecordValue(members));
+    }
+
+    private static ArrayValue names(List<String> names) {
+        return new ArrayValue(names.stream()
+                .map(name -> WireForm.plain(new TokenValue(name, TokenForm.SINGLE_LINE_QUOTED))).toList());
     }
 
     /**

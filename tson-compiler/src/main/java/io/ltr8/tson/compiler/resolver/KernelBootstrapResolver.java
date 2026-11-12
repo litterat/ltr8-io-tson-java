@@ -133,7 +133,7 @@ public final class KernelBootstrapResolver {
      * they are written in consulted for nothing.
      */
     static TsonSchema resolve(SchemaDocument parsed, SchemaPositions positions) {
-        SchemaDocument document = SchemaDesugarer.desugar(parsed);
+        SchemaDocument document = SchemaDesugarer.desugar(parsed, null, positions);
         Map<String, TsonSchema.EntryFacts> facts = new LinkedHashMap<>();
         Map<String, Top> entries = new Bootstrap(document, positions, facts).resolve();
         return new TsonSchema(id(document), document.imports(), AnnotatedMap.of(entries), true,
