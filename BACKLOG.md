@@ -38,11 +38,13 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
-- [ ] **An entry whose chain reaches no base kind reports PRODUCT** ([TSON-SCHEMA] §4.2, §8.1). `EntryKind.ofChain`
-  answers PRODUCT where a record's chain names none of the kernel's `atom`, `product` and `sum`, which is right for
-  an ordinary record and wrong for `meta.top`, `meta.type`, `meta.alias` and `meta.apply`: none of them describes a
-  product. Decide what such an entry's kind is (a kind of its own, or none), state it in §8.1, and give
-  `EntryKind` that answer; check every caller that switches on the kind.
+- [ ] **Remove the derived kind of an entry** ([TSON-SCHEMA] §4.1, §5.5, §8.1). Nothing decides by it: no main
+  code branches on an `EntryKind` value, `determineKind`'s result is discarded, `kindOf` on the linked and compiled
+  schema has no caller outside tests, and no corpus vector names a kind. Its default is also wrong: `meta.top`,
+  `meta.type`, `meta.alias`, `meta.apply`, `meta.atom` and `meta.sum` report PRODUCT. Delete §8.1's derivation and
+  §4.1's kind membership, keep §5.5's rule that a chain reaches at most one base kind, and reword "-kinded" as
+  IS-A the base kind. In Java delete `EntryKind` and both `kindOf` methods, give `isConstructor` another home,
+  reword the refinement diagnostic that prints `kind=`, and have the tests assert on the value's class.
 
 - [ ] **A constructor's application passes an argument written in place through a generated name.** A
   constructor's application is built by reading a binding record of its arguments, and a reference there reads a
