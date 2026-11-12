@@ -22,7 +22,7 @@ import java.util.function.Function;
  * <ul>
  *   <li>a construction of a container, a tuple, a choice or a reference ({@link #constructible}): an {@link
  *       ArrayBody} ({@code meta.array}, and {@code meta.set_type} refining it), a {@link MapBody}, a {@link
- *       TupleBody}, a {@link ChoiceBody} or a {@link ReferenceBody} ({@code meta.ref});</li>
+ *       TupleBody}, a {@link ChoiceBody} or a {@link RefBody} ({@code meta.ref});</li>
  *   <li>a closed {@link RecordBody}, under {@code meta.record}: the record an application of an open record closes to
  *       at a type slot ([TSON-SCHEMA] §5.10), or one a resolved form states.</li>
  *   <li>an {@link ApplyBody}, {@code meta.apply}, an application written in place, which in resolved output stands
@@ -100,7 +100,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound ApplyBod
      */
     public static boolean constructible(Type type) {
         return type instanceof ArrayBody || type instanceof MapBody || type instanceof TupleBody
-                || type instanceof ChoiceBody || type instanceof ReferenceBody;
+                || type instanceof ChoiceBody || type instanceof RefBody;
     }
 
     /**
@@ -226,7 +226,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound ApplyBod
             case TupleBody tuple -> String.join(", ",
                     tuple.elements().stream().map(element -> slot.apply(element.elementType())).toList());
             case ChoiceBody choice -> String.join(", ", choice.variants().stream().map(slot).toList());
-            case ReferenceBody reference -> slot.apply(reference.of());
+            case RefBody reference -> slot.apply(reference.of());
             default -> throw new IllegalStateException("not inlinable: " + of);
         };
     }

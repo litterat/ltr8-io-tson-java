@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * <b>this library's own resolved schema model</b> needs on top of what a consumer's classes need.
  *
  * <p>None could travel. {@link Token}, {@link ValueRef} and {@link TypeRef} are {@code tson-schema}'s, a reference's
- * text read by {@code tson-atom}'s grammar ({@link TypeRefTextBridge}, registered for {@link NameRef} as well, since a
+ * text read by {@code tson-atom}'s grammar ({@link TypeRefNameBridge}, registered for {@link NameRef} as well, since a
  * value written by its own class is described by its variant), and {@link
  * SourcePosition}'s bridge names this module's own {@code Position}, the only concrete implementation there is.
  * {@link Rational}, the {@code rational} reader's host value, is a record, which {@code ltr8-bind} would otherwise
@@ -50,8 +50,8 @@ public final class ResolverBindContext {
                 .registerAtom(Rational.class)
                 .registerAtom(SourcePosition.class, new SourcePositionStringBridge())
                 .registerAtom(ValueRef.class, new ValueRefNameBridge())
-                .registerAtom(TypeRef.class, new TypeRefTextBridge())
-                .registerAtom(NameRef.class, new TypeRefTextBridge.ForName())
+                .registerAtom(TypeRef.class, new TypeRefNameBridge())
+                .registerAtom(NameRef.class, new TypeRefNameBridge.ForName())
                 .registerAtom(Object.class);
     }
 
@@ -76,8 +76,8 @@ public final class ResolverBindContext {
         }
         if (!builder.registersAtom(ValueRef.class)) {
             builder.registerAtom(ValueRef.class, new ValueRefNameBridge())
-                .registerAtom(TypeRef.class, new TypeRefTextBridge())
-                .registerAtom(NameRef.class, new TypeRefTextBridge.ForName());
+                .registerAtom(TypeRef.class, new TypeRefNameBridge())
+                .registerAtom(NameRef.class, new TypeRefNameBridge.ForName());
         }
         return builder;
     }

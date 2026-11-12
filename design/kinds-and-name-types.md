@@ -6,17 +6,17 @@ is why they are the linker's. Current form only; history lives in git.
 
 **Invariants**
 
-- A kind is the kernel's `meta.ref` atom (`ReferenceBody`; §4.2) over a constructor, `meta.top`
+- A kind is the kernel's `meta.ref` atom (`RefBody`; §4.2) over a constructor, `meta.top`
   or IS-A it, so its values are type names. What `of` names decides it (`KindMembers.namesTypes`), never the spelling,
   which is one, `meta.ref<T>`: `meta.ref<meta.record>` holds type names, and `meta.ref<api>`, over a type that is no
   constructor, names values (`ValuesByName`, `design/references.md`).
 - Every reference's derived `index` (`Index(namesTypes, members, entries, shown, values)`: the members sorted; the
-  final namespace's entries, which a name read in data finds through `ReferenceBody.closure()`; and the members as a
+  final namespace's entries, which a name read in data finds through `RefBody.closure()`; and the members as a
   message lists them, by name, before the pending ones a partial link adds) is recomputed for **every** reference in the
   closure, imports included (`TsonSchemaLinker.computeKinds`), and never trusted from a body. It is `@Unbound` and
   never written: a resolved form states `!meta.ref { of: … }` alone, and a written `members:` is refused as an
   unknown field.
-  `ReferenceBody`'s equality is `of` and the chain, never the index, so an importer re-deriving an import's kind
+  `RefBody`'s equality is `of` and the chain, never the index, so an importer re-deriving an import's kind
   unifies with it.
 - `of` resolves in the schema's one namespace and names any type or constructor; refused are a name resolving to
   nothing, an open record and a value entry (`KindMembers.ofRefusal`). A kind is not a bound.
@@ -27,7 +27,7 @@ is why they are the linker's. Current form only; history lives in git.
   `meta.ref<meta.map>` and `meta.ref<meta.namespace>`, and of no `meta.ref<meta.record>`. A value entry is a member of
   no kind: its tag names an ordinary type, which no walk reaches a constructor through.
 - A refinement of a reference (`!meta.type_ref ^ { of: … }`) narrows `of` to the source's or a type IS-A it, judged
-  at link (`ReferenceBody.ofNarrowing`), and is IS-A its source: `meta.identifier_ref` is `meta.type_ref` narrowed to
+  at link (`RefBody.ofNarrowing`), and is IS-A its source: `meta.identifier_ref` is `meta.type_ref` narrowed to
   `unicode.identifier_type`, its chain listing `meta.type_ref`. That edge is what admits `meta.namespace`'s restating
   `meta.map`'s `key_type` as `meta.identifier_ref` (`TsonSchemaLinker.checkRestatedFieldTypes`, §5.7).
 - A kind-typed position is judged by membership in every data document, over the reading document's closure; in a
@@ -69,7 +69,7 @@ net.uuid_type }` of the kernel's refined constructor) is an atom
 whose values are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a
 listed one. The kernel declares `meta.type_ref` and its refinement `meta.identifier_ref`, and types
 `meta.enum_type.name_type` and `meta.record.name_type` by the second. `computeKinds` derives every reference's index
-(`ReferenceBody.linked`) onto its body in the merged map after `computeSubtypes` and before the name-type checks; a reference
+(`RefBody.linked`) onto its body in the merged map after `computeSubtypes` and before the name-type checks; a reference
 that names values gets `namesTypes` false and no members.
 
 - **Membership is one walk over resolved entries.** `KindMembers`' class Javadoc states the walk: alias hops to the
@@ -97,7 +97,7 @@ that names values gets `namesTypes` false and no members.
   (`checkReferenceNarrows`): the source's or IS-A it, by the chain of the entry `of` names past its alias hops, so a
   widening or an unrelated `of` is refused. The resolver binds a refinement before the names `of` holds are ready
   (they wait on nothing, `design/resolver-vocabulary-and-bootstrap.md`), so the IS-A is the link's to ask, and the
-  family's rule (`ReferenceBody.ofNarrowing`) takes it as a predicate; `constraintsCheck` asks only that a reference
+  family's rule (`RefBody.ofNarrowing`) takes it as a predicate; `constraintsCheck` asks only that a reference
   refines a reference. Anything else is admitted: `meta.ref<meta.top>` holds every
   type, `meta.ref<meta.alias>` holds nothing, and `meta.ref<stock_id>` or `meta.ref<api>` names values of that type.
 - **Recomputed everywhere, trusted nowhere.** Members are computed over each linking schema's closure, so the
@@ -108,7 +108,7 @@ that names values gets `namesTypes` false and no members.
   the kernel's `enum => meta.enum_type ^ { name_type?: = meta.identifier }` is a member at the kernel's link, a schema's pin
   of its own `text_identifier` at that schema's, and a pin of a text family is refused where it is written.
 - **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers.forRead`'s
-  `TypeNameRefParser`, an `AtomTypeParser<TypeRef>`): a name token, or a JSON string holding one, read into the
+  `TypeRefParser`, an `AtomTypeParser<TypeRef>`): a name token, or a JSON string holding one, read into the
   `TypeRef` it is and naming a member of the linked index. In a data document a reference is a name, so a reference
   with arguments, unquoted in text or in a JSON string, is refused whether or not the closure closes it
   (`design/references.md`). A name is judged as one name, its path from the root
@@ -117,7 +117,7 @@ that names values gets `namesTypes` false and no members.
   its canonical text. That is every data document's reading, whatever it imports: a data document importing only temporal.tn
   that writes `!meta.record_field { type: int32 }` is refused, `int32` being numeric.tn's. In a **schema document** a name
   resolves in the schema being resolved, which the reading closure does not hold, so the reader checks the grammar alone
-  (`AtomParsers.inSchemaDocument`, `TypeNameRefParser.namesOnly`), an application included, and `AtomTypeReader`
+  (`AtomParsers.inSchemaDocument`, `TypeRefParser.namesOnly`), an application included, and `AtomTypeReader`
   records the name for that schema's link to judge. A schema document is a construction's or a value entry's
   payload, which the resolver reads (`TsonReadContext.readsSchemaDocument`), or a value of the kernel's `meta.schema`
   read as data, a resolved form (`readsSchemaNames`, set by the reader `TsonSchemaCompiler` builds for the kernel's

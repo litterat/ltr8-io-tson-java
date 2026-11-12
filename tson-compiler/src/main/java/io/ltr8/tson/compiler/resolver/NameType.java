@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.unicode.IdentifierType;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 
@@ -101,15 +101,15 @@ public final class NameType {
      * {@code entry}'s value applies -- read in {@code structure} first, then {@code local}; the linker hands both the
      * schema's one namespace. Empty where no such constructor or kind is in reach.
      */
-    private static Optional<ReferenceBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
-                                               Function<String, Top> structure) {
+    private static Optional<RefBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
+                                              Function<String, Top> structure) {
         Function<String, Top> constructors = fallingBackTo(structure, local);
         Optional<String> head = constructor.or(() -> Optional.of(TsonSchema.constructorOf(entry)));
         return head.flatMap(name -> slotKindOf(constructors.apply(AliasChain.terminal(name, constructors)),
                 constructors));
     }
 
-    private static Optional<ReferenceBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
+    private static Optional<RefBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
         if (!(constructor instanceof RecordBody record)) {
             return Optional.empty();
         }
@@ -121,8 +121,8 @@ public final class NameType {
                     // A reference written in place, `meta.ref<…>`, is the kind itself.
                     case TypeInline inline -> Optional.of(inline.of());
                 })
-                .filter(ReferenceBody.class::isInstance)
-                .map(ReferenceBody.class::cast);
+                .filter(RefBody.class::isInstance)
+                .map(RefBody.class::cast);
     }
 
     /**

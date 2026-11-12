@@ -61,7 +61,7 @@ import java.util.Set;
  * invoking a constructor is caught and re-reported through {@code ctx} too, so a caller sees one
  * uniform error model regardless of which layer noticed the problem.
  *
- * <p><b>A type-ref must link to something</b>, by {@link TypeRefCheck}'s rules, wherever it is written --
+ * <p><b>A type-ref must link to something</b>, by {@link TypeTagCheck}'s rules, wherever it is written --
  * not just at an atom leaf. A name {@link BuiltinTypeVocabulary} resolves (§5) is a built-in atom, so it
  * must sit on a token; any other name is {@code UNKNOWN_TYPE_REF}, a resolver error, exactly as {@code tson
  * validate} reports it: a schemaless document has no source of type names but §5's vocabulary
@@ -233,7 +233,7 @@ public final class DataClassObjectReader {
         return result;
     }
 
-    // ── Type-refs (TypeRefCheck's rules) ─────────────────────────────────
+    // ── Type-refs (TypeTagCheck's rules) ─────────────────────────────────
 
     /**
      * Consumes a container-shaped value's {@code annotation* type-ref?} framing and checks the type-ref
@@ -253,9 +253,9 @@ public final class DataClassObjectReader {
         }
         String name = typeRef.get();
         if (BuiltinTypeVocabulary.lookup(name).isPresent()) {
-            TypeRefCheck.notScalar(ctx, name, ctx.peek());
-        } else if (!(hostTypes && TypeRefCheck.names(target.typeClass(), name)) && !preserveUnknownTypeRefs) {
-            TypeRefCheck.unknown(ctx, name, target.typeClass(), hostTypes, TypeRefCheck.names(target.typeClass(), name));
+            TypeTagCheck.notScalar(ctx, name, ctx.peek());
+        } else if (!(hostTypes && TypeTagCheck.names(target.typeClass(), name)) && !preserveUnknownTypeRefs) {
+            TypeTagCheck.unknown(ctx, name, target.typeClass(), hostTypes, TypeTagCheck.names(target.typeClass(), name));
         }
     }
 
@@ -269,8 +269,9 @@ public final class DataClassObjectReader {
             return bindBaseValue(ctx, new BaseValue.VoidValue(), dataClass.dataClass());
         }
         if (!(e instanceof TokenEvent token)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
-                    "a token", TypeRefCheck.describe(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + dataClass.typeClass()
+                    + ", found " + TypeTagCheck.describe(e),
+                    "a token", TypeTagCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -284,9 +285,9 @@ public final class DataClassObjectReader {
             }
             // Not a built-in: only a name the target class declares outright gets through -- see the class
             // Javadoc on why an atom position takes `declares` rather than `names`.
-            boolean declared = TypeRefCheck.declares(dataClass.typeClass(), typeRef.get());
+            boolean declared = TypeTagCheck.declares(dataClass.typeClass(), typeRef.get());
             if (!(hostTypes && declared) && !preserveUnknownTypeRefs) {
-                TypeRefCheck.unknown(ctx, typeRef.get(), dataClass.typeClass(), hostTypes, declared);
+                TypeTagCheck.unknown(ctx, typeRef.get(), dataClass.typeClass(), hostTypes, declared);
                 return null;
             }
         }
@@ -387,8 +388,9 @@ public final class DataClassObjectReader {
             ctx.next();
             empty = true;
         } else {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
-                    "a record", TypeRefCheck.describe(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for " + dataClass.typeClass()
+                    + ", found " + TypeTagCheck.describe(e),
+                    "a record", TypeTagCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -504,8 +506,9 @@ public final class DataClassObjectReader {
         containerFraming(ctx, dataClass);
         if (!(ctx.peek() instanceof ArrayStart)) {
             TsonEvent e = ctx.peek();
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
-                    "an array", TypeRefCheck.describe(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for " + dataClass.typeClass()
+                    + ", found " + TypeTagCheck.describe(e),
+                    "an array", TypeTagCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -556,8 +559,9 @@ public final class DataClassObjectReader {
             ctx.next();
             empty = true;
         } else {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
-                    "a map", TypeRefCheck.describe(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for " + dataClass.typeClass()
+                    + ", found " + TypeTagCheck.describe(e),
+                    "a map", TypeTagCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -616,8 +620,9 @@ public final class DataClassObjectReader {
         containerFraming(ctx, dataClass);
         if (!(ctx.peek() instanceof ArrayStart)) {
             TsonEvent e = ctx.peek();
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for tuple " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
-                    "an array", TypeRefCheck.describe(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for tuple " + dataClass.typeClass()
+                    + ", found " + TypeTagCheck.describe(e),
+                    "an array", TypeTagCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -674,12 +679,13 @@ public final class DataClassObjectReader {
         if (typeRef.isEmpty()) {
             TsonEvent e = ctx.peek();
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "union type " + dataClass.typeClass()
-                    + " requires a type annotation (!typeName) to disambiguate members", "a !typeName", TypeRefCheck.describe(e));
+                    + " requires a type annotation (!typeName) to disambiguate members", "a !typeName",
+                    TypeTagCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
         if (!hostTypes && BuiltinTypeVocabulary.lookup(typeRef.get()).isEmpty()) {
-            TypeRefCheck.unknownUnionMember(ctx, typeRef.get(), dataClass.typeClass());
+            TypeTagCheck.unknownUnionMember(ctx, typeRef.get(), dataClass.typeClass());
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -741,7 +747,7 @@ public final class DataClassObjectReader {
      *
      * <p><b>Two scans rather than one</b>, so that a member's declared {@code @Typename} beats another
      * member's incidental class name where both claim the wire name -- an explicit declaration is the one
-     * the author meant. Collapsing them does not merely reorder that case: {@code TypeRefCheck#names} is
+     * the author meant. Collapsing them does not merely reorder that case: {@code TypeTagCheck#names} is
      * case-insensitive and matches an un-annotated {@code Foo} against {@code !foo}, so one loop would
      * answer {@code Foo} for both spellings and leave a {@code @Typename("foo")} sibling unaddressable.
      */
@@ -755,12 +761,12 @@ public final class DataClassObjectReader {
             return discovered;
         }
         for (Class<?> member : dataClass.memberTypes()) {
-            if (TypeRefCheck.declares(member, typeName)) {
+            if (TypeTagCheck.declares(member, typeName)) {
                 return member;
             }
         }
         for (Class<?> member : dataClass.memberTypes()) {
-            if (TypeRefCheck.names(member, typeName)) {
+            if (TypeTagCheck.names(member, typeName)) {
                 return member;
             }
         }

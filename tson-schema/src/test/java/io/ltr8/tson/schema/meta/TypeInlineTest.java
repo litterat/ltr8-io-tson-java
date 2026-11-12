@@ -19,7 +19,7 @@ class TypeInlineTest {
     @Test
     void withNoConstructorGivenItIsTheOneTheBodyIsAnInstanceOf() {
         assertEquals("meta.array", new TypeInline(AT_LEAST_ONE).constructor());
-        assertEquals("meta.ref", new TypeInline(ReferenceBody.of("order")).constructor());
+        assertEquals("meta.ref", new TypeInline(RefBody.of("order")).constructor());
         assertEquals(new TypeInline("meta.array", AT_LEAST_ONE), new TypeInline(AT_LEAST_ONE));
     }
 
@@ -40,7 +40,7 @@ class TypeInlineTest {
         ArrayBody set = new ArrayBody(TypeChain.EMPTY, TypeRef.of("text"), false, false, true, Optional.empty(),
                 Optional.empty());
         assertEquals("set<text>", new TypeInline("meta.set_type", set).text());
-        assertEquals("meta.ref<order>", new TypeInline("meta.ref", ReferenceBody.of("order")).text());
+        assertEquals("meta.ref<order>", new TypeInline("meta.ref", RefBody.of("order")).text());
         assertEquals("{text => nonempty_type<uuid>}", new TypeInline(MapBody.of(TypeRef.of("text"),
                 new TypeInline("nonempty_type", AT_LEAST_ONE))).text());
     }

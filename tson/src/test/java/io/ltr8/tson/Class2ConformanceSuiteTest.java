@@ -2,7 +2,6 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
@@ -13,7 +12,7 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -283,7 +282,7 @@ class Class2ConformanceSuiteTest {
             for (RecordValue claim : Sidecar.fieldRecordArray(expected, "members")) {
                 String name = fieldText(claim, "name");
                 // The names a reference over a constructor admits, derived at link and compared as a set.
-                if (!(definitionOf(entries, name) instanceof ReferenceBody kind) || !kind.namesTypes()) {
+                if (!(definitionOf(entries, name) instanceof RefBody kind) || !kind.namesTypes()) {
                     throw new AssertionError(name + " is no reference over a constructor, so it admits no members");
                 }
                 assertEquals(new TreeSet<>(fieldTextArray(claim, "members")), new TreeSet<>(kind.memberNames()),

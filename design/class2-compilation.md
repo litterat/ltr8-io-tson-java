@@ -45,7 +45,7 @@ choices. Current form only; history lives in git.
   record is a bind mismatch; read where no component says, it raises `MissingBindingException`. `tson-json`'s
   `RecordInPlaceReader` is the same rule.
 - In bind mode a component typed `TypeExpr` at a type slot's choice reads an untagged value through
-  readers of its own (`NamedDispatchReader.recoveringWith`): a name through the `TypeNameSlotReader` a `TypeRef`
+  readers of its own (`NamedDispatchReader.recoveringWith`): a name through the `TypeRefSlotReader` a `TypeRef`
   component gets, so the annotations written on the name are kept, and the `{ of: !C { … } }` wrapper through
   `TypeInlineReader`, which looks ahead for `C` -- the tag on `of`, no field of the wrapper -- and records it, past its
   alias hops, on the `TypeInline` the wrapper's own reader built. A natural reader's guess at an inline type's host

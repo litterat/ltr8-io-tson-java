@@ -12,7 +12,7 @@ package io.ltr8.tson.compiler.ast.schema;
  *       application; a parameter list is admitted only before {@code !meta.record}, an open record -- see
  *       {@link Instance}'s own Javadoc)</li>
  *   <li>{@link StructuralTypeDef} -- {@code [type-params] ["~"] structural-def} (§5.7-§5.9)</li>
- *   <li>{@link ReferenceTypeDef} -- {@code [type-params] type-ref} (§8.3): a plain reference, or any
+ *   <li>{@link TypeExprDef} -- {@code [type-params] type-ref} (§8.3): a plain reference, or any
  *       container form, since a declaration-level container reaches this through {@code type-ref} like
  *       every other position</li>
  *   <li>{@link SchemaMapDef} -- {@code "!schema" ws schema-map}: a schema map nested as an entry, whose members
@@ -24,5 +24,5 @@ package io.ltr8.tson.compiler.ast.schema;
  * sugar names {@code array} and binds its fields directly, with no size template in between.
  */
 public sealed interface TypeDef
-        permits AtomRefinement, Instance, StructuralTypeDef, ReferenceTypeDef, SchemaMapDef {
+        permits AtomRefinement, Instance, StructuralTypeDef, TypeExprDef, SchemaMapDef {
 }

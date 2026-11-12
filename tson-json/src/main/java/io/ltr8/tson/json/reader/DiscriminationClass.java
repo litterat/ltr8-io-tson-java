@@ -4,6 +4,7 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.numeric.DecimalType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.numeric.FloatType;
@@ -74,7 +75,7 @@ enum DiscriminationClass {
             // they can only be reached with a tag.
             case io.ltr8.tson.schema.unicode.TextType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.unicode.IdentifierType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.ReferenceBody ignored -> Optional.of(STRING);
+            case RefBody ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.net.UriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.net.IriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.unicode.RegexType ignored -> Optional.of(STRING);

@@ -31,7 +31,7 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
 - In a data document a bare token fills a record's one positional field (§5.6) whatever its type. In a schema
   document (`TsonReadContext.readsSchemaDocument()`) it does so only where that field is atom-typed; an unquoted
   token is otherwise a value by name, read only by a `TypeRef` component at a record-typed slot.
-  `ReferenceNameReader.nameIn` is the one statement of which tokens are names; their segment grammar is the linker's.
+  `ValueRefSlotReader.nameIn` is the one statement of which tokens are names; their segment grammar is the linker's.
 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
@@ -95,7 +95,7 @@ annotation has no pointer step of its own, and §9.4 wants one pointer for a rul
 at the value too.
 
 **Which is one instance of a line that runs through the whole vocabulary.** `UNKNOWN_TYPE_REF` means the
-written name *denotes nothing* — the schemaless reader's own check (`TypeRefCheck`) and an annotation naming
+written name *denotes nothing* — the schemaless reader's own check (`TypeTagCheck`) and an annotation naming
 no type the governing schema declares (`AnnotationCapture`) — two classes, and the only ones that report it. Everything
 where a name resolves and is merely not admissible is `TYPE_MISMATCH`: §7.2 subsumption, a choice's variant
 membership, a union's member test, a type-ref naming a template (`OpenTemplateReader`, which every open record
@@ -120,8 +120,8 @@ constructor's binding record, a value entry's payload — reaches its declaring 
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
 bare value as that field — `meta.record_field`'s `type` is `meta.type_expr`, whose name variant is an atom
-whose value is a type's name (`TypeNameSlotReader`) — and where the field is a product or a sum, an unquoted token
-(`ReferenceNameReader.nameIn`) is a **value by name** the record reader does not read as the field (`meta.record_field`'s
+whose value is a type's name (`TypeRefSlotReader`) — and where the field is a product or a sum, an unquoted token
+(`ValueRefSlotReader.nameIn`) is a **value by name** the record reader does not read as the field (`meta.record_field`'s
 own positional field being an atom, `fields: { p => x }` fills its `type`, as the sugar `p: x` does). Whether the token is
 a well-formed qualified name — each `.`-separated segment a [TSON-DATA] §7.7 identifier — is the linker's to judge,
 where the name is resolved (`ValuesByName.segments`).
@@ -133,9 +133,9 @@ has no positional form, so the rule has no JSON side.
 
 **The slot declares the spelling, never the host.** A value by name stands at a reference-typed slot (a reference over
 a type that is no constructor, `meta.ref<method>`) and a type's name at a kind-typed one (a reference over a constructor);
-a record-typed slot holds the record's value inline, and a `TypeRef` or `Ref` host there is a bind mismatch
+a record-typed slot holds the record's value inline, and a `TypeRef` or `ValueRef` host there is a bind mismatch
 (`BindTargets`). Every reference has one host shape: a kind-typed slot binds a `TypeRef`, and any other
-reference-typed slot a `TypeRef` or a `Ref`, whose `ReferenceNameReader` (set in place of the slot's atom reader
+reference-typed slot a `TypeRef` or a `ValueRef`, whose `ValueRefSlotReader` (set in place of the slot's atom reader
 by `BindTargets`) keeps the token as written in the `TypeRef`'s `name` in a schema document; a host holding such a slot
 as anything else (a `String`) receives what the atom reads, and the name is recorded all the same
 (`RecordedNameReader`). In a schema document the reader resolves nothing — the linker does

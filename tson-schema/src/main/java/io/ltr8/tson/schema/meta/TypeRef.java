@@ -16,7 +16,7 @@ import java.util.Optional;
  *
  * <p><b>{@link #referent} is what the reference names</b> in the closure it was read under: the value of the entry its
  * name names. A reference read where a closure is known carries it ({@link #closure}), attached by the kind's parser
- * from the reference type's linked index ({@code ReferenceBody.closure}). One built by hand, or read inside a schema
+ * from the reference type's linked index ({@code RefBody.closure}). One built by hand, or read inside a schema
  * document being resolved, carries {@link Closure#NONE}, and names nothing. A value's name is no {@code TypeRef}: it
  * reads to a {@link ValueRef}.
  *

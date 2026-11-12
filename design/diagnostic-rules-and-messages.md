@@ -103,7 +103,7 @@ encoding: the `of*` factories each switch on an exception an *encoding* declares
 would make the base depend on the vocabulary, while a copy per reader is how two encodings come to disagree
 about one token — a target that cannot represent a family's value being a bind problem on one path and a
 type mismatch on the other, with nothing saying which is right. Four readers go
-through it — `AtomTypeReader`, `TypeRefCheck`, `DataClassObjectReader` and the JSON stack's
+through it — `AtomTypeReader`, `TypeTagCheck`, `DataClassObjectReader` and the JSON stack's
 `JsonAtoms` — and `AtomTypeException` is sealed to exactly two subtypes, so the switch is exhaustive rather
 than a guess. Per-field schema positions are a separate matter
 (`design/reader-naming-and-schema-location.md`). (Message synthesis from code + params
@@ -123,7 +123,7 @@ watching every differing document get rejected.
 
 **`expected` carries the constraint that failed, never the type's name.** `AtomTypeException` holds an
 `expected` alongside its message, filled at each throw site from the facet that rejected the value, and all
-three atom report sites (`AtomTypeReader`, `TypeRefCheck.violation`, `DataClassObjectReader.bindBuiltin`)
+three atom report sites (`AtomTypeReader`, `TypeTagCheck.violation`, `DataClassObjectReader.bindBuiltin`)
 pass it straight through. Naming the type there — `a value satisfying quantity_t` against a message
 reading `'99999' is greater than the maximum 100` — would make the structured half carry strictly *less* than
 the prose, so a consumer wanting the bound would have to regex the sentence. That exception's own Javadoc fixes the

@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -16,7 +15,6 @@ import io.ltr8.tson.tree.TsonValue;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,7 +38,7 @@ import java.util.Set;
  * only a schema-driven read produces a {@code TsonTuple}), and {@code {}} resolves to an empty {@link
  * TsonRecord} (§2.8 leaves this to the resolver; a tree with no schema picks record).
  *
- * <p><b>Type-refs are checked</b>, by {@link TypeRefCheck}'s rules: a built-in name must sit on a token and
+ * <p><b>Type-refs are checked</b>, by {@link TypeTagCheck}'s rules: a built-in name must sit on a token and
  * that token must satisfy the atom, and with no target class to name (rule 2 is object-binding only) any
  * other name links to nothing and is {@code UNKNOWN_TYPE_REF}. {@link #preserving()} opts out of that last
  * rule for a caller who wants the wire back as authored -- reading the structure of a document whose
@@ -69,7 +67,7 @@ public final class SchemalessTreeReader {
     /** Whether a type-ref that links to nothing is preserved silently rather than reported -- see {@link #preserving()}. */
     private final boolean preserveUnknownTypeRefs;
 
-    /** Reports a type-ref that names no built-in type ({@link TypeRefCheck}'s rule 3). */
+    /** Reports a type-ref that names no built-in type ({@link TypeTagCheck}'s rule 3). */
     public SchemalessTreeReader() {
         this(false);
     }
@@ -124,7 +122,7 @@ public final class SchemalessTreeReader {
     }
 
     /**
-     * Applies {@link TypeRefCheck}'s rules to this value's own type-ref, returning the built-in atom that
+     * Applies {@link TypeTagCheck}'s rules to this value's own type-ref, returning the built-in atom that
      * should decode it -- empty when there is no type-ref, when the name isn't a built-in, or when a built-in
      * name sits on a container (all three reported unless preserved, and all three then read structurally,
      * so a collecting read still descends into whatever was actually written).
@@ -137,12 +135,12 @@ public final class SchemalessTreeReader {
         Optional<AtomType<?>> atom = BuiltinTypeVocabulary.lookup(name);
         if (atom.isEmpty()) {
             if (!preserveUnknownTypeRefs) {
-                TypeRefCheck.unknown(ctx, name);
+                TypeTagCheck.unknown(ctx, name);
             }
             return Optional.empty();
         }
         if (!(core instanceof TokenEvent)) {
-            TypeRefCheck.notScalar(ctx, name, core);
+            TypeTagCheck.notScalar(ctx, name, core);
             return Optional.empty();
         }
         return atom;
@@ -235,7 +233,7 @@ public final class SchemalessTreeReader {
             try {
                 value = atom.get().read(tokenValue.text());
             } catch (AtomTypeException e) {
-                TypeRefCheck.violation(ctx, typeRef.orElseThrow(), e, token.text());
+                TypeTagCheck.violation(ctx, typeRef.orElseThrow(), e, token.text());
                 return new TsonVoid(typeRef, annotations);
             }
         } else {

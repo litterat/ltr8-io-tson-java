@@ -10,13 +10,13 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
 **Invariants**
 
 - A name held in a slot is a value of the kernel's one atom of names, `meta.ref => meta.atom & { of: meta.type_ref }`
-  (`ReferenceBody`). It admits a name exactly when the type of the named entry's value, its tag, past its alias hops,
+  (`RefBody`). It admits a name exactly when the type of the named entry's value, its tag, past its alias hops,
   IS-A `of`: `order => { … }` holds a value of `meta.record`, `int32 => !integer ^ { … }` one of
   `numeric.integer_type`, `orders => !api { … }` one of `api`. `meta.ref<T>` is the construction `!meta.ref { of: T }`
   (§5.3's construction sugar), whatever `of` names, and a refinement of `meta.ref` is a constructor IS-A it, so a
   question of whether a body is a reference goes by the constructor's chain, never its name;
   `meta.type_ref` is `!meta.ref { of: meta.type }`, and `meta.identifier_ref` a refinement of that to
-  `unicode.identifier_type`, a refinement narrowing `of` to a type IS-A the source's (`ReferenceBody.ofNarrowing`).
+  `unicode.identifier_type`, a refinement narrowing `of` to a type IS-A the source's (`RefBody.ofNarrowing`).
   `meta.type_ref`, `meta.ref<meta.record>` and `meta.ref<method>` differ only in `of`.
 - **What `of` names decides what the slot holds, never the spelling** (`KindMembers.namesTypes`). Over a constructor,
   `meta.top` or IS-A it, the values admitted are types: the slot holds a type's name, its path from the root (`order`,
@@ -30,14 +30,14 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   namespace, the root's entries and the import closure, and each further segment selects in what it reached: a member
   of a nested `!schema` map, a key of a namespace value, a field of a record value. Inside `geo`, a sibling is
   `geo.address`, and a bare `address` is the root's or unresolved. There is no lexical scope, so no shadowing rule.
-- The linker stores that answer in `ReferenceBody`'s derived `@Unbound` `index` (`Index(namesTypes, members, entries,
+- The linker stores that answer in `RefBody`'s derived `@Unbound` `index` (`Index(namesTypes, members, entries,
   shown, values)`: the final namespace's entries, which a name read here finds; the members as a message lists them, the
   names an author writes; and, for a reference naming values in a whole link, `values`, a lookup
-  (`ReferenceBody.Values`) that judges a qualified name over the final namespace by `ValuesByName`'s walk, empty in a link of
+  (`RefBody.Values`) that judges a qualified name over the final namespace by `ValuesByName`'s walk, empty in a link of
   a resolution in progress), and `ValuesByName` re-derives it from `of` over the final namespace whatever the read guessed;
   `TsonSchema.SlotType`'s `KIND` and `REFERENCE` roles are only how the read read the name. The index is never written: a
   resolved form states `!meta.ref { of: … }` alone, a written `members:` is refused as an unknown field, and
-  equality and `toString` exclude it (`ReferenceBody.memberNames()` is the processor's own).
+  equality and `toString` exclude it (`RefBody.memberNames()` is the processor's own).
 - `of` names any type or constructor of the writer's namespace. It is a `TypeRef` at a slot that holds a name alone
   (§4.2): an application there, `!meta.ref { of: box<text> }` or `meta.ref<box<text>>`, is refused, to be
   declared under a name and named (`TypeSlots`' reference arm, `TemplateMaterialiser.nameRequired`), so a resolved `of`
@@ -119,13 +119,13 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   applicability, and counts `meta.top` by name and origin.
 - Every parameter is a type parameter, recording its name and the bound it is written with (`Param`); one stands only
   at a field's type or as an argument of an application there or in a parent (`design/open-records.md`).
-- A kind-typed slot whose host component is a `TypeRef` reads through `TypeNameSlotReader`: a bare token through the
+- A kind-typed slot whose host component is a `TypeRef` reads through `TypeRefSlotReader`: a bare token through the
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the
   slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). An application is never a value
   there: in a kernel body the desugarer writes one as `meta.apply` in place for the materialiser to close. The name
   itself is recorded by the kind's `AtomTypeReader`, in a schema document only, and name hygiene judges each name an
   application writes.
-- **In a data document a reference is a name** (§4.2). The kind's parser (`TypeNameRefParser`, shared by both
+- **In a data document a reference is a name** (§4.2). The kind's parser (`TypeRefParser`, shared by both
   encodings) refuses an application, `ATOM_CONSTRAINT_VIOLATION` at the slot, whether or not the closure closes it:
   `set<text>` is refused where the schema declares `names => set<text>`, and the document names `names`. The grammar
   reads it, so it is no parse error. Nothing in data is resolved against the applications a schema closed: the index
@@ -137,7 +137,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   the reference's `of`), so the linker never walks the path back through the meta's declarations, and a slot only a
   tagged subtype declares is judged however deep the value sits.
 - A name at a reference-typed slot is recorded and judged whatever the host component holds, since the
-  slot's `AtomTypeReader` records it: a host other than `TypeRef`/`Ref` (a `String`) receives what the slot's atom
+  slot's `AtomTypeReader` records it: a host other than `TypeRef`/`ValueRef` (a `String`) receives what the slot's atom
   reads, through a `RecordedNameReader` that refuses what is no name as a `TypeRef` host's reader refuses it.
 - A slot that names a value is typed by a reference over a type that is no constructor, `meta.ref<method>`. Its value
   is a qualified name. A slot typed by a record holds the record's value inline and takes no name.
@@ -145,8 +145,8 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   and `!meta.ref { of: order }` applied directly is no different
   (`ReferenceDeclarationTest`). A value's qualified name is judged by what it reaches, which a link judges: a
   reference over a type that is no constructor reads its grammar alone in a schema document
-  (`AtomParsers.inSchemaDocument`, `RefParser.namesOnly`), the schema's own link judging the name; in a data document
-  its atom (`RefParser`) asks the lookup the governing schema's link left on the reference (`ReferenceBody.Values`),
+  (`AtomParsers.inSchemaDocument`, `ValueRefParser.namesOnly`), the schema's own link judging the name; in a data document
+  its atom (`ValueRefParser`) asks the lookup the governing schema's link left on the reference (`RefBody.Values`),
   so the name is judged by the walk a value body's names take and refused as `ATOM_CONSTRAINT_VIOLATION` where it
   reaches nothing, a type, or a value of another type. A field's default or pin at one is judged at link the same way
   (`checkFieldValue`, through `ValuesByName.reach`), refused against the entry declaring the field.
@@ -162,9 +162,9 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   values, each the other's bind mismatch, and a `String` host receives the name at either. `ValueRef` is a cell
   delivered once and compared by name; it shares no parent with `TypeRef`, a value being no type.
 - **A reference read in data finds what it names.** A type's `TypeRef.referent()` is the value of the entry its name
-  names in the closure it was read under: `TypeNameRefParser` attaches `ReferenceBody.closure()`, which looks the name
-  up in the index's `entries`. A value's `ValueRef` is delivered the value its name reached (`RefParser`, over
-  `ReferenceBody.Values`), the governing schema's own value, bound or tree-held as the value entry is. The closure is
+  names in the closure it was read under: `TypeRefParser` attaches `RefBody.closure()`, which looks the name
+  up in the index's `entries`. A value's `ValueRef` is delivered the value its name reached (`ValueRefParser`, over
+  `RefBody.Values`), the governing schema's own value, bound or tree-held as the value entry is. The closure is
   a component excluded from `equals`, `hashCode` and `toString`. A reference read in a schema document, or built by
   hand, carries `Closure.NONE` and names nothing. A schemaless read has no closure at all and keeps a name as a
   `TsonAtom` holding its text (`design/tree-model.md`), with no referent.

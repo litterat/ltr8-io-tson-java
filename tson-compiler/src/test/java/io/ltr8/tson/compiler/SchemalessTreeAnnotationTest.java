@@ -27,7 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SchemalessTreeAnnotationTest {
 
-    /** Preserving, because these fixtures use custom type-refs ({@code !order}) as scenery -- a schemaless read reports one by default, which is {@code TypeRefCheck}'s business, not this test's. */
+    /**
+     * Preserving, because these fixtures use custom type-refs ({@code !order}) as scenery -- a schemaless read reports
+     * one by default, which is {@code TypeTagCheck}'s business, not this test's.
+     */
     private static TsonValue read(String source) {
         return new TsonTreeReader().preservingUnknownTypeRefs().read(source);
     }

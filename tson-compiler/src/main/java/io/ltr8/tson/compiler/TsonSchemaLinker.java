@@ -45,7 +45,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.numeric.FloatType;
 import io.ltr8.tson.schema.numeric.IntegerType;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.net.HostType;
 import io.ltr8.tson.schema.net.HostnameType;
 import io.ltr8.tson.schema.net.MediaTypeType;
@@ -1226,7 +1226,7 @@ public final class TsonSchemaLinker {
      * already resolved. A reference that names types and has no members admits no value, and the inhabitance check
      * reports it.
      *
-     * <p>A reference over any other type carries what a qualified name reaches ({@link ReferenceBody.Values}): judged
+     * <p>A reference over any other type carries what a qualified name reaches ({@link RefBody.Values}): judged
      * by {@link ValuesByName} over the final namespace, which {@code reached} holds once the link has assembled it, so
      * a data document's read judges the name as a value body's is.
      *
@@ -1241,11 +1241,11 @@ public final class TsonSchemaLinker {
                                                  AtomicReference<ValuesByName> reached, Map<String, Top> entries) {
         Map<String, Top> result = null;
         // A reference written in place is linked as an entry's is, at the slot that holds it.
-        UnaryOperator<io.ltr8.tson.schema.meta.Type> link = body -> body instanceof ReferenceBody reference
+        UnaryOperator<io.ltr8.tson.schema.meta.Type> link = body -> body instanceof RefBody reference
                 ? linkReference(reference, merged, facts, structure, pending, reached, entries) : body;
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             Top value = mapInline(entry.getValue(), link);
-            if (value instanceof ReferenceBody reference) {
+            if (value instanceof RefBody reference) {
                 value = linkReference(reference, merged, facts, structure, pending, reached, entries);
             }
             if (value != entry.getValue()) {
@@ -1259,10 +1259,10 @@ public final class TsonSchemaLinker {
     }
 
     /** One reference's index: whether its {@code of} names types, and the members or the value reach it admits. */
-    private static ReferenceBody linkReference(ReferenceBody reference, Map<String, Top> merged,
-                                               Map<String, TsonSchema.EntryFacts> facts, Function<String, Top> structure,
-                                               Set<String> pending, AtomicReference<ValuesByName> reached,
-                                               Map<String, Top> entries) {
+    private static RefBody linkReference(RefBody reference, Map<String, Top> merged,
+                                         Map<String, TsonSchema.EntryFacts> facts, Function<String, Top> structure,
+                                         Set<String> pending, AtomicReference<ValuesByName> reached,
+                                         Map<String, Top> entries) {
         boolean namesTypes = KindMembers.namesTypes(reference.of().name(), structure);
         List<String> members = namesTypes ? KindMembers.of(reference, merged,
                 name -> constructorOf(name, merged.get(name), facts), structure) : List.of();
@@ -1280,7 +1280,7 @@ public final class TsonSchemaLinker {
      * What a name read under a reference over {@code of}, a type that is no constructor, reaches: judged by {@link
      * ValuesByName} over the final namespace, which {@code reached} holds once the link has assembled it.
      */
-    private static ReferenceBody.Values valuesOf(String of, AtomicReference<ValuesByName> reached) {
+    private static RefBody.Values valuesOf(String of, AtomicReference<ValuesByName> reached) {
         return (where, name) -> {
             ValuesByName judged = reached.get();
             if (judged == null) {
@@ -1493,7 +1493,7 @@ public final class TsonSchemaLinker {
             // `of` resolves in the schema's one namespace and names any type or constructor ([TSON-SCHEMA] §4.2,
             // §5.12): what it admits is the names whose entries' values are of it, which is the slot's judgement
             // wherever a name is written. The index is the linker's own computation, so nothing else is validated.
-            case ReferenceBody reference -> {
+            case RefBody reference -> {
                 // `of` holds a name (§4.2).
                 if (namespace.get(AliasChain.terminal(reference.of().name(), namespace)) == null) {
                     throw new UnresolvedReference(entryName, " of", reference.of().name());
@@ -1782,13 +1782,13 @@ public final class TsonSchemaLinker {
 
     /**
      * [TSON-SCHEMA] §5.7's rule for a refinement of a reference, {@code !meta.type_ref ^ { of: … }}: its {@code of}
-     * is its source's or IS-A it ({@link ReferenceBody#ofNarrowing}). The resolver binds the refinement before the
+     * is its source's or IS-A it ({@link RefBody#ofNarrowing}). The resolver binds the refinement before the
      * names {@code of} holds need be resolved, so the IS-A is asked here, over the one namespace both resolve in; the
      * source is the reference the refinement's chain names, past its alias hops.
      */
-    private static void checkReferenceNarrows(String entryName, ReferenceBody reference, Map<String, Top> namespace) {
+    private static void checkReferenceNarrows(String entryName, RefBody reference, Map<String, Top> namespace) {
         for (String supertype : TypeChain.supertypesOf(reference)) {
-            if (namespace.get(AliasChain.terminal(supertype, namespace)) instanceof ReferenceBody source) {
+            if (namespace.get(AliasChain.terminal(supertype, namespace)) instanceof RefBody source) {
                 List<String> violations = source.ofNarrowing(reference, (sub, sup) -> isA(sub, sup, namespace));
                 if (!violations.isEmpty()) {
                     throw new SchemaValidationException("'" + entryName + "': not a valid refinement of '!"
@@ -1938,11 +1938,11 @@ public final class TsonSchemaLinker {
             return;
         }
         Token value = field.value().get();
-        if (target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get)) {
+        if (target instanceof RefBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get)) {
             checkKindValue(entryName, fieldName, field, value, reference, namespace, constructors);
             return;
         }
-        if (target instanceof ReferenceBody reference) {
+        if (target instanceof RefBody reference) {
             // A value's qualified name, judged by what it reaches as a value body's names are (§5.12).
             byName.reach("'" + entryName + "': field '" + fieldName + "''s "
                     + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value"),
@@ -1978,7 +1978,7 @@ public final class TsonSchemaLinker {
      * halves named, as any other value of the wrong type is.
      */
     private static void checkKindValue(String entryName, String fieldName, RecordField field, Token value,
-                                       ReferenceBody kind, Map<String, Top> namespace,
+                                       RefBody kind, Map<String, Top> namespace,
                                        Function<String, Optional<String>> constructors) {
         if (KindMembers.isMember(value.text(), kind.of().name(), namespace::get, constructors, namespace::get)) {
             return;

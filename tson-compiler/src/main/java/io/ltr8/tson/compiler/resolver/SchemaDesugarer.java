@@ -25,7 +25,7 @@ import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RecordExpr;
-import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
+import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -99,7 +99,7 @@ import java.util.function.UnaryOperator;
  *
  * <p><b>What is deliberately left alone.</b> Three positions keep their heads intact, because a name there is
  * being <em>declared</em> or <em>composed</em>, not applied: a declaration's own body reference
- * ({@code ReferenceTypeDef}), a refinement source, and a composition supertype.
+ * ({@code TypeExprDef}), a refinement source, and a composition supertype.
  *
  * <p><b>A template's body is a record body</b> ([TSON-SCHEMA] §5.10): braces, a composition or a refinement, and the
  * record passes through as it would without parameters, for {@code DefinitionResolver} to build as an open record. A
@@ -324,9 +324,9 @@ final class SchemaDesugarer {
             }
             // A declaration's own body reference names what this declaration *is*; only its arguments are
             // expandable, so the head stays put and its own handling is unchanged.
-            case ReferenceTypeDef reference when !reference.typeParams().isEmpty() ->
+            case TypeExprDef reference when !reference.typeParams().isEmpty() ->
                     throw refuseTemplateBody(reference.ref());
-            case ReferenceTypeDef reference -> {
+            case TypeExprDef reference -> {
                 // **A declaration's own body is the construction** (§5.3): the form becomes the instance
                 // directly, which keeps `score_list => [integer; 1..]` a PRODUCT entry with a real body and
                 // `contact => (email | phone)` a SUM entry with a real ChoiceBody. Every sugar form takes this
@@ -337,7 +337,7 @@ final class SchemaDesugarer {
                     yield instance(binding.get());
                 }
                 TypeExpr ref = argumentsOnly(reference.ref());
-                yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);
+                yield ref == reference.ref() ? reference : new TypeExprDef(reference.typeParams(), ref);
             }
             default -> typeDef;
         };
@@ -594,7 +594,7 @@ final class SchemaDesugarer {
         List<String> parameters = typeParams(declaration.typeDef());
         boolean mayConstruct = switch (declaration.typeDef()) {
             case StructuralTypeDef structural -> !(structural.body() instanceof RecordDef);
-            case ReferenceTypeDef ignored -> true;
+            case TypeExprDef ignored -> true;
             default -> false;
         };
         if (parameters.isEmpty() && !mayConstruct) {
@@ -609,7 +609,7 @@ final class SchemaDesugarer {
         return switch (typeDef) {
             case Instance instance -> instance.typeParams();
             case StructuralTypeDef structural -> structural.typeParams();
-            case ReferenceTypeDef reference -> reference.typeParams();
+            case TypeExprDef reference -> reference.typeParams();
             default -> List.of();
         };
     }

@@ -31,9 +31,9 @@ import io.ltr8.tson.compiler.stream.VoidEvent;
  * every name they see, which is what lets the readers report one at its position; both schemaless readers
  * report by default, and {@code preservingUnknownTypeRefs()} is the caller's opt-out.
  */
-final class TypeRefCheck {
+final class TypeTagCheck {
 
-    private TypeRefCheck() {
+    private TypeTagCheck() {
     }
 
     /** A type-ref naming neither a built-in type nor anything else this read can link it to. */

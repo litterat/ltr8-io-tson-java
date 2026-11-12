@@ -47,7 +47,7 @@ import java.util.function.Function;
  * linker delivers into, or as the name alone where a host holds it as text; and a type's name at a slot typed by a kind,
  * judged a member ({@link #judgeMember}). The same walk judges every other value's name ({@link #reach}): a field's
  * default or pin at a reference, and a name a data document writes at one, which the linker leaves the reference a
- * lookup for ({@code ReferenceBody.Values}).
+ * lookup for ({@code RefBody.Values}).
  *
  * <p><b>Fed by the read, not by the host.</b> The references judged are the ones the resolver's read produced by
  * name, each with its slot ({@link TsonSchema#valuesByName()}). The host class declares nothing for them, so none

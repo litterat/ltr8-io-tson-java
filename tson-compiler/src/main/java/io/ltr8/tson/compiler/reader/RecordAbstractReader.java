@@ -104,11 +104,11 @@ import java.util.stream.Collectors;
  * <p><b>In a schema document, a bare token is a positional fill only where the positional field is atom-typed</b>
  * ([TSON-SCHEMA] §5.6). When the read is of a value inside a schema document ({@link
  * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
- * ReferenceNameReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
+ * ValueRefSlotReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
  * positional field is <b>atom</b>-typed -- {@code meta.record_field}'s {@code type}, a {@code meta.type_ref}, so {@code
  * !meta.record { fields: { p => text } }} fills {@code type} -- and loses it where that field is a product or a sum,
  * where the explicit record is the only spelling. The record reader refuses a name it does not take as no record,
- * since a component that holds the name is read by {@link ReferenceNameReader} instead and never reaches this
+ * since a component that holds the name is read by {@link ValueRefSlotReader} instead and never reaches this
  * class. A data document has no namespace to resolve a name in,
  * so its reads are untouched: there a bare token fills the positional field whatever its type. Whether the positional
  * field is atom-typed is read off its own compiled reader ({@link #bareTokenFillsPositionally}), the one this class
@@ -396,12 +396,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             ctx.next();
             return new ShapeResult(Shape.EMPTY, anchor);
         }
-        Optional<String> byName = ctx.readsSchemaDocument() ? ReferenceNameReader.nameIn(e) : Optional.empty();
+        Optional<String> byName = ctx.readsSchemaDocument() ? ValueRefSlotReader.nameIn(e) : Optional.empty();
         if (positionalFieldIndex >= 0 && (byName.isEmpty() || bareTokenFillsPositionally())) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
         ctx.report(rules.notARecord(byName.map(written -> "the name '" + written + "'")
-                .orElseGet(() -> TypeRefCheck.describe(e))));
+                .orElseGet(() -> TypeTagCheck.describe(e))));
         EventSkip.coreValue(ctx);
         return new ShapeResult(Shape.MISMATCH, anchor);
     }
@@ -410,7 +410,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * Whether a bare token at this record's position fills its one positional field (§5.6) in a schema document --
      * false where the record has none, and where that field is product- or sum-typed, so a token well-formed as a
      * qualified name there is a value by name ([TSON-SCHEMA] §5.6). {@link BindTargets} asks it before giving a
-     * {@code TypeRef} component at a slot of this type a {@link ReferenceNameReader}: a type whose bare token is
+     * {@code TypeRef} component at a slot of this type a {@link ValueRefSlotReader}: a type whose bare token is
      * positional binds the reference through its own reader.
      *
      * <p>Asked of the field's own reader rather than of its declaration, at the read rather than at construction:

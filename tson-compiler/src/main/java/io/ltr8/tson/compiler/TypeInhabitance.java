@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -115,7 +115,7 @@ final class TypeInhabitance {
             // A reference that names types admits the names of its members, whatever the types they name admit,
             // so it is inhabited exactly when linking found a member. One that names values admits a name whose
             // referent only the linker judges.
-            case ReferenceBody reference -> !reference.namesTypes() || !reference.memberNames().isEmpty();
+            case RefBody reference -> !reference.namesTypes() || !reference.memberNames().isEmpty();
             case Alias alias -> refInhabited(alias.target(), namespace, inhabited);
 
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one

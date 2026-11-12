@@ -9,7 +9,7 @@ import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.KernelNames;
@@ -169,7 +169,7 @@ final class DependentFields {
             }
             case TypeInline inline -> inline.of();
         };
-        return target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get);
+        return target instanceof RefBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get);
     }
 
     /** The kernel's choice a type slot is typed by: a type's name, or a type written in place. */

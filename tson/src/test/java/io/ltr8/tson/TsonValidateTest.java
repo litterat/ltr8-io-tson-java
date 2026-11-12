@@ -545,7 +545,7 @@ class TsonValidateTest {
     /**
      * The shape word, not the event. Every container reader reported {@code found
      * ArrayStart[position=Position[line=2, column=8, byteOffset=50]]} and put the same in {@code actual};
-     * one {@code TypeRefCheck.describe} now serves all of them.
+     * one {@code TypeTagCheck.describe} now serves all of them.
      */
     @Test
     void aContainerShapeMismatchNamesTheShapeNotTheEvent() {

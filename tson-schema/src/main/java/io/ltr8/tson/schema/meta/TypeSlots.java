@@ -111,7 +111,7 @@ public final class TypeSlots {
                     choice.variants().stream().map(variant -> map(variant, rewrite)).toList(), choice.disjoint());
             case Alias alias -> new Alias(rewrite.atName(alias.target()));
             // `of` holds a name ([TSON-SCHEMA] §4.2); the index is carried, derived at link.
-            case ReferenceBody reference -> new ReferenceBody(reference.chain(), rewrite.atName(reference.of()),
+            case RefBody reference -> new RefBody(reference.chain(), rewrite.atName(reference.of()),
                     reference.index());
             // Every other atom's facets are values, never references; a declared type holds its chain alone.
             case Atom atom -> atom;

@@ -5,7 +5,7 @@ import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ValueRef;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.Optional;
@@ -16,7 +16,7 @@ import java.util.Optional;
  * read into the {@link ValueRef} a host receives.
  *
  * <p><b>The value finds what it names</b> where the reference was linked over a whole closure ({@link
- * ReferenceBody#values}): the name is judged by what it reaches there, as the linker judges a value body's names
+ * RefBody#values}): the name is judged by what it reaches there, as the linker judges a value body's names
  * ([TSON-SCHEMA] §4.2, §5.12), and the {@link ValueRef} returned has that value delivered. A name reaching nothing, a
  * type, or a value whose type is no {@code of} is refused as a constraint the value breaks.
  *
@@ -24,25 +24,25 @@ import java.util.Optional;
  * not hold: {@link #namesOnly} reads the grammar alone, into a {@link ValueRef} that schema's link delivers. A
  * reference whose schema is still resolving has nothing to reach yet and reads the grammar alone too.
  *
- * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link TypeNameRefParser}.
+ * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link TypeRefParser}.
  */
-public record RefParser(ReferenceBody reference, boolean judgesValues) implements AtomTypeParser<ValueRef<Object>> {
+public record ValueRefParser(RefBody reference, boolean judgesValues) implements AtomTypeParser<ValueRef<Object>> {
 
     /** A reference read under the schema whose closure it was linked over. */
-    public RefParser(ReferenceBody reference) {
+    public ValueRefParser(RefBody reference) {
         this(reference, true);
     }
 
     /** {@code reference}, read where a name resolves in the document being read: the grammar alone. */
-    public static RefParser namesOnly(ReferenceBody reference) {
-        return new RefParser(reference, false);
+    public static ValueRefParser namesOnly(RefBody reference) {
+        return new ValueRefParser(reference, false);
     }
 
     @Override
     public ValueRef<Object> read(String text) {
         TypeRef read = ReferenceGrammar.parse(text);
         ValueRef<Object> cell = ValueRef.to(read.name());
-        Optional<ReferenceBody.Values> values = judgesValues ? reference.values() : Optional.empty();
+        Optional<RefBody.Values> values = judgesValues ? reference.values() : Optional.empty();
         if (values.isEmpty()) {
             return cell;
         }

@@ -10,9 +10,9 @@ import java.util.List;
  * depending on what {@code ref} turns out to name -- a semantic-layer distinction (§5.6, §5.10),
  * not one this grammar-only stage makes.
  */
-public record ReferenceTypeDef(List<String> typeParams, TypeExpr ref) implements TypeDef {
+public record TypeExprDef(List<String> typeParams, TypeExpr ref) implements TypeDef {
 
-    public ReferenceTypeDef {
+    public TypeExprDef {
         typeParams = List.copyOf(typeParams);
     }
 }

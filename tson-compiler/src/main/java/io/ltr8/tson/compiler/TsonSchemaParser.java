@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.DiagnosticsReceiver;
@@ -27,7 +26,7 @@ import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RecordExpr;
-import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
+import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -413,10 +412,10 @@ public final class TsonSchemaParser extends TsonDataParser {
             return braceTypeDef(typeParams);
         }
         if (check(TokenType.LPAREN)) {
-            return new ReferenceTypeDef(typeParams, parseTypeRef());
+            return new TypeExprDef(typeParams, parseTypeRef());
         }
         if (check(TokenType.LBRACKET)) {
-            return new ReferenceTypeDef(typeParams, parseBracket());
+            return new TypeExprDef(typeParams, parseBracket());
         }
 
         TypeRef head = parseTypeRefHead();
@@ -431,14 +430,14 @@ public final class TsonSchemaParser extends TsonDataParser {
             throw parseError("expected '^' (refinement) or '&' (composition) after a bare type-ref, "
                     + "found '{'");
         }
-        return new ReferenceTypeDef(typeParams, head);
+        return new TypeExprDef(typeParams, head);
     }
 
     /** A brace at a type-def position: a record body is the declaration's structural-def, a map its type-expr. */
     private TypeDef braceTypeDef(List<String> typeParams) {
         TypeExpr form = parseBraceType();
         return form instanceof RecordExpr record ? new StructuralTypeDef(typeParams, record.body())
-                : new ReferenceTypeDef(typeParams, form);
+                : new TypeExprDef(typeParams, form);
     }
 
     /**

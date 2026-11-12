@@ -36,7 +36,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.tson.schema.numeric.IntegerType;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
@@ -415,7 +415,7 @@ public final class KernelBootstrapResolver {
             case "enum" -> toEnumBody(instance.value());
             // `!meta.ref { of: type }`: `of` is the authored field, and the index is derived when the kernel links,
             // as every reference's is.
-            case "meta.ref" -> new ReferenceBody(TypeRef.of(bindingField(instance.value(), "of")));
+            case "meta.ref" -> new RefBody(TypeRef.of(bindingField(instance.value(), "of")));
             // `field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }`.
             case "meta.map" -> new MapBody(TypeRef.of(bindingField(instance.value(), "key_type")),
                     TypeRef.of(bindingField(instance.value(), "value_type")),

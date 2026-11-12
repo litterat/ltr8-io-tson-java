@@ -627,7 +627,7 @@ class TsonObjectReaderTest {
         assertThrows(ReadException.class, () -> mapper.read("{ value: !Int32 42 }", IntHolder.class));
     }
 
-    // ── Type-refs on a container (TypeRefCheck's rules) ─────────────────────
+    // ── Type-refs on a container (TypeTagCheck's rules) ─────────────────────
 
     @Test
     void aBuiltInTypeRefOnAContainerIsAMismatch() {
