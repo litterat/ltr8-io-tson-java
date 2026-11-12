@@ -501,6 +501,17 @@ Items 59–70 carry #6, a dependent field's type in place. Each names the rule b
     a field's or a member's whole type. **§12.3** — a row for the suffix `!`: adjacent to the
     token before it and followed by whitespace, `a!b`, `kind!}` and `kind!?` parse errors.
 
+Item 71 completes #5's line on a record written in place. It names the rule before and after.
+
+71. **§4.2, §5.10.1** — §4.2 said a type written in place carries no `chain` but not what
+    stating one is, nor that a record written in place takes no `parameters`, and nothing
+    said what an abstract record written in place denotes. A record written in place takes no
+    `parameters`, and `parameters`, or a `chain` on any type written in place, is a resolver
+    error at the declaration. An abstract record written in place is empty, no schema being
+    able to name it as a parent, so a required field typed by it is refused by the
+    productivity rule, as one typed by `meta.ref<meta.alias>` is, and an optional one can
+    only be missing; a declared abstract record stays open to its importers' members.
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Their entries are not edited by this

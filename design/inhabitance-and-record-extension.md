@@ -45,8 +45,10 @@ the schema, at a line the data's author does not control. The diagnostic spells 
 - **The base cases, and nothing else**: a field that admits `_` or may be omitted with no value of its own, an optional
   tuple position, a container whose `min_items` is zero or absent (an array also where it is voidable), and a choice
   variant that does not recur. `void`'s only value is `_`, so a `void` field that does not admit `_` is stated by no
-  document: `a: void` empties its record, where `a?: void` empties only the field. A choice is the one place the walk
-  **branches** rather than conjoins: one good variant is enough, where a product needs every part.
+  document: `a: void` empties its record, where `a?: void` empties only the field. An abstract record written in
+  place is empty by itself, whatever its fields: with no name, no schema can add a member, where a declared abstract
+  record waits on its importers' and counts as inhabited. A choice is the one place the walk **branches** rather than
+  conjoins: one good variant is enough, where a product needs every part.
   - **Field groups are walked separately**, because §5.11 makes their members uniformly optional in `fields` with the
     requirement carried by the group's own state; reading the field list alone would call every group satisfied. A
     required group needs one choosable option: every member it does not mark `?` stated, and at least one member.

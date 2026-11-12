@@ -12,6 +12,7 @@ import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Alias;
@@ -201,8 +202,23 @@ final class TypeInhabitance {
         return switch (field.typeExpr()) {
             case TypeRef reference -> !AliasChain.resolvesToVoid(reference.name(), namespace)
                     && refInhabited(reference, namespace, inhabited);
-            case TypeInline inline -> isInhabited(inline.of(), namespace, inhabited);
+            case TypeInline inline -> inlineInhabited(inline, namespace, inhabited);
         };
+    }
+
+    /**
+     * A type written in place, inhabited by the rules its body would be judged by as an entry, but for an abstract
+     * record in place, which is empty ([TSON-SCHEMA] §4.2): it has no direct instances, and with no name no schema can
+     * declare a member of it, where a declared abstract record stays open to the members an importing schema adds.
+     * {@code discriminators} alone decide nothing: a record in place stating them and not abstract is read as any
+     * record is.
+     */
+    private static boolean inlineInhabited(TypeInline inline, Map<String, Top> namespace, Set<String> inhabited) {
+        return !abstractInPlace(inline) && isInhabited(inline.of(), namespace, inhabited);
+    }
+
+    private static boolean abstractInPlace(TypeInline inline) {
+        return inline.of() instanceof RecordBody record && record.extension() == RecordExtensionType.ABSTRACT;
     }
 
     private static boolean positionInhabited(TupleElement element, Map<String, Top> namespace,
@@ -218,18 +234,19 @@ final class TypeInhabitance {
     private static boolean slotInhabited(TypeExpr type, Map<String, Top> namespace, Set<String> inhabited) {
         return switch (type) {
             case TypeRef reference -> refInhabited(reference, namespace, inhabited);
-            case TypeInline inline -> isInhabited(inline.of(), namespace, inhabited);
+            case TypeInline inline -> inlineInhabited(inline, namespace, inhabited);
         };
     }
 
     /**
      * The next link of the chain through a slot nothing satisfies: its name, or, for a type written in place, the
-     * first name inside it that is not satisfied.
+     * first name inside it that is not satisfied -- none for an abstract record in place, empty by itself.
      */
     private static String slotDependency(TypeExpr type, Map<String, Top> namespace, Set<String> inhabited) {
         return switch (type) {
             case TypeRef reference -> reference.name();
-            case TypeInline inline -> firstUnsatisfiedDependency(inline.of(), namespace, inhabited);
+            case TypeInline inline -> abstractInPlace(inline)
+                    ? null : firstUnsatisfiedDependency(inline.of(), namespace, inhabited);
         };
     }
 

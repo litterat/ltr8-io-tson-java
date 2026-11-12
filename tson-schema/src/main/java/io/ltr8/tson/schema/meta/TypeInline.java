@@ -16,23 +16,22 @@ import java.util.function.Function;
  * constructor denotes, or the record an application of an open record closes to, held at the slot that wrote it,
  * {@code { of: !meta.array { element_type: text } }}. It is no entry: it has no name, and nothing looks it up.
  *
- * <p><b>What may be inline</b> ([TSON-SCHEMA] §4.2, §5.2), and this constructor is the one place the line is kept --
- * the kernel types {@code of} by the abstract {@code meta.type}, which admits more:
+ * <p><b>What may be inline</b> ([TSON-SCHEMA] §4.2, §5.2), and {@link #refusal} is the one place the line is kept --
+ * the kernel types {@code of} by the abstract {@code meta.type}, which admits more, so the constructor admits what the
+ * kernel does and whatever makes one from what an author wrote asks {@link #refusal} before it is used:
  * <ul>
  *   <li>a construction of a container, a tuple, a choice or a reference ({@link #constructible}): an {@link
  *       ArrayBody} ({@code meta.array}, and {@code meta.set_type} refining it), a {@link MapBody}, a {@link
  *       TupleBody}, a {@link ChoiceBody} or a {@link ReferenceBody} ({@code meta.reference_type}, and {@code
  *       meta.ref});</li>
  *   <li>a closed {@link RecordBody}, under {@code meta.record}: the record an application of an open record closes to
- *       at a type slot ([TSON-SCHEMA] §5.10), the one record in place. Only closing an application produces one: an
- *       author's record or {@code !meta.record { … }} at a slot is refused before it reaches the model, and a
- *       resolved form read as data states the record an application closed to.</li>
+ *       at a type slot ([TSON-SCHEMA] §5.10), or one a resolved form states.</li>
  *   <li>a {@link DependentBody}, {@code meta.dependent}, which is written in place only, and only directly at a record
  *       field's type ({@link #dependentOn}): a variable bound by that record, so equal text in two records is two
  *       types.</li>
  * </ul>
- * An enum and every other atom, any other record, and a namespace type ({@link NamespaceBody}), whose values carry
- * its name as their tag, are declared and named.
+ * An enum and every other atom and a namespace type ({@link NamespaceBody}), whose values carry its name as their
+ * tag, are declared and named.
  *
  * <p><b>{@code constructor} is the tag on {@code of}</b>, the entry the construction applies, past its alias hops
  * ([TSON-SCHEMA] §8.3): {@code set<T>} is {@code { of: !meta.set_type { element_type: T } }}, {@code meta.ref<T>} is
@@ -62,16 +61,6 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
     @Record
     public TypeInline {
         Objects.requireNonNull(of, "of");
-        if (!constructible(of) && !(of instanceof DependentBody)
-                && !(of instanceof RecordBody record && !record.isOpen())) {
-            throw new IllegalArgumentException("a type written in place is a container, a tuple, a choice, a "
-                    + "reference, a dependent type or the record an application closes to, and a "
-                    + of.getClass().getSimpleName() + " is none: an enum, an atom and a namespace type are declared "
-                    + "and named ([TSON-SCHEMA] §5.2)");
-        }
-        if (!of.chain().equals(TypeChain.EMPTY)) {
-            throw new IllegalArgumentException("a type written in place carries no chain: " + of.chain());
-        }
         constructor = constructor == null ? constructorOf(of) : constructor;
         if (application != null && !(of instanceof RecordBody)) {
             throw new IllegalArgumentException("only a record in place closes an application: " + application.text());
@@ -106,11 +95,34 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
     /**
      * Whether {@code type} is a construction that may be written in place: a container, a tuple, a choice or a
      * reference. A namespace type is no such container: its values are tagged by its name. A record in place is no
-     * construction, and only closing an application produces one ({@link #closing}).
+     * construction.
      */
     public static boolean constructible(Type type) {
         return type instanceof ArrayBody || type instanceof MapBody || type instanceof TupleBody
                 || type instanceof ChoiceBody || type instanceof ReferenceBody;
+    }
+
+    /**
+     * Why this type may not be written in place ([TSON-SCHEMA] §4.2, §5.2), naming it by its form; empty where it may.
+     * A type in place has no name: nothing composes it or applies it.
+     */
+    public Optional<String> refusal() {
+        if (!constructible(of) && !(of instanceof DependentBody) && !(of instanceof RecordBody)) {
+            return Optional.of("'!" + constructor + " { ... }' is written in place, and only a container, a tuple, a "
+                    + "choice, a reference, a dependent type or a record is: an enum, an atom and a namespace type "
+                    + "are declared and named");
+        }
+        String form = (of instanceof RecordBody ? "the record written in place '" : "the type written in place '")
+                + text() + "'";
+        if (!of.chain().isEmpty()) {
+            return Optional.of(form + " states a chain, and a type written in place carries none: it has no name, "
+                    + "so it is a member of nothing and nothing composes it");
+        }
+        if (of instanceof RecordBody record && record.isOpen()) {
+            return Optional.of(form + " takes parameters, and an open record is applied by its name, which a record "
+                    + "written in place has none of");
+        }
+        return Optional.empty();
     }
 
     /** The field a dependent type in place takes its type from, or empty where {@code of} is no {@link DependentBody}. */

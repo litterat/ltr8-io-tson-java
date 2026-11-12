@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.stream.EventSkip;
@@ -19,6 +20,9 @@ import java.util.function.UnaryOperator;
  * <p>The tag is found by looking ahead over the wrapper's opening, which consumes nothing, so the wrapper's reader
  * reads the whole value as written and reports what it finds wrong with it; where the lookahead finds no tag, that
  * reader's value stands as it built it.
+ *
+ * <p>What the kernel admits at {@code of} and a type in place may not be ({@link TypeInline#refusal}) is reported
+ * here, where an author's type in place becomes a value, so no pass sees one the rule refuses.
  */
 record TypeInlineReader(TsonTypeReader<?> wrapper, UnaryOperator<String> terminal) implements TsonTypeReader<Object> {
 
@@ -28,8 +32,17 @@ record TypeInlineReader(TsonTypeReader<?> wrapper, UnaryOperator<String> termina
     public Object read(TsonReadContext ctx) {
         Optional<String> constructor = TsonReadContext.lookingAhead(ctx, TypeInlineReader::constructorAhead);
         Object read = wrapper.read(ctx);
-        return read instanceof TypeInline inline && constructor.isPresent()
-                ? inline.withConstructor(terminal.apply(constructor.get())) : read;
+        if (!(read instanceof TypeInline inline)) {
+            return read;
+        }
+        TypeInline tagged = constructor.map(tag -> inline.withConstructor(terminal.apply(tag))).orElse(inline);
+        Optional<String> refusal = tagged.refusal();
+        if (refusal.isPresent()) {
+            ctx.report(Diagnostic.Code.SCHEMA_ERROR, refusal.get() + " ([TSON-SCHEMA] §4.2, §5.2): declare it under a "
+                    + "name and write that name", "a type that may be written in place", tagged.constructor());
+            return null;
+        }
+        return tagged;
     }
 
     /** The tag on the wrapper's {@code of}, read past whatever stands ahead of it; empty where there is none. */
