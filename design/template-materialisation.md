@@ -7,8 +7,8 @@ derived — and the static check that runs before any of it.
 **Invariants**
 
 - The pass order in `SchemaResolver` is fixed: the driving loop resolves every declaration, then
-  `TemplateRegularity.check`, then `ParameterTypes.check` and `checkDeferred`, then `materialise`, then
-  `appliedParentEdges` and `closeChains`. Every step reads what the one before it settled.
+  `TemplateRegularity.check`, then `ParameterTypes.check`, `HeldRecursion` and `checkDeferred`, then `materialise`,
+  then `appliedParentEdges` and `closeChains`. Every step reads what the one before it settled.
 - **Nothing is minted.** An application is closed where it stands, or closes into the declaration that names it, or
   is reported; no entry is added under a name derived from content or from the application.
 - A template that fails the regularity check, or whose parameters stand where none may, is replaced with the
@@ -36,8 +36,10 @@ derived — and the static check that runs before any of it.
   one a declaration is closing names that declaration (`closingInto`). One at a refinement source is absorbed, as a
   composition operand is (below).
 - **Two refusals come before closing in place** (`instantiate`): one whose record in place would be IS-A a declared
-  type (`refuseMembership`, §5.2), and a recursion with no declaration to tie to (§5.10.1). Held in an open record,
-  either is reported at the declaration whose application closed it.
+  type (`refuseMembership`, §5.2), and a recursion with no declaration to tie to (§5.10.1). Held in an open record, a
+  membership is reported at the declaration whose application closed it, and a recursion at the open record's own
+  declaration (`HeldRecursion`: it holds a recursive record whose cycle avoids it), its appliers closing against its
+  placeholder, so the refusal at a slot is a closed record's alone.
   - *Membership* has two halves. A template's written parents reaching a declared type are judged at once. An applied
     parent a declaration names (`dog_of => <T> animal_of<T> & { … }` beside `animal_text => animal_of<text>`) is known
     only once every declaration has closed, so one asked while declarations are being made ready is deferred to

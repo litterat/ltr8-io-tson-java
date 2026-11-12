@@ -248,7 +248,7 @@ Open questions are recorded here and are NOT reflected as open text in the speci
 33. **§13.2** — `TSON-DATA` and `TSON-JSON` at `/2026/40/`, `TSON-GUIDE` left at
     `/2026/39/`; the six artifact rows carry the Revision 40 pins (§6).
 
-Items 34–56 carry #5, inline types. Each names the rule before and after.
+Items 34–57 carry #5, inline types. Each names the rule before and after.
 
 34. **Header** — the summary gains a sentence: a type slot holds a name or a type written in
     place, nothing is lifted or minted, and `@meta.synthetic` is gone.
@@ -367,6 +367,15 @@ Items 34–56 carry #5, inline types. Each names the rule before and after.
     §12.1's `map-key`, `element-type` and `type-arg` comments state the new rules and the
     `type-name` note on internal names goes; §12.2's generic-key dispatch notes the refusal.
     **§13.2** — the six artifact pins follow the re-stamped kernel (§6).
+57. **§5.10, §5.10.1** — an open record holding an application of a recursive open record
+    it is not on a cycle of (`wrap => <T> { n: node<T> }`) was accepted, and the refusal fell
+    on whoever applied it (`wrap_text => wrap<text>`), where its remedy, declare
+    `node_text` and write it, could not be followed. It is a resolver error at its own
+    declaration, applied or not: the held applications that would close in place are
+    followed, the fields absorbed through an applied parent or a refinement source among
+    them, and a recursive record reached on a cycle the declaration is not on means no
+    application of it could close. The remedy is the closed type taken as a parameter,
+    `wrap => <N> { n: N }` applied to `node_text`.
 
 ### 3.3 Companion artifacts
 
@@ -434,7 +443,9 @@ Changes a Revision 39 implementer must act on:
     `type: { of: !meta.array { element_type: text } }`. Nothing is lifted, minted or merged;
     `@meta.synthetic`, internal names and comparison up to renaming are gone. An application
     of an open record at a type slot closes in place to a record with no name; a recursive
-    one ties to the declaration closing it, and is refused where none does. An argument of
+    one ties to the declaration closing it, and is refused where none does; an open record
+    holding a recursive one it is not on a cycle of could never close, and is refused at its
+    declaration. An argument of
     an open record's application is a name or a parameter, and a map's key is a name.
 12. **Every bundled pin changes** (§6).
 
@@ -510,7 +521,8 @@ carries no open questions.
 3. **#5's examples** — the examples #5 writes or changes run: §1.6's schema, its `history`
    closing `flagged<status>` in place, and its data document; §5.10's `f: page<order>` beside
    `page_order` (a tag naming `page_order` refused at `f`) and `cursor: box<T>` closed in place;
-   §5.10.1's `node_text` and `tree_text`, and the refusal of an unnamed recursive application;
+   §5.10.1's `node_text` and `tree_text`, the refusal of an unnamed recursive application,
+   `wrap` refused at its declaration applied or not, and the parameter remedy;
    §8.2's `pair<text, text>` at a field; sugar in place, a sugar form refused as an argument and
    the widened positional form.
 4. **The build** — the implementation's full build, with the conformance corpus's Revision

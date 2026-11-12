@@ -359,8 +359,12 @@ public final class SchemaResolver {
                 return vocabulary.value(type, value, names, heldByName);
             }
         };
+        HeldRecursion heldRecursion = new HeldRecursion(name -> {
+            Top visible = waitOrder.definition(name);
+            return visible != null ? visible : heads.definition(name);
+        }, declarations::containsKey);
         TemplateMaterialiser materialiser = new TemplateMaterialiser(waitOrder, reads,
-                heads::definition, waitOrder::current, facts, applications, kernel);
+                heads::definition, waitOrder::current, facts, applications, kernel, heldRecursion);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
@@ -440,6 +444,22 @@ public final class SchemaResolver {
                     problems.report(declarations.get(name), "'" + name + "': " + error.getMessage(), error);
                 });
         condemn(refusedParameters, resolvedLocals, namespace);
+        // §5.10.1's held recursion, over the open records as the two checks above left them, each declaration once:
+        // one holding where it closes in place an application of a recursive open record whose recursion does not
+        // pass back through it could never be closed. Its appliers closed against its placeholder while declarations
+        // were made ready, so this is the one report, and condemning it keeps materialisation from a second.
+        heldRecursion.forget();
+        Set<String> heldRecursive = new LinkedHashSet<>();
+        for (String name : declarations.keySet()) {
+            heldRecursion.refusal(name).ifPresent(error -> {
+                if (!problems.collecting()) {
+                    throw error;
+                }
+                problems.report(declarations.get(name), error);
+                heldRecursive.add(name);
+            });
+        }
+        condemn(heldRecursive, resolvedLocals, namespace);
         // The bound checks of the applications closed while declarations were being made ready, which an argument
         // could not order (§3.4.1), run now that every argument is ready -- before anything else closes. A
         // declaration that already failed has its verdict, so a check is not a second one.
@@ -878,7 +898,7 @@ public final class SchemaResolver {
      * mismatch: a `Sum`-bodied placeholder makes every dependent report too, which is the cascade the
      * placeholder exists to prevent.
      */
-    private static Top unresolved(List<String> parameters) {
+    static Top unresolved(List<String> parameters) {
         // An open placeholder is an empty open record, so it closes by the one process a template does.
         return parameters.isEmpty() ? RecordBody.of(RecordBody.fieldMap())
                 : new RecordBody(TypeChain.EMPTY, parameters.stream().map(Param::new).toList(), new AnnotatedMap<>(),

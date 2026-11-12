@@ -383,7 +383,10 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   { value: T  next?: node<T> }` holds `next: node_text`. Mutual recursion through records in place ties the same way:
   closing `a_text => a<text>` over `a => <T> { b: b<T> }` and `b => <T> { a?: a<T> }` closes `b` in place, whose
   `a<text>` names `a_text`. Recursion is judged by closing: an application reached again inside its own closing in
-  place, with no declaration closing it, is refused (`f: b<text>`, with or without `a_text` declared).
+  place, with no declaration closing it, is refused (`f: b<text>`, with or without `a_text` declared). An open record
+  holding an application of a recursive open record it is not on a cycle of (`wrap => <T> { n: node<T> }`) could never
+  close, and is refused at its own declaration, applied or not, judged over the open records' held heads once every
+  declaration is ready; its appliers report nothing.
 - *Records in place, read and bound.* A record in place reads in tree and bind mode and through the JSON stack, by a
   reader built from its body: the open record's field states, defaults, pins, groups, name type and dependent fields,
   each diagnostic located by its field path and naming the application as written. A value there carries no tag and
@@ -395,10 +398,11 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   declaration, naming the declaration to write (`text_box => box<text>`); an argument of a constructor's application
   inside an open record (`meta.array<box<T>>`) is held and closes at its slot. An application at a slot typed
   `meta.type_ref` — a map's key, a reference's `of`, a parameter's bound, an alias's target — is refused the same way.
-- *Refused.* An application whose record in place would be IS-A a declared type (`k: dog_of<text>`, §5.2) and a
-  recursive application with no declaration closing it (`f: node<text>`, §5.10.1) are resolver errors, each at the
-  declaration that wrote it or, held in an open record, at the declaration whose application closed it, judged before
-  the record is closed.
+- *Refused.* An application whose record in place would be IS-A a declared type (`k: dog_of<text>`, §5.2) is a
+  resolver error at the declaration that wrote it or, held in an open record, at the declaration whose application
+  closed it, judged before the record is closed. A recursive application with no declaration closing it (`f:
+  node<text>`, §5.10.1) is one at the closed record that wrote it; held in an open record, the open record is refused
+  at its declaration (*Recursion*, above).
 - *The three widened rules.* A dependent field's sibling typed by the type-slot choice, a constructor's argument
   slot typed by it (`meta.array<text>` constructs), and the positional `fields: { p => text }` all run.
 - *Kinds.* A construction in place is a member of no kind; a kind over a refined constructor whose only member was a
