@@ -90,10 +90,9 @@ materialization, no validation (those are the resolver's/linker's jobs).
     deliberate grammar-layer deferral, classified at a later semantic layer.
 - **A type reference's head is a `qualified-name`** (`parseTypeRefHead`, `requireQualifiedName`): `geo.address` and
   `geo.address<T>` parse, each `.`-separated segment an identifier, and the parser keeps the dotted text whole; it
-  names the entry keyed by that path (`design/schema-resolution.md`). **The `<` is adjacent to the head** (§12.3), as the
-  data grammar's is ([TSON-DATA] §7.5): `box <text>` is a parse error naming the rule; inside the list whitespace and commas
-  are free. The schema grammar keeps a parser of its own for references rather than the data stream's, because its `type-arg`
-  admits sugar (`box<[text]>`, `box<(text | int32)>`), which a data argument never holds.
+  names the entry keyed by that path (`design/schema-resolution.md`). **The `<` is adjacent to the head** (§12.3):
+  `box <text>` is a parse error naming the rule; inside the list whitespace and commas are free. The argument list is
+  this grammar's alone, the data grammar having none ([TSON-DATA] §7.2.5).
 - **`kind!` is read where a field's type is, and refused by name everywhere else** (§5.2, §12.1; `parseFieldType`,
   `parseTypeRefHead`). `parseFieldType` takes an adjacent `!` after the first name as the mark; `parseTypeRefHead`,
   which every other reference position reaches, refuses one with the message naming where it stands, so `[ kind! ]`,

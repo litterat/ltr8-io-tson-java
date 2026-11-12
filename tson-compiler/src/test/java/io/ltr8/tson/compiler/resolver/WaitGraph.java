@@ -395,8 +395,7 @@ final class WaitGraph {
                 case DECLARED -> problems.add(entry + ": an untagged value at the declared " + type + " (" + path + ")");
                 case ABSTRACT -> dispatch(core, type, subtypes(shape.declaration()), path);
                 case ATOM -> {
-                    if (!(core instanceof TokenValue) && !(core instanceof VoidValue)
-                            && !(core instanceof io.ltr8.tson.compiler.ast.ReferenceValue)) {
+                    if (!(core instanceof TokenValue) && !(core instanceof VoidValue)) {
                         problems.add(entry + ": a " + kind(core) + " at atom " + type + " (" + path + ")");
                     }
                 }
@@ -471,8 +470,7 @@ final class WaitGraph {
 
     private static boolean admits(Form form, CoreValue core) {
         return switch (form) {
-            case ATOM -> core instanceof TokenValue || core instanceof VoidValue
-                    || core instanceof io.ltr8.tson.compiler.ast.ReferenceValue;
+            case ATOM -> core instanceof TokenValue || core instanceof VoidValue;
             case RECORD -> core instanceof RecordValue || core instanceof EmptyBrace;
             case NAMESPACE, MAP -> core instanceof MapValue || core instanceof EmptyBrace;
             case ARRAY, TUPLE -> core instanceof ArrayValue;

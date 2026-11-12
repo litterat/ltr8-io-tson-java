@@ -6,7 +6,6 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.FieldTypeExpr;
@@ -80,7 +79,6 @@ class SchemaDesugarerTest {
         String tag = value.typeRef().map(t -> "!" + t + " ").orElse("");
         return tag + switch (value.coreValue()) {
             case io.ltr8.tson.compiler.ast.TokenValue token -> token.text();
-            case io.ltr8.tson.compiler.ast.ReferenceValue reference -> reference.toString();
             case io.ltr8.tson.compiler.ast.RecordValue record -> record.fields().stream()
                     .map(f -> f.name() + ": " + rendered(f.value()))
                     .collect(java.util.stream.Collectors.joining("  ", "{ ", " }"));

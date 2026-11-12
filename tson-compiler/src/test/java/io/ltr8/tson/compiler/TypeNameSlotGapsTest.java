@@ -114,28 +114,32 @@ class TypeNameSlotGapsTest {
     }
 
     /**
-     * A kind-typed slot holds the name of a type, and an application is no name: it is refused, sound or not, and
-     * the declaration to write named ({@code order_box => box<order>}).
+     * A kind-typed slot holds the name of a type, and a value carries no argument list ([TSON-DATA] §7.2.5): an
+     * application is a syntax error, sound or not.
      */
     @Test
-    void anApplicationAtAKindSlotIsRefusedNamingTheDeclarationToWrite() {
+    void anApplicationAtAKindSlotDoesNotParse() {
         for (String application : List.of("box<order>", "box<no_such>", "no_box<order>", "box<order order>",
                 "box< other >")) {
-            refused(schema("applied-" + application.hashCode(),
-                            "op => !gap_operations { o => { request: " + application + " } }"),
-                    "a reference is a name", "write the name a declaration gives it");
+            doesNotParse(schema("applied-" + application.hashCode(),
+                    "op => !gap_operations { o => { request: " + application + " } }"));
         }
     }
 
     /** The same one level down, in a record value inside the body. */
     @Test
-    void anApplicationInANestedRecordIsRefused() {
-        refused(schema("nested", """
+    void anApplicationInANestedRecordDoesNotParse() {
+        doesNotParse(schema("nested", """
                 op => !gap_operations { o => {
                   request: order
                   replies: [ { status: 200  body: box<no_such> } ]
-                } }"""),
-                "a reference is a name");
+                } }"""));
+    }
+
+    private static void doesNotParse(String id) {
+        List<Diagnostic> problems = problems(id);
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code(), problems.toString());
     }
 
     /** The alias gives the application an entry, and the bare name then names it and is judged. */

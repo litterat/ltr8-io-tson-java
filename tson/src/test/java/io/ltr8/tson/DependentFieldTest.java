@@ -367,7 +367,7 @@ class DependentFieldTest {
     /**
      * Data has no {@code kind!}: a construction's payload and a data document are read by the data grammar, which
      * gives the mark its own syntax error. Its canonical form, {@code { of: !meta.dependent { on: kind } }}, is what a
-     * payload writes; quoted, {@code "kind!"} is text, which names no type.
+     * payload writes; quoted, {@code "kind!"} is text that is no qualified name, outside the reference's grammar.
      */
     @Test
     void theMarkIsNoDataForm() {
@@ -382,7 +382,7 @@ class DependentFieldTest {
         Tson typed = tson(schema("typed => { t: meta.type_ref }"));
         List<Diagnostic> problems = typed.validate("!!import:\"" + ID + "\"\n!typed { t: kind! }");
         assertTrue(problems.stream().anyMatch(problem -> problem.message().equals(separator)), problems::toString);
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH,
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID,
                 only(typed.validate("!!import:\"" + ID + "\"\n!typed { t: \"kind!\" }")).code());
     }
 

@@ -32,10 +32,10 @@ Provenance markers used in the disposition table:
 **This revision does not change the lexer.** The schema grammar's productions change at one
 point: a record field's or a group member's type may be a `dependent-type`, `kind!`, which
 no other production admits (#6, [TSON-SCHEMA] §12.1); `type-params` still parses before any
-body, and the resolver admits it before a record body alone. It narrows the **data grammar
-at two positions**: a reference's argument is a reference, so a number or a quoted token in
-a data document's argument list is a parse error; and `sibling-ref` is gone, `reference =
-application`, so `kind!` in a data value is a parse error ([TSON-DATA] §7.4).
+body, and the resolver admits it before a record body alone. It takes **both of Revision
+39's value forms out of the data grammar**: the argument list, so `<` and `>` in a data value
+are parse errors as they were in Revision 38; and `sibling-ref`, so `kind!` in a data value
+is a parse error ([TSON-DATA] §7.2.5, §7.4). A value that names something is a token.
 
 What it changes is **templates, and with them the kernel**. Revision 39 gave a template two
 representations and a parameter two kinds: a record template was its own constructor and a
@@ -50,9 +50,9 @@ derived by a fixed point across templates. Revision 40 replaces all of it with t
 2. **`C<args>` over a constructor is construction sugar**: `!C { f₁: a₁ … }` over its
    required fields typed by a reference naming types, in declaration order, as `[T]` and
    `{K => V}` already were.
-3. **At a reference slot of a schema document `H<args>` is a reference**, substituting
-   where `H` is an open record and constructing where it is a constructor. In a data
-   document a reference is a name.
+3. **`H<args>` is schema grammar**, sugar for the construction `meta.apply`, substituting
+   where `H` is an open record and constructing where it is a constructor. A reference is a
+   name, and no value carries an argument list.
 
 What follows from them: no value parameters, no derived or inherited bounds, no template a
 position names, no template over a body that is not a record, no alias template, no open
@@ -195,6 +195,34 @@ Items 11–19 carry #6, a dependent field's type in place. Each names the rule b
 19. **§7.7, §8.1** — the positions the identifier grammar holds at a parse error lose
     `sibling-ref` and "the token of a sibling reference"; the parse-error list loses "a
     sibling reference's `!` not followed by whitespace".
+
+Items 20–25 take the argument list out of the data grammar. With items 11–19, both of
+Revision 39's value forms, the argument list and the sibling form, are gone from it: a value
+that names something is a token, a qualified name, and `<` and `>` have no role in a data
+value, as in Revision 38. Items 2 and 4–8 are superseded where they describe a reference
+carrying an argument list. Each names the rule before and after.
+
+20. **§1.3** — the lexer-freeze paragraph's Revision 40 sentence narrowed a reference's
+    argument to a reference; it takes both of Revision 39's value forms out of the data
+    grammar, so `<` and `>` in a data value are parse errors again. The lexer is unchanged.
+21. **§1.5** — a Class 1 processor MUST read "a reference carrying an argument list as the
+    structured value §4.1 describes"; the requirement goes.
+22. **§2.3, §2.6** — `core-value` loses `reference`, and "one scalar form stands beside the
+    token", a reference carrying an argument list, becomes: a value that names something is
+    a token, a qualified name, and the argument list is no data syntax. A map key "may be a
+    reference" goes.
+23. **§3.2, §4.1** — an application "parses where a value stands", kept by a schemaless read
+    and a validation error under a schema; it is a parse error, as after `!`. A Class 1 value
+    is one of three things again, and a schemaless read reads a qualified name as the token
+    it is.
+24. **§7.2, §7.2.5, §7.3** — `<` and `>` had a grammar role in data values, the argument
+    list; they rejoin the characters the schema grammar reserves, thirteen again, each a
+    parse error in a data value. The token-position paragraph loses `<`'s adjacency. The
+    lexer is unchanged: `<` and `>` are the tokens they were, for the schema grammar.
+25. **§7.4, §7.5, §7.7, §8.1** — `reference`, `application`, `type-args` and `type-arg` go,
+    and so does the adjacency row for `<`; the identifier grammar's positions lose "the head
+    of a reference"; the parse-error list loses the argument-list cases and gains a special
+    token the data grammar gives no role, `<` and `>` among them.
 
 ### 3.2 Part 2 — Type System and Schema
 
@@ -625,6 +653,28 @@ and after.
 93. **Header, §1.3, §13.2** — the summary and the kernel's inventory gain `meta.apply`;
     every pin changes (§6).
 
+Items 94–97 follow the argument list out of the data grammar (§3.1 items 20–25).
+
+94. **§4.2** — "the data grammar still parses an argument list after a name", and a value
+    carrying one is "a validation error in a data document and a resolver error in a
+    schema document". It is a parse error wherever a value stands, a construction's payload,
+    a value entry's and a resolved form read as data included: the data grammar's ordinary
+    error for a character it reserves, as for `kind!`, the grammar not knowing the form.
+    Item 85's "which the data grammar still parses" is
+    superseded.
+95. **§3.3.4, §7.2, §7.4** — an application in a data document, at a reference-typed
+    position or where a tag would be, was a validation error; it is a parse error ([TSON-DATA]
+    §7.2.5).
+96. **§12.1, §12.3, §5.2** — the `instance` comment: "an application inside it is the
+    reference production of [TSON-DATA] §7.4, written unquoted"; an argument list in a
+    payload is a parse error, and a type slot there writes an application as `{ of:
+    !meta.apply { … } }`. The application's `<` adjacency, which cited [TSON-DATA] §7.5's
+    row, is a row of §12.3's table, the argument list being this grammar's alone. §5.2's
+    "the form is no data grammar" cites the separator rule ([TSON-DATA] §2.4).
+97. **Header, Kernel** — the summary's "a value carrying an argument list is refused
+    wherever a reference is read" names the parse error; `meta.reference_type`'s
+    documentation drops the argument list the data grammar parsed. Every pin changes (§6).
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Their entries are not edited by this
@@ -662,6 +712,13 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
    admitted at a record field's type and refused elsewhere by the facet; the string form is
    gone, and `"kind!"` at a kind's position is no reference, refused as the production
    refuses it. A reference naming values loses "and no sibling reference".
+9. **§1.6, §5.6** — item 23 and §5.6: a string holding an application was a validation
+   error, read by [TSON-DATA] §7.4's reference production so that the two encodings refused
+   one document for one reason; the production is gone ([TSON-DATA] items 20–25). A
+   reference's string is a qualified name, so `"set<text>"`, like `"kind!"`, is a string
+   outside the kind's grammar and a resolver error, as any string outside an atom's grammar
+   is. The text encoding refuses the unquoted form earlier, as a parse error, and its quoted
+   token as JSON does. Item 8's "refused as the production refuses it" is superseded.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -700,8 +757,8 @@ Changes a Revision 39 implementer must act on:
 8. **A field whose type names a parameter takes no value and is no selector.**
 9. **`meta.tuple1` and `meta.voidable_tuple1` are gone**: a one-position tuple is declared,
    `!meta.tuple [{ element_type: text }]`.
-10. **In a data document a reference is a name**: an application there is a validation
-    error, and the document names the entry a declaration gives it.
+10. **In a data document a reference is a name**: an application there is a parse error,
+    and the document names the entry a declaration gives it.
 11. **A type slot holds a name or a type written in place** (#5): `tags: [text]` resolves to
     `type: { of: !meta.array { element_type: text } }`. Nothing is lifted, minted or merged;
     `@meta.synthetic`, internal names and comparison up to renaming are gone. An application
@@ -718,6 +775,10 @@ Changes a Revision 39 implementer must act on:
     record field's type alone. `kind!` is no reference value, no data grammar and no JSON
     string; `allow_sibling`, `meta.field_type_ref` and `meta.field_type_expr` are gone, and
     `meta.record_field.type` is a `meta.type_expr`.
+14. **The data grammar is tokens and structures again** (§3.1 items 20–25): Revision 39's
+    argument list and sibling form are both gone from it. `<` and `>` in a data value are
+    parse errors, as in Revision 38, in a data document and a schema value's payload alike,
+    and a JSON string at a reference holds a qualified name and nothing else.
 
 ---
 
@@ -758,13 +819,14 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `32b894ac…` (Revision 39 `c9b069b6…`), numeric `640679c8…` (`dfa66c5d…`), temporal
-   `9f21273a…` (`fb4ada8f…`), net `0426eaff…` (`371fc20c…`), core `f1b7ddcd…`
-   (`4e8d9c43…`), policy `150ecaac…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   `0853746e…` (Revision 39 `c9b069b6…`), numeric `383a9f3a…` (`dfa66c5d…`), temporal
+   `3c781a0d…` (`fb4ada8f…`), net `3d617292…` (`371fc20c…`), core `220c3e9f…`
+   (`4e8d9c43…`), policy `a96b94e2…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
-   78–84's documentation of a parameter in a type written in place and for items 85–93's
-   `meta.apply` and final constructors. The chain is
+   78–84's documentation of a parameter in a type written in place, for items 85–93's
+   `meta.apply` and final constructors, and for items 94–97's documentation of a reference
+   with no argument list. The chain is
    consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
    libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
@@ -777,8 +839,8 @@ carries no open questions.
    `meta.type_inline`'s again, a record no longer declared and named. Items 85–93 add
    `meta.apply`, retype `type_chain.parents` and `application`, mark `meta.dependent` final,
    and rewrite the documentation of `meta.type`, `meta.reference_type`, `meta.type_inline`,
-   `meta.type_expr` and `meta.type_chain`: the kernel measures 83 entries. `meta-resolved.tn`
-   follows; the four library fixtures change only their identities.
+   `meta.type_expr` and `meta.type_chain`: the kernel measures 83 entries. Items 94–97
+   rewrite `meta.reference_type`'s again. `meta-resolved.tn` follows; the four library fixtures change only their identities.
 
 ---
 

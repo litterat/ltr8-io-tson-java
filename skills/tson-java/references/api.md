@@ -468,13 +468,13 @@ everything, are fail-fast by design.
 ### Exported sub-packages
 
 - `io.ltr8.tson.compiler.ast` — the parse-preserving AST: `Document`, `DataValue`, `CoreValue` and its
-  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `ReferenceValue`, `VoidValue`, `EmptyBrace`),
+  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `VoidValue`, `EmptyBrace`),
   `Annotation`,
   `TokenForm`.
 - `io.ltr8.tson.compiler.ast.schema` — `SchemaDocument` and the schema-grammar nodes.
 - `io.ltr8.tson.compiler.stream` — the Tier 2 event vocabulary: `TsonEvent` (sealed) with
   `DocumentStart`/`End`, `RecordStart`/`End`, `MapStart`/`MapArrow`/`MapEnd`, `ArrayStart`/`End`,
-  `FieldName`, `TokenEvent`, `ReferenceEvent` (an application, assembled whole), `VoidEvent`,
+  `FieldName`, `TokenEvent`, `VoidEvent`,
   `EmptyBraceEvent`, `TypeRef`,
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
 - `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`: the schema
@@ -493,10 +493,9 @@ A true leaf — depends on **nothing**, not even `ltr8-annotation`.
 
 ```java
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonReference, TsonVoid, TsonMissing {
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonVoid, TsonMissing {
 
-    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isReference() / isVoid()
-            / isMissing();
+    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isVoid() / isMissing();
     default boolean isContainer();
     default Optional<String> missingPath();          // the pointer up to the step that FAILED
 
@@ -523,18 +522,7 @@ public sealed interface TsonValue
 public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
         implements TsonValue { public static TsonAtom of(Object value[, String typeRef]); }
 
-// A reference the grammar alone shows to be one, read with no schema: no referent, nothing resolved.
-// A bare name is a TsonAtom holding text.
-public sealed interface TsonReference extends TsonValue permits TsonApplicationReference {
-    String text();                                   // what it reads as: box<text>
-}
-
-// An application (map<text list<int32>>), at least one argument.
-public record TsonApplicationReference(List<String> segments, List<TsonValue> arguments, Optional<String> typeRef,
-        List<TsonAnnotation> annotations) implements TsonReference {
-    public String name();                            // segments joined by "."
-    public String text();                            // canonical: one space between arguments
-}
+// A name read with no schema is a TsonAtom holding its text: nothing resolves without a schema.
 
 public record TsonDocument(Optional<String> id, List<String> imports, TsonValue root) {}
 ```
@@ -556,7 +544,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     public EntryFacts factsOf(String name);              // NONE for a name with no facts
     public Optional<SourcePosition> positionOf(String name); // absent where no source was read
     public Optional<String> constructorOf(String name);  // the constructor tag the entry's value applies
-    public Optional<TypeRef> applicationOf(String name); // the @meta.application on its key (§8.2)
+    public Optional<ApplyBody> applicationOf(String name); // the @meta.application on its key (§8.2)
 }
 
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
@@ -612,31 +600,29 @@ interfaces and enums, §8's `Top` and its bodies — one package per namespace i
 `DecimalType`, `FloatType`, `RationalType`, `ComplexType`), `net` (`IriType`, `UriType`, `EmailType`, `UuidType`, …),
 `binary` (`BytesType`) and `temporal` (`DateType`, `DateTimeType`, `TimeType`, `DurationType`, `PeriodType`). A schema
 map's entry is its value: a `Type` carries its own chain (`Type.chain()`, a `TypeChain` of `parents`, `supertypes` and
-`subtypes`, with accessors for each on `Type`, and `TypeChain.supertypesOf(top)` and its siblings for any
-value); the application an entry is the instantiation of is the derived
-`@meta.application` on its key (`TsonSchema.applicationOf`), stated as written, nested arguments unreduced
-(`@meta.application:pair<box<text> int32>`); and what is not part of the value — where it was declared, its
-value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The
-host values the atoms read to
-are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`,
-`Alias`, `TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a
-map of them, a namespace type (`operations => !meta.namespace { key_type: meta.identifier  value_type: operation }`, a
-`NamespaceBody`). An entry whose tag names such a type rather than a constructor, `api => !operations { search =>
-{ … } }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a
-member of no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind
-context binds one (by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its
-references. A slot
-typed by a reference (`ReferenceBody`, spelled `meta.ref<T>`) holds what its `T` decides: over a
-constructor (`request: meta.ref<meta.record>`) it binds a `TypeRef` holding a type's name (its path from the root,
-`geo.address` for a member of a nested `!schema` map; an application, `set<text>`, is refused there, and a document
-names the entry the schema declares for it), whose `referent()` is the value of the entry it names — a tree read
-delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type
-(`method: meta.ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and
-then a key of its namespace value, or a field of a record value) and the value it names (`method().get()`), or a `TypeRef`
-whose `referent()` is that value, or a `String` the name. In a schema the resolver records each with its slot as it reads the
-value, and the linker judges it and delivers the value; in a data document the read judges the name in the governing schema
-(`ATOM_CONSTRAINT_VIOLATION` where it reaches nothing, a type, or a value of another type) and delivers at once. The value is
-the schema's own value entry's, bound or a tree as the schema holds it.
+`subtypes`, with accessors for each on `Type`, and `TypeChain.supertypesOf(top)` and its siblings for any value); the
+application an entry is the instantiation of is the derived `@meta.application` on its key
+(`TsonSchema.applicationOf`), a `meta.apply` stated as written, each argument a name (`@meta.application:{ head: pair
+arguments: [box_text int32] }`); and what is not part of the value — where it was declared, its value annotations, its
+constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The host values the atoms read to are not
+here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`, `Alias`,
+`TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a map of them,
+a namespace type (`operations => !meta.namespace { key_type: meta.identifier  value_type: operation }`, a
+`NamespaceBody`). An entry whose tag names such a type rather than a constructor, `api => !operations { search => { …
+} }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a member of
+no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind context binds one
+(by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its references. A slot
+typed by a reference (`ReferenceBody`, spelled `meta.ref<T>`) holds what its `T` decides: over a constructor
+(`request: meta.ref<meta.record>`) it binds a `TypeRef` holding a type's name (its path from the root, `geo.address`
+for a member of a nested `!schema` map; an argument list, `set<text>`, is no data form and does not parse there, and a
+document names the entry the schema declares for it), whose `referent()` is the value of the entry it names — a tree
+read delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type (`method:
+meta.ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and then
+a key of its namespace value, or a field of a record value) and the value it names (`method().get()`), or a `TypeRef`
+whose `referent()` is that value, or a `String` the name. In a schema the resolver records each with its slot as it
+reads the value, and the linker judges it and delivers the value; in a data document the read judges the name in the
+governing schema (`ATOM_CONSTRAINT_VIOLATION` where it reaches nothing, a type, or a value of another type) and
+delivers at once. The value is the schema's own value entry's, bound or a tree as the schema holds it.
 
 ---
 

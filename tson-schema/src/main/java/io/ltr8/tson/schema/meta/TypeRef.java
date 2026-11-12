@@ -12,8 +12,7 @@ import java.util.Optional;
  * name} is the qualified name, its {@link #segments} joined by {@code .}.
  *
  * <p><b>A reference holds a name and nothing else.</b> An application, {@code box<T>}, is no reference: it is the
- * construction {@link ApplyBody} written in place, and a value carrying an argument list is refused wherever a
- * reference is read.
+ * construction {@link ApplyBody} written in place, and an argument list is no part of a value ([TSON-DATA] §7.2.5).
  *
  * <p><b>{@link #referent} is what the reference names</b> in the closure it was read under: the value of the entry its
  * name names. A reference read where a closure is known carries it ({@link #closure}), attached by the kind's parser

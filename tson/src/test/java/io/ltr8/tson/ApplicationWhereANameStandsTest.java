@@ -50,6 +50,18 @@ class ApplicationWhereANameStandsTest {
         }
     }
 
+    /**
+     * A construction's payload is data, where an argument list is no grammar ([TSON-DATA] §7.2.5): it is a syntax
+     * error, reported under the base-syntax code and never as the resolver's.
+     */
+    private static void doesNotParse(String declarations, String entry) {
+        List<Diagnostic> problems = problems(declarations);
+        assertEquals(1, problems.size(), problems::toString);
+        Diagnostic problem = problems.getFirst();
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problem.code(), problems::toString);
+        assertEquals(Optional.of("/" + entry), problem.schemaPointer(), problems::toString);
+    }
+
     // ── An argument of an open record's application is a name or a parameter (§5.3) ───────────
 
     @Test
@@ -85,17 +97,16 @@ class ApplicationWhereANameStandsTest {
     void anApplicationAtAReferencesOfIsRefused() {
         refused("  r => { f: meta.ref<box<text>> }", "r", "'box<text>' is an application", "only a name may stand");
         refused("  rr => meta.ref<box<text>>", "rr", "'box<text>' is an application");
-        refused("  rr => !meta.reference_type { of: box<text> }", "rr", "'box<text>' is an application");
+        doesNotParse("  rr => !meta.reference_type { of: box<text> }", "rr");
         refused("  r => { f: meta.ref<meta.array<text>> }", "r", "'meta.array<text>' is an application");
         refused("  o => <T> { f: meta.ref<box<T>> }", "o", "'box<T>' is an application");
     }
 
     @Test
     void anApplicationAtAMapsKeyIsRefused() {
-        refused("  m => !meta.map { key_type: box<text>  value_type: text }", "m", "'box<text>' is an application");
+        doesNotParse("  m => !meta.map { key_type: box<text>  value_type: text }", "m");
         refused("  r => { f: {box<text> => text} }", "r", "'box<text>' is an application");
-        refused("  m => !meta.map { key_type: meta.array<text>  value_type: text }", "m",
-                "'meta.array<text>' is an application");
+        doesNotParse("  m => !meta.map { key_type: meta.array<text>  value_type: text }", "m");
     }
 
     @Test
@@ -105,8 +116,8 @@ class ApplicationWhereANameStandsTest {
 
     @Test
     void anApplicationAtAnAliassTargetIsRefused() {
-        refused("  a => !meta.alias { target: box<text> }", "a", "'box<text>' is an application");
-        refused("  a => !meta.alias { target: meta.array<text> }", "a", "'meta.array<text>' is an application");
+        doesNotParse("  a => !meta.alias { target: box<text> }", "a");
+        doesNotParse("  a => !meta.alias { target: meta.array<text> }", "a");
     }
 
     // ── What a record in place may not be (§5.2, §5.10.1) ───────────────────────────────────────

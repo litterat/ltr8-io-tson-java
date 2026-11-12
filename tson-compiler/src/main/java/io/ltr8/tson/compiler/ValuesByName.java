@@ -56,7 +56,7 @@ import java.util.function.Function;
  * <p><b>The grammar is judged here, where the name is resolved.</b> The read keeps any unquoted token; this splits
  * it at each {@code .} and requires each segment to be a [TSON-DATA] §7.7 identifier ({@link #segments}), so
  * {@code orders.1x}, {@code .orders} and {@code orders.} are refused as no qualified name before anything is looked
- * up. A reference carrying arguments is no value by name.
+ * up.
  *
  * <p><b>One namespace holds both sides.</b> The slot's type arrives with the name: the reader that read the name was built
  * from the slot's declared type and recorded it beside the name ({@link TsonSchema.SlotType}), the slot's reference's {@code

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=32b894ac4793468f9f68325c69827605afd4b3d405ca77bdeb869f34fc9b329b"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=0853746eb05d7ddcec2cc4cf1243f4456d955c4b67c6267a040fee4fd16a8528"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -947,13 +947,12 @@
       written, and the name is judged when that schema links: the set of names
       a reference admits is the closure's, derived and never written.
 
-      A value is a name, never an application. The data grammar still reads an
-      argument list after a name, `geo.address<T>` ([TSON-DATA] §7.4), and a
-      value carrying one is refused wherever a reference is read, in data and
-      in a schema value alike. An application is schema source's: at a type
-      slot `box<T>` is the construction `apply` written in place, `{ of:
-      !meta.apply { head: box  arguments: [T] } }`, which closes where it
-      stands -- a constructor's to its construction, `set<text>` to
+      A value is a name, never an application: an argument list is no part of
+      a value, and `geo.address<T>` in one is a parse error ([TSON-DATA]
+      §7.2.5), in data and in a schema value alike. An application is schema
+      source's: at a type slot `box<T>` is the construction `apply` written in
+      place, `{ of: !meta.apply { head: box  arguments: [T] } }`, which closes
+      where it stands -- a constructor's to its construction, `set<text>` to
       `!meta.set_type { element_type: text }`, and an open record's to the
       record it denotes -- and stays written in place only inside an open
       record, over one of its parameters ([TSON-SCHEMA] §5.3, §5.10).

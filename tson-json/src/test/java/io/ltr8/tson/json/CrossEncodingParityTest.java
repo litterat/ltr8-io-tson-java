@@ -615,24 +615,25 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A kind names a declared application by its entry, and a data document's reference is a name, so an application
-     * is refused whether or not the schema closes it ([TSON-SCHEMA] §4.2): {@code unique => set<text>} is named
-     * {@code unique}, and {@code set<text>}, {@code set<label>} and {@code set<int32>} are each refused, on one code at
-     * one pointer. TSON writes the reference unquoted, as data grammar; JSON, having no unquoted form, writes the same
-     * text as a string, and the two are one rule ([TSON-JSON] §5.6).
+     * A kind names a declared application by its entry, and a reference is a name, so an application is refused
+     * whether or not the schema closes it ([TSON-SCHEMA] §4.2): {@code unique => set<text>} is named {@code unique}.
+     * In TSON an argument list is no data grammar, so {@code set<text>} does not parse ([TSON-DATA] §7.2.5); JSON has
+     * no unquoted form, so the string reaches the kind and spells no name, refused as any string outside the kind's
+     * grammar is ([TSON-JSON] §5.6).
      */
     @Test
-    void anApplicationAtAKindIsRefusedByBoth() {
+    void anApplicationIsNoReferenceInEitherEncoding() {
         bothAccept("typed", "{ t: unique }", """
                 {"t": "unique"}""");
         for (String application : List.of("set< text >", "set<label>", "set<int32>")) {
-            sameVerdict("typed", "{ t: " + application + " }", """
-                    {"t": "%s"}""".formatted(application));
-            assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/t")),
-                    tson("typed", "{ t: " + application + " }"), application);
+            assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_FORM_INVALID, "/t")), json("typed", """
+                    {"t": "%s"}""".formatted(application)), application);
+            assertTrue(tson("typed", "{ t: " + application + " }")
+                    .contains(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "")), application);
         }
-        sameVerdict("ided", "{ id: set<text> }", """
-                {"id": "set<text>"}""");
+        assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_FORM_INVALID, "/id")), json("ided", """
+                {"id": "set<text>"}"""));
+        assertTrue(tson("ided", "{ id: set<text> }").contains(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "")));
     }
 
     /**
@@ -655,15 +656,6 @@ class CrossEncodingParityTest {
         }
         sameVerdict("order_pick", "{ which: o1  also: c1 }", """
                 {"which": "o1", "also": "c1"}""");
-    }
-
-    /** An application nothing in the closure closed names no type the schema closes, and is refused by both. */
-    @Test
-    void anUnclosedApplicationAtAKindIsRefusedByBoth() {
-        sameVerdict("typed", "{ t: set<int32> }", """
-                {"t": "set<int32>"}""");
-        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
-                tson("typed", "{ t: set<int32> }").stream().map(Verdict::code).toList());
     }
 
     /**

@@ -271,13 +271,10 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   the enclosing frame's next pull sees it — at the document boundary `requireDocumentEnd`, whose
   `IllegalStateException` then fires on ordinary caller input with the diagnostics lost inside it. Where the skip goes
   is the caller's question: `DataClassObjectReader.read` has taken nothing and skips a whole data value, while
-  `bindUnion` has consumed the framing to find the member and skips the core-value alone. A `ReferenceEvent` is a
-  leaf to it, as a token is: the stream delivered the reference whole.
-- **A reference-typed position reads a token or a `ReferenceEvent`** (`AtomTypeReader`, `KindSlotReader`), rolling
-  either into one `TypeRef`, and refuses a quoted token holding `<` as `TYPE_MISMATCH`: a quoted token is never a
-  reference ([TSON-DATA] §7.4). Any other typed position meeting a `ReferenceEvent` reports it as it reports any
-  non-token, naming `the reference box<text>`; `DataValueEvents` replays a `ReferenceValue` as one event. In a data
-  document the name is judged
+  `bindUnion` has consumed the framing to find the member and skips the core-value alone.
+- **A reference-typed position reads a token** (`AtomTypeReader`, `TypeNameSlotReader`) into one `TypeRef`, its text
+  a qualified name (`ReferenceGrammar`); an argument list never reaches it, being no data form ([TSON-DATA]
+  §7.2.5). In a data document the name is judged
   where it is read, whichever `of` names: a kind's members over the closure (`TypeNameRefParser`), a value's qualified
   name by what it reaches in the governing schema (`RefParser`, `design/references.md`); in a schema document both
   read the grammar alone and record the name for the link.

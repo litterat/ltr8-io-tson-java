@@ -47,11 +47,11 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   admits nothing, no entry past its hops being an alias, and a required field typed by it is refused by §5.10.1's
   productivity check (`TypeInhabitance`). A reference is not a bound: `meta.param.bound` still refuses a constructor
   (`ParameterTypes.requireType`), a bound being IS-A, which no type argument is of a constructor.
-- **A reference is a name, and a value carrying an argument list is refused wherever one is read** (§4.2), in data
-  and in a schema value alike (`ReferenceGrammar.parse`, an `AtomValidationException` naming how an application is
-  written). The data grammar still parses the list ([TSON-DATA] §7.4) until it leaves the grammar: the stream assembles
-  a `ReferenceEvent` and the AST a `ReferenceValue`, each holding `ReferenceGrammar.Spelled`, and a schemaless read keeps
-  it as `TsonApplicationReference`. A **quoted token is never a reference**.
+- **A reference is a name, and an argument list is no data form** ([TSON-DATA] §7.2.5): in data and in a schema
+  value alike, `set<text>` is a parse error at its `<`, the grammar's ordinary one for a reserved character. A
+  reference's text is a qualified name (`ReferenceGrammar`), so a JSON string or a quoted token holding an argument
+  list fails that grammar, a resolver error, the message saying the same (SPEC-FEEDBACK.md #2 holds whether a quoted
+  token is a reference at all).
 - **An application is `meta.apply` written in place** (`ApplyBody`): `head` a name, `arguments` names, and while a
   schema resolves an argument may be an application in place, which a constructor's construction lands at its slot
   (`ConstructionSugar.StandIns`). The schema grammar's `head<args>` at a type slot is its sugar, and the explicit
@@ -122,14 +122,10 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   at a field's type or as an argument of an application there or in a parent (`design/open-records.md`).
 - A kind-typed slot whose host component is a `TypeRef` reads through `TypeNameSlotReader`: a bare token through the
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the
-  slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). A `ReferenceEvent` is an application,
-  its `TypeRef` taken as the stream parsed it; a malformed one (`box<text`) is a parse error, and a quoted token,
-  `"box<text>"`, is text, a `TYPE_MISMATCH` at a reference-typed position. In a kernel body an application is a
-  value: resolved output holds one where an application is open, and the desugarer writes one into the slot it fills
-  for the materialiser to close in place afterwards. In a value body (`TsonReadContext.readsValueBody`, a value
-  entry's payload) nothing is closed, so it is refused and the alias
-  spelling named: `order_box => box<order>`, then the bare name. The name itself is recorded by the kind's
-  `AtomTypeReader`, in a schema document only, and name hygiene judges each name an application writes.
+  slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). An application is never a value
+  there: in a kernel body the desugarer writes one as `meta.apply` in place for the materialiser to close. The name
+  itself is recorded by the kind's `AtomTypeReader`, in a schema document only, and name hygiene judges each name an
+  application writes.
 - **In a data document a reference is a name** (§4.2). The kind's parser (`TypeNameRefParser`, shared by both
   encodings) refuses an application, `ATOM_CONSTRAINT_VIOLATION` at the slot, whether or not the closure closes it:
   `set<text>` is refused where the schema declares `names => set<text>`, and the document names `names`. The grammar
@@ -171,8 +167,8 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   in data at a slot naming values, its referent is the value its name reached (`RefParser`), the governing schema's
   own value, bound or tree-held as the value entry is. The closure is a component excluded from `equals`, `hashCode`
   and `toString`. A reference read in a schema document, or built by hand, carries `Closure.NONE` and names nothing.
-  A schemaless read has no closure at all and keeps an application as a `TsonReference`
-  (`design/tree-model.md`), with no referent.
+  A schemaless read has no closure at all and keeps a name as a `TsonAtom` holding its text (`design/tree-model.md`),
+  with no referent.
 
 Related: `design/linking-and-compilation.md` (the judgements), `design/open-records.md` (parameter positions),
 `design/namespace-types-and-value-entries.md` (value entries' slots), `design/record-dispatch.md` (the positional form).

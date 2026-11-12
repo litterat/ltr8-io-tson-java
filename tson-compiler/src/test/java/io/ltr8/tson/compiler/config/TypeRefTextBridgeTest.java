@@ -13,8 +13,7 @@ class TypeRefTextBridgeTest {
     @Test
     void aReferenceIsReadFromItsTextAndAMarkedNameIsNone() {
         assertEquals(TypeRef.of("text"), new TypeRefTextBridge().toObject("text"));
-        assertThrows(io.ltr8.tson.atom.AtomValidationException.class,
-                () -> new TypeRefTextBridge().toObject("box<text>"));
+        assertThrows(AtomParseException.class, () -> new TypeRefTextBridge().toObject("box<text>"));
         assertThrows(AtomParseException.class, () -> new TypeRefTextBridge().toObject("kind!"));
         assertThrows(AtomParseException.class, () -> new TypeRefTextBridge.ForName().toObject("kind!"));
     }
