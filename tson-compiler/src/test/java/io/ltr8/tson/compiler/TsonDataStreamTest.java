@@ -49,7 +49,6 @@ class TsonDataStreamTest {
             case AnnotationEnd a -> "AnnotationEnd";
             case TypeRef t -> "TypeRef(" + t.name() + ")";
             case TokenEvent t -> "Token(" + t.text() + "," + t.form() + ")";
-            case ReferenceEvent r -> "Reference(" + r.reference().text() + ")";
             case VoidEvent a -> "Absent";
             case EmptyBraceEvent e2 -> "EmptyBrace";
         };
@@ -68,40 +67,27 @@ class TsonDataStreamTest {
                 shape("\"has spaces\""));
     }
 
-    // ── A reference ([TSON-DATA] §7.4) ──────────────────────────────────
+    // ── An argument list is no data grammar ([TSON-DATA] §7.2.5) ──────────
 
-    /** A qualified name with an adjacent argument list is one value, nested to any depth; whitespace inside is free. */
+    /**
+     * {@code <} and {@code >} have no role in a data value, so an argument list is a parse error wherever it stands,
+     * a field, an element and a map key alike, by the ordinary rules: the grammar does not know the form.
+     */
     @Test
-    void aReferenceIsOneValue() {
-        for (String literal : List.of("box<201>", "box<\"a b\">", "box<T 1x>")) {
-            assertThrows(ParseException.class, () -> shape(literal), literal);
+    void anAngleBracketIsNoPartOfAValue() {
+        for (String source : List.of("box<text>", "{ t: box<text>  n: 1 }", "[ pair<box<text> int32> ]",
+                "{ box<text> => 1 }", "{ k => box<text> }", "box <text>", "\"box\"<text>", "<", "[ > ]", "{ t: < }",
+                "box<", "1x<text>")) {
+            assertThrows(ParseException.class, () -> drain(source), source);
         }
-        assertEquals(List.of("DocumentStart(|)", "Reference(map<text list<int32>>)", "DocumentEnd"),
-                shape("map< text,  list<int32> >"));
-        assertEquals(List.of("DocumentStart(|)", "Reference(geo.address<T pair<text int32>>)", "DocumentEnd"),
-                shape("geo.address<T pair<text, int32>>"));
-        assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(t)", "Reference(box<text>)",
-                "FieldName(n)", "Token(1,UNQUOTED)", "RecordEnd", "DocumentEnd"), shape("{ t: box<text>  n: 1 }"));
+        ParseException bare = assertThrows(ParseException.class, () -> drain("[ < ]"));
+        assertTrue(bare.getMessage().contains("has no role in a data value"), bare.getMessage());
     }
 
-    /** A reference stands where a core value does, a map key included. */
-    @Test
-    void aReferenceMayBeAMapKey() {
-        assertEquals(List.of("DocumentStart(|)", "MapStart", "Reference(box<text>)", "MapArrow", "Token(1,UNQUOTED)",
-                "MapEnd", "DocumentEnd"), shape("{ box<text> => 1 }"));
-    }
-
-    /** {@code <} opens an argument list only adjacent to an unquoted qualified name. */
-    @Test
-    void aDetachedOrQuotedHeadIsRefused() {
-        for (String source : List.of("box <text>", "\"box\"<text>", "box<>", "box<text", "1x<text>", "box<[a]>",
-                "box<_>")) {
-            TsonDataStream stream = new TsonDataStream(ByteSource.of(source));
-            assertThrows(ParseException.class, () -> {
-                while (!(stream.next() instanceof DocumentEnd)) {
-                    // drain
-                }
-            }, source);
+    private static void drain(String source) {
+        TsonDataStream stream = new TsonDataStream(ByteSource.of(source));
+        while (!(stream.next() instanceof DocumentEnd)) {
+            // drain
         }
     }
 

@@ -76,7 +76,7 @@ data document ──!!import──▶ schema ──!!import──▶ library ─
   reader and stating its own encoding rules                  [TSON-JSON]
 ```
 
-Reading order runs the other way: this document stands alone, and a Class 1 processor (§1.5) needs nothing from [TSON-SCHEMA] or [TSON-JSON]. Each part adds capability without modifying the parts below it. The lexer defined in this document is complete: higher parts introduce no new tokens, no new lexer modes, and no changes to character classification. Within the 2026 series the lexer has changed twice under principle 6, and this paragraph is where a revision that touches it says so: Revision 35 changed the escape production (§7.2.2), and Revision 37 emits a bare `+` as a special token (§7.2.4, §7.2.5) where it had been a lexer error, for the at-least-one field group of the schema grammar ([TSON-SCHEMA] §5.11). No token a data document lexed to before Revision 37 is changed by it: `+5` and `+0.5` begin unquoted tokens as they did. Revision 38 left the lexer alone and moved one judgement out of the parser: a field name is any unquoted or single-line token, and whether its text is an identifier is the resolver's question in a schemaless document and the schema's under one (§2.5, [TSON-SCHEMA] §5.2). Revision 39 leaves the lexer alone too, and changes the data grammar at four positions, each over tokens the lexer already emits: a reference carrying an argument list is a core value, so `<` and `>` have a grammar role in data (§7.4); an unquoted token followed by an adjacent `!`, a dependent field's type, is a core value; a type annotation and an annotation name are qualified names (§3.1, §3.2); and the header is the one place a directive stands (§2.2, §3.3). Revision 40 leaves the lexer alone and narrows the data grammar at two positions: a reference's argument is a reference, so a number or a quoted token in an argument list is a parse error (§7.4); and an unquoted token followed by an adjacent `!` is no core value, a dependent field's type being schema grammar ([TSON-SCHEMA] §5.2, §12.1), so `kind!` in a data value is a parse error (§2.4).
+Reading order runs the other way: this document stands alone, and a Class 1 processor (§1.5) needs nothing from [TSON-SCHEMA] or [TSON-JSON]. Each part adds capability without modifying the parts below it. The lexer defined in this document is complete: higher parts introduce no new tokens, no new lexer modes, and no changes to character classification. Within the 2026 series the lexer has changed twice under principle 6, and this paragraph is where a revision that touches it says so: Revision 35 changed the escape production (§7.2.2), and Revision 37 emits a bare `+` as a special token (§7.2.4, §7.2.5) where it had been a lexer error, for the at-least-one field group of the schema grammar ([TSON-SCHEMA] §5.11). No token a data document lexed to before Revision 37 is changed by it: `+5` and `+0.5` begin unquoted tokens as they did. Revision 38 left the lexer alone and moved one judgement out of the parser: a field name is any unquoted or single-line token, and whether its text is an identifier is the resolver's question in a schemaless document and the schema's under one (§2.5, [TSON-SCHEMA] §5.2). Revision 39 leaves the lexer alone too, and changes the data grammar at four positions, each over tokens the lexer already emits: a reference carrying an argument list is a core value, so `<` and `>` have a grammar role in data (§7.4); an unquoted token followed by an adjacent `!`, a dependent field's type, is a core value; a type annotation and an annotation name are qualified names (§3.1, §3.2); and the header is the one place a directive stands (§2.2, §3.3). Revision 40 leaves the lexer alone and takes both of Revision 39's value forms out of the data grammar: a reference carrying an argument list is no core value, an application being schema grammar ([TSON-SCHEMA] §5.10), so `<` and `>` have no role in data again and either in a data value is a parse error (§7.2.5); and an unquoted token followed by an adjacent `!` is no core value, a dependent field's type being schema grammar ([TSON-SCHEMA] §5.2, §12.1), so `kind!` in a data value is a parse error (§2.4).
 
 [TSON-SCHEMA] defines a second document kind, the **schema document**, recognised by its root's tag (§2.2). A schema document is parsed by a companion grammar — the schema grammar — that shares this document's lexer and core value rules: its declaration grammar gives the reserved special tokens (§7.2.5) their meaning, and [TSON-SCHEMA] defines the operation of the `import` directive on it (§3.3). None of that syntax appears in data documents: in the data grammar, a reserved special token is a parse error, and a `!!` token whose name is not followed by an adjacent `:` is a parse error.
 
@@ -103,7 +103,6 @@ A **Class 1 processor** (data-format processor) implements the lexer (§7.2), th
 - MUST preserve annotations and the header's `import` directives it does not act on, and MUST report a type annotation outside the vocabulary as a resolver error (§3, §3.2);
 - MUST treat a directive token (`!!`) whose name is not followed by an adjacent `:` as a parse error (§1.3), a directive outside the header as a parse error, and a directive name outside the closed positional set — or inside it but outside its position — as a parse error (§3.3);
 - MUST match every segment of every type-annotation and annotation name against the identifier grammar (§7.7), after NFC normalisation, and reject a name that fails it as a parse error; and MUST match every field name of a document that names no schema against the same grammar, rejecting one that fails it as a resolver error (§2.5) — a document that names a schema has its field names judged by that schema alone ([TSON-SCHEMA] §5.2), and a Class 1 processor reading it holds them to no name rule;
-- MUST read a reference carrying an argument list as the structured value §4.1 describes, resolving nothing;
 - MUST implement the name-hygiene checks of §8.2 over every named scope at this layer (each record's own field names, where this layer judges them), enforce them by default, and report a refusal as §8.1 defines one — in the same report as the four categories, distinguishable from them, and never as a finding about validity;
 - MUST enforce the resource limits of §9.1 at their defaults or at a configured or documented value, reporting a limit refusal on the same terms;
 - MUST be able to state, with any report that carries a refusal and SHOULD be able to state with no document in hand, the identifier policy, token policy, limits policy and UCD version under which it judges (§8.2, §9.1);
@@ -217,7 +216,7 @@ tag              = "!" qualified-name-token
 
 core-value       = record / map / array
                  / empty-brace
-                 / void / reference / token
+                 / void / token
 ```
 
 The data grammar is closed: no directive produces content, directives stand in the header alone (§2.2, §3.3), and the directive name set is fixed.
@@ -230,7 +229,7 @@ There are three structural types for contained data; the document is the implici
 | Map    | `{ => }`    | `=>`      | Variable key-value associations  |
 | Array  | `[ ]`       | whitespace| Variable-length sequence         |
 
-One scalar form stands beside the token: a **reference** carrying an argument list (`set<text>`, `geo.pair<text int32>`), one core value delivered whole (§7.4). What a reference means is the business of the type that reads it ([TSON-SCHEMA] §4.2); a schemaless read keeps it as a structured value (§4.1). Under a schema a reference in a data document is a name, and one carrying an argument list is a validation error ([TSON-SCHEMA] §4.2).
+A value that names something — a type, or a value ([TSON-SCHEMA] §4.2) — is a token: a qualified name (§7.7), read as a name by a position typed by a reference and as a token elsewhere. The argument list of [TSON-SCHEMA]'s type-definition grammar (`set<text>`) is not data syntax: `<` and `>` have no role in a data value, and either there is a parse error (§7.2.5).
 
 
 ### 2.4 Tokens
@@ -283,7 +282,7 @@ map       = "{" ws map-entry *( separator map-entry ) [ ws "," ] ws "}"
 map-entry = data-value ws "=>" ws data-value
 ```
 
-Map keys are data values — they may carry annotations and a type annotation, and a key may be a reference (§7.4). Keys are not restricted to strings, and a key is not a name: a map is where a key that is not an identifier lives (§2.5). The one exception is a schema's to make: a key whose declared type is an identifier family is a name by that type's own statement, and meets name hygiene as one (§8.2, [TSON-SCHEMA] §11.4).
+Map keys are data values — they may carry annotations and a type annotation. Keys are not restricted to strings, and a key is not a name: a map is where a key that is not an identifier lives (§2.5). The one exception is a schema's to make: a key whose declared type is an identifier family is a name by that type's own statement, and meets name hygiene as one (§8.2, [TSON-SCHEMA] §11.4).
 
 Duplicate keys MUST NOT be present: a map containing two identical keys is a resolver error (§8.1), with the diagnostic at the repeated occurrence's position — one category for the rule at this layer, whether the textual or the decoded-value identity below detects a given pair. Key identity is layered, and each layer detects at least what the one below it does. **Textual identity** is the parser's minimum: scalar keys are identical if they produce the same NFC-normalized string after escape processing (`Alice` and `"Alice"` are duplicates); compound keys are identical if they have the same structure with textually identical elements at every position; a reference's textual identity is its parsed form, head and arguments (§7.4), so whitespace inside an argument list is free. **A processor that decodes values compares decoded values**: from base type resolution (§4) onward, different spellings of one value are one key (`0xFF` and `255`, `1_000` and `1000`), so a reader producing decoded output rejects keys the parser's textual rule could not relate. A declared key type may make *more* keys equal — `1` and `1.0` are two keys with no schema and one under a `number`-keyed schema, two spellings of one octet string are one key under a `bytes`-keyed one, and `Content-Type` and `content-type` are one key under a text key type whose `normalization` folds case — because under a schema identity for an *atom* key type is over its *value space*, never its lexical space ([TSON-SCHEMA] §5.5); a type-aware duplicate under a schema is a Class 2 validation error ([TSON-SCHEMA] §7.7), and a declared type never makes fewer keys equal. A **compound** key — a record, array or map — has no value space the series defines beyond its parts', and its identity is the processor's own equality over what it built: at least the textual identity above in a tree the processor builds itself, and a bound host type's own equality where keys are bound ([TSON-SCHEMA] §7.5, §7.7). A schema that needs portable duplicate detection over compound content keys by an atom. A key's annotations and type annotation do not participate in identity at any layer: `!text a` and `a` are the same key.
 
@@ -387,7 +386,7 @@ At the document level, a type annotation identifies the expected type of the doc
 
 In schemaless processing, the built-in type vocabulary (§5) resolves a fixed set of annotation names; [TSON-SCHEMA] defines resolution against declared schemas. A type annotation whose name is not in the built-in vocabulary (§5), in a document with no schema in scope, is a resolver error (§8.1): schemaless processing has no other source of type names, and a document that names its own types imports the schema that declares them. The vocabulary is a property of the revision and not of the deployment (§1.5), so the rejection is a portable finding about the document — a category error, never a refusal — and `!uiid 550e…` or `!Date 2026-01-01` is caught where it is written rather than at the first schema-bound consumer. A diagnostic SHOULD name the nearest built-in where there is one (`!uuid`, `!date`). Reading a schemaless document into a host type binding is no exception: the verdict on a document is a property of its bytes, so a tag naming a host type the caller happens to bind is still outside the vocabulary; a caller that wants its host types read as a document's type definitions is supplying a schema in all but form, and does so by an explicit choice outside this series' verdict.
 
-**A tag carries no argument list, and the type-definition sugar is not data syntax.** `!box<text> { … }` is a parse error: a tag is a qualified name and nothing more. An application parses where a *value* stands — `t: set<text>` — as a reference value (§7.4); a schemaless read keeps it (§4.1), and under a schema it is a validation error, a reference in a data document being a name ([TSON-SCHEMA] §4.2). A generic type reaches a tag, and any position of a data document that names a type, through a name some declaration gives its application (`names => set<text>`, then `!names` or `t: names`; [TSON-SCHEMA] §8.2). Array brackets, the choice and map sugar and the `?` suffix exist only within the [TSON-SCHEMA] type-definition grammar, and their appearance after `!` or inside an argument list in a data value is a parse error.
+**A tag carries no argument list, and the type-definition sugar is not data syntax.** `!box<text> { … }` is a parse error: a tag is a qualified name and nothing more, and so is a value that names a type — `t: set<text>` is a parse error too (§7.2.5). A generic type reaches a tag, and any position of a data document that names a type, through a name some declaration gives its application (`names => set<text>`, then `!names` or `t: names`; [TSON-SCHEMA] §8.2). Array brackets, the choice and map sugar and the `?` suffix exist only within the [TSON-SCHEMA] type-definition grammar, and their appearance after `!` or anywhere else in a data value is a parse error.
 
 
 ### 3.3 Directives
@@ -430,9 +429,9 @@ Base type resolution is the Class 1 reading of an untyped token: it assigns one 
 
 Base type resolution applies to a token that carries no built-in type annotation, **at a position nothing types** — a document whose header carries no `!!import` (§2.2), being read into no declared type, as when a processor produces a document-shaped value. A built-in annotation overrides base resolution for its token (§5). Where the position *is* typed — by a schema, by a tag, or by a **declared host type a processor is reading into** that names a family §5 defines — the type's own parsing contract reads the token and this section does not apply: under a schema every value is typed by its position or by its tag, each declared atom type owns its own parsing contract, and there is no third way to read a token ([TSON-SCHEMA] §4.2, §7.1). The host-typed case is the same rule seen from the reader's side rather than the document's: a processor binding `{ i: "12" }` to a 32-bit integer field reads `12`, as a schema declaring `int32` there would, and reports a token the family's contract rejects as that contract's error, in the family's own words, rather than as a bind failure naming a host type the sender has never heard of; the division is over whether anything types the position, not over what the header says. A target that names no family the series defines — an opaque host object, a type outside §5's vocabulary — leaves the position untyped, and base resolution applies. The tokens `true` and `false` have special status only under base type resolution (§4.2). Resolution applies to **data values only**: field names are names (§2.5), and map keys are text, never resolved — in `{ "007": 007 }` the key is the name `007` and the value is a string by fallthrough (leading zeros fail the `integer` production, §4.3), and `07` and `7` are distinct map keys because key identity is textual at this layer (§2.6).
 
-A Class 1 value is one of four things — an untyped token, a token carrying a built-in annotation from §5's vocabulary, a container, or a reference (§7.4) — and this section governs only the first. The vocabulary is the schemaless way to say what a token *means*: `!date 2025-03-13`, `!uuid 9f1c…`, `!int32 007` are typed and checked with no schema in scope. Base resolution is what a token gets when its author chose not to say and nothing else says for them.
+A Class 1 value is one of three things — an untyped token, a token carrying a built-in annotation from §5's vocabulary, or a container — and this section governs only the first. The vocabulary is the schemaless way to say what a token *means*: `!date 2025-03-13`, `!uuid 9f1c…`, `!int32 007` are typed and checked with no schema in scope. Base resolution is what a token gets when its author chose not to say and nothing else says for them.
 
-**A reference resolves nothing schemaless.** A reference carrying an argument list is kept as a structured value — the qualified name's segments and its arguments, each argument a qualified name read as this section reads a token or a nested application kept the same way — with its text recreatable and no referent, there being no namespace to resolve in. A dotted annotation name is kept as written; a dotted type annotation names nothing in §5's vocabulary and is §3.2's resolver error. None of the others is refused: what a reference names is the business of the type that reads it ([TSON-SCHEMA] §4.2), and a Class 1 processor preserves it as it preserves a tag it does not act on.
+**A name resolves nothing schemaless.** A qualified name in a value is a token, read as this section reads any token, with no referent, there being no namespace to resolve in. A dotted annotation name is kept as written; a dotted type annotation names nothing in §5's vocabulary and is §3.2's resolver error. None of the others is refused: what a name names is the business of the type that reads it ([TSON-SCHEMA] §4.2), and a Class 1 processor preserves it as it preserves a tag it does not act on.
 
 
 ### 4.2 Boolean
@@ -702,7 +701,7 @@ The lexer produces a stream of tokens from the input, classifying each token by 
 
 Every input character falls into exactly one category. The lookahead rules (quotation mark, equals sign, exclamation mark, full stop, hyphen-minus, plus sign) and the boundary test for the ignorable format controls (rule 1, which looks at the characters on either side of a run of them) are the only cases where the lexer examines more than one character to determine a token.
 
-**Token positions.** Every token carries its source position. The parser uses position adjacency to enforce no-whitespace rules: the prefix operators `!`, `@`, and `!!` MUST be adjacent to their operand, and the `<` of an argument list to the token before it. See §7.5.
+**Token positions.** Every token carries its source position. The parser uses position adjacency to enforce no-whitespace rules: the prefix operators `!`, `@`, and `!!` MUST be adjacent to their operand. See §7.5.
 
 
 #### 7.2.1 Normalization
@@ -781,17 +780,14 @@ The termination rule of §7.2 pairs with the range rule: `1..100` lexes as `1`, 
 
 The special-token set is **closed**: a character is emitted as a single-character special token if and only if it has a grammar role somewhere in the TSON series. Fifteen characters qualify, all of them `Pattern_Syntax`; since `Pattern_Syntax` is immutable, the set of characters that can serve as TSON syntax operators is stable across all Unicode versions.
 
-Four special characters have grammar roles in data values:
+Two special characters have grammar roles in data values:
 
 ```
 !     — type prefix (type annotation); also first character of !! lookahead
 @     — annotation prefix
-<  >  — the argument list of a reference (§7.4)
 ```
 
-`<` and `>` are each one token: `map<text list<int32>>` lexes as `map` `<` `text` `list` `<` `int32` `>` `>`, and `>>` is two tokens.
-
-The remaining eleven — `&` `?` `~` `=` `|` `;` `(` `)` `^` `-` `+` — are reserved by the schema grammar of [TSON-SCHEMA] and have no role in data values; in a data value, each is a parse error. (`-` and `+` reach special-token mode only through the boundary rule of §7.2.4: followed by a continuation-set character either begins an ordinary unquoted token, so signed numbers and hyphenated names are unaffected. `+` joined the set in Revision 37; a bare `+` was a lexer error before it and is a parse error in a data value now.)
+The remaining thirteen — `&` `<` `>` `?` `~` `=` `|` `;` `(` `)` `^` `-` `+` — are reserved by the schema grammar of [TSON-SCHEMA] and have no role in data values; in a data value, each is a parse error. (`-` and `+` reach special-token mode only through the boundary rule of §7.2.4: followed by a continuation-set character either begins an ordinary unquoted token, so signed numbers and hyphenated names are unaffected. `+` joined the set in Revision 37; a bare `+` was a lexer error before it and is a parse error in a data value now.) `<` and `>` are each one token, so `map<text list<int32>>` lexes as `map` `<` `text` `list` `<` `int32` `>` `>` for the schema grammar to read, and `>>` is two tokens.
 
 
 #### 7.2.6 Unrecognised Characters
@@ -899,10 +895,9 @@ special-char  = "!" / "@" / "&" / "<" / ">" / "?"
               / "~" / "=" / "|" / ";" / "(" / ")"
               / "^" / "-" / "+"
                 ; the closed special-token set (§7.2.5).
-                ; In data values: ! (type prefix), @ (annotation),
-                ; < and > (a reference's argument list). The other
-                ; eleven are reserved by [TSON-SCHEMA] and are parse
-                ; errors in data values.
+                ; In data values: ! (type prefix), @ (annotation).
+                ; The other thirteen are reserved by [TSON-SCHEMA]
+                ; and are parse errors in data values.
                 ; "-", "+" and "." reach the lexer's special and
                 ; compound modes only via the boundary dispatch of
                 ; §7.2.4. Any character matching no token rule is an
@@ -980,7 +975,7 @@ tag             = "!" qualified-name-token
                 ; a type annotation: no argument list (§3.2)
 
 core-value      = record / map / array
-                / empty-brace / void / reference / token
+                / empty-brace / void / token
 
 record          = "{" ws field *( separator field )
                   [ ws "," ] ws "}"
@@ -994,25 +989,6 @@ array           = "[" ws [ data-value
                  *( separator data-value ) [ ws "," ] ] ws "]"
                 ; a comma may follow a value (§2.4); a comma
                 ; following nothing, or a comma, is a parse error
-
-; ── References ────────────────────────────────────────────
-
-reference       = application
-application     = qualified-name-token "<" ws type-args ws ">"
-                ; a reference with arguments: "<" adjacent to the
-                ; qualified-name (§7.5), whitespace free inside the
-                ; list, one value delivered whole. A qualified-name
-                ; without arguments is a token: one value, read as a
-                ; reference by a position typed by one and as a token
-                ; elsewhere.
-
-type-args       = type-arg *( separator type-arg ) [ ws "," ]
-type-arg        = application / qualified-name-token
-                ; an argument is a reference: a qualified-name with or
-                ; without arguments. Any other token — a number, a
-                ; quoted token — is a parse error here, a quoted token
-                ; never being a reference. The bracket, map and choice
-                ; sugar of [TSON-SCHEMA] is not data grammar either.
 
 ; ── Shared terminals ──────────────────────────────────────
 
@@ -1047,7 +1023,6 @@ ABNF concatenation does not express "no whitespace permitted here." The followin
 | `!` | prefix | type annotation | MUST be adjacent to the following unquoted-token (type name) |
 | `!!` | prefix | directive | MUST be adjacent to the following unquoted-token (directive name) |
 | `@` | prefix | annotation | MUST be adjacent to the following unquoted-token (annotation name) |
-| `<` | prefix of a list | reference arguments (§7.4) | MUST be adjacent to the preceding unquoted-token (the qualified name); whitespace inside the list is free; `box <text>` is a parse error |
 | `:` | separator | record field | whitespace optional on both sides |
 | `:` | separator | annotation value, directive argument | MUST be adjacent to the preceding name; whitespace optional after |
 | (none) | trailing | annotation without value | at least one whitespace character MUST follow the annotation name |
@@ -1147,7 +1122,7 @@ Three rules apply on top of the production:
 2. **Joining controls.** ZWNJ (U+200C) and ZWJ (U+200D) are `XID_Continue` and so are admitted by the production, but only in the contexts UTS #39 §3.1.1.1 defines for joining controls — conditions A1, A2, and B on the `Joining_Type`, `General_Category`, `Canonical_Combining_Class`, and `Indic_Syllabic_Category` of the neighbouring characters, under the two global conditions that the identifier be in NFC and be single-script (ignoring Common and Inherited). A joining control outside those contexts makes the text not an identifier. The rule admits the joiners where they have a shaping effect (Persian `کتاب‌ها`, an Indic conjunct) and rejects them where they are invisible — every position in a Latin name — and it is what makes the token profile's admission of the joiners (§7.1) safe. An implementation MUST implement all three conditions; the Arabic condition alone admits Persian and rejects Malayalam, which is the wrong line.
 3. **No reserved words.** The grammar excludes nothing by name: there is no keyword list, and `true` and `false` are identifiers like any other — the two words that have a special reading under base type resolution (§4.2) are, under a schema, the members of the kernel's `boolean` enum `[true false]` ([TSON-SCHEMA] §7.4), `null` is an ordinary string (§4.4), and `abstract` and `final` are identifiers that [TSON-SCHEMA] §12.1 reads as marks at exactly one position of the schema grammar and nowhere else. The one lexical reservation the format makes — the token-initial underscore, occupied by the void sentinel (§7.1) — is not a reservation on names at all: `_` is `XID_Continue` only, so no identifier begins with it, and `_` and `_id` are not identifiers (§2.5).
 
-A token at a naming position whose decoded text fails this grammar is a parse error at every position the data grammar marks `qualified-name-token` (§7.4 — annotation names, type-annotation names and the head of a reference, each segment judged) and at every naming position of the schema grammar ([TSON-SCHEMA] §12.1) but a declared field name; at a field name it is a resolver error in a document that names no schema (§2.5), and under a schema the record's name type judges it — this grammar where the type is the kernel's `meta.identifier`, the declared profile otherwise ([TSON-SCHEMA] §5.2). Map keys are values, not names, and are never matched against it at this layer (§2.6). Under a schema, a key — or any other value — whose declared type is an identifier family is matched against that family's own profile as part of reading the value ([TSON-SCHEMA] §7.4), and where the family is the kernel's `meta.identifier` that profile is this grammar, stated as data.
+A token at a naming position whose decoded text fails this grammar is a parse error at every position the data grammar marks `qualified-name-token` (§7.4 — annotation names and type-annotation names, each segment judged) and at every naming position of the schema grammar ([TSON-SCHEMA] §12.1) but a declared field name; at a field name it is a resolver error in a document that names no schema (§2.5), and under a schema the record's name type judges it — this grammar where the type is the kernel's `meta.identifier`, the declared profile otherwise ([TSON-SCHEMA] §5.2). Map keys are values, not names, and are never matched against it at this layer (§2.6). Under a schema, a key — or any other value — whose declared type is an identifier family is matched against that family's own profile as part of reading the value ([TSON-SCHEMA] §7.4), and where the family is the kernel's `meta.identifier` that profile is this grammar, stated as data.
 
 The grammar is built on `XID_Start`, `XID_Continue`, NFC and `Canonical_Combining_Class`, which the Unicode Standard has stabilised — a character never leaves `XID_Start` or `XID_Continue`, and its normalization and combining class never change once it is assigned, though new characters enter as scripts are encoded (§7.1) — so a text valid at one Unicode version is valid at every later one, and a content-addressed schema's validity (§2.2.1) can be lost to no Unicode Character Database refresh. The joining-control contexts of rule 2 are the one exception: they also read `Joining_Type`, `Script`, `General_Category` and `Indic_Syllabic_Category`, which the stability policy does not cover, so the guarantee holds of every name except one admitted only through a joiner's context, whose admission at a later version depends on those properties of its characters being unchanged. A processor on an earlier version rejects a name a later one accepts — unquoted, its new character is a lexer error (§7.1); quoted, its text is no identifier, the error the position reports above — and its report names the version it validated against. The name-hygiene mechanisms of §8.2, which depend on data that can move a name from valid to refused, are deliberately kept out of validity for that reason.
 
@@ -1161,7 +1136,7 @@ The grammar is built on `XID_Start`, `XID_Continue`, NFC and `Canonical_Combinin
 Errors fall into four categories corresponding to the processing layers. The categories are defined here for the whole series; the resolver and validation categories are populated mainly by the higher parts.
 
 - **Lexer errors** — Malformed input below the token layer: byte sequences invalid in the document's encoding (§7.1), unterminated quoted or multi-line tokens, invalid escapes, a character escape denoting no scalar value (§7.2.2), unrecognised characters, unquoted tokens that are not NFC-normalized.
-- **Parser errors** — Structural mismatches: unclosed brackets, adjacency violations, unexpected tokens, missing separators, `!!` without an adjacent colon form, a directive name outside the closed positional set or outside its placement — `meta` and `schema` among the names, and any directive past the header (§3.3) — a comma that follows nothing or follows a comma (§2.4), a token at an annotation-name or type-annotation-name position, or at the head of a reference, whose decoded text is not a qualified name (§3.1, §3.2, §7.4, §7.7), a field name that is not an unquoted or single-line token (§2.5), a `<` not adjacent to a qualified name or an unclosed argument list, an argument that is no reference — a number, a quoted token (§7.4) — and a reference carrying arguments at a position that admits only a token (§7.4).
+- **Parser errors** — Structural mismatches: unclosed brackets, adjacency violations, unexpected tokens, missing separators, `!!` without an adjacent colon form, a directive name outside the closed positional set or outside its placement — `meta` and `schema` among the names, and any directive past the header (§3.3) — a comma that follows nothing or follows a comma (§2.4), a token at an annotation-name or type-annotation-name position whose decoded text is not a qualified name (§3.1, §3.2, §7.4, §7.7), a field name that is not an unquoted or single-line token (§2.5), and a special token the data grammar gives no role — `<` and `>` among them, so an argument list in a value (§7.2.5).
 - **Resolver errors** — Reference and resolution failures. At the data-format layer: a void sentinel in map key position; a field name of a document that names no schema whose decoded, NFC-normalised text is not an identifier (§2.5, §7.7); a type annotation outside the built-in vocabulary in a document with no schema in scope (§3.2); a duplicate field name in a record (§2.5) or a duplicate key in a map (§2.6) under the textual and decoded-value layers of key identity — one category for one rule, whichever of those two layers detects a given pair; a duplicate that only a *declared* key type relates is the schema layer's and is a Class 2 validation error ([TSON-SCHEMA] §7.7); a built-in type annotation on a container value (§5.1); a token that a built-in atom's parsing contract rejects (§5.2) — the structural parser has already accepted the document before an atom contract is consulted, so contract failures resolve, they do not parse. [TSON-SCHEMA] adds unresolved type names, schema resolution failures, and schema compilation failures: every error that makes a schema fail to load or ingest — incoherent constraint values, invalid defaults, refuted assertions, failed ingest checks, a wait cycle — is a resolver error, however value-like the violated rule, because it is detected while resolving the schema. Validation errors are reserved for data checked against a successfully loaded schema.
 - **Validation errors** — Type and constraint violations. At the data-format layer: range violations by the numeric atoms, CIDR prefix rules, and a relative reference where `!uri` or `!iri` requires a scheme (§5). [TSON-SCHEMA] generalises validation to author-declared constraints.
 

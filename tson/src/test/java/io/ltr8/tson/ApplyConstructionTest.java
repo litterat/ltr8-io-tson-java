@@ -115,11 +115,15 @@ class ApplyConstructionTest {
 
     // ── Refusals ────────────────────────────────────────────────────────────────────────────────
 
-    /** A value carrying an argument list is refused in a schema value's payload, saying how to write it. */
+    /**
+     * A schema value's payload is data, where an argument list is no grammar ([TSON-DATA] §7.2.5): it is a syntax
+     * error, under the base-syntax code and never the resolver's.
+     */
     @Test
-    void anArgumentListInASchemaValuesPayloadIsRefused() {
-        refused("  r => !meta.record { fields: { f => !meta.record_field { type: box<text> } } }",
-                "a reference is a name");
+    void anArgumentListInASchemaValuesPayloadDoesNotParse() {
+        List<Diagnostic> found = problems("  r => !meta.record { fields: { f => !meta.record_field { type: box<text> } } }");
+        assertEquals(1, found.size(), found::toString);
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, found.getFirst().code(), found::toString);
     }
 
     /** {@code @meta.application} is derived, never written. */

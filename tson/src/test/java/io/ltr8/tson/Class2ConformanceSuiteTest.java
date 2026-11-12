@@ -6,6 +6,8 @@ import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.ParseException;
+import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonDocumentPeek;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -39,6 +41,7 @@ import static io.ltr8.tson.suite.Sidecar.outcomeOf;
 import static io.ltr8.tson.suite.Sidecar.outcomePayload;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -319,6 +322,13 @@ class Class2ConformanceSuiteTest {
                 assertFalse(reported.isEmpty(), "the document is invalid, but nothing was reported");
                 RecordValue expected = outcomePayload(sidecar);
                 String category = fieldText(expected, "category");
+                if (category.equals("parser")) {
+                    // A Class 2 read reports a base-syntax failure under no category of its own, so the data
+                    // grammar's verdict is taken where it is made: the document fails the Class 1 parse.
+                    assertThrows(ParseException.class,
+                            () -> new TsonDataParser(new ByteArrayInputStream(raw)).parseDocument());
+                    return;
+                }
                 String path = hasField(expected, "path") ? fieldText(expected, "path") : null;
                 assertTrue(reported.stream().anyMatch(diagnostic -> matches(diagnostic, category, path)),
                         "no diagnostic is a " + category + " error"

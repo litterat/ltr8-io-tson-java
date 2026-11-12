@@ -10,10 +10,10 @@ only; history lives in git.
 - `TsonAtom.toString()` renders its value alone — it reaches a `Diagnostic`'s `expected`/`actual`.
 - `get`/`at` never throw; a `TsonMissing` carries the pointer of the step that failed, and the first failure
   sticks. "Missing" and "absent" stay distinct kinds.
-- A schemaless read keeps a reference the grammar alone shows to be one as a `TsonReference`: an application
-  (`TsonApplicationReference`). A bare name is a `TsonAtom` holding text. It carries no referent, there being no
-  closure to resolve in. Under a schema a reference-typed position delivers a `schema.meta.TypeRef` in a `TsonAtom`
-  instead. A dependent field's node is whatever the type its sibling names reads to.
+- A schemaless read keeps a name as a `TsonAtom` holding text, the data grammar having no other form of one
+  ([TSON-DATA] §7.2.5). It carries no referent, there being no closure to resolve in. Under a schema a reference-typed
+  position delivers a `schema.meta.TypeRef` in a `TsonAtom` instead. A dependent field's node is whatever the type its
+  sibling names reads to.
 - There is one no-value node, `TsonVoid`; `null` is a `TsonAtom` holding the string `null`, and a `void`
   position admits `_` and nothing else.
 - `as(Class)`/`asString`/… cast, `asInt`/`asLong`/`asDouble` convert — a test asserting which host type a
@@ -28,9 +28,8 @@ Related: `design/facades-and-tree.md` (the readers producing a tree), `design/wr
 ## Tree model: `TsonValue` (`tson-tree` module)
 
 What every tree read hands back — the compiled tree readers (`design/class2-compilation.md`) and the
-schemaless `TsonTreeReader` alike. A sealed `TsonValue` over eight pure immutable node kinds (`TsonRecord`/
-`TsonMap`/`TsonArray`/`TsonTuple`/`TsonAtom`/`TsonReference`/`TsonVoid`/`TsonMissing`, `TsonReference` itself sealed
-over two records), **structure-preserving** — TSON's
+schemaless `TsonTreeReader` alike. A sealed `TsonValue` over seven pure immutable node kinds (`TsonRecord`/
+`TsonMap`/`TsonArray`/`TsonTuple`/`TsonAtom`/`TsonVoid`/`TsonMissing`), **structure-preserving** — TSON's
 record-vs-map and array-vs-tuple distinctions survive into the model, where JSON's would collapse — and
 annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
 
@@ -86,19 +85,10 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   cast via `TsonValue.missingPath()`. The first failure sticks — stepping on past a missing returns the
   same node rather than extending its pointer. "Missing" (not in the tree) and "absent" (written, but
   holding no value) stay distinct kinds.
-- **`TsonReference` is a reference read with no schema** ([TSON-DATA] §4, §7.4), a sealed interface whose `text()`
-  is what it reads as and whose `isReference()` is true. **A tree reference is one the grammar alone shows to be a
-  reference**: an application by its `<…>`. A qualified name with no arguments is a token, a `TsonAtom` like any
-  other, since a schemaless read cannot tell a bare name from any other token.
-  - **`TsonApplicationReference`**: `segments`, `arguments` (at least one), `typeRef`, `annotations`. A Class 1 read
-    keeps `map<text list<int32>>` as the structured value it is, each argument read by the ordinary schemaless rule,
-    so in `response<order 201>` the `201` is a number and `order` a string, and a nested application is another
-    `TsonApplicationReference`. `text()` (and `toString()`) recreates the canonical text, one space between
-    arguments, a string argument that is a qualified name bare and any other quoted.
-  - **It offers no referent**: what a reference names is a closure's question, and a schemaless read has none.
-  Under a schema a reference-typed position delivers the schema model's `TypeRef` instead, whose `referent()` answers it
-  (`design/references.md`, `design/facades-and-tree.md`). The node lives here rather than reusing `TypeRef` because
-  `tson-tree` depends on nothing.
+- **A name read with no schema is a `TsonAtom`**: a schemaless read cannot tell a name from any other token, and
+  what a name names is a closure's question, which a schemaless read has none of. Under a schema a reference-typed
+  position delivers the schema model's `TypeRef`, whose `referent()` answers it (`design/references.md`,
+  `design/facades-and-tree.md`); the tree has no node of its own for it because `tson-tree` depends on nothing.
 - **There is one no-value node, `TsonVoid`, because there is one no-value spelling**: the `_` sentinel. A read that
   failed leaves no node at all — every read is all-or-nothing — so a `TsonVoid` in a tree always means the document
   wrote `_`. `null` is not one — §4 resolves boolean, number and string, so the unquoted token is a `TsonAtom` holding

@@ -411,7 +411,7 @@ public final class SchemaResolver {
         });
 
         // §5.10 materialisation, after every declaration has resolved and before anything reads the result:
-        // a template application reaches here as a type-ref carrying arguments, and closing it needs the
+        // a template application reaches here as an ApplyBody written in place, and closing it needs the
         // template's own *resolved* open form, which only exists once the driving loop above has run. It adds no
         // entry: an application closes in place, or into the declaration naming it.
         Map<String, Top> resolvedLocals = new LinkedHashMap<>();

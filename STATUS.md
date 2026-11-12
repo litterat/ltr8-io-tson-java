@@ -37,12 +37,11 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `meta.enum_type.name_type` and `meta.record.name_type` by its `meta.identifier_ref`, a refinement of
       `meta.type_ref`, and judges a name type by membership (Part 2 §4.2). A refinement narrows `of` to the source's or
       a type IS-A it, judged at link (Part 2 §5.7)
-- [x] An application is a reference value (Part 2 §4.2, §8.2) — a reference with arguments is
-      data grammar ([TSON-DATA] §7.4), written unquoted (`set<text>`, `@meta.application:response<order 201>`, an open
-      alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonApplicationReference`. In a schema document
-      it is a reference at a reference slot; in a data document a reference is a name, so an application at a kind-typed
-      position is refused whether or not the schema closes it, and a name reads to a `TypeRef` whose `referent()` is the
-      entry's value. A quoted token is never a reference. In JSON the same text is a string, refused alike
+- [x] A reference is a name (Part 2 §4.2, §5.10) — an application is schema grammar, the construction `meta.apply`
+      written in place, and an argument list is no data form ([TSON-DATA] §7.2.5): `t: set<text>` in a data document or
+      a schema value's payload is a parse error, the grammar's ordinary one, whether or not the schema closes the
+      application. A name reads to a `TypeRef` whose `referent()` is the entry's value. In JSON a reference is the string
+      of a qualified name, and `"set<text>"` is refused as a string outside its grammar
 - [x] A dependent field's type is a sum written in place (Part 2 §5.2, `SPEC-FEEDBACK.md` #6) —
       `{ of: !meta.dependent { on: kind } }` at a record field's type, `kind!` in schema-grammar sugar, which parses at
       a field's or group member's type and nowhere else; a `meta.dependent` declared or at any other slot is refused at

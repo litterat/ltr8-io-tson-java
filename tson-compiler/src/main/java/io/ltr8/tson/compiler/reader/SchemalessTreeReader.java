@@ -119,10 +119,6 @@ public final class SchemalessTreeReader {
                 ctx.next();
                 yield leaf(ctx, token, typeRef, atom, annotations);
             }
-            case ReferenceEvent(var reference, _) -> {
-                ctx.next();
-                yield reference(reference, typeRef, annotations);
-            }
             default -> throw new IllegalStateException("unexpected event where a value was expected: " + e);
         };
     }
@@ -248,23 +244,6 @@ public final class SchemalessTreeReader {
         return new TsonAtom(value, typeRef, annotations);
     }
 
-    /**
-     * A reference with arguments, kept as the structured value it is ([TSON-DATA] §4): its segments, and each
-     * argument a name read by the schemaless rule a token is read by, a nested application a reference of its own.
-     * Nothing resolves.
-     */
-    private static TsonApplicationReference reference(ReferenceGrammar.Spelled reference, Optional<String> typeRef,
-                                                      List<TsonAnnotation> annotations) {
-        List<TsonValue> arguments = new ArrayList<>(reference.arguments().size());
-        for (ReferenceGrammar.Spelled argument : reference.arguments()) {
-            arguments.add(argument.arguments().isEmpty()
-                    ? TsonAtom.of(ValueParser.INSTANCE.read(new TokenValue(argument.head(), TokenForm.UNQUOTED)))
-                    : reference(argument, Optional.empty(), List.of()));
-        }
-        return new TsonApplicationReference(List.of(reference.head().split("\\.", -1)), arguments, typeRef,
-                annotations);
-    }
-
     /** A map key's own path segment: its scalar text, or {@code ?} for a key with no single text form. */
     private static String keySegment(TsonValue key) {
         return key instanceof TsonAtom atom ? String.valueOf(atom.value()) : "?";
@@ -313,8 +292,6 @@ public final class SchemalessTreeReader {
     private static Object keyIdentity(TsonValue key) {
         return switch (key) {
             case TsonAtom atom -> ValueIdentity.of(atom.value());
-            case TsonApplicationReference reference -> List.of(KeyKind.REFERENCE, reference.segments(),
-                    reference.arguments().stream().map(SchemalessTreeReader::keyIdentity).toList());
             case TsonArray array -> array.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonTuple tuple -> tuple.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonRecord record -> {
@@ -334,5 +311,5 @@ public final class SchemalessTreeReader {
     }
 
     /** Identity stand-ins for the payload-free node kinds -- see {@link #keyIdentity}. */
-    private enum KeyKind { VOID, MISSING, REFERENCE }
+    private enum KeyKind { VOID, MISSING }
 }

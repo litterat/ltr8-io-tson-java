@@ -252,15 +252,16 @@ class NamespaceEntryTest {
     }
 
     /**
-     * A kind slot of a value body holds a type's name, one token: an application there is refused, naming the
-     * declaration to write.
+     * A kind slot of a value body holds a type's name, one token: an argument list there does not parse
+     * ([TSON-DATA] §7.2.5), a syntax error under the base-syntax code.
      */
     @Test
-    void anApplicationInANamespaceValueIsRefused() {
-        refused(schema("applied", """
+    void anApplicationInANamespaceValueDoesNotParse() {
+        List<Diagnostic> problems = problems(schema("applied", """
                 box   => <T> { v: T }
-                other => !api { m => { response: box<order> } }"""),
-                "a reference is a name", "write the name a declaration gives it");
+                other => !api { m => { response: box<order> } }"""));
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code(), problems.toString());
     }
 
     // ── Kinds ─────────────────────────────────────────────────────────────────────────────────────────

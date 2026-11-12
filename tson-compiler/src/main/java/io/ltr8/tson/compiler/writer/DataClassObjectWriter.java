@@ -180,7 +180,7 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (value instanceof TypeRef reference) {
-                // A reference is data grammar, written unquoted with the annotations written on it ahead, one token.
+                // A reference is a name, written unquoted with the annotations written on it ahead, one token.
                 // A name that is no qualified name reads back only quoted.
                 writeAnnotations(reference.annotations(), writer);
                 if (typeRef != null) {

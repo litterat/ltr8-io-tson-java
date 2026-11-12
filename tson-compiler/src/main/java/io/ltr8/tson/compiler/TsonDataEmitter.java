@@ -301,38 +301,11 @@ public final class TsonDataEmitter {
         return this;
     }
 
-    /**
-     * Writes {@code reference} unquoted ([TSON-DATA] §7.4): its qualified name, and where it
-     * carries arguments an adjacent {@code <}, each argument separated by one space, and {@code >} -- the canonical
-     * text, {@code map<text list<int32>>}, each argument a reference in turn. The caller is responsible for the head
-     * and every argument being qualified names, which is what the grammar spelled.
-     */
-    public TsonDataEmitter reference(io.ltr8.tson.atom.ReferenceGrammar.Spelled reference) {
-        startCoreValue();
-        emitReference(reference);
-        return this;
-    }
-
-    /** Writes the name {@code reference} unquoted ([TSON-DATA] §7.4). */
+    /** Writes the name {@code reference} unquoted, a qualified name ([TSON-DATA] §7.7). */
     public TsonDataEmitter reference(io.ltr8.tson.schema.meta.TypeRef reference) {
         startCoreValue();
         emit(reference.name());
         return this;
-    }
-
-    private void emitReference(io.ltr8.tson.atom.ReferenceGrammar.Spelled reference) {
-        emit(reference.head());
-        if (reference.arguments().isEmpty()) {
-            return;
-        }
-        emit('<');
-        for (int i = 0; i < reference.arguments().size(); i++) {
-            if (i > 0) {
-                emit(' ');
-            }
-            emitReference(reference.arguments().get(i));
-        }
-        emit('>');
     }
 
     /**

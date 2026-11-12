@@ -10,7 +10,6 @@ import io.ltr8.tson.tree.TsonAtom;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonMissing;
 import io.ltr8.tson.tree.TsonRecord;
-import io.ltr8.tson.tree.TsonApplicationReference;
 import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -47,10 +46,6 @@ public final class TreeValueWriter {
             case TsonArray array -> writeSequence(array.elements(), array.typeRef(), out);
             case TsonTuple tuple -> writeSequence(tuple.elements(), tuple.typeRef(), out);
             case TsonAtom atom -> writeAtom(atom, out);
-            case TsonApplicationReference reference -> {
-                reference.typeRef().ifPresent(out::typeRef);
-                out.reference(reference(reference));
-            }
             case TsonVoid voidNode -> {
                 voidNode.typeRef().ifPresent(out::typeRef);
                 out.voidValue();
@@ -59,26 +54,6 @@ public final class TreeValueWriter {
                     "a TsonMissing is a navigation artifact and cannot be written as TSON; navigation failed at \""
                             + missing.path() + "\"");
         }
-    }
-
-    /**
-     * A schemaless reference as the reference it was read from: each argument a nested application or a string that
-     * is a qualified name. Anything else is no argument ([TSON-SCHEMA] §5.10), and a tree holding one cannot be
-     * written as a reference.
-     */
-    private static io.ltr8.tson.atom.ReferenceGrammar.Spelled reference(TsonApplicationReference reference) {
-        List<io.ltr8.tson.atom.ReferenceGrammar.Spelled> arguments = new java.util.ArrayList<>();
-        for (TsonValue argument : reference.arguments()) {
-            arguments.add(switch (argument) {
-                case TsonApplicationReference nested -> reference(nested);
-                case TsonAtom atom when atom.value() instanceof String text
-                        && io.ltr8.tson.atom.ReferenceGrammar.isQualifiedName(text) ->
-                        new io.ltr8.tson.atom.ReferenceGrammar.Spelled(text, List.of());
-                default -> throw new IllegalArgumentException("'" + argument + "' is no argument of the reference '"
-                        + reference.name() + "<...>': an argument is a reference, a qualified name or an application");
-            });
-        }
-        return new io.ltr8.tson.atom.ReferenceGrammar.Spelled(reference.name(), arguments);
     }
 
     /**

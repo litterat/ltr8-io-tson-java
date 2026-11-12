@@ -100,20 +100,18 @@ class TypeNameRefReadTest {
     }
 
     /**
-     * In a data document a reference is a name ([TSON-SCHEMA] §4.2): an application is refused at its slot whether
-     * the schema closes it ({@code box<text>}, declared as {@code inner}; {@code pair<inner int32>}, as {@code
-     * outer}; {@code box<caption>}, {@code box<text>} past an alias) or not ({@code box<int32>}), as a constraint
-     * the value breaks, the grammar having read it.
+     * In a data document a reference is a name ([TSON-SCHEMA] §4.2): an argument list is no data grammar, so an
+     * application does not parse whether the schema closes it ({@code box<text>}, declared as {@code inner}; {@code
+     * pair<inner int32>}, as {@code outer}; {@code box<caption>}, {@code box<text>} past an alias) or not ({@code
+     * box<int32>}): a syntax error at the document, under the base-syntax code ([TSON-DATA] §7.2.5). The token before
+     * the {@code <} is read as the position reads any token, as {@code kind} in {@code kind!} is.
      */
     @Test
-    void anApplicationIsRefusedWhetherOrNotTheSchemaClosesIt() {
+    void anApplicationDoesNotParseWhetherOrNotTheSchemaClosesIt() {
         for (String application : List.of("box<text>", "pair< inner, int32 >", "box<caption>", "box<int32>")) {
             List<Diagnostic> problems = problems("!typed { t: " + application + " }");
-            assertEquals(1, problems.size(), application + ": " + problems);
-            Diagnostic problem = problems.getFirst();
-            assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code(), application);
-            assertEquals(Optional.of("/t"), problem.path(), application);
-            assertTrue(problem.message().contains("a reference is a name"), problem.message());
+            assertTrue(problems.stream().anyMatch(problem -> problem.code() == Diagnostic.Code.VALIDATION_ERROR
+                    && problem.path().equals(Optional.of(""))), application + ": " + problems);
         }
     }
 
@@ -178,8 +176,8 @@ class TypeNameRefReadTest {
     }
 
     /**
-     * Bind mode reads the slot as a tree read does: the bound reference names the declared entry, and an application
-     * is refused.
+     * Bind mode reads the slot as a tree read does: the bound reference names the declared entry, and an argument
+     * list is refused, at the token before it or at the {@code <}, whichever a fail-fast read meets first.
      */
     @Test
     void bindModeNamesTheDeclaredEntryAndRefusesAnApplication() {
@@ -193,9 +191,8 @@ class TypeNameRefReadTest {
 
         assertEquals(tson.bindRegistry().core().resolveLinked(IDS).schema().entries().get("inner"),
                 typed.t().referent().orElseThrow());
-        ReadException refused = assertThrows(ReadException.class, () -> tson.objectReader()
+        assertThrows(ReadException.class, () -> tson.objectReader()
                 .read("!!import:\"" + IDS + "\"\n!typed { t: box<text> }", Typed.class));
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, refused.diagnostic().code());
     }
 
     @Test

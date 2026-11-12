@@ -11,7 +11,6 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.TypeExpr;
@@ -114,14 +113,13 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
     }
 
     /**
-     * The class of the untagged value an event opens: a scalar token's §4 base-type class, a reference token's
-     * string class (one unquoted token, like a name, §5.4), a brace's or a bracket's; {@code null} for anything else.
+     * The class of the untagged value an event opens: a scalar token's §4 base-type class, a brace's or a bracket's;
+     * {@code null} for anything else.
      */
     private static DiscriminationClass classOf(TsonEvent event) {
         return switch (event) {
             case TokenEvent token -> DiscriminationClass.ofValue(
                     ValueParser.INSTANCE.read(new TokenValue(token.text(), token.form())));
-            case ReferenceEvent ignored -> DiscriminationClass.STRING;
             case RecordStart ignored -> DiscriminationClass.BRACE;
             case MapStart ignored -> DiscriminationClass.BRACE;
             case EmptyBraceEvent ignored -> DiscriminationClass.BRACE;

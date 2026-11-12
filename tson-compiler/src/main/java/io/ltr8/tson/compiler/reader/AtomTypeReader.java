@@ -19,7 +19,6 @@ import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.stream.EventSkip;
-import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.unicode.IdentifierType;
@@ -224,26 +223,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         ctx = ctx.underDeclaration(schemaLocation);
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
-        boolean referenceTyped = kindOf != null || refOf != null;
-        String text;
-        TokenForm form;
-        if (e instanceof TokenEvent token) {
-            text = token.text();
-            form = token.form();
-            if (referenceTyped && form != TokenForm.UNQUOTED && (text.indexOf('<') >= 0 || text.endsWith("!"))) {
-                // A quoted token is text, never a reference ([TSON-DATA] §7.4): an application and a sibling
-                // reference are written unquoted.
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a reference, found the quoted token \"" + text
-                        + "\" -- a quoted token is never a reference; write the reference unquoted",
-                        "a reference", "the quoted token \"" + text + "\"");
-                ctx.next();
-                return null;
-            }
-        } else if (referenceTyped && e instanceof ReferenceEvent reference) {
-            // A reference's tree rolls up into the one value the reference atom reads.
-            text = reference.reference().text();
-            form = TokenForm.UNQUOTED;
-        } else {
+        if (!(e instanceof TokenEvent event)) {
             String expected = name == null ? "a token" : "a token for " + name;
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected " + (name == null ? "a token" : "a token for '"
                     + name + "'") + ", found " + TypeRefCheck.describe(e), expected, TypeRefCheck.describe(e));
@@ -251,7 +231,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             return null;
         }
         ctx.next();
-        TokenValue tokenValue = new TokenValue(text, form);
+        String text = event.text();
+        TokenValue tokenValue = new TokenValue(text, event.form());
         if (inSchemaDocument != null && ctx.readsSchemaNames()) {
             // A name in a schema document resolves in the schema being resolved: its grammar is read here, and it
             // is recorded for that schema's link to judge.

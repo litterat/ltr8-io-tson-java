@@ -14,18 +14,13 @@ import java.util.Optional;
  * Parses and validates against a reference that names types -- an instance of the kernel's {@code reference}
  * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, {@code meta.ref<record>}. A value is read by {@link
  * ReferenceGrammar} into the {@link TypeRef} it is, and then judged a member: the name must be one of the
- * reference's linked members. The value is the reference, never a value of the type it names; a reader rolls a name
- * token or a reference's tree into the one text this reads.
+ * reference's linked members. The value is the reference, never a value of the type it names.
  *
  * <p><b>The value finds what it names.</b> A reference read here carries the closure the members were computed over
  * ({@link ReferenceBody#closure}), so {@link TypeRef#referent} answers with the entry it names.
  *
- * <p><b>In a data document a reference is a name</b> ([TSON-SCHEMA] §4.2). An application, a reference carrying an
- * argument list ({@code set<text>}), is refused as a constraint the value breaks, whether or not the schema closes it:
- * the author names the entry the schema declares for it ({@code names => set<text>}, then {@code names}). The grammar
- * still reads one, so the refusal is a validation error and not a parse error. A type's name is its path from the
- * root, {@code order} or {@code geo.address} for a member of a schema map nested as an entry, and is judged as one
- * name.
+ * <p>A type's name is its path from the root, {@code order} or {@code geo.address} for a member of a schema map
+ * nested as an entry, and is judged as one name.
  *
  * <p><b>Membership is judged where the names resolve.</b> A kind's members are the names of the reading
  * document's closure, so a name a data document writes is a member or refused here, as an enum refuses a label it

@@ -86,8 +86,9 @@ spec-required case:
 - [ ] **A syntax error in a data document read under a schema is filed as a validation error** ([TSON-DATA] §8.1).
   `!cell { kind: text  v: kind! }` read against its schema reports the separation error under the code
   `VALIDATION_ERROR` ("expected well-formed TSON"), which the conformance runner maps to `validation`; §8.1 files
-  adjacency and separator errors under `parser`. No validate vector states `parser`, so nothing pins it. Give the
-  read a code the runner maps to `parser`, then add the vector.
+  adjacency and separator errors under `parser`. The validate vectors that state `parser` (an argument list in data)
+  are checked by the subject failing a Class 1 parse instead (`Class2ConformanceSuiteTest.checkValidateVector`). Give
+  the read a code the runner maps to `parser`, and check those vectors by it.
 - [ ] **A literal under a closed type in an open record is judged only when the template closes**
   ([TSON-SCHEMA] §5.10). `t => <T> { a: T  n?: int8 ~ 500 }` loads, the default held until an application closes the
   field; the type is closed, so its verdict cannot vary by application and §5.10 judges it at the declaration, as
