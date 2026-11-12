@@ -43,7 +43,15 @@ spec-required case:
   against the array in bind mode, where the sibling binds to its `TypeInline`; a tree read holds the sibling as the
   record it is written as and reports `v` `NOT_IMPLEMENTED` (`RecordAbstractReader.Dependents.heldInPlace`, and
   `tson-json`'s `RecordReader`). Build the `TypeInline` a tree's wrapper record denotes (its `of`'s tag and fields,
-  read against the kernel's model) and read the value through its reader, in both encodings.
+  read against the kernel's model) and read the value through its reader, in both encodings. Where the sibling holds a
+  dependent type no reader is needed: §5.2 refuses it as naming no type a value can be read against, and a tree read
+  reports `NOT_IMPLEMENTED` there too (`!meta.record_field { type: { of: !meta.dependent { on: kind } }  role: DEFAULT
+  value: 5 }` read as data).
+- [ ] **A syntax error in a data document read under a schema is filed as a validation error** ([TSON-DATA] §8.1).
+  `!cell { kind: text  v: kind! }` read against its schema reports the separation error under the code
+  `VALIDATION_ERROR` ("expected well-formed TSON"), which the conformance runner maps to `validation`; §8.1 files
+  adjacency and separator errors under `parser`. No validate vector states `parser`, so nothing pins it. Give the
+  read a code the runner maps to `parser`, then add the vector.
 - [ ] **A literal under a closed type in an open record is judged only when the template closes**
   ([TSON-SCHEMA] §5.10). `t => <T> { a: T  n?: int8 ~ 500 }` loads, the default held until an application closes the
   field; the type is closed, so its verdict cannot vary by application and §5.10 judges it at the declaration, as

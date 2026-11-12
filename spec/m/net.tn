@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/40/m/net.tn?sha256=3db97e90f52c95d6ad212e7ac45dfd286537674caf91b9ecc6da516800c53a52"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=cc877a3b650622e33c20df744f044d048fbb41723079bd50e9ac75a749325ae9"
+!!id:"https://tson.io/2026/40/m/net.tn?sha256=eee3fc0c04026dcf1e7973f68e64a77655ece9a9319172a4667dbafff9181e8b"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=1c114ed6d78b326ee884327fd2ca016620945f90af75f7c52dadef326a794134"
 @doc:"""
   TSON net — the network and identifier type library (2026 Revision 40
   draft).

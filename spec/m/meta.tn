@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=cc877a3b650622e33c20df744f044d048fbb41723079bd50e9ac75a749325ae9"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=1c114ed6d78b326ee884327fd2ca016620945f90af75f7c52dadef326a794134"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -994,8 +994,9 @@
       a constructor refining one of them, `set_type` and `ref` among them; a
       `dependent` only directly at a record field's `type`. A record, an enum,
       every other atom and a namespace type, whose values carry its name as
-      their tag, are declared and named. It is not itself a type, so one never
-      holds another directly.
+      their tag, are declared and named, and so is a declared sum
+      (`declared_type`). It is not itself a type, so one never holds another
+      directly.
       """
     type_inline => { of: meta.type }
 

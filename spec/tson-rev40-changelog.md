@@ -626,9 +626,9 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `cc877a3b…` (Revision 39 `c9b069b6…`), numeric `cdb9876c…` (`dfa66c5d…`), temporal
-   `71a40b2a…` (`fb4ada8f…`), net `3db97e90…` (`371fc20c…`), core `4b427e8c…`
-   (`4e8d9c43…`), policy `e45bfa03…` (`e9cb5b93…`), each re-stamped for #5's kernel and its
+   `1c114ed6…` (Revision 39 `c9b069b6…`), numeric `5865606d…` (`dfa66c5d…`), temporal
+   `eea52822…` (`fb4ada8f…`), net `eee3fc0c…` (`371fc20c…`), core `c79bfb22…`
+   (`4e8d9c43…`), policy `8e203282…` (`e9cb5b93…`), each re-stamped for #5's kernel and its
    declared namespace type and for #6's, policy again for the materialisation depth's
    removal. The chain is consistent — numeric,
    temporal, net and policy each pin the kernel; core pins the three libraries.
