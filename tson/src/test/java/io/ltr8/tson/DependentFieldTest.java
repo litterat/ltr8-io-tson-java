@@ -9,6 +9,7 @@ import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -185,6 +187,40 @@ class DependentFieldTest {
         assertEquals(Optional.of("/v"), only(validate("!cell { kind: point  v: 5 }")).path());
         TsonValue read = tson(CELLS).treeReader().read("!!import:\"" + ID + "\"\n!cell { kind: text  v: hello }");
         assertEquals(Optional.of("hello"), read.get("v").asString());
+    }
+
+    /** A dependent type is its field's: equal constructions under two records are read by each record's sibling. */
+    @Test
+    void equalDependentTypesAreReadByEachRecordsOwnSibling() {
+        String schema = schema("""
+                  point   => { x: int32  y: int32 }
+                  any     => { kind: meta.type_ref  v?: kind! }
+                  rec     => { kind: meta.ref<meta.record>  v?: kind! }""");
+        var entries = tson(schema).resolve(schema).schema().entries();
+        RecordBody any = (RecordBody) entries.get("any");
+        RecordBody rec = (RecordBody) entries.get("rec");
+        assertEquals(any.fields().get("v").type(), rec.fields().get("v").type());
+        assertNotEquals(any.fields().get("kind"), rec.fields().get("kind"));
+
+        String header = "!!import:\"" + ID + "\"\n";
+        assertEquals(List.of(), tson(schema).validate(header + "!any { kind: int32  v: 5 }"));
+        assertEquals(Optional.of("/kind"),
+                tson(schema).validate(header + "!rec { kind: int32  v: 5 }").getFirst().path());
+        assertEquals(List.of(), tson(schema).validate(header + "!rec { kind: point  v: { x: 1  y: 2 } }"));
+    }
+
+    /** Records in place that close one application share a reader, and each instance still reads by its own sibling. */
+    @Test
+    void recordsInPlaceHoldingADependentFieldReadByEachInstancesSibling() {
+        String schema = schema("""
+                  point   => { x: int32  y: int32 }
+                  pair    => <T> { kind: meta.type_ref  v?: kind!  w: T }
+                  holder  => { a: pair<text>  b: pair<text>  c: pair<int32> }""");
+        String header = "!!import:\"" + ID + "\"\n";
+        assertEquals(List.of(), tson(schema).validate(header + "!holder { a: { kind: int32  v: 5  w: x }  "
+                + "b: { kind: text  v: y  w: z }  c: { kind: point  v: { x: 1  y: 2 }  w: 3 } }"));
+        assertEquals(Optional.of("/a/v"), tson(schema).validate(header + "!holder { a: { kind: int32  v: nope  w: x }  "
+                + "b: { kind: text  v: y  w: z }  c: { kind: int32  v: 1  w: 3 } }").getFirst().path());
     }
 
     @Test
