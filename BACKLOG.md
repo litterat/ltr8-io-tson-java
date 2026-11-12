@@ -47,6 +47,14 @@ spec-required case:
   dependent type no reader is needed: §5.2 refuses it as naming no type a value can be read against, and a tree read
   reports `NOT_IMPLEMENTED` there too (`!meta.record_field { type: { of: !meta.dependent { on: kind } }  role: DEFAULT
   value: 5 }` read as data).
+- [ ] **A record written in place may be abstract or state `discriminators`** ([TSON-SCHEMA] §4.2, §5.2). `at =>
+  !meta.record_field { type: { of: !meta.record { fields: { … }  extension: ABSTRACT } } }` loads, and so does one
+  stating `discriminators: [x]`. A record in place is a member of nothing and nothing can extend it, so the first is
+  a slot no value can fill and the second dispatches over no members. Refuse both where the record is written.
+- [ ] **A `chain` or `parameters` on a record written in place is refused with an internal message.** The verdict is
+  right; the text is "TypeInline rejected the value the schema admits: java.lang.IllegalArgumentException …", the
+  model's constructor speaking through the constructor-payload read. Refuse it by rule before the bind, naming what
+  a type written in place may not carry.
 - [ ] **A syntax error in a data document read under a schema is filed as a validation error** ([TSON-DATA] §8.1).
   `!cell { kind: text  v: kind! }` read against its schema reports the separation error under the code
   `VALIDATION_ERROR` ("expected well-formed TSON"), which the conformance runner maps to `validation`; §8.1 files
