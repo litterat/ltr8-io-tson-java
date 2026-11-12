@@ -187,10 +187,11 @@ spec-required case:
   reached lazily. When a record holding a dependent field compiles in bind mode, check every type the sibling's
   reference admits (narrowed by a pin or by a discriminator's members) and refuse the schema there, naming the field
   and the first unbound type. The schema narrows that set by refining the reference (`meta.ref<meta.record>` under
-  `meta.ref<meta.type>`). A free `meta.type_ref` sibling admits the kernel's records and every declared type, so it
-  compiles in bind mode only where it is refined. The same set, as an accessor on the compiled schema, is what a
-  consumer checking it at startup assembles by hand today (`ltr8-io-tson-java-http`'s `ChosenTypes`). Do the same in
-  `tson-json`'s bind path.
+  `meta.ref<meta.type>`). A free `meta.type_ref` sibling admits the kernel's types and every declared type, so it
+  compiles in bind mode only where each of them has a class or the reference is refined; a free `meta.type_expr`
+  sibling also admits a type written in place, which no class binds, so it never does ([TSON-SCHEMA] §5.2). The same
+  set, as an accessor on the compiled schema, is what a consumer checking it at startup assembles by hand today
+  (`ltr8-io-tson-java-http`'s `ChosenTypes`). Do the same in `tson-json`'s bind path.
 
 - [ ] **A reference inside an annotation's value is not judged** ([TSON-SCHEMA] §5.12, §6). With `binds =>
   @meta.annotation [meta.ref<protocol>]`, a schema writing `@binds:[nothing_declares_this]` loads: the annotation

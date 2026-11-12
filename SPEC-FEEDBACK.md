@@ -511,3 +511,74 @@ Part 3 §1.6 (items 16 and 21) and §5.6; `spec/tson-rev40-changelog.md` records
 Four points the design left open are settled there as ruled: `kind!` in data takes the separator rule's parse error
 and no targeted one; `meta.ref` stays as an empty refinement; `on` names a field by its declared spelling; and a
 declared sum is named, as a namespace type is.
+
+## 7. [TSON-SCHEMA] §5.2, §11 — a free sibling hands the choice of a dependent field's type to the document's author
+
+**Problem.** §5.2 reads a dependent field against the type its sibling's value names, and admits as a sibling a
+reference naming types (`meta.type_ref`, `meta.ref<C>` over a constructor, a refinement of one) or the type-slot
+choice `meta.type_expr`. Where the sibling is free, neither pinned nor a discriminator, the author of the document
+chooses the type the value is read against, from everything the sibling admits:
+
+- `kind: meta.type_ref` admits every type of the closure, the kernel's among them, so `kind: meta.record` reads the
+  value as a record definition inside an application's own document;
+- `kind: meta.type_expr` admits, beside those names, a type the author writes in place.
+
+The rules are complete: the set is the sibling's type, and the schema narrows it by pinning the sibling, by making it
+a discriminator over a family, or by refining the reference. What is missing is the warning. §11 names the other
+places a document steers its own interpretation (`!!import`, external references) and says nothing of this one, and
+a schema author writing `payload: kind!` for a tagged payload has no prompt to ask how wide `kind` is.
+
+One limit of the narrowing is worth stating beside it: a reference narrows by constructor (`meta.ref<meta.record>`
+is every record of the closure, the kernel's included), never to the subtypes of one record. A family with a
+discriminator is the spelling for that set.
+
+**What is running.** In this implementation a tree read reads the value against whatever type the sibling names. A
+bind read does the same where a class is bound for that type, and throws `MissingBindingException` during the read
+where none is: the receiver's wiring, found only when a document names the type. `BACKLOG.md` holds the work that
+moves that check to the bind-mode load. In the HTTP layer (`ltr8-io-tson-java-http`) the exception is a 500 any
+client can produce, so `TsonApiDescription` refuses at startup a bound request record whose dependent field lets a
+sender name a type no class binds, or one of the kernel's vocabulary (`ChosenTypes`), pinned by
+`UpstreamGapsTest.aDependentFieldsSiblingNamingATypeNothingBindsIsAMissingBinding`.
+
+**Resolution proposed.** One paragraph in §11, and no change to §5.2's rules: a free sibling typed `meta.type_ref` or
+`meta.type_expr` gives the document's author the choice of the type a value is read against, the kernel's vocabulary
+included and, for `meta.type_expr`, a type the author writes; a schema for untrusted input SHOULD pin the sibling,
+make it a discriminator, or narrow the reference.
+
+Two sentences the consumer's report suggested are not proposed. *That a receiver may hold a sender to fewer types
+than the reference admits*: the set is the schema's, and a receiver accepting less is using another schema without
+naming it. *That a chosen type the receiver cannot read is the document's fault*: the document is valid under the
+schema and a tree read accepts it; whether a host has a class for a type is a fact about one receiver, which the
+type system does not see.
+
+## 8. [TSON-SCHEMA] §5.12, §6, §3.3.3 — a name inside an annotation's value: that it is judged, where, and when
+
+**Problem.** §6 says an annotation's value is "a single data-value conforming to `T`", validated against `T`'s
+contract, and §5.12 judges a name at a `meta.ref<T>` slot by what it reaches, in a schema document and in a data
+document alike. Together they judge a name inside an annotation's value. Neither says so: §5.12 lists the slots the
+rule reaches (a value entry's field, a field's default or pin, a data document's field) and never an annotation's
+value, and §3.3.3 states the namespace for the annotation's own name only. §6's opening, "Annotation values are
+always data values", is read by a consumer as making the name an inert token; the sentence opposes a data value to a
+type definition, and says nothing of whether the value is checked.
+
+Two facts are unstated:
+
+- **The namespace.** A name inside an annotation's value resolves in the annotating document's namespace, as the
+  annotation's name does (§3.3.3): for a data document the closure its `!!import`s bind, for a schema document its
+  own entries and its import closure.
+- **The time.** In a schema document the name is judged when the schema links, as a field's default or pin is
+  (§5.2, §5.12), since the entries it may name are the schema's own.
+
+**What is running.** A data document's annotation value is judged at the read: with `about => @meta.annotation
+meta.ref<order>` and `typed => @meta.annotation meta.type_ref`, `@about:nope` is refused as naming no entry and
+`@typed:nope` as no member, each `ATOM_CONSTRAINT_VIOLATION`, and `@about:o1` naming a value of `order` reads clean.
+A schema document's is not: `@binds:[no_such]` under `binds => @meta.annotation [meta.ref<protocol>]` loads, the
+value's shape checked and the name held undelivered. That is a gap of this library, held in `BACKLOG.md`, and no
+reading of the text. In the HTTP layer (`ltr8-io-tson-java-http`) `@binds` and an exemption's `exchange` keep their
+`meta.ref<…>` typing and `TsonApiDescription` checks the names itself, pinned by
+`UpstreamGapsTest.aReferenceInsideAnAnnotationValueIsNotJudged`.
+
+**Resolution proposed.** One sentence in §5.12's "Where the rule stands", naming an annotation's value among the
+slots the rule reaches, with the namespace and the time above; and in §6, beside "conforming to `T`", a pointer to
+it. No rule changes: §6's "an annotation never changes whether a value is valid" is about the annotated value, and
+an annotation whose own value does not conform is already an error.
