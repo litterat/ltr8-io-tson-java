@@ -24,6 +24,11 @@ The schema grammar itself is in `design/schema-grammar.md`.
 - An invalid sugar form is reported per declaration through `DesugarFailureReporter`, not thrown.
 - `kind!` reaches this phase only at a field's or group member's type, the grammar admitting it nowhere else, and is
   written there as `!meta.dependent { on: kind }` in place, the same `InlineConstruction` a container is.
+- A record body at a slot is its `!meta.record` construction, each field the `meta.record_field` `FieldModifiers` makes
+  of its marks. What that value cannot carry is kept against it (`SchemaPositions.WrittenField`) and restored by
+  `DefinitionResolver.asWritten`: the field's position, and its annotations, which resolve in the schema's namespace
+  where a construction's payload resolves its own against its constructor's. A selector writes `extension: ABSTRACT`,
+  `=?` implying it (§5.2).
 
 Related: `design/schema-grammar.md` (the parser producing the AST this rewrites),
 `design/desugaring-open-forms-and-templates.md` (forms over a parameter, template bodies refused),
@@ -51,6 +56,7 @@ does ([TSON-SCHEMA] §3.4.1).
   | `{K => V}` | `!meta.map { key_type: K  value_type: V }` |
   | `{K => V?}`, `{K => V?; …}` | the corresponding form with `voidable: true` bound directly |
   | `{K => V; N..M}` | the same, plus `min_items`/`max_items` |
+  | `{ a: T  b?: U }`, at a slot | `!meta.record { fields: { a => { type: T }  b => { type: U  optional: true } } }` |
   | `kind!`, at a field's type alone | `!meta.dependent { on: kind }` |
 
   A slot in the table holds what a type slot holds (`slotValue`): a bare token for a name, an application as the data

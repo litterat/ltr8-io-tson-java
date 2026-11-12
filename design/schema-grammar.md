@@ -21,8 +21,11 @@ history lives in git.
 - `SchemaMap.declarations` is a `LinkedHashMap` and a duplicate name overwrites — the grammar layer doesn't dedupe.
 - No production of the schema grammar takes the full `data-value`: `instance` takes a `core-value`, `atom-refinement` a
   braced `record-def`.
-- `{` at a type position dispatches on one consumed token plus one of lookahead (§12.2); everywhere except type-def
-  position a `{` is a map and only a map.
+- `{` opening a type dispatches by one rule at every position, a declaration's body and a type slot alike: one consumed
+  token plus one of lookahead (§12.2) decide a record body or the map. At a slot the record is a `RecordExpr`.
+- Nothing composes, refines or subtracts at a slot: `&`, `^` or `-` after a slot's type, and a name before `{`, are
+  parse errors naming the declaration to write (`inPlace`). A composition operand is read by `parseTypeRef`, which
+  does not ask.
 - `abstract` and `final` are marks at the type-def head and ordinary identifiers everywhere else — the parser decides
   on the word alone, never on what follows it.
 - A mismatch names the construct the position admits, in the author's voice, not the token class.
@@ -168,14 +171,14 @@ materialization, no validation (those are the resolver's/linker's jobs).
   - A map key stays `type-name ["<" type-args ">"]` and nothing else — not a paren type, not a bracket form
     — which is what holds the brace dispatch below to its lookahead budget; a composite key earns a named
     declaration and the explicit `!meta.map { key_type: … }` form.
-- **`{` at a type position dispatches by consuming one token and inspecting** (`braceTypeDef`/
+- **`{` opening a type dispatches by consuming one token and inspecting** (`parseBraceType`/
   `braceOpensMap`) — [TSON-DATA] §2.8's record/map idiom, imported wholesale into the schema grammar as
-  §12.2 asks. `}`, `(` (a leading field group) and `@` (annotations, which the map sugar admits nowhere
-  inside its braces) commit to a record; a name followed by `=>`, or by `<` opening a generic key's
-  arguments, commits to a map; a name followed by anything else is a record whose field is missing its `:`.
-  Everywhere *except* type-def position a `{` is a map and only a map, since a bare record body is not
-  spellable at a type position (§5.2) — `requireMapBrace` says which of the two constructs the author
-  reached for rather than reporting an unexpected token.
+  §12.2 asks, one rule for a declaration's body and a type slot. `}`, `(` (a leading field group) and `@`
+  (annotations, which the map sugar admits nowhere inside its braces) commit to a record; a name followed by `=>`,
+  or by `<` opening a generic key's arguments, commits to a map; a name followed by anything else is a record whose
+  field is missing its `:`. A `{` or `[` after the brace is refused there, a map's key being a name. At a slot the
+  record is a `RecordExpr`, wherever a container may stand; at an argument or a parameter's bound it parses and a
+  later phase refuses it, as it does a container there.
   - **A record body stays a record body wherever the grammar already fixed one** — a refinement body, a
     composition tail, a constructor vocabulary — so `config ^ {text => text}` fails at the `=>`, named as
     "a record body's entries are `name: type`; `=>` begins a map type only where a type is expected".

@@ -54,6 +54,22 @@ spec-required case:
   `meta.record` `@doc` says such a record must be ABSTRACT and the mark `final` beside `=?` is refused. A record
   written in place keeps its stated `extension`, and its `discriminators` decide nothing at read. Decide refusal or
   derivation for the canonical form, and apply it in both places.
+- [ ] **An annotation in a construction's payload resolves against the governing schema** ([TSON-SCHEMA] §3.3.3).
+  With `note => text` declared beside it, `r => !meta.record { fields: { a => @note:"hi" { type: int32 } } }` is
+  refused: "the body is not valid data for 'meta.record' … annotation '@note' names no type the governing schema
+  declares (§6)". The payload is read through the constructor's compiled reader (`DefinitionResolver.bindAtomInstance`),
+  whose annotation types are the meta layer's (`AnnotationCapture`), where §3.3.3 resolves an annotation a schema
+  document writes in that document's namespace. The same annotation on a declared field, `r => { @note:"hi" a: int32
+  }`, loads, and so does one on a field of a record written in place as sugar, whose annotations the desugarer keeps
+  off the payload (`SchemaPositions.WrittenField`). Read a payload's annotations in the writing schema's namespace,
+  then drop that carrying, and add a `schema/valid` vector.
+- [ ] **A value at an abstract record in place is refused with a reason that cannot apply** ([TSON-SCHEMA] §5.10.1,
+  §7.2). Under `r => { at?: { kind: text =?  x: int32 } }`, `!r { at: { kind: a  x: 1 } }` reports "no schema in this
+  closure declares a subtype of '{ kind: text  x: int32 }', and it is abstract, so nothing can stand here -- the schema
+  that declares its subtypes is not among those this document's own schema imports"
+  (`RecordExtensionDiagnostics`). No schema can declare a subtype of a record nothing can name; the same message
+  follows an abstract application closed in place (`s?: shape<circle>`). Say that a record written in place that is
+  abstract is empty, at both encodings' readers.
 - [ ] **A syntax error in a data document read under a schema is filed as a validation error** ([TSON-DATA] §8.1).
   `!cell { kind: text  v: kind! }` read against its schema reports the separation error under the code
   `VALIDATION_ERROR` ("expected well-formed TSON"), which the conformance runner maps to `validation`; §8.1 files

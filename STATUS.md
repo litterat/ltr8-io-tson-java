@@ -47,6 +47,10 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `{ of: !meta.dependent { on: kind } }` at a record field's type, `kind!` in schema-grammar sugar, which parses at
       a field's or group member's type and nowhere else; a `meta.dependent` declared or at any other slot is refused at
       link. `kind!` is no data form in either encoding
+- [x] A record written in place (Part 2 §5.2) — a record body at a field's type, a group member's, an array's
+      element, a map's value, a tuple's element or a choice's variant (`at: { x: int32 }`) is the record an
+      application of an open record closes to in place, read untagged in tree and bind mode in both encodings; one over
+      a parameter of its open record is `NOT_IMPLEMENTED`
 - [x] Dependent fields (Part 2 §5.2) — `v?: kind!` is read per instance
       against the type its sibling's value names, in tree and bind mode (an `Object` component) and in JSON. The
       sibling's rules are checked at the declaration against the flattened record: declared first, typed by a reference

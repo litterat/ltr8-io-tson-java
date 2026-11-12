@@ -19,6 +19,7 @@ import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
+import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -441,14 +442,79 @@ class TsonSchemaParserTest {
                 thrown.getMessage());
     }
 
-    /** At a type-ref position the two brace meanings are distinguished by name: a bare record must be declared. */
+    /**
+     * A record body parses wherever a type expression stands and a container may: a field's type, a group member's,
+     * an array's element, a map's value, a tuple's element and a choice's variant, by the declaration's own dispatch.
+     */
     @Test
-    void aBareRecordAtATypeRefPositionDistinguishesTheTwoBraceMeanings() {
-        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
-                !!import:"https://tson.io/2026/40/m/meta.tn"
-                !schema { holder => { inner: {name: text} } }"""));
-        assertTrue(thrown.getMessage().contains("opens the map sugar"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("record body is not permitted"), thrown.getMessage());
+    void aRecordBodyParsesAtEveryTypeSlot() {
+        RecordDef xy = new RecordDef(List.of(fieldOf("p => { x: int32  y: int32 }", "x"),
+                fieldOf("p => { x: int32  y: int32 }", "y")));
+        assertEquals(new RecordExpr(xy), fieldTypeOf("r => { at: { x: int32  y: int32 } }", "at"));
+        GroupDef group = (GroupDef) ((RecordDef) ((StructuralTypeDef) declOf(
+                "r => { ( a: { x: int32  y: int32 } | b: text ) }").typeDef()).body()).entries().getFirst();
+        assertEquals(new RecordExpr(xy), group.options().getFirst().getFirst().typeRef());
+        assertEquals(new RecordExpr(xy), assertInstanceOf(ArrayExpr.class,
+                fieldTypeOf("r => { at: [{ x: int32  y: int32 }] }", "at")).elementType().typeRef());
+        assertEquals(new RecordExpr(xy), mapOf("r => {text => { x: int32  y: int32 }}").valueType().typeRef());
+        assertEquals(new RecordExpr(xy), assertInstanceOf(TupleExpr.class,
+                fieldTypeOf("r => { at: [{ x: int32  y: int32 }, text] }", "at")).elementTypes().getFirst().typeRef());
+        assertEquals(List.of(new RecordExpr(xy), new NameRef("text")), assertInstanceOf(ChoiceExpr.class,
+                fieldTypeOf("r => { at: ( { x: int32  y: int32 } | text ) }", "at")).variants());
+    }
+
+    /** {@code {}} at a slot is the empty record, as at a declaration, and records nest. */
+    @Test
+    void anEmptyBraceAtASlotIsAnEmptyRecordAndRecordsNest() {
+        assertEquals(new RecordExpr(new RecordDef(List.of())), fieldTypeOf("r => { at: {} }", "at"));
+        RecordExpr outer = assertInstanceOf(RecordExpr.class, fieldTypeOf("r => { at: { a: { b: int32 } } }", "at"));
+        FieldDef a = (FieldDef) outer.body().entries().getFirst();
+        assertInstanceOf(RecordExpr.class, a.type().orElseThrow().typeRef());
+    }
+
+    /** What a declared record's body holds, one written in place holds: marks, modifiers, groups, annotations. */
+    @Test
+    void aRecordInPlaceHoldsWhatADeclaredBodyHolds() {
+        String declared = "{ @doc:\"d\" a?: text? ~ x  b: int32 = 3  k: meta.type_ref  v?: k!  ( p: int32 | q: text )? }";
+        RecordDef body = (RecordDef) ((StructuralTypeDef) declOf("d => " + declared).typeDef()).body();
+        assertEquals(new RecordExpr(body), fieldTypeOf("r => { at: " + declared + " }", "at"));
+    }
+
+    /** A brace dispatches by the same rule at a slot as at a declaration: a name and {@code =>} open the map. */
+    @Test
+    void theBraceDispatchIsOneRuleAtBothPositions() {
+        assertInstanceOf(MapExpr.class, fieldTypeOf("r => { m: {text => int32} }", "m"));
+        assertInstanceOf(RecordExpr.class, fieldTypeOf("r => { m: { text: int32 } }", "m"));
+    }
+
+    /** A map's key is a name, so a brace or a bracket after a map's opening brace is refused saying so. */
+    @ParameterizedTest
+    @ValueSource(strings = {"r => { m: { { x: int32 } => text } }", "r => { m: { [text] => text } }",
+            "m => { { x: int32 } => text }"})
+    void aTypeInPlaceAtAMapKeyIsRefused(String declaration) {
+        ParseException thrown = assertThrows(ParseException.class, () -> declOf(declaration));
+        assertTrue(thrown.getMessage().contains("a map type's key is a type name"), thrown.getMessage());
+    }
+
+    /** Composition, refinement and subtraction are declared, never written in place: each refusal says so. */
+    @ParameterizedTest
+    @ValueSource(strings = {"r => { at: point & { z: int32 } }", "r => { at: point ^ { x?: = 0 } }",
+            "r => { at: point - { x } }", "r => { at: { x: int32 } & point }", "r => { at: [point & { z: int32 }] }",
+            "r => { at: ( text | point ^ { x?: = 0 } ) }", "r => { at: box<point & { z: int32 }> }"})
+    void compositionAndRefinementInPlaceAreRefused(String declaration) {
+        ParseException thrown = assertThrows(ParseException.class, () -> declOf(declaration));
+        assertTrue(thrown.getMessage().contains("is declared, never written in place"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("declare it under a name"), thrown.getMessage());
+    }
+
+    /** A name followed by a brace at a slot, a definition mark included, is refused naming the bare body. */
+    @Test
+    void aNameBeforeABraceAtASlotIsRefused() {
+        ParseException mark = assertThrows(ParseException.class, () -> declOf("r => { at: abstract { x: int32 } }"));
+        assertTrue(mark.getMessage().contains("'abstract' marks how a declared record may be realised"),
+                mark.getMessage());
+        ParseException name = assertThrows(ParseException.class, () -> declOf("r => { at: point { z: int32 } }"));
+        assertTrue(name.getMessage().contains("a record written in place is its bare body"), name.getMessage());
     }
 
     /**

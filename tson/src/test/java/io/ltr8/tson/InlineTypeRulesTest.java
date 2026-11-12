@@ -357,6 +357,120 @@ class InlineTypeRulesTest {
         assertEquals(List.of(), read(declarations, "!r { at: { x: 1 } }"));
     }
 
+    // ── A record body written at a slot (§5.2) ──────────────────────────────────────────────────
+
+    /** Two records in place are not disjoint, and neither has a name a tag could give; one beside text is. */
+    @Test
+    void twoRecordsInPlaceAsVariantsAreNotDisjoint() {
+        refused("  r => { c: ( { x: int32 } | { y: int32 } ) }", "are variants written in place");
+        refused("  c => ( { x: int32 } | { y: int32 } )", "are variants written in place");
+        assertEquals(List.of(), problems("  r => { c: ( { x: int32 } | text ) }"));
+    }
+
+    /** A field typed by a record in place carries no value: a field's value is a token. */
+    @Test
+    void aDefaultOrPinOnAFieldTypedByARecordInPlaceIsRefused() {
+        refused("  r => { at?: { x: int32 } ~ a }", "a type written in place that is no reference");
+        refused("  r => { at: { x: int32 } = a }", "a type written in place that is no reference");
+    }
+
+    /** The checks a declared record's fields answer to reach one written in place. */
+    @Test
+    void aRecordInPlaceAnswersADeclaredRecordsChecks() {
+        refused("  r => { at: { x: int32 ~ 3 } }", "gives a default to a key that is always written");
+        refused("  r => { at: { x: = 3 } }", "states only a modifier and no type");
+        refused("  r => { at: { x: nothing_here } }", "nothing_here");
+        refused("  r => { at: { @nope x: int32 } }", "'@nope' does not name a type in this schema's namespace");
+        unsatisfiable("  r => { at: { a: void } }", "r");
+        assertEquals(List.of(), problems("  r => { at?: { a: void } }"));
+    }
+
+    /** {@code {}} at a slot is the empty record, which reads an empty value and refuses any field. */
+    @Test
+    void anEmptyBraceAtASlotIsTheEmptyRecord() {
+        assertEquals(List.of(), read("  r => { at: {} }", "!r { at: {} }"));
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, read("  r => { at: {} }", "!r { at: { a: 1 } }").getFirst()
+                .code());
+    }
+
+    /**
+     * A selector in a record in place makes it abstract, as {@code =?} makes a declared record (§5.2), and nothing
+     * can be its member, so it is empty: required it empties its record, optional it can only be missing.
+     */
+    @Test
+    void aSelectorInARecordInPlaceMakesItAnEmptyAbstractRecord() {
+        unsatisfiable("  r => { at: { kind: text =?  x: int32 } }", "r");
+        String optional = "  r => { at?: { kind: text =?  x: int32 } }";
+        assertEquals(List.of(), problems(optional));
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(optional, "!r { at: { kind: a  x: 1 } }").getFirst().code());
+    }
+
+    /** A record in place over a parameter of its open record is not implemented: a gap, never a schema error. */
+    @Test
+    void aRecordInPlaceOverAParameterIsAGap() {
+        List<Diagnostic> found = problems("  page => <T> { meta: { cursor: T  total: int32 } }");
+        assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED), found.stream().map(Diagnostic::code).toList(),
+                found::toString);
+    }
+
+    /** One naming no parameter is closed, and an application of its open record reads it. */
+    @Test
+    void aRecordInPlaceNamingNoParameterInsideAnOpenRecordReads() {
+        String declarations = "  page => <T> { items: [T]  meta: { total: int32 } }\n  r => { p: page<text> }";
+        assertEquals(List.of(), problems(declarations));
+        assertEquals(List.of(), read(declarations, "!r { p: { items: [a]  meta: { total: 1 } } }"));
+        assertEquals(Optional.of("/p/meta/total"),
+                read(declarations, "!r { p: { items: []  meta: { total: x } } }").getFirst().path());
+    }
+
+    // ── A record in place's field names (§5.2, §11.4) ───────────────────────────────────────────
+
+    /**
+     * A record written in place judges its field names as a declared record does, under its own name type, at any
+     * depth and inside containers and choices, written as sugar or in canonical form, refused at its declaration.
+     */
+    @Test
+    void aFieldNameOutsideTheNameTypeOfARecordInPlaceIsRefused() {
+        refused("  r => { at: { \"a b\": int32 } }",
+                "the record written in place '{ a b: int32 }' in 'r': field name 'a b' is not an identifier");
+        refused("  r => { at: [{ x: ( text | { \"a b\": int32 } ) }] }", "field name 'a b' is not an identifier");
+        refused("  r => [{ \"a b\": int32 }]", "field name 'a b' is not an identifier");
+        refused("  r => !meta.record { fields: { at => { type: { of: !meta.record { fields: { \"a b\" => { type: int32 "
+                + "} } } } } } }", "field name 'a b' is not an identifier");
+        assertEquals(List.of(), problems("  jn => !unicode.identifier_type { start_add: \"@$\" }\n  r => !meta.record { "
+                + "fields: { at => { type: { of: !meta.record { name_type: jn  fields: { \"@id\" => { type: int32 } } } "
+                + "} } } }"));
+    }
+
+    /** The names a record an application closes to holds are its open record's, refused there and only there. */
+    @Test
+    void aRecordAnApplicationClosesToIsJudgedAtItsOpenRecord() {
+        List<Diagnostic> found = problems("  bad => <T> !meta.record { fields: { \"a b\" => { type: T } } }\n"
+                + "  r => { at: bad<int32> }");
+        assertEquals(1, found.size(), found::toString);
+        assertEquals(Optional.of("/bad"), found.getFirst().schemaPointer(), found::toString);
+    }
+
+    /** Two look-alike field names in one record in place are refused; its fields are a scope of their own. */
+    @Test
+    void aRecordInPlaceIsANameScopeOfItsOwn() {
+        for (String declarations : List.of("  r => { at: { comer: int32  corner: int32 } }",
+                "  r => { at: { ( comer: int32 | corner: text ) } }", "  r => { at: [{ comer: int32  corner: int32 }] }")) {
+            List<Diagnostic> found = problems(declarations);
+            assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES), found.stream().map(Diagnostic::code).toList(),
+                    declarations + " " + found);
+            assertTrue(found.getFirst().message().contains("the record written in place"), found::toString);
+        }
+        assertEquals(List.of(), problems("  r => { comer: int32  at: { corner: int32 } }"));
+    }
+
+    @Test
+    void aMixedScriptFieldNameInARecordInPlaceIsRefused() {
+        List<Diagnostic> found = problems("  r => { at: { p\u0430y: text } }");
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT), found.stream().map(Diagnostic::code).toList(),
+                found::toString);
+    }
+
     private static List<Diagnostic> read(String declarations, String document) {
         List<Diagnostic> found = new ArrayList<>();
         tson(declarations).treeReader().withDiagnostics(found::add).read("!!import:\"" + ID + "\"\n" + document);

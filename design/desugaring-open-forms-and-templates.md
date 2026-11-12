@@ -50,7 +50,10 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, reporting),
 - **A tuple or a choice is no constructor over reference fields.** Their positions are a list, so construction sugar
   does not reach them, and an untagged sum over a parameter cannot be judged disjoint until it is applied (§5.4). A
   labelled alternative inside the record is a field group, `( body: T | problem: problem )`.
-- **An inline record over a parameter needs no rule here**: §5.3 already refuses a bare record at a field position.
+- **A record in place over a parameter is a gap, not a reference** (`recordInPlace`): §5.10 substitutes it when its
+  open record is applied, and substitution does not yet reach inside a type written in place, so it is reported
+  `NOT_IMPLEMENTED`, naming the open record to declare instead. One naming no parameter is closed, as anywhere. As an
+  argument it is refused before it is expanded, so the verdict is the argument rule's, never the gap.
 
 ## Template bodies (`refuseTemplateBody`)
 

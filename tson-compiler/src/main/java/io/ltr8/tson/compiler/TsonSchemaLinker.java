@@ -335,16 +335,23 @@ public final class TsonSchemaLinker {
             IdentifierProfile profile = NameType.profile(definition, constructorOf(name, definition, facts),
                             merged::get, structure)
                     .orElse(IdentifierGrammar.PROFILE);
-            checkScope(receiver, schema, name, position, names, noun, identifiers, profile);
+            checkScope(receiver, schema, name, "'" + name + "'", position, names, noun, identifiers, profile);
             // An open record's literal values are every application's, so they are judged here, once.
             if (body instanceof RecordBody record) {
-                checkFieldValues(receiver, schema, name, position,
-                        record.fields().entrySet().stream()
-                                .filter(f -> f.getValue().value().isPresent() && f.getValue().sibling().isEmpty())
-                                // A value is a name only at an identifier family, never written in place.
-                                .flatMap(f -> TypeExpr.named(f.getValue().typeExpr()).stream()
-                                        .map(type -> new FieldValue(f.getKey(), type, f.getValue().role(),
-                                                f.getValue().value().get()))).toList(), merged, identifiers);
+                checkFieldValues(receiver, schema, name, "'" + name + "'", position, fieldValues(record), merged,
+                        identifiers);
+            }
+            // A record written in place is a scope of its own, judged as a declared record is (§5.2, §11.4).
+            if (!refusedEnums.contains(name)) {
+                for (TypeInline inline : FieldNames.inPlace(definition)) {
+                    RecordBody record = (RecordBody) inline.of();
+                    String who = FieldNames.inPlace(name, inline);
+                    checkScope(receiver, schema, name, who, position, List.copyOf(record.fields().keySet()),
+                            "field names", identifiers, NameType.profile(record, Optional.of(inline.constructor()),
+                                    merged::get, structure).orElse(IdentifierGrammar.PROFILE));
+                    checkFieldValues(receiver, schema, name, who, position, fieldValues(record), merged,
+                            identifiers);
+                }
             }
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
@@ -361,24 +368,25 @@ public final class TsonSchemaLinker {
     private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    Optional<SourcePosition> definition, List<String> names, String noun,
                                    IdentifierPolicy identifiers) {
-        checkScope(receiver, schema, entry, definition, names, noun, identifiers, IdentifierGrammar.PROFILE);
+        checkScope(receiver, schema, entry, "'" + entry + "'", definition, names, noun, identifiers,
+                IdentifierGrammar.PROFILE);
     }
 
     /**
      * The same, judging each name under {@code profile} -- an enum's or a record's name type's, for its members or
-     * field names.
+     * field names -- and naming the scope in a message as {@code who}, reported against {@code entry}.
      */
-    private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
+    private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry, String who,
                                    Optional<SourcePosition> definition, List<String> names, String noun,
                                    IdentifierPolicy identifiers, IdentifierProfile profile) {
         if (identifiers.appliesSkeletonDistinctness()) {
             ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
                     definition, Diagnostic.Code.CONFUSABLE_NAMES,
-                    "'" + entry + "' has " + noun + " that read alike: " + collision.describe()));
+                    who + " has " + noun + " that read alike: " + collision.describe()));
         }
         String singular = noun.substring(0, noun.length() - 1);
         names.forEach(member -> perName(receiver, schema, entry, definition, member,
-                "'" + entry + "' has a " + singular + " where ", identifiers, profile));
+                who + " has a " + singular + " where ", identifiers, profile));
     }
 
     /**
@@ -388,7 +396,7 @@ public final class TsonSchemaLinker {
      * refuse if the document wrote it must not be one the reader injects. Judged under the family's own profile,
      * as a read judges it: over the value, the text in the family's normalization form.
      */
-    private static void checkFieldValues(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
+    private static void checkFieldValues(DiagnosticsReceiver receiver, TsonSchema schema, String entry, String who,
                                          Optional<SourcePosition> definition, List<FieldValue> values,
                                          Map<String, Top> merged, IdentifierPolicy identifiers) {
         for (FieldValue field : values) {
@@ -399,7 +407,7 @@ public final class TsonSchemaLinker {
                 String what = field.role() == FieldRole.FIXED ? "a fixed value" : "a default";
                 perName(receiver, schema, entry, definition,
                         family.get().normalization().apply(field.value().text()),
-                        "'" + entry + "' has " + what + " for '" + field.name() + "' where ", identifiers,
+                        who + " has " + what + " for '" + field.name() + "' where ", identifiers,
                         family.get().profile());
             }
         }
@@ -407,6 +415,15 @@ public final class TsonSchemaLinker {
 
     /** One field's literal value, with the type it is a value of. */
     private record FieldValue(String name, TypeRef type, FieldRole role, Token value) {
+    }
+
+    /** {@code record}'s literal values: a value is a name only at an identifier family, never written in place. */
+    private static List<FieldValue> fieldValues(RecordBody record) {
+        return record.fields().entrySet().stream()
+                .filter(f -> f.getValue().value().isPresent() && f.getValue().sibling().isEmpty())
+                .flatMap(f -> TypeExpr.named(f.getValue().typeExpr()).stream()
+                        .map(type -> new FieldValue(f.getKey(), type, f.getValue().role(),
+                                f.getValue().value().get()))).toList();
     }
 
     /**
