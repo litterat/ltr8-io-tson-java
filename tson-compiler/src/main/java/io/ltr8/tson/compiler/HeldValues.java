@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.ValueRef;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -111,7 +112,7 @@ final class HeldValues {
                     @Override
                     public void held(List<String> at, TsonSchema.SlotType slotType,
                                      io.ltr8.tson.schema.meta.TypeRef reference,
-                                     io.ltr8.tson.schema.meta.Ref<?> cell) {
+                                     ValueRef<?> cell) {
                         byName.add(new TsonSchema.ValueByName(under(slot, at), slotType, reference,
                                 Optional.ofNullable(cell)));
                     }

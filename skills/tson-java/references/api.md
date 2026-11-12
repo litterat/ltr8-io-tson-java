@@ -617,9 +617,10 @@ typed by a reference (`ReferenceBody`, spelled `meta.ref<T>`) holds what its `T`
 for a member of a nested `!schema` map; an argument list, `set<text>`, is no data form and does not parse there, and a
 document names the entry the schema declares for it), whose `referent()` is the value of the entry it names — a tree
 read delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type (`method:
-meta.ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and then
-a key of its namespace value, or a field of a record value) and the value it names (`method().get()`), or a `TypeRef`
-whose `referent()` is that value, or a `String` the name. In a schema the resolver records each with its slot as it
+meta.ref<method>`) it binds a `ValueRef<T>` holding the qualified name as written (`orders.place_order`, an entry and
+then a key of its namespace value, or a field of a record value) and the value it names (`method().get()`), or a
+`String` the name -- a tree read delivers the same `ValueRef`, and a `TypeRef` host there is a bind mismatch, a value
+being no type. In a schema the resolver records each with its slot as it
 reads the value, and the linker judges it and delivers the value; in a data document the read judges the name in the
 governing schema (`ATOM_CONSTRAINT_VIOLATION` where it reaches nothing, a type, or a value of another type) and
 delivers at once. The value is the schema's own value entry's, bound or a tree as the schema holds it.

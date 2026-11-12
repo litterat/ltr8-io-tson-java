@@ -12,6 +12,7 @@ import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.tree.TsonAtom;
 
 import java.util.function.Function;
@@ -151,7 +152,7 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
 
     /**
      * The type a sibling's read produced, in whichever form the read built it: a name -- a tree's atom, the reference
-     * itself, a token held as written, a host's {@code Ref}, or the canonical text a string component holds -- or a
+     * itself, a token held as written, a host's {@code ValueRef}, or the canonical text a string component holds -- or a
      * type written in place; null where the read produced nothing.
      */
     public static TypeExpr typeIn(Object decoded) {
@@ -168,7 +169,7 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
             // A type written in place is read against as it stands, a reference among them (§5.2).
             case TypeInline inline -> inline;
             case io.ltr8.tson.schema.meta.Token token -> typeIn(token.text());
-            case io.ltr8.tson.schema.meta.Ref<?> ref -> typeIn(ref.name());
+            case ValueRef<?> ref -> typeIn(ref.name());
             case CharSequence text -> {
                 try {
                     yield ReferenceGrammar.parse(text.toString());

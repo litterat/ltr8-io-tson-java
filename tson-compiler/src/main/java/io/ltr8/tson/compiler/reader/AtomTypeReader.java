@@ -15,6 +15,7 @@ import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -142,7 +143,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         return kindOf != null;
     }
 
-    /** Whether this reads a value's qualified name -- held by a {@code Ref} or a {@code TypeRef}. */
+    /** Whether this reads a value's qualified name, into a {@code ValueRef}. */
     boolean readsARef() {
         return refOf != null;
     }
@@ -238,8 +239,13 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             // is recorded for that schema's link to judge.
             try {
                 T value = inSchemaDocument.read(tokenValue.text());
-                ctx.heldByName(value instanceof io.ltr8.tson.schema.meta.TypeRef reference ? reference
-                        : io.ltr8.tson.schema.meta.TypeRef.of(text), slotType(), null);
+                switch (value) {
+                    case io.ltr8.tson.schema.meta.TypeRef reference -> ctx.heldByName(reference, slotType(), null);
+                    // A value's reference is the cell the link delivers what its name reaches into.
+                    case ValueRef<?> cell -> ctx.heldByName(io.ltr8.tson.schema.meta.TypeRef.of(cell.name()),
+                            slotType(), cell);
+                    default -> ctx.heldByName(io.ltr8.tson.schema.meta.TypeRef.of(text), slotType(), null);
+                }
                 return value;
             } catch (UnsupportedOperationException gap) {
                 ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, gap.getMessage(), "a value this library can judge", text);
@@ -265,6 +271,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                 return value;
             }
             if (value instanceof io.ltr8.tson.schema.meta.TypeRef reference) {
+                return ctx.refusesName(reference.name(), names) ? null : value;
+            }
+            if (value instanceof ValueRef<?> reference) {
                 return ctx.refusesName(reference.name(), names) ? null : value;
             }
             return ctx.refusesName(value instanceof String named ? named : text, names) ? null : value;

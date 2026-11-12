@@ -88,7 +88,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   source left unset widens the profile, so no set-once form of the rule is sound (`IdentifierType`). Every text
   family's `normalization` is identity-only on the same terms (`TextType`): turning folding on would make
   `Content-Type` one value under the source and another under the refinement.
-- **A reference narrows `of` by IS-A, and the link judges it** (§5.7, `meta.reference_type`'s own `@doc`). The refined `of`
+- **A reference narrows `of` by IS-A, and the link judges it** (§5.7, `meta.ref`'s own `@doc`). The refined `of`
   is the source's or a type IS-A it -- a constructor IS-A one by its chain (`unicode.identifier_type` lists
   `meta.type`), an ordinary type by its own (`big_order => order ^ {}`) -- so every name the refinement admits, the
   source admits too: `meta.identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }` is the kernel's case.

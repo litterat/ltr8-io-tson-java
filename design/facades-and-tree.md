@@ -172,12 +172,12 @@ admit UTS #39's own `Toys-Я-Us`.
   built-in names stay checked — and is what round-tripping through `TsonTreeWriter`, or reading the wire of a
   document whose `!!import` is deliberately out of scope, wants. The two controls compose, as
   `ignoringUnknownFields()` does with both.
-- **A reference is a `TypeRef` in both modes.** Under a schema a reference-typed position (a kind or a `meta.ref<…>`)
-  reads to a `schema.meta.TypeRef`, so a tree read hands back a `TsonAtom` holding one (`node.as(TypeRef.class)`)
-  and a bind delivers the same object, a `String` host receiving its canonical text. Read in data under a kind, it
-  carries its closure, so `referent()` is the value of the entry it names (`design/references.md`); read in data
-  under a reference naming values (`meta.ref<order>`), its `referent()` is the value its name reaches, and a `Ref`
-  host is delivered that value at the read. A schemaless read
+- **A reference reads to one host shape in both modes.** Under a schema a kind reads to a `schema.meta.TypeRef`, so a
+  tree read hands back a `TsonAtom` holding one (`node.as(TypeRef.class)`) and a bind delivers the same object; read
+  in data it carries its closure, so `referent()` is the value of the entry it names (`design/references.md`). A
+  reference naming values (`meta.ref<order>`) reads to a `schema.meta.ValueRef` the same way, the value its name
+  reaches delivered into it at the read in data and at link in a schema document; a `TypeRef` host there is a bind
+  mismatch. A `String` host receives the name at either. A schemaless read
   has no closure: it keeps a name as a token (`design/tree-model.md`).
 - **Rule 2 is looser for a container than for an atom, deliberately.** `TypeRefCheck.names` (a `@Typename`,
   else the simple class name case-insensitively — the same match `bindUnion` gives union members) is what

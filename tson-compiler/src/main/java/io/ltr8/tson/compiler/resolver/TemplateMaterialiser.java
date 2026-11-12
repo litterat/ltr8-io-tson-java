@@ -38,8 +38,8 @@ import java.util.function.Supplier;
 
 /**
  * §5.10 materialisation: closes the applications a resolved schema holds, over the resolved form, not the AST. An
- * application reaches here as a {@link TypeRef} carrying {@code arguments}, so closing is a walk over {@code
- * schema.meta} values ({@link TypeSlots}).
+ * application reaches here as an {@code ApplyBody} written in place, so closing is a walk over {@code schema.meta}
+ * values ({@link TypeSlots}).
  *
  * <p><b>Two operations share the spelling</b> ([TSON-SCHEMA] §5.10, §5.3). Over a constructor, {@code
  * meta.array<text>} constructs: the binding record {@code [text]} writes, built by the constructor's own reader

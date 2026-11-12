@@ -30,6 +30,7 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -269,7 +270,7 @@ public final class KernelBootstrapResolver {
 
                         @Override
                         public void held(List<String> slot, TsonSchema.SlotType slotType,
-                                         TypeRef reference, io.ltr8.tson.schema.meta.Ref<?> cell) {
+                                         TypeRef reference, ValueRef<?> cell) {
                         }
 
                         @Override
@@ -395,7 +396,7 @@ public final class KernelBootstrapResolver {
      * The hand-written construction of a pre-loaded instance (see the class Javadoc). The pre-loaded set applies
      * its constructors in four shapes, each checked rather than assumed: a bare {@code {}} for
      * {@code integer_type} and {@code text_type}, each the target's unconstrained constant; a bare token array for
-     * {@code enum}; a record of tokens for {@code reference_type} and for {@code map}; and a record holding a token
+     * {@code enum}; a record of tokens for {@code ref} and for {@code map}; and a record holding a token
      * array for {@code choice}, whose {@code variants} are names.
      *
      * <p>Package-private so {@code KernelBootstrapResolverTest} can reach the refusals the real kernel never
@@ -412,9 +413,9 @@ public final class KernelBootstrapResolver {
                 yield TextType.UNCONSTRAINED;
             }
             case "enum" -> toEnumBody(instance.value());
-            // `!meta.reference_type { of: type }`: `of` is the authored field, and the index is derived when the
-            // kernel links, as every reference's is.
-            case "meta.reference_type" -> new ReferenceBody(TypeRef.of(bindingField(instance.value(), "of")));
+            // `!meta.ref { of: type }`: `of` is the authored field, and the index is derived when the kernel links,
+            // as every reference's is.
+            case "meta.ref" -> new ReferenceBody(TypeRef.of(bindingField(instance.value(), "of")));
             // `field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }`.
             case "meta.map" -> new MapBody(TypeRef.of(bindingField(instance.value(), "key_type")),
                     TypeRef.of(bindingField(instance.value(), "value_type")),

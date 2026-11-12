@@ -5,11 +5,12 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
-import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
@@ -17,11 +18,13 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-JSON] §5's reading of a position typed by a reference that names values ([TSON-SCHEMA] §4.2, §5.12): a JSON
  * string holding the qualified name of a value of the governing schema, judged by what it reaches as a TSON read
- * judges it, and bound into the host shapes a TSON read binds -- a {@code Ref} receiving the value, a {@code TypeRef}
+ * judges it, and bound into the host shapes a TSON read binds -- a {@code ValueRef} receiving the value, a {@code TypeRef}
  * the name carrying it, a {@code String} the name.
  */
 class JsonValueRefReadTest {
@@ -50,7 +53,7 @@ class JsonValueRefReadTest {
     public record Customer(String name) {
     }
 
-    public record Pick(Ref<Order> which) {
+    public record Pick(ValueRef<Order> which) {
     }
 
     public record NamedPick(TypeRef which) {
@@ -60,7 +63,7 @@ class JsonValueRefReadTest {
     }
 
     /**
-     * The schema resolved under a context binding its value entries to this test's records, so a {@code Ref} names
+     * The schema resolved under a context binding its value entries to this test's records, so a {@code ValueRef} names
      * an {@code Order}; the JSON reader binds the document's own records under a context of its own.
      */
     private static Json json(Class<?> pick) {
@@ -100,11 +103,10 @@ class JsonValueRefReadTest {
     }
 
     @Test
-    void aTypeRefHostReceivesTheNameCarryingItsReferent() {
-        NamedPick pick = bind(NamedPick.class, "{\"which\": \"book.first\"}");
-
-        assertEquals(TypeRef.of("book.first"), pick.which());
-        assertEquals(new Order("B-1"), pick.which().referent().orElseThrow());
+    void aTypeRefHostIsABindMismatch() {
+        ReadException refused = assertThrows(ReadException.class,
+                () -> bind(NamedPick.class, "{\"which\": \"book.first\"}"));
+        assertTrue(refused.getMessage().contains("declare it ValueRef"), refused.getMessage());
     }
 
     @Test

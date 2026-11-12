@@ -20,7 +20,7 @@ JSON inputs are in `design/cli-config-hashing.md`.
   inspecting a value.
 - A choice value may omit its tag only when the choice is disjoint; no member-shape matching, no trying variants in
   order. A missing required tag is `TYPE_MISMATCH`.
-- A kind (a `meta.reference_type` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and
+- A kind (a `meta.ref` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and
   never a discrimination case ([TSON-JSON] §5.6). A JSON document is always data, so the name is judged a member over the
   reading document's closure, whatever it imports (`AtomParsers.forType`). JSON has no unquoted form, so a string
   is read by `atom.ReferenceGrammar`, the production TSON reads unquoted, and judged as TSON judges it by the shared
@@ -265,9 +265,9 @@ its schema name because a tuple written in place has no entry name, and no bindi
 place, the record an application closes to at a slot, has none either and no natural host form, so it is read into the
 record class its component declares (`RecordInPlaceReader`, `BindRecordBuilder.boundTo`) and builds nothing where no
 component says. `BindTargets` is the
-one place that meets a component — an atom through `AtomReader.boundTo` (a reference's `TypeRef` or `Ref` component
-bound to the family's own production rather than a bridge from its name, so the `TypeRef` keeps its referent and the
-`Ref` is delivered), a container rebuilt over the component's class
+one place that meets a component — an atom through `AtomReader.boundTo` (a kind's `TypeRef` component or a value
+reference's `ValueRef` bound to the family's own production rather than a bridge from its name, so the `TypeRef` keeps
+its referent and the `ValueRef` is delivered, each the other's mismatch), a container rebuilt over the component's class
 with every element, key and value bound in turn, a record checked against it — and every disagreement joins the record's
 one `BindMismatchException`. So an element of a `List<Long>` over `[int32]` is a `Long`, where `tson-compiler` reads it
 at the family's natural class.

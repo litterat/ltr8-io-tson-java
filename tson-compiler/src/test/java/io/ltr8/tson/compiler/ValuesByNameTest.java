@@ -403,7 +403,7 @@ class ValuesByNameTest {
     }
 
     /**
-     * A {@code Ref} host receives the value its name reaches when the schema links: the binding's {@code method}
+     * A {@code ValueRef} host receives the value its name reaches when the schema links: the binding's {@code method}
      * is the interface's {@code place_order}, delivered into the cell the read created with the name.
      */
     @Test

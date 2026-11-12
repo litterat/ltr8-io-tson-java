@@ -61,7 +61,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   entry. §4.1 makes every base kind IS-A `meta.top` and every constructor transitively so, while IS-A stops at
   construction — an instance or a fresh record carries an empty chain — so the predicate admits every constructor and
   nothing else. Over the bundled schemas that is every vocabulary constructor plus `meta.top`, `meta.type`, the three base
-  kinds, `meta.namespace`, `meta.alias`, `meta.reference_type` and its refinement `meta.ref` — judged by where `meta.top`
+  kinds, `meta.namespace`, `meta.alias`, `meta.ref` — judged by where `meta.top`
   is defined (one predicate the resolver, the compiled vocabulary's reader table and the linker all ask), and over an
   open record's chain as over a closed one's. Every other head is an ordinary type, and the entry is a value of it
   (`resolveValueEntry`): a component record, `!meta.record_field { … }`, a namespace type, `!api { … }`, and a consumer's
@@ -117,7 +117,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   field is a slot where it is not optional, its role is `FREE` (a pin or a default supplies its value, so the
   construction needs none), and its type, past its alias hops, is a reference whose `of` names types
   (`KindMembers.namesTypes`). `meta.array` has one (`element_type`), `meta.map` two (`key_type value_type`),
-  `meta.namespace` the same two, `meta.reference_type` one (`of`), `meta.enum_type` one (`name_type`, `members`
+  `meta.namespace` the same two, `meta.ref` one (`of`), `meta.enum_type` one (`name_type`, `members`
   being a set of values), and `meta.tuple` and the root's `enum` none. Nothing is written on a constructor to permit
   it, and it is the rule `[T]` and `{K => V}` already follow.
 - **A constructor here is a closed record IS-A `meta.type`** (`ConstructionSugar.constructs`), read past the head's
@@ -126,10 +126,9 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `meta.top` and is still a template. The check runs before the template path in both places an application resolves,
   so a head is asked once which operation it stands for.
 - **The kernel applies its own constructors this way**: the root's `set => meta.set_type` is an alias, so `set<text>`
-  constructs `!meta.set_type { element_type: text }` through it, and `meta.ref => meta.reference_type ^ {}` is a
-  refined constructor, so `meta.ref<method>` is `!meta.ref { of: method }`. A refined
-  constructor's construction is an instance of the refinement, a subtype constructor, so a question about what a body
-  is goes by the constructor's chain (`meta.ref` IS-A `meta.reference_type`, `meta.set_type` IS-A `meta.array`).
+  constructs `!meta.set_type { element_type: text }` through it, and `meta.ref<method>` is `!meta.ref { of: method }`.
+  A refined constructor's construction is an instance of the refinement, a subtype constructor, so a question about
+  what a body is goes by the constructor's chain (`meta.set_type` IS-A `meta.array`).
 - **A declaration is the construction** (`DefinitionResolver.construction`): the payload is built and handed to
   `resolveInstance` as `!C { … }`, so `text_list => meta.array<text>` gets every check and fact the braced form does,
   its tag the head as written, and records no application. **A use site writes the construction in place**

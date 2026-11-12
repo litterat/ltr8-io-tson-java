@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -9,6 +8,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
@@ -19,7 +19,6 @@ import io.ltr8.tson.compiler.stream.TsonEventSource;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.BiConsumer;
 
 /**
  * Carried through every {@link TsonTypeReader#read(TsonReadContext)} call -- the read's own pull
@@ -275,7 +274,7 @@ public interface TsonReadContext {
      * to judge it in.
      */
     void heldByName(io.ltr8.tson.schema.meta.TypeRef reference, TsonSchema.SlotType type,
-                    io.ltr8.tson.schema.meta.Ref<?> cell);
+                    ValueRef<?> cell);
 
     /**
      * Records the value of the dependent field this context is at, held as written in a schema document ([TSON-SCHEMA]
@@ -290,13 +289,13 @@ public interface TsonReadContext {
 
     /**
      * Where a schema document's read hands each reference it produces by name: its slot, the slot's declared type,
-     * the name, and the host's {@code Ref} cell where the host holds one -- and each dependent field's value it holds
+     * the name, and the host's {@code ValueRef} cell where the host holds one -- and each dependent field's value it holds
      * as written ({@link #heldAsWritten(TsonSchema.HeldValue)}).
      */
     @FunctionalInterface
     interface HeldByName {
         void held(List<String> slot, TsonSchema.SlotType type, io.ltr8.tson.schema.meta.TypeRef reference,
-                  io.ltr8.tson.schema.meta.Ref<?> cell);
+                  ValueRef<?> cell);
 
         /** A dependent field's value the read held as written ({@link TsonReadContext#heldAsWritten}). */
         default void heldAsWritten(TsonSchema.HeldValue value) {

@@ -47,9 +47,7 @@ import java.util.stream.Stream;
  * suffix added explicitly ({@link #ALIASES}: {@code meta.record} is {@code meta.RecordBody}). A constructor that
  * tightens another -- {@code meta.set_type} over {@code meta.array}, {@code enum} over {@code meta.enum_type} -- needs
  * no alias: it restates fields and adds none, and the bind lookup falls back along its chain to the constructor it
- * tightens ({@code ValueReaderContext.bindingNamesFor}). {@code meta.ref} over {@code meta.reference_type} is the
- * exception, its name mangling to {@link io.ltr8.tson.schema.meta.Ref}, the value a host receives by name, so it is
- * aliased to the body its instances are.
+ * tightens ({@code ValueReaderContext.bindingNamesFor}).
  *
  * <p>Some entries resolve to a class that is not a record: {@code meta.atom}/{@code meta.product}/{@code
  * meta.sum}/{@code meta.top} mangle to the sealed marker interfaces {@link io.ltr8.tson.schema.meta.Atom}/{@link
@@ -81,7 +79,6 @@ public final class SchemaModelNameBinder {
             Map.entry("meta.choice", "meta.choice_body"),
             Map.entry("meta.dependent", "meta.dependent_body"),
             Map.entry("meta.apply", "meta.apply_body"),
-            Map.entry("meta.reference_type", "meta.reference_body"),
             Map.entry("meta.ref", "meta.reference_body"),
             Map.entry("meta.enum_type", "meta.enum_body"),
 

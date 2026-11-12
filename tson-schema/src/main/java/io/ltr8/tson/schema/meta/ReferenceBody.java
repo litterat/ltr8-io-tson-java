@@ -12,11 +12,10 @@ import java.util.Optional;
 import java.util.function.BiPredicate;
 
 /**
- * An instance of the kernel's {@code reference_type} constructor, or of its refinement {@code ref}, resolved ([TSON-SCHEMA]
- * §4.2, §5.12): the atom whose values are names, each naming an entry whose value's type, past its alias hops, IS-A {@link
- * #of}. {@code meta.ref<record>} is the construction {@code !meta.ref { of: record }}; the slot's meaning comes from {@link
- * #of}, whichever of the two built it, so a question of whether a body is a reference goes by the constructor's chain, never
- * its name.
+ * An instance of the kernel's {@code ref} constructor, or of a refinement of it, resolved ([TSON-SCHEMA] §4.2, §5.12):
+ * the atom whose values are names, each naming an entry whose value's type, past its alias hops, IS-A {@link #of}.
+ * {@code meta.ref<record>} is the construction {@code !meta.ref { of: record }}; the slot's meaning comes from {@link
+ * #of}, so a question of whether a body is a reference goes by the constructor's chain, never its name.
  *
  * <p><b>{@link #of} is a {@link TypeRef}</b>, the kernel typing it {@code meta.type_ref}, and only a name stands there
  * ([TSON-SCHEMA] §4.2): an application at {@code of}, {@code meta.ref<box<text>>}, closes nowhere and is refused, so
@@ -25,7 +24,7 @@ import java.util.function.BiPredicate;
  * <p><b>What {@link #of} names decides what the slot holds.</b> Where it is a constructor ({@code top} or IS-A it),
  * the values it admits are types, and the slot holds a type's name, delivered to a host as a {@link TypeRef} that
  * takes part in structural identity. Where it is any other type, the values it admits are values, and the slot holds
- * a value's qualified name, delivered as the referent ({@link Ref}). That fact is the namespace's, so the linker
+ * a value's qualified name, delivered as the referent ({@link ValueRef}). That fact is the namespace's, so the linker
  * derives it ({@link #namesTypes}).
  *
  * <p><b>The {@link #index} is derived and never written.</b> It is absent on a declaration and computed at link over
@@ -41,7 +40,7 @@ import java.util.function.BiPredicate;
  * <p><b>Equality is {@link #of} and the chain, never the index.</b> Two schemas that both apply
  * {@code meta.ref<uuid_type>} hold equal bodies whatever members each closure admits.
  */
-@Typename(name = "meta.reference_type")
+@Typename(name = "meta.ref")
 public record ReferenceBody(TypeChain chain, TypeRef of, @Unbound Optional<Index> index) implements Atom {
 
     /**

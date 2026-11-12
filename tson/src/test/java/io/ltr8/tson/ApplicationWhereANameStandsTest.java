@@ -97,7 +97,7 @@ class ApplicationWhereANameStandsTest {
     void anApplicationAtAReferencesOfIsRefused() {
         refused("  r => { f: meta.ref<box<text>> }", "r", "'box<text>' is an application", "only a name may stand");
         refused("  rr => meta.ref<box<text>>", "rr", "'box<text>' is an application");
-        doesNotParse("  rr => !meta.reference_type { of: box<text> }", "rr");
+        doesNotParse("  rr => !meta.ref { of: box<text> }", "rr");
         refused("  r => { f: meta.ref<meta.array<text>> }", "r", "'meta.array<text>' is an application");
         refused("  o => <T> { f: meta.ref<box<T>> }", "o", "'box<T>' is an application");
     }

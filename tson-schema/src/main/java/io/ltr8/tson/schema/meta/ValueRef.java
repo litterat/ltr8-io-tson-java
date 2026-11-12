@@ -3,31 +3,31 @@ package io.ltr8.tson.schema.meta;
 import java.util.Objects;
 
 /**
- * A value held by name, as a host receives it at a slot typed {@code meta.ref<T>} with {@code T} no constructor (the
- * kernel's {@code reference}): the qualified name as written, {@code myapi.get_orders}, and the value it names. In a
- * schema document the read creates it with the name alone, and the linker resolves the name, judges the referent a
- * value of {@code T}, and delivers it here exactly once; in a data document the read judges the name in the governing
- * schema and delivers at once. Before delivery {@link #get} throws, so a host that reads references out of an unlinked
- * body is told rather than handed {@code null}.
+ * A value held by name, what the kernel's {@code ref} atom reads to at a slot typed {@code meta.ref<T>} with {@code
+ * T} no constructor, in a tree read and a bound one alike: the qualified name as written, {@code myapi.get_orders},
+ * and the value it names. In a schema document the read creates it with the name alone, and the linker resolves the
+ * name, judges the referent a value of {@code T}, and delivers it here exactly once; in a data document the read
+ * judges the name in the governing schema and delivers at once. Before delivery {@link #get} throws, so a host that
+ * reads references out of an unlinked body is told rather than handed {@code null}.
  *
- * <p>Equality is by name: two references to one address are one reference, delivered or not. A {@code TypeRef}
+ * <p>Equality is by name: two references to one address are one reference, delivered or not. A {@code String}
  * component at the same slot receives the name and nothing else, for a host that wants no delivery.
  *
  * @param <T> the referent's host type, the slot's {@code T} as the host binds it
  */
-public final class Ref<T> {
+public final class ValueRef<T> {
 
     private final String name;
     private volatile T value;
     private volatile boolean delivered;
 
-    private Ref(String name) {
+    private ValueRef(String name) {
         this.name = Objects.requireNonNull(name, "name");
     }
 
     /** A reference to {@code name}, undelivered. */
-    public static <T> Ref<T> to(String name) {
-        return new Ref<>(name);
+    public static <T> ValueRef<T> to(String name) {
+        return new ValueRef<>(name);
     }
 
     /** The qualified name as written. */
@@ -68,7 +68,7 @@ public final class Ref<T> {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof Ref<?> other && name.equals(other.name);
+        return o instanceof ValueRef<?> other && name.equals(other.name);
     }
 
     @Override

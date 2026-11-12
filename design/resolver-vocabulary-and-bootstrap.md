@@ -224,7 +224,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   `record_field.value` is typed `type!`, a dependent field, whose value a schema document holds as written through a
   reader of its own (`DependentFieldReader`), so the record waits on no entry for it. `instanceBody` covers the shapes
   those apply — a bare `{}` (each target's unconstrained constant, `void` among them), a bare token array (`enum`), a
-  record of tokens (`meta.reference_type` with its `of`, `meta.map` for
+  record of tokens (`meta.ref` with its `of`, `meta.map` for
   `meta.field_map`, `meta.set_type` for `meta.enum_set`, with its `min_items`/`max_items`), and a record holding a token
   array (`meta.choice`) — and refuses any other target; `refinedBody` merges the integer family's `min`, `max` and
   `size`. The set is built before anything is read, and

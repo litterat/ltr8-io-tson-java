@@ -42,6 +42,7 @@ import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ValueRef;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -932,7 +933,7 @@ public final class SchemaResolver {
                     @Override
                     public void held(List<String> slot, TsonSchema.SlotType type,
                                      io.ltr8.tson.schema.meta.TypeRef reference,
-                                     io.ltr8.tson.schema.meta.Ref<?> cell) {
+                                     ValueRef<?> cell) {
                         held.add(new TsonSchema.ValueByName(slot, type, reference, Optional.ofNullable(cell)));
                     }
 
