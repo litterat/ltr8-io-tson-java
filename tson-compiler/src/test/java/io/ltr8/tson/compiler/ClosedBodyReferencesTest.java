@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The type slots a namespace type holds are walked as every other body's are ({@code MetaRefs}): an application at
+ * The type slots a namespace type holds are walked as every other body's are ({@code TypeSlots}): an application at
  * its {@code value_type} closes in place, as a map type's does ([TSON-SCHEMA] §5.10).
  */
 class ClosedBodyReferencesTest {

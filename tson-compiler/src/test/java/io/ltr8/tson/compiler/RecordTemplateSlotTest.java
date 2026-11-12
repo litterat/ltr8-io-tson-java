@@ -70,29 +70,26 @@ class RecordTemplateSlotTest {
     }
 
     /**
-     * A parameter at a type slot inside a type written in place, in an explicit payload, is no author's error but is
-     * not yet supported: the parameters are scoped and substituted at the field types and their applications, and
-     * neither reaches inside the wrapper. The sugar spelling, {@code [T]}, is the application and is admitted.
+     * A parameter at a type slot inside a type written in place, in an explicit payload, stands as it does at a
+     * field's type, and is substituted where the record is applied: the explicit spelling and the sugar close to one
+     * type.
      */
     @Test
-    void aParameterInsideATypeWrittenInPlaceIsNotYetSupported() {
-        Map<String, String> gaps = Map.of(
+    void aParameterInsideATypeWrittenInPlaceIsSubstituted() {
+        List<String> admitted = List.of(
                 "  arr => <T> !meta.record { fields: { v => { type: { of: !meta.array { element_type: T } } } } }",
-                "parameter 'T' stands at meta.array.element_type, inside a type written in place",
-                "  deep => <T> !meta.record { fields: { v => { type: { of: !meta.map { key_type: text  value_type: "
+                "  arr => <T> !meta.record { fields: { v => { type: { of: !meta.map { key_type: text  value_type: "
                         + "{ of: !meta.array { element_type: T } } } } } } }",
-                "parameter 'T' stands at meta.array.element_type, inside a type written in place",
-                "  pick => <T> !meta.record { fields: { v => { type: { of: !meta.choice { variants: [text T] } } } } }",
-                "parameter 'T' stands at meta.choice.variants, inside a type written in place");
-        gaps.forEach((declaration, expected) -> {
-            UnsupportedOperationException gap = assertThrows(UnsupportedOperationException.class,
-                    () -> compile(declaration), declaration);
-            assertTrue(gap.getMessage().contains(expected), gap.getMessage());
-        });
-        assertDoesNotThrow(() -> compile("""
-                  arr => <T> { v: [T] }
-                  a => arr<text>
-                """));
+                "  arr => <T> !meta.record { fields: { v => { type: { of: !meta.choice { variants: [text T] } } } } }");
+        List<String> sugar = List.of("  arr => <T> { v: [T] }", "  arr => <T> { v: {text => [T]} }",
+                "  arr => <T> { v: ( text | T ) }");
+        for (int i = 0; i < admitted.size(); i++) {
+            TypeInline explicit = (TypeInline) ((RecordBody) compile(admitted.get(i) + "\n  a => arr<int32>")
+                    .schema().entries().get("a")).fields().get("v").type();
+            TypeInline written = (TypeInline) ((RecordBody) compile(sugar.get(i) + "\n  a => arr<int32>")
+                    .schema().entries().get("a")).fields().get("v").type();
+            assertEquals(written, explicit, admitted.get(i));
+        }
     }
 
     /** A parameter at a slot that holds no type is the author's error inside a type written in place as outside it. */

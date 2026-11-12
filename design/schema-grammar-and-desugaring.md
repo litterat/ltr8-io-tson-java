@@ -68,8 +68,8 @@ does ([TSON-SCHEMA] §3.4.1).
   construction `{text => text}` spells. Both are decided over the **resolved** form (`TemplateMaterialiser`,
   `design/template-materialisation.md`), where a head's chain is known. `checkTemplateApplication` refuses exactly one
   thing: a local head declaring *no* parameters whose body says it is no constructor. A head this document neither
-  declares nor imports is the linker's unresolved reference, and a container sugar form over one of the enclosing
-  template's own parameters is the application it spells, or refused (`design/desugaring-open-forms-and-templates.md`).
+  declares nor imports is the linker's unresolved reference. A sugar form over one of the enclosing template's own
+  parameters is its construction in place like any other (`design/desugaring-open-forms-and-templates.md`).
 - **Identity is structural.** Two constructions written in place are one type when their constructor and fields are
   equal, compared as values (`TypeInline.equals`, which leaves out the application a record in place is named by and
   the annotations on its field keys), so `[T; 3]` and `[T; 3..3]`, and a radix-spelled bound and

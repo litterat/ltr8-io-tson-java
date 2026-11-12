@@ -23,6 +23,7 @@ import io.ltr8.unicode.ConfusableNames;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.binary.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -614,13 +615,7 @@ public final class TsonSchemaLinker {
 
     /** Whether the open record {@code open} writes {@code name}, in a reference or inside a type it holds in place. */
     private static boolean writes(Top open, String name) {
-        Set<String> named = new LinkedHashSet<>(OpenEntry.names(open));
-        ((RecordBody) open).fields().values().forEach(field -> {
-            if (field.type() instanceof TypeInline inline) {
-                collectBodyNames(inline.of(), named);
-            }
-        });
-        return named.contains(name);
+        return OpenEntry.names(open).contains(name);
     }
 
     /** One entry's failure, reported when there is a receiver and rethrown as a schema error when there is not. */
@@ -2075,6 +2070,11 @@ public final class TsonSchemaLinker {
                                          Function<String, Optional<String>> constructors,
                                          String subject, String trail) {
         String context = "'" + subject + "'" + trail;
+        if (ref instanceof ParamRef) {
+            // A closed body holds no parameter, so one here would resolve only as a parameter (§8.1), and is judged
+            // by the name it is, never by an entry that happens to share it.
+            throw new UnresolvedReference(subject, trail, ref.name());
+        }
         Top target = namespace.get(ref.name());
         if (target instanceof ValueEntry value) {
             // A value entry is a value and never a type. Without this the misuse resolves, links and compiles, and

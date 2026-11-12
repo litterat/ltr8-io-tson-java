@@ -139,7 +139,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   constructor the same one. Arguments are written as the author wrote them, not dereferenced, as the sugar forms
   write theirs. A use site is never looked up to a declaration of the same construction (§8.2).
 - **The sugar decides where an argument lands and nothing else.** The arity (`requireArity`, also the linker's
-  `checkArity` over a held reference such as `meta.array<T>` in an open record) is refused here; a literal
+  `checkArity` over a held reference such as `set<T>` in an open record) is refused here; a literal
   argument (`meta.array<3>`) never arrives, the grammar refusing it where it is written (§5.10); an argument a slot's
   `of` refuses is refused at link as the braced form's is; a required field no
   slot fills leaves the construction incomplete and the constructor's reader refuses it. A refined constructor's

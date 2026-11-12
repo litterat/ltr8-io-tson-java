@@ -67,9 +67,10 @@
     list, written unquoted in its canonical text, `result<T>`: no
     whitespace, and one space between arguments. A closed application
     of an open record is named bare, so one stands only where an
-    application is still open: an open record's `parents`, its field
-    types and the constructions written in them, and the
-    `application` annotation.
+    application of an open record is still open: an open record's
+    `parents` and its field types, at any depth of the types written
+    in them, and the `application` annotation. A constructor's
+    application over a parameter is its construction in place.
   - The container constructors carry no parameters: their type
     slots are plain required fields, filled by the construction (or
     by a sugar form's desugaring) like any other required field. An
@@ -80,9 +81,9 @@
   - An open record is a `!meta.record` carrying `parameters` (Part 2
     Sections 5.10, 8.1), read as the vocabulary and never held as
     text. A parameter is a reference value: it stands as its name at a
-    field's `type`, at a type slot of a construction written there, or
-    as an argument of an application there or in a parent, and never
-    at a field's `value`; it is read against the
+    field's `type`, at a slot naming a type of a type written in place
+    there, at any depth, or as an argument of an application at any of
+    those or in a parent, and never at a field's `value`; it is read against the
     record's `parameters` before the namespace (Part 2 Section 5.10's
     shadowing rule). Its `chain` holds
     `parents` as written, one of which may be an application. An

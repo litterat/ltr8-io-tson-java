@@ -200,10 +200,13 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   the application at the use site or a refined constructor applied; before a choice or a tuple, a discriminated
   record family or a field group; before a value (`<T> !api { … }`), one value per instantiation; before a bare
   reference (`<B> pair<uuid, B>`, `<T> T`), no alias template. Inside an open record a form over a parameter is
-  admitted only where it is a reference: `[T]` and `{K => V}` are the references `meta.array<T>` and `meta.map<K V>`,
-  held as written until the record is applied and then constructed; `[T; 1..]`, `[T?]`, `{K => V; ..10}`, a choice and
-  a tuple over a parameter are each a resolver error at the declaration naming the form, a choice's pointing at field
-  groups. Nothing is lifted for a form over a parameter, so there are no open synthetic entries. Writing `parameters`
+  written in place like any other, the parameter a name at its slot at any depth -- `[T; 1..]`, `[T?]`, `{K => V;
+  ..10}`, a tuple, a choice and a record written in place over a parameter among them -- and a constructor's
+  application over a parameter is its construction in place, `meta.array<T>` the form `[T]` is. Each is substituted
+  when the record is applied and judged as the type written with the argument in place, a choice's distinctness and
+  disjointness where each application closes. A size bound naming a parameter, an application at a slot that holds
+  only a name, and a sugar form as an argument stay resolver errors at the declaration. Nothing is lifted for a form
+  over a parameter, so there are no open synthetic entries. Writing `parameters`
   as a binding of a construction of `record` is a resolver error: parameters are the list before the body. The
   kernel measures 81 entries, one wait cycle of 25 holding `meta.record`, a closure of 69 with `meta.param` and
   `meta.param_name` in it, and six synthetic entries.
@@ -249,28 +252,26 @@ schema document, `H<args>` is a reference.** Resolving it substitutes where `H` 
 it writes and filling the slots they mark -- and constructs where `H` is a constructor (§5.3). It supplies every
 argument, so there is no partial application, and `void` is an argument like any type. In a data document a
 reference is a name, and an application is a validation error (§4.2). With every argument closed it resolves at
-once, to the declaration that names it or its expansion (§8.2); with a parameter among its arguments it is held as
-written until the open record holding it is applied. The result is a value of the body's constructor and a type. Its
-IS-A edges are a substituted record's parents, or none for a construction; the head is never one. An argument is
-judged against the parameter's written bound, or for a constructor's field against the slot's `of`. **No other form
-holds a parameter.** Inside an open record, a sugar form over a parameter is the reference its construction is
-written as (`[T]` is `meta.array<T>`, `{K => V}` is `meta.map<K V>`). Any other form over a parameter is a resolver
-error at the declaration. Container sugar carrying a size or a `?` -- `[T; 1..]`, `[T?]` -- sets a field no argument
-list carries, so §5.3's freedom of position for those forms stops at a parameter. A choice or a tuple -- `( T | error
-)`, `[T, text]` -- is not written as a reference over reference fields, and an untagged sum over a parameter cannot be
-judged disjoint until it is applied (§5.4). A labelled alternative inside the record is a field group: `( body: T |
-problem: problem )`." Replace ¶1017-1024 with: "**No alias templates.** A template's body is a record body; a body
-that is a bare reference -- `<B> pair<uuid, B>`, `<T> T` -- is a resolver error. A use site writes the application it
-means." Then delete ¶986 ("Declaration-time checking splits …") with its stand-in-value prohibition, most of ¶988
-("Where a deferred diagnostic lands"), the example block at ¶994-997, §8.2 ¶1535's "parsed held body" and its
-identity clause for open synthetic entries, §5.3's open half of the lift rule, every mention of `meta.template` in
-§8.1, and narrow §12.1's `type-def` alternative `[type-params] type-expr` to a record body; and in §13.1 and the
-kernel's companion text replace `template`, `template_param`, `record_template`, `record_template_field`,
-`record_template_field_map`, `tuple1` and `voidable_tuple1` with `record.parameters` and `param`, `meta.ref` with the
-refined constructor and the root's `set` with an alias of `meta.set_type`. The spec's own examples that need a record
-body move to one: `result => <T> ( T | error )` becomes a discriminated family (`result_of => <T> result & { value?: T
-}`), and §5.10.1's and §8.2's `nested => <T> ( T | [nested<T>] )` becomes a record, `nested => <T> { value?: T  more?:
-[nested<T>] }`.
+once, to the declaration that names it or its expansion (§8.2); with a parameter among its arguments, an open
+record's is held as written until the open record holding it is applied, and a constructor's is its construction in
+place. The result is a value of the body's constructor and a type. Its IS-A edges are a substituted record's parents,
+or none for a construction; the head is never one. An argument is judged against the parameter's written bound, or
+for a constructor's field against the slot's `of`. **A form over a parameter is written in place.** Inside an open
+record a parameter stands at any slot naming a type of a type written in place, at any depth, and is replaced when
+the record is applied: `[T; 1..]`, `[T?]`, `[T, text]`, `( T | error )` and `{ cursor: T }` are each the construction
+their sugar denotes, and a constructor's application over a parameter is its construction in place. A choice over a
+parameter is judged where each application closes (§5.4)." Replace ¶1017-1024 with: "**No alias templates.** A
+template's body is a record body; a body that is a bare reference -- `<B> pair<uuid, B>`, `<T> T` -- is a resolver
+error. A use site writes the application it means." Then delete ¶986 ("Declaration-time checking splits …") with its
+stand-in-value prohibition, most of ¶988 ("Where a deferred diagnostic lands"), the example block at ¶994-997, §8.2
+¶1535's "parsed held body" and its identity clause for open synthetic entries, §5.3's open half of the lift rule, every
+mention of `meta.template` in §8.1, and narrow §12.1's `type-def` alternative `[type-params] type-expr` to a record
+body; and in §13.1 and the kernel's companion text replace `template`, `template_param`, `record_template`,
+`record_template_field`, `record_template_field_map`, `tuple1` and `voidable_tuple1` with `record.parameters` and
+`param`, `meta.ref` with the refined constructor and the root's `set` with an alias of `meta.set_type`. The spec's own
+examples that need a record body move to one: `result => <T> ( T | error )` becomes a discriminated family (`result_of
+=> <T> result & { value?: T }`), and §5.10.1's and §8.2's `nested => <T> ( T | [nested<T>] )` becomes a record, `nested
+=> <T> { value?: T  more?: [nested<T>] }`.
 
 ## 4. [TSON-SCHEMA] §5.4, §5.2 — a tag at a choice names a variant; a choice with an abstract variant has no values
 
@@ -376,9 +377,9 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   <T> { cursor: box<T> }` is applied). Two records in place are one type when their bodies are equal, whichever open
   records produced them; `f: page<order>` and `f: page_order` are two types of one shape, so restating one as the other
   is refused. An abstract open record applied in place closes to an abstract record nothing is a member of.
-  Inside an open record an application over a parameter is held as written whatever its head, and a constructor's
-  closes in place when the record is applied, one nested in another constructor's arguments included
-  (`meta.map<text meta.array<T>>`).
+  Inside an open record a constructor's application over a parameter is its construction in place at the declaration,
+  one nested in another constructor's arguments included (`meta.map<text meta.array<T>>`), and an open record's is
+  held as written, at a field's type or at a slot of a type written there, until the record is applied.
 - *Recursion.* A recursive application closing a declaration ties to it: `node_text => node<text>` over `node => <T>
   { value: T  next?: node<T> }` holds `next: node_text`. Mutual recursion through records in place ties the same way:
   closing `a_text => a<text>` over `a => <T> { b: b<T> }` and `b => <T> { a?: a<T> }` closes `b` in place, whose
@@ -395,8 +396,9 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   no record class is a bind mismatch.
 - *Arguments and names.* A sugar form, an applied constructor or an application of an open record passed as an
   argument of an open record's application is refused, at a closed record and, inside an open record, at its own
-  declaration, naming the declaration to write (`text_box => box<text>`); an argument of a constructor's application
-  inside an open record (`meta.array<box<T>>`) is held and closes at its slot. An application at a slot typed
+  declaration, naming the declaration to write (`text_box => box<text>`); an application as an argument of a
+  constructor's application (`meta.array<box<T>>`) closes at its slot, and a sugar form there (`meta.array<[T]>`) is
+  refused as at any argument. An application at a slot typed
   `meta.type_ref` — a map's key, a reference's `of`, a parameter's bound, an alias's target — is refused the same way.
 - *Refused.* An application whose record in place would be IS-A a declared type (`k: dog_of<text>`, §5.2) is a
   resolver error at the declaration that wrote it or, held in an open record, at the declaration whose application
@@ -419,10 +421,7 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   lifted construction now needs the member declared.
 
 **What is not yet running.** A tree read reports a dependent value whose sibling holds a type written in place as not
-implemented, holding the sibling as the record it is written as rather than as the type. A record written in place over
-a parameter of the open record holding it (`page => <T> { meta: { cursor: T } }`) is reported as not implemented: the
-open record's parameters are substituted at its own field types and the applications there, and not yet inside a
-record in place.
+implemented, holding the sibling as the record it is written as rather than as the type.
 
 **Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 2 §1.3, §1.6, §2.2.3,
 §3.3.3, §3.4.1, §4.1, §4.2 (the type-slot choice), §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12,

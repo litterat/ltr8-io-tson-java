@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeSlots;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -136,7 +137,7 @@ final class HeldRecursion {
     private void heldIn(String field, RecordField declared, List<Held> found) {
         switch (declared.type()) {
             case TypeRef reference -> atSlot(field, true, reference, found);
-            case TypeInline inline -> MetaRefs.mapRefs(inline.of(), new MetaRefs.Rewrite() {
+            case TypeInline inline -> TypeSlots.mapBody(inline.of(), new TypeSlots.Rewrite() {
                 @Override
                 public TypeRef atName(TypeRef reference) {
                     return reference;

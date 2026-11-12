@@ -447,6 +447,13 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **A map keyed by a record type admits a token key** ([TSON-SCHEMA] §4.2, §5.3; [TSON-DATA] §2.5). §4.2 says
+  "a map's keys may be records, tuples or arrays, each declared and named", and a key is a data value read at the
+  key type. Under `order => { id: text }` and `r => { keyed: {order => int32} }`, `!r { keyed: { o => 1 } }` reads
+  with no diagnostic, though `o` is no value of `order`. Read each key against the key type as an entry's value is
+  read against the value type, in both stacks, and add a `class2/validate` invalid vector beside a valid one keyed
+  by `{ id: a }`.
+
 - [ ] **`policy.script_policy` is the token policy under another name** ([TSON-DATA] §8.2). Part 1 names the two
   policies "so that two implementations reporting them agree on what they are called", and `policy.processor` writes
   `token_policy: policy.script_policy` beside `identifier_policy: policy.identifier_policy`. Rename the record

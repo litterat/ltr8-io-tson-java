@@ -538,10 +538,10 @@ final class DefinitionResolver {
 
     /**
      * A sugar form that reached resolution, or a construction in place off a field's type. {@link
-     * SchemaDesugarer} rewrites every sugar form -- into the construction a declaration's body is, into a
-     * construction in place at a field's type, or into the application it spells over a parameter -- and refuses
-     * one as an argument, so no schema an author writes can produce one here: it is a caller resolving raw AST
-     * without that phase, an invariant of the pipeline rather than a gap in it.
+     * SchemaDesugarer} rewrites every sugar form -- into the construction a declaration's body is, or into a
+     * construction in place at a field's type -- and refuses one as an argument, so no schema an author writes can
+     * produce one here: it is a caller resolving raw AST without that phase, an invariant of the pipeline rather than a
+     * gap in it.
      */
     private static IllegalStateException unlifted(String where, FieldTypeExpr ref) {
         return new IllegalStateException(where + ": a sugar form reached resolution where it is not "
@@ -975,11 +975,31 @@ final class DefinitionResolver {
 
     /**
      * A literal {@code value} needs a closed type ([TSON-SCHEMA] §5.10): what a literal token means is decided by the
-     * type it is read as, and a field typed by a parameter, whole ({@code w?: T ~ 5}) or as an argument ({@code w?:
-     * box<T> ~ 5}), has a different type in every application. Such a field takes no value.
+     * type it is read as, and a field typed by a parameter, whole ({@code w?: T ~ 5}), as an argument ({@code w?:
+     * box<T> ~ 5}) or at a slot in place ({@code w?: [T] ~ []}), has a different type in every application. Such a
+     * field takes no value, in the open record and in every record written in place inside it.
      */
     private static void refuseLiteralOnOpenType(RecordBody open) {
-        open.fields().forEach((name, field) -> {
+        literalsOnOpenTypes(open);
+        io.ltr8.tson.schema.meta.TypeSlots.Rewrite inPlace = new io.ltr8.tson.schema.meta.TypeSlots.Rewrite() {
+            @Override
+            public io.ltr8.tson.schema.meta.TypeRef atName(io.ltr8.tson.schema.meta.TypeRef reference) {
+                return reference;
+            }
+
+            @Override
+            public Type inPlace(Type body) {
+                if (body instanceof RecordBody record) {
+                    literalsOnOpenTypes(record);
+                }
+                return body;
+            }
+        };
+        open.fields().values().forEach(field -> io.ltr8.tson.schema.meta.TypeSlots.map(field.type(), inPlace));
+    }
+
+    private static void literalsOnOpenTypes(RecordBody record) {
+        record.fields().forEach((name, field) -> {
             Optional<String> parameter = OpenEntry.parameterIn(field.type());
             if (parameter.isPresent() && field.value().isPresent()) {
                 throw literalOnOpenType(name, parameter.get(), field.value().get().text());

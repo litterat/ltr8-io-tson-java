@@ -12,6 +12,8 @@ import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Param;
+import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Sum;
@@ -96,7 +98,7 @@ class OpenEntryResolvedFormTest {
 
     /**
      * <b>An open record validates in §8.1's form</b>: a {@code !meta.record} carrying {@code parameters}, each standing
-     * where it is written as its name, a reference value -- at a field's type, and among an application's arguments.
+     * where it is written as its name, a reference value -- at a field's type, and at a slot of a type written in place.
      * Nothing about it needs a vocabulary of its own: it is read against {@code record}'s, as any record is.
      *
      * <p>The document is hand-authored rather than produced by this library's writer, deliberately: the claim under
@@ -111,7 +113,7 @@ class OpenEntryResolvedFormTest {
                     parameters: [ !meta.param { name: T } ]
                     fields: {
                       item  => !meta.record_field { type: T }
-                      items => !meta.record_field { type: meta.array<T> }
+                      items => !meta.record_field { type: { of: !meta.array { element_type: T } } }
                     }
                   }
                 }
@@ -120,8 +122,8 @@ class OpenEntryResolvedFormTest {
 
     /**
      * <b>And it reads back as the open record it is</b>: the record's parameters are looked up before the namespace,
-     * so its field types are parameters ({@link ParamRef}), whole and as an argument, and no reference names an
-     * entry spelled {@code T}.
+     * so its field types are parameters ({@link ParamRef}), whole and inside a type written in place, and no reference
+     * names an entry spelled {@code T}.
      */
     @Test
     void anOpenRecordReadsBackWithItsParameters() {
@@ -132,7 +134,7 @@ class OpenEntryResolvedFormTest {
                     parameters: [ !meta.param { name: T } ]
                     fields: {
                       item  => !meta.record_field { type: T }
-                      items => !meta.record_field { type: meta.array<T> }
+                      items => !meta.record_field { type: { of: !meta.array { element_type: T } } }
                     }
                   }
                 }
@@ -141,7 +143,7 @@ class OpenEntryResolvedFormTest {
         RecordBody page = assertInstanceOf(RecordBody.class, read.get("page"));
         assertEquals(List.of(new Param("T")), page.parameters());
         assertEquals(ParamRef.of("T"), page.fields().get("item").type());
-        assertEquals(TypeRef.of("meta.array", List.of(ParamRef.of("T"))), page.fields().get("items").type());
+        assertEquals(new TypeInline(ArrayBody.of(ParamRef.of("T"))), page.fields().get("items").type());
     }
 
     // ── The biconditional an entry's parameters rest on ─────────────────

@@ -24,18 +24,24 @@ import java.util.function.UnaryOperator;
  * none.
  *
  * <p><b>Closed or open.</b> A record with no {@link #parameters} is closed: it is what readers and writers are built
- * for, and no reference it holds is a {@link ParamRef}. A record with parameters is an <em>open record</em>, a
+ * for. A record with parameters is an <em>open record</em>, a
  * template ([TSON-SCHEMA] §5.10): a reference names it only as the head of an application, never bare, and each
  * application substitutes its arguments for the parameters and closes to a record without them. So no closed
  * position, and no member set over {@code meta.ref<meta.record>}, reaches an open record, and nothing builds a reader
  * or a writer for one ({@link #isOpen}).
  *
  * <p><b>Where a parameter stands is this value's to state.</b> A parameter is written as its name, a reference value
- * looked up in {@link #parameters} before the namespace, and stands at a field's {@code type} or as an argument of an
- * application there or in a parent ({@code <T> result<T> & { ... }}). The constructor turns every such name into a
- * {@link ParamRef} as the record is built, so a record bound from a resolved form and one the resolver builds are one
- * value, and refuses a {@link ParamRef} its parameters do not declare. A field's {@code value} is a literal and never
- * a parameter; that, and a parameter at any other slot, is the author's rule, refused where the declaration resolves.
+ * looked up in {@link #parameters} before the namespace, and stands at a field's {@code type}, at a slot of a type
+ * written in place there at any depth ({@code { meta: { cursor: T } }}, {@code [T]}), or as an argument of an
+ * application at any of those or in a parent ({@code <T> result<T> & { ... }}). The constructor turns every such name
+ * into a {@link ParamRef} as the record is built ({@link TypeSlots}), so a record bound from a resolved form and one
+ * the resolver builds are one value, and refuses a {@link ParamRef} its parameters do not declare. A field's {@code
+ * value} is a literal and never a parameter; that, and a parameter at any other slot, is the author's rule, refused
+ * where the declaration resolves.
+ *
+ * <p><b>A closed record does not judge its parameters.</b> One written in place inside an open record holds that
+ * record's parameters, and only the open record can tell them from a stray one; closing an application substitutes
+ * every one away ({@code TemplateMaterialiser}).
  *
  * <p><b>{@code chain} is {@code chained}'s</b> (see {@link TypeChain}): the complete IS-A chain and its inverse,
  * computed by the resolver and the linker. A fresh record and a subtracted one ([TSON-SCHEMA] §5.9) have an empty
@@ -87,8 +93,9 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
      * reports and abandons the construction over, so it never reaches here, and swallowing a {@code null}
      * would only turn some other defect into an empty record.
      *
-     * <p>With parameters, each name they declare among the fields' types and the parents' arguments becomes the
-     * {@link ParamRef} it is; a {@link ParamRef} they do not declare, or a parameter declared twice, is refused.
+     * <p>With parameters, each name they declare among the fields' types, at any depth, and the parents' arguments
+     * becomes the {@link ParamRef} it is; a {@link ParamRef} they do not declare, or a parameter declared twice, is
+     * refused.
      */
     @Record
     public RecordBody {
@@ -107,9 +114,9 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
         if (!declared.isEmpty()) {
             chain = chain.withParents(chain.parents().stream().map(parent -> scoped(parent, declared)).toList());
             fields = scopedFields(fields, declared);
-        }
-        for (TypeRef reference : references(chain, fields)) {
-            requireDeclared(reference, declared);
+            for (TypeRef reference : references(chain, fields)) {
+                requireDeclared(reference, declared);
+            }
         }
     }
 
@@ -196,9 +203,9 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
     }
 
     /**
-     * Every type reference this record holds, in its fields' {@code type}s and then its parents as written: the places
-     * a parameter stands, as a {@link ParamRef} itself or among an application's arguments. A type written in place
-     * is not among them: it holds no parameter, a form over one being held as the application it spells.
+     * Every type reference this record holds, in its fields' {@code type}s at any depth of types written in place
+     * ({@link TypeSlots}) and then its parents as written: the places a parameter stands, as a {@link ParamRef} itself
+     * or among an application's arguments.
      */
     public List<TypeRef> references() {
         return references(chain, fields);
@@ -206,11 +213,7 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
 
     private static List<TypeRef> references(TypeChain chain, AnnotatedMap<String, RecordField> fields) {
         List<TypeRef> references = new ArrayList<>();
-        fields.values().forEach(field -> {
-            if (field.type() instanceof TypeRef reference) {
-                references.add(reference);
-            }
-        });
+        fields.values().forEach(field -> TypeSlots.forEach(field.type(), references::add));
         references.addAll(chain.parents());
         return references;
     }
@@ -229,8 +232,9 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
     private static AnnotatedMap<String, RecordField> scopedFields(AnnotatedMap<String, RecordField> fields,
                                                                   Set<String> declared) {
         AnnotatedMap<String, RecordField> scoped = new AnnotatedMap<>();
-        fields.forEach((name, field) -> scoped.put(name, field.type() instanceof TypeRef reference
-                ? field.withType(scoped(reference, declared)) : field, fields.getAnnotations(name)));
+        TypeSlots.Rewrite scope = reference -> scoped(reference, declared);
+        fields.forEach((name, field) -> scoped.put(name, field.withType(TypeSlots.map(field.type(), scope)),
+                fields.getAnnotations(name)));
         return AnnotatedMap.copyOf(scoped);
     }
 

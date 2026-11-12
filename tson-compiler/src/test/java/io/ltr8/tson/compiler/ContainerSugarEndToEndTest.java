@@ -140,22 +140,22 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>Over a parameter, a choice is refused</b> ([TSON-SCHEMA] §5.10): a template's body is a record body, and
-     * inside one a choice over a parameter is no reference -- an untagged sum over a parameter cannot be judged
-     * disjoint until it is applied. A closed choice holding an application is admitted, above.
+     * <b>A choice is no template body</b> ([TSON-SCHEMA] §5.10): a template's body is a record body. Inside one a
+     * choice over a parameter is written in place, and is judged disjoint where it is applied, once its variants are
+     * known.
      */
     @Test
-    void aChoiceOverAParameterIsRefused() {
+    void aChoiceOverAParameterIsNoBodyAndIsJudgedWhereItIsApplied() {
         SchemaValidationException body = assertThrows(SchemaValidationException.class, () -> compile("""
                   box => <T> { v: T }
                   w   => <T> ( box<T> | int32 )"""));
-        SchemaValidationException field = assertThrows(SchemaValidationException.class, () -> compile("""
-                  box => <T> { v: T }
-                  w   => <T> { c: ( box<T> | int32 ) }"""));
-
         assertTrue(body.getMessage().contains("a template's body is a record body"), body.getMessage());
-        assertTrue(field.getMessage().contains("stands over the parameter 'T' and is no reference"),
-                field.getMessage());
+
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  w   => <T> { c: ( box<T> | int32 ) }
+                  u   => w<text>""");
+        assertNotNull(compiled.get("u").read(TestDocuments.document("{ c: { v: \"a\" } }")));
     }
 
     /**
@@ -465,17 +465,16 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>A collection-valued slot holds no parameter</b> (§5.10): a choice's variants and a tuple's elements are a
-     * list, not reference fields, so a choice or a tuple over a parameter is no reference and is refused at the
-     * declaration, naming the form.
+     * A choice's variants and a tuple's elements are type slots like any other, so a parameter stands there inside an
+     * open record and is substituted where the record is applied (§5.10).
      */
     @Test
-    void aParameterInsideACollectionValuedSlotIsRefused() {
+    void aParameterInsideACollectionValuedSlotIsSubstituted() {
         for (String body : List.of("(T | text)", "[T, text]")) {
-            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> compile("  odd => <T> { v: %s }\n  use => odd<int32>".formatted(body)), body);
-            assertTrue(thrown.getMessage().contains("stands over the parameter 'T' and is no reference"),
-                    thrown.getMessage());
+            TsonCompiledSchema compiled = compile("  odd => <T> { v: %s }\n  use => odd<int32>".formatted(body));
+            TypeInline v = assertInstanceOf(TypeInline.class, ((RecordBody) bodyOf(compiled, "use")).fields()
+                    .get("v").type(), body);
+            assertTrue(v.text().contains("int32"), v.text());
         }
     }
 

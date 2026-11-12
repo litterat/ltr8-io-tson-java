@@ -155,7 +155,7 @@ the offending token.
 
 - **A position table is identity-keyed, so every phase that rebuilds a node has to carry it over**, and
   three do. `SchemaDesugarer` re-registers a rebuilt *declaration* and a rebuilt *field* (any record holding
-  a single `[T]` field is rewritten whole, so this is the common case, not an edge); `MetaRefs.mapRefs`, the
+  a single `[T]` field is rewritten whole, so this is the common case, not an edge); `TypeSlots.mapBody`, the
   reference walk a rename runs through, rebuilds every `RecordField` it visits to rewrite its type-ref. That
   last one is why
   `RecordField.withType`/`withState` exist: a rebuild naming components positionally silently drops the ones

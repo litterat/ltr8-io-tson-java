@@ -181,7 +181,7 @@ a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch code
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
 
 **A template's expected resolved form is a record.** An open record is a `!meta.record` carrying `parameters`, its
-parameters written where they stand as their names (`type: T`, `type: meta.array<T>`, `parents: [result<T>]`), so it
+parameters written where they stand as their names (`type: T`, `element_type: T` in place, `parents: [result<T>]`), so it
 is a schema-map value like any other, read back through `record`'s own reader with the record's `parameters`
 consulted before the namespace, and compared by `ResolvedForm` as every other entry is. An application of one is a
 closed `!meta.record` carrying `@meta.application` at its key; a construction (`meta.ref<X>`, `set<text>`) is an

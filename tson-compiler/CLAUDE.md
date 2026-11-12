@@ -11,7 +11,7 @@ before editing — each opens with its invariants.
 | `TsonSchemaParser`, `ast/schema/` | `schema-grammar.md` |
 | `resolver/SchemaDesugarer` | `schema-grammar-and-desugaring.md`, `desugaring-open-forms-and-templates.md` |
 | `resolver/DefinitionResolver`, `SchemaResolver`, `ConstructionSugar` | `schema-resolution.md`, `constructor-application.md`, `atom-refinement-and-coherence.md` |
-| `resolver/WireForm`, `MetaRefs`, `CanonicalApplication`, `KernelBootstrapResolver` | `resolver-vocabulary-and-bootstrap.md` |
+| `resolver/WireForm`, `CanonicalApplication`, `KernelBootstrapResolver`, the model's `TypeSlots` | `resolver-vocabulary-and-bootstrap.md` |
 | `resolver/TemplateMaterialiser`, `Substitution`, `ParameterTypes` | `open-records.md`, `template-materialisation.md` |
 | `TsonSchemaLinker`, `ChoiceDisjointness`, `ValuesByName` | `linking-and-compilation.md`, `choice-disjointness.md`, `name-hygiene.md` |
 | `TypeInhabitance`, `RecordExtension` | `inhabitance-and-record-extension.md` |
@@ -28,9 +28,9 @@ Rules that bite here:
 - A schema-author error is `SchemaValidationException`; a library gap is `UnsupportedOperationException` and travels
   as `NOT_IMPLEMENTED`; a broken invariant is `IllegalStateException`. `DefinitionResolver`'s Javadoc is the boundary.
 - A template is an open record, a `RecordBody` with `parameters`, built directly and substituted on the model; a
-  parameter in it is a `ParamRef`, and a closed `RecordBody` holds none. Anything that builds a reader or a writer from
-  a `RecordBody`, or treats one as a type, asks `isOpen()` first. There is one opinion about a binding's wire form, and
-  it is `WireForm`'s.
+  parameter in it is a `ParamRef`, at any depth of a type written in place, and a closed entry holds none. Anything
+  that builds a reader or a writer from a `RecordBody`, or treats one as a type, asks `isOpen()` first. There is one
+  opinion about a binding's wire form, and it is `WireForm`'s.
 - The grammar is checked where a name is read; §8.2 hygiene runs once per layer over scopes, never at a reading position.
 - The resolver names engines (`writer.DataClassObjectWriter`), never facades.
 - Lexer/parser/resolver behaviour changes get conformance vectors in the same session (`design/conformance-suite.md`).
