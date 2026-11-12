@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -23,7 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The rules a type written in place is held to beside a name ([TSON-SCHEMA] §5.2, §5.4, §5.7, §8.2): a value modifier
  * on an inline reference, a name never one type with a construction, a choice that is not disjoint naming every
- * variant, and an application of an open record absorbed at a refinement source.
+ * variant, an application of an open record absorbed at a refinement source, what a type in place may carry, and an
+ * abstract record in place empty.
  */
 class InlineTypeRulesTest {
 
@@ -259,5 +261,105 @@ class InlineTypeRulesTest {
         assertEquals(List.of(),
                 problems("  tagged => !meta.namespace { key_type: meta.identifier  value_type: box<text> }"));
         assertEquals(List.of(), problems("  ns => meta.namespace<meta.identifier method>\n  r => { f: ns }"));
+    }
+
+    // ── What a type written in place may carry (§4.2) ───────────────────────────────────────────
+
+    private static String atInPlace(String of) {
+        return atInPlace("", of);
+    }
+
+    /** {@code r}, whose field {@code at} states {@code facts} and holds {@code of} in place. */
+    private static String atInPlace(String facts, String of) {
+        return "  r => !meta.record { fields: { at => !meta.record_field { " + facts + " type: { of: " + of
+                + " } } } }";
+    }
+
+    private static final String X = "fields: { x => !meta.record_field { type: int32 } }";
+
+    /** What the kernel admits at {@code of} and a type in place may not carry is refused by the rule. */
+    @Test
+    void aChainParametersOrANominalTypeInPlaceIsRefusedByTheRule() {
+        refused(atInPlace("!meta.record { " + X + "  chain: { supertypes: [animal] } }"),
+                "the record written in place '{ x: int32 }' states a chain");
+        refused(atInPlace("!meta.record { parameters: [ !meta.param { name: T } ]  "
+                + "fields: { x => !meta.record_field { type: T } } }"), "'{ x: T }' takes parameters");
+        refused(atInPlace("!meta.array { element_type: text  chain: { supertypes: [animal] } }"),
+                "the type written in place '[text]' states a chain");
+        refused(atInPlace("!numeric.integer_type { min: 0 }"), "'!numeric.integer_type { ... }' is written in place");
+        for (String body : List.of("!meta.record { " + X + "  chain: { supertypes: [animal] } }",
+                "!numeric.integer_type { min: 0 }")) {
+            List<Diagnostic> found = problems(atInPlace(body));
+            assertFalse(found.getFirst().message().contains("rejected"), found::toString);
+        }
+    }
+
+    /** What a record in place may say of itself loads: FINAL, an empty chain, a name type, groups. */
+    @Test
+    void whatARecordInPlaceMayStateLoads() {
+        for (String body : List.of("!meta.record { " + X + "  extension: FINAL }",
+                "!meta.record { " + X + "  chain: {} }", "!meta.record { " + X + "  name_type: meta.field_name }",
+                "!meta.record { fields: { x => !meta.record_field { type: int32  optional: true }  "
+                        + "y => !meta.record_field { type: int32  optional: true } }  "
+                        + "groups: [ !meta.field_group { members: [[x] [y]] } ] }")) {
+            assertEquals(List.of(), problems(atInPlace(body)), body);
+        }
+    }
+
+    // ── An abstract record written in place is empty (§4.2, §5.10.1) ────────────────────────────
+
+    private static final String SHAPE = "  shape => <T> { kind: text =?  data: T }\n";
+
+    private static void unsatisfiable(String declarations, String entry) {
+        refused(declarations, "'" + entry + "' can never be satisfied by any document");
+    }
+
+    /**
+     * An abstract record in place has no member any schema could add, so a required use of it empties the record
+     * holding it, by the productivity rule -- written in canonical form or closed from an application alike, and
+     * through a container exactly where the container cannot be empty.
+     */
+    @Test
+    void aRequiredUseOfAnAbstractRecordInPlaceIsUnsatisfiable() {
+        unsatisfiable(atInPlace("!meta.record { " + X + "  extension: ABSTRACT }"), "r");
+        unsatisfiable(SHAPE + "  r => { s: shape<method> }", "r");
+        unsatisfiable(SHAPE + "  r => { s: [shape<method>; 1..] }", "r");
+        unsatisfiable(SHAPE + "  r => { s: [shape<method>, text] }", "r");
+        assertEquals(List.of(), problems(SHAPE + "  r => { s: [shape<method>]  m: {text => shape<method>} }"));
+        assertEquals(List.of(), problems(SHAPE + "  r => { s: ( shape<method> | text )  v: shape<method>? }"));
+    }
+
+    /** A declared abstract record stays open to members an importing schema declares, so it empties nothing. */
+    @Test
+    void aRequiredUseOfADeclaredAbstractRecordLoads() {
+        assertEquals(List.of(), problems("  pet => abstract { kind: text =?  name: text }\n  r => { p: pet }"));
+    }
+
+    /** An optional field typed by an abstract record in place loads, and can only be missing. */
+    @Test
+    void anOptionalUseOfAnAbstractRecordInPlaceLoadsAndCanOnlyBeMissing() {
+        for (String declarations : List.of(atInPlace("optional: true", "!meta.record { " + X
+                + "  extension: ABSTRACT }"), SHAPE + "  r => { at?: shape<method> }")) {
+            assertEquals(List.of(), problems(declarations), declarations);
+            assertEquals(List.of(), read(declarations, "!r {}"), declarations);
+            List<Diagnostic> written = read(declarations, "!r { at: { x: 1  kind: k  data: { name: n } } }");
+            assertEquals(1, written.size(), written::toString);
+            assertEquals(Diagnostic.Code.TYPE_MISMATCH, written.getFirst().code(), written::toString);
+            assertEquals(Optional.of("/at"), written.getFirst().path(), written::toString);
+        }
+    }
+
+    /** {@code discriminators} alone decide nothing: a record in place that is not abstract reads as any record. */
+    @Test
+    void discriminatorsWithoutAbstractDoNotEmptyARecordInPlace() {
+        String declarations = atInPlace("!meta.record { " + X + "  discriminators: [x] }");
+        assertEquals(List.of(), problems(declarations));
+        assertEquals(List.of(), read(declarations, "!r { at: { x: 1 } }"));
+    }
+
+    private static List<Diagnostic> read(String declarations, String document) {
+        List<Diagnostic> found = new ArrayList<>();
+        tson(declarations).treeReader().withDiagnostics(found::add).read("!!import:\"" + ID + "\"\n" + document);
+        return found;
     }
 }

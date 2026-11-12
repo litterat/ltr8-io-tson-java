@@ -209,7 +209,7 @@ class TemplateIsNotATypeTest {
         List<Diagnostic> problems = read("a3", APPLIED_FAMILY, "!holder { p: { kind: fish  name: x } }");
         assertEquals(1, problems.size(), problems::toString);
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.getFirst().code());
-        List<Diagnostic> inPlace = read("a3p", APPLIED_FAMILY.replace("{ p: tpet_text }", "{ p: tpet<text> }"),
+        List<Diagnostic> inPlace = read("a3p", APPLIED_FAMILY.replace("{ p: tpet_text }", "{ p?: tpet<text> }"),
                 "!holder { p: { kind: dog  name: Rex  breed: lab } }");
         assertEquals(1, inPlace.size(), inPlace::toString);
         assertEquals(Optional.of("/p"), inPlace.getFirst().path(), inPlace::toString);
@@ -234,7 +234,7 @@ class TemplateIsNotATypeTest {
     void aSelectorTemplatesApplicationWithNoMemberSelectsNothing() {
         List<Diagnostic> problems = read("a5", """
                   pet    => <V> { kind: text =?  name: V }
-                  holder => { p: pet<text> }
+                  holder => { p?: pet<text> }
                 """, "!holder { p: { kind: cat  name: x } }");
 
         assertEquals(1, problems.size(), problems::toString);

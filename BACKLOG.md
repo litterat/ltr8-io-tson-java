@@ -47,14 +47,13 @@ spec-required case:
   dependent type no reader is needed: §5.2 refuses it as naming no type a value can be read against, and a tree read
   reports `NOT_IMPLEMENTED` there too (`!meta.record_field { type: { of: !meta.dependent { on: kind } }  role: DEFAULT
   value: 5 }` read as data).
-- [ ] **A record written in place may be abstract or state `discriminators`** ([TSON-SCHEMA] §4.2, §5.2). `at =>
-  !meta.record_field { type: { of: !meta.record { fields: { … }  extension: ABSTRACT } } }` loads, and so does one
-  stating `discriminators: [x]`. A record in place is a member of nothing and nothing can extend it, so the first is
-  a slot no value can fill and the second dispatches over no members. Refuse both where the record is written.
-- [ ] **A `chain` or `parameters` on a record written in place is refused with an internal message.** The verdict is
-  right; the text is "TypeInline rejected the value the schema admits: java.lang.IllegalArgumentException …", the
-  model's constructor speaking through the constructor-payload read. Refuse it by rule before the bind, naming what
-  a type written in place may not carry.
+- [ ] **A declared record stating `discriminators` is made abstract whatever its `extension` says** ([TSON-SCHEMA]
+  §5.2). `d => !meta.record { fields: { x => !meta.record_field { type: int32 } }  extension: FINAL  discriminators:
+  [x] }` loads, and `!d { x: 1 }` is refused as a tag naming an abstract record: the definition-mark step in
+  `DefinitionResolver` derives ABSTRACT from `discriminators` over a stated `OPEN` or `FINAL`, where the kernel's
+  `meta.record` `@doc` says such a record must be ABSTRACT and the mark `final` beside `=?` is refused. A record
+  written in place keeps its stated `extension`, and its `discriminators` decide nothing at read. Decide refusal or
+  derivation for the canonical form, and apply it in both places.
 - [ ] **A syntax error in a data document read under a schema is filed as a validation error** ([TSON-DATA] §8.1).
   `!cell { kind: text  v: kind! }` read against its schema reports the separation error under the code
   `VALIDATION_ERROR` ("expected well-formed TSON"), which the conformance runner maps to `validation`; §8.1 files

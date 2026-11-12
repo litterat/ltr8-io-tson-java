@@ -359,7 +359,7 @@ class SealedFamilyCheckTest {
                 {
                   outcome => abstract <T> { code: T }
                   box     => <T> { v: T }
-                  ledger  => { o: outcome<text>  b: box<text>  s: set<text> }
+                  ledger  => { o?: outcome<text>  b: box<text>  s: set<text> }
                 }""");
     }
 
