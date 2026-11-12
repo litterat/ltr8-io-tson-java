@@ -7,6 +7,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TypeInline;
@@ -273,7 +274,7 @@ class OpenRecordShapeTest {
                   u4   => t4<int32>
                 """);
 
-        assertEquals(TypeRef.of("two", List.of(ParamRef.of("X"), TypeRef.of("text"))),
+        assertEquals(new ApplyBody(TypeRef.of("two"), List.of(ParamRef.of("X"), TypeRef.of("text"))).inPlace(),
                 open(compiled, "t4").fields().get("z").type());
         RecordBody u4 = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("u4"));
         assertEquals(TypeRef.of("int32"), u4.fields().get("x").type());

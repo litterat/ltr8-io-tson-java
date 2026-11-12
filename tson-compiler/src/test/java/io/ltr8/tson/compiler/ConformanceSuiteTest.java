@@ -284,22 +284,22 @@ class ConformanceSuiteTest {
     }
 
     /** A reference with arguments: its name, and each argument a nested reference or a name's token, in order. */
-    private static void assertReferenceMatches(RecordValue expected, io.ltr8.tson.schema.meta.TypeRef actual) {
-        assertEquals(fieldText(expected, "name"), actual.name(), "reference name");
+    private static void assertReferenceMatches(RecordValue expected, io.ltr8.tson.atom.ReferenceGrammar.Spelled actual) {
+        assertEquals(fieldText(expected, "name"), actual.head(), "reference name");
         ArrayValue expArguments = (ArrayValue) fieldCore(expected, "arguments");
         assertEquals(expArguments.elements().size(), actual.arguments().size(), "reference argument count");
         for (int i = 0; i < actual.arguments().size(); i++) {
             RecordValue.Field argument = soleField((RecordValue) expArguments.elements().get(i).coreValue(),
                     "reference argument");
             RecordValue payload = (RecordValue) argument.value().coreValue();
-            io.ltr8.tson.schema.meta.TypeRef nested = actual.arguments().get(i);
+            io.ltr8.tson.atom.ReferenceGrammar.Spelled nested = actual.arguments().get(i);
             if (!nested.arguments().isEmpty()) {
                 assertEquals("reference", argument.name(), "argument[" + i + "] kind");
                 assertReferenceMatches(payload, nested);
             } else {
                 assertEquals("token", argument.name(), "argument[" + i + "] kind");
                 assertEquals("unquoted", fieldText(payload, "form"), "argument[" + i + "] form");
-                assertEquals(fieldText(payload, "text"), nested.name(), "argument[" + i + "] text");
+                assertEquals(fieldText(payload, "text"), nested.head(), "argument[" + i + "] text");
             }
         }
     }
@@ -322,9 +322,8 @@ class ConformanceSuiteTest {
                 assertEquals(expForm, actForm, "token form");
                 assertEquals(fieldText(payload, "text"), tv.text(), "token text");
             }
-            case "reference" -> assertReferenceMatches(payload, assertInstanceOf(io.ltr8.tson.schema.meta.TypeRef.class,
-                    assertInstanceOf(ReferenceValue.class, actual, "core-value kind 'reference'").reference(),
-                    "core-value kind 'reference'"));
+            case "reference" -> assertReferenceMatches(payload,
+                    assertInstanceOf(ReferenceValue.class, actual, "core-value kind 'reference'").reference());
             case "absent" -> assertInstanceOf(VoidValue.class, actual, "core-value kind 'absent'");
             case "empty-brace" -> assertInstanceOf(EmptyBrace.class, actual, "core-value kind 'empty-brace'");
             case "record" -> {

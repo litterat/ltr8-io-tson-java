@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -80,7 +81,7 @@ final class RecordExtension {
      * collision inside one import cannot reach here, since that import was refused when it linked.
      */
     static List<Violation> check(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                 Map<String, TypeRef> applications, Set<String> localNames,
+                                 Map<String, ApplyBody> applications, Set<String> localNames,
                                  Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
         for (String name : localNames) {
@@ -179,7 +180,7 @@ final class RecordExtension {
     // ── The family's obligations, over the closure ───────────────────────
 
     private static void checkFamily(String base, Top def, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-            Map<String, TypeRef> applications, Set<String> localNames, Map<String, String> origins,
+            Map<String, ApplyBody> applications, Set<String> localNames, Map<String, String> origins,
             Map<String, Normalization> enumForms, List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
@@ -222,7 +223,7 @@ final class RecordExtension {
      * and for an entry with no source position the form or the application its key records.
      */
     private static String shown(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                Map<String, TypeRef> applications) {
+                                Map<String, ApplyBody> applications) {
         Top definition = merged.get(name);
         return definition == null ? name : EntryDisplayName.of(name, definition,
                 facts.getOrDefault(name, TsonSchema.EntryFacts.NONE), Optional.ofNullable(applications.get(name)),
@@ -290,7 +291,7 @@ final class RecordExtension {
         String terminal;
         Top target;
         switch (field.type()) {
-            case TypeRef reference when reference.arguments().isEmpty() -> {
+            case TypeRef reference -> {
                 terminal = AliasChain.terminal(reference.name(), merged);
                 target = merged.get(terminal);
             }

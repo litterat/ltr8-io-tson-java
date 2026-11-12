@@ -95,18 +95,19 @@ class TypeChainTest {
 
     @Test
     void anOpenRecordHoldsItsParametersAsParameterReferences() {
-        RecordBody open = new RecordBody(TypeChain.EMPTY.withParents(List.of(TypeRef.of("base",
-                List.of(TypeRef.of("T"))))), List.of(new Param("T")), RecordBody.fieldMap(
+        RecordBody open = new RecordBody(TypeChain.EMPTY.withParents(List.of(ApplyBody.of("base", "T").inPlace())),
+                List.of(new Param("T")), RecordBody.fieldMap(
                 Map.entry("v", RecordField.required(TypeRef.of("T"))),
-                Map.entry("w", RecordField.required(TypeRef.of("box", List.of(TypeRef.of("T"))))),
+                Map.entry("w", RecordField.required(ApplyBody.of("box", "T").inPlace())),
                 Map.entry("x", RecordField.required(TypeRef.of("text")))),
                 List.of(), RecordExtensionType.OPEN, List.of(), Optional.empty());
 
         assertTrue(open.isOpen());
         assertEquals(ParamRef.of("T"), open.fields().get("v").type());
-        assertEquals(TypeRef.of("box", List.of(ParamRef.of("T"))), open.fields().get("w").type());
+        assertEquals(new ApplyBody(TypeRef.of("box"), List.of(ParamRef.of("T"))).inPlace(),
+                open.fields().get("w").type());
         assertEquals(TypeRef.of("text"), open.fields().get("x").type());
-        assertEquals(List.of(TypeRef.of("base", List.of(ParamRef.of("T")))), open.parents());
+        assertEquals(List.of(new ApplyBody(TypeRef.of("base"), List.of(ParamRef.of("T"))).inPlace()), open.parents());
     }
 
     /**

@@ -160,11 +160,11 @@ class KernelBootstrapResolverTest {
     void theFixtureDeclarationsResolveWithNoEntryAdded() {
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
-        assertEquals(82, schema.entries().size());
+        assertEquals(83, schema.entries().size());
         io.ltr8.tson.schema.meta.RecordBody chain =
                 (io.ltr8.tson.schema.meta.RecordBody) schema.entries().get("meta.type_chain");
         assertEquals(new io.ltr8.tson.schema.meta.TypeInline(io.ltr8.tson.schema.meta.ArrayBody.of(
-                io.ltr8.tson.schema.meta.TypeRef.of("meta.type_ref"))), chain.fields().get("parents").type());
+                io.ltr8.tson.schema.meta.TypeRef.of("meta.type_expr"))), chain.fields().get("parents").type());
     }
 
     // ── The pre-loaded set, and what the rest of the kernel comes out as ──

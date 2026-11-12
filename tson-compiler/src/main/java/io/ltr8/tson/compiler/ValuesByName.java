@@ -200,13 +200,9 @@ final class ValuesByName {
 
     /**
      * The segments of the qualified name {@code reference} writes: its {@code name} split at each {@code .}, each a
-     * §7.7 identifier. Refused where the name has an empty segment, a segment that is no identifier, or arguments.
+     * §7.7 identifier. Refused where the name has an empty segment or a segment that is no identifier.
      */
     static List<String> segments(String where, TypeRef reference) {
-        if (!reference.arguments().isEmpty()) {
-            throw new SchemaValidationException(where + " holds '" + reference.name() + "' with arguments, and a "
-                    + "value by name is a qualified name alone");
-        }
         List<String> segments = List.of(reference.name().split("\\.", -1));
         for (String segment : segments) {
             Optional<String> violation = segment.isEmpty() ? Optional.of("a segment is empty")

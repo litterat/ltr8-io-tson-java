@@ -260,7 +260,7 @@ class NamespaceEntryTest {
         refused(schema("applied", """
                 box   => <T> { v: T }
                 other => !api { m => { response: box<order> } }"""),
-                "a position typed by a kind holds the name of a type", "declare it under a name");
+                "a reference is a name", "write the name a declaration gives it");
     }
 
     // ── Kinds ─────────────────────────────────────────────────────────────────────────────────────────

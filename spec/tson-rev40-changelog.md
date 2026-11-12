@@ -583,6 +583,48 @@ record, replaced when the record is applied. Each names the rule before and afte
     `meta.type_inline` states where a parameter stands as above; `meta-resolved.tn`'s
     conventions note follows. Every pin changes (§6).
 
+Items 85–93 take the application out of the reference: a reference is a name, and an
+application is the construction `meta.apply` written in place. Each names the rule before
+and after.
+
+85. **§4.2, §1.4** — "a reference is a name, an application or a parameter", and "a value
+    may be an application", `geo.address<T>`, read as a reference value. A reference is a
+    name or, inside an open record, a parameter. A value carrying an argument list, which
+    the data grammar still parses, is refused at every reference-typed slot: a validation
+    error in data and a resolver error in a schema document, a construction's payload and a
+    value entry's included, the diagnostic naming how an application is written.
+86. **§4.1, §4.2, Kernel** — new constructor `apply => final meta.type & { head:
+    meta.type_ref  arguments: [meta.type_ref; 1..] }`. It composes `meta.type` and no base
+    kind: an application stands for a type that exists only once its open record is applied,
+    so it has no kind and nothing reads a value against it. What `of` holds gains it, inside
+    an open record only.
+87. **§5.10, §5.3, §8.1** — an open record's application over a parameter "held as written"
+    as a reference with arguments is the construction written in place, `{ of: !meta.apply {
+    head: box  arguments: [T] } }`, at a field's type, at a slot of a type written there or
+    among `chain.parents`, and closes when the record is applied. The explicit spelling
+    means what `box<T>` means and closes the same way. In resolved output an application
+    stands only inside an open record, over one of its parameters, applying an open record;
+    reading a resolved form checks it, as a dependent type's position is checked.
+88. **§4.1, §5.8, Kernel** — `type_chain.parents` was `[meta.type_ref]`, holding `result<T>`
+    with its arguments; it is `[meta.type_expr]`, a name or an application in place.
+    `supertypes` and `subtypes` stay names.
+89. **§6, §8.1, §8.2, Kernel** — `@meta.application:pair<text integer>`, a reference with
+    arguments, is `@meta.application:{ head: pair  arguments: [text integer] }`, a value of
+    `meta.apply`; `application => @meta.annotation meta.apply`. An applied parent's edge and
+    a recursion tying to its declaration compare applications as values, head and
+    arguments, never as text.
+90. **§5.3, §5.6, §5.12, §12.1** — "in resolved output the application is the reference
+    value [TSON-DATA] §7.4 reads" and the `type-ref` comment "[TSON-DATA] §7.4's production"
+    are restated: the schema grammar's application is its own, sugar for `meta.apply`. A
+    reference over a constructor holds a name, never an argument list.
+91. **§5.2, Kernel** — `dependent => final meta.sum & { on: text }`: nothing composes or
+    refines it, so the position rule is the one constructor's.
+92. **§5.10, Kernel** — `meta.apply` is final for the same reason, so no constructor refining
+    it can be written in place under the allow-list's "a constructor refining an admitted
+    one".
+93. **Header, §1.3, §13.2** — the summary and the kernel's inventory gain `meta.apply`;
+    every pin changes (§6).
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Their entries are not edited by this
@@ -647,7 +689,10 @@ Changes a Revision 39 implementer must act on:
    application and pinning the selectors.
 6. **A template's body is a record body.** No template over a container, an atom, a
    choice, a tuple, a value or a bare reference; no alias template, no partial application.
-7. **Inside an open record** a form over a parameter is written in place like any other
+7. **An application is no reference** (items 85–90): it is `meta.apply` written in place,
+   which resolved output holds only inside an open record over one of its parameters, and a
+   value carrying an argument list is refused wherever a reference is read.
+   **Inside an open record** a form over a parameter is written in place like any other
    (items 78–80): `[T; 1..]`, `[T?]`, `[T, text]`, `( T | int32 )` and `{ cursor: T }` load,
    a constructor's application over a parameter is its construction in place, and a choice
    over a parameter is judged where each application closes. There is no open synthetic
@@ -713,12 +758,13 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `8c3cbece…` (Revision 39 `c9b069b6…`), numeric `75198ff6…` (`dfa66c5d…`), temporal
-   `1233d199…` (`fb4ada8f…`), net `7f06ca43…` (`371fc20c…`), core `edf3beb1…`
-   (`4e8d9c43…`), policy `3a789b50…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   `32b894ac…` (Revision 39 `c9b069b6…`), numeric `640679c8…` (`dfa66c5d…`), temporal
+   `9f21273a…` (`fb4ada8f…`), net `0426eaff…` (`371fc20c…`), core `f1b7ddcd…`
+   (`4e8d9c43…`), policy `150ecaac…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
-   78–84's documentation of a parameter in a type written in place. The chain is
+   78–84's documentation of a parameter in a type written in place and for items 85–93's
+   `meta.apply` and final constructors. The chain is
    consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
    libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
@@ -728,7 +774,10 @@ carries no open questions.
    `meta.field_type_ref` and `meta.field_type_expr`, adds `meta.dependent`, and rewrites the
    documentation of `meta.record_field`, `meta.reference_type`, `meta.ref`, `meta.type_ref`,
    `meta.type_inline` and `meta.type_expr`; #5's record written at a slot rewrites
-   `meta.type_inline`'s again, a record no longer declared and named. `meta-resolved.tn`
+   `meta.type_inline`'s again, a record no longer declared and named. Items 85–93 add
+   `meta.apply`, retype `type_chain.parents` and `application`, mark `meta.dependent` final,
+   and rewrite the documentation of `meta.type`, `meta.reference_type`, `meta.type_inline`,
+   `meta.type_expr` and `meta.type_chain`: the kernel measures 83 entries. `meta-resolved.tn`
    follows; the four library fixtures change only their identities.
 
 ---

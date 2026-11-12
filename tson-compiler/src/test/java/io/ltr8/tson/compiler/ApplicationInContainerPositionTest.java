@@ -4,6 +4,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.OpenEntry;
@@ -104,7 +105,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody children = assertInstanceOf(ArrayBody.class, inPlace(slot(entry(compiled, "text_tree"),
                 "children")));
         assertEquals(TypeRef.of("text_tree"), children.elementType(), "the knot");
-        assertEquals("tree", compiled.schema().applicationOf("text_tree").orElseThrow().name());
+        assertEquals("tree", compiled.schema().applicationOf("text_tree").orElseThrow().head().name());
         assertEquals(TypeRef.of("text"), slot(entry(compiled, "text_tree"), "value"), "T bound at the value field too");
     }
 
@@ -116,8 +117,8 @@ class ApplicationInContainerPositionTest {
 
         RecordBody tree = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("tree"));
         assertTrue(tree.isOpen());
-        assertEquals(new TypeInline(ArrayBody.of(TypeRef.of("tree", List.of(ParamRef.of("T"))))),
-                tree.fields().get("children").type());
+        assertEquals(new TypeInline(ArrayBody.of(new ApplyBody(TypeRef.of("tree"), List.of(ParamRef.of("T")))
+                .inPlace())), tree.fields().get("children").type());
         assertTrue(unpositioned(compiled).isEmpty(), () -> "no entry added for a form over a parameter: "
                 + unpositioned(compiled));
     }

@@ -1,8 +1,11 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -71,16 +74,19 @@ final class Ancestry {
      * The chain a closed record's written parents reach: every closed parent's contribution and every
      * application's, deduplicated, with each application kept in {@code parents} for the fold.
      */
-    static TypeChain chainOf(List<TypeRef> written, DefinitionGetter namespace) {
-        List<TypeRef> applied = new ArrayList<>();
+    static TypeChain chainOf(List<TypeExpr> written, DefinitionGetter namespace) {
+        List<TypeExpr> applied = new ArrayList<>();
         Set<String> names = new LinkedHashSet<>();
-        for (TypeRef parent : written) {
-            if (!parent.arguments().isEmpty()) {
-                names.addAll(ofTemplate(parent.name(), namespace));
-                applied.add(parent);
-                continue;
+        for (TypeExpr parent : written) {
+            switch (parent) {
+                case TypeRef name -> names.addAll(ofParent(name.name(), namespace));
+                case TypeInline inline when inline.of() instanceof ApplyBody application -> {
+                    names.addAll(ofTemplate(application.head().name(), namespace));
+                    applied.add(parent);
+                }
+                case TypeInline inline -> throw new IllegalStateException("a parent is a name or an application, "
+                        + "never '" + inline.text() + "'");
             }
-            names.addAll(ofParent(parent.name(), namespace));
         }
         return TypeChain.of(List.copyOf(names)).withParents(applied);
     }

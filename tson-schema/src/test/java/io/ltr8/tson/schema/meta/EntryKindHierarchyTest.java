@@ -17,9 +17,11 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
  */
 class EntryKindHierarchyTest {
 
+    /** The three kinds, and an application, which stands for a type of no kind until its open record is applied. */
     @Test
-    void theThreeKindsOfDataValuesAreTypes() {
-        assertEquals(Set.of(Atom.class, Product.class, Sum.class), Set.of(Type.class.getPermittedSubclasses()));
+    void theThreeKindsOfDataValuesAndAnApplicationAreTypes() {
+        assertEquals(Set.of(Atom.class, Product.class, Sum.class, io.ltr8.tson.schema.meta.ApplyBody.class),
+                Set.of(Type.class.getPermittedSubclasses()));
     }
 
     @Test

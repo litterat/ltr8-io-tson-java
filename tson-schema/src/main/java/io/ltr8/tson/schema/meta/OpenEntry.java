@@ -39,16 +39,19 @@ public final class OpenEntry {
     }
 
     /**
-     * Every application an open record writes, in its fields' types at any depth of types written in place and in its
-     * parents ({@link RecordBody#references}), each as written with its arguments; an application nested in another's
-     * arguments comes back inside it. Empty for a closed entry.
+     * Every application an open record writes ({@link ApplyBody}), in its fields' types and its parents, at any depth
+     * of types written in place, each as written, an application nested in another's arguments after it. Empty for a
+     * closed entry.
      */
-    public static List<TypeRef> applications(Top value) {
+    public static List<ApplyBody> applications(Top value) {
         if (!isOpen(value)) {
             return List.of();
         }
-        return ((RecordBody) value).references().stream().filter(reference -> !reference.arguments().isEmpty())
-                .toList();
+        RecordBody record = (RecordBody) value;
+        List<ApplyBody> found = new ArrayList<>();
+        record.fields().values().forEach(field -> TypeSlots.applications(field.type(), found::add));
+        record.parents().forEach(parent -> TypeSlots.applications(parent, found::add));
+        return found;
     }
 
     /**
@@ -58,14 +61,9 @@ public final class OpenEntry {
     public static Set<String> names(Top value) {
         Set<String> names = new LinkedHashSet<>();
         if (isOpen(value)) {
-            ((RecordBody) value).references().forEach(reference -> collect(reference, names));
+            ((RecordBody) value).references().forEach(reference -> names.add(reference.name()));
         }
         return names;
-    }
-
-    private static void collect(TypeRef reference, Set<String> into) {
-        into.add(reference.name());
-        reference.arguments().forEach(argument -> collect(argument, into));
     }
 
     /**
@@ -75,26 +73,7 @@ public final class OpenEntry {
     public static Optional<String> parameterIn(TypeExpr type) {
         List<TypeRef> references = new ArrayList<>();
         TypeSlots.forEach(type, references::add);
-        for (TypeRef reference : references) {
-            Optional<String> found = parameterIn(reference);
-            if (found.isPresent()) {
-                return found;
-            }
-        }
-        return Optional.empty();
-    }
-
-    private static Optional<String> parameterIn(TypeRef reference) {
-        if (reference instanceof ParamRef parameter) {
-            return Optional.of(parameter.name());
-        }
-        for (TypeRef argument : reference.arguments()) {
-            Optional<String> found = parameterIn(argument);
-            if (found.isPresent()) {
-                return found;
-            }
-        }
-        return Optional.empty();
+        return references.stream().filter(ParamRef.class::isInstance).map(TypeRef::name).findFirst();
     }
 
     /**

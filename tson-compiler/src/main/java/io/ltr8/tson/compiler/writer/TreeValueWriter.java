@@ -66,19 +66,19 @@ public final class TreeValueWriter {
      * is a qualified name. Anything else is no argument ([TSON-SCHEMA] §5.10), and a tree holding one cannot be
      * written as a reference.
      */
-    private static io.ltr8.tson.schema.meta.TypeRef reference(TsonApplicationReference reference) {
-        List<io.ltr8.tson.schema.meta.TypeRef> arguments = new java.util.ArrayList<>();
+    private static io.ltr8.tson.atom.ReferenceGrammar.Spelled reference(TsonApplicationReference reference) {
+        List<io.ltr8.tson.atom.ReferenceGrammar.Spelled> arguments = new java.util.ArrayList<>();
         for (TsonValue argument : reference.arguments()) {
             arguments.add(switch (argument) {
                 case TsonApplicationReference nested -> reference(nested);
                 case TsonAtom atom when atom.value() instanceof String text
                         && io.ltr8.tson.atom.ReferenceGrammar.isQualifiedName(text) ->
-                        io.ltr8.tson.schema.meta.TypeRef.of(text);
+                        new io.ltr8.tson.atom.ReferenceGrammar.Spelled(text, List.of());
                 default -> throw new IllegalArgumentException("'" + argument + "' is no argument of the reference '"
                         + reference.name() + "<...>': an argument is a reference, a qualified name or an application");
             });
         }
-        return io.ltr8.tson.schema.meta.TypeRef.of(reference.name(), arguments);
+        return new io.ltr8.tson.atom.ReferenceGrammar.Spelled(reference.name(), arguments);
     }
 
     /**

@@ -113,9 +113,7 @@ class TypeNameRefReadTest {
             Diagnostic problem = problems.getFirst();
             assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code(), application);
             assertEquals(Optional.of("/t"), problem.path(), application);
-            assertTrue(problem.message().contains("in a data document a reference is a name"), problem.message());
-            assertTrue(problem.expected().contains("inner") && problem.expected().contains("outer"),
-                    problem.expected());
+            assertTrue(problem.message().contains("a reference is a name"), problem.message());
         }
     }
 

@@ -29,6 +29,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaRefusalException;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
@@ -230,7 +231,7 @@ public final class SchemaResolver {
         // Which application each entry is the instantiation of (§8.2): an import's as its key states it, a local
         // one's as materialisation closes it. Keyed on the entry, whatever its kind; written on the local keys as
         // `@meta.application` where the entry map is assembled.
-        Map<String, io.ltr8.tson.schema.meta.TypeRef> applications = new LinkedHashMap<>();
+        Map<String, ApplyBody> applications = new LinkedHashMap<>();
         // Which schema declared each imported entry: the compiled reader a construction head or an annotation is read
         // through is that schema's.
         Map<String, String> origins = new LinkedHashMap<>();
@@ -376,7 +377,7 @@ public final class SchemaResolver {
                 heads, waitOrder, new ApplicationCloser() {
 
                     @Override
-                    public String closeApplication(io.ltr8.tson.schema.meta.TypeRef application) {
+                    public String closeApplication(ApplyBody application) {
                         return materialiser.closeApplication(application);
                     }
 
@@ -392,8 +393,7 @@ public final class SchemaResolver {
                      * application closes here, into the declaration's own name.
                      */
                     @Override
-                    public Top closeApplicationInto(String declaredName,
-                            io.ltr8.tson.schema.meta.TypeRef application) {
+                    public Top closeApplicationInto(String declaredName, ApplyBody application) {
                         return materialiser.closeApplicationInto(declaredName, application);
                     }
                 }, positions, facts, kernel, kernel);
@@ -514,8 +514,7 @@ public final class SchemaResolver {
         // ingest reads it back as stated. A construction carries none: its value states its constructor.
         // The application is stated as written, its nested arguments unreduced.
         for (String name : List.copyOf(localOnly.keySet())) {
-            io.ltr8.tson.schema.meta.TypeRef application = materialiser.writtenApplication(name)
-                    .orElse(applications.get(name));
+            ApplyBody application = materialiser.writtenApplication(name).orElse(applications.get(name));
             if (application != null) {
                 localOnly.put(name, localOnly.get(name),
                         TsonSchema.withApplication(localOnly.getAnnotations(name), application));
@@ -630,13 +629,11 @@ public final class SchemaResolver {
      * subtracted entry has no applied parent for this pass to find and an empty chain for it to close.
      */
     private static void appliedParentEdges(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                           Map<String, io.ltr8.tson.schema.meta.TypeRef> applications) {
-        Map<String, String> byApplication = new LinkedHashMap<>();
+                                           Map<String, ApplyBody> applications) {
+        Map<ApplyBody, String> byApplication = new LinkedHashMap<>();
         namespace.keySet().forEach(entryName -> Optional.ofNullable(applications.get(entryName))
-                .filter(application -> !application.arguments().isEmpty())
                 .ifPresent(application -> byApplication.putIfAbsent(
-                        CanonicalApplication.of(application.name(), application.arguments()),
-                        entryName)));
+                        CanonicalApplication.of(application.head().name(), application.names()), entryName)));
         // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the chains the
         // previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs `ok_of`'s own
         // edge to `result_of` to exist before `great_of` can inherit it. Bounded by the entry count: each round
@@ -666,7 +663,7 @@ public final class SchemaResolver {
     }
 
     /** One round of {@link #appliedParentEdges} over one map -- {@code true} when any chain grew. */
-    private static boolean fold(Map<String, Top> entries, Map<String, String> byApplication,
+    private static boolean fold(Map<String, Top> entries, Map<ApplyBody, String> byApplication,
                                  Map<String, Top> namespace) {
         boolean changedAny = false;
         // <b>To a fixed point within the map, not merely across rounds.</b> A pass visits entries in map
@@ -697,18 +694,19 @@ public final class SchemaResolver {
      * later round still finds it when the owner's chain has grown. {@code definition} itself where nothing
      * grew.
      */
-    private static Top completed(Top definition, Map<String, String> byApplication, Map<String, Top> namespace) {
+    private static Top completed(Top definition, Map<ApplyBody, String> byApplication, Map<String, Top> namespace) {
         if (!(definition instanceof Type type)) {
             return definition;
         }
         Set<String> chain = new LinkedHashSet<>(type.supertypes());
-        for (io.ltr8.tson.schema.meta.TypeRef parent : type.parents()) {
-            if (parent.arguments().isEmpty()) {
+        for (io.ltr8.tson.schema.meta.TypeExpr parent : type.parents()) {
+            if (!(parent instanceof io.ltr8.tson.schema.meta.TypeInline inline)
+                    || !(inline.of() instanceof ApplyBody application)) {
                 continue;
             }
             // A parent written through an alias of its open record is that open record's application (§8.3).
-            String head = Ancestry.templateHead(parent.name(), namespace::get);
-            String owner = byApplication.get(CanonicalApplication.of(head, parent.arguments()));
+            String head = Ancestry.templateHead(application.head().name(), namespace::get);
+            String owner = byApplication.get(CanonicalApplication.of(head, application.names()));
             if (owner != null) {
                 chain.add(owner);
             }
@@ -860,11 +858,12 @@ public final class SchemaResolver {
             return;
         }
         List<String> parameters = OpenEntry.parameterNames(resolved);
-        for (io.ltr8.tson.schema.meta.TypeRef application : OpenEntry.applications(resolved)) {
-            if (parameters.contains(application.name())) {
-                throw new SchemaValidationException("'" + name + "': '" + application.name()
+        for (ApplyBody application : OpenEntry.applications(resolved)) {
+            String head = application.head().name();
+            if (parameters.contains(head)) {
+                throw new SchemaValidationException("'" + name + "': '" + head
                         + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
-                        + "for a template, and §5.10 admits no head abstraction, so '" + application.name()
+                        + "for a template, and §5.10 admits no head abstraction, so '" + head
                         + "<...>' is no form. Take the applied type as the parameter instead");
             }
         }

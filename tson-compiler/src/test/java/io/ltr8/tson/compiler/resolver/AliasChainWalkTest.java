@@ -32,7 +32,6 @@ class AliasChainWalkTest {
         map.put("text", TextType.UNCONSTRAINED);
         map.put("hop", alias(TypeRef.of("text")));
         map.put("alias", alias(TypeRef.of("hop")));
-        map.put("applied", alias(TypeRef.of("box", List.of(TypeRef.of("text")))));
         map.put("loop_a", alias(TypeRef.of("loop_b")));
         map.put("loop_b", alias(TypeRef.of("loop_a")));
         return map;
@@ -48,18 +47,6 @@ class AliasChainWalkTest {
         assertEquals("text", AliasChain.terminal("alias", ENTRIES));
         assertEquals("text", AliasChain.terminal("hop", ENTRIES));
         assertEquals("text", AliasChain.terminal("text", ENTRIES), "a name that starts no chain is its own end");
-    }
-
-    /**
-     * <b>An argument-bearing target is an application, not a hop.</b> It names no entry, so the walk
-     * stops <em>at</em> the entry holding the application rather
-     * than following it into a template.
-     */
-    @Test
-    void anArgumentBearingTargetStopsTheWalk() {
-        assertEquals("applied", AliasChain.terminal("applied", ENTRIES));
-        assertTrue(AliasChain.terminalDefinition("applied", ENTRIES).isPresent(),
-                "it stopped on an entry, so there is one to hand back");
     }
 
     /**

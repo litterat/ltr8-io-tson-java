@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.ast;
 
-import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.atom.ReferenceGrammar;
 
 /**
  * A {@code reference} core-value ([TSON-DATA] §7.4) that is no bare name, as the stream
@@ -9,5 +9,5 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * arguments name is a reader's or the resolver's to judge, and {@code reference} holds each argument as the grammar
  * classified it, a qualified name a reference and any other token a value with its token form.
  */
-public record ReferenceValue(TypeRef reference) implements CoreValue {
+public record ReferenceValue(ReferenceGrammar.Spelled reference) implements CoreValue {
 }

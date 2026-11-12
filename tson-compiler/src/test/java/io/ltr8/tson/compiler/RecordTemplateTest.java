@@ -84,7 +84,7 @@ class RecordTemplateTest {
     private static List<String> instantiationsOf(TsonCompiledSchema compiled, String head) {
         var schema = compiled.schema();
         return schema.entries().keySet().stream()
-                .filter(n -> schema.applicationOf(n).filter(applied -> applied.name().equals(head)).isPresent())
+                .filter(n -> schema.applicationOf(n).filter(applied -> applied.head().name().equals(head)).isPresent())
                 .sorted().toList();
     }
 
@@ -119,8 +119,8 @@ class RecordTemplateTest {
                   tb     => box<text>""");
 
         assertEquals(List.of("tb"), instantiationsOf(compiled, "box"));
-        TypeRef source = compiled.schema().applicationOf("tb").orElseThrow();
-        assertEquals("box", source.name());
+        io.ltr8.tson.schema.meta.ApplyBody source = compiled.schema().applicationOf("tb").orElseThrow();
+        assertEquals("box", source.head().name());
         assertEquals(List.of(TypeRef.of("text")), source.arguments());
     }
 

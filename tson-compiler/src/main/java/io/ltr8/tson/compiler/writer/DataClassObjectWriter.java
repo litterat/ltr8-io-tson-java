@@ -180,14 +180,13 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (value instanceof TypeRef reference) {
-                // A reference is data grammar, written unquoted with the annotations written on it ahead: a name
-                // one token, an application its name and argument list. A name that is no qualified name reads
-                // back only quoted.
+                // A reference is data grammar, written unquoted with the annotations written on it ahead, one token.
+                // A name that is no qualified name reads back only quoted.
                 writeAnnotations(reference.annotations(), writer);
                 if (typeRef != null) {
                     writer.typeRef(typeRef);
                 }
-                if (qualified(reference)) {
+                if (ReferenceGrammar.isQualifiedName(reference.name())) {
                     writer.reference(reference);
                 } else {
                     writer.quotedString(reference.text());
@@ -269,22 +268,6 @@ public final class DataClassObjectWriter {
         } catch (Throwable t) {
             throw new DataBindException("failed to write value of type " + dataClass.typeClass(), t);
         }
-    }
-
-    /**
-     * Whether {@code reference} reads back unquoted as written: its name a qualified name, every {@code .}-separated
-     * segment an identifier, and the name of each reference among its arguments the same ([TSON-DATA] §7.4).
-     */
-    private static boolean qualified(TypeRef reference) {
-        if (!ReferenceGrammar.isQualifiedName(reference.name())) {
-            return false;
-        }
-        for (TypeRef argument : reference.arguments()) {
-            if (!qualified(argument)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**

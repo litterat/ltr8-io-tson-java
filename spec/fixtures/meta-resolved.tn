@@ -61,16 +61,16 @@
     `{ of: !meta.array { element_type: text  min_items: 1 } }`. A slot
     that names a type
     (`meta.map.key_type`, a parameter's `bound`, an alias's `target`,
-    a reference's `of`, a chain's lists) is typed `meta.type_ref` and
-    holds a name. A name is judged a member of its kind when the
-    schema links. An application is a reference with an argument
-    list, written unquoted in its canonical text, `result<T>`: no
-    whitespace, and one space between arguments. A closed application
-    of an open record is named bare, so one stands only where an
-    application of an open record is still open: an open record's
-    `parents` and its field types, at any depth of the types written
-    in them, and the `application` annotation. A constructor's
-    application over a parameter is its construction in place.
+    a reference's `of`, a chain's supertypes and subtypes) is typed
+    `meta.type_ref` and holds a name. A name is judged a member of its
+    kind when the schema links. An application is no reference: it is
+    the construction `meta.apply` written in place, `{ of: !meta.apply
+    { head: result  arguments: [T] } }`, and it stands only where an
+    application of an open record is still open, inside an open record
+    over one of its parameters, at its field types and its `parents`;
+    the `application` annotation's value is the same record. A
+    constructor's application over a parameter is its construction in
+    place.
   - The container constructors carry no parameters: their type
     slots are plain required fields, filled by the construction (or
     by a sugar form's desugaring) like any other required field. An
@@ -86,7 +86,8 @@
     those or in a parent, and never at a field's `value`; it is read against the
     record's `parameters` before the namespace (Part 2 Section 5.10's
     shadowing rule). Its `chain` holds
-    `parents` as written, one of which may be an application. An
+    `parents` as written, one of which may be an application written
+    in place. An
     application substitutes the arguments and closes to a
     `!meta.record` without `parameters`, which carries the derived
     `@meta.application` at its schema-map key, read as stated on
@@ -214,14 +215,14 @@
   meta => !meta.schema {
     top => !meta.record {
       chain: {
-        subtypes: [binary.bytes_type enum meta.alias meta.array meta.atom meta.choice meta.declared_type meta.dependent meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.alias meta.apply meta.array meta.atom meta.choice meta.declared_type meta.dependent meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {}
       extension: ABSTRACT
     }
 
     type_chain => !meta.record { fields: {
-      parents    => !meta.record_field { type: { of: !meta.array { element_type: meta.type_ref } }  optional: true }
+      parents    => !meta.record_field { type: { of: !meta.array { element_type: meta.type_expr } }  optional: true }
       supertypes => !meta.record_field { type: { of: !meta.array { element_type: meta.type_ref } }  optional: true }
       subtypes   => !meta.record_field { type: { of: !meta.array { element_type: meta.type_ref } }  optional: true }
     } }
@@ -229,7 +230,7 @@
     type => !meta.record {
       chain: {
         supertypes: [meta.top]
-        subtypes: [binary.bytes_type enum meta.array meta.atom meta.choice meta.declared_type meta.dependent meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.apply meta.array meta.atom meta.choice meta.declared_type meta.dependent meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {
         chain => !meta.record_field { type: meta.type_chain  optional: true }
@@ -289,7 +290,7 @@
 
     annotation => !meta.alias { target: void }
 
-    application => @meta.annotation !meta.alias { target: meta.type_ref }
+    application => @meta.annotation !meta.alias { target: meta.apply }
 
     record_field => !meta.record { fields: {
       type     => !meta.record_field { type: meta.type_expr }
@@ -412,7 +413,13 @@
     dependent => !meta.record { chain: { supertypes: [meta.sum meta.top meta.type] }  fields: {
       chain => !meta.record_field { type: meta.type_chain  optional: true }
       on    => !meta.record_field { type: text }
-    } }
+    }  extension: FINAL }
+
+    apply => !meta.record { chain: { supertypes: [meta.top meta.type] }  fields: {
+      chain     => !meta.record_field { type: meta.type_chain  optional: true }
+      head      => !meta.record_field { type: meta.type_ref }
+      arguments => !meta.record_field { type: { of: !meta.array { element_type: meta.type_ref  min_items: 1 } } }
+    }  extension: FINAL }
 
     reference_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type]  subtypes: [meta.ref] }  fields: {
       chain => !meta.record_field { type: meta.type_chain  optional: true }

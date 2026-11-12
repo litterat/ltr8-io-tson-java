@@ -112,12 +112,15 @@ checks), `design/schema-resolution.md` (chains, applied parents),
     would make the answer depend on declaration order. The fold indexes entries by their recorded canonical
     application (`CanonicalApplication.of`) and folds each owner and its ancestors into `supertypes` to a
     fixed point. An application no declaration names contributes no edge: nobody declared that type.
-- **An argument of an open record's application closes nothing.** It is a name or a parameter (§5.3), so an
-  application or a construction there is refused (`closeArgument`); an argument of a constructor's application lands
-  at the construction's slot and closes there.
+- **An application is `meta.apply` written in place** (`ApplyBody`), closed by one walk (`TypeSlots`, the
+  materialiser's `Closing`), innermost first, the application as written kept beside the one whose arguments closed so
+  a refusal names what the author wrote. An argument of an open record's application closes nothing: it is a name or
+  a parameter (§5.3), so an application or a construction there is refused (`arguments`); an argument of a
+  constructor's application lands at the construction's slot through a stand-in name
+  (`ConstructionSugar.StandIns`), a reference reading names only, and closes there.
 - **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head abstraction),
-  but it may be one *inside an argument list*, which is what recursion looks like; binding only the outer name
-  leaves `T` in `chain<T>` unbound.
+  but it may be one *among an application's arguments*, which is what recursion looks like; binding only the outer
+  name leaves `T` in `chain<T>` unbound.
 - **Knot-tying is `closingInto`**, registered before the body is substituted and keyed on the canonical
   application: a recursive application reached during substitution finds the declaration being closed and names it.
   One reached again inside its own closing in place, with no declaration closing it, is refused (`closingInPlace`,
@@ -244,9 +247,9 @@ a recursive application — direct or mutual — must pass each parameter throug
 - **Mutual recursion needs reachability, not a self-edge**: neither template in an `a → b → a` cycle applies
   itself, so an application is checked whenever its head can reach the declaration it sits in.
 - **Applications nested inside arguments are checked too** (`box<deep<box<T>>>`), so the walk recurses through
-  `TypeRef.arguments`. The applications come from the open record's references (`OpenEntry.applications`), the ones
-  `refuseHeadAbstraction` and the linker's arity check also read: every reference at any depth of a type in place
-  (`RecordBody.references`), so `kids?: [tree<T>]` and `m: { next?: tree<T> }` are judged as `next?: tree<T>` is. An
+  `ApplyBody.arguments`. The applications come from the open record's type slots (`OpenEntry.applications`), the
+  ones `refuseHeadAbstraction` and the linker's arity check also read: every application at any depth of a type in
+  place (`TypeSlots.applications`), so `kids?: [tree<T>]` and `m: { next?: tree<T> }` are judged as `next?: tree<T>` is. An
   argument is a name or a parameter, and a sugar form is never one, so growth can only come through an application
   among the arguments, which this walk sees wherever it stands.
 - **Deliberately stricter than termination requires.** What bounds the work is weaker — every argument a bare

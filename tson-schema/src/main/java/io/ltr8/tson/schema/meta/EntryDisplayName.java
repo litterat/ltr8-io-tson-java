@@ -28,7 +28,7 @@ public final class EntryDisplayName {
      * {@code name} if the author wrote it, else the form that produced this entry -- {@code application} being the
      * one its key carries ({@link TsonSchema#applicationOf(String)}).
      */
-    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application) {
+    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<ApplyBody> application) {
         return of(name, value, facts, application, ignored -> null, ignored -> TsonSchema.EntryFacts.NONE,
                 ignored -> Optional.empty());
     }
@@ -49,10 +49,10 @@ public final class EntryDisplayName {
      * TsonSchema.EntryFacts, Optional)}), which is what a reader already has and enough for the value it is
      * reporting on.
      */
-    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<TypeRef> application,
+    public static String of(String name, Top value, TsonSchema.EntryFacts facts, Optional<ApplyBody> application,
                             Function<String, ? extends Top> namespace,
                             Function<String, TsonSchema.EntryFacts> factsOf,
-                            Function<String, Optional<TypeRef>> applicationOf) {
+                            Function<String, Optional<ApplyBody>> applicationOf) {
         Lookup lookup = new Lookup(namespace, factsOf, applicationOf);
         lookup.rendering().add(name);
         return authored(name, value, facts, application, lookup).orElse(name);
@@ -63,13 +63,13 @@ public final class EntryDisplayName {
      * records. One level deep, as {@link #of(String, Top, TsonSchema.EntryFacts, Optional)} is.
      */
     public static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
-                                            Optional<TypeRef> application) {
+                                            Optional<ApplyBody> application) {
         return authored(name, value, facts, application,
                 new Lookup(ignored -> null, ignored -> TsonSchema.EntryFacts.NONE, ignored -> Optional.empty()));
     }
 
     private static Optional<String> authored(String name, Top value, TsonSchema.EntryFacts facts,
-                                             Optional<TypeRef> application, Lookup lookup) {
+                                             Optional<ApplyBody> application, Lookup lookup) {
         if (value == null || facts.position().isPresent()) {
             return Optional.of(name);
         }
@@ -93,10 +93,10 @@ public final class EntryDisplayName {
      * its entry name rather than unrolled.
      */
     private record Lookup(Function<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
-                          Function<String, Optional<TypeRef>> applicationOf, Set<String> rendering) {
+                          Function<String, Optional<ApplyBody>> applicationOf, Set<String> rendering) {
 
         Lookup(Function<String, ? extends Top> namespace, Function<String, TsonSchema.EntryFacts> factsOf,
-               Function<String, Optional<TypeRef>> applicationOf) {
+               Function<String, Optional<ApplyBody>> applicationOf) {
             this(namespace, factsOf, applicationOf, new HashSet<>());
         }
     }
@@ -129,11 +129,9 @@ public final class EntryDisplayName {
     /**
      * {@code head<arg, arg>} for a declared application, which its key carries (§8.2).
      */
-    private static Optional<String> applied(Optional<TypeRef> application) {
-        return application
-                .filter(applied -> !applied.arguments().isEmpty())
-                .map(applied -> applied.name() + applied.arguments().stream()
-                        .map(TypeRef::name).collect(Collectors.joining(", ", "<", ">")));
+    private static Optional<String> applied(Optional<ApplyBody> application) {
+        return application.map(applied -> applied.head().name() + applied.arguments().stream()
+                .map(TypeExpr::text).collect(Collectors.joining(", ", "<", ">")));
     }
 
     /** §5.3's size specifier, in the shortest form that says the same thing -- and empty when unbounded. */

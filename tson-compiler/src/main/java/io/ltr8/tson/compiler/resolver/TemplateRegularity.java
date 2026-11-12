@@ -3,6 +3,9 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -95,7 +98,7 @@ final class TemplateRegularity {
     }
 
     /** One application written inside a template body: the head it applies and the arguments it applies to. */
-    private record Application(String head, List<TypeRef> arguments) {
+    private record Application(String head, List<TypeExpr> arguments) {
     }
 
     /**
@@ -108,8 +111,8 @@ final class TemplateRegularity {
             return null;
         }
         for (int i = 0; i < parameters.size(); i++) {
-            TypeRef argument = application.arguments().get(i);
-            if (argument.arguments().isEmpty() && argument.name().equals(parameters.get(i))) {
+            TypeExpr argument = application.arguments().get(i);
+            if (argument instanceof TypeRef named && named.name().equals(parameters.get(i))) {
                 continue;
             }
             return "'" + name + "' applies '" + application.head() + "' recursively but does not pass '"
@@ -121,10 +124,9 @@ final class TemplateRegularity {
         return null;
     }
 
-    private static String shown(TypeRef argument) {
-        return argument.arguments().isEmpty()
-                ? "'" + argument.name() + "'"
-                : "the application '" + argument.name() + "<...>'";
+    private static String shown(TypeExpr argument) {
+        return argument instanceof TypeInline inline && inline.of() instanceof ApplyBody application
+                ? "the application '" + application.head().name() + "<...>'" : "'" + argument.text() + "'";
     }
 
     /** Whether {@code from} reaches {@code target} by applying templates, {@code from == target} included. */
@@ -149,24 +151,14 @@ final class TemplateRegularity {
 
     /**
      * Every application a template's body writes, including ones nested inside another application's
-     * arguments ({@code box<chain<T>>} at a field position applies both).
+     * arguments ({@code box<chain<T>>} at a field position applies both), and inside types written in place.
      *
      * <p>Every entry with parameters is an open record, which answers which applications it writes ({@link
      * OpenEntry#applications}), the same kind of declared question as its names, which is what keeps this rule at the
      * declaration, before anything is resolved against it.
      */
     private static List<Application> applicationsIn(Top template) {
-        List<Application> found = new ArrayList<>();
-        OpenEntry.applications(template).forEach(ref -> collect(ref, found));
-        return found;
-    }
-
-    private static void collect(TypeRef ref, List<Application> found) {
-        if (!ref.arguments().isEmpty()) {
-            found.add(new Application(ref.name(), ref.arguments()));
-        }
-        for (TypeRef argument : ref.arguments()) {
-            collect(argument, found);
-        }
+        return OpenEntry.applications(template).stream()
+                .map(application -> new Application(application.head().name(), application.arguments())).toList();
     }
 }

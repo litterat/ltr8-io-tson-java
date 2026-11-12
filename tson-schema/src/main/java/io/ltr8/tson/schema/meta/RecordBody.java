@@ -112,7 +112,8 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
             }
         }
         if (!declared.isEmpty()) {
-            chain = chain.withParents(chain.parents().stream().map(parent -> scoped(parent, declared)).toList());
+            TypeSlots.Rewrite scope = reference -> scoped(reference, declared);
+            chain = chain.withParents(chain.parents().stream().map(parent -> TypeSlots.map(parent, scope)).toList());
             fields = scopedFields(fields, declared);
             for (TypeRef reference : references(chain, fields)) {
                 requireDeclared(reference, declared);
@@ -205,7 +206,7 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
     /**
      * Every type reference this record holds, in its fields' {@code type}s at any depth of types written in place
      * ({@link TypeSlots}) and then its parents as written: the places a parameter stands, as a {@link ParamRef} itself
-     * or among an application's arguments.
+     * or among an application's arguments ({@link ApplyBody}).
      */
     public List<TypeRef> references() {
         return references(chain, fields);
@@ -214,19 +215,14 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
     private static List<TypeRef> references(TypeChain chain, AnnotatedMap<String, RecordField> fields) {
         List<TypeRef> references = new ArrayList<>();
         fields.values().forEach(field -> TypeSlots.forEach(field.type(), references::add));
-        references.addAll(chain.parents());
+        chain.parents().forEach(parent -> TypeSlots.forEach(parent, references::add));
         return references;
     }
 
-    /** {@code reference} with each name {@code declared} holds turned into the {@link ParamRef} it is, at any depth. */
+    /** {@code reference} as the {@link ParamRef} it is where {@code declared} holds its name. */
     private static TypeRef scoped(TypeRef reference, Set<String> declared) {
-        return switch (reference) {
-            case NameRef name when declared.contains(name.name()) -> new ParamRef(name.name(), name.annotations());
-            case ApplicationRef application -> new ApplicationRef(application.name(),
-                    application.arguments().stream().map(argument -> scoped(argument, declared)).toList(),
-                    application.annotations(), application.closure());
-            default -> reference;
-        };
+        return reference instanceof NameRef name && declared.contains(name.name())
+                ? new ParamRef(name.name(), name.annotations()) : reference;
     }
 
     private static AnnotatedMap<String, RecordField> scopedFields(AnnotatedMap<String, RecordField> fields,
@@ -238,13 +234,12 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
         return AnnotatedMap.copyOf(scoped);
     }
 
-    /** Refuses a {@link ParamRef} in {@code reference}, at any depth, that {@code declared} does not hold. */
+    /** Refuses {@code reference} where it is a {@link ParamRef} {@code declared} does not hold. */
     private static void requireDeclared(TypeRef reference, Set<String> declared) {
         if (reference instanceof ParamRef parameter && !declared.contains(parameter.name())) {
             throw new IllegalArgumentException("'" + parameter.name() + "' stands as a parameter, and the record "
                     + (declared.isEmpty() ? "declares none" : "declares " + declared));
         }
-        reference.arguments().forEach(argument -> requireDeclared(argument, declared));
     }
 
     /** The name type's name, for a message: the one stated, or {@link #FIELD_NAME}. */

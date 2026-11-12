@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
@@ -19,7 +20,7 @@ interface ApplicationCloser {
      * head that takes no parameters; one whose head names nothing is left for the linker. An application of an open
      * record at a refinement source is absorbed by value and never reaches here.
      */
-    String closeApplication(TypeRef application);
+    String closeApplication(ApplyBody application);
 
     /**
      * §5.10's call-site check, for an application absorbed <b>by value</b> rather than closed: each argument must
@@ -48,7 +49,7 @@ interface ApplicationCloser {
      * kernel bootstrap and the tests over hand-built namespaces keep passing a lambda and keep the
      * reference shape.
      */
-    default Top closeApplicationInto(String declaredName, TypeRef application) {
+    default Top closeApplicationInto(String declaredName, ApplyBody application) {
         return null;
     }
 }

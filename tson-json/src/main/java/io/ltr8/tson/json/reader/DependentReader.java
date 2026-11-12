@@ -1,6 +1,6 @@
 package io.ltr8.tson.json.reader;
 
-import io.ltr8.tson.atom.AtomParseException;
+import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.json.JsonReadContext;
@@ -59,8 +59,6 @@ final class DependentReader implements JsonTypeReader<Object> {
         switch (named) {
             case TypeInline inline -> refusal = "the dependent type '" + inline.text()
                     + "', which names a field and no type";
-            case TypeRef reference when !reference.arguments().isEmpty() -> refusal = "'" + reference.text()
-                    + "', an application, where a value names the entry declared for one";
             case TypeRef reference -> {
                 entry = reference.name();
                 Top body = AliasChain.terminal(context.schema(), entry).map(AliasChain.Resolved::definition)
@@ -88,7 +86,7 @@ final class DependentReader implements JsonTypeReader<Object> {
         }
         try {
             return ReferenceGrammar.parse(text);
-        } catch (AtomParseException e) {
+        } catch (AtomTypeException e) {
             return null;
         }
     }

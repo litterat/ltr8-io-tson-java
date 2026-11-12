@@ -122,8 +122,8 @@ record, or a template named bare at a position.
    head of an application.
 2. `C<args>` over a constructor is construction sugar: `!C { f1: a1 … }` over its required fields typed by a
    reference naming types, in declaration order, as `[T]` and `{K => V}` already are.
-3. At a reference slot of a schema document `H<args>` is a reference, substituting where `H` is an open record and
-   constructing where it is a constructor. In a data document a reference is a name.
+3. At a type slot of schema source `H<args>` is an application, the construction `meta.apply` in place, substituting
+   where `H` is an open record and constructing where it is a constructor. A reference is a name.
 
 What follows from them: no value parameters, no derived bounds, no template named as a type, no template over a body
 that is not a record, and no `meta.template` or `meta.record_template`.
@@ -142,21 +142,23 @@ that is not a record, and no `meta.template` or `meta.record_template`.
 - *§5.10, bounds: written, never inherited.* A parameter's bound is what its declaration writes, `<T: text>`, and is
   otherwise absent; nothing about a parameter is inferred from its uses, so a parameter is known in full at its
   declaration and no fixed point runs across templates. A parameter passed as an argument to a bounded parameter of
-  another template is written with a bound that IS-A that one, wherever it is an argument: a field type, an
-  application nested in one or inside container sugar (`[boxed<T>]`, the reference `meta.array<boxed<T>>`), an
-  applied parent. With `boxed => <T: text> { v: T }`, `rebox => <T: text> { b: boxed<T> }`
-  and `<T: non_empty_text>` resolve, `rebox => <T> { b: boxed<T> }` is a resolver error at `rebox` naming `boxed`'s
-  `T: text`, and `<T: int32>` stays refused. An imported template's recorded bound binds the same way, being the
-  one its author wrote. A parameter passed to a constructor's slot (`<K> { m: {K => text} }`) needs no
-  bound: the slot judges the argument that arrives when the record is applied. A closed argument is judged against
-  the written bound as before; one in an application closed while declarations are still being made ready is judged
-  once every declaration is, since an argument is a name at a type position and orders nothing (§3.4.1), and is
+  another template is written with a bound that IS-A that one, wherever it is an argument: a field type, an application
+  nested in one or inside a type written in place (`[boxed<T>]`), an applied parent. With `boxed => <T: text> { v: T }`,
+  `rebox => <T: text> { b: boxed<T> }` and `<T: non_empty_text>` resolve, `rebox => <T> { b: boxed<T> }` is a resolver
+  error at `rebox` naming `boxed`'s `T: text`, and `<T: int32>` stays refused. An imported template's recorded bound
+  binds the same way, being the one its author wrote. A parameter passed to a constructor's slot (`<K> { m: {K => text}
+  }`) needs no bound: the slot judges the argument that arrives when the record is applied. A closed argument is judged
+  against the written bound as before; one in an application closed while declarations are still being made ready is
+  judged once every declaration is, since an argument is a name at a type position and orders nothing (§3.4.1), and is
   reported at the declaration that wrote it.
 - *§4.2, an application in a data document: running.* In a data document a value at a reference-typed slot is a
   name. One carrying an argument list is a validation error whether or not the schema's closure closed that
   application, in both encodings: a constraint violation of the reference atom, whose message gives the remedy, the
-  entry the schema declares for the application. A schema document and a resolved form still hold applications, the
-  resolved form being read as one because its reader is told so. The lookup of an application in data against the
+  entry the schema declares for the application. In a schema document too a value carrying an argument list is refused,
+  a resolver error naming how an application is written: an application is the construction `meta.apply` written in
+  place, `{ of: !meta.apply { head: box  arguments: [T] } }`, which `box<T>` at a type slot of schema source is, and
+  which resolved output holds only inside an open record over one of its parameters, `@meta.application` holding the
+  same record. The lookup of an application in data against the
   closure's applications is gone, and a refusal's list of admitted names leaves out minted entries. [TSON-JSON]
   §1.6, §5 and §5.6 are edited to match. Left as it was: data may still write a minted entry's internal name.
 - *§5.3, construction sugar: running.* At a type position of a schema document, `C<a1 … an>` where `C` resolves
@@ -240,38 +242,38 @@ never the template's own name. `abstract` and the selectors on a template are ea
 resolver error", and delete the family/abbreviation split in ¶952, ¶1001's "a family base is reached by a position",
 the record-template half of ¶1003 and of §8.1 ¶1457, and §4.2's `kind<record_template>`.
 
-For a template as an open record, replace ¶954, ¶958 and ¶1003 with: "**An open record is a record with
-parameters.** `<T, U: bound>` before a record body -- braces, a composition or a refinement -- declares its
-parameters, each a name standing at a field's type, or as an argument of an application there or in a parent, and
-nowhere else: a field's value is never a parameter. There a parameter is a reference value: inside an open record a
-reference is a name, an application or one of the record's parameters, looked up before the
-namespace (the shadowing rule). The slot judges the argument that arrives there when the record is applied. So the
-body is read at the declaration against `record`'s own vocabulary. A reference names an open record only as the head
-of an application (§5.10, "A template is not a type"); only `record` carries parameters. **At a reference slot of a
-schema document, `H<args>` is a reference.** Resolving it substitutes where `H` is an open record -- binding the names
-it writes and filling the slots they mark -- and constructs where `H` is a constructor (§5.3). It supplies every
-argument, so there is no partial application, and `void` is an argument like any type. In a data document a
-reference is a name, and an application is a validation error (§4.2). With every argument closed it resolves at
-once, to the declaration that names it or its expansion (§8.2); with a parameter among its arguments, an open
-record's is held as written until the open record holding it is applied, and a constructor's is its construction in
-place. The result is a value of the body's constructor and a type. Its IS-A edges are a substituted record's parents,
-or none for a construction; the head is never one. An argument is judged against the parameter's written bound, or
-for a constructor's field against the slot's `of`. **A form over a parameter is written in place.** Inside an open
-record a parameter stands at any slot naming a type of a type written in place, at any depth, and is replaced when
-the record is applied: `[T; 1..]`, `[T?]`, `[T, text]`, `( T | error )` and `{ cursor: T }` are each the construction
-their sugar denotes, and a constructor's application over a parameter is its construction in place. A choice over a
-parameter is judged where each application closes (§5.4)." Replace ¶1017-1024 with: "**No alias templates.** A
-template's body is a record body; a body that is a bare reference -- `<B> pair<uuid, B>`, `<T> T` -- is a resolver
-error. A use site writes the application it means." Then delete ¶986 ("Declaration-time checking splits …") with its
-stand-in-value prohibition, most of ¶988 ("Where a deferred diagnostic lands"), the example block at ¶994-997, §8.2
-¶1535's "parsed held body" and its identity clause for open synthetic entries, §5.3's open half of the lift rule, every
-mention of `meta.template` in §8.1, and narrow §12.1's `type-def` alternative `[type-params] type-expr` to a record
-body; and in §13.1 and the kernel's companion text replace `template`, `template_param`, `record_template`,
-`record_template_field`, `record_template_field_map`, `tuple1` and `voidable_tuple1` with `record.parameters` and
-`param`, `meta.ref` with the refined constructor and the root's `set` with an alias of `meta.set_type`. The spec's own
-examples that need a record body move to one: `result => <T> ( T | error )` becomes a discriminated family (`result_of
-=> <T> result & { value?: T }`), and §5.10.1's and §8.2's `nested => <T> ( T | [nested<T>] )` becomes a record, `nested
-=> <T> { value?: T  more?: [nested<T>] }`.
+For a template as an open record, replace ¶954, ¶958 and ¶1003 with: "**An open record is a record with parameters.**
+`<T, U: bound>` before a record body -- braces, a composition or a refinement -- declares its parameters, each a name
+standing at a field's type, or as an argument of an application there or in a parent, and nowhere else: a field's value
+is never a parameter. There a parameter is a reference value: inside an open record a reference is a name, an
+application or one of the record's parameters, looked up before the namespace (the shadowing rule). The slot judges the
+argument that arrives there when the record is applied. So the body is read at the declaration against `record`'s own
+vocabulary. A reference names an open record only as the head of an application (§5.10, "A template is not a type");
+only `record` carries parameters. **At a type slot of schema source, `H<args>` is an application, the construction
+`meta.apply` written in place.** Resolving it substitutes where `H` is an open record -- binding the names it writes and
+filling the slots they mark -- and constructs where `H` is a constructor (§5.3). It supplies every argument, so there is
+no partial application, and `void` is an argument like any type. In a data document a reference is a name, and an
+application is a validation error (§4.2). With every argument closed it resolves at once, to the declaration that names
+it or its expansion (§8.2); with a parameter among its arguments, an open record's is the construction `meta.apply`
+written in place until the open record holding it is applied, and a constructor's is its construction in place. The
+result is a value of the body's constructor and a type. Its IS-A edges are a substituted record's parents, or none for a
+construction; the head is never one. An argument is judged against the parameter's written bound, or for a constructor's
+field against the slot's `of`. **A form over a parameter is written in place.** Inside an open record a parameter stands
+at any slot naming a type of a type written in place, at any depth, and is replaced when the record is applied: `[T;
+1..]`, `[T?]`, `[T, text]`, `( T | error )` and `{ cursor: T }` are each the construction their sugar denotes, and a
+constructor's application over a parameter is its construction in place. A choice over a parameter is judged where each
+application closes (§5.4)." Replace ¶1017-1024 with: "**No alias templates.** A template's body is a record body; a body
+that is a bare reference -- `<B> pair<uuid, B>`, `<T> T` -- is a resolver error. A use site writes the application it
+means." Then delete ¶986 ("Declaration-time checking splits …") with its stand-in-value prohibition, most of ¶988
+("Where a deferred diagnostic lands"), the example block at ¶994-997, §8.2 ¶1535's "parsed held body" and its identity
+clause for open synthetic entries, §5.3's open half of the lift rule, every mention of `meta.template` in §8.1, and
+narrow §12.1's `type-def` alternative `[type-params] type-expr` to a record body; and in §13.1 and the kernel's
+companion text replace `template`, `template_param`, `record_template`, `record_template_field`,
+`record_template_field_map`, `tuple1` and `voidable_tuple1` with `record.parameters` and `param`, `meta.ref` with the
+refined constructor and the root's `set` with an alias of `meta.set_type`. The spec's own examples that need a record
+body move to one: `result => <T> ( T | error )` becomes a discriminated family (`result_of => <T> result & { value?: T
+}`), and §5.10.1's and §8.2's `nested => <T> ( T | [nested<T>] )` becomes a record, `nested => <T> { value?: T  more?:
+[nested<T>] }`.
 
 ## 4. [TSON-SCHEMA] §5.4, §5.2 — a tag at a choice names a variant; a choice with an abstract variant has no values
 
@@ -379,7 +381,8 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   is refused. An abstract open record applied in place closes to an abstract record nothing is a member of.
   Inside an open record a constructor's application over a parameter is its construction in place at the declaration,
   one nested in another constructor's arguments included (`meta.map<text meta.array<T>>`), and an open record's is
-  held as written, at a field's type or at a slot of a type written there, until the record is applied.
+  `meta.apply` written in place, at a field's type, at a slot of a type written there or among `chain.parents`, until
+  the record is applied.
 - *Recursion.* A recursive application closing a declaration ties to it: `node_text => node<text>` over `node => <T>
   { value: T  next?: node<T> }` holds `next: node_text`. Mutual recursion through records in place ties the same way:
   closing `a_text => a<text>` over `a => <T> { b: b<T> }` and `b => <T> { a?: a<T> }` closes `b` in place, whose

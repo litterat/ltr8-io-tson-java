@@ -374,10 +374,10 @@ public final class TsonDataStream implements TsonEventSource {
      * token that is no qualified name is no argument ([TSON-SCHEMA] §5.10). Assembled whole, so the stream delivers
      * one value.
      */
-    private io.ltr8.tson.schema.meta.TypeRef referenceArguments(Token head) {
+    private ReferenceGrammar.Spelled referenceArguments(Token head) {
         requireQualifiedName(head);
         advance(); // '<'
-        List<io.ltr8.tson.schema.meta.TypeRef> arguments = new ArrayList<>();
+        List<ReferenceGrammar.Spelled> arguments = new ArrayList<>();
         if (check(TokenType.GREATER_THAN)) {
             throw parseError("an argument list holds at least one argument, and '" + head.text() + "<>' holds none");
         }
@@ -386,10 +386,10 @@ public final class TsonDataStream implements TsonEventSource {
             arguments.add(referenceArgument());
         }
         expect(TokenType.GREATER_THAN, "a reference's closing '>'");
-        return io.ltr8.tson.schema.meta.TypeRef.of(head.text(), arguments);
+        return new ReferenceGrammar.Spelled(head.text(), arguments);
     }
 
-    private io.ltr8.tson.schema.meta.TypeRef referenceArgument() {
+    private ReferenceGrammar.Spelled referenceArgument() {
         Token t = peekToken();
         switch (t.type()) {
             case UNQUOTED -> {
@@ -399,7 +399,7 @@ public final class TsonDataStream implements TsonEventSource {
                     throw new ParseException("'" + t.text() + "' is no argument: a reference's argument is a "
                             + "reference, a qualified name or an application, and never a literal token", t.start());
                 }
-                return applied ? referenceArguments(t) : io.ltr8.tson.schema.meta.TypeRef.of(t.text());
+                return applied ? referenceArguments(t) : new ReferenceGrammar.Spelled(t.text(), List.of());
             }
             case SINGLE_LINE_STRING, MULTI_LINE_STRING -> throw new ParseException("a quoted token is no argument: "
                     + "a reference's argument is a reference, a qualified name or an application", t.start());

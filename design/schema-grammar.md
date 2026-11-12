@@ -43,13 +43,13 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **`extends TsonDataParser`, same package** — §12.1 imports Part 1's `annotation`/`data-value`/directive
   grammar directly, so `TsonSchemaParser` calls straight into package-private methods rather than
   re-implementing them, adding only the schema-only tokens (`~ ^ & | ( ) < > ? ; -`).
-- **The AST names a reference as the model does** (`ast.schema`). A reference is a `TypeRef`, sealed over `NameRef`
-  and `ApplicationRef` — the shape of `schema.meta`'s `TypeRef` and of `meta.tn`'s `meta.type_ref`, so one name means
-  one thing in the AST, the resolved model and the kernel. The structural forms are expressions, not references:
-  `ChoiceExpr`, `ArrayExpr`, `TupleExpr`, `MapExpr`. `TypeExpr` is any of them, a reference or a structural form, and is
-  what §12.1's `type-expr` production parses to. A slot the grammar holds to a reference is typed by it:
-  `MapExpr.keyType` and `RefinedDef.target` are a `TypeRef` (`parseTypeRefHead`). `kind!` is no reference: a
-  `DependentType`, a `FieldTypeExpr` beside `TypeExpr`.
+- **The AST names a reference as the grammar writes it** (`ast.schema`). A reference is a `TypeRef`, sealed over
+  `NameRef` and `ApplicationRef`. The model's `TypeRef` is a name only: resolution turns an `ApplicationRef` into the
+  construction `meta.apply` (`ApplyBody`), since an application is sugar for it. The structural forms are expressions,
+  not references: `ChoiceExpr`, `ArrayExpr`, `TupleExpr`, `MapExpr`. `TypeExpr` is any of them, a reference or a
+  structural form, and is what §12.1's `type-expr` production parses to. A slot the grammar holds to a reference is
+  typed by it: `MapExpr.keyType` and `RefinedDef.target` are a `TypeRef` (`parseTypeRefHead`). `kind!` is no
+  reference: a `DependentType`, a `FieldTypeExpr` beside `TypeExpr`.
 - **The header is the data grammar's; the root's tag is this parser's rule.** `SchemaDocument(id, imports, body)`
   takes its `!!id` and `!!import`s off the stream's `DocumentStart`, then reads the root's annotations and requires
   the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's root `schema`, an

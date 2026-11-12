@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -59,7 +60,7 @@ final class HeldRecursion {
     }
 
     /** One application of an open record held where it closes in place, under the field holding it. */
-    private record Held(String field, boolean whole, TypeRef written, String head) {
+    private record Held(String field, boolean whole, ApplyBody written, String head) {
     }
 
     /**
@@ -134,57 +135,29 @@ final class HeldRecursion {
         return found;
     }
 
-    private void heldIn(String field, RecordField declared, List<Held> found) {
-        switch (declared.type()) {
-            case TypeRef reference -> atSlot(field, true, reference, found);
-            case TypeInline inline -> TypeSlots.mapBody(inline.of(), new TypeSlots.Rewrite() {
-                @Override
-                public TypeRef atName(TypeRef reference) {
-                    return reference;
-                }
-
-                @Override
-                public TypeExpr atSlot(TypeRef reference) {
-                    HeldRecursion.this.atSlot(field, false, reference, found);
-                    return reference;
-                }
-            });
-        }
-    }
-
     /**
-     * An application at a type slot: an open record's is held, its arguments being names; a constructor's lands each
-     * argument at a slot of the construction, and one at a type slot closes there in turn.
+     * Every application of an open record {@code declared}'s type holds, at any depth of types written in place: one
+     * where it closes in place once the record holding it is applied. A constructor's application holding one is its
+     * construction, the application at its slot.
      */
-    private void atSlot(String field, boolean whole, TypeRef reference, List<Held> found) {
-        if (reference.arguments().isEmpty()) {
-            return;
-        }
-        String head = AliasChain.terminal(reference.name(), lookup);
-        Top definition = lookup.apply(head);
-        if (OpenEntry.isOpen(definition)) {
-            found.add(new Held(field, whole, reference, head));
-            return;
-        }
-        if (!ConstructionSugar.constructs(head, definition)) {
-            return;
-        }
-        List<Boolean> inPlace = ConstructionSugar.slotsInPlace((RecordBody) definition, lookup);
-        for (int i = 0; i < reference.arguments().size(); i++) {
-            if (i < inPlace.size() && inPlace.get(i)) {
-                atSlot(field, false, reference.arguments().get(i), found);
+    private void heldIn(String field, RecordField declared, List<Held> found) {
+        TypeSlots.applications(declared.type(), application -> {
+            String head = AliasChain.terminal(application.head().name(), lookup);
+            if (OpenEntry.isOpen(lookup.apply(head))) {
+                boolean whole = declared.type() instanceof TypeInline inline && inline.of() == application;
+                found.add(new Held(field, whole, application, head));
             }
-        }
+        });
     }
 
     private static SchemaValidationException refused(String name, List<String> parameters, Held held) {
         String parameter = fresh(parameters);
         boolean closed = held.written().arguments().stream()
-                .noneMatch(argument -> argument.arguments().isEmpty() && parameters.contains(argument.name()));
+                .noneMatch(argument -> argument instanceof TypeRef named && parameters.contains(named.name()));
         String declared = closed
                 ? TemplateMaterialiser.suggestedName(held.written()) + " => " + held.written().text()
-                : "my_" + held.written().segments().getLast() + " => " + TypeRef.of(held.written().name(),
-                        held.written().arguments().stream().map(argument -> TypeRef.of("...")).toList()).text();
+                : "my_" + held.written().head().segments().getLast() + " => " + held.written().head().name() + "<"
+                        + String.join(" ", held.written().arguments().stream().map(argument -> "...").toList()) + ">";
         String spelled = held.written().text();
         String written = held.whole() ? "write '" + held.field() + ": " + parameter + "', '" + parameter + "' a parameter"
                 + " of '" + name + "'" : "write a parameter '" + parameter + "' of '" + name + "' where '" + spelled

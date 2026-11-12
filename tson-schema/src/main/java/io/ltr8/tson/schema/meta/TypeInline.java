@@ -26,6 +26,8 @@ import java.util.function.Function;
  *       meta.ref});</li>
  *   <li>a closed {@link RecordBody}, under {@code meta.record}: the record an application of an open record closes to
  *       at a type slot ([TSON-SCHEMA] §5.10), or one a resolved form states.</li>
+ *   <li>an {@link ApplyBody}, {@code meta.apply}, an application written in place, which in resolved output stands
+ *       only inside an open record, over one of its parameters;</li>
  *   <li>a {@link DependentBody}, {@code meta.dependent}, which is written in place only, and only directly at a record
  *       field's type ({@link #dependentOn}): a variable bound by that record, so equal text in two records is two
  *       types.</li>
@@ -53,7 +55,7 @@ import java.util.function.Function;
  * box<int32>} and {@code crate<int32>} closing to one field list are one.
  */
 @Typename(name = "meta.type_inline")
-public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef application)
+public record TypeInline(@Unbound String constructor, Type of, @Unbound ApplyBody application)
         implements TypeExpr {
 
     private static final String RECORD = "meta.record";
@@ -78,7 +80,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
     }
 
     /** The record {@code application}, written as it was, closes to in place ([TSON-SCHEMA] §5.10). */
-    public static TypeInline closing(TypeRef application, RecordBody record) {
+    public static TypeInline closing(ApplyBody application, RecordBody record) {
         return new TypeInline(RECORD, record, Objects.requireNonNull(application, "application"));
     }
 
@@ -107,10 +109,11 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
      * A type in place has no name: nothing composes it or applies it.
      */
     public Optional<String> refusal() {
-        if (!constructible(of) && !(of instanceof DependentBody) && !(of instanceof RecordBody)) {
+        if (!constructible(of) && !(of instanceof DependentBody) && !(of instanceof RecordBody)
+                && !(of instanceof ApplyBody)) {
             return Optional.of("'!" + constructor + " { ... }' is written in place, and only a container, a tuple, a "
-                    + "choice, a reference, a dependent type or a record is: an enum, an atom and a namespace type "
-                    + "are declared and named");
+                    + "choice, a reference, a dependent type, a record or an application is: an enum, an atom and a "
+                    + "namespace type are declared and named");
         }
         String form = (of instanceof RecordBody ? "the record written in place '" : "the type written in place '")
                 + text() + "'";
@@ -131,7 +134,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
     }
 
     /** The application this record in place closes, as written, where it is known. */
-    public Optional<TypeRef> closes() {
+    public Optional<ApplyBody> closes() {
         return Optional.ofNullable(application);
     }
 
@@ -192,6 +195,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
         return switch (of) {
             case RecordBody record -> application != null ? application.text() : fields(record, slot);
             case DependentBody dependent -> dependent.text();
+            case ApplyBody apply -> apply.text();
             case ArrayBody array when constructor.equals("meta.array") -> "[" + slot.apply(array.elementType())
                     + (array.voidable() ? "?" : "") + size(array.minItems(), array.maxItems()) + "]";
             case MapBody map when constructor.equals("meta.map") -> "{" + slot.apply(map.keyType()) + " => "

@@ -87,7 +87,8 @@ class ClosedBodyReferencesTest {
     @Test
     void aNamespaceTypesValueTypeClosesItsApplication() {
         TsonCompiledSchema compiled = compiled("""
-                api => !meta.namespace { key_type: meta.identifier  value_type: box<text> }
+                api => !meta.namespace { key_type: meta.identifier
+                                         value_type: { of: !meta.apply { head: box  arguments: [text] } } }
                 use => { f: api }""");
 
         NamespaceBody api = assertInstanceOf(NamespaceBody.class, compiled.schema().entries().get("api"));

@@ -356,8 +356,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         static TsonTypeReader<?> declared(TsonTypeReaderResolver resolver, ValueReaderContext context, String name,
                                           RecordField field) {
             return switch (field.type()) {
-                case TypeRef type when !type.arguments().isEmpty() -> new UnclosedApplicationReader(name, type);
                 case TypeRef type -> resolver.resolve(type.name());
+                case io.ltr8.tson.schema.meta.TypeInline inline
+                        when inline.of() instanceof io.ltr8.tson.schema.meta.ApplyBody apply ->
+                        new UnclosedApplicationReader(name, apply);
                 case io.ltr8.tson.schema.meta.TypeInline inline when inline.dependentOn().isPresent() ->
                         new DependentFieldReader(name, inline.dependentOn().get(), resolver, context);
                 case io.ltr8.tson.schema.meta.TypeInline inline -> resolver.resolve(inline);

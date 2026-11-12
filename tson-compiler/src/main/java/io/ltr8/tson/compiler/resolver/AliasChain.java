@@ -69,7 +69,7 @@ public final class AliasChain {
             if (current.equals(target)) {
                 return true;
             }
-            if (entries.get(current) instanceof Alias alias && alias.target().arguments().isEmpty()) {
+            if (entries.get(current) instanceof Alias alias) {
                 current = alias.target().name();
                 continue;
             }
@@ -117,7 +117,7 @@ public final class AliasChain {
             if (definition == null) {
                 return new Stop(current, false);
             }
-            if (definition instanceof Alias alias && alias.target().arguments().isEmpty()) {
+            if (definition instanceof Alias alias) {
                 current = alias.target().name();
                 continue;
             }

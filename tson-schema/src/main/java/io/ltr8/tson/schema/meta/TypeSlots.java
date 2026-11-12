@@ -37,13 +37,22 @@ public final class TypeSlots {
         default Type inPlace(Type body) {
             return body;
         }
+
+        /**
+         * A type written in place, met after its slots are walked, which may come back as another type in its stead:
+         * how an application written in place closes where it stands.
+         */
+        default TypeExpr atInPlace(TypeInline inline) {
+            return inline;
+        }
     }
 
     /** What a type slot holds with {@code rewrite} applied: a name rewritten, a type written in place walked into. */
     public static TypeExpr map(TypeExpr type, Rewrite rewrite) {
         return switch (type) {
             case TypeRef reference -> rewrite.atSlot(reference);
-            case TypeInline inline -> inline.withOf((Type) mapBody(rewrite.inPlace(inline.of()), rewrite));
+            case TypeInline inline -> rewrite.atInPlace(inline.withOf((Type) mapBody(rewrite.inPlace(inline.of()),
+                    rewrite)));
         };
     }
 
@@ -55,6 +64,24 @@ public final class TypeSlots {
     /** Every reference {@code body}'s slots hold, its chain left out; {@link #forEach} over each. */
     public static void forEachIn(Top body, Consumer<TypeRef> visit) {
         mapBody(body, visitor(visit));
+    }
+
+    /** Every application written in place in {@code type}, at any depth, an outer one before those it holds. */
+    public static void applications(TypeExpr type, Consumer<ApplyBody> visit) {
+        map(type, new Rewrite() {
+            @Override
+            public TypeRef atName(TypeRef reference) {
+                return reference;
+            }
+
+            @Override
+            public Type inPlace(Type body) {
+                if (body instanceof ApplyBody apply) {
+                    visit.accept(apply);
+                }
+                return body;
+            }
+        });
     }
 
     private static Rewrite visitor(Consumer<TypeRef> visit) {
@@ -91,6 +118,10 @@ public final class TypeSlots {
             case DeclaredType declared -> declared;
             // `on` names a field of the enclosing record, which no rewrite of type names touches.
             case DependentBody dependent -> dependent;
+            // `head` holds a name. An argument is a name in resolved output, and while a schema resolves it may be an
+            // application written in place, which a constructor's construction lands at a type slot: a type slot.
+            case ApplyBody apply -> new ApplyBody(apply.chain(), rewrite.atName(apply.head()),
+                    apply.arguments().stream().map(argument -> map(argument, rewrite)).toList());
             // A value is data: a name it holds is judged at link against the closure.
             case ValueEntry value -> value;
         };

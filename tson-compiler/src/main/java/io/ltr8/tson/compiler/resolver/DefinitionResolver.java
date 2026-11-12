@@ -34,6 +34,7 @@ import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -1444,16 +1445,12 @@ final class DefinitionResolver {
      * text_list => [text]} is the entry), so one that <em>denotes</em> a type obeys the same rule.
      */
     private Top resolveTemplateApplication(String name, ApplicationRef generic) {
-        List<io.ltr8.tson.schema.meta.TypeRef> arguments = new ArrayList<>();
-        for (TypeExpr arg : generic.args()) {
-            try {
-                arguments.add(resolveTypeRef(arg));
-            } catch (UnsupportedOperationException e) {
-                throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
-            }
+        ApplyBody target;
+        try {
+            target = application(generic);
+        } catch (UnsupportedOperationException e) {
+            throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
         }
-        io.ltr8.tson.schema.meta.TypeRef target =
-                io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), arguments);
         Optional<Top> constructed = construction(name, target);
         if (constructed.isPresent()) {
             return constructed.get();
@@ -1466,7 +1463,28 @@ final class DefinitionResolver {
                 return owned;
             }
         }
-        return new io.ltr8.tson.schema.meta.Alias(target);
+        throw unclosed(name, target);
+    }
+
+    /**
+     * Why a declaration naming {@code application} could not be closed into it: its head names nothing, takes no
+     * arguments, or takes another number of them (§5.10). The application has no entry to be in that case, so the
+     * verdict is given here rather than left to a later phase.
+     */
+    private SchemaValidationException unclosed(String name, ApplyBody application) {
+        String head = application.head().name();
+        Top definition = namespaceDefinitions.definition(Ancestry.templateHead(head, namespaceDefinitions));
+        if (definition == null) {
+            return new SchemaValidationException("'" + name + "' has an unresolved reference '" + head + "'");
+        }
+        List<String> parameters = OpenEntry.parameterNames(definition);
+        if (parameters.isEmpty()) {
+            return new SchemaValidationException("'" + head + "' declares no type parameters, so '" + head
+                    + "<...>' applies arguments to something that takes none (§5.10); drop the argument list");
+        }
+        return new SchemaValidationException("'" + head + "' takes " + parameters.size() + " type argument"
+                + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but " + application.arguments().size()
+                + " " + (application.arguments().size() == 1 ? "was" : "were") + " applied (§5.10)");
     }
 
     /**
@@ -1476,19 +1494,22 @@ final class DefinitionResolver {
      * and it records no application, since nothing was substituted. Empty where the head, past its alias hops, is
      * no constructor, for the template path to take.
      */
-    private Optional<Top> construction(String name, io.ltr8.tson.schema.meta.TypeRef application) {
+    private Optional<Top> construction(String name, ApplyBody application) {
         java.util.function.Function<String, Top> types = type -> {
             Top found = vocabularyDefinitions.definition(type);
             return found != null ? found : namespaceDefinitions.definition(type);
         };
-        String constructor = AliasChain.terminal(application.name(), types);
+        String head = application.head().name();
+        String constructor = AliasChain.terminal(head, types);
         Top definition = types.apply(constructor);
         if (!ConstructionSugar.constructs(constructor, definition)) {
             return Optional.empty();
         }
-        RecordValue payload = ConstructionSugar.payload(application, (RecordBody) definition, types);
-        return Optional.of(resolveInstance(name, new Instance(
-                new DataValue(List.of(), Optional.of(application.name()), payload))));
+        ConstructionSugar.StandIns standIns = ConstructionSugar.StandIns.of(application.arguments());
+        RecordValue payload = ConstructionSugar.payload(head, ConstructionSugar.slots((RecordBody) definition, types),
+                standIns.written());
+        return Optional.of(standIns.placed(resolveInstance(name, new Instance(
+                new DataValue(List.of(), Optional.of(head), payload)))));
     }
 
 
@@ -1516,7 +1537,7 @@ final class DefinitionResolver {
      * actually uses each parameter.
      */
     private Built resolveComposition(String name, ConstructionDef construction, List<String> parameters) {
-        List<io.ltr8.tson.schema.meta.TypeRef> directSupertypes = new ArrayList<>();
+        List<io.ltr8.tson.schema.meta.TypeExpr> directSupertypes = new ArrayList<>();
         // [TSON-SCHEMA] §5.2: a record's name type is set where it is declared, the kernel's default included,
         // and a composition takes its supertypes' one type: supertypes that disagree compose names of two types,
         // and choosing either would re-judge the other's names by a type they were never declared under.
@@ -1549,10 +1570,10 @@ final class DefinitionResolver {
                     // Closed: the arguments go in as the operand read them, since this channel is validated.
                     // Open: they stay as written, the argument being this declaration's own parameter, substituted
                     // when an application closes.
-                    directSupertypes.add(io.ltr8.tson.schema.meta.TypeRef.of(generic.name(),
+                    directSupertypes.add(new ApplyBody(io.ltr8.tson.schema.meta.TypeRef.of(generic.name()),
                             namesOwnParameter(generic, parameters)
                                     ? typeArguments(name, generic)
-                                    : operand.arguments()));
+                                    : operand.arguments()).inPlace());
                 }
                 absorb(name, operand.fields(), operand.groups(), fields, groups, seenFieldNames, inheritedFields);
                 // An applied operand states its template's name type, which every application keeps (§5.2).
@@ -1663,7 +1684,7 @@ final class DefinitionResolver {
         TypeChain chain = TypeChain.EMPTY;
         if (construction.removal().isEmpty()) {
             chain = TypeChain.of(transitiveSupertypes).withParents(parameters.isEmpty()
-                    ? directSupertypes.stream().filter(parent -> !parent.arguments().isEmpty()).toList()
+                    ? directSupertypes.stream().filter(io.ltr8.tson.schema.meta.TypeInline.class::isInstance).toList()
                     : directSupertypes);
         }
         return new Built(chain, fields, groups,
@@ -1845,8 +1866,9 @@ final class DefinitionResolver {
             // template itself.
             OpenOperand operand = openOperand(name, generic, parameters, "refinement source");
             return refineOnto(name, refined, parameters,
-                    io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), namesOwnParameter(generic, parameters)
-                            ? typeArguments(name, generic) : operand.arguments()),
+                    new ApplyBody(io.ltr8.tson.schema.meta.TypeRef.of(generic.name()),
+                            namesOwnParameter(generic, parameters) ? typeArguments(name, generic)
+                                    : operand.arguments()).inPlace(),
                     new ArrayList<>(operand.ancestors()), operand.fields(), operand.groups(), operand.nameType());
         }
         if (refined.target() instanceof NameRef simple) {
@@ -1907,7 +1929,7 @@ final class DefinitionResolver {
      * one rule and lives here once. {@code source} is the parent as written, what an open record keeps.
      */
     private Built refineOnto(String name, RefinedDef refined,
-            List<String> parameters, io.ltr8.tson.schema.meta.TypeRef source, List<String> transitiveSupertypes,
+            List<String> parameters, io.ltr8.tson.schema.meta.TypeExpr source, List<String> transitiveSupertypes,
             SequencedMap<String, BuiltField> sourceFields, List<FieldGroup> sourceGroups,
             Optional<String> nameType) {
         SequencedMap<String, BuiltField> fields = new LinkedHashMap<>(sourceFields);
@@ -1940,8 +1962,8 @@ final class DefinitionResolver {
         // one for SchemaResolver's fold, and a closed refinement of a name records it as a fact, since its chain
         // cannot tell `^` from a composition adding nothing (TsonSchema.EntryFacts).
         TypeChain chain = TypeChain.of(transitiveSupertypes);
-        if (parameters.isEmpty() && source.arguments().isEmpty()) {
-            facts.put(name, factsOf(name).withRefines(Optional.of(source.name())));
+        if (parameters.isEmpty() && source instanceof io.ltr8.tson.schema.meta.TypeRef named) {
+            facts.put(name, factsOf(name).withRefines(Optional.of(named.name())));
         } else {
             chain = chain.withParents(List.of(source));
         }
@@ -1963,7 +1985,7 @@ final class DefinitionResolver {
         if (target instanceof ApplicationRef generic) {
             // A construction is refused here, as at any slot that holds a name; any other application whose
             // head is no open record is the materialiser's to judge (ApplicationCloser#closeApplication).
-            return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, typeParams, "refinement source"));
+            return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, "refinement source"));
         }
         // Not a gap and not the author's error: the two shapes above are the two §12.1's `atom-refinement`
         // can produce, so a third means this resolver was handed a tree the grammar cannot build.
@@ -2133,25 +2155,32 @@ final class DefinitionResolver {
      * to the materialiser ({@link ApplicationCloser#closeApplication}). An application of an open record goes to
      * {@link #openOperand} instead, which absorbs its fields without closing anything.
      */
-    private String closedApplication(String name, ApplicationRef application, List<String> typeParams, String position) {
+    private String closedApplication(String name, ApplicationRef application, String position) {
         if (applicationCloser == null) {
             throw new UnsupportedOperationException("'" + name + "': closing the " + position + " '"
                     + application.name() + "<...>' needs a whole-schema materialiser, and this resolver was "
                     + "built without one");
         }
-        io.ltr8.tson.schema.meta.TypeRef resolved;
+        ApplyBody resolved;
         try {
-            resolved = io.ltr8.tson.schema.meta.TypeRef.of(application.name(), typeArguments(name, application));
+            resolved = application(application);
         } catch (UnsupportedOperationException e) {
             throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
         }
         return applicationCloser.closeApplication(resolved);
     }
 
+    /**
+     * The arguments of an application of an open record, each a name or a parameter ([TSON-SCHEMA] §5.3): an
+     * application or a sugar form there is refused, to be declared under a name first.
+     */
     private List<io.ltr8.tson.schema.meta.TypeRef> typeArguments(String name, ApplicationRef application) {
         List<io.ltr8.tson.schema.meta.TypeRef> args = new ArrayList<>();
         for (TypeExpr arg : application.args()) {
-            args.add(resolveTypeRef(arg));
+            if (!(argument(arg) instanceof io.ltr8.tson.schema.meta.TypeRef named)) {
+                throw TemplateMaterialiser.argumentNotAName(argument(arg), application(application));
+            }
+            args.add(named);
         }
         return args;
     }
@@ -2474,8 +2503,10 @@ final class DefinitionResolver {
                 });
         if (field.type().isPresent()) {
             io.ltr8.tson.schema.meta.TypeExpr type = resolveFieldType(field.name(), field.type().get().typeRef());
+            // An application is judged by what it closes to, once materialisation has closed it.
             if (value.isPresent() && type instanceof io.ltr8.tson.schema.meta.TypeInline inline
-                    && !(inline.of() instanceof io.ltr8.tson.schema.meta.ReferenceBody)) {
+                    && !(inline.of() instanceof io.ltr8.tson.schema.meta.ReferenceBody)
+                    && !(inline.of() instanceof ApplyBody)) {
                 // §5.2: a value is admitted at a field typed by an atom or an enum, and a type written in place is one
                 // only as a reference; a container, a tuple or a choice in place carries none, as a declared one
                 // carries none.
@@ -2630,18 +2661,30 @@ final class DefinitionResolver {
      * construction in place only at a field's type, and refuses one as an argument ({@link #unlifted}).
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeExpr ref) {
+        return switch (argument(ref)) {
+            case io.ltr8.tson.schema.meta.TypeRef named -> named;
+            case io.ltr8.tson.schema.meta.TypeInline applied -> throw TemplateMaterialiser.nameRequired(applied);
+        };
+    }
+
+    /**
+     * A type-ref at a slot that names a type or holds one written in place: a name, or an application, the
+     * construction {@link ApplyBody} written in place, its arguments each the same in turn. Resolution closes it where
+     * it can ({@code TemplateMaterialiser}).
+     */
+    private io.ltr8.tson.schema.meta.TypeExpr argument(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-            case ApplicationRef generic -> {
-                List<io.ltr8.tson.schema.meta.TypeRef> args = new ArrayList<>();
-                for (TypeExpr arg : generic.args()) {
-                    args.add(resolveTypeRef(arg));
-                }
-                yield io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), args);
-            }
+            case ApplicationRef generic -> application(generic).inPlace();
             case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, RecordExpr _, InlineConstruction _ ->
                     throw unlifted("a type-ref position", ref);
         };
+    }
+
+    /** {@code generic} as the application it writes: its head, and each argument as {@link #argument} reads it. */
+    private ApplyBody application(ApplicationRef generic) {
+        return new ApplyBody(io.ltr8.tson.schema.meta.TypeRef.of(generic.name()),
+                generic.args().stream().map(this::argument).toList());
     }
 
     /**
@@ -2655,7 +2698,7 @@ final class DefinitionResolver {
         return switch (ref) {
             case InlineConstruction inline -> inlineType(field, inline);
             case DependentType _ -> throw unlifted("field '" + field + "'", ref);
-            case TypeExpr type -> resolveTypeRef(type);
+            case TypeExpr type -> argument(type);
         };
     }
 
@@ -2668,7 +2711,9 @@ final class DefinitionResolver {
         // The head is made ready first, as a declaration's `!C { ... }` makes its own (§3.4.1): reading a value
         // against a type waits on the type.
         String constructor = resolveConstructorTarget("field '" + field + "'", inline.constructor()).name();
-        Top body = bindAtomInstance("field '" + field + "'", inline.value());
+        Map<String, io.ltr8.tson.schema.meta.TypeInline> standIns = new LinkedHashMap<>();
+        Top body = ConstructionSugar.StandIns.of(standIns).placed(bindAtomInstance("field '" + field + "'",
+                standingIn(field, inline.value(), standIns)));
         if (!(body instanceof io.ltr8.tson.schema.meta.Type type)
                 || !io.ltr8.tson.schema.meta.TypeInline.constructible(type)
                         && !(type instanceof io.ltr8.tson.schema.meta.DependentBody) && !(type instanceof RecordBody)) {
@@ -2678,6 +2723,52 @@ final class DefinitionResolver {
         }
         return new io.ltr8.tson.schema.meta.TypeInline(constructor,
                 ((Type) asWritten(type, inline.value())).withChain(io.ltr8.tson.schema.meta.TypeChain.EMPTY));
+    }
+
+    /**
+     * {@code written} with each argument written in place in an application it holds replaced by a stand-in name, the
+     * argument read and kept in {@code standIns}. The sugar writes an application at a slot in place, {@code [box<T>]},
+     * and a reference reads a name only, so an application nested as an argument, which a constructor's construction
+     * lands at its slot ({@code [meta.array<box<T>>]}), is read on its own and put back where the read placed it.
+     */
+    private DataValue standingIn(String field, DataValue written,
+                                 Map<String, io.ltr8.tson.schema.meta.TypeInline> standIns) {
+        boolean applies = written.typeRef().filter(KernelNames.of("apply")::equals).isPresent();
+        CoreValue core = switch (written.coreValue()) {
+            case RecordValue record -> new RecordValue(record.fields().stream().map(each -> new RecordValue.Field(
+                    each.name(), applies && "arguments".equals(each.name())
+                            && each.value().coreValue() instanceof ArrayValue arguments
+                            ? new DataValue(each.value().annotations(), each.value().typeRef(), new ArrayValue(
+                                    arguments.elements().stream().map(argument -> argumentStandingIn(field, argument,
+                                            standIns)).toList()))
+                            : standingIn(field, each.value(), standIns))).toList());
+            case ArrayValue array -> new ArrayValue(array.elements().stream()
+                    .map(element -> standingIn(field, element, standIns)).toList());
+            case MapValue map -> new MapValue(map.entries().stream().map(entry -> new MapValue.MapEntry(entry.key(),
+                    standingIn(field, entry.value(), standIns))).toList());
+            default -> written.coreValue();
+        };
+        // The same value where nothing stood in, so what is keyed on it -- a field written in place -- still finds it.
+        return core.equals(written.coreValue()) ? written : new DataValue(written.annotations(), written.typeRef(), core);
+    }
+
+    /** One argument of an application: a name as it is, and one written in place read and stood in for. */
+    private DataValue argumentStandingIn(String field, DataValue argument,
+                                         Map<String, io.ltr8.tson.schema.meta.TypeInline> standIns) {
+        if (!(argument.coreValue() instanceof RecordValue wrapper)) {
+            return argument;
+        }
+        Optional<DataValue> of = member(wrapper, WireForm.OF);
+        if (of.isEmpty()) {
+            return argument; // no wrapper: the reader refuses it in its own words
+        }
+        Map<String, io.ltr8.tson.schema.meta.TypeInline> inner = new LinkedHashMap<>();
+        Top read = ConstructionSugar.StandIns.of(inner).placed(bindAtomInstance("field '" + field + "'",
+                standingIn(field, of.get(), inner)));
+        String standIn = "in_place_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        standIns.put(standIn, new io.ltr8.tson.schema.meta.TypeInline(((Type) read).withChain(
+                io.ltr8.tson.schema.meta.TypeChain.EMPTY)));
+        return new DataValue(List.of(), Optional.empty(), new TokenValue(standIn, TokenForm.UNQUOTED));
     }
 
     /**

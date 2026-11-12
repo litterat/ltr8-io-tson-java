@@ -33,6 +33,9 @@ public enum EntryKind {
             case Atom ignored -> ATOM;
             case Product ignored -> PRODUCT;
             case Sum ignored -> SUM;
+            // An application stands for a type that exists only once its open record is applied, so it has none.
+            case ApplyBody application -> throw new IllegalStateException("the application '" + application.text()
+                    + "' has no kind: it stands only inside an open record, written in place, and is no entry's value");
             case Alias ignored -> ALIAS;
 
             case ValueEntry ignored -> VALUE;

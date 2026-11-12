@@ -50,24 +50,15 @@ public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) imple
 
     @Override
     public TypeRef read(String text) {
-        TypeRef reference = ReferenceGrammar.parse(text);
-        if (reference.arguments().isEmpty()) {
-            // A name is read as the kernel's meta.type_name reads each segment, into its normalization form.
-            List<String> segments = new ArrayList<>(reference.segments().size());
-            for (String segment : reference.segments()) {
-                segments.add(IdentifierParser.IDENTIFIER.read(segment));
-            }
-            reference = TypeRef.of(String.join(".", segments));
+        TypeRef parsed = ReferenceGrammar.parse(text);
+        // A name is read as the kernel's meta.type_name reads each segment, into its normalization form.
+        List<String> segments = new ArrayList<>(parsed.segments().size());
+        for (String segment : parsed.segments()) {
+            segments.add(IdentifierParser.IDENTIFIER.read(segment));
         }
+        TypeRef reference = TypeRef.of(String.join(".", segments));
         if (!judgesMembers) {
             return reference;
-        }
-        if (!reference.arguments().isEmpty()) {
-            // A position rule: the value is well formed, and data names an entry.
-            throw new AtomValidationException("'" + reference.text() + "' is an application, and in a data document a "
-                    + "reference is a name ([TSON-SCHEMA] §4.2) -- name the entry the schema declares for it "
-                    + "(order_page => page<order>, then order_page); one of " + kind.shownMembers(),
-                    "one of (" + String.join(", ", kind.shownMembers()) + ")");
         }
         if (kind.memberNames().contains(reference.name())) {
             return reference.withClosure(kind.closure());

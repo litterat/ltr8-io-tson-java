@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.AnnotatedMap;
-import io.ltr8.tson.schema.meta.ApplicationRef;
+import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -36,19 +36,14 @@ final class Substitution {
     }
 
     /** {@code open}'s parents as written, each substituted -- closing completes the chain from them. */
-    static List<TypeRef> parents(RecordBody open, Map<String, TypeRef> bindings) {
-        return open.parents().stream().map(parent -> reference(parent, bindings)).toList();
+    static List<TypeExpr> parents(RecordBody open, Map<String, TypeRef> bindings) {
+        TypeSlots.Rewrite substitute = reference -> reference(reference, bindings);
+        return open.parents().stream().map(parent -> TypeSlots.map(parent, substitute)).toList();
     }
 
-    /** {@code ref} with every parameter in it replaced by its binding, at any depth. */
+    /** {@code ref}, or its binding where it is a parameter. */
     static TypeRef reference(TypeRef ref, Map<String, TypeRef> bindings) {
-        return switch (ref) {
-            case ParamRef parameter -> bound(parameter.name(), bindings);
-            case ApplicationRef application -> TypeRef.of(application.name(), application.arguments().stream()
-                    .map(argument -> reference(argument, bindings)).toList(), application.annotations(),
-                    application.closure());
-            default -> ref;
-        };
+        return ref instanceof ParamRef parameter ? bound(parameter.name(), bindings) : ref;
     }
 
     private static TypeRef bound(String parameter, Map<String, TypeRef> bindings) {
