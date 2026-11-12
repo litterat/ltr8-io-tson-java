@@ -197,9 +197,8 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
 
     /**
      * Every type reference this record holds, in its fields' {@code type}s and then its parents as written: the places
-     * a parameter stands, as a {@link ParamRef} itself or among an application's arguments. A sibling reference names
-     * a field, never a parameter or a type, so it is not among them; nor is a type written in place, which holds no
-     * parameter, a form over one being held as the application it spells.
+     * a parameter stands, as a {@link ParamRef} itself or among an application's arguments. A type written in place
+     * is not among them: it holds no parameter, a form over one being held as the application it spells.
      */
     public List<TypeRef> references() {
         return references(chain, fields);

@@ -25,10 +25,9 @@ JSON inputs are in `design/cli-config-hashing.md`.
   reading document's closure, whatever it imports (`AtomParsers.forType`). JSON has no unquoted form, so a string
   is read by `atom.ReferenceGrammar`, the production TSON reads unquoted, and judged as TSON judges it by the shared
   `TypeNameRefParser`: a data document's reference is a name, so a string holding an application, `"set<text>"`, is
-  refused (`ATOM_CONSTRAINT_VIOLATION`) whether or not the closure closes it ([TSON-JSON] §5.6). A sibling
-  reference's string, `"kind!"`, is read by the same production and admitted only where the reference's
-  `allow_sibling` admits it, a record field's type; elsewhere it is refused as a constraint the value breaks, as the
-  TSON reader refuses it ([TSON-JSON] §5.6). A tree read keeps the `JsonString` as written.
+  refused (`ATOM_CONSTRAINT_VIOLATION`) whether or not the closure closes it ([TSON-JSON] §5.6). A string holding
+  `kind!` spells no reference, schema-grammar sugar having no data form, and is refused as malformed
+  (`ATOM_FORM_INVALID`). A tree read keeps the `JsonString` as written.
 - A reference over a type that is no constructor (`meta.ref<order>`) is an atom too, read from a string holding a
   value's qualified name and judged by what it reaches in the governing schema, as the TSON reader judges it
   (`AtomParsers.forRead`, `RefParser` over the lookup the link left on the reference, `ReferenceBody.Values`). A

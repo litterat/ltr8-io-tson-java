@@ -175,7 +175,7 @@ Where schemas come from is one value, `SchemaAccess` — the source plus the `Fe
 
 `TsonValue` is a sealed interface over eight pure immutable node kinds — `TsonRecord`, `TsonMap`,
 `TsonArray`, `TsonTuple`, `TsonAtom`, `TsonReference`, `TsonVoid`, `TsonMissing` (no `Node` suffix,
-deliberately); `TsonReference` is itself sealed over `TsonApplicationReference` and `TsonSiblingReference`. **Every
+deliberately); `TsonReference` is itself sealed over `TsonApplicationReference`. **Every
 accessor is total — nothing throws.**
 
 | Call                                                     | Answers                                                         |
@@ -198,18 +198,16 @@ The token `null` is not absence — §4 resolves it to the string `null`, so it 
 **A reference with arguments is data grammar, written unquoted** (`set<text>`, `@meta.application:response<order 201>`;
 [TSON-DATA] §7.4). A schemaless read keeps one as a `TsonApplicationReference` — `segments()`, `arguments()` (each
 read by the ordinary rule: `201` a number, `text` a string, a nested application another `TsonApplicationReference`),
-`text()` for the canonical spelling — and resolves nothing, so it has no referent. A sibling reference, `kind!` (a record
-field's type taken from the field `kind` of the same record), is kept as a `TsonSiblingReference` (`field()`, `text()`). Both
-are a `TsonReference`, the references the grammar alone shows to be one; a bare name is a `TsonAtom`. Under a schema, a value
+`text()` for the canonical spelling — and resolves nothing, so it has no referent. It is a `TsonReference`, the
+reference the grammar alone shows to be one; a bare name is a `TsonAtom`. Under a schema, a value
 at a kind-typed position (`meta.ref<T>`, `meta.type_ref`) arrives in tree mode as an atom holding a `schema.meta.TypeRef`
 (`as(TypeRef.class)`), never a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names
 in the schema it was read under. In a data document that value is a name: an application there (`t: set<text>`) is refused
 (`ATOM_CONSTRAINT_VIOLATION`) whether or not the schema closes it, and the document names the entry the schema declares for
-it (`names => set<text>`, then `t: names`). A quoted `"set<text>"` there is text, a type mismatch. A record field's
-type (`meta.field_type_ref`, the reference whose `allow_sibling` is left true) may hold a sibling reference, read as a
-`schema.meta.SiblingRef`; every other reference refuses one. A position typed by a reference over a type that is no
-constructor (`meta.ref<order>`) holds a value's qualified name (`o1`, `book.first`), judged by what it reaches in the
-schema, and its `TypeRef`'s `referent()` is that value.
+it (`names => set<text>`, then `t: names`). A quoted `"set<text>"` there is text, a type mismatch. `kind!` is schema
+sugar for a dependent field's type and no data form: written in data it is a syntax error. A position typed by a
+reference over a type that is no constructor (`meta.ref<order>`) holds a value's qualified name (`o1`, `book.first`),
+judged by what it reaches in the schema, and its `TypeRef`'s `referent()` is that value.
 
 **A dependent field, `v?: kind!`, is read against the type its sibling names in each instance** (Part 2 §5.2): `{ kind:
 point  v: { x: 1  y: 2 } }`. Write a free sibling before its dependent field (a pinned or discriminator sibling may come

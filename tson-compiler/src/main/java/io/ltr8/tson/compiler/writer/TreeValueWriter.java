@@ -11,7 +11,6 @@ import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonMissing;
 import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.tree.TsonApplicationReference;
-import io.ltr8.tson.tree.TsonSiblingReference;
 import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -51,10 +50,6 @@ public final class TreeValueWriter {
             case TsonApplicationReference reference -> {
                 reference.typeRef().ifPresent(out::typeRef);
                 out.reference(reference(reference));
-            }
-            case TsonSiblingReference sibling -> {
-                sibling.typeRef().ifPresent(out::typeRef);
-                out.reference(io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field()));
             }
             case TsonVoid voidNode -> {
                 voidNode.typeRef().ifPresent(out::typeRef);
@@ -154,11 +149,6 @@ public final class TreeValueWriter {
             // A reference a schema-directed read delivered: written as the reference it is, unquoted.
             node.typeRef().ifPresent(out::typeRef);
             out.reference(reference);
-            return;
-        }
-        if (value instanceof io.ltr8.tson.schema.meta.SiblingRef sibling) {
-            node.typeRef().ifPresent(out::typeRef);
-            out.reference(sibling);
             return;
         }
         VocabularyAtoms.Entry vocab = vocabularyAtoms.get(value.getClass());

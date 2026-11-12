@@ -6,7 +6,7 @@ import java.util.Optional;
  * What a type slot holds, the kernel's {@code meta.type_expr}: a {@link TypeRef}, a name looked up in the closure, or a
  * {@link TypeInline}, a type written where it is used. It types {@link ArrayBody#elementType}, {@link
  * MapBody#valueType}, {@link NamespaceBody#valueType}, {@link TupleElement#elementType} and each of {@link
- * ChoiceBody#variants}; a record field's slot is the wider {@link FieldTypeExpr}.
+ * ChoiceBody#variants} and {@link RecordField#type}.
  *
  * <p>A consumer switches on the two: a name is looked up, and an inline type is the type. A name is string-class and
  * the wrapper brace-class, so the two are told apart by form when read ([TSON-SCHEMA] §5.4).

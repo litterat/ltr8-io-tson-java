@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.FieldTypeExpr;
+import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 
@@ -250,7 +250,7 @@ class TemplateIsNotATypeTest {
 
     // ── A field naming no parameter is one type in every application ───────
 
-    private static FieldTypeExpr fieldType(TsonLinkedSchema schema, String entry, String field) {
+    private static TypeExpr fieldType(TsonLinkedSchema schema, String entry, String field) {
         return switch (schema.schema().entries().get(entry)) {
             case RecordBody record -> record.fields().get(field).type();
             default -> throw new AssertionError(entry + " is no record");

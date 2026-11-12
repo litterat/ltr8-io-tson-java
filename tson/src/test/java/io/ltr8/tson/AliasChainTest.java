@@ -57,7 +57,7 @@ class AliasChainTest {
     /** A position naming something that is not an alias is unaffected, as it always was. */
     @Test
     void aNonAliasIsUnaffected() {
-        assertEquals("meta.field_type_expr", fieldType(kernelEntry("meta.record_field"), "type").name());
+        assertEquals("meta.type_expr", fieldType(kernelEntry("meta.record_field"), "type").name());
     }
 
     private static final String CHAIN = """

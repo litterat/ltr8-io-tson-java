@@ -108,7 +108,7 @@ that names values gets `namesTypes` false and no members.
   the kernel's `enum => meta.enum_type ^ { name_type?: = meta.identifier }` is a member at the kernel's link, a schema's pin
   of its own `text_identifier` at that schema's, and a pin of a text family is refused where it is written.
 - **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers.forRead`'s
-  `TypeNameRefParser`, an `AtomTypeParser<Reference>`): a name token, or a JSON string holding one, read into the
+  `TypeNameRefParser`, an `AtomTypeParser<TypeRef>`): a name token, or a JSON string holding one, read into the
   `TypeRef` it is and naming a member of the linked index. In a data document a reference is a name, so a reference
   with arguments, unquoted in text or in a JSON string, is refused whether or not the closure closes it
   (`design/references.md`). A name is judged as one name, its path from the root

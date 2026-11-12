@@ -5,8 +5,6 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.schema.meta.ApplicationRef;
 import io.ltr8.tson.schema.meta.NameRef;
-import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
@@ -17,10 +15,9 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * records the name for the linker), and the writers write a reference themselves; this serves a reference bound
  * from its text anywhere else, a JSON string's among them.
  *
- * <p><b>Each variant is an atom as well</b> ({@link ForName}, {@link ForApplication}, {@link ForSibling}): a value
- * written where no component declares its type -- an annotation's value, a value entry's -- is described by its own
- * class, which is the variant, never the interface. {@link ForReference} serves a component typed {@link Reference},
- * a record field's type.
+ * <p><b>Each variant is an atom as well</b> ({@link ForName}, {@link ForApplication}): a value written where no
+ * component declares its type -- an annotation's value, a value entry's -- is described by its own class, which is
+ * the variant, never the interface.
  */
 public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
 
@@ -77,48 +74,6 @@ public final class TypeRefTextBridge implements DataBridge<String, TypeRef> {
                 return application;
             }
             throw new AtomParseException("'" + text + "' is a name, not an application", "an application");
-        }
-    }
-
-    /**
-     * {@link Reference} as an atom host: the reference's text, which spells a name, an application or a sibling
-     * reference ({@link ReferenceGrammar#parseReference}).
-     */
-    public static final class ForReference implements DataBridge<String, Reference> {
-
-        /** The bridge; it holds nothing. */
-        public ForReference() {
-        }
-
-        @Override
-        public String toData(Reference reference) {
-            return reference.text();
-        }
-
-        @Override
-        public Reference toObject(String text) {
-            return ReferenceGrammar.parseReference(text);
-        }
-    }
-
-    /** {@link SiblingRef} as an atom host: the reference's text, which must spell a sibling reference. */
-    public static final class ForSibling implements DataBridge<String, SiblingRef> {
-
-        /** The bridge; it holds nothing. */
-        public ForSibling() {
-        }
-
-        @Override
-        public String toData(SiblingRef reference) {
-            return reference.text();
-        }
-
-        @Override
-        public SiblingRef toObject(String text) {
-            if (ReferenceGrammar.parseReference(text) instanceof SiblingRef sibling) {
-                return sibling;
-            }
-            throw new AtomParseException("'" + text + "' names a type, not a sibling field", "a sibling reference");
         }
     }
 }

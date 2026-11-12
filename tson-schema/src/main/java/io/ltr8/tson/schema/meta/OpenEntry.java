@@ -72,7 +72,7 @@ public final class OpenEntry {
      * empty where {@code type} means the same thing in every application, and so is closed already. A type written in
      * place holds no parameter: inside an open record a form over one is held as the application it spells.
      */
-    public static Optional<String> parameterIn(FieldTypeExpr type) {
+    public static Optional<String> parameterIn(TypeExpr type) {
         if (type instanceof ParamRef parameter) {
             return Optional.of(parameter.name());
         }

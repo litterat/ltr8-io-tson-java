@@ -1,14 +1,13 @@
 package io.ltr8.tson.compiler.ast;
 
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
  * A {@code reference} core-value ([TSON-DATA] §7.4) that is no bare name, as the stream
- * assembled it: a qualified name with its argument list, {@code pair<uuid B>}, or a sibling reference, {@code kind!}.
+ * assembled it: a qualified name with its argument list, {@code pair<uuid B>}.
  * A qualified name without arguments is a {@link TokenValue}. Uninterpreted like a token: what the head and its
  * arguments name is a reader's or the resolver's to judge, and {@code reference} holds each argument as the grammar
- * classified it, a qualified name a reference and any other token a value with its token form. A walk that rewrites
- * applications matches {@code ReferenceValue(TypeRef applied)}, and a sibling reference falls through it as written.
+ * classified it, a qualified name a reference and any other token a value with its token form.
  */
-public record ReferenceValue(Reference reference) implements CoreValue {
+public record ReferenceValue(TypeRef reference) implements CoreValue {
 }

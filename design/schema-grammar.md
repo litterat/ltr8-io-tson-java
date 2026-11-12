@@ -13,8 +13,9 @@ history lives in git.
 - `type-name = meta.identifier`: every declared name and type parameter is matched against `IdentifierProfile`; a type
   reference's head and a `!` head are each a `qualified-name`, each segment so matched, with an argument list's `<`
   adjacent to a reference's head (§12.3). Field names are the one naming position the parser leaves alone.
-- A sibling reference (`kind!`) parses wherever a type-ref does, its `!` adjacent and followed by whitespace; where it
-  may stand is §5.2's position rule, stated by the desugar phase, never by the parser.
+- `kind!` parses only as a record field's or a group member's type, its `!` adjacent and followed by whitespace; an
+  adjacent `!` after a name anywhere else is a parse error saying where the mark stands. The AST's type holds it:
+  only `FieldDef.FieldType` and `GroupDef.Member` take a `FieldTypeExpr`, every other slot a `TypeExpr`.
 - A document has one declaration map. `geo => !schema { … }` is a schema map nested as an entry: its members go into
   that map under their paths (`geo.address`), and `geo` itself is a `SchemaMapDef` of its members' own names.
 - `SchemaMap.declarations` is a `LinkedHashMap` and a duplicate name overwrites — the grammar layer doesn't dedupe.
@@ -39,13 +40,13 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **`extends TsonDataParser`, same package** — §12.1 imports Part 1's `annotation`/`data-value`/directive
   grammar directly, so `TsonSchemaParser` calls straight into package-private methods rather than
   re-implementing them, adding only the schema-only tokens (`~ ^ & | ( ) < > ? ; -`).
-- **The AST names a reference as the model does** (`ast.schema`). A reference is a `Reference`, sealed over `TypeRef`
-  and `SiblingRef`, and `TypeRef` over `NameRef` and `ApplicationRef` — the shape of `schema.meta`'s `Reference` and
-  of `meta.tn`'s `meta.type_ref`, so one name means one thing in the AST, the resolved model and the kernel. The
-  structural forms are expressions, not references: `ChoiceExpr`, `ArrayExpr`, `TupleExpr`, `MapExpr`. `TypeExpr` is
-  any of them, a reference or a structural form, and is what §12.1's `type-expr` production parses to. A slot the
-  grammar holds to a reference is typed by it: `MapExpr.keyType` and `RefinedDef.target` are a `Reference`
-  (`parseTypeRefHead`), a sibling there being the desugar phase's to refuse.
+- **The AST names a reference as the model does** (`ast.schema`). A reference is a `TypeRef`, sealed over `NameRef`
+  and `ApplicationRef` — the shape of `schema.meta`'s `TypeRef` and of `meta.tn`'s `meta.type_ref`, so one name means
+  one thing in the AST, the resolved model and the kernel. The structural forms are expressions, not references:
+  `ChoiceExpr`, `ArrayExpr`, `TupleExpr`, `MapExpr`. `TypeExpr` is any of them, a reference or a structural form, and is
+  what §12.1's `type-expr` production parses to. A slot the grammar holds to a reference is typed by it:
+  `MapExpr.keyType` and `RefinedDef.target` are a `TypeRef` (`parseTypeRefHead`). `kind!` is no reference: a
+  `DependentType`, a `FieldTypeExpr` beside `TypeExpr`.
 - **The header is the data grammar's; the root's tag is this parser's rule.** `SchemaDocument(id, imports, body)`
   takes its `!!id` and `!!import`s off the stream's `DocumentStart`, then reads the root's annotations and requires
   the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's root `schema`, an
@@ -90,14 +91,14 @@ materialization, no validation (those are the resolver's/linker's jobs).
   data grammar's is ([TSON-DATA] §7.5): `box <text>` is a parse error naming the rule; inside the list whitespace and commas
   are free. The schema grammar keeps a parser of its own for references rather than the data stream's, because its `type-arg`
   admits sugar (`box<[text]>`, `box<(text | int32)>`), which a data argument never holds.
-- **`sibling-ref` is a `type-expr` alternative** (§12.1; `parseTypeRefHead`,
-  `parseSiblingRef`): one token of lookahead after the name picks it, an adjacent `!` a sibling reference, an adjacent
-  `<` an application, neither a bare name. It becomes an `ast.schema.SiblingRef`, a `Reference` and so a `TypeExpr`, so
-  `[ kind! ]`, `box< kind! >`, `( kind! | text )`, `{ kind! => text }` (the brace dispatch takes an adjacent `!` after
-  the first name as a map key, as it does `<`) and `x => kind!` all parse. **The `!` is followed by whitespace**
-  (§12.3), so `[kind!]`, `kind!}`, `a!b` and `kind!?` are parse errors; the token is one identifier (`a.b!` is
-  refused), and a quoted token is never one (`"kind"!`). A `!` head is a qualified name, so `!int32!` is refused by
-  name in `parseAtomRefinementOrInstance`.
+- **`kind!` is read where a field's type is, and refused by name everywhere else** (§5.2, §12.1; `parseFieldType`,
+  `parseTypeRefHead`). `parseFieldType` takes an adjacent `!` after the first name as the mark; `parseTypeRefHead`,
+  which every other reference position reaches, refuses one with the message naming where it stands, so `[ kind! ]`,
+  `box< kind! >`, `( kind! | text )`, `x => kind!`, a parameter's type and a field's value `~ kind!` are each that
+  error. The brace dispatch takes an adjacent `!` after the first name as a map key, as it does `<`, so `{ kind! =>
+  text }` reaches the same refusal and not a missing `:`. **The `!` is followed by whitespace** (§12.3), so `kind!}`,
+  `a!b` and `kind!?` are parse errors; the token is one identifier (`a.b!` is refused), and a quoted token is never one
+  (`"kind"!`).
 - **A parameter may write a type after its name** (`type-param = param-name [ws ":" ws type-ref]`), on every
   type-def form alike. `parseTypeParamsOpt` still returns the names the type-def records; a written type goes to
   the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution

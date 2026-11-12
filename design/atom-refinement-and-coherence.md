@@ -25,8 +25,8 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   (`AtomCoherence.checkAdmitsAValue`), never by the linker or the resolver; its prefix bounds fold in.
 - Unchecked by design: `pattern` against `pattern` (and `pattern` emptiness), selector facets.
 - A reference's `of` narrows to the source's or a type IS-A it, and that one rule is judged at **link**, not in
-  `checkNarrows`: `ReferenceBody.constraintsCheck` asks that a reference refines a reference and that `allow_sibling`
-  is only withdrawn, and `ReferenceBody.ofNarrowing` takes the IS-A as a predicate the linker supplies
+  `checkNarrows`: `ReferenceBody.constraintsCheck` asks that a reference refines a reference, and
+  `ReferenceBody.ofNarrowing` takes the IS-A as a predicate the linker supplies
   (`TsonSchemaLinker.checkReferenceNarrows`).
 - `unicode.text_type`'s `pattern` and `members` are each **settable once** — they occupy one logical position and the pattern
   half cannot be narrowed, so the position takes one rule. A member set may still be *added* to a patterned source.
@@ -94,10 +94,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   source admits too: `meta.identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }` is the kernel's case.
   The two names are a namespace's, not the bodies', and `of` holds names that order nothing
   (`design/resolver-vocabulary-and-bootstrap.md`), so at resolution neither need be ready:
-  `ReferenceBody.constraintsCheck` admits any reference whose `allow_sibling` withdraws or keeps the source's, a
-  permission as `float_type`'s `allow_nan` is (`AtomNarrowing.checkOnlyWithdraws`: `meta.type_ref => !meta.field_type_ref
-  ^ { allow_sibling: false }` narrows, `!meta.type_ref ^ { allow_sibling: true }` is refused at resolution), and the
-  linker's `checkReferenceNarrows` asks the family's
+  `ReferenceBody.constraintsCheck` admits any reference, and the linker's `checkReferenceNarrows` asks the family's
   rule, `ReferenceBody.ofNarrowing`, with §7.2's IS-A over the merged namespace (alias hops followed, the entry's chain
   read), against each reference the refinement's chain names. A widening (`!maps ^ { of: meta.product }` over `of:
   meta.map`) and an unrelated `of` are `SchemaValidationException`s, reported as `checkNarrows` reports, "not a valid

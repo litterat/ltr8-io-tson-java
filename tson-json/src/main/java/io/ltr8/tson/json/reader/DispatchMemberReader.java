@@ -316,6 +316,6 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
 
     /** One pin as written: a reference by its text, any other value by its own spelling. */
     private static String pin(Object pin) {
-        return pin instanceof io.ltr8.tson.schema.meta.Reference reference ? reference.text() : String.valueOf(pin);
+        return pin instanceof io.ltr8.tson.schema.meta.TypeRef reference ? reference.text() : String.valueOf(pin);
     }
 }

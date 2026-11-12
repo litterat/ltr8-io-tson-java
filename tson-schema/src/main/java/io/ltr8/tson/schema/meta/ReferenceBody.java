@@ -1,13 +1,10 @@
 package io.ltr8.tson.schema.meta;
 
-import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
-import io.ltr8.tson.schema.atom.AtomNarrowing;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -15,22 +12,15 @@ import java.util.Optional;
 import java.util.function.BiPredicate;
 
 /**
- * An instance of the kernel's {@code reference_type} constructor, or of its refinement {@code ref}, resolved
- * ([TSON-SCHEMA] §4.2, §5.12): the atom whose values are names, each naming an entry whose value's type, past its
- * alias hops, IS-A {@link #of}. {@code meta.ref<record>} is the construction {@code !meta.ref { of: record }}, its
- * {@code allow_sibling} pinned false by the refinement; the slot's meaning comes from {@link #of}, whichever of the
- * two built it, so a question of whether a body is a reference goes by the constructor's chain, never its name.
+ * An instance of the kernel's {@code reference_type} constructor, or of its refinement {@code ref}, resolved ([TSON-SCHEMA]
+ * §4.2, §5.12): the atom whose values are names, each naming an entry whose value's type, past its alias hops, IS-A {@link
+ * #of}. {@code meta.ref<record>} is the construction {@code !meta.ref { of: record }}; the slot's meaning comes from {@link
+ * #of}, whichever of the two built it, so a question of whether a body is a reference goes by the constructor's chain, never
+ * its name.
  *
  * <p><b>{@link #of} is a {@link TypeRef}</b>, the kernel typing it {@code meta.type_ref}, and only a name stands there
  * ([TSON-SCHEMA] §4.2): an application at {@code of}, {@code meta.ref<box<text>>}, closes nowhere and is refused, so
  * the author declares it and names the declaration. A resolved body's {@code of} is a name.
- *
- * <p><b>{@link #allowSibling} says whether a sibling reference ({@code kind!}) is a value</b> ([TSON-SCHEMA] §5.2,
- * §8.1). The grammar reads one wherever a reference stands, and the facet admits or refuses it, as {@code allow_nan}
- * admits or refuses NaN at a {@code float_type}: true by default, the widest reading, and withdrawn by a refinement.
- * Only {@code meta.field_type_ref}, which types a record field's {@code type}, keeps it; {@code meta.type_ref} and
- * {@code meta.ref<T>} set it false. In bind mode the same rule is the component type: a {@link Reference} component
- * holds a sibling reference, a {@link TypeRef} one never does.
  *
  * <p><b>What {@link #of} names decides what the slot holds.</b> Where it is a constructor ({@code top} or IS-A it),
  * the values it admits are types, and the slot holds a type's name, delivered to a host as a {@link TypeRef} that
@@ -48,12 +38,11 @@ import java.util.function.BiPredicate;
  * and it is IS-A its source. Whether one name IS-A another is the namespace's, so the rule ({@link #ofNarrowing}) takes
  * that relation from the linker.
  *
- * <p><b>Equality is {@link #of}, {@link #allowSibling} and the chain, never the index.</b> Two schemas that both apply
+ * <p><b>Equality is {@link #of} and the chain, never the index.</b> Two schemas that both apply
  * {@code meta.ref<uuid_type>} hold equal bodies whatever members each closure admits.
  */
 @Typename(name = "meta.reference_type")
-public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling") boolean allowSibling,
-                            @Unbound Optional<Index> index) implements Atom {
+public record ReferenceBody(TypeChain chain, TypeRef of, @Unbound Optional<Index> index) implements Atom {
 
     /**
      * What the linker derives for one reference: whether {@code of} names a constructor, so the values admitted are types,
@@ -107,22 +96,19 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling")
         index = index == null ? Optional.empty() : index;
     }
 
-    /**
-     * A reference as an author declares it, placed in no chain -- the linker derives its {@link #index} -- admitting
-     * a sibling reference or refusing one as {@code allowSibling} says.
-     */
-    public ReferenceBody(TypeRef of, boolean allowSibling) {
-        this(TypeChain.EMPTY, of, allowSibling, Optional.empty());
+    /** A reference as an author declares it, placed in no chain -- the linker derives its {@link #index}. */
+    public ReferenceBody(TypeRef of) {
+        this(TypeChain.EMPTY, of, Optional.empty());
     }
 
-    /** A reference over the entry {@code of} names, as {@code meta.ref<T>} declares it: {@code allow_sibling: false}. */
+    /** A reference over the entry {@code of} names, as {@code meta.ref<T>} declares it. */
     public static ReferenceBody of(String of) {
-        return new ReferenceBody(TypeRef.of(of), false);
+        return new ReferenceBody(TypeRef.of(of));
     }
 
     @Override
     public ReferenceBody withChain(TypeChain chain) {
-        return new ReferenceBody(chain, of, allowSibling, index);
+        return new ReferenceBody(chain, of, index);
     }
 
     /** This reference with its derived index: {@code namesTypes}, the members sorted, its entries and the shown names. */
@@ -134,7 +120,7 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling")
     /** {@link #linked(boolean, List, Map, List)} with what a name this reference holds reaches ({@link Values}). */
     public ReferenceBody linked(boolean namesTypes, List<String> members, Map<String, Top> entries,
                                 List<String> shown, Optional<Values> values) {
-        return new ReferenceBody(chain, of, allowSibling, Optional.of(new Index(namesTypes,
+        return new ReferenceBody(chain, of, Optional.of(new Index(namesTypes,
                 members.stream().sorted().toList(), entries, shown.stream().sorted().toList(), values)));
     }
 
@@ -180,17 +166,12 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling")
      *
      * <p>Whether a refinement's {@code of} narrows the source's is an IS-A question about two names, which only the
      * namespace they resolve in answers: that half of the rule is {@link #ofNarrowing}, asked at link. Here a
-     * reference refines only a reference, and {@link #allowSibling} is a permission: a refinement may withdraw it,
-     * never grant it back.
+     * reference refines only a reference.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
-        if (!(refined instanceof ReferenceBody other)) {
-            return List.of("refines a reference with " + refined.getClass().getSimpleName());
-        }
-        List<String> violations = new ArrayList<>();
-        AtomNarrowing.checkOnlyWithdraws(violations, "allow_sibling", allowSibling, other.allowSibling);
-        return List.copyOf(violations);
+        return refined instanceof ReferenceBody ? List.of()
+                : List.of("refines a reference with " + refined.getClass().getSimpleName());
     }
 
     /**
@@ -205,22 +186,21 @@ public record ReferenceBody(TypeChain chain, TypeRef of, @Field("allow_sibling")
                 + "' or IS-A it, so the refinement admits names the source refuses -- a refinement narrows 'of' (§5.7)");
     }
 
-    /** Compares {@link #of}, {@link #allowSibling} and the chain, never the index -- see this class's Javadoc. */
+    /** Compares {@link #of} and the chain, never the index -- see this class's Javadoc. */
     @Override
     public boolean equals(Object o) {
-        return o instanceof ReferenceBody other && of.equals(other.of) && allowSibling == other.allowSibling
-                && chain.equals(other.chain);
+        return o instanceof ReferenceBody other && of.equals(other.of) && chain.equals(other.chain);
     }
 
-    /** {@link #of}, {@link #allowSibling} and the chain, as {@link #equals} compares them. */
+    /** {@link #of} and the chain, as {@link #equals} compares them. */
     @Override
     public int hashCode() {
-        return 31 * (31 * of.hashCode() + Boolean.hashCode(allowSibling)) + chain.hashCode();
+        return 31 * of.hashCode() + chain.hashCode();
     }
 
     /** What {@link #equals} compares: the derived index is no part of what this is. */
     @Override
     public String toString() {
-        return "ReferenceBody[chain=" + chain + ", of=" + of + ", allowSibling=" + allowSibling + "]";
+        return "ReferenceBody[chain=" + chain + ", of=" + of + "]";
     }
 }

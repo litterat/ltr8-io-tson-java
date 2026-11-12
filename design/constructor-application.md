@@ -126,8 +126,8 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `meta.top` and is still a template. The check runs before the template path in both places an application resolves,
   so a head is asked once which operation it stands for.
 - **The kernel applies its own constructors this way**: the root's `set => meta.set_type` is an alias, so `set<text>`
-  constructs `!meta.set_type { element_type: text }` through it, and `meta.ref => meta.reference_type ^ {
-  allow_sibling?: = false }` is a refined constructor, so `meta.ref<method>` is `!meta.ref { of: method }`. A refined
+  constructs `!meta.set_type { element_type: text }` through it, and `meta.ref => meta.reference_type ^ {}` is a
+  refined constructor, so `meta.ref<method>` is `!meta.ref { of: method }`. A refined
   constructor's construction is an instance of the refinement, a subtype constructor, so a question about what a body
   is goes by the constructor's chain (`meta.ref` IS-A `meta.reference_type`, `meta.set_type` IS-A `meta.array`).
 - **A declaration is the construction** (`DefinitionResolver.construction`): the payload is built and handed to

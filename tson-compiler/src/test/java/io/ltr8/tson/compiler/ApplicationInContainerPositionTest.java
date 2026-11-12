@@ -5,7 +5,7 @@ import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.FieldTypeExpr;
+import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.ParamRef;
@@ -61,7 +61,7 @@ class ApplicationInContainerPositionTest {
     }
 
     /** What field {@code field} of the record {@code record} holds: an entry's, or a record in place's. */
-    private static FieldTypeExpr slot(Top record, String field) {
+    private static TypeExpr slot(Top record, String field) {
         return ((RecordBody) record).fields().get(field).type();
     }
 
@@ -165,7 +165,7 @@ class ApplicationInContainerPositionTest {
                   b      => { g: grid<pixel> }
                   direct => { d: [[pixel]] }""");
 
-        FieldTypeExpr a = slot(entry(compiled, "a"), "g");
+        TypeExpr a = slot(entry(compiled, "a"), "g");
         assertEquals(a, slot(entry(compiled, "b"), "g"), "one type");
         assertEquals(slot(entry(compiled, "direct"), "d"), slot(inPlace(a), "x"),
                 "the rows the grid builds are the rows written directly");

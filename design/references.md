@@ -10,17 +10,16 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
 **Invariants**
 
 - A name held in a slot is a value of the kernel's one atom of names, `meta.reference_type => meta.atom & { of:
-  meta.type_ref  allow_sibling?: boolean ~ true }` (`ReferenceBody`). It admits a name exactly when the type of the
+  meta.type_ref }` (`ReferenceBody`). It admits a name exactly when the type of the
   named entry's value, its tag, past its alias hops, IS-A `of`: `order => { … }` holds a value of `meta.record`,
   `int32 => !integer ^ { … }` one of `numeric.integer_type`, `orders => !api { … }` one of `api`. The kernel's
-  `meta.ref => meta.reference_type ^ { allow_sibling?: = false }` is a refined constructor, and `meta.ref<T>` is its
+  `meta.ref => meta.reference_type ^ {}` is a refined constructor, and `meta.ref<T>` is its
   construction `!meta.ref { of: T }` (§5.3's construction sugar), whatever `of` names -- an instance of `meta.ref`, a
   subtype constructor of `meta.reference_type`, so a question of whether a body is a reference goes by the
   constructor's chain, never its name, as `set_type` already requires of arrays;
-  `meta.field_type_ref` is `!meta.reference_type { of: meta.type }`, `meta.type_ref` its refinement `^ {
-  allow_sibling: false }`, and `meta.identifier_ref` a refinement of that to `unicode.identifier_type`, a refinement
-  narrowing `of` to a type IS-A the source's (`ReferenceBody.ofNarrowing`). A field's type position,
-  `meta.ref<meta.record>` and `meta.ref<method>` differ only in `of` and the facet.
+  `meta.type_ref` is `!meta.reference_type { of: meta.type }`, and `meta.identifier_ref` a refinement of that to
+  `unicode.identifier_type`, a refinement narrowing `of` to a type IS-A the source's (`ReferenceBody.ofNarrowing`).
+  `meta.type_ref`, `meta.ref<meta.record>` and `meta.ref<method>` differ only in `of`.
 - **What `of` names decides what the slot holds, never the spelling** (`KindMembers.namesTypes`). Over a constructor,
   `meta.top` or IS-A it, the values admitted are types: the slot holds a type's name, its path from the root (`order`,
   `geo.address`), judged a member over the governing closure (`KindMembers`) and delivered to a host as a `TypeRef`. Over any
@@ -61,22 +60,11 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   `result<T>`. A qualified head (`geo.box<T>`) names a member of a nested schema map as a bare head names a root
   entry. An argument is a reference, a name or an application, and a literal token is no argument (§5.10): the grammar
   refuses `maxint<10>` and `box<"a">` where they are written.
-- **A reference may be a sibling reference** (§4.2, §5.2), `kind!`: a record field's type chosen per instance
-  by the value of the field `kind` of the same record. It is data grammar as well, `sibling-ref = unquoted-token "!"`,
-  the `!` adjacent to one identifier and followed by whitespace ([TSON-DATA] §7.4, §7.5); JSON holds the same text in
-  a string, read by the same production (`ReferenceGrammar.parseReference`). The reference atom reads one wherever a
-  reference stands, and **whether a slot admits one is the facet `allow_sibling`**, a permission as `allow_nan` is of
-  `float_type`: true by default, withdrawn by a refinement and never granted back (`ReferenceBody.constraintsCheck`).
-  Only `meta.field_type_ref` keeps it, the type of `record_field.type`, the one model slot typed `Reference`, and the
-  field's `value` is typed `type!` against it; `meta.type_ref` and `meta.ref<T>` withdraw it. Everywhere else a sibling
-  reference is refused, naming the slot: in sugar by the desugar phase, in an
-  explicit instance by the slot reader (`TypeNameSlotReader`, admitting one only for a `Reference` component at a
-  reference that allows one), in an argument list by the grammar, and in a tree read by the atom's parser
-  (`TypeNameRefParser`), whose refusal is a constraint the value breaks, `ATOM_CONSTRAINT_VIOLATION`. A reference over a
-  type that is no constructor names values, and never holds one (`RefParser`). A sibling reference names a field and no
-  type, so nothing records it for a member's judgement (`AtomTypeReader`). Identity is the variant and its components:
-  `kind`, `kind<T>` and `kind!` are three references. The rules a sibling and its dependent field answer to, and the
-  reading, are `design/schema-resolution.md`'s and `design/readers-and-diagnostics.md`'s.
+- **A dependent field's type is no reference** (§5.2): `kind!` is schema-grammar sugar for `{ of: !meta.dependent { on:
+  kind } }`, a type written in place at the field's type (`design/schema-resolution.md`). No reference production,
+  data or JSON, reads a marked name, so `kind`, `kind<T>` and a type written in place are the only shapes a type slot
+  holds. A slot typed by a reference refuses `kind!` as the syntax error it is in data, and `"kind!"` in JSON as a
+  string spelling no name.
 - A reference carries arguments only where an application is still open: an open record's `chain.parents` and field
   `type`s, and the `application` annotation. A closed application at a type slot is a type written in place there,
   and where only a name may stand an application is refused (§4.2, §5.3). Its head is judged by resolution and arity,
@@ -182,7 +170,7 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   in data at a slot naming values, its referent is the value its name reached (`RefParser`), the governing schema's
   own value, bound or tree-held as the value entry is. The closure is a component excluded from `equals`, `hashCode`
   and `toString`. A reference read in a schema document, or built by hand, carries `Closure.NONE` and names nothing.
-  A schemaless read has no closure at all and keeps an application or a sibling reference as a `TsonReference`
+  A schemaless read has no closure at all and keeps an application as a `TsonReference`
   (`design/tree-model.md`), with no referent.
 
 Related: `design/linking-and-compilation.md` (the judgements), `design/open-records.md` (parameter positions),
@@ -244,7 +232,7 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 | `meta.type_chain.supertypes`, `subtypes` | index, `meta.type_ref` | — | — | link |
 | `meta.alias.target` | reference, `meta.type_ref` | namespace | any entry, type or constructor, by resolution; never arguments in a resolved alias | `validateTypeRef` |
 | `meta.param.bound` | reference | namespace | `meta.type_ref`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
-| `meta.record_field.type` | reference, a parameter of an open record, or a sibling reference | the record's `parameters`, then namespace; enclosing `fields` for a sibling | `meta.field_type_ref`; a parameter by §5.10's shadowing rule; a sibling by §5.2's rules | `validateTypeRef`, `checkOpenArity`, `DependentFields` |
+| `meta.record_field.type` | reference, a parameter of an open record, or a type in place, `meta.dependent` among them | the record's `parameters`, then namespace; enclosing `fields` for a dependent type's `on` | `meta.type_expr`; a parameter by §5.10's shadowing rule; `on` by §5.2's rules | `validateTypeRef`, `checkOpenArity`, `DependentFields` |
 | `meta.tuple_element.element_type`, `meta.array.element_type`, `meta.map.key_type`, `meta.map.value_type`, `meta.namespace.value_type`, `meta.choice.variants` | reference | namespace | `meta.type_ref`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
 | `meta.record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference (typed `type!`, so read against the field's own `type`) | namespace | member of the slot's kind | `checkKindValue` |
 | `meta.record.discriminators`, `meta.field_group.members` | reference by key | enclosing `fields` | a key of it | linker |

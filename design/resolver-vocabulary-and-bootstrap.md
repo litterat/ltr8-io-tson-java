@@ -210,34 +210,32 @@ of the value is read against as the read reaches it; a reference and a held valu
 Its output is what ordinary resolution of the kernel against it produces, entry for entry and constructor for
 constructor, positions included (the bootstrap resolves with the parser's positions).
 
-- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the two refinements on the
+- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the
   kernel's one wait cycle, the one holding `meta.record`: `boolean`, `meta.field_role`, `meta.record_extension_type`,
-  `meta.enum_set`, `integer`, `numeric.count`, `text`, `void`, `meta.field_type_ref`, `meta.type_ref`,
-  `meta.field_map`, and the two choices a type slot is typed by, `meta.type_expr` and `meta.field_type_expr`
-  (`PRE_LOADED`). A choice's own `variants` is `[meta.type_expr]`, so reading `type_expr`'s declaration reaches
-  `type_expr`; the hand-built choice states the `disjoint` its `@meta.disjoint` asserts, a slot of the records on the
-  cycle being read against it before the whole kernel links. `meta.field_type_ref => !meta.reference_type { of:
-  meta.type }` is on the cycle because reading its `of` waits on `meta.type_ref`, its own refinement.
+  `meta.enum_set`, `integer`, `numeric.count`, `text`, `void`, `meta.type_ref`, `meta.field_map`, and the choice a
+  type slot is typed by, `meta.type_expr` (`PRE_LOADED`). A choice's own `variants` is `[meta.type_expr]`, so reading
+  `type_expr`'s declaration reaches `type_expr`; the hand-built choice states the `disjoint` its `@meta.disjoint`
+  asserts, a slot of the records on the cycle being read against it before the whole kernel links.
   `record_field.value` is typed `type!`, a dependent field, whose value a schema document holds as written through a
   reader of its own (`DependentFieldReader`), so the record waits on no entry for it. `instanceBody` covers the shapes
   those apply — a bare `{}` (each target's unconstrained constant, `void` among them), a bare token array (`enum`), a
-  record of tokens (`meta.reference_type` with its `of` and an `allow_sibling` defaulting to true, `meta.map` for
+  record of tokens (`meta.reference_type` with its `of`, `meta.map` for
   `meta.field_map`, `meta.set_type` for `meta.enum_set`, with its `min_items`/`max_items`), and a record holding a token
   array (`meta.choice`) — and refuses any other target; `refinedBody` merges the integer family's `min`, `max` and
-  `size` and a reference's `of` and `allow_sibling`. The set is built before anything is read, and
+  `size`. The set is built before anything is read, and
   `meta.type_inline`, a record read from its grammar that reads nothing, is readied with it: a record's field written in
   place is read against `meta.type_expr`, whose untagged recovery classifies both its variants. Once every entry is
   ready the chains are closed transitively, as `SchemaResolver` closes a schema's (`completeChains`).
   `KernelBootstrapResolverTest` measures the cycle with `WaitGraph` from `spec/fixtures/meta-resolved.tn` (the six
   maps read as their members under their paths; a type written in place at a slot is no entry, and a read against it
   waits on what reading its construction reaches) and asserts the hand-built names equal it, so a kernel edit that
-  moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 77 entries (64 members of the six maps
-  and 13 at the root; the maps themselves make the kernel's 83 resolved entries), one cycle of 32, longest wait chain
-  3 — and asserts the kernel contains the cycle's closure (68 entries) and the related concepts. The cycle grew with
-  the type slots: a record field's type is read against `meta.field_type_expr`, a choice asserted disjoint, and a type
-  written in place reaches every constructor's record through `meta.type`, so the choice constructor, the disjoint
-  assertion, `void` and `meta.record_extension_type` are on it. Of the 32, 13 are hand-built; the other 19 are records
-  and compositions resolved from their grammar.
+  moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 76 entries (63 members of the six maps
+  and 13 at the root; the maps themselves make the kernel's 82 resolved entries), one cycle of 31, longest wait chain
+  3 — and asserts the kernel contains the cycle's closure (67 entries) and the related concepts. The type slots put
+  the choice constructor on it: a record field's type is read against `meta.type_expr`, a choice asserted disjoint,
+  and a type written in place reaches every constructor's record through `meta.type`, so the disjoint assertion,
+  `void` and `meta.record_extension_type` are on it too. Of the 31, 11 are hand-built; the other 20 are records and
+  compositions resolved from their grammar.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record (`meta.ref` among them), an alias — as `SchemaResolver` resolves one. The bootstrap readies these
   and

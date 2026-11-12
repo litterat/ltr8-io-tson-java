@@ -24,10 +24,10 @@ import java.util.Optional;
  * would be admitted where the pin refuses it, and a DEFAULT on a field that is not optional, a value only
  * omission reaches.
  *
- * <p><b>{@code type} is a {@link FieldTypeExpr}</b>: a type reference, a type written in place ({@link TypeInline}),
- * or a sibling reference ({@code kind!}) naming the field of the same record whose value chooses the type
- * ([TSON-SCHEMA] §5.2) -- the one slot that may hold one. A field so typed is a <em>dependent field</em>: each
- * instance's value is read against the type that instance's sibling names. {@link #ownType()} is the type where
+ * <p><b>{@code type} is a {@link TypeExpr}</b>, as every type slot is: a type reference or a type written in place
+ * ({@link TypeInline}). A {@link DependentBody} in place ({@code kind!} in source) is the one type written in place
+ * that only a record field's type holds directly: a field so typed is a <em>dependent field</em>, each instance's value
+ * read against the type that instance's sibling names ([TSON-SCHEMA] §5.2). {@link #ownType()} is the type where
  * there is one.
  *
  * <p><b>In an open record {@code type} may be a parameter</b> ({@link ParamRef}), whole or among an application's
@@ -53,7 +53,7 @@ import java.util.Optional;
  * against really-resolved ones, and a position in equality would stop two representations of one logical
  * field comparing equal.
  */
-public record RecordField(FieldTypeExpr type, boolean optional, boolean voidable, FieldRole role,
+public record RecordField(TypeExpr type, boolean optional, boolean voidable, FieldRole role,
                            Optional<Token> value, Annotations annotations,
                            @Unbound Optional<SourcePosition> position) {
 
@@ -64,49 +64,49 @@ public record RecordField(FieldTypeExpr type, boolean optional, boolean voidable
     }
 
     /** Same as the canonical constructor with no position -- every caller that does not know its own source. */
-    public RecordField(FieldTypeExpr type, boolean optional, boolean voidable, FieldRole role,
+    public RecordField(TypeExpr type, boolean optional, boolean voidable, FieldRole role,
                         Optional<Token> value, Annotations annotations) {
         this(type, optional, voidable, role, value, annotations, Optional.empty());
     }
 
     /** Same as the canonical constructor with no annotations -- every caller that has none to carry. */
-    public RecordField(FieldTypeExpr type, boolean optional, boolean voidable, FieldRole role,
+    public RecordField(TypeExpr type, boolean optional, boolean voidable, FieldRole role,
                         Optional<Token> value) {
         this(type, optional, voidable, role, value, Annotations.empty(), Optional.empty());
     }
 
     /** {@code a: T} -- the key must be written, and {@code _} is refused. */
-    public static RecordField required(FieldTypeExpr type) {
+    public static RecordField required(TypeExpr type) {
         return new RecordField(type, false, false, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T} -- the key may be omitted, and {@code _} is refused. */
-    public static RecordField optional(FieldTypeExpr type) {
+    public static RecordField optional(TypeExpr type) {
         return new RecordField(type, true, false, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a: T?} -- the key must be written, and may be written {@code _}. */
-    public static RecordField voidable(FieldTypeExpr type) {
+    public static RecordField voidable(TypeExpr type) {
         return new RecordField(type, false, true, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T?} -- the key may be omitted, and may be written {@code _}. */
-    public static RecordField optionalVoidable(FieldTypeExpr type) {
+    public static RecordField optionalVoidable(TypeExpr type) {
         return new RecordField(type, true, true, FieldRole.FREE, Optional.empty());
     }
 
     /** {@code a?: T ~ value} -- omission injects {@code value}, and a written value overrides it. */
-    public static RecordField defaulted(FieldTypeExpr type, Token value) {
+    public static RecordField defaulted(TypeExpr type, Token value) {
         return new RecordField(type, true, false, FieldRole.DEFAULT, Optional.of(value));
     }
 
     /** {@code a?: T = value} -- omission injects {@code value}, and a written value must equal it. */
-    public static RecordField fixed(FieldTypeExpr type, Token value) {
+    public static RecordField fixed(TypeExpr type, Token value) {
         return new RecordField(type, true, false, FieldRole.FIXED, Optional.of(value));
     }
 
     /** {@code a: T = value} -- a marker: the key must be written, and its value must equal {@code value}. */
-    public static RecordField marker(FieldTypeExpr type, Token value) {
+    public static RecordField marker(TypeExpr type, Token value) {
         return new RecordField(type, false, false, FieldRole.FIXED, Optional.of(value));
     }
 
@@ -117,22 +117,16 @@ public record RecordField(FieldTypeExpr type, boolean optional, boolean voidable
      * {@link #ownType()} or switches on {@link #type}.
      */
     public TypeExpr typeExpr() {
-        return typeExpr(type);
-    }
-
-    /** A record field's {@code type} as the type it holds -- see {@link #typeExpr()}. */
-    public static TypeExpr typeExpr(FieldTypeExpr type) {
-        return switch (type) {
-            case TypeRef reference -> reference;
-            case TypeInline inline -> inline;
-            case SiblingRef sibling -> throw new IllegalStateException("a dependent field ('" + sibling.text()
-                    + "') names no type of its own: its type is the one its sibling's value names, per instance");
-        };
+        if (sibling().isPresent()) {
+            throw new IllegalStateException("a dependent field ('" + type.text() + "') names no type of its own: its "
+                    + "type is the one its sibling's value names, per instance");
+        }
+        return type;
     }
 
     /** {@link #type} as the type it holds, or empty for a dependent field ({@link #sibling()}). */
     public Optional<TypeExpr> ownType() {
-        return type instanceof SiblingRef ? Optional.empty() : Optional.of(typeExpr(type));
+        return sibling().isPresent() ? Optional.empty() : Optional.of(type);
     }
 
     /**
@@ -140,7 +134,12 @@ public record RecordField(FieldTypeExpr type, boolean optional, boolean voidable
      * where {@link #type} names a type ([TSON-SCHEMA] §5.2).
      */
     public Optional<String> sibling() {
-        return type instanceof SiblingRef sibling ? Optional.of(sibling.field()) : Optional.empty();
+        return sibling(type);
+    }
+
+    /** The sibling a field typed {@code type} takes its type from -- see {@link #sibling()}. */
+    public static Optional<String> sibling(TypeExpr type) {
+        return type instanceof TypeInline inline ? inline.dependentOn() : Optional.empty();
     }
 
     /** What a field yields when a document never writes it -- see {@link #omitted}. */
@@ -198,7 +197,7 @@ public record RecordField(FieldTypeExpr type, boolean optional, boolean voidable
      * ones it does not mention -- {@code annotations} and {@code position} both, the second of which no test
      * comparing resolved values can catch, since it is excluded from equality.
      */
-    public RecordField withType(FieldTypeExpr type) {
+    public RecordField withType(TypeExpr type) {
         return new RecordField(type, optional, voidable, role, value, annotations, position);
     }
 

@@ -187,7 +187,7 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   `{ name, bound? }`; a record with parameters is open, a template, and the kernel declares no other template
   constructor and no template: `template`, `template_param`, `record_template`, `record_template_field`,
   `record_template_field_map`, `tuple1` and `voidable_tuple1` are gone, `meta.ref` is the refined constructor
-  `meta.reference_type ^ { allow_sibling?: = false }` and the root's `set` an alias of `meta.set_type`, so
+  `meta.reference_type ^ {}` (#6) and the root's `set` an alias of `meta.set_type`, so
   `meta.ref<X>` and `set<text>` are constructions and carry no `@meta.application`. An open record is read at its
   declaration against `record`'s own vocabulary: a parameter is a reference value, written as its name and looked up
   in the record's `parameters` before the namespace, standing at a field's `type` or among an application's
@@ -241,7 +241,7 @@ For a template as an open record, replace ¶954, ¶958 and ¶1003 with: "**An op
 parameters.** `<T, U: bound>` before a record body -- braces, a composition or a refinement -- declares its
 parameters, each a name standing at a field's type, or as an argument of an application there or in a parent, and
 nowhere else: a field's value is never a parameter. There a parameter is a reference value: inside an open record a
-reference is a name, an application, a sibling reference or one of the record's parameters, looked up before the
+reference is a name, an application or one of the record's parameters, looked up before the
 namespace (the shadowing rule). The slot judges the argument that arrives there when the record is applied. So the
 body is read at the declaration against `record`'s own vocabulary. A reference names an open record only as the head
 of an application (§5.10, "A template is not a type"); only `record` carries parameters. **At a reference slot of a
@@ -329,8 +329,8 @@ write as a tag and that fails at the next processor, and a way to recover the wr
 of it describes a value: two schemas that differ only in how their resolvers name lifted entries admit the same data.
 
 **The proposal.** A type slot holds a name or a type written where it is used, and the kernel's type says so:
-`type_inline => { of: meta.type }`, `type_expr => @meta.disjoint ( meta.type_ref | meta.type_inline )`, and
-`field_type_expr`, which admits the sibling reference too. `tags: [text]` resolves to
+`type_inline => { of: meta.type }` and `type_expr => @meta.disjoint ( meta.type_ref | meta.type_inline )`, which
+types every type slot, a record field's included (#6). `tags: [text]` resolves to
 `type: { of: !meta.array { element_type: text } }`; a refined constructor's construction carries its own tag
 (`!meta.set_type`, `!meta.ref`). The slots are a record field's `type`, `array.element_type`, `map.value_type`,
 `tuple_element.element_type` and each of `choice.variants`. What may be written in place is a container, a tuple, a
@@ -350,11 +350,10 @@ the positional form of a one-field record admits a field typed by it.
 **What is running** on the inline-types branch off the Revision 40 proposal branch, against the hand-written kernel
 and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-resolved.tn`).
 
-- *The kernel and the slots.* `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` are declared and the
-  five slots retyped; `map.key_type` stays `meta.type_ref`. `@meta.synthetic` is gone. The bundled schemas resolve,
-  link and compile, and `ResolvedFixtureTest` passes against the hand-written fixtures. The kernel's hand-built wait
-  cycle grows to 32 entries from 25: `meta.type_expr`, `meta.field_type_expr`, and through `of: meta.type` every
-  constructor's record, `meta.record_extension_type` and `void`.
+- *The kernel and the slots.* `meta.type_inline` and `meta.type_expr` are declared and the five slots retyped;
+  `map.key_type` stays `meta.type_ref`. `@meta.synthetic` is gone. The bundled schemas resolve, link and compile, and
+  `ResolvedFixtureTest` passes against the hand-written fixtures. The kernel's hand-built wait cycle is 31 entries:
+  `meta.type_expr`, and through `of: meta.type` every constructor's record, `meta.record_extension_type` and `void`.
 - *Sugar in place.* `[T; n..]`, `{K => V}`, `[A, B]`, `( A | B )`, `set<T>` and `meta.ref<T>` at a slot desugar to
   `{ of: !C { … } }`, nested forms nested, each construction carrying its constructor's tag. Nothing is lifted or
   merged, no name is derived from content, and no code that derived one remains. A user schema with inline forms reads
@@ -420,3 +419,76 @@ value modifier on a field typed by a reference written in place is admitted and 
 container, tuple or choice written in place; a choice that is not disjoint names every variant, a variant written in
 place there being a resolver error; and a name and a type written in place are never the same type, even where the
 name's construction is identical.
+
+## 6. [TSON-DATA] §7.4, [TSON-SCHEMA] §4.2, §5.2, §12.1, [TSON-JSON] §5.6 — a dependent field's type is a sum in place
+
+**Problem.** A dependent field's type, `kind!`, is a reference value in Revision 39, and it is no name: it names a
+field of the record instance, bound at each read, and is never replaced by an entry's name. Holding it in
+`meta.reference_type` costs a facet that exists to be withdrawn (`allow_sibling`, true at `meta.field_type_ref` and
+false at every other reference), two near-identical type-slot choices (`type_expr`, `field_type_expr`), a position rule
+the grammar cannot state because it parses `kind!` wherever a reference stands, and a data-grammar form, with a tree
+node and a JSON string form, that no data document but a resolved schema may hold.
+
+**The proposal.** A dependent field's type is a type written in place, a sum in which a field of the enclosing record
+names the type, as `meta.declared` is the sum in which a value's tag does:
+
+```
+dependent => meta.sum & { on: text }
+payload   => !meta.record_field { type: { of: !meta.dependent { on: kind } } }      -- payload: kind!
+```
+
+`kind!` is schema-grammar sugar for it, admitted only as a record field's type. A reference is a name, an
+application or a parameter.
+
+**What is running** on a branch off the Revision 40 proposal branch, against the hand-written kernel and resolved
+fixture (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`).
+
+- *The kernel.* `allow_sibling`, `meta.field_type_ref` and `meta.field_type_expr` are gone; `meta.dependent` is added;
+  `record_field.type` is a `meta.type_expr`, as every type slot is; `meta.type_ref` is `!meta.reference_type { of:
+  meta.type }`; and `meta.ref` is an empty refinement, `meta.reference_type ^ {}`, kept so `meta.ref<T>` keeps its
+  spelling. The kernel's own `record_field.value` is typed `type!`. `on` is `text` and names a declared field by its
+  declared spelling, as a `discriminators` entry does.
+- *The data grammar* ([TSON-DATA] §7.4, §7.5). `sibling-ref` and its adjacency row are gone, and `reference =
+  application`; no tree node or writer case holds the form. A data document writing `kind!` — or a schema document
+  writing it inside a construction's payload, which is data — gets the separation rule's syntax error at the `!`
+  ("adjacent values must be separated by whitespace, a comma, or both"), the token `kind` before it read as the
+  position reads any token. No targeted message names the mark, which would put the form back in this grammar.
+- *The schema grammar* ([TSON-SCHEMA] §12.1, §5.3's sugar table). `kind!` parses only as a record field's type or a
+  field group member's, a member being a field: `field-type = type-expr ["?"] / dependent-type`, `dependent-type =
+  unquoted-token "!"`, `group-member = *annotation field-name ["?"] ws ":" ws field-type`, with `sibling-ref` gone
+  from `type-expr`, `refined-def`, `supertype-ref`, `map-key` and the imported productions. The token is one
+  identifier and the `!` is followed by whitespace (§12.3), so `kind!?` is a parse error and a dependent field is
+  never voidable by grammar. An adjacent `!` after a name at any other position — inside a field's type, a
+  declaration's body, a refinement source, a composition operand, a map key, a parameter's type, an argument, a
+  field's value — is a parse error: "'kind!' is a dependent field's type, and stands only as a record field's type, a
+  field group member's included -- never inside a type, nor at any other position". The desugar step writes `kind!`
+  as `{ of: !meta.dependent { on: kind } }` in place, and resolved output writes that.
+- *The link rule* ([TSON-SCHEMA] §4.2, §5.2). A `meta.dependent` is admitted in place only, and only directly at a
+  record field's type: declared (`x => !meta.dependent { on: kind }`), or in place at an element type, a map's value
+  type, a tuple element or a choice variant, it is a resolver error at link, nothing else binding `on`. Two records
+  each holding `{ of: !meta.dependent { on: kind } }` hold equal values and two types; a dependent field is read
+  through its record's reader, never through a reader shared by a type in place's structural identity. §5.2's rules
+  on the sibling and the dependent field are unchanged, and hold for the sugar and the canonical form alike.
+- *The JSON encoding* ([TSON-JSON] §5.6). The string form of a sibling reference is gone: `"kind!"` at a kind's
+  position spells no reference and is refused as a malformed value (`ATOM_FORM_INVALID`).
+
+**Open against the text.**
+
+- *A kernel-typed data document can write what the list refuses.* `meta.type_inline.of` is typed `meta.type`, and
+  §4.2's list is a resolver rule, so a data document typed by the kernel (`!meta.array { element_type: { of:
+  !meta.dependent { on: kind } } }`) reads with no diagnostic. This predates `meta.dependent`, which only adds an entry
+  to the list; it is not solved here.
+- *A declared sum in place is refused with the wrong diagnostic.* The text now says a declared sum
+  (`meta.declared_type`) is never written in place (§4.2, §5.2). The implementation refuses it at resolution, where the
+  model's type for a type in place admits only what the list names, so the diagnostic reads as the schema and the
+  bound class disagreeing rather than naming the rule.
+
+**Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 1 §1.3, §1.5, §2.3, §2.5,
+§2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4, §7.5, §7.7 and §8.1; Part 2's header, §1.4, §4.2 (the reference
+listing, the sibling bullet, the type-slot choice, and the list of what `of` holds, which gains `meta.dependent` at a
+record field's type alone and states that a declared sum is never written in place), §5.2 (the opening and the
+position rule), §5.3 (the sugar table), §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9, §12.1, §12.2 and §12.3;
+Part 3 §1.6 (items 16 and 21) and §5.6; `spec/tson-rev40-changelog.md` records each section's rule before and after.
+Four points the design left open are settled there as ruled: `kind!` in data takes the separator rule's parse error
+and no targeted one; `meta.ref` stays as an empty refinement; `on` names a field by its declared spelling; and a
+declared sum is named, as a namespace type is.

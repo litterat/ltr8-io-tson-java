@@ -83,8 +83,8 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         boolean tagged = false;
         // A dependent field's state, kept only where the record has one: each sibling's reference as written, and
         // each dependent member reached before its sibling was written, by the name written and where it stands.
-        io.ltr8.tson.schema.meta.FieldTypeExpr[] named = plan.hasDependents
-                ? new io.ltr8.tson.schema.meta.FieldTypeExpr[slots.length] : null;
+        io.ltr8.tson.schema.meta.TypeExpr[] named = plan.hasDependents
+                ? new io.ltr8.tson.schema.meta.TypeExpr[slots.length] : null;
         String[] readBefore = plan.hasDependents ? new String[slots.length] : null;
         JsonReadContext[] readBeforeAt = plan.hasDependents ? new JsonReadContext[slots.length] : null;
         for (int position = 0; ; position++) {
@@ -164,11 +164,11 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
      * rule, or when the object closes without it ([TSON-SCHEMA] §5.2).
      */
     private Object readDependent(JsonReadContext ctx, int at, String memberName, Object[] slots,
-                                 io.ltr8.tson.schema.meta.FieldTypeExpr[] named, String[] readBefore,
+                                 io.ltr8.tson.schema.meta.TypeExpr[] named, String[] readBefore,
                                  JsonReadContext[] readBeforeAt) {
         int sibling = plan.siblingOf[at];
         JsonReadContext fieldCtx = plan.field(ctx, at, memberName);
-        io.ltr8.tson.schema.meta.FieldTypeExpr reference;
+        io.ltr8.tson.schema.meta.TypeExpr reference;
         if (plan.fields[sibling].role() == FieldRole.FIXED && plan.stated[sibling] != null) {
             reference = DependentReader.referenceIn(plan.stated[sibling].text());
         } else if (slots[sibling] != null) {

@@ -97,13 +97,11 @@ final class HeldValues {
         }
         String naming = where + " is the dependent field '" + value.field() + "', typed by its sibling '"
                 + value.sibling() + "'";
-        String type = switch (value.named().get()) {
-            case io.ltr8.tson.schema.meta.TypeInline inline -> inline.text();
-            case io.ltr8.tson.schema.meta.Reference reference -> switch (ValuesByName.typeNamed(reference, merged)) {
-                case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
-                case DependentFieldReader.TypeNamed.None none -> throw new SchemaValidationException(naming
-                        + ", which holds " + none.held() + " -- so its value has no type to be read against");
-            };
+        String type = switch (ValuesByName.typeNamed(value.named().get(), merged)) {
+            case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
+            case DependentFieldReader.TypeNamed.InPlace inline -> inline.type().text();
+            case DependentFieldReader.TypeNamed.None none -> throw new SchemaValidationException(naming
+                    + ", which holds " + none.held() + " -- so its value has no type to be read against");
         };
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         List<String> slot = value.slot();

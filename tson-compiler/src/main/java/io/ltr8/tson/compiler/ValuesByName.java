@@ -25,7 +25,6 @@ import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Ref;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
@@ -416,17 +415,16 @@ final class ValuesByName {
         if (held == null && holder == null) {
             throw new SchemaValidationException(unreached);
         }
-        io.ltr8.tson.schema.meta.FieldTypeExpr typed = DependentFieldReader.typeIn(held);
+        io.ltr8.tson.schema.meta.TypeExpr typed = DependentFieldReader.typeIn(held);
         if (typed == null) {
             throw new SchemaValidationException(naming + ", which the value does not hold, so the name has no type "
                     + "to go on through");
         }
-        if (!(typed instanceof Reference named)) {
-            throw new SchemaValidationException(naming + ", which holds the type written in place '" + typed.text()
-                    + "', and a name goes on through a value's declared type alone (§5.12)");
-        }
-        return switch (typeNamed(named, merged)) {
+        return switch (typeNamed(typed, merged)) {
             case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
+            case DependentFieldReader.TypeNamed.InPlace inline -> throw new SchemaValidationException(naming
+                    + ", which holds the type written in place '" + inline.type().text() + "', and a name goes on "
+                    + "through a value's declared type alone (§5.12)");
             case DependentFieldReader.TypeNamed.None none -> throw new SchemaValidationException(naming
                     + ", which holds " + none.held() + " -- so the name has no type to go on through");
         };
@@ -437,7 +435,7 @@ final class ValuesByName {
      * {@code merged}: the read path's rule ({@link DependentFieldReader#typeNamed}), and a value entry naming no type
      * either.
      */
-    static DependentFieldReader.TypeNamed typeNamed(Reference named, Map<String, Top> merged) {
+    static DependentFieldReader.TypeNamed typeNamed(io.ltr8.tson.schema.meta.TypeExpr named, Map<String, Top> merged) {
         DependentFieldReader.TypeNamed typed = DependentFieldReader.typeNamed(named, merged::get);
         if (typed instanceof DependentFieldReader.TypeNamed.Entry entry
                 && AliasChain.terminalDefinition(entry.name(), merged).orElse(null) instanceof ValueEntry value) {

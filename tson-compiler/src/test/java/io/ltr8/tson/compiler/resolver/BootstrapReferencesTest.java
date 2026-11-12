@@ -41,7 +41,7 @@ class BootstrapReferencesTest {
 
         RecordField name = field(kernel.entries().get("meta.param"), "name");
         assertEquals("meta.param_name", name.typeExpr().text());
-        assertTrue(((io.ltr8.tson.schema.meta.Reference) name.type()).annotations().isEmpty(),
+        assertTrue(((io.ltr8.tson.schema.meta.TypeRef) name.type()).annotations().isEmpty(),
                 "nothing records where it points");
     }
 
@@ -51,8 +51,8 @@ class BootstrapReferencesTest {
         Top recordField = KernelBootstrapResolver.kernelSchema()
                 .entries().get("meta.record_field");
 
-        assertEquals("meta.field_type_expr", field(recordField, "type").typeExpr().text());
-        assertTrue(((io.ltr8.tson.schema.meta.Reference) field(recordField, "type").type()).annotations().isEmpty());
+        assertEquals("meta.type_expr", field(recordField, "type").typeExpr().text());
+        assertTrue(((io.ltr8.tson.schema.meta.TypeRef) field(recordField, "type").type()).annotations().isEmpty());
     }
 
     /** The chain stays walkable through the entries, which is what a reader collapses it by. */

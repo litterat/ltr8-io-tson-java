@@ -119,7 +119,7 @@ order — the selector may arrive after the fields it selects.
 constructor's binding record, a value entry's payload — reaches its declaring schema's compiled readers as a replay from
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
-bare value as that field — `meta.record_field`'s `type` is `meta.field_type_expr`, whose name variant is an atom
+bare value as that field — `meta.record_field`'s `type` is `meta.type_expr`, whose name variant is an atom
 whose value is a type's name (`TypeNameSlotReader`) — and where the field is a product or a sum, an unquoted token
 (`ReferenceNameReader.nameIn`) is a **value by name** the record reader does not read as the field (`meta.record_field`'s
 own positional field being an atom, `fields: { p => x }` fills its `type`, as the sugar `p: x` does). Whether the token is

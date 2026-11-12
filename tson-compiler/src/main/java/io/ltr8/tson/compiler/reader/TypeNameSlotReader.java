@@ -7,16 +7,13 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.ReferenceEvent;
-import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.List;
 
 /**
- * A position typed by a reference that names types, whose bound component is a {@link TypeRef} or, at a record
- * field's type, a {@link Reference}: {@code meta.record_field.type}, typed {@code meta.type_ref} in the kernel, or a
- * meta layer's own {@code request: meta.ref<record>}. The value is a
+ * A position typed by a reference that names types, whose bound component is a {@link TypeRef}: a type slot's name,
+ * typed {@code meta.type_ref} in the kernel, or a meta layer's own {@code request: meta.ref<record>}. The value is a
  * reference: a type's name, one token, or an application, the data grammar's reference with an argument list
  * ([TSON-DATA] §7.4), which the stream delivers as one value. A name is read by the reference's own
  * atom reader (the grammar, and the members where the document is data) into a {@code TypeRef}; in a schema document
@@ -31,48 +28,24 @@ import java.util.List;
  * application is refused and the declaration to write named ([TSON-SCHEMA] §5.6). In a data document a reference is
  * a name ([TSON-SCHEMA] §4.2): the kind's reader refuses an application, whether or not the schema closes it. A quoted
  * token is never a reference.
- *
- * <p><b>The component's class states the position rule</b> ([TSON-SCHEMA] §5.2), as the reference's {@code
- * allow_sibling} states it in tree mode: a sibling reference ({@code kind!}) stands only at a record field's type, the
- * one slot whose component is a {@code Reference} and whose type, {@code meta.field_type_ref}, allows one. There it is
- * read as written; anywhere else it is refused at its token, naming the slot, and never reaches the model.
  */
-final class TypeNameSlotReader implements TsonTypeReader<Reference> {
+final class TypeNameSlotReader implements TsonTypeReader<TypeRef> {
 
     private final AtomTypeReader<?> kind;
     private final AnnotationTypes annotationTypes;
 
-    /** The slot as a message names it ({@code field 'element_type'}), or null where a sibling reference stands. */
-    private final String refusingSiblingAt;
-
-    /**
-     * @param slot              the slot as a refusal names it ({@code field 'element_type'})
-     * @param componentHoldsOne whether the component is a {@code Reference}, which holds a sibling reference; one is
-     *                          admitted where the reference's {@code allow_sibling} admits it as well
-     */
-    TypeNameSlotReader(AtomTypeReader<?> kind, AnnotationTypes annotationTypes, String slot,
-                       boolean componentHoldsOne) {
+    TypeNameSlotReader(AtomTypeReader<?> kind, AnnotationTypes annotationTypes) {
         this.kind = kind;
         this.annotationTypes = annotationTypes;
-        this.refusingSiblingAt = componentHoldsOne && kind.admitsSibling() ? null : slot;
     }
 
     @Override
-    public Reference read(TsonReadContext ctx) {
+    public TypeRef read(TsonReadContext ctx) {
         Annotations annotations = ctx.peek() instanceof AnnotationStart
                 ? AnnotationCapture.bound(ctx, annotationTypes) : Annotations.empty();
         if (ReferenceNameReader.nameIn(ctx.peek()).isPresent()) {
             // The kind's reader records the name in a schema document, as it does whatever the host holds.
             return withAnnotations(kind.read(ctx), annotations);
-        }
-        if (ctx.peek() instanceof ReferenceEvent(SiblingRef sibling, _)) {
-            ctx.next();
-            if (refusingSiblingAt == null) {
-                return sibling.withAnnotations(annotations);
-            }
-            String found = "the sibling reference '" + sibling.text() + "'";
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, sibling.refusedAt(refusingSiblingAt), "a type's name", found);
-            return null;
         }
         if (ctx.peek() instanceof ReferenceEvent reference) {
             if (!ctx.readsSchemaNames()) {

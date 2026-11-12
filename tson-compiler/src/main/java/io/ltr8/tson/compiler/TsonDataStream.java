@@ -394,9 +394,6 @@ public final class TsonDataStream implements TsonEventSource {
         switch (t.type()) {
             case UNQUOTED -> {
                 advance();
-                if (marksSibling(t)) {
-                    throw new ParseException(siblingReference(t).refusedAt("a template argument"), t.start());
-                }
                 boolean applied = opensArguments(t);
                 if (!ReferenceGrammar.isQualifiedName(t.text())) {
                     throw new ParseException("'" + t.text() + "' is no argument: a reference's argument is a "
@@ -409,47 +406,6 @@ public final class TsonDataStream implements TsonEventSource {
             default -> throw mismatch("a reference's argument: a qualified name or an application "
                     + "(no structure stands in an argument list in data)");
         }
-    }
-
-    /**
-     * Whether the token just consumed, {@code head}, is marked as a sibling reference ([TSON-DATA] §7.4): the next
-     * token is a {@code !} adjacent to it. A prefix {@code !} is adjacent to the token after it and so is never
-     * adjacent to the one before ({@link #siblingReference} holds the other half). A quoted token is never a
-     * reference, so a {@code !} after one is refused.
-     */
-    private boolean marksSibling(Token head) {
-        Token next = peekToken();
-        // A multi-line token's end is past its closing line's terminator, where the next line starts, so a prefix
-        // `!` opening that line would read as adjacent to it.
-        if (next.type() != TokenType.BANG || !head.adjacentTo(next) || head.type() == TokenType.MULTI_LINE_STRING) {
-            return false;
-        }
-        if (head.type() != TokenType.UNQUOTED) {
-            throw parseError("a quoted token is never a reference, so '!' cannot mark it as a sibling reference: "
-                    + "a sibling is a field named by one unquoted identifier");
-        }
-        return true;
-    }
-
-    /**
-     * The sibling reference {@code head} and the {@code !} next at the cursor spell: {@code sibling-ref =
-     * unquoted-token "!"}, the token one identifier (a single segment), and the {@code !} followed by whitespace
-     * (§7.5) or the end of the document. The whitespace is what keeps a postfix {@code !} apart from a prefix one,
-     * so {@code a!b}, <code>kind!}</code>, {@code kind!]} and {@code kind!?} are refused here. Assembled whole, so the
-     * stream delivers one value.
-     */
-    private io.ltr8.tson.schema.meta.SiblingRef siblingReference(Token head) {
-        if (!ReferenceGrammar.isSiblingField(head.text())) {
-            throw new ParseException("'" + head.text() + "!' is no sibling reference -- the '!' marks one field "
-                    + "of the same record, named by one identifier, a single segment (§7.4)", head.start());
-        }
-        Token bang = advance();
-        Token next = peekToken();
-        if (next.type() != TokenType.EOF && bang.adjacentTo(next)) {
-            throw parseError("a sibling reference's '!' must be followed by whitespace (§7.5): write '"
-                    + head.text() + "! ' before " + describe(next));
-        }
-        return new io.ltr8.tson.schema.meta.SiblingRef(head.text(), null);
     }
 
     private void requireQualifiedName(Token head) {
@@ -908,10 +864,6 @@ public final class TsonDataStream implements TsonEventSource {
                     + "not available in a data value (§3.2): a data type-ref is a bare name. Name the "
                     + "application in the schema ('my_type => " + name.text() + "<...>') and write '!my_type' here");
         }
-        if (next.type() == TokenType.BANG && name.adjacentTo(next)) {
-            throw parseError("'!" + name.text() + "!' marks a type's name as a sibling reference, and a tag names a "
-                    + "type (§7.4): a tag is '!' and a qualified name, never a reference to a field");
-        }
         if (next.type() == TokenType.QUESTION && name.adjacentTo(next)) {
             throw parseError("'!" + name.text() + "?' uses the optional suffix, which is schema syntax and not "
                     + "available in a data value (§3.2): optionality is a field's state where the schema "
@@ -1051,8 +1003,6 @@ public final class TsonDataStream implements TsonEventSource {
                     advance();
                     if (opensArguments(t)) {
                         ready.add(new ReferenceEvent(referenceArguments(t), t.start()));
-                    } else if (marksSibling(t)) {
-                        ready.add(new ReferenceEvent(siblingReference(t), t.start()));
                     } else {
                         ready.add(new TokenEvent(t.text(), formOf(t.type()), t.start()));
                     }
