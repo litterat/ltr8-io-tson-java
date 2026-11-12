@@ -240,7 +240,7 @@ step reported as a gap.
 `ValuesByName.dependentType`): the sibling's pin from the declared `RecordField` (so a host holding no component for
 a pinned sibling is never asked), else what the record value holds there, else the sibling's default, and the walk
 goes on with that type. What the sibling holds is judged by the read path's rule, `DependentFieldReader.typeNamed`: a
-sibling reference, a template or an application the closure does not hold names no type, and so does a value entry
+template or an application the closure does not hold names no type, and so does a value entry
 (`aValueNoType`); each, and a sibling the value does not hold, is a `SCHEMA_ERROR` naming the name, the dependent field
 and the sibling. Past a field the value does not hold there is no value to read the sibling from: a pin or default
 still types the field and the name is refused as reaching no value after its type is judged, as any such name is, and

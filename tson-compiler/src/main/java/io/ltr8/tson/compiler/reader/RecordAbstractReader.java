@@ -222,7 +222,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final boolean hasDependents;
 
     /**
-     * Each field's sibling index where the field is typed by a sibling reference, whatever reads it -- a {@link
+     * Each field's sibling index where the field is a dependent one, whatever reads it -- a {@link
      * DependentFieldReader} or a bound {@code Token} component's reader -- and -1 elsewhere: a schema document holds
      * every such value as written and hands it to the read's sink ({@link Held}).
      */
@@ -231,7 +231,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /** Whether each field is the sibling of some field {@link #heldSiblingOf} names. */
     private final boolean[] typesAHeld;
 
-    /** Whether any field is typed by a sibling reference ({@link #heldSiblingOf}). */
+    /** Whether any field is a dependent one ({@link #heldSiblingOf}). */
     private final boolean holdsAsWritten;
 
     /**
@@ -433,7 +433,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             case VoidTreeReader ignored -> true;
             case ErrorReader ignored -> true;
             // A choice that recovers an untagged token reads it at its atom variant -- the kernel's
-            // `meta.field_type_expr`, where a name is the reference variant's -- so the token is that atom's value.
+            // `meta.type_expr`, where a name is the reference variant's -- so the token is that atom's value.
             case NamedDispatchReader choice -> choice.recovers(DiscriminationClass.STRING);
             case NamedDispatchReader.Recovering choice -> choice.dispatch().recovers(DiscriminationClass.STRING);
             default -> false;
@@ -593,7 +593,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * Each field typed by a sibling reference that {@code seen} holds and whose sibling, a field group's member, it does
+     * Each dependent field that {@code seen} holds and whose sibling, a field group's member, it does
      * not: nothing typed the value, so it is refused where it was {@code written}. A sibling with nothing to stand for
      * it is known to be absent only here, at the record's close, a dependent field written first being a sibling that
      * may yet arrive; a required one is the missing-field error instead. Whatever reads the field, a bound {@code
@@ -719,7 +719,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * What one read of a record in a schema document keeps of the fields typed by a sibling reference: each such
+     * What one read of a record in a schema document keeps of its dependent fields: each such
      * value's events, captured before it is read and held, where it stands, and each sibling's value as this instance
      * wrote it. Handed to the read's sink once the record is read ({@link TsonReadContext#heldAsWritten}), since a
      * schema document holds the value whatever the order its fields are written in, so the sibling may come after.

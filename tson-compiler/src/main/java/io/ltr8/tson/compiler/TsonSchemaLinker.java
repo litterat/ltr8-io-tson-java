@@ -1554,10 +1554,10 @@ public final class TsonSchemaLinker {
             // A record's dependent field is judged with its sibling (DependentFields) and never reaches here, so a
             // dependent type that does is declared, or written in place at some other slot: it is bound by the
             // record whose field's type it is, and nowhere else has a sibling to name (§5.2).
-            case DependentBody dependent -> throw new SchemaValidationException("'" + entryName + "' is the dependent "
-                    + "type '" + dependent.text() + "', which stands only directly at a record field's type, written "
-                    + "in place: its field '" + dependent.on() + "' is a sibling in that record, and a declaration or "
-                    + "any other slot has none (§5.2)");
+            case DependentBody dependent -> throw new SchemaValidationException("the dependent type '"
+                    + dependent.text() + "' stands only directly at a record field's type, written in place: it names "
+                    + "a field of that record, '" + dependent.on() + "', and a declaration or any other slot has none "
+                    + "(§5.2)");
             // A value entry was read against its type, so the read judged its shape; every reference it holds is at a
             // slot typed by a kind or a reference, recorded by the read and judged by its slot (ValuesByName), so
             // nothing is asked of the host class a value binds to.

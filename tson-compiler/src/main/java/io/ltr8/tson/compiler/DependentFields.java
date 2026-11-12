@@ -34,18 +34,18 @@ import java.util.Optional;
  *       puts inherited fields first, so a base's sibling precedes a subtype's dependent field.</li>
  *   <li><b>The sibling is typed by a reference to types</b>: past its alias hops a reference ({@code meta.type_ref},
  *       {@code meta.ref<C>} over a constructor, or a refinement) whose {@code of} is a constructor or {@code top}, so
- *       every value it holds names a type. One that allows a sibling reference is admitted, as {@code
- *       record_field.type} is; a sibling reference as its value is refused where the dependent field is read.</li>
+ *       every value it holds names a type.</li>
  *   <li><b>The sibling is there to read whenever the dependent field is</b>: required, defaulted, pinned, or a member
  *       of a field group with the dependent field optional, a group's own member being declared optional. A member is
  *       absent when another option is chosen, so a dependent field written without it is refused where it is read.
  *       A sibling that is optional with no default, or voidable, is refused, as is a member beside a required
  *       dependent field.</li>
  *   <li><b>A sibling's default or pin names a type a value can be read against</b>: a template, which no value is read
- *       against until it is applied, is refused, and so is a sibling reference. That it
- *       is a member of the sibling's reference is the field-value check's ({@code TsonSchemaLinker}).</li>
+ *       against until it is applied, is refused. That it is a member of the sibling's reference is the field-value
+ *       check's ({@code TsonSchemaLinker}).</li>
  *   <li><b>A dependent field is never voidable and carries no default or pin</b>: its type is not fixed at its
- *       declaration, so neither is the type a value of it would be read against.</li>
+ *       declaration, so neither is the type a value of it would be read against. Only the canonical form reaches this
+ *       rule: {@code kind!?} does not parse, and a value on a type in place is refused at resolution.</li>
  * </ul>
  *
  * <p>A dependent field restated only as itself is {@link #restates}'s rule, which the restated-field check asks; a
@@ -183,8 +183,8 @@ final class DependentFields {
     /**
      * Why {@code restated} is no restatement of {@code inherited} where either is a dependent field, or empty where
      * neither is or the two agree: a dependent field is restated only as itself, its marks moving along §5.7's order as
-     * any field's do. Its type stays the sibling reference on every member of the family, and pinning the sibling is
-     * what fixes the type.
+     * any field's do. Its type stays the dependent type on every member of the family, and pinning the sibling is what
+     * fixes the type.
      */
     static Optional<String> restates(String fieldName, RecordField inherited, RecordField restated) {
         boolean wasDependent = inherited.sibling().isPresent();

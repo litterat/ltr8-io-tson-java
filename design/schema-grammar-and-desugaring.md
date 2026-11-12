@@ -22,22 +22,14 @@ The schema grammar itself is in `design/schema-grammar.md`.
   no special case.
 - An element, position or map-value `?` binds `voidable` directly; an unmarked one states nothing.
 - An invalid sugar form is reported per declaration through `DesugarFailureReporter`, not thrown.
-- A sibling reference (`kind!`) is refused anywhere but at a record field's or group member's type, naming the slot
-  (`siblingsAtFieldTypesOnly`, [TSON-SCHEMA] §5.2); at a field's type it passes through as written.
+- `kind!` reaches this phase only at a field's or group member's type, the grammar admitting it nowhere else, and is
+  written there as `!meta.dependent { on: kind }` in place, the same `InlineConstruction` a container is.
 
 Related: `design/schema-grammar.md` (the parser producing the AST this rewrites),
 `design/desugaring-open-forms-and-templates.md` (forms over a parameter, template bodies refused),
 `design/template-materialisation.md` (materialisation), `design/open-records.md`, `design/schema-side-diagnostics.md`.
 
 ## Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
-
-**The position rule for a sibling reference runs first, over the declaration as written** (§5.2). The grammar admits
-`kind!` wherever a type-ref stands; at any slot but a field's type there is no sibling to read (`[ kind! ]` would need
-an array chosen per value), so the phase refuses it where it is written, as a `SchemaValidationException` whose
-message is `SiblingRef.refusedAt`'s: an alias target, a refinement source, a composition operand, an array's element
-type, a map's key or value type, a tuple element, a choice variant, a template argument. A group member is a field of
-the record and takes one as a field does. At a field's type the reference is carried as written, and
-`DefinitionResolver.resolveFieldType` hands `BuiltField` the model's `SiblingRef`.
 
 An AST→AST rewrite between parsing and resolution. Every sugar form — `[T]` and the sized forms, `[T, U]`, `{K => V}`
 (§5.3), `(A | B)` (§5.4) — becomes the `!C value` construction it denotes, and stays where it is written. So
@@ -59,6 +51,7 @@ does ([TSON-SCHEMA] §3.4.1).
   | `{K => V}` | `!meta.map { key_type: K  value_type: V }` |
   | `{K => V?}`, `{K => V?; …}` | the corresponding form with `voidable: true` bound directly |
   | `{K => V; N..M}` | the same, plus `min_items`/`max_items` |
+  | `kind!`, at a field's type alone | `!meta.dependent { on: kind }` |
 
   A slot in the table holds what a type slot holds (`slotValue`): a bare token for a name, an application as the data
   grammar's reference (`WireForm.refValue`), and a nested form as `{ of: <its construction> }`. One spelling per shape,

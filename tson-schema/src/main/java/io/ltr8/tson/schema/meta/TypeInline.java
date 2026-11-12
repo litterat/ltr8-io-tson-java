@@ -65,8 +65,9 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
         if (!constructible(of) && !(of instanceof DependentBody)
                 && !(of instanceof RecordBody record && !record.isOpen())) {
             throw new IllegalArgumentException("a type written in place is a container, a tuple, a choice, a "
-                    + "reference or the record an application closes to, and a " + of.getClass().getSimpleName()
-                    + " is none: an enum, an atom and a namespace type are declared and named ([TSON-SCHEMA] §5.2)");
+                    + "reference, a dependent type or the record an application closes to, and a "
+                    + of.getClass().getSimpleName() + " is none: an enum, an atom and a namespace type are declared "
+                    + "and named ([TSON-SCHEMA] §5.2)");
         }
         if (!of.chain().equals(TypeChain.EMPTY)) {
             throw new IllegalArgumentException("a type written in place carries no chain: " + of.chain());

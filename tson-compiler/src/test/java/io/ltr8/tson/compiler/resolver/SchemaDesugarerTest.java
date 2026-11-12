@@ -9,13 +9,14 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.FieldTypeExpr;
+import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.InlineConstruction;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -487,50 +488,32 @@ class SchemaDesugarerTest {
                 .reduce((a, b) -> a + " " + b).orElse("") + "] }";
     }
 
-    // ── §5.2's position rule: a sibling reference stands only at a record field's type ─────────────
+    // ── A dependent field's type (§5.2): kind! is its construction in place ─────────────────────
 
-    /** At a record field's type, and a group member's, a sibling reference is the dependent type in place. */
+    /** At a record field's type, and at a group member's, {@code kind!} is {@code !meta.dependent { on: kind }}. */
     @Test
-    void aSiblingReferenceAtAFieldsTypeIsKeptAsWritten() {
+    void aDependentTypeAtAFieldsTypeIsItsConstructionInPlace() {
         SchemaDocument document = desugar("  cell => { kind: meta.type_ref  v?: kind!  ( a: kind! | b: text ) }");
         StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get("cell").typeDef();
-        FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);
-        assertEquals("meta.dependent", dependentOn(field.type().orElseThrow().typeRef()));
+        RecordDef record = (RecordDef) typeDef.body();
+        FieldDef field = (FieldDef) record.entries().get(1);
+        assertEquals("meta.dependent", constructorOf(field.type().orElseThrow().typeRef()));
+        GroupDef group = (GroupDef) record.entries().get(2);
+        assertEquals("meta.dependent", constructorOf(group.members().getFirst().typeRef()));
     }
 
     /** The constructor a construction in place applies, where the slot holds one. */
-    private static String dependentOn(TypeExpr written) {
+    private static String constructorOf(FieldTypeExpr written) {
         return ((InlineConstruction) written).value().typeRef().orElseThrow();
     }
 
     /** An open record's field holds it in the record body, as a closed record's does. */
     @Test
-    void anOpenRecordFieldKeepsASiblingReference() {
+    void anOpenRecordsDependentFieldIsItsConstructionInPlace() {
         StructuralTypeDef typeDef = assertInstanceOf(StructuralTypeDef.class, desugar(
                 "  cell => <T> { kind: meta.type_ref  v?: kind!  w: T }").body().declarations().get("cell").typeDef());
         FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);
-        assertEquals("meta.dependent", dependentOn(field.type().orElseThrow().typeRef()));
-    }
-
-    /** Anywhere else in sugar it is refused before the form is rewritten, naming the slot. */
-    @Test
-    void aSiblingReferenceOffAFieldsTypeIsRefusedNamingTheSlot() {
-        Map<String, String> slots = Map.of(
-                "  cell => { kind: meta.type_ref  v: [ kind! ] }", "an array's element type",
-                "  cell => { kind: meta.type_ref  v: { text => kind! } }", "a map's value type",
-                "  cell => { kind: meta.type_ref  v: { kind! => text } }", "a map's key type",
-                "  cell => { kind: meta.type_ref  v: ( kind! | text ) }", "a choice variant",
-                "  cell => { kind: meta.type_ref  v: [ kind! text ] }", "a tuple element",
-                "  box => <T> { v: T }\n  cell => { kind: meta.type_ref  v: box< kind! > }", "a template argument",
-                "  x => kind!", "an alias target",
-                "  x => kind! ^ {}", "a refinement source",
-                "  x => kind! & { note: text }", "a composition operand");
-        slots.forEach((declarations, slot) -> {
-            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> desugar(declarations), declarations);
-            assertEquals("a sibling reference ('kind!') stands only at a record field's type ([TSON-SCHEMA] §5.2), "
-                    + "not at " + slot, thrown.getMessage(), declarations);
-        });
+        assertEquals("meta.dependent", constructorOf(field.type().orElseThrow().typeRef()));
     }
 
     /** An application in a slot: the data grammar's reference, {@code head<arg>}. */

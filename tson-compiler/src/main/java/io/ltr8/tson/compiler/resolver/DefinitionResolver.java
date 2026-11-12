@@ -11,7 +11,9 @@ import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ChoiceExpr;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
+import io.ltr8.tson.compiler.ast.schema.DependentType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.FieldTypeExpr;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.InlineConstruction;
 import io.ltr8.tson.compiler.ast.schema.Instance;
@@ -25,7 +27,6 @@ import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
-import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
@@ -187,7 +188,7 @@ import java.util.function.Predicate;
  * lists me as a supertype, transitively), imports included, so {@code TsonSchemaLinker} computes it.
  *
  * <p>Note the two reference models in play: this class imports the grammar layer's ({@link TypeExpr}, and the
- * references {@link NameRef}, {@link ApplicationRef} and {@link SiblingRef}) for reading the AST, and refers to the
+ * references {@link NameRef} and {@link ApplicationRef}) for reading the AST, and refers to the
  * resolved model's ({@code io.ltr8.tson.schema.meta.TypeRef} and its variants, the references it produces) by
  * fully-qualified name -- the two layers name their references alike, so only one can be the unqualified import.
  *
@@ -516,7 +517,7 @@ final class DefinitionResolver {
                     // A declaration-level container form is rewritten by SchemaDesugarer before resolution into the
                     // `!meta.array { ... }` (or map, tuple, choice) construction it denotes (§5.3), and a construction
                     // in place stands only at a field's type -- so one here is that phase not having run.
-                    case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, SiblingRef _, InlineConstruction _ ->
+                    case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, InlineConstruction _ ->
                             throw unlifted("'" + name + "'", referenceTypeDef.ref());
                 };
             }
@@ -533,19 +534,14 @@ final class DefinitionResolver {
     }
 
     /**
-     * A container sugar form that reached resolution, or a construction in place off a field's type. {@link
+     * A sugar form that reached resolution, or a construction in place off a field's type. {@link
      * SchemaDesugarer} rewrites every sugar form -- into the construction a declaration's body is, into a
      * construction in place at a field's type, or into the application it spells over a parameter -- and refuses
      * one as an argument, so no schema an author writes can produce one here: it is a caller resolving raw AST
      * without that phase, an invariant of the pipeline rather than a gap in it.
      */
-    private static IllegalStateException unlifted(String where, TypeExpr ref) {
-        if (ref instanceof SiblingRef) {
-            return new IllegalStateException(where + ": a sibling reference reached resolution off a field's type: "
-                    + ref + " -- SchemaDesugarer refuses one there (§5.2), so this declaration was resolved from raw "
-                    + "AST without that phase");
-        }
-        return new IllegalStateException(where + ": a container sugar form reached resolution where it is not "
+    private static IllegalStateException unlifted(String where, FieldTypeExpr ref) {
+        return new IllegalStateException(where + ": a sugar form reached resolution where it is not "
                 + "rewritten: " + ref + " -- SchemaDesugarer rewrites every sugar form before DefinitionResolver runs "
                 + "(§5.3), so this declaration was resolved from raw AST without that phase");
     }
@@ -2594,10 +2590,6 @@ final class DefinitionResolver {
      * and is refused here in those terms.
      */
     private io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeExpr written) {
-        if (written instanceof SiblingRef sibling) {
-            throw new SchemaValidationException(SchemaDesugarer.siblingRefusedAt(sibling.field(),
-                    "the type of parameter '" + parameter + "'"));
-        }
         if (!(written instanceof NameRef) && !(written instanceof ApplicationRef)) {
             throw new SchemaValidationException("parameter '" + parameter + "' is written with the type "
                     + written + ", and a parameter's written type names a declared type or an application of one "
@@ -2624,23 +2616,23 @@ final class DefinitionResolver {
                 }
                 yield io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), args);
             }
-            case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, SiblingRef _, InlineConstruction _ ->
+            case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, InlineConstruction _ ->
                     throw unlifted("a type-ref position", ref);
         };
     }
 
     /**
      * A field's or group member's type: a type-ref as {@link #resolveTypeRef} resolves one, or a construction
-     * written in place, a dependent type among them ({@code kind!}, which {@link SchemaDesugarer} writes as {@code
-     * !meta.dependent { on: kind }}), read through its constructor's reader as a
+     * written in place, {@code !meta.dependent { on: kind }} among them, read through its constructor's reader as a
      * declaration's {@code !C { ... }} is ({@link #bindAtomInstance}) and held at the field
      * ({@link io.ltr8.tson.schema.meta.TypeInline}). Reading it waits on its constructor, and on each type the read
      * reaches, as reading any value does ([TSON-SCHEMA] §3.4.1).
      */
-    private io.ltr8.tson.schema.meta.TypeExpr resolveFieldType(String field, TypeExpr ref) {
+    private io.ltr8.tson.schema.meta.TypeExpr resolveFieldType(String field, FieldTypeExpr ref) {
         return switch (ref) {
             case InlineConstruction inline -> inlineType(field, inline);
-            default -> resolveTypeRef(ref);
+            case DependentType _ -> throw unlifted("field '" + field + "'", ref);
+            case TypeExpr type -> resolveTypeRef(type);
         };
     }
 

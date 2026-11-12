@@ -14,7 +14,7 @@ import java.util.Map;
  * An open record's parameters substituted on the model ([TSON-SCHEMA] §5.10): each {@link ParamRef} in its fields'
  * types and its parents replaced by the argument bound to it, at any depth, and nothing else changed. A parameter
  * stands only at a field's type or as an argument of an application there or in a parent, so those references are
- * all substitution visits; a sibling reference names a field and is left as written.
+ * all substitution visits.
  *
  * <p><b>Two callers, one rule.</b> {@code TemplateMaterialiser} closes an application, where every argument is closed;
  * {@code DefinitionResolver} absorbs an applied operand, where an argument may be one of the absorbing declaration's

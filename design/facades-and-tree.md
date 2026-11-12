@@ -178,7 +178,7 @@ admit UTS #39's own `Toys-Я-Us`.
   carries its closure, so `referent()` is the value of the entry it names (`design/references.md`); read in data
   under a reference naming values (`meta.ref<order>`), its `referent()` is the value its name reaches, and a `Ref`
   host is delivered that value at the read. A schemaless read
-  has no closure: it keeps an application or a sibling reference as a `TsonReference` (`design/tree-model.md`) and a
+  has no closure: it keeps an application as a `TsonReference` (`design/tree-model.md`) and a
   bare name as a token.
 - **Rule 2 is looser for a container than for an atom, deliberately.** `TypeRefCheck.names` (a `@Typename`,
   else the simple class name case-insensitively — the same match `bindUnion` gives union members) is what

@@ -11,10 +11,9 @@ only; history lives in git.
 - `get`/`at` never throw; a `TsonMissing` carries the pointer of the step that failed, and the first failure
   sticks. "Missing" and "absent" stay distinct kinds.
 - A schemaless read keeps a reference the grammar alone shows to be one as a `TsonReference`: an application
-  (`TsonApplicationReference`) or a sibling reference (`TsonSiblingReference`). A bare name is a `TsonAtom` holding
-  text. Neither variant carries a referent, there being no closure to resolve in. Under a schema a reference-typed
-  position delivers a `schema.meta.TypeRef` in a `TsonAtom` instead, and a record field's type, which admits a sibling
-  reference, a `schema.meta.SiblingRef`. A dependent field's node is whatever the type its sibling names reads to.
+  (`TsonApplicationReference`). A bare name is a `TsonAtom` holding text. It carries no referent, there being no
+  closure to resolve in. Under a schema a reference-typed position delivers a `schema.meta.TypeRef` in a `TsonAtom`
+  instead. A dependent field's node is whatever the type its sibling names reads to.
 - There is one no-value node, `TsonVoid`; `null` is a `TsonAtom` holding the string `null`, and a `void`
   position admits `_` and nothing else.
 - `as(Class)`/`asString`/… cast, `asInt`/`asLong`/`asDouble` convert — a test asserting which host type a
@@ -89,17 +88,14 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   holding no value) stay distinct kinds.
 - **`TsonReference` is a reference read with no schema** ([TSON-DATA] §4, §7.4), a sealed interface whose `text()`
   is what it reads as and whose `isReference()` is true. **A tree reference is one the grammar alone shows to be a
-  reference**: an application by its `<…>`, a sibling reference by its trailing `!`. A qualified name with no
-  arguments is a token, a `TsonAtom` like any other, since a schemaless read cannot tell a bare name from any other
-  token. Code that needs only "a reference" switches on the interface; code that needs the parts, on the two records.
+  reference**: an application by its `<…>`. A qualified name with no arguments is a token, a `TsonAtom` like any
+  other, since a schemaless read cannot tell a bare name from any other token.
   - **`TsonApplicationReference`**: `segments`, `arguments` (at least one), `typeRef`, `annotations`. A Class 1 read
     keeps `map<text list<int32>>` as the structured value it is, each argument read by the ordinary schemaless rule,
     so in `response<order 201>` the `201` is a number and `order` a string, and a nested application is another
     `TsonApplicationReference`. `text()` (and `toString()`) recreates the canonical text, one space between
     arguments, a string argument that is a qualified name bare and any other quoted.
-  - **`TsonSiblingReference`**: `field`, `typeRef`, `annotations`; `text()` is `kind!` ([TSON-DATA] §7.4). What
-    it names is per record instance and a schema's to give, only at a record field's type.
-  - **Neither offers a referent**: what a reference names is a closure's question, and a schemaless read has none.
+  - **It offers no referent**: what a reference names is a closure's question, and a schemaless read has none.
   Under a schema a reference-typed position delivers the schema model's `TypeRef` instead, whose `referent()` answers it
   (`design/references.md`, `design/facades-and-tree.md`). The node lives here rather than reusing `TypeRef` because
   `tson-tree` depends on nothing.

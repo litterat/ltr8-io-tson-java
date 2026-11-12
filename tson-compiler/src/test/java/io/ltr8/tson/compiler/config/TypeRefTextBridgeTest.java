@@ -7,9 +7,15 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/**
- * A reference bound from its text -- a JSON string's among them: a {@code Reference} or {@code SiblingRef} host reads
- * {@code kind!}, and a {@code TypeRef} host refuses it by the position rule ([TSON-SCHEMA] §5.2).
- */
+/** A reference bound from its text, a JSON string's among them. */
 class TypeRefTextBridgeTest {
+
+    @Test
+    void aReferenceIsReadFromItsTextAndAMarkedNameIsNone() {
+        assertEquals(TypeRef.of("text"), new TypeRefTextBridge().toObject("text"));
+        assertEquals(TypeRef.of("box", java.util.List.of(TypeRef.of("text"))),
+                new TypeRefTextBridge().toObject("box<text>"));
+        assertThrows(AtomParseException.class, () -> new TypeRefTextBridge().toObject("kind!"));
+        assertThrows(AtomParseException.class, () -> new TypeRefTextBridge.ForName().toObject("kind!"));
+    }
 }

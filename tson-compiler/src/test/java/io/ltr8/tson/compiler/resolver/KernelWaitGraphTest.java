@@ -57,10 +57,10 @@ class KernelWaitGraphTest {
      * with them, which nothing in the closure names: the tuple and choice constructors and the tuple's element, the
      * {@code application} annotation, the {@code ref} reference with {@code field_name}, the root's {@code set}, the
      * {@code disjoint} assertion, and the octet-sequence constructor with its encodings and instance. An open record's
-     * {@code param} and {@code param_name} are in the closure, reached through {@code record.parameters}. The
-     * measurement: a cycle of 32, a closure of 68, of 77 entries. The choice constructor and the disjoint assertion
-     * are on the cycle: a record field's type is read against {@code meta.field_type_expr}, a choice asserted
-     * disjoint, and a type written in place reaches every constructor's record through {@code meta.type}.
+     * {@code param} and {@code param_name} are in the closure, reached through {@code record.parameters}. The choice
+     * constructor and the disjoint assertion are on the cycle: a record field's type is read against {@code
+     * meta.type_expr}, a choice asserted disjoint, and a type written in place reaches every constructor's record
+     * through {@code meta.type}.
      */
     @Test
     void theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts() throws Exception {

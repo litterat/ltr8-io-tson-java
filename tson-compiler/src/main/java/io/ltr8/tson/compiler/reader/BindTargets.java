@@ -50,13 +50,11 @@ import java.util.function.UnaryOperator;
  *       nothing is rebuilt. A record written in place has no name to bind by, and is read into the target's own
  *       record class ({@link RecordInPlaceBindReader}).</li>
  *   <li><b>A name at a reference- or kind-typed slot</b> is recorded with the slot's declared type for the linker
- * to judge, whatever the target holds. A {@code Reference} target reads as a {@code TypeRef} one does, a type reference
- * being a reference, and admits a sibling reference besides, which a {@code TypeRef} target refuses at its token, naming the
- * slot ([TSON-SCHEMA] §5.2's position rule). A {@code Ref} or {@code TypeRef} target at a reference-typed slot ({@code
+ * to judge, whatever the target holds. A {@code Ref} or {@code TypeRef} target at a reference-typed slot ({@code
  * meta.ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives the value the
  * name reaches -- when the schema links, for a name a schema document writes, and at the read for one in a data
  * document -- and a {@code TypeRef} the name, carrying that value as its referent in a data document. A {@code
- * TypeRef} target at a kind-typed slot ({@code meta.record_field.type} is {@code meta.type_ref}, a meta's {@code
+ * TypeRef} target at a kind-typed slot (a name at {@code meta.record_field.type} is a {@code meta.type_ref}, a meta's {@code
  * request: meta.ref<record>}) reads through a {@link TypeNameSlotReader}: a type's name, or in a kernel body an
  * application still to close, written unquoted. Any other target there is bound as at an atom and wrapped in a {@link
  * RecordedNameReader}, which records the name it read. The slot declares the spelling, so a {@code TypeRef} or

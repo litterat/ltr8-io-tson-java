@@ -30,7 +30,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `meta.enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
       judged under its own name type in both encodings (Part 2 §5.2)
 - [x] References (Part 2 §4.2) — one atom, `!meta.reference_type { of: T }`, spelled
-      `meta.ref<T>` (`allow_sibling: false`) whatever `T` is, admits a name exactly when the named entry's value, past
+      `meta.ref<T>` whatever `T` is, admits a name exactly when the named entry's value, past
       its alias hops, is of a type IS-A `T`. Over a constructor (`meta.ref<net.uuid_type>`) its values are the names of
       the types in the schema's closure built with it: computed at link, never listed or written, and judged by
       membership in both encodings. Over any other type its values are qualified names of values. The kernel types
@@ -43,11 +43,10 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       it is a reference at a reference slot; in a data document a reference is a name, so an application at a kind-typed
       position is refused whether or not the schema closes it, and a name reads to a `TypeRef` whose `referent()` is the
       entry's value. A quoted token is never a reference. In JSON the same text is a string, refused alike
-- [x] A sibling reference is a reference value (Part 1 §7.4, Part 2 §4.2) — `kind!` parses in data
-      and in sugar, its `!` followed by whitespace, and in JSON the same text is a string; it stands only at a record
-      field's type, the one slot whose type, `meta.field_type_ref`, keeps `meta.reference_type`'s `allow_sibling`, and
-      is refused elsewhere, naming the slot, in sugar, in an explicit instance and in data. A schemaless read keeps one
-      as a `TsonSiblingReference`
+- [x] A dependent field's type is a sum written in place (Part 2 §5.2, `SPEC-FEEDBACK.md` #6) —
+      `{ of: !meta.dependent { on: kind } }` at a record field's type, `kind!` in schema-grammar sugar, which parses at
+      a field's or group member's type and nowhere else; a `meta.dependent` declared or at any other slot is refused at
+      link. `kind!` is no data form in either encoding
 - [x] Dependent fields (Part 2 §5.2) — `v?: kind!` is read per instance
       against the type its sibling's value names, in tree and bind mode (an `Object` component) and in JSON. The
       sibling's rules are checked at the declaration against the flattened record: declared first, typed by a reference

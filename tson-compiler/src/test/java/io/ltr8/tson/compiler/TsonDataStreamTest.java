@@ -105,8 +105,6 @@ class TsonDataStreamTest {
         }
     }
 
-    // ── A sibling reference ([TSON-DATA] §7.4, §7.5) ────────────────────
-
     @Test
     void voidRoot() {
         assertEquals(List.of("DocumentStart(|)", "Absent", "DocumentEnd"), shape("_"));

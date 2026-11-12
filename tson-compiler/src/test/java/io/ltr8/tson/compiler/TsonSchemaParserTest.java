@@ -11,7 +11,9 @@ import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ChoiceExpr;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
+import io.ltr8.tson.compiler.ast.schema.DependentType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.FieldTypeExpr;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapExpr;
@@ -22,7 +24,6 @@ import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
-import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
@@ -58,7 +59,7 @@ class TsonSchemaParserTest {
                 .filter(f -> f.name().equals(field)).findFirst().orElseThrow();
     }
 
-    private static TypeExpr fieldTypeOf(String declaration, String field) {
+    private static FieldTypeExpr fieldTypeOf(String declaration, String field) {
         return fieldOf(declaration, field).type().orElseThrow().typeRef();
     }
 
@@ -1205,37 +1206,46 @@ class TsonSchemaParserTest {
         assertEquals(List.of("https://tson.io/2026/40/m/meta.tn", "https://tson.io/2026/40/m/core.tn"), doc.imports());
     }
 
-    // ── A sibling reference (§12.1, §12.3) ───────────────────────────────
+    // ── A dependent field's type (§5.2, §12.1, §12.3) ─────────────────────
+
+    /** {@code kind!} parses as a record field's type, and as a field group member's, a member being a field. */
+    @Test
+    void aDependentTypeParsesAtAFieldsTypeAndAGroupMembersType() {
+        assertEquals(new DependentType("kind"), fieldTypeOf("cell => { kind: meta.type_ref  v?: kind!  w: text }", "v"));
+        GroupDef group = groupOf("cell => { ( v: kind! | w: text )? }");
+        assertEquals(new DependentType("kind"), group.members().getFirst().typeRef());
+    }
 
     /**
-     * {@code kind!} parses wherever a type-ref does -- a field's type, an element, a variant, an argument, a
-     * declaration's own body -- into a {@link SiblingRef}; where it may stand is the desugar phase's to say.
+     * Anywhere else a reference stands, {@code kind!} is a parse error saying where the mark may stand: inside a field's
+     * type, as a declaration's body, a refinement's source, a composition operand, a map's key, a parameter's type, and
+     * as a field's value.
      */
     @Test
-    void aSiblingReferenceParsesWhereverATypeRefDoes() {
-        assertEquals(new SiblingRef("kind"), fieldTypeOf("cell => { kind: meta.type_ref  v?: kind!  w: text }", "v"));
-        assertEquals(new SiblingRef("kind"), assertInstanceOf(ArrayExpr.class,
-                fieldTypeOf("cell => { v: [ kind! ] }", "v")).elementType().typeRef());
-        assertEquals(new SiblingRef("kind"), assertInstanceOf(ChoiceExpr.class,
-                fieldTypeOf("cell => { v: ( kind! | text ) }", "v")).variants().getFirst());
-        assertEquals(new SiblingRef("kind"), assertInstanceOf(ApplicationRef.class,
-                fieldTypeOf("cell => { v: box< kind! > }", "v")).args().getFirst());
-        assertEquals(new SiblingRef("kind"),
-                assertInstanceOf(ReferenceTypeDef.class, declOf("x => kind!").typeDef()).ref());
-        assertEquals(new SiblingRef("kind"), mapOf("x => { kind! => text }").keyType());
+    void aDependentTypeOffAFieldsTypeDoesNotParse() {
+        for (String declaration : List.of("cell => { v: [ kind! ] }", "cell => { v: [ kind!, text ] }",
+                "cell => { v: { text => kind! } }", "cell => { v: ( kind! | text ) }", "cell => { v: box< kind! > }",
+                "cell => { ( v: [ kind! ] | w: text )? }", "x => kind!", "x => kind! ^ { a: text }",
+                "x => base & kind! & { a: text }", "x => kind! & { a: text }", "x => { kind! => text }",
+                "x => <T: kind! > { a: T }", "cell => { kind: meta.type_ref ~ kind!  v: text }")) {
+            ParseException e = assertThrows(ParseException.class, () -> declOf(declaration), declaration);
+            assertEquals("'kind!' is a dependent field's type, and stands only as a record field's type, a field "
+                    + "group member's included -- never inside a type, nor at any other position (§5.2, §12.1)",
+                    e.getMessage(), declaration);
+        }
     }
 
     /**
      * The {@code !} is followed by whitespace, the token before it is one unquoted identifier, and a tag names a
-     * type: <code>kind!}</code>, {@code [kind!]}, {@code a!b}, {@code kind!?}, {@code a.b!}, {@code "kind"!} and {@code
-     * !int32!} do not parse.
+     * type: <code>kind!}</code>, {@code a!b}, {@code kind!?}, {@code a.b!}, {@code "kind"!} and {@code !int32!} do not
+     * parse.
      */
     @Test
-    void aMalformedSiblingReferenceDoesNotParse() {
-        for (String declaration : List.of("cell => { k: meta.type_ref  v?: k!}", "cell => { v: [k!] }",
+    void aMalformedDependentTypeDoesNotParse() {
+        for (String declaration : List.of("cell => { k: meta.type_ref  v?: k!}",
                 "cell => { a: meta.type_ref  v?: a!b }", "cell => { k: meta.type_ref  v?: k!? }",
                 "cell => { a: meta.type_ref  v?: a.b! }", "cell => { k: meta.type_ref  v?: \"k\"! }",
-                "small => !int32! ^ { max: 10 }", "cell => { v: box<k!> }")) {
+                "small => !int32! ^ { max: 10 }")) {
             assertThrows(ParseException.class, () -> declOf(declaration), declaration);
         }
     }

@@ -21,11 +21,7 @@ keeps the rest of the document. Current form only; history lives in git.
 - A reference is written unquoted, as data grammar ([TSON-DATA] §7.4):
   `TsonDataEmitter.reference(TypeRef)` writes the qualified name and, where it carries arguments, an adjacent `<`,
   the arguments one space apart and `>`, the canonical text `map<text list<int32>>`, each argument a reference.
-  `TsonDataEmitter.reference(SiblingRef)` writes `kind!` ([TSON-DATA] §7.4), and
-  `reference(Reference)` picks between the two. A sibling's `!` must be followed by whitespace ([TSON-DATA] §7.5),
-  which the emitter always supplies: a space separates every element, a map's arrow and a non-empty scope's closing
-  delimiter, and ends an annotation's value. `AstWriter` writes a `ReferenceValue` through it, `TreeValueWriter` a
-  `TsonReference` (either record), and
+  `AstWriter` writes a `ReferenceValue` through it, `TreeValueWriter` a `TsonReference`, and
   `DataClassObjectWriter` a `schema.meta.TypeRef` (a `meta.type_ref` value): a name as its one token, as a value written
   by name has only that spelling ([TSON-SCHEMA] §5.12), and an application as `!meta.alias { target: result<T> }` or
   `@meta.application:response<order 201>` writes it. A reference some name in which is no qualified name is written as a

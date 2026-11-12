@@ -67,9 +67,8 @@ final class ParameterTypes {
     /** The one slot of an open record a parameter may stand in as a whole token: a field's type. */
     private static final String FIELD_TYPE = RECORD_FIELD + "." + WireForm.TYPE;
 
-    /** The kernel's type slots that hold a name or a type written in place, {@code { of: … }}. */
-    private static final Set<String> IN_PLACE_SLOTS = Set.of(KernelNames.of("type_expr"),
-            KernelNames.of("field_type_expr"));
+    /** The kernel's type a type slot holds: a name or a type written in place, {@code { of: … }}. */
+    private static final String TYPE_EXPR = KernelNames.of("type_expr");
 
     /** A field's value, which is never a parameter. */
     private static final String FIELD_VALUE = RECORD_FIELD + "." + WireForm.VALUE;
@@ -385,12 +384,12 @@ final class ParameterTypes {
             };
             switch (written) {
                 case TokenValue token when declares(token.text()) && inPlace
-                        && (type instanceof ReferenceBody || IN_PLACE_SLOTS.contains(declaredName)) ->
+                        && (type instanceof ReferenceBody || TYPE_EXPR.equals(declaredName)) ->
                         throw inPlace(token.text(), slot);
                 // A field written positionally, `item => T`, is its record_field's one unmarked slot, its type.
                 case TokenValue token when declares(token.text()) -> token(token.text(),
                         RECORD_FIELD.equals(declaredName) ? FIELD_TYPE : slot);
-                case RecordValue wrapper when IN_PLACE_SLOTS.contains(declaredName) -> wrapped(wrapper);
+                case RecordValue wrapper when TYPE_EXPR.equals(declaredName) -> wrapped(wrapper);
                 case ArrayValue array -> elements(array, type, slot);
                 case MapValue map when type instanceof MapBody entries -> entries(map, entries, slot);
                 case RecordValue record when type instanceof RecordBody nested && declaredName != null ->

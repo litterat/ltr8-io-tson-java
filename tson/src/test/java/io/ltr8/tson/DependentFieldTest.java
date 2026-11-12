@@ -90,10 +90,16 @@ class DependentFieldTest {
         }
     }
 
+    /** In sugar and in canonical form alike, the field {@code on} names precedes the dependent field. */
     @Test
     void theSiblingIsDeclaredBeforeItsDependentField() {
         assertTrue(refusal("cell => { v?: kind!  kind: meta.type_ref }").contains("is declared after it"));
         assertTrue(refusal("kind => { a: text }\n  cell => { v?: kind! }").contains("has no field 'kind'"));
+        String dependent = "v => !meta.record_field { type: { of: !meta.dependent { on: kind } }  optional: true }";
+        assertTrue(refusal("cell => !meta.record { fields: { " + dependent + "  kind => meta.type_ref } }")
+                .contains("is declared after it"));
+        assertTrue(refusal("cell => !meta.record { fields: { name => text  " + dependent + " } }")
+                .contains("has no field 'kind'"));
     }
 
     @Test
@@ -101,6 +107,15 @@ class DependentFieldTest {
         assertTrue(refusal("cell => { n: int32  v?: n! }").contains("which is typed 'int32'"));
         assertTrue(refusal("method => { verb: text }\n  calls => meta.ref<method>\n  cell => { m: calls  v?: m! }")
                 .contains("which is typed 'calls'"));
+    }
+
+    /** A dependent field names no types, so it is no sibling, in sugar and in canonical form alike. */
+    @Test
+    void theSiblingIsNoDependentField() {
+        assertTrue(refusal("cell => { kind: meta.type_ref  a?: kind!  b?: a! }").contains("itself a dependent field"));
+        assertTrue(refusal("cell => !meta.record { fields: { kind => meta.type_ref  a => !meta.record_field { type: "
+                + "{ of: !meta.dependent { on: kind } }  optional: true }  b => !meta.record_field { type: "
+                + "{ of: !meta.dependent { on: a } }  optional: true } } }").contains("itself a dependent field"));
     }
 
     @Test
@@ -146,6 +161,13 @@ class DependentFieldTest {
         assertTrue(refusal("cell => !meta.record { fields: { kind => meta.type_ref  v => !meta.record_field { "
                 + "type: { of: !meta.dependent { on: kind } }  optional: true  voidable: true } } }")
                 .contains("is voidable"));
+        // In canonical form the grammar and the resolver's refusal of a value on a type in place are not reached, so
+        // the dependent field's own rule is.
+        for (String role : List.of("DEFAULT", "FIXED")) {
+            String canonical = refusal("cell => !meta.record { fields: { kind => meta.type_ref  v => !meta.record_field "
+                    + "{ type: { of: !meta.dependent { on: kind } }  optional: true  role: " + role + "  value: 5 } } }");
+            assertTrue(canonical.contains("a dependent field, and carries"), canonical);
+        }
     }
 
     @Test
@@ -271,11 +293,61 @@ class DependentFieldTest {
         String meta = "!!import:\"https://tson.io/2026/40/m/meta.tn\"\n";
         assertEquals(List.of(), tson.validate(meta + "!meta.record { fields: { kind => { type: meta.type_ref }  "
                 + "value => { type: { of: !meta.dependent { on: kind } }  optional: true } } }"));
-        assertTrue(refusal("x => !meta.dependent { on: kind }").contains("stands only directly at a record field's"));
-        assertTrue(refusal("cell => !meta.record { fields: { kind => !meta.record_field { type: meta.type_ref }  "
-                + "v => !meta.record_field { type: { of: !meta.array { element_type: { of: !meta.dependent { "
-                + "on: kind } } } } } } }").contains("stands only directly at a record field's"));
+        String dependent = "{ of: !meta.dependent { on: kind } }";
+        for (String declaration : List.of("x => !meta.dependent { on: kind }",
+                "x => !meta.array { element_type: " + dependent + " }")) {
+            assertTrue(refusal(declaration).contains("stands only directly at a record field's"), declaration);
+        }
+        for (String type : List.of("!meta.array { element_type: " + dependent + " }",
+                "!meta.map { key_type: text  value_type: " + dependent + " }",
+                "!meta.tuple { elements: [{ element_type: " + dependent + " } { element_type: text }] }",
+                "!meta.choice { variants: [" + dependent + " text] }")) {
+            String declaration = "cell => !meta.record { fields: { kind => !meta.record_field { type: meta.type_ref }  "
+                    + "v => !meta.record_field { type: { of: " + type + " } } } }";
+            // A choice holding one is also refused as no disjoint choice, a dependent type having no form class.
+            List<Diagnostic> problems = Tson.standard().validateSchema(schema(declaration));
+            assertTrue(problems.stream().anyMatch(problem -> problem.message().contains(
+                    "stands only directly at a record field's")), () -> declaration + " -> " + problems);
+        }
         assertTrue(refusal("wide => !meta.type_ref ^ { allow_sibling: true }").contains("allow_sibling"));
+    }
+
+    // ── Where kind! is written ────────────────────────────────────────────
+
+    /**
+     * {@code kind!} is schema-grammar sugar at a record field's type alone (a group member's included), so anywhere
+     * else in a schema it is a syntax error naming where it may stand.
+     */
+    @Test
+    void theMarkIsASyntaxErrorOffAFieldsType() {
+        for (String declaration : List.of("cell => { kind: meta.type_ref  v: [ kind! ] }", "x => kind!",
+                "cell => { kind: meta.type_ref  v: ( kind! | text ) }")) {
+            Diagnostic problem = only(Tson.standard().validateSchema(schema(declaration)));
+            assertTrue(problem.message().contains("'kind!' is a dependent field's type, and stands only as a record "
+                    + "field's type"), problem.message());
+        }
+    }
+
+    /**
+     * Data has no {@code kind!}: a construction's payload and a data document are read by the data grammar, which
+     * gives the mark its own syntax error. Its canonical form, {@code { of: !meta.dependent { on: kind } }}, is what a
+     * payload writes; quoted, {@code "kind!"} is text, which names no type.
+     */
+    @Test
+    void theMarkIsNoDataForm() {
+        String separator = "adjacent values must be separated by whitespace, a comma, or both";
+        for (String declaration : List.of(
+                "cell => !meta.record { fields: { kind => meta.type_ref  v => !meta.record_field { type: kind! } } }",
+                "x => !meta.array { element_type: kind! }")) {
+            List<Diagnostic> problems = Tson.standard().validateSchema(schema(declaration));
+            assertTrue(problems.stream().anyMatch(problem -> problem.message().equals(separator)),
+                    () -> declaration + " -> " + problems);
+        }
+        Tson typed = tson(schema("typed => { t: meta.type_ref }"));
+        List<Diagnostic> problems = typed.validate("!!import:\"" + ID + "\"\n!typed { t: kind! }");
+        assertTrue(problems.stream().anyMatch(problem -> problem.message().equals(separator)), problems::toString);
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH,
+                only(typed.validate("!!import:\"" + ID + "\"\n!typed { t: \"kind!\" }")).code());
     }
 
     // ── Reading, bind mode ────────────────────────────────────────────────

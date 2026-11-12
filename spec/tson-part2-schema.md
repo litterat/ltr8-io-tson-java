@@ -2075,12 +2075,12 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/40/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/40/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/39/tson-guide |
-| meta.tn | TSON Kernel (companion artifact, pre-loaded) | https://tson.io/2026/40/m/meta.tn?sha256=8cf5710ef573a031c118095db3444757bd4b8eb2b1cd2aa45257eabbd846e67e |
-| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/40/m/numeric.tn?sha256=47503916aba48dcb7c1a9e139b625d1834dbd2fafed488cdbe3484dc466beb0d |
-| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=19b98a9df00c065f3f7d92bb46cce4289d897a9d449e1955b1bc347047a554a2 |
-| net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=a16522c59b928b07a89e1cde4a7e83e437276ae48eead94300780b6c615175dd |
-| core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=4815bf2e6c88e47bb58747a126d82cfdf231774e53048639dc9f5f162f50e2ab |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=be1d45051296ebc2615ebc1fc2b04eccc44d08ac70daff3dd3138a63bc162554 |
+| meta.tn | TSON Kernel (companion artifact, pre-loaded) | https://tson.io/2026/40/m/meta.tn?sha256=cc877a3b650622e33c20df744f044d048fbb41723079bd50e9ac75a749325ae9 |
+| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/40/m/numeric.tn?sha256=cdb9876c5b6102d16940f2e137ea3b0766d5eb7824066eef599ff8d0231a91b0 |
+| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=71a40b2aa61bf7ee112ff1b316a6e4b98dd19b9c7da08b7cd014afd556de3695 |
+| net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=3db97e90f52c95d6ad212e7ac45dfd286537674caf91b9ecc6da516800c53a52 |
+| core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=4b427e8cfc99148deeed4cc3b48e4fa77ba65f5e174a9b02cc2885045a1f9b89 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=e45bfa037d24b79eb202331739f8e7e1cff00e67c71cf2947c396f1cbd9ad57b |
 
 ### 13.3 Informative References
 

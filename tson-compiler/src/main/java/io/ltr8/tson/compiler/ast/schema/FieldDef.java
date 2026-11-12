@@ -27,10 +27,10 @@ public record FieldDef(List<Annotation> annotations, String name, boolean omitta
     }
 
     /**
-     * {@code field-type = type-ref ["?"]} -- {@code voidable} admits a written {@code _}, as the same mark does
-     * at an element, an entry value or a tuple slot. Whether the key may be omitted is the name's mark.
+     * {@code field-type} -- a type or a {@link DependentType}, and {@code voidable} admits a written {@code _}, as the
+     * same mark does at an element, an entry value or a tuple slot. Whether the key may be omitted is the name's mark.
      */
-    public record FieldType(TypeExpr typeRef, boolean voidable) {
+    public record FieldType(FieldTypeExpr typeRef, boolean voidable) {
     }
 
     /**

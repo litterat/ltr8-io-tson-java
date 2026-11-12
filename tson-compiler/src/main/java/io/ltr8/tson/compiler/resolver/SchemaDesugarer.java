@@ -10,8 +10,10 @@ import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
 import io.ltr8.tson.compiler.ast.schema.ChoiceExpr;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
+import io.ltr8.tson.compiler.ast.schema.DependentType;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.FieldTypeExpr;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.InlineConstruction;
 import io.ltr8.tson.compiler.ast.schema.Instance;
@@ -19,9 +21,6 @@ import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
-
-import io.ltr8.tson.compiler.ast.schema.Reference;
-import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -65,6 +64,7 @@ import java.util.function.UnaryOperator;
  * (A | B)          !meta.choice { variants: [A B] }
  * {K =&gt; V}         !meta.map   { key_type: K  value_type: V }
  * {K =&gt; V; N..M}   the same, with min_items/max_items
+ * kind!            !meta.dependent { on: kind }, at a field's type alone
  * </pre>
  *
  * This phase therefore consults no governing meta at all. The kernel's container constructors are
@@ -277,7 +277,6 @@ final class SchemaDesugarer {
     }
 
     private SchemaMap.Declaration declaration(SchemaMap.Declaration declaration) {
-        siblingsAtFieldTypesOnly(declaration.typeDef());
         currentParameters = typeParams(declaration.typeDef());
         currentName = declaration.name();
         try {
@@ -286,78 +285,6 @@ final class SchemaDesugarer {
         } finally {
             currentParameters = List.of();
             currentName = "";
-        }
-    }
-
-    // ── §5.2's position rule: a sibling reference stands only at a record field's type ─────────────
-
-    /**
-     * Refuses a sibling reference ({@code kind!}) written in sugar anywhere but at a record field's type, naming the
-     * slot ([TSON-SCHEMA] §5.2). The grammar admits one wherever a type-ref stands, and it is refused here, before
-     * the form is rewritten: the construction it sits in is a type of its own, which has no sibling to read, so
-     * {@code [ kind! ]} would need an array chosen per value. A group member is a field of the record, and takes one as a
-     * field does. A construction's payload is data, read against its constructor, whose slot readers state the
-     * same rule.
-     */
-    private static void siblingsAtFieldTypesOnly(TypeDef typeDef) {
-        switch (typeDef) {
-            case ReferenceTypeDef reference -> siblingRefused(reference.ref(), "an alias target");
-            case StructuralTypeDef structural -> {
-                switch (structural.body()) {
-                    case RecordDef record -> siblingsAtFieldTypesOnly(record);
-                    case RefinedDef refined -> {
-                        siblingRefused(refined.target(), "a refinement source");
-                        siblingsAtFieldTypesOnly(refined.body());
-                    }
-                    case ConstructionDef construction -> {
-                        construction.supertypes().forEach(operand -> siblingRefused(operand, "a composition operand"));
-                        construction.body().ifPresent(SchemaDesugarer::siblingsAtFieldTypesOnly);
-                    }
-                }
-            }
-            default -> { } // a payload is data, judged by its constructor's slot readers
-        }
-    }
-
-    private static void siblingsAtFieldTypesOnly(RecordDef record) {
-        for (RecordEntry entry : record.entries()) {
-            switch (entry) {
-                case FieldDef field -> field.type().ifPresent(type -> siblingInside(type.typeRef()));
-                case GroupDef group -> group.members().forEach(member -> siblingInside(member.typeRef()));
-            }
-        }
-    }
-
-    /** A record field's type: a sibling reference itself stands here, and is refused anywhere inside the type. */
-    private static void siblingInside(TypeExpr ref) {
-        if (!(ref instanceof SiblingRef)) {
-            siblingRefused(ref, "");
-        }
-    }
-
-    /** The position rule's refusal of {@code field!} at {@code slot}, as a message names the slot. */
-    static String siblingRefusedAt(String field, String slot) {
-        return "a sibling reference ('" + field + "!') stands only at a record field's type ([TSON-SCHEMA] §5.2), "
-                + "not at " + slot;
-    }
-
-    /** {@code ref}, standing at {@code slot}, refused where it is a sibling reference or holds one at any depth. */
-    private static void siblingRefused(TypeExpr ref, String slot) {
-        switch (ref) {
-            case SiblingRef sibling -> throw new SchemaValidationException(siblingRefusedAt(sibling.field(), slot));
-            case NameRef _ -> { }
-            case ApplicationRef application ->
-                    application.args().forEach(argument -> siblingRefused(argument, "a template argument"));
-            case ArrayExpr array -> siblingRefused(array.elementType().typeRef(), "an array's element type");
-            case MapExpr map -> {
-                siblingRefused(map.keyType(), "a map's key type");
-                siblingRefused(map.valueType().typeRef(), "a map's value type");
-            }
-            case TupleExpr tuple -> tuple.elementTypes()
-                    .forEach(element -> siblingRefused(element.typeRef(), "a tuple element"));
-            case ChoiceExpr choice -> choice.variants().forEach(variant -> siblingRefused(variant, "a choice variant"));
-            // This phase's own output: a declaration as written holds none.
-            case InlineConstruction ignored -> { }
         }
     }
 
@@ -475,7 +402,6 @@ final class SchemaDesugarer {
     private static String spell(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> simple.name();
-            case SiblingRef sibling -> sibling.field() + "!";
             case ApplicationRef generic -> generic.name() + "<" + String.join(", ",
                     generic.args().stream().map(SchemaDesugarer::spell).toList()) + ">";
             case ArrayExpr array -> "[" + spell(array.elementType()) + array.size().map(SchemaDesugarer::spell)
@@ -508,7 +434,7 @@ final class SchemaDesugarer {
             case RecordDef record -> recordDef(record);
             case RefinedDef refined -> {
                 // §5.7 refines a *named* source; only its arguments are expandable.
-                Reference target = refined.target() instanceof ApplicationRef generic
+                TypeRef target = refined.target() instanceof ApplicationRef generic
                         ? applicationArguments(generic) : refined.target();
                 RecordDef body = recordDef(refined.body());
                 yield target == refined.target() && body == refined.body() ? refined
@@ -538,7 +464,7 @@ final class SchemaDesugarer {
                     yield field; // modifier-only entry (a tightening body restating state, §5.7)
                 }
                 FieldDef.FieldType fieldType = field.type().orElseThrow();
-                TypeExpr ref = typeRef(fieldType.typeRef());
+                TypeExpr ref = fieldType(fieldType.typeRef());
                 if (ref == fieldType.typeRef()) {
                     yield field;
                 }
@@ -560,10 +486,19 @@ final class SchemaDesugarer {
     }
 
     private GroupDef.Member groupMember(GroupDef.Member member) {
-        TypeExpr ref = typeRef(member.typeRef());
+        TypeExpr ref = fieldType(member.typeRef());
         return ref == member.typeRef() ? member
                 : new GroupDef.Member(member.annotations(), member.name(), member.omittable(), ref,
                         member.voidable());
+    }
+
+    /** A field's or group member's type: {@code kind!} is its construction in place, any other as {@link #typeRef}. */
+    private TypeExpr fieldType(FieldTypeExpr type) {
+        return switch (type) {
+            case DependentType dependent -> new InlineConstruction(construction(new Binding(DEPENDENT,
+                    List.of(WireForm.nameField("on", dependent.on())))));
+            case TypeExpr ref -> typeRef(ref);
+        };
     }
 
     /**
@@ -575,8 +510,6 @@ final class SchemaDesugarer {
     private TypeExpr typeRef(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> simple;
-            case SiblingRef sibling -> new InlineConstruction(construction(new Binding(DEPENDENT,
-                    List.of(WireForm.nameField("on", sibling.field())))));
             case ArrayExpr array -> container(ref, List.of(elementRef(array.elementType())));
             case MapExpr map -> container(ref, List.of(typeRef(map.keyType()), elementRef(map.valueType())));
             case TupleExpr tuple -> container(ref, tuple.elementTypes().stream().map(this::elementRef).toList());

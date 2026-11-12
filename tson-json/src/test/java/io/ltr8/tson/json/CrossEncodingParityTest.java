@@ -667,16 +667,14 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A sibling reference is a reference value, read by the same production in both encodings: unquoted in TSON, a
-     * string holding the same text in JSON. It stands only at a record field's type, so a field typed by a type
-     * reference refuses it, on the same code at the same pointer in both.
+     * {@code kind!} is schema-grammar sugar and no data form in either encoding: in TSON it is the data grammar's syntax
+     * error, and in JSON a string holding it spells no reference, refused as one spelling no name.
      */
     @Test
-    void aSiblingReferenceAtAKindIsRefusedByBoth() {
-        sameVerdict("typed", "{ t: kind! }", """
-                {"t": "kind!"}""");
-        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
-                tson("typed", "{ t: kind! }").stream().map(Verdict::code).toList());
+    void aMarkedNameIsNoReferenceInEitherEncoding() {
+        assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_FORM_INVALID, "/t")), json("typed", """
+                {"t": "kind!"}"""));
+        assertTrue(tson("typed", "{ t: kind! }").contains(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "")));
     }
 
     /**

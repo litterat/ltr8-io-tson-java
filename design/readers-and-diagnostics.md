@@ -121,7 +121,7 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   `Token` component's slot answers to it (`record_field.value`). `RecordReader` is the same
   rule in JSON.
 
-  A sibling naming no type a value can be read against — a sibling reference, a template, an application, which
+  A sibling naming no type a value can be read against — a template, an application, which
   names no entry where a value stands (§4.2) and which the sibling's own read refuses first — is refused at the
   sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and the value is skipped unjudged; a
   sibling whose own read reported leaves the value skipped and nothing more. What a sibling's value names is one
@@ -275,13 +275,9 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   leaf to it, as a token is: the stream delivered the reference whole.
 - **A reference-typed position reads a token or a `ReferenceEvent`** (`AtomTypeReader`, `KindSlotReader`), rolling
   either into one `TypeRef`, and refuses a quoted token holding `<` as `TYPE_MISMATCH`: a quoted token is never a
-  reference ([TSON-DATA] §7.4). A `ReferenceEvent` holding a sibling reference (`kind!`) is admitted only where the
-  reference's `allow_sibling` admits one, a record field's type (`meta.field_type_ref`), and in bind mode only by a
-  slot reader whose component is a `Reference` besides; elsewhere the slot reader (`TYPE_MISMATCH`) and the atom's own
-  parser (`ATOM_CONSTRAINT_VIOLATION`) refuse it by the position rule ([TSON-SCHEMA] §5.2,
-  `design/schema-resolution.md`). Any other typed position
-  meeting a `ReferenceEvent` reports it as it reports any non-token, naming `the reference box<text>` or `the sibling
-  reference kind!`; `DataValueEvents` replays a `ReferenceValue` as one event. In a data document the name is judged
+  reference ([TSON-DATA] §7.4). Any other typed position meeting a `ReferenceEvent` reports it as it reports any
+  non-token, naming `the reference box<text>`; `DataValueEvents` replays a `ReferenceValue` as one event. In a data
+  document the name is judged
   where it is read, whichever `of` names: a kind's members over the closure (`TypeNameRefParser`), a value's qualified
   name by what it reaches in the governing schema (`RefParser`, `design/references.md`); in a schema document both
   read the grammar alone and record the name for the link.

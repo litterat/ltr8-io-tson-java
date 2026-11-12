@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=12e42ca0b29ba5589c95864d043cd83d4a0687c930c8b7c6e7d255293d9baa5f"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=cc877a3b650622e33c20df744f044d048fbb41723079bd50e9ac75a749325ae9"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -886,7 +886,7 @@
       the value's tag, this takes it from the record the value sits in. It is
       written in place, directly at a record field's `type`, and never declared:
       `{ of: !meta.dependent { on: kind } }`, spelled `kind!` in source. `on`
-      names a field of the nearest enclosing record, judged by its `name_type`.
+      names a field of that record, declared before the field this types.
       """
     dependent => meta.sum & { on: text }
 

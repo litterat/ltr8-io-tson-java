@@ -63,7 +63,7 @@ import java.util.Set;
  *
  * <ul>
  *   <li><b>The pre-loaded set is hand-built</b> ({@link #instanceBody}, {@link #refinedBody}): the instances and the
- *       two refinements on the kernel's one wait cycle, the cycle holding {@code record} -- {@link #PRE_LOADED},
+ *       one refinement on the kernel's one wait cycle, the cycle holding {@code record} -- {@link #PRE_LOADED},
  *       built before anything is read. Rule 4 makes the set a measurement of the kernel, and {@code
  *       KernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle fails
  *       there rather than here.</li>

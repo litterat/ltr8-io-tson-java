@@ -57,12 +57,12 @@ public record GroupDef(List<Annotation> annotations, List<List<Member>> options,
     }
 
     /**
-     * {@code group-member = *annotation field-name ["?"] ws ":" ws type-ref ["?"]}. The name's {@code ?}
-     * ({@code omittable}) makes the member optional once its option is chosen; the type's ({@code voidable})
-     * admits {@code _}, and a voidable member written {@code _} is present and chooses its option. A member
-     * takes no value modifier, since a group never supplies a member.
+     * {@code group-member = *annotation field-name ["?"] ws ":" ws field-type}, a member being a field. The name's
+     * {@code ?} ({@code omittable}) makes the member optional once its option is chosen; the type's ({@code voidable})
+     * admits {@code _}, and a voidable member written {@code _} is present and chooses its option. A member takes no
+     * value modifier, since a group never supplies a member.
      */
-    public record Member(List<Annotation> annotations, String name, boolean omittable, TypeExpr typeRef,
+    public record Member(List<Annotation> annotations, String name, boolean omittable, FieldTypeExpr typeRef,
                          boolean voidable) {
 
         public Member {

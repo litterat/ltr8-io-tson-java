@@ -16,14 +16,14 @@ import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ChoiceExpr;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.DefinitionMark;
+import io.ltr8.tson.compiler.ast.schema.DependentType;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.FieldTypeExpr;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
-import io.ltr8.tson.compiler.ast.schema.Reference;
-import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -37,6 +37,7 @@ import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
+import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -416,7 +417,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             return new ReferenceTypeDef(typeParams, parseBracket());
         }
 
-        Reference head = parseTypeRefHead();
+        TypeRef head = parseTypeRefHead();
         if (check(TokenType.CARET)) {
             advance();
             return new StructuralTypeDef(typeParams, new RefinedDef(head, parseRecordDef()));
@@ -438,8 +439,9 @@ public final class TsonSchemaParser extends TsonDataParser {
      * consumed token plus one of lookahead. {@code '}'} (the empty record, {@code top}'s shape), {@code '('}
      * (a leading field group) and {@code '@'} (§6 annotations, which the map sugar admits nowhere inside its
      * braces) commit to a record; a name followed by {@code '=>'}, or by {@code '<'} opening a generic key's
-     * arguments, commits to a map. A name followed by anything else is a record whose field is missing its
-     * {@code ':'}, and {@link #parseFieldDef} names it as one.
+     * arguments, commits to a map, and so does an adjacent {@code '!'}, so the key refuses {@code kind!} by name
+     * rather than as a field missing its {@code ':'}. A name followed by anything else is a record whose field is
+     * missing its {@code ':'}, and {@link #parseFieldDef} names it as one.
      */
     private TypeDef braceTypeDef(List<String> typeParams) {
         expect(TokenType.LBRACE, "a record body's or map type's opening '{'");
@@ -501,10 +503,6 @@ public final class TsonSchemaParser extends TsonDataParser {
         advance();
         requireQualifiedName(name);
         String target = name.text();
-        if (check(TokenType.BANG) && name.adjacentTo(peek())) {
-            throw parseError("'!" + target + "!' marks a type's name as a sibling reference, and a tag names a type "
-                    + "([TSON-DATA] §7.4): a tag is '!' and a qualified name, never a reference to a field");
-        }
 
         // A nested schema map is tagged `!schema`, the kernel root's alias the root's tag names, or by its target's
         // path, `!meta.schema`, as resolved output writes it: one grammar for both (see nestedSchemaMap).
@@ -641,7 +639,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
             modifier = Optional.of(parseFieldModifier());
         } else {
-            TypeExpr ref = parseTypeRef();
+            FieldTypeExpr ref = parseFieldType();
             boolean voidable = consumeAdjacentQuestion();
             type = Optional.of(new FieldDef.FieldType(ref, voidable));
             if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
@@ -677,6 +675,9 @@ public final class TsonSchemaParser extends TsonDataParser {
                         : "a scalar token, the void sentinel '_', or '?' after '='");
             };
             advance();
+            if (form == TokenForm.UNQUOTED && check(TokenType.BANG) && t.adjacentTo(peek())) {
+                throw dependentTypeOffAFieldsType(t);
+            }
             value = new FieldDef.Modifier.Value.Literal(recordPosition(new TokenValue(t.text(), form), t.start()));
         }
         return new FieldDef.Modifier(kind, value);
@@ -728,7 +729,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         // Optional once the member's option is chosen: the option, not the record, is what the mark is about.
         boolean omittable = consumeAdjacentQuestion();
         expect(TokenType.COLON, "a field group member's ':'");
-        TypeExpr type = parseTypeRef();
+        FieldTypeExpr type = parseFieldType();
         boolean voidable = consumeAdjacentQuestion();
         if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
             // §5.11: a member's presence is the group's, and a group does not inject, so `~`, `=` and `=?`
@@ -816,23 +817,34 @@ public final class TsonSchemaParser extends TsonDataParser {
                     + "position (§5.3); declare a named type instead (e.g. 'quantity_t => !integer ^ { min: 1 }') "
                     + "and reference it by name");
         }
-        if (check(TokenType.SINGLE_LINE_STRING) && peekSecond().type() == TokenType.BANG
-                && peek().adjacentTo(peekSecond())) {
-            throw parseError("a quoted token is never a reference, so '!' cannot mark it as a sibling reference "
-                    + "([TSON-DATA] §7.4): a sibling is a field named by one unquoted identifier");
-        }
         return parseTypeRefHead();
     }
 
     /**
-     * {@code sibling-ref / type-name ["<" type-args ">"]} -- the name-based tail shared by every type-ref position and
-     * by refinement/construction heads. One token of lookahead after the name picks the alternative: an adjacent
-     * {@code !} a sibling reference, an adjacent {@code <} an application, neither a bare name.
+     * A record field's or a field group member's type: a type-ref, or {@code kind!}, a {@link DependentType}, which
+     * the grammar admits here and nowhere else (§5.2, §12.1). One token of lookahead after the name decides it.
      */
-    private Reference parseTypeRefHead() {
+    private FieldTypeExpr parseFieldType() {
+        if (check(TokenType.UNQUOTED) && peekSecond().type() == TokenType.BANG && peek().adjacentTo(peekSecond())) {
+            return parseDependentType(advance());
+        }
+        if (check(TokenType.SINGLE_LINE_STRING) && peekSecond().type() == TokenType.BANG
+                && peek().adjacentTo(peekSecond())) {
+            throw parseError("a dependent field's '!' follows the name of a field of the same record, one unquoted "
+                    + "identifier, and a quoted token is none (§12.1)");
+        }
+        return parseTypeRef();
+    }
+
+    /**
+     * {@code type-name ["<" type-args ">"]} -- the name-based tail shared by every type-ref position and by
+     * refinement/construction heads. An adjacent {@code <} makes it an application; an adjacent {@code !} is a
+     * dependent field's type off a field's type ({@link #parseFieldType}), refused naming where it stands.
+     */
+    private TypeRef parseTypeRefHead() {
         Token head = expect(TokenType.UNQUOTED, "a type reference");
         if (check(TokenType.BANG) && head.adjacentTo(peek())) {
-            return parseSiblingRef(head);
+            throw dependentTypeOffAFieldsType(head);
         }
         requireQualifiedName(head);
         String name = head.text();
@@ -850,22 +862,28 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * {@code sibling-ref = unquoted-token "!"} past its token, the {@code !} next at the cursor: the token one
-     * identifier, a single segment, and the {@code !} followed by whitespace (§12.3). The whitespace is what keeps a
-     * postfix {@code !} apart from a prefix one, so {@code a!b}, <code>kind!}</code>, {@code [kind!]} and {@code
-     * kind!?} do not parse. Where it may stand is §5.2's position rule, {@code SchemaDesugarer}'s to state.
+     * {@code kind!} past its token, the {@code !} next at the cursor: the token one identifier, a single segment, and
+     * the {@code !} followed by whitespace (§12.3). The whitespace is what keeps a postfix {@code !} apart from a
+     * prefix one, so {@code a!b}, <code>kind!}</code> and {@code kind!?} do not parse.
      */
-    private SiblingRef parseSiblingRef(Token head) {
-        if (head.text().indexOf('.') >= 0 || io.ltr8.tson.atom.IdentifierGrammar.validate(head.text()).isPresent()) {
-            throw new ParseException("'" + head.text() + "!' is no sibling reference -- the '!' marks one field of "
-                    + "the same record, named by one identifier, a single segment ([TSON-DATA] §7.4)", head.start());
+    private DependentType parseDependentType(Token head) {
+        if (head.text().indexOf('.') >= 0 || IdentifierGrammar.validate(head.text()).isPresent()) {
+            throw new ParseException("'" + head.text() + "!' types no dependent field -- the '!' follows the name of "
+                    + "one field of the same record, one identifier, a single segment (§12.1)", head.start());
         }
         Token bang = advance();
         if (!check(TokenType.EOF) && bang.adjacentTo(peek())) {
-            throw parseError("a sibling reference's '!' must be followed by whitespace (§12.3): write '"
+            throw parseError("a dependent field's '!' must be followed by whitespace (§12.3): write '"
                     + head.text() + "! ' before " + describe(peek()));
         }
-        return new SiblingRef(head.text());
+        return new DependentType(head.text());
+    }
+
+    /** {@code head} followed by an adjacent {@code !} where no field's type is written. */
+    private static ParseException dependentTypeOffAFieldsType(Token head) {
+        return new ParseException("'" + head.text() + "!' is a dependent field's type, and stands only as a record "
+                + "field's type, a field group member's included -- never inside a type, nor at any other position "
+                + "(§5.2, §12.1)", head.start());
     }
 
     private TypeExpr parseChoiceRef() {
@@ -923,8 +941,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      * arguments, and never a bracket or paren form. That restriction is what holds {@link #braceOpensMap}'s
      * record/map decision to two tokens; a composite key type earns a named declaration instead.
      */
-    private Reference parseMapKey() {
-        Reference key = parseTypeRefHead();
+    private TypeRef parseMapKey() {
+        TypeRef key = parseTypeRefHead();
         rejectKeyQuestion();
         return key;
     }
@@ -1006,7 +1024,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * unconditionally permitted.
      */
     private MapExpr parseMapBody() {
-        Reference key = parseMapKey();
+        TypeRef key = parseMapKey();
         expect(TokenType.MAP_ARROW, "a map type's '=>'");
         ElementType value = parseElementType();
         Optional<SizeSpec> size = Optional.empty();
