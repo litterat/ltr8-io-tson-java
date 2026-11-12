@@ -6,6 +6,7 @@ import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeSlots;
 
 import java.util.List;
 import java.util.Map;
@@ -13,8 +14,8 @@ import java.util.Map;
 /**
  * An open record's parameters substituted on the model ([TSON-SCHEMA] §5.10): each {@link ParamRef} in its fields'
  * types and its parents replaced by the argument bound to it, at any depth, and nothing else changed. A parameter
- * stands only at a field's type or as an argument of an application there or in a parent, so those references are
- * all substitution visits.
+ * stands only at a slot of a field's type ({@link TypeSlots}) or as an argument of an application there or in a parent,
+ * so those references are all substitution visits.
  *
  * <p><b>Two callers, one rule.</b> {@code TemplateMaterialiser} closes an application, where every argument is closed;
  * {@code DefinitionResolver} absorbs an applied operand, where an argument may be one of the absorbing declaration's
@@ -25,10 +26,13 @@ final class Substitution {
     private Substitution() {
     }
 
-    /** {@code open}'s fields with {@code bindings} substituted, in order and with their key annotations. */
+    /**
+     * {@code open}'s fields with {@code bindings} substituted at every slot of their types, at any depth of types
+     * written in place, in order and with their key annotations.
+     */
     static AnnotatedMap<String, RecordField> fields(RecordBody open, Map<String, TypeRef> bindings) {
-        return open.mapFields(field -> field.type() instanceof TypeRef reference
-                ? field.withType(reference(reference, bindings)) : field);
+        TypeSlots.Rewrite substitute = reference -> reference(reference, bindings);
+        return open.mapFields(field -> field.withType(TypeSlots.map(field.type(), substitute)));
     }
 
     /** {@code open}'s parents as written, each substituted -- closing completes the chain from them. */

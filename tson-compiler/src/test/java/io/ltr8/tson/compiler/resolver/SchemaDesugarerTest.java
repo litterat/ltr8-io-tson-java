@@ -229,15 +229,14 @@ class SchemaDesugarerTest {
         assertEquals(4, written.position().orElseThrow().line());
     }
 
-    /** A record in place over a parameter of its open record is a gap, reported as one. */
+    /** A record in place over a parameter of its open record is its construction, the parameter at its slot. */
     @Test
-    void aRecordInPlaceOverAParameterIsNotImplemented() {
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> desugar("  page => <T> { meta: { cursor: T  total: int32 } }"));
-        assertTrue(thrown.getMessage().contains("'{ cursor: T  total: int32 }' stands over the parameter 'T'"),
-                thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("declare the record as an open record of its own"),
-                thrown.getMessage());
+    void aRecordInPlaceOverAParameterIsItsConstruction() {
+        SchemaDocument document = desugar("  page => <T> { meta: { cursor: T  total: int32 } }");
+        RecordDef page = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("page").typeDef()).body();
+        InlineConstruction meta = assertInstanceOf(InlineConstruction.class,
+                ((FieldDef) page.entries().getFirst()).type().orElseThrow().typeRef());
+        assertEquals(Optional.of("meta.record"), meta.value().typeRef());
     }
 
     /** One that names no parameter is closed, inside an open record as anywhere. */
@@ -454,33 +453,18 @@ class SchemaDesugarerTest {
     // ── Generic application heads (§3.3.1, §5.10) ────────────────────────
 
     /**
-     * Inside an open record a container over one of its parameters is the reference it spells, {@code [T]} the
-     * application {@code meta.array<T>} and {@code {K => V}} the application {@code meta.map<K V>}, held as written
-     * in place (§5.10).
+     * Inside an open record a form over one of its parameters is the construction it denotes anywhere, written in
+     * place with the parameter at its slot, whatever else it sets (§5.3, §5.10).
      */
     @Test
-    void aContainerOverAParameterIsTheApplicationItSpells() {
-        SchemaDocument document = desugar("  box => <T> { v: [T]  m: {text => T}  n: [[T]] }");
-
-        assertEquals(Set.of("box"), document.body().declarations().keySet(), "no declaration added");
-        RecordDef box = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("box").typeDef()).body();
-        assertEquals(new ApplicationRef("meta.array", List.of(new NameRef("T"))),
-                ((FieldDef) box.entries().get(0)).type().orElseThrow().typeRef());
-        assertEquals(new ApplicationRef("meta.map", List.of(new NameRef("text"), new NameRef("T"))),
-                ((FieldDef) box.entries().get(1)).type().orElseThrow().typeRef());
-        assertEquals(new ApplicationRef("meta.array", List.of(new ApplicationRef("meta.array",
-                        List.of(new NameRef("T"))))),
-                ((FieldDef) box.entries().get(2)).type().orElseThrow().typeRef());
-    }
-
-    /** A form over a parameter that is no reference is refused, naming the form (§5.10). */
-    @Test
-    void aFormOverAParameterThatIsNoReferenceIsRefused() {
-        for (String form : List.of("[T; 1..]", "[T?]", "{text => T; ..10}", "( T | text )", "[T, text]")) {
-            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> desugar("  box => <T> { v: " + form + " }"), form);
-            assertTrue(thrown.getMessage().contains("stands over the parameter 'T' and is no reference"),
-                    thrown.getMessage());
+    void aFormOverAParameterIsItsConstructionInPlace() {
+        for (String form : List.of("[T]", "{text => T}", "[[T]]", "[T; 1..]", "[T?]", "{text => T; ..10}",
+                "( T | text )", "[T, text]")) {
+            SchemaDocument document = desugar("  box => <T> { v: " + form + " }");
+            RecordDef box = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("box").typeDef())
+                    .body();
+            assertInstanceOf(InlineConstruction.class, ((FieldDef) box.entries().getFirst()).type().orElseThrow()
+                    .typeRef(), form);
         }
     }
 

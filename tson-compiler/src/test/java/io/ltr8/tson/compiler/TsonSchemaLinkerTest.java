@@ -21,6 +21,7 @@ import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Param;
+import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.VoidType;
@@ -139,6 +140,27 @@ class TsonSchemaLinkerTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
         assertTrue(thrown.getMessage().contains("'set' declares no type parameters"), thrown.getMessage());
+    }
+
+    /**
+     * A closed body holds no parameter ([TSON-SCHEMA] §8.1): one built by hand into a closed record, at a field or
+     * inside a record written in place, is an unresolved reference, though an entry of the same name exists.
+     */
+    @Test
+    void aParameterInAClosedRecordIsAnUnresolvedReference() {
+        for (Top closed : List.<Top>of(
+                RecordBody.of(RecordBody.fieldMap(Map.entry("v", RecordField.required(ParamRef.of("T"))))),
+                RecordBody.of(RecordBody.fieldMap(Map.entry("m", RecordField.required(new TypeInline(
+                        RecordBody.of(RecordBody.fieldMap(Map.entry("v",
+                                RecordField.required(ParamRef.of("T"))))))))))))  {
+            Map<String, Top> entries = new LinkedHashMap<>();
+            entries.put("T", textEntry());
+            entries.put("r", closed);
+
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> TsonSchemaLinker.link(schemaOf(entries), null));
+            assertTrue(thrown.getMessage().contains("unresolved reference 'T'"), thrown.getMessage());
+        }
     }
 
     /**

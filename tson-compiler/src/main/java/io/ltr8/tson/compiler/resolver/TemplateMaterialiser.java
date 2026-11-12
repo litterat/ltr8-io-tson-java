@@ -17,6 +17,7 @@ import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeSlots;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -34,15 +35,15 @@ import java.util.function.Supplier;
 /**
  * §5.10 materialisation: closes the applications a resolved schema holds, over the resolved form, not the AST. An
  * application reaches here as a {@link TypeRef} carrying {@code arguments}, so closing is a walk over {@code
- * schema.meta} values ({@link MetaRefs}).
+ * schema.meta} values ({@link TypeSlots}).
  *
  * <p><b>Two operations share the spelling</b> ([TSON-SCHEMA] §5.10, §5.3). Over a constructor, {@code
  * meta.array<text>} constructs: the binding record {@code [text]} writes, built by the constructor's own reader
  * ({@link #construction}), and held in place at the slot that wrote it, {@code { of: !meta.array { element_type:
  * text } }} ({@link TypeInline}). Over an open record, {@code page<order>} substitutes: the record's parameters are
- * replaced by the arguments on the model and each field's application closed in turn ({@link #closeOpenRecord}). A
- * reference held inside an open record, {@code meta.array<T>} or {@code box<T>}, closes the same way once the record
- * holding it is applied and its parameter substituted.
+ * replaced by the arguments on the model and each application at a slot of a field's type closed in turn ({@link
+ * #closeOpenRecord}). An application held inside an open record, {@code box<T>} at a field or in {@code [box<T>]},
+ * closes the same way once the record holding it is applied and its parameter substituted.
  *
  * <p><b>Nothing is minted.</b> A declaration naming an application of an open record, {@code page_order =>
  * page<order>}, is the record under that name with the application recorded ({@link #closeApplicationInto}, {@code
@@ -59,8 +60,7 @@ import java.util.function.Supplier;
  * of}, an alias's target -- an application closes nowhere: a construction and an application of an open record are
  * each refused there, and declared under a name first ([TSON-SCHEMA] §4.2, §5.3). An argument of a constructor's
  * application lands at a type slot of the construction, so a construction there is written in place in turn: {@code
- * meta.map<text meta.array<T>>}, which an open record holds for {@code {text => [T]}}, closes to a map whose value is
- * the array in place.
+ * meta.map<text meta.array<text>>} closes to a map whose value is the array in place.
  */
 final class TemplateMaterialiser {
 
@@ -204,10 +204,12 @@ final class TemplateMaterialiser {
      * it, which is left as it was.
      */
     void materialise(Map<String, Top> entries, MaterialisationFailureReporter reporter) {
-        MetaRefs.Rewrite rewrite = slotRewrite();
+        TypeSlots.Rewrite rewrite = slotRewrite();
         for (Map.Entry<String, Top> entry : entries.entrySet()) {
             try {
-                entry.setValue(MetaRefs.mapRefs(entry.getValue(), rewrite));
+                entry.setValue(entry.getValue() instanceof RecordBody record && record.isOpen()
+                        ? TypeSlots.mapBody(record, openRewrite())
+                        : TypeSlots.mapBody(entry.getValue(), rewrite));
             } catch (SchemaValidationException | UnsupportedOperationException e) {
                 if (reporter == null) {
                     throw e;
@@ -218,6 +220,33 @@ final class TemplateMaterialiser {
                 reporter.reportFailedApplication(entry.getKey(), e);
             }
         }
+    }
+
+    /**
+     * What {@link #materialise} applies inside an open record. A reference naming none of its parameters means the same
+     * thing in every application, so it is closed now and every application holds the one type, which is what {@code
+     * FamilySelectors} reads a selector's type from. A constructor's application over a parameter is its construction
+     * in place, the parameter at its slot ([TSON-SCHEMA] §5.10), so {@code meta.array<T>} and {@code [T]} are one
+     * resolved form. An open record's application over a parameter waits for substitution to supply the argument.
+     */
+    private TypeSlots.Rewrite openRewrite() {
+        return new TypeSlots.Rewrite() {
+            @Override
+            public TypeRef atName(TypeRef reference) {
+                return OpenEntry.parameterIn(reference).isPresent() ? reference : closeName(reference);
+            }
+
+            @Override
+            public TypeExpr atSlot(TypeRef reference) {
+                if (OpenEntry.parameterIn(reference).isEmpty()) {
+                    return closeSlot(reference);
+                }
+                if (reference.arguments().isEmpty() || !constructs(reference)) {
+                    return reference;
+                }
+                return construction(reference, this).orElseThrow();
+            }
+        };
     }
 
     /** Where an application this pass cannot close is reported, entry by entry. */
@@ -293,7 +322,7 @@ final class TemplateMaterialiser {
         if (ref.arguments().isEmpty()) {
             return ref;
         }
-        Optional<TypeInline> constructed = construction(ref);
+        Optional<TypeInline> constructed = construction(ref, slotRewrite());
         if (constructed.isPresent()) {
             return constructed.get();
         }
@@ -401,7 +430,7 @@ final class TemplateMaterialiser {
      * <p><b>No {@code @meta.application}, and no entry.</b> The value states its constructor and its arguments, and
      * nothing is substituted, so there is nothing to record beside it.
      */
-    private Optional<TypeInline> construction(TypeRef application) {
+    private Optional<TypeInline> construction(TypeRef application, TypeSlots.Rewrite nested) {
         String constructor = AliasChain.terminal(application.name(), this::lookup);
         Top definition = lookup(constructor);
         if (!ConstructionSugar.constructs(constructor, definition)) {
@@ -424,15 +453,14 @@ final class TemplateMaterialiser {
                     + application.segments().getLast() + " => " + application.text() + "') and write that name");
         }
         // Each argument landed at a slot of the construction, read as the reference it was written as; closing the
-        // body closes each one where it stands -- a nested constructor's application, which an open record holds
-        // for a nested form over its parameter ({@code {text => [T]}}), in place at its type slot.
+        // body closes each one where it stands, a nested constructor's application in place at its type slot.
         return Optional.of(new TypeInline(constructor,
-                (Type) MetaRefs.mapRefs(type.withChain(TypeChain.EMPTY), slotRewrite())));
+                (Type) TypeSlots.mapBody(type.withChain(TypeChain.EMPTY), nested)));
     }
 
     /** What {@link #materialise} applies to every reference: a slot's closed in place, a name's to a name. */
-    private MetaRefs.Rewrite slotRewrite() {
-        return new MetaRefs.Rewrite() {
+    private TypeSlots.Rewrite slotRewrite() {
+        return new TypeSlots.Rewrite() {
             @Override
             public TypeRef atName(TypeRef reference) {
                 return closeName(reference);
@@ -583,9 +611,10 @@ final class TemplateMaterialiser {
 
     /**
      * An open record applied: its fields and parents substituted on the model ({@link Substitution}), each field's type
-     * closed -- the applications in it, a held {@code meta.array<T>} or {@code box<T>} among them, closed now that the
-     * parameter is bound -- and the record's own facts kept as they are written: its {@code extension} and its {@code
-     * discriminators}, so an abstract template's application is an abstract record (§5.10). The chain is computed
+     * closed -- every application at a slot of it, at any depth of types written in place ({@code box<T>} in {@code
+     * [box<T>]} or in <code>{ cursor: box&lt;T&gt; }</code>), closed now that the parameter is bound -- and the
+     * record's own facts kept as they are written: its {@code extension} and its {@code discriminators}, so an
+     * abstract template's application is an abstract record (§5.10). The chain is computed
      * after substitution, from the parents as written ({@link Ancestry#chainOf}): a parent applied to the record's own
      * parameter stays in {@code parents} for {@code SchemaResolver}'s fold to turn into the edge to the entry the
      * closed application denotes. Parents are substituted and not closed: an operand denotes no entry (§8.2). The
@@ -595,17 +624,10 @@ final class TemplateMaterialiser {
     private RecordBody closeOpenRecord(RecordBody open, Map<String, TypeRef> bindings) {
         AnnotatedMap<String, RecordField> substituted = Substitution.fields(open, bindings);
         AnnotatedMap<String, RecordField> fields = new AnnotatedMap<>();
+        TypeSlots.Rewrite close = slotRewrite();
         substituted.forEach((name, field) -> fields.put(name,
-                field.withType(switch (field.type()) {
-                    case TypeRef reference -> switch (closeSlot(reference)) {
-                        case TypeRef closed -> closed;
-                        case TypeInline inline -> inline;
-                    };
-                    // A type written in place holds no parameter, and may still hold an application of an open
-                    // record this pass has not reached in the template (`[box<text>; 2..]`): closed where it stands.
-                    case TypeInline inline -> inline.withOf(
-                            (Type) MetaRefs.mapRefs(inline.of(), slotRewrite()));
-                }).withPosition(Optional.empty()), substituted.getAnnotations(name)));
+                field.withType(TypeSlots.map(field.type(), close)).withPosition(Optional.empty()),
+                substituted.getAnnotations(name)));
         return new RecordBody(Ancestry.chainOf(Substitution.parents(open, bindings), namespace),
                 AnnotatedMap.copyOf(fields), open.groups(), open.extension(), open.discriminators(), open.nameType());
     }

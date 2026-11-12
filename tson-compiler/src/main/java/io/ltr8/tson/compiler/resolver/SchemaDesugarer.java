@@ -105,10 +105,8 @@ import java.util.function.UnaryOperator;
  * record passes through as it would without parameters, for {@code DefinitionResolver} to build as an open record. A
  * parameter list before a sugar form or a bare reference -- {@code <T> [T]}, {@code <T> ( T | error )}, {@code <B>
  * pair<uuid, B>} -- is refused here, naming what to write instead ({@link #refuseTemplateBody}). Inside an open record
- * a form over a parameter is admitted only where it is a reference: {@code [T]} and {@code {K => V}} are written as
- * the applications they spell, {@code meta.array<T>} and {@code meta.map<K V>}, held until the record is applied, and
- * every other form over a parameter -- a size, a {@code ?} element, a tuple, a choice -- is refused, naming the form
- * ({@link #openForm}). A form naming no parameter is its construction in place, as anywhere.
+ * a form is its construction in place whether or not it names a parameter: a parameter is a name at a type slot like
+ * any other, which the open record scopes and each application substitutes.
  *
  * <p><b>An invalid sugar form is reported per declaration, not thrown</b>, when a {@link
  * DesugarFailureReporter} is supplied -- the same one-pass treatment {@code SchemaResolver} and {@code
@@ -187,11 +185,7 @@ final class SchemaDesugarer {
     /** This document's own declarations, for {@link #checkTemplateApplication} -- set before the walk starts. */
     private Map<String, SchemaMap.Declaration> local = Map.of();
 
-    /**
-     * The type parameters of the declaration currently being walked, or empty outside a template. A sugar form
-     * naming one of these is the reference it spells, or refused ({@link #openForm}). Every other form in the same
-     * declaration is written in place exactly as it would be outside a template.
-     */
+    /** The type parameters of the declaration currently being walked, or empty outside a template. */
     private List<String> currentParameters = List.of();
 
     /** The name of the declaration currently being walked, for a refusal that names it. */
@@ -313,16 +307,12 @@ final class SchemaDesugarer {
      * with parameters is the resolver's to admit (before {@code !meta.record}) or refuse, since only it knows what
      * the head is.
      *
-     * <p>A template's record body is walked as any record's, its forms over a parameter written as the references
-     * they spell ({@link #openForm}); a parameter list before anything but a record body is refused ({@link
-     * #refuseTemplateBody}).
+     * <p>A template's record body is walked as any record's; a parameter list before anything but a record body is
+     * refused ({@link #refuseTemplateBody}).
      */
     private TypeDef typeDef(TypeDef typeDef) {
         return switch (typeDef) {
             case StructuralTypeDef structural -> {
-                // A template's body is walked like any record's: a concrete form inside it is written in place,
-                // exactly as it would be outside a template, and a form naming one of the declaration's own
-                // parameters is the reference it spells, or refused -- see openForm.
                 StructuralDef body = structuralDef(structural.body());
                 yield body == structural.body() ? structural
                         : new StructuralTypeDef(structural.typeParams(), body);
@@ -372,49 +362,6 @@ final class SchemaDesugarer {
                     + "is. Restate the body as a record ('<B> { first: uuid  second: B }'), or write the application "
                     + "at each use ('pair<uuid, int32>')";
         });
-    }
-
-    /**
-     * A sugar form standing inside an open record, over one of its parameters ([TSON-SCHEMA] §5.10): admitted only
-     * where it is a reference. {@code [T]} and {@code {K => V}} are the applications they spell, {@code meta.array<T>}
-     * and {@code meta.map<K V>}, held as written until the record is applied; a size or a {@code ?} sets a field no
-     * argument list carries, and a tuple or a choice is no constructor over reference fields, so each is refused,
-     * naming the form. {@code children} are the form's positions, already expanded.
-     */
-    private TypeExpr openForm(TypeExpr written, List<TypeExpr> children) {
-        String parameter = children.stream().map(this::parameterIn).flatMap(Optional::stream).findFirst()
-                .orElseThrow();
-        String prefix = "'" + currentName + "': '" + spell(written) + "' stands over the parameter '" + parameter
-                + "' and is no reference, and inside an open record a form over a parameter is admitted only "
-                + "where it is one (§5.10) -- ";
-        return switch (written) {
-            case ArrayExpr array when array.size().isEmpty() && !array.elementType().voidable() ->
-                    new ApplicationRef(ARRAY, children);
-            case MapExpr map when map.size().isEmpty() && !map.valueType().voidable() ->
-                    new ApplicationRef(MAP, children);
-            case ArrayExpr _, MapExpr _ -> throw new SchemaValidationException(prefix + "a size or a '?' sets a "
-                    + "field of the container that no argument list carries, and '[T]' and '{K => V}' alone are "
-                    + "the references 'meta.array<T>' and 'meta.map<K V>'. Declare a refined constructor and apply "
-                    + "it ('nonempty_type => meta.array ^ { min_items?: = 1 }', then 'nonempty_type<" + parameter
-                    + ">'), or move the container into the argument");
-            case ChoiceExpr _ -> throw new SchemaValidationException(prefix + "a choice is no constructor over "
-                    + "reference fields, and an untagged sum over a parameter cannot be judged disjoint until it is "
-                    + "applied (§5.4). Write the alternative as a field group, '( body: " + parameter
-                    + " | problem: problem )'");
-            default -> throw new SchemaValidationException(prefix + "a tuple's positions are a list of records, not "
-                    + "reference fields. Name the positions as fields of the record");
-        };
-    }
-
-    /** The first of the enclosing declaration's parameters {@code ref} names, as itself or in an argument. */
-    private Optional<String> parameterIn(TypeExpr ref) {
-        return switch (ref) {
-            case NameRef simple -> currentParameters.contains(simple.name()) ? Optional.of(simple.name())
-                    : Optional.empty();
-            case ApplicationRef generic -> generic.args().stream().map(this::parameterIn).flatMap(Optional::stream)
-                    .findFirst();
-            default -> Optional.empty();
-        };
     }
 
     /** A form as the author spells it, for a message. */
@@ -557,8 +504,7 @@ final class SchemaDesugarer {
     /**
      * A type at a field's or group member's slot, where a sugar form is written in place: children first, so a
      * nested form is already its construction by the time the enclosing one is built, and lands in the enclosing
-     * binding as a {@code { of: … }} wrapper ({@code meta.type_inline}). A form over a parameter of the enclosing
-     * declaration is the application it spells, or refused ({@link #openForm}).
+     * binding as a {@code { of: … }} wrapper ({@code meta.type_inline}).
      */
     private TypeExpr typeRef(TypeExpr ref) {
         return switch (ref) {
@@ -575,39 +521,14 @@ final class SchemaDesugarer {
 
     /**
      * A record body at a type slot, written in place as the {@code meta.record} construction it denotes, its own
-     * forms already theirs ({@link #recordDef}). Over a parameter of the enclosing open record it is a gap: an open
-     * record's parameters are substituted at its own field types and the applications there ({@code Substitution}),
-     * and a record in place is neither.
+     * forms already theirs ({@link #recordDef}).
      */
     private TypeExpr recordInPlace(RecordExpr written) {
-        RecordDef record = recordDef(written.body());
-        for (RecordEntry entry : record.entries()) {
-            List<FieldTypeExpr> types = switch (entry) {
-                case FieldDef field -> field.type().map(FieldDef.FieldType::typeRef).stream().toList();
-                case GroupDef group -> group.members().stream().map(GroupDef.Member::typeRef).toList();
-            };
-            for (FieldTypeExpr type : types) {
-                if (type instanceof TypeExpr ref && parameterIn(ref).isPresent()) {
-                    throw new UnsupportedOperationException("'" + currentName + "': the record written in place '"
-                            + spell(written) + "' stands over the parameter '" + parameterIn(ref).get() + "', and an "
-                            + "open record's parameters are not yet substituted inside a record written in place -- "
-                            + "declare the record as an open record of its own ('my_record => <"
-                            + parameterIn(ref).get() + "> " + spell(written) + "') and apply it");
-                }
-            }
-        }
-        return new InlineConstruction(construction(recordBinding(record)));
+        return new InlineConstruction(construction(recordBinding(recordDef(written.body()))));
     }
 
-    /**
-     * A sugar form whose positions are {@code children}, already rewritten: the application it spells or refused
-     * where one of them names a parameter of the enclosing declaration ({@link #openForm}), and the construction it
-     * denotes, in place, otherwise.
-     */
+    /** A sugar form whose positions are {@code children}, already rewritten, as the construction it denotes in place. */
     private TypeExpr container(TypeExpr ref, List<TypeExpr> children) {
-        if (children.stream().anyMatch(child -> parameterIn(child).isPresent())) {
-            return openForm(ref, children);
-        }
         Binding binding = binding(ref, children);
         refuseParameterBound(binding);
         return new InlineConstruction(construction(binding));

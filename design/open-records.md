@@ -17,12 +17,14 @@ application of one closes is `design/template-materialisation.md`'s. Current for
   `DispatchFactories.over` in `tson-json`). Code building a reader or writer from a `RecordBody` asks `isOpen` first.
 - **A parameter is a reference value** (`schema.meta.ParamRef`, a `TypeRef` with no arguments and no closure). Inside
   an open record a name its `parameters` declare is that parameter, looked up before the namespace (§3.3).
-  `RecordBody`'s constructor turns every such `NameRef` among its fields' types and its parents' arguments into a
-  `ParamRef`, from source and from a bound resolved form alike, and refuses a `ParamRef` its parameters do not declare
-  (`IllegalArgumentException`). So a closed record holds none, and an application, substituting each away, closes to
-  a record with none -- enforced by the model, not by the callers.
-- **A parameter stands at a field's `type`, or as an argument of an application there or in a parent, and nowhere
-  else.** A field's `value` is never one (`ParameterTypes.atValue`, at the source spelling in
+  `RecordBody`'s constructor turns every such `NameRef` among its fields' types, at any depth of types in place
+  (`TypeSlots`), and its parents' arguments into a `ParamRef`, from source and from a bound resolved form alike, and
+  refuses a `ParamRef` its parameters do not declare (`IllegalArgumentException`). **A closed record judges none**: one
+  written in place inside an open record holds that record's parameters, and only the open record can tell them from a
+  stray one. An application substitutes every one away, so a closed entry holds none.
+- **A parameter stands at a field's `type`, at a slot of a type written in place there (a type slot or a name slot:
+  `[T]`, `{T => int32}`, `{ cursor: T }`, at any depth), or as an argument of an application at any of those or in a
+  parent, and nowhere else.** A field's `value` is never one (`ParameterTypes.atValue`, at the source spelling in
   `DefinitionResolver.resolveFieldEntry`); a field name or a group member named like one, and a `name_type` naming
   one, are refused by `DefinitionResolver.checked` (`ParameterTypes.at`); a size bound naming one by
   `SchemaDesugarer.refuseParameterBound`; a parameter as an operand of `&`/`^` by `refuseParameterOperand`; a
@@ -37,6 +39,9 @@ application of one closes is `design/template-materialisation.md`'s. Current for
   (`SchemaResolver.OnDemand.refuseShadowingParameters`): a parameter spelled like an entry the schema's namespace
   holds, a type or a value entry, its own or an import's, is refused at the declaration. With every argument a
   reference, a name an absorbed field's type writes is an entry, so this one rule covers absorbed fields too.
+- **An application where a type in place holds only a name is refused at the declaration** (`ParameterTypes`'
+  `requireNamesInPlace`): `{box<T> => text}` is refused at the open record, as `meta.map<box<T> text>` is, rather than
+  only at each application.
 - **A bound is written, never inherited.** `<T: text>` puts `Param.bound` on where the declaration resolves
   (`DefinitionResolver.withBounds`); nothing about a parameter is inferred. `ParameterTypes.check` runs once every
   declaration is ready and before anything closes: each written bound names a type, and each parameter passed to a
@@ -66,7 +71,8 @@ open record, and the bodies refused), `design/schema-resolution.md` (`openRecord
   to once its parameter is supplied -- an argument a slot refuses (`meta.namespace<int32 text>`), a recursion that
   never terminates (`TypeInhabitance`).
 - **A literal needs a closed type, and a selector one closed in every application.** `checked` refuses a literal
-  `value` on a field whose type names a parameter, whole or as an argument (`refuseLiteralOnOpenType`), and a selector
+  `value` on a field whose type names a parameter, whole, as an argument or at a slot in place, the open record's own
+  or one of a record written in place inside it (`refuseLiteralOnOpenType`), and a selector
   typed by one (`refuseParameterTypedSelector`). A value that differs per application is written where the
   application is declared, `created => response<order> & { status?: = 201 }`.
 - **`abstract` and the selectors are each application's.** `result => abstract <T> { ok: boolean =? }` makes
@@ -86,10 +92,10 @@ open record, and the bodies refused), `design/schema-resolution.md` (`openRecord
 - **The explicit spelling** `<T> !meta.record { … }` is read through `record`'s own reader (`openRecord`): first the
   author's terms -- a binding `record` does not declare (`checkTemplateBindings`), a parameter at a slot that names no
   type (`ParameterTypes.checkSlots`, the one walk left over a payload; a positional field `item => T` is its
-  `record_field`'s type; a `{ of: !C { … } }` wrapper is walked against `C`'s vocabulary, where a parameter at a type
-  slot is not yet supported, `UnsupportedOperationException`, since neither `RecordBody`'s scoping nor `Substitution`
-  reaches inside a type written in place, and one at a scalar slot is refused as anywhere else), a literal beside a
-  parameter-typed field (`refuseLiteralOnParameter`) -- then the
+  `record_field`'s type; a `{ of: !C { … } }` wrapper is walked against `C`'s vocabulary, where a parameter at a slot
+  holding a type or a name stands as at a field's type, and one at a scalar slot is refused as anywhere else; only a
+  wrapper whose constructor cannot be read yet leaves the slots untold, a gap), a literal beside a parameter-typed
+  field (`refuseLiteralOnParameter`) -- then the
   declaration's parameters are added as `parameters` and the payload bound. A construction writing `parameters`
   itself is refused (`refuseWrittenParameters`): the list before the body is what puts them in scope and what every
   check reads.
@@ -113,7 +119,7 @@ stands is only ever checked, never derived from.
   judged against the bounds its callees *wrote*, so no order among templates is needed and nothing iterates. An
   imported template's recorded bound is what its author wrote, and binds the same way.
 - **A constructor's slot needs no bound.** A head that is no open record -- construction sugar, `meta.map<K
-  text>`, `[boxed<T>]` held as `meta.array<boxed<T>>` -- has no parameters to bound; its slot judges the argument that
+  text>`, a form in place such as `{K => text}` -- has no parameters to bound; its slot judges the argument that
   arrives when the record is applied, and the applications nested in its arguments are judged in turn.
 - **The call-site check** (`TemplateMaterialiser.checkArguments`): each argument must name a type that IS-A its
   parameter's bound, following alias chains. An application as an argument, or an unresolved name, falls to the

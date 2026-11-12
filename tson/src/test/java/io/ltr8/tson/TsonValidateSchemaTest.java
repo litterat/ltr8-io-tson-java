@@ -62,14 +62,13 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * <b>A parameter inside a collection-valued slot is refused</b> (§5.10): a choice's variants and a tuple's
-     * elements are a list, not reference fields, so a choice or a tuple over a parameter is no reference -- as a
-     * template's whole body, or inside an open record. Each is one diagnostic against the declaration.
+     * <b>A choice or a tuple is no template body</b> (§5.10): a template's body is a record body, so a choice or a
+     * tuple over a parameter there is one diagnostic against the declaration. Inside an open record either is written
+     * in place, the parameter at its slot.
      */
     @ParameterizedTest
     @ValueSource(strings = {
             "{ result => <T> ( T | error )  error => { code: text } }",  // §5.4 variants, as the body
-            "{ box => <T> { v: (T | text) } }",                           // ... inside an open record
             "{ pair => <T> [T, text] }"})                                 // tuple elements
     void aParameterInACollectionSlotIsRefused(String body) {
         List<Diagnostic> problems = check(body);

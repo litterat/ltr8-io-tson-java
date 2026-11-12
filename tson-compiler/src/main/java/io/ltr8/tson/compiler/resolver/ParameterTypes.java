@@ -23,6 +23,7 @@ import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeSlots;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -36,16 +37,17 @@ import java.util.function.Function;
 /**
  * [TSON-SCHEMA] §5.10's parameters: where each may stand, and the bound each is written with.
  *
- * <p><b>A parameter is a type.</b> It stands only at a field's type, or as an argument of an application there or in a
- * parent. A parameter anywhere else is refused at the declaration, naming the slot ({@link #at}): a field's default or
- * fixed value ({@link #atValue}), a size bound, a field name, a group member, a field's {@code optional}, {@code
- * voidable} or {@code role}, the record's {@code extension}, {@code name_type} or {@code discriminators}. Each would
- * leave the open record without one shape its applications share, and a field's value in particular is never a
- * parameter, whatever the field's type: a pin on a slot typed {@code meta.type_ref} ({@code <T> meta.array ^ {
- * element_type?: = T }}) is refused with every other parameter at a value. An open record built from a record body
- * holds a parameter only where it may stand, its fields' types and its parents' arguments being the only references it
- * has; the explicit spelling, {@code <T> !meta.record { … }}, is walked against {@code record}'s own vocabulary before
- * it is bound ({@link #checkSlots}).
+ * <p><b>A parameter is a type.</b> It stands only at a field's type, at a slot of a type written in place there that
+ * holds a type or a name, or as an argument of an application at any of those or in a parent. A parameter anywhere
+ * else is refused at the declaration, naming the slot ({@link #at}): a field's default or fixed value ({@link
+ * #atValue}), a size bound, a field name, a group member, a field's {@code optional}, {@code voidable} or {@code
+ * role}, the record's {@code extension}, {@code name_type} or {@code discriminators}. Each would leave the open record
+ * without one shape its applications share, and a field's value in particular is never a parameter, whatever the
+ * field's type: a pin on a slot typed {@code meta.type_ref} ({@code <T> meta.array ^ { element_type?: = T }}) is
+ * refused with every other parameter at a value. An open record built from a record body holds a parameter only where
+ * it may stand, its fields' types, at any depth, and its parents' arguments being the only references it has; the
+ * explicit spelling, {@code <T> !meta.record { … }}, is walked against {@code record}'s own vocabulary before it is
+ * bound ({@link #checkSlots}).
  *
  * <p><b>A bound is written.</b> A declaration writes one after the name ({@code <T: text>}), which must name a type;
  * otherwise the parameter is unbounded. Nothing about a parameter is inferred from its uses. A parameter passed as an
@@ -53,8 +55,8 @@ import java.util.function.Function;
  * {@code rebox => <T> { b: boxed<T> }} over {@code boxed => <T: text> { v: T }} is refused at {@code rebox}. Each
  * declaration is checked once, against the bounds its callees wrote, so no order among templates is needed. A
  * constructor's slot judges the argument that arrives when the record is applied, so a parameter passed to one
- * ({@code meta.map<K text>}, {@code [boxed<T>]} as {@code meta.array<boxed<T>>}) needs no bound, the
- * applications nested in its arguments being judged in turn.
+ * ({@code meta.map<K text>}, {@code [T]}) needs no bound, the applications nested in its arguments or held at its
+ * other slots ({@code [boxed<T>]}) being judged in turn.
  */
 final class ParameterTypes {
 
@@ -117,6 +119,7 @@ final class ParameterTypes {
                 return;
             }
             try {
+                requireNamesInPlace((RecordBody) definition);
                 written.put(name, OpenEntry.applications(definition));
                 for (Param parameter : OpenEntry.parameters(definition)) {
                     parameter.bound().ifPresent(bound -> requireType(bound, entries::get));
@@ -154,6 +157,29 @@ final class ParameterTypes {
         if (walk.resolve(RECORD) instanceof RecordBody vocabulary) {
             walk.payload(payload.coreValue(), RECORD, vocabulary);
         }
+    }
+
+    /**
+     * Refuses an application at a slot of a type in place that holds only a name -- a map's key, a reference's {@code
+     * of} ([TSON-SCHEMA] §4.2) -- at the open record's declaration, as {@link Callees#requireNames} refuses one among a
+     * constructor's arguments: closing would refuse it only at each application, and never where none is written.
+     */
+    private static void requireNamesInPlace(RecordBody open) {
+        TypeSlots.Rewrite names = new TypeSlots.Rewrite() {
+            @Override
+            public TypeRef atName(TypeRef reference) {
+                if (!reference.arguments().isEmpty()) {
+                    throw TemplateMaterialiser.nameRequired(reference);
+                }
+                return reference;
+            }
+
+            @Override
+            public TypeExpr atSlot(TypeRef reference) {
+                return reference;
+            }
+        };
+        open.fields().values().forEach(field -> TypeSlots.map(field.type(), names));
     }
 
     /** Where a declaration whose parameters are refused is reported, entry by entry. */
@@ -324,13 +350,10 @@ final class ParameterTypes {
      * can name it.
      *
      * <p><b>A type written in place is walked into</b> ({@code inPlace}), its {@code { of: !C { … } }} body against
-     * {@code C}'s vocabulary. A parameter at a type slot there -- {@code type: { of: !meta.array { element_type: T }
-     * }} -- is no author's error, the slot holding a type, but is not yet supported: an open record's parameters are
-     * scoped and substituted at its field types and the applications there ({@link RecordBody}, {@code Substitution}),
-     * and neither reaches inside a type written in place, so the parameter would stand unbound. The sugar an author
-     * writes never puts one there, {@code [T]} over a parameter being the application {@code meta.array<T>} ({@code
-     * SchemaDesugarer}). A parameter at a slot that holds no type is refused for where it stands, inside the wrapper as
-     * outside it.
+     * {@code C}'s vocabulary. A parameter at a slot there that holds a type or a name -- {@code type: { of: !meta.array
+     * { element_type: T } }} -- stands as it does at a field's type, scoped by the open record and substituted when it
+     * is applied ({@link RecordBody}, {@code Substitution}). A parameter at a slot that holds no type is refused for
+     * where it stands, inside the wrapper as outside it.
      */
     private record Walk(List<String> parameters, Function<String, Top> meta, boolean inPlace) {
 
@@ -384,8 +407,8 @@ final class ParameterTypes {
             };
             switch (written) {
                 case TokenValue token when declares(token.text()) && inPlace
-                        && (type instanceof ReferenceBody || TYPE_EXPR.equals(declaredName)) ->
-                        throw inPlace(token.text(), slot);
+                        && (type instanceof ReferenceBody || TYPE_EXPR.equals(declaredName)) -> {
+                }
                 // A field written positionally, `item => T`, is its record_field's one unmarked slot, its type.
                 case TokenValue token when declares(token.text()) -> token(token.text(),
                         RECORD_FIELD.equals(declaredName) ? FIELD_TYPE : slot);
@@ -402,7 +425,8 @@ final class ParameterTypes {
         /**
          * A type written in place, {@code { of: !C { … } }}, walked as the construction of {@code C} it holds. Where
          * {@code C} is not yet a record this namespace can show -- a constructor of this schema still resolving -- no
-         * slot can be told from another, and a parameter anywhere inside is the gap.
+         * slot can be told from another, so a parameter anywhere inside is a gap: substitution reaches type slots
+         * alone, and one at a scalar slot would be read as its spelling.
          */
         private void wrapped(RecordValue wrapper) {
             for (RecordValue.Field field : wrapper.fields()) {
@@ -435,13 +459,11 @@ final class ParameterTypes {
             }
         }
 
-        /** A parameter at {@code slot} inside a type written in place, which phase 1 cannot bind (see this walk). */
+        /** A parameter inside a construction whose constructor cannot be read yet ({@link #wrapped}). */
         private static UnsupportedOperationException inPlace(String parameter, String slot) {
             return new UnsupportedOperationException("parameter '" + parameter + "' stands at " + slot + ", inside "
-                    + "a type written in place: an open record's parameters are not yet substituted there -- write a "
-                    + "container over it as the application its sugar spells, 'meta.array<" + parameter + ">' for '["
-                    + parameter + "]', and a record over it as an open record of its own, applied to '" + parameter
-                    + "'");
+                    + "a construction whose constructor is not yet resolved, so which of its slots hold a type cannot "
+                    + "be told -- write the type in place with a kernel constructor, or declare the constructor first");
         }
 
         /**

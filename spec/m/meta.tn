@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=3052b4617a1febcecf7f69f194325a6563bd20ca34202a856efbd822ac8261e9"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=8c3cbece074056221cc28a40a6c6a91b205a8dd274d411d91dd304a303bf0356"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -447,12 +447,12 @@
 
       Every parameter is a type. It is written where it stands as its name, a
       reference value (`meta.reference_type`), and stands at a field's `type`,
-      or as an argument of an application there or in a parent, a form over it
-      being held as the application it spells (`meta.array<T>` for `[T]`), and
-      nowhere else: a field's `value` is never a parameter. A parameter passed
-      on as an
-      argument to a bounded parameter is written with a bound that IS-A that
-      bound.
+      at a slot naming a type of a type written in place there, at any depth
+      (`[T]`, `{ cursor: T }`), or as an argument of an application at any of
+      those or in a parent, and nowhere else: a field's `value` is never a
+      parameter. Applying the record replaces it wherever it stands. A
+      parameter passed on as an argument to a bounded parameter is written
+      with a bound that IS-A that bound.
       """
     param => {
       name:   meta.param_name
@@ -945,16 +945,19 @@
       constructor's is its construction, and an open record's the record it
       closes to ([TSON-SCHEMA] §5.3, §5.10). Where only a name may stand, an
       application closes nowhere and is refused ([TSON-SCHEMA] §4.2). So a
-      value carries arguments only where an application is still open, in an
-      open record's `parents`, its field types and the constructions written
-      in them, and in the `application` annotation.
+      value carries arguments only where an application of an open record is
+      still open, in an open record's `parents` and its field types, at any
+      depth of the types written in them, and in the `application`
+      annotation; a constructor's application over a parameter is its
+      construction in place.
 
       Inside an open record a value may be one of the record's parameters,
       written as its name, alone or among an application's arguments, and
       looked up before the namespace ([TSON-SCHEMA] §3.3). A parameter is a
-      type: it stands at a field's `type`, or as an argument of an application
-      there or in a parent, and never at a field's `value`. The slot judges the
-      argument that arrives when the record is applied.
+      type: it stands at a field's `type`, at a slot of a type written in place
+      there, or as an argument of an application at either or in a parent,
+      and never at a field's `value`. The slot judges the argument that
+      arrives when the record is applied.
 
       A refinement narrows `of`: the refined `of` is the source's or IS-A it,
       so every name the refinement admits the source admits too, and the
@@ -996,7 +999,8 @@
       record field's `type`. An enum, every other atom and a namespace type,
       whose values carry its name as their tag, are declared and named, and so
       is a declared sum (`declared_type`). It is not itself a type, so one
-      never holds another directly.
+      never holds another directly. Inside an open record a slot in it may hold
+      one of the record's parameters, replaced when the record is applied.
       """
     type_inline => { of: meta.type }
 

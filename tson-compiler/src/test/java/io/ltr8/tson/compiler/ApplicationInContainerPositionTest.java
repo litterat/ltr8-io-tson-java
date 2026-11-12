@@ -108,15 +108,15 @@ class ApplicationInContainerPositionTest {
         assertEquals(TypeRef.of("text"), slot(entry(compiled, "text_tree"), "value"), "T bound at the value field too");
     }
 
-    /** The template holds the array as the reference it spells, its parameter among the arguments. */
+    /** The template holds the array in place, the application over its parameter at the element's slot. */
     @Test
-    void theOpenRecordHoldsTheArrayAsAReference() {
+    void theOpenRecordHoldsTheArrayInPlace() {
         TsonCompiledSchema compiled = compile("""
                   tree => <T> { value: T  children?: [tree<T>] }""");
 
         RecordBody tree = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("tree"));
         assertTrue(tree.isOpen());
-        assertEquals(TypeRef.of("meta.array", List.of(TypeRef.of("tree", List.of(ParamRef.of("T"))))),
+        assertEquals(new TypeInline(ArrayBody.of(TypeRef.of("tree", List.of(ParamRef.of("T"))))),
                 tree.fields().get("children").type());
         assertTrue(unpositioned(compiled).isEmpty(), () -> "no entry added for a form over a parameter: "
                 + unpositioned(compiled));
@@ -135,18 +135,19 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * §8's own spelling sizes the recursive position, {@code [tree<T>; 1..]}: a size over a parameter sets a field no
-     * argument list carries, so the form is no reference and is refused at the declaration ([TSON-SCHEMA] §5.10).
+     * §8's own spelling sizes the recursive position, {@code [tree<T>; 1..]}: the array is written in place with its
+     * size, and the recursion inside it ties to the declaration closing it, as an unsized one does.
      */
     @Test
-    void aSizedArrayOverAParameterIsRefused() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> compile("""
-                          tree => <T> { value: T  children: [tree<T>; 1..] }
-                          use  => { t: tree<text> }"""));
+    void aSizedArrayOverAParameterTiesToItsDeclaration() {
+        TsonCompiledSchema compiled = compile("""
+                  tree      => <T> { value: T  children?: [tree<T>; 1..] }
+                  text_tree => tree<text>""");
 
-        assertTrue(thrown.getMessage().contains("'[tree<T>; 1..]' stands over the parameter 'T' and is no "
-                + "reference"), thrown.getMessage());
+        ArrayBody children = assertInstanceOf(ArrayBody.class, inPlace(slot(entry(compiled, "text_tree"),
+                "children")));
+        assertEquals(TypeRef.of("text_tree"), children.elementType());
+        assertEquals(Optional.of(1L), children.minItems());
     }
 
     // ── One type per form, whichever channel produced it ─────────────────────

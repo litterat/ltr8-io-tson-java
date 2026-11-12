@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +39,9 @@ public final class OpenEntry {
     }
 
     /**
-     * Every application an open record writes, in its fields' types and its parents ({@link RecordBody#references}),
-     * each as written with its arguments; an application nested in another's arguments comes back inside it. Empty
-     * for a closed entry.
+     * Every application an open record writes, in its fields' types at any depth of types written in place and in its
+     * parents ({@link RecordBody#references}), each as written with its arguments; an application nested in another's
+     * arguments comes back inside it. Empty for a closed entry.
      */
     public static List<TypeRef> applications(Top value) {
         if (!isOpen(value)) {
@@ -68,20 +69,29 @@ public final class OpenEntry {
     }
 
     /**
-     * The first of {@code value}'s parameters that {@code type} names, as itself or in an argument at any depth --
-     * empty where {@code type} means the same thing in every application, and so is closed already. A type written in
-     * place holds no parameter: inside an open record a form over one is held as the application it spells.
+     * The first parameter {@code type} names, as itself, at a slot of a type written in place, or in an argument, at
+     * any depth -- empty where {@code type} means the same thing in every application, and so is closed already.
      */
     public static Optional<String> parameterIn(TypeExpr type) {
-        if (type instanceof ParamRef parameter) {
+        List<TypeRef> references = new ArrayList<>();
+        TypeSlots.forEach(type, references::add);
+        for (TypeRef reference : references) {
+            Optional<String> found = parameterIn(reference);
+            if (found.isPresent()) {
+                return found;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<String> parameterIn(TypeRef reference) {
+        if (reference instanceof ParamRef parameter) {
             return Optional.of(parameter.name());
         }
-        if (type instanceof TypeRef reference) {
-            for (TypeRef argument : reference.arguments()) {
-                Optional<String> found = parameterIn(argument);
-                if (found.isPresent()) {
-                    return found;
-                }
+        for (TypeRef argument : reference.arguments()) {
+            Optional<String> found = parameterIn(argument);
+            if (found.isPresent()) {
+                return found;
             }
         }
         return Optional.empty();

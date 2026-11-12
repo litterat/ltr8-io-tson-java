@@ -41,7 +41,7 @@ namespace (`ParamRef`, `design/open-records.md`), whole at a field's type or amo
   equality and `toString` exclude it (`ReferenceBody.memberNames()` is the processor's own).
 - `of` names any type or constructor of the writer's namespace. It is a `TypeRef` at a slot that holds a name alone
   (§4.2): an application there, `!meta.reference_type { of: box<text> }` or `meta.ref<box<text>>`, is refused, to be
-  declared under a name and named (`MetaRefs`' reference arm, `TemplateMaterialiser.nameRequired`), so a resolved `of`
+  declared under a name and named (`TypeSlots`' reference arm, `TemplateMaterialiser.nameRequired`), so a resolved `of`
   is a name. Refused too are a name resolving to nothing (an unresolved reference), an open record and a value entry
   (`KindMembers.ofRefusal`, from `validateBody`). `meta.ref<meta.top>` holds every type. `meta.ref<meta.alias>`
   admits nothing, no entry past its hops being an alias, and a required field typed by it is refused by §5.10.1's

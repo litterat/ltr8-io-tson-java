@@ -542,6 +542,47 @@ Items 72–77 carry #5's record written at a type slot. Each names the rule befo
 77. **Header, §8.1** — the summary's list of what stays where it is written gains a record
     body, and §8.1's row for a type at a slot gains `at: { x: int32 }` among its examples.
 
+Items 78–84 make a parameter a leaf at any slot of a type written in place inside an open
+record, replaced when the record is applied. Each names the rule before and after.
+
+78. **§5.10** — **Forms over a parameter**: "admitted only where it is a reference: `[T]` is
+    `meta.array<T>` and `{K => V}` is `meta.map<K V>`"; a size or a `?`, a tuple and a choice
+    over a parameter were resolver errors. A form is written in place whether or not it names
+    a parameter, the parameter a name at its slot, nested to any depth, a record written in
+    place included; each is substituted when the open record is applied and judged as the
+    same type written with the argument in place. A size bound naming a parameter, and an
+    application at a slot that holds only a name, stay resolver errors at the declaration.
+79. **§5.10, §5.3, §8.1** — a constructor's application over a parameter, `meta.array<T>`,
+    `set<T>`, `meta.ref<T>`, was held as written until the record was applied. It is its
+    construction in place at once, so `meta.array<T>` and `[T]` are one resolved form, and an
+    application in resolved output applies an open record. **Where an application closes**
+    and **In output** say so; §8.1's row for a type at a slot follows.
+80. **§5.4, §5.10** — a choice over a parameter, `( T | int32 )`, was refused because its
+    disjointness "cannot be judged until it is applied". It loads at the open record, and
+    each application is judged where it closes, its variants' distinctness and its
+    disjointness alike: `pick<text>` loads, and `p => pick<int32>` is a resolver error at
+    `p`. The open record's own choice states `disjoint: false`, a parameter having no class.
+    New paragraph in §5.4, **A choice over a parameter is judged where it is applied**.
+81. **§5.10** — **Where a parameter stands** names the slots of a type written in place, at
+    any depth; the field that takes no value is one whose type names a parameter anywhere,
+    the open record's or a record written in place inside it. **A bound is written** names
+    a type written in place among the places a parameter is passed on. **Scoping**: a
+    closed record holds no parameter but where it is written in place inside an open
+    record; anywhere else a name that would resolve only as a parameter is an unresolved
+    reference (§8.1).
+82. **§4.2, §5.2, §5.3, §5.6** — §4.2's two statements of where a parameter or an
+    application stands, §5.2's record written in place, §5.3's **Arguments** (a sugar form
+    as an argument is refused whatever the head, `meta.array<[T]>` included, and an
+    application as an argument of a constructor's application closes at its slot) and
+    **Nested forms are written in place** (a size or `?` is legal over a parameter too), and
+    §5.6's end state ("a binding record never holds a parameter") are restated.
+83. **Header, §1.3, §8.1, §12.1** — the summary, the resolved-output consumers' paragraph,
+    §8.1's **Open records** and **Reading parameter references**, and the `type-arg` comment
+    follow.
+84. **Kernel** — the documentation of `meta.param`, `meta.reference_type` and
+    `meta.type_inline` states where a parameter stands as above; `meta-resolved.tn`'s
+    conventions note follows. Every pin changes (§6).
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Their entries are not edited by this
@@ -591,8 +632,8 @@ Changes a Revision 39 implementer must act on:
 1. **A template is an open record.** `meta.record` carries `parameters`; `meta.template`,
    `meta.template_param`, `meta.record_template` and its field records are gone, and so are
    held text bodies.
-2. **A parameter is a type**, standing at a field's type or as an argument of an
-   application there or in a parent. At a value, facet, size bound, enum member, field
+2. **A parameter is a type**, standing at a field's type, at a slot of a type written in
+   place there, or as an argument of an application at either or in a parent. At a value, facet, size bound, enum member, field
    name or modifier it is a resolver error. There are no value parameters, and an argument
    is a reference.
 3. **A bound is written.** A parameter passed to a bounded parameter is written with a
@@ -606,9 +647,11 @@ Changes a Revision 39 implementer must act on:
    application and pinning the selectors.
 6. **A template's body is a record body.** No template over a container, an atom, a
    choice, a tuple, a value or a bare reference; no alias template, no partial application.
-7. **Inside an open record**, `[T]` and `{K => V}` over a parameter are the references
-   `meta.array<T>` and `meta.map<K V>`; a sized or voidable container, a choice or a tuple
-   over a parameter is a resolver error. There is no open synthetic entry.
+7. **Inside an open record** a form over a parameter is written in place like any other
+   (items 78–80): `[T; 1..]`, `[T?]`, `[T, text]`, `( T | int32 )` and `{ cursor: T }` load,
+   a constructor's application over a parameter is its construction in place, and a choice
+   over a parameter is judged where each application closes. There is no open synthetic
+   entry.
 8. **A field whose type names a parameter takes no value and is no selector.**
 9. **`meta.tuple1` and `meta.voidable_tuple1` are gone**: a one-position tuple is declared,
    `!meta.tuple [{ element_type: text }]`.
@@ -659,6 +702,7 @@ carries no open questions.
 | #6 (ruled) | `meta.dependent.on` is `text`, naming a field of the record by its declared spelling, declared before the dependent field, as a `discriminators` entry names one. | **[settled]** — the spec author's ruling. |
 | #6 (ruled) | A declared sum written in place was refused only by its absence from Part 2 §4.2's list of what `of` holds. §4.2 states it, beside a namespace type. | **[settled]** — the spec author's ruling. |
 | #6 (open) | A data document typed by the kernel can write a type in place that §4.2's list refuses (`!meta.array { element_type: { of: !meta.dependent { on: kind } } }` reads with no diagnostic): `meta.type_inline.of` is typed `meta.type`, and the list is a resolver rule. It predates `meta.dependent`, which adds one entry to the list. | Open — carried. |
+| Items 78–84 (ruled) | A choice over a parameter, `( T \| int32 )`, is disjoint for some arguments and not others. Refusing it at the declaration, or requiring disjointness for every argument, were the alternatives; it loads at the open record, and each application is judged where it closes. | **[settled]** — the spec author's ruling. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
 
@@ -669,12 +713,14 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `3052b461…` (Revision 39 `c9b069b6…`), numeric `2094f34c…` (`dfa66c5d…`), temporal
-   `71330b39…` (`fb4ada8f…`), net `8c21f7b8…` (`371fc20c…`), core `aef0be34…`
-   (`4e8d9c43…`), policy `d3d88512…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   `8c3cbece…` (Revision 39 `c9b069b6…`), numeric `75198ff6…` (`dfa66c5d…`), temporal
+   `1233d199…` (`fb4ada8f…`), net `7f06ca43…` (`371fc20c…`), core `edf3beb1…`
+   (`4e8d9c43…`), policy `3a789b50…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
-   the materialisation depth's removal. The chain is consistent — numeric,
-   temporal, net and policy each pin the kernel; core pins the three libraries.
+   the materialisation depth's removal, and the kernel and its dependants again for items
+   78–84's documentation of a parameter in a type written in place. The chain is
+   consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
+   libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of
    `meta.record`, `meta.record_field`, `meta.reference_type`, `meta.alias`, `meta.array`
@@ -718,5 +764,12 @@ carries no open questions.
    `wrap` refused at its declaration applied or not, and the parameter remedy;
    §8.2's `pair<text, text>` at a field; sugar in place, a sugar form refused as an argument and
    the widened positional form.
+5. **Items 78–84's examples** — `[T; 1..]`, `[T?]`, `[T, text]`, `( T | int32 )`, `{T =>
+   int32}`, `{ cursor: T }` and `[{ at: T  tags: {text => T} }]` load and read through a
+   declared application and one at a slot, each equal to the type written by hand;
+   `meta.array<T>`, `meta.map<text meta.array<T>>`, `set<T>` and `meta.ref<T>` resolve to the
+   same form as their sugar; `pick<int32>` is refused at its declaration; `{box<T> => text}`,
+   `m: { w?: T ~ 5 }`, `meta.array<[T]>`, an irregular recursion inside a type in place and
+   `f: [node<text>]` are refused.
 4. **The build** — the implementation's full build, with the conformance corpus's Revision
    40 branch required, passes over the revised text.

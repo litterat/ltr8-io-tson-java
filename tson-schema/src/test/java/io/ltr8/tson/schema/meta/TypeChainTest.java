@@ -94,7 +94,7 @@ class TypeChainTest {
     }
 
     @Test
-    void anOpenRecordHoldsItsParametersAsParameterReferencesAndAClosedOneRefusesThem() {
+    void anOpenRecordHoldsItsParametersAsParameterReferences() {
         RecordBody open = new RecordBody(TypeChain.EMPTY.withParents(List.of(TypeRef.of("base",
                 List.of(TypeRef.of("T"))))), List.of(new Param("T")), RecordBody.fieldMap(
                 Map.entry("v", RecordField.required(TypeRef.of("T"))),
@@ -107,8 +107,27 @@ class TypeChainTest {
         assertEquals(TypeRef.of("box", List.of(ParamRef.of("T"))), open.fields().get("w").type());
         assertEquals(TypeRef.of("text"), open.fields().get("x").type());
         assertEquals(List.of(TypeRef.of("base", List.of(ParamRef.of("T")))), open.parents());
-        assertThrows(IllegalArgumentException.class, () -> RecordBody.of(RecordBody.fieldMap(
-                Map.entry("v", RecordField.required(ParamRef.of("T"))))), "a closed record holds no parameter");
+    }
+
+    /**
+     * Inside a type written in place an open record's parameter is scoped at every slot, and one it does not declare is
+     * refused there too; a closed record judges none, since one in place holds its open record's.
+     */
+    @Test
+    void anOpenRecordScopesItsParametersInsideATypeWrittenInPlace() {
+        TypeInline inPlace = new TypeInline(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("cursor", RecordField.required(TypeRef.of("T"))),
+                Map.entry("all", RecordField.required(new TypeInline(ArrayBody.of(TypeRef.of("T"))))))));
+        RecordBody open = new RecordBody(TypeChain.EMPTY, List.of(new Param("T")), RecordBody.fieldMap(
+                Map.entry("meta", RecordField.required(inPlace))), List.of(), RecordExtensionType.OPEN, List.of(),
+                Optional.empty());
+
+        RecordBody meta = (RecordBody) ((TypeInline) open.fields().get("meta").type()).of();
+        assertEquals(ParamRef.of("T"), meta.fields().get("cursor").type());
+        assertEquals(new TypeInline(ArrayBody.of(ParamRef.of("T"))), meta.fields().get("all").type());
+        assertThrows(IllegalArgumentException.class, () -> new RecordBody(TypeChain.EMPTY, List.of(new Param("U")),
+                RecordBody.fieldMap(Map.entry("meta", RecordField.required(new TypeInline(meta)))), List.of(),
+                RecordExtensionType.OPEN, List.of(), Optional.empty()), "T is not U's");
     }
 
     private static RecordBody emptyTemplate(List<Param> parameters) {

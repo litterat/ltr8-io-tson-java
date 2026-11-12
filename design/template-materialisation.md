@@ -14,9 +14,10 @@ derived — and the static check that runs before any of it.
 - A template that fails the regularity check, or whose parameters stand where none may, is replaced with the
   error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
   application's head resolves).
-- The pass runs over the **resolved** form through `MetaRefs`, whose `Rewrite` tells a type slot (`atSlot`) from a
-  slot that holds a name (`atName`). In an open record it closes only the field types that name none of its
-  parameters (`OpenEntry.parameterIn`).
+- The pass runs over the **resolved** form through `schema.meta.TypeSlots`, whose `Rewrite` tells a type slot
+  (`atSlot`) from a slot that holds a name (`atName`). In an open record (`openRewrite`) it closes each reference
+  that names none of its parameters, constructs in place each constructor's application over one, and leaves each
+  open record's application over one for substitution.
 - An application over a **constructor** (`construction`, `design/constructor-application.md`) is the construction
   written in place at a type slot: construction sugar builds the binding record the braced form writes, the
   constructor's reader reads it, the body is walked so each argument closes where it landed (a nested constructor's
@@ -26,7 +27,7 @@ derived — and the static check that runs before any of it.
   construction is refused, to be declared. A namespace type is no such container, its values tagged by its name: one
   is refused by its head before it is read (`ConstructionSugar.refuseNamespaceInPlace`), here and, held in an open
   record, at that record's declaration (`ParameterTypes`).
-- **Where only a name may stand an application closes nowhere** (§4.2): at a slot `MetaRefs` walks with `atName` — a
+- **Where only a name may stand an application closes nowhere** (§4.2): at a slot `TypeSlots` walks with `atName` — a
   map's key, a reference's `of`, an alias's target — a construction and an application of an open record are both
   refused (`closeName`, `nameRequired`), and so is an application at a parameter's bound (`ParameterTypes.requireType`).
   Each is a `SchemaValidationException` at the declaration that wrote it, naming the declaration to write.
@@ -70,7 +71,7 @@ derived — and the static check that runs before any of it.
 
 Related: `design/open-records.md` (what an open record is, where a parameter stands, bounds and argument
 checks), `design/schema-resolution.md` (chains, applied parents),
-`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `CanonicalApplication`, `MetaRefs`, `@meta.application`),
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `CanonicalApplication`, `TypeSlots`, `@meta.application`),
 `design/constructor-application.md`, `design/linking-and-compilation.md`.
 
 ## Materialisation (`tson-compiler/.../resolver/TemplateMaterialiser.java`)
@@ -121,14 +122,15 @@ checks), `design/schema-resolution.md` (chains, applied parents),
   application: a recursive application reached during substitution finds the declaration being closed and names it.
   One reached again inside its own closing in place, with no declaration closing it, is refused (`closingInPlace`,
   §5.10.1), so regular recursion ties on its first repeat or stops there, and nothing nests without bound.
-- **Substitution changes no field fact.** A field's value is never a parameter (§5.10), so replacing each `ParamRef`
-  with its argument is the whole of it (`Substitution`, in `closeOpenRecord`): every field's type is then closed, the
-  applications in it -- a held `meta.array<T>` or `box<T>` among them -- closed now that the parameter is bound, and
-  nothing is written out or read back. A type written in place in the template is walked too: it holds no parameter, but
-  may hold an application of an open record the materialise pass has not reached in the template's own entry
-  (`[box<text>; 2..]`), which closes where it stands. The result is a `RecordBody` without `parameters`; one left
-  holding a `ParamRef` would be refused by the record's constructor. A value that differs per application is pinned
-  where the application is declared (`created => response<order> & { status?: = 201 }`), by composition. The
+- **Substitution changes no field fact, and reaches every type slot.** A field's value is never a parameter (§5.10),
+  so replacing each `ParamRef` with its argument, at any depth of types written in place, is the whole of it
+  (`Substitution`, in `closeOpenRecord`): every field's type is then closed by the same walk, each application at a
+  slot of it -- `box<T>` at a field, in `[box<T>]` or in `{ c: box<T> }` -- closed now that
+  the parameter is bound, and nothing is written out or read back. One walk serves every body kind
+  (`schema.meta.TypeSlots`), so a record in place, a container, a tuple and a choice need no case each. The result is a
+  `RecordBody` without `parameters` and, every `ParamRef` substituted by the one total walk, holding none. A value
+  that differs per application is pinned where the application is declared (`created => response<order> & { status?:
+  = 201 }`), by composition. The
   record-level facts are kept as written too: `extension`, `discriminators`, groups and name type are each
   application's, so an abstract template's application is an abstract record, the base of the declarations composing it
   (§5.10).
@@ -243,7 +245,10 @@ a recursive application — direct or mutual — must pass each parameter throug
   itself, so an application is checked whenever its head can reach the declaration it sits in.
 - **Applications nested inside arguments are checked too** (`box<deep<box<T>>>`), so the walk recurses through
   `TypeRef.arguments`. The applications come from the open record's references (`OpenEntry.applications`), the ones
-  `refuseHeadAbstraction` and the linker's arity check also read.
+  `refuseHeadAbstraction` and the linker's arity check also read: every reference at any depth of a type in place
+  (`RecordBody.references`), so `kids?: [tree<T>]` and `m: { next?: tree<T> }` are judged as `next?: tree<T>` is. An
+  argument is a name or a parameter, and a sugar form is never one, so growth can only come through an application
+  among the arguments, which this walk sees wherever it stands.
 - **Deliberately stricter than termination requires.** What bounds the work is weaker — every argument a bare
   parameter reference, at any position — since arguments are only copied, so permuting
   (`swap => <A, B> { x: swap<B, A> }`) or duplicating still reaches finitely many instantiations. Positional

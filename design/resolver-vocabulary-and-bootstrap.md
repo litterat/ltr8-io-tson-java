@@ -1,7 +1,7 @@
 # Resolver vocabulary, alias hops, `@meta.application`, and the kernel bootstrap
 
-The facts the resolver phases share rather than own: the leaf classes (`WireForm`, `MetaRefs`,
-`CanonicalApplication`), how an alias chain is kept in resolved output and walked, the one derived key annotation, the
+The facts the resolver phases share rather than own: the leaf classes (`WireForm`, `CanonicalApplication`, and the
+model's `TypeSlots`), how an alias chain is kept in resolved output and walked, the one derived key annotation, the
 compiled vocabulary a resolution reads `!C` bodies and annotation values through, and the special-cased bootstrap that
 resolves the kernel, meta.tn, itself. Current form only; history lives in git.
 
@@ -10,10 +10,10 @@ resolves the kernel, meta.tn, itself. Current form only; history lives in git.
 - There is one `WireForm`: a binding record is written by the desugarer and by construction sugar, and a second
   opinion about what a reference or an application in a slot looks like is what makes one of them wrong. An open
   record is no binding record: it is built on the model and substituted there (`Substitution`).
-- `MetaRefs`' switch over `Top` is exhaustive with no default arm, so a new body shape fails to compile there until
-  it says which references it holds. It tells a type slot (`TypeExpr`: may take a construction in place) from a slot
-  that holds a name alone (a map's key, a reference's `of`, an alias's target, a parent), and walks into a type
-  written in place, which stays in place.
+- `schema.meta.TypeSlots`' switch over `Top` is exhaustive with no default arm, so a new body shape fails to compile
+  there until it says which references it holds. It tells a type slot (`TypeExpr`: may take a construction in place)
+  from a slot that holds a name alone (a map's key, a reference's `of`, an alias's target), walks into a type written
+  in place, which stays in place, and never walks a chain.
 - Nothing is named by its content: every entry has an author-written name. `CanonicalApplication` is one method,
   `of`, the comparison §8.2 keys an application on (the applied-parent fold, a recursion closing into its declaration).
 - Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
@@ -48,7 +48,7 @@ Related: `design/schema-resolution.md` (definition resolution), `design/template
 `design/open-records.md` (the callers of `WireForm` and `CanonicalApplication`), `design/constructor-application.md`,
 `design/schema-grammar-and-desugaring.md` (sugar written in place), `design/linking-and-compilation.md`.
 
-## Shared vocabulary: `WireForm`, `MetaRefs`, `CanonicalApplication`
+## Shared vocabulary: `WireForm`, `TypeSlots`, `CanonicalApplication`
 
 Leaf classes the phases share. Each owns a fact that belongs to none of them individually; stated inside whichever
 phase happens to need it first, such a fact ends up stated more than once.
@@ -61,18 +61,23 @@ sugar form's binding record (a nested construction in its `{ of: … }` wrapper,
 a text slot holding `"box<T>"` is text whatever it spells. `TsonObjectWriter` cannot build a binding record: its
 output is canonical-explicit and fully quoted, a different language from the one a binding is written in.
 
-**`MetaRefs`** — the `schema.meta` reference walk: `mapRefs` maps every reference an entry's value holds and leaves
-its chain as written. Its one caller is materialisation, closing an application where it stands. No pass rewrites a
-use site onto the end of an alias chain — see "References are hops" below. A walk is a `Rewrite` with two arms:
-`atSlot` for a reference at a type slot, which may come back as a construction written in place, and `atName` for one
-at a slot that holds a name alone. Which body shape carries which references is a fact about the value model, stated
-once, where the model is walked:
+**`TypeSlots`** (`tson-schema`, beside the model it walks) — every reference a value holds, at any depth of types
+written in place, its chain left as written. It lives in the model because `RecordBody` itself needs it: an open
+record scopes its parameters at every slot, and `references()` is every reference at every depth. Its other callers
+are materialisation (closing an application where it stands, an open record's fields only where they name none of
+its parameters), `Substitution`, `HeldRecursion`, and the declaration checks over an open record's types in place. No
+pass rewrites a use site onto the end of an alias chain — see "References are hops" below. A walk is a `Rewrite`
+with two arms and a hook: `atSlot` for a reference at a type slot, which may come back as a construction written in
+place, `atName` for one at a slot that holds a name alone, and `inPlace` for the body of a type in place before its
+slots. Which body shape carries which references is a fact about the value model, stated once, where the model is
+walked:
 
-- A record's field types (an open record's only where they name none of its parameters), an array's element, a map's
-  and a namespace type's `value_type`, a tuple's elements and a choice's variants are type slots; a type written in
-  place there is walked into, each slot inside it mapped the same way.
-- A map's and a namespace type's `key_type`, a reference's `of`, an alias's target and a chain's parents hold a name:
-  a construction has nowhere to stand there.
+- A record's field types, an array's element, a map's and a namespace type's `value_type`, a tuple's elements and a
+  choice's variants are type slots; a type written in place there is walked into, each slot inside it mapped the same
+  way.
+- A map's and a namespace type's `key_type`, a reference's `of` and an alias's target hold a name: a construction has
+  nowhere to stand there. A chain's parents are no slot: an open record substitutes them, and linking derives the
+  rest.
 - Nothing in any other atom (its facets are values), a declared type, or a value entry.
 
 §5.10's regularity check does not use the walk: every entry with parameters is an open record, and reads its

@@ -7,6 +7,9 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -74,17 +77,17 @@ class OpenRecordShapeTest {
     }
 
     /**
-     * A parameter is a reference value: whole at a field's type, or as an argument there, and no label says which. A
-     * container over a parameter is the reference it spells, {@code [T]} the application {@code meta.array<T>}, held
-     * as written; a literal on a closed type stays a literal.
+     * A parameter is a reference value: whole at a field's type, or at a slot of a type written in place there, and no
+     * label says which. A container over a parameter is its construction in place, {@code [T]} the array whose element
+     * is the parameter; a literal on a closed type stays a literal.
      */
     @Test
-    void aParameterIsAReferenceWholeOrAsAnArgument() {
+    void aParameterIsAReferenceWholeOrAtASlotInPlace() {
         RecordBody pair = open(compile("  pair => <T> { a: T  b: [T]  c: {text => T}  d?: text ~ \"x\" }"), "pair");
 
         assertEquals(ParamRef.of("T"), pair.fields().get("a").type());
-        assertEquals(TypeRef.of("meta.array", List.of(ParamRef.of("T"))), pair.fields().get("b").type());
-        assertEquals(TypeRef.of("meta.map", List.of(TypeRef.of("text"), ParamRef.of("T"))),
+        assertEquals(new TypeInline(ArrayBody.of(ParamRef.of("T"))), pair.fields().get("b").type());
+        assertEquals(new TypeInline(MapBody.of(TypeRef.of("text"), ParamRef.of("T"))),
                 pair.fields().get("c").type());
         assertEquals(Optional.of("x"), pair.fields().get("d").value().map(Token::text));
     }
@@ -157,25 +160,17 @@ class OpenRecordShapeTest {
     }
 
     /**
-     * Inside an open record a form over a parameter is admitted only where it is a reference (§5.10): a size or a
-     * {@code ?} element, a choice and a tuple over a parameter are refused, naming the form.
+     * Inside an open record a form over a parameter is its construction in place, whatever else it sets (§5.10): a
+     * size, a {@code ?} element, a choice and a tuple each load and close where the record is applied.
      */
     @Test
-    void aFormOverAParameterThatIsNoReferenceIsRefused() {
-        String sized = assertThrows(SchemaValidationException.class,
-                () -> compile("  page => <T> { items: [T; 1..] }")).getMessage();
-        String voidable = assertThrows(SchemaValidationException.class,
-                () -> compile("  page => <T> { items: [T?] }")).getMessage();
-        String choice = assertThrows(SchemaValidationException.class,
-                () -> compile("  page => <T> { body: ( T | text ) }")).getMessage();
-        String tuple = assertThrows(SchemaValidationException.class,
-                () -> compile("  page => <T> { at: [T, text] }")).getMessage();
+    void aFormOverAParameterIsItsConstructionWhateverElseItSets() {
+        TsonCompiledSchema compiled = compile("""
+                  page => <T> { items: [T; 1..]  maybe: [T?]  body: ( T | int32 )  at: [T, int32] }
+                  text_page => page<text>""");
 
-        assertTrue(sized.contains("'[T; 1..]' stands over the parameter 'T' and is no reference"), sized);
-        assertTrue(voidable.contains("'[T?]' stands over the parameter 'T'"), voidable);
-        assertTrue(choice.contains("'( T | text )' stands over the parameter 'T'")
-                && choice.contains("field group"), choice);
-        assertTrue(tuple.contains("'[T, text]' stands over the parameter 'T'"), tuple);
+        assertEquals(List.of(), read(compiled, "text_page", "{ items: [a]  maybe: [_]  body: b  at: [c 1] }"));
+        assertEquals(1, read(compiled, "text_page", "{ items: []  maybe: []  body: 1  at: [c 1] }").size());
     }
 
     /** An argument is a type, written as a reference: a literal token is no argument (§5.10). */

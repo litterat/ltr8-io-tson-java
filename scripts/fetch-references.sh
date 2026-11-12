@@ -16,7 +16,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REF_DIR="$REPO_ROOT/.references"
 
 SUITE_REPO="https://github.com/litterat/ltr8-io-tson-test-suite"
-SUITE_PIN=36975ba25ccd33bfa50ca54601fa12652770c37f
+SUITE_PIN=9de48ad748df66275dacb6e2de40f75ae01630f9
 
 if [ "${1:-}" = "--force" ]; then
   echo "==> --force: removing $REF_DIR"

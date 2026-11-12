@@ -405,12 +405,13 @@ class InlineTypeRulesTest {
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(optional, "!r { at: { kind: a  x: 1 } }").getFirst().code());
     }
 
-    /** A record in place over a parameter of its open record is not implemented: a gap, never a schema error. */
+    /** A record in place over a parameter of its open record is substituted where the record is applied. */
     @Test
-    void aRecordInPlaceOverAParameterIsAGap() {
-        List<Diagnostic> found = problems("  page => <T> { meta: { cursor: T  total: int32 } }");
-        assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED), found.stream().map(Diagnostic::code).toList(),
-                found::toString);
+    void aRecordInPlaceOverAParameterReadsWhereItsRecordIsApplied() {
+        String declarations = "  page => <T> { meta: { cursor: T  total: int32 } }\n  r => { p: page<int32> }";
+        assertEquals(List.of(), problems(declarations));
+        assertEquals(Optional.of("/p/meta/cursor"),
+                read(declarations, "!r { p: { meta: { cursor: x  total: 1 } } }").getFirst().path());
     }
 
     /** One naming no parameter is closed, and an application of its open record reads it. */
