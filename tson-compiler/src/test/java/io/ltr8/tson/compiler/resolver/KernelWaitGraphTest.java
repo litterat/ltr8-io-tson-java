@@ -86,9 +86,9 @@ class KernelWaitGraphTest {
         System.out.println("  related concepts beyond the closure: " + related);
 
         assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
-        assertEquals(32, cycle.size(), "the cycle");
-        assertEquals(68, closure.size(), "the cycle's closure");
-        assertEquals(77, graph.entries().size(), "the kernel's entries");
+        assertEquals(31, cycle.size(), "the cycle");
+        assertEquals(67, closure.size(), "the cycle's closure");
+        assertEquals(76, graph.entries().size(), "the kernel's entries");
         assertTrue(closure.containsAll(List.of("meta.param", "meta.param_name")), "reached through record.parameters");
         assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application",
                 "binary.bytes_encoding", "binary.bytes_type",

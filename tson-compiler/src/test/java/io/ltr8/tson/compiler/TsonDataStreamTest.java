@@ -107,38 +107,6 @@ class TsonDataStreamTest {
 
     // ── A sibling reference ([TSON-DATA] §7.4, §7.5) ────────────────────
 
-    /** {@code kind!} is one value, a reference event holding the sibling, wherever a core value stands. */
-    @Test
-    void aSiblingReferenceIsOneValue() {
-        assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(type)", "Reference(kind!)",
-                "FieldName(optional)", "Token(true,UNQUOTED)", "RecordEnd", "DocumentEnd"),
-                shape("{ type: kind!  optional: true }"));
-        assertEquals(List.of("DocumentStart(|)", "ArrayStart", "Reference(kind!)", "ArrayEnd", "DocumentEnd"),
-                shape("[ kind!\n]"));
-        assertEquals(List.of("DocumentStart(|)", "MapStart", "Reference(kind!)", "MapArrow", "Token(1,UNQUOTED)",
-                "MapEnd", "DocumentEnd"), shape("{ kind! => 1 }"));
-        assertEquals(List.of("DocumentStart(|)", "Reference(kind!)", "DocumentEnd"), shape("kind!"));
-        assertTrue(events("{ type: kind!  }").get(3) instanceof ReferenceEvent(
-                io.ltr8.tson.schema.meta.SiblingRef sibling, var ignored) && sibling.field().equals("kind"));
-    }
-
-    /**
-     * The {@code !} is followed by whitespace, which keeps it apart from a prefix {@code !}; the token before it is one
-     * unquoted identifier; a sibling reference is no template argument; and a tag names a type, never a sibling.
-     */
-    @Test
-    void aMalformedOrMisplacedSiblingReferenceIsRefused() {
-        for (String source : List.of("{ type: kind!}", "[kind!]", "{ v: a!b }", "{ v: kind!, w: 1 }", "{ v: kind!? }",
-                "{ v: a.b! }", "{ v: \"kind\"! }", "{ v: 1x! }", "box<kind! >", "{ v: !int32! 5 }")) {
-            TsonDataStream stream = new TsonDataStream(ByteSource.of(source));
-            assertThrows(ParseException.class, () -> {
-                while (!(stream.next() instanceof DocumentEnd)) {
-                    // drain
-                }
-            }, source);
-        }
-    }
-
     @Test
     void voidRoot() {
         assertEquals(List.of("DocumentStart(|)", "Absent", "DocumentEnd"), shape("_"));

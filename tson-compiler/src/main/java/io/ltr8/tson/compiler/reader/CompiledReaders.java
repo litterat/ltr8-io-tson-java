@@ -104,6 +104,11 @@ public final class CompiledReaders implements TsonTypeReaderResolver {
      */
     @Override
     public TsonTypeReader<?> resolveInline(TypeInline type) {
+        if (type.dependentOn().isPresent()) {
+            // Equal text under two records is two types: a dependent type is read only through the record that binds
+            // it, so one keyed here alone would be shared across binders (§5.2, §8.2).
+            throw new IllegalStateException("the dependent type '" + type.text() + "' is read through its record");
+        }
         InlineKey key = new InlineKey(type, type.text());
         TsonTypeReader<?> built = inline.get(key);
         if (built != null) {

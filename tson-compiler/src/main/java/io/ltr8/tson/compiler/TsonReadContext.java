@@ -285,7 +285,7 @@ public interface TsonReadContext {
      * sink its factory was given ({@link #schemaDocument}), for the linker to judge against the type the sibling
      * holds, a name read in the reading schema's namespace.
      */
-    void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.FieldTypeExpr named,
+    void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.TypeExpr named,
                        List<TsonEvent> written);
 
     /**

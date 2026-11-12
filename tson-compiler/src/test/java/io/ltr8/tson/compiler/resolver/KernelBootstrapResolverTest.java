@@ -160,7 +160,7 @@ class KernelBootstrapResolverTest {
     void theFixtureDeclarationsResolveWithNoEntryAdded() {
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
-        assertEquals(83, schema.entries().size());
+        assertEquals(82, schema.entries().size());
         io.ltr8.tson.schema.meta.RecordBody chain =
                 (io.ltr8.tson.schema.meta.RecordBody) schema.entries().get("meta.type_chain");
         assertEquals(new io.ltr8.tson.schema.meta.TypeInline(io.ltr8.tson.schema.meta.ArrayBody.of(

@@ -327,7 +327,7 @@ class KindMembersTest {
 
         assertEquals(List.of("products"), TypeChain.supertypesOf(kind(linked, "maps")));
         assertEquals(List.of("maps", "products"), TypeChain.supertypesOf(kind(linked, "namespaces")));
-        assertEquals(List.of("meta.field_type_ref", "meta.type_ref"),
+        assertEquals(List.of("meta.type_ref"),
                 TypeChain.supertypesOf(kind(linked, "meta.identifier_ref")));
         assertTrue(TypeChain.subtypesOf(kind(linked, "meta.type_ref")).contains("meta.identifier_ref"));
         assertEquals("meta.namespace", kind(linked, "namespaces").of().text());

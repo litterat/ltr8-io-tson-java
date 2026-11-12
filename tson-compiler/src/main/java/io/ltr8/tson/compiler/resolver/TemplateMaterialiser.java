@@ -17,7 +17,6 @@ import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
-import io.ltr8.tson.schema.meta.SiblingRef;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -606,8 +605,6 @@ final class TemplateMaterialiser {
                     // record this pass has not reached in the template (`[box<text>; 2..]`): closed where it stands.
                     case TypeInline inline -> inline.withOf(
                             (Type) MetaRefs.mapRefs(inline.of(), slotRewrite()));
-                    // A sibling names a field of the record, and has no application to close.
-                    case SiblingRef sibling -> sibling;
                 }).withPosition(Optional.empty()), substituted.getAnnotations(name)));
         return new RecordBody(Ancestry.chainOf(Substitution.parents(open, bindings), namespace),
                 AnnotatedMap.copyOf(fields), open.groups(), open.extension(), open.discriminators(), open.nameType());

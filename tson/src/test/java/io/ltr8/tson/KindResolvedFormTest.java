@@ -40,7 +40,7 @@ class KindResolvedFormTest {
         assertEquals(List.of("customer_id", "stock_id", "uuid"), linked.memberNames());
 
         String written = tson.objectWriter().toTson(linked);
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: net.uuid_type allow_sibling: true }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: net.uuid_type }",
                 written, "of is a reference, written unquoted");
 
         ReferenceBody read = assertInstanceOf(ReferenceBody.class,

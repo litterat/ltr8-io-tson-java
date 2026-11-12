@@ -1,12 +1,9 @@
 package io.ltr8.tson.atom.parser;
 
-import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.ReferenceGrammar;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.ReferenceBody;
-import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -16,7 +13,7 @@ import java.util.Optional;
 /**
  * Parses and validates against a reference that names types -- an instance of the kernel's {@code reference}
  * ([TSON-SCHEMA] §4.2) whose {@code of} is a constructor, {@code meta.ref<record>}. A value is read by {@link
- * ReferenceGrammar} into the {@link Reference} it is, and then judged a member: the name must be one of the
+ * ReferenceGrammar} into the {@link TypeRef} it is, and then judged a member: the name must be one of the
  * reference's linked members. The value is the reference, never a value of the type it names; a reader rolls a name
  * token or a reference's tree into the one text this reads.
  *
@@ -36,15 +33,10 @@ import java.util.Optional;
  * #namesOnly} reads the grammar alone, and that schema's link, or ingest, judges the name a member ([TSON-SCHEMA]
  * §4.2, §8.1).
  *
- * <p><b>A sibling reference is a value where the reference allows one</b> ({@link ReferenceBody#allowSibling}, true
- * only for {@code meta.field_type_ref}, the type of a record field's {@code type}): {@code kind!} is read as written
- * and judged nothing here, since it names a field of the record holding it and no type. Where the facet is false it
- * is refused by the position rule ([TSON-SCHEMA] §5.2) as a constraint the value breaks, not a form it lacks.
- *
  * <p>Not part of Part 1's published built-in vocabulary (§5), like {@link EnumParser}: the members are the
  * closure's.
  */
-public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) implements AtomTypeParser<Reference> {
+public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) implements AtomTypeParser<TypeRef> {
 
     /** A kind read under the schema whose closure its members were computed over. */
     public TypeNameRefParser(ReferenceBody kind) {
@@ -57,17 +49,8 @@ public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) imple
     }
 
     @Override
-    public Reference read(String text) {
-        Reference written = ReferenceGrammar.parseReference(text);
-        if (written instanceof SiblingRef sibling) {
-            if (kind.allowSibling()) {
-                return sibling;
-            }
-            // The facet's refusal, as NaN's at a float_type withdrawing allow_nan is: the value itself is well formed.
-            throw new AtomValidationException(sibling.refusedAt("a position typed by a type reference"),
-                    "a type's name");
-        }
-        TypeRef reference = (TypeRef) written;
+    public TypeRef read(String text) {
+        TypeRef reference = ReferenceGrammar.parse(text);
         if (reference.arguments().isEmpty()) {
             // A name is read as the kernel's meta.type_name reads each segment, into its normalization form.
             List<String> segments = new ArrayList<>(reference.segments().size());
@@ -80,7 +63,7 @@ public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) imple
             return reference;
         }
         if (!reference.arguments().isEmpty()) {
-            // A position rule, as the sibling reference's above: the value is well formed, and data names an entry.
+            // A position rule: the value is well formed, and data names an entry.
             throw new AtomValidationException("'" + reference.text() + "' is an application, and in a data document a "
                     + "reference is a name ([TSON-SCHEMA] §4.2) -- name the entry the schema declares for it "
                     + "(order_page => page<order>, then order_page); one of " + kind.shownMembers(),
@@ -95,30 +78,16 @@ public record TypeNameRefParser(ReferenceBody kind, boolean judgesMembers) imple
     }
 
     @Override
-    public String write(Reference value) {
+    public String write(TypeRef value) {
         return value.text();
     }
 
-    /**
-     * A kind reads to its reference: a {@code Reference} target receives it, a string target its canonical text, and a
-     * {@code TypeRef} target a type reference, the sibling reference a facet admits being refused there by the
-     * position rule.
-     */
+    /** A kind reads to its reference: a {@code TypeRef} target receives it, a string target its canonical text. */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
         if (target == String.class) {
-            return converting(Reference::text, text -> text);
+            return converting(TypeRef::text, text -> text);
         }
-        if (target == TypeRef.class && !kind.allowSibling()) {
-            return Optional.of(this);
-        }
-        if (target == TypeRef.class) {
-            return bound(text -> switch (read(text)) {
-                case TypeRef reference -> reference;
-                case SiblingRef sibling -> throw new AtomParseException(sibling.refusedAt("a position typed by a "
-                        + "type reference"), "a type's name");
-            }, TypeRef::text);
-        }
-        return natural(Reference.class, target);
+        return natural(TypeRef.class, target);
     }
 }

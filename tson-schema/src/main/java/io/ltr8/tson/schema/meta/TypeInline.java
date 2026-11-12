@@ -27,6 +27,9 @@ import java.util.function.Function;
  *       at a type slot ([TSON-SCHEMA] §5.10), the one record in place. Only closing an application produces one: an
  *       author's record or {@code !meta.record { … }} at a slot is refused before it reaches the model, and a
  *       resolved form read as data states the record an application closed to.</li>
+ *   <li>a {@link DependentBody}, {@code meta.dependent}, which is written in place only, and only directly at a record
+ *       field's type ({@link #dependentOn}): a variable bound by that record, so equal text in two records is two
+ *       types.</li>
  * </ul>
  * An enum and every other atom, any other record, and a namespace type ({@link NamespaceBody}), whose values carry
  * its name as their tag, are declared and named.
@@ -52,14 +55,15 @@ import java.util.function.Function;
  */
 @Typename(name = "meta.type_inline")
 public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef application)
-        implements TypeExpr, FieldTypeExpr {
+        implements TypeExpr {
 
     private static final String RECORD = "meta.record";
 
     @Record
     public TypeInline {
         Objects.requireNonNull(of, "of");
-        if (!constructible(of) && !(of instanceof RecordBody record && !record.isOpen())) {
+        if (!constructible(of) && !(of instanceof DependentBody)
+                && !(of instanceof RecordBody record && !record.isOpen())) {
             throw new IllegalArgumentException("a type written in place is a container, a tuple, a choice, a "
                     + "reference or the record an application closes to, and a " + of.getClass().getSimpleName()
                     + " is none: an enum, an atom and a namespace type are declared and named ([TSON-SCHEMA] §5.2)");
@@ -106,6 +110,11 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
     public static boolean constructible(Type type) {
         return type instanceof ArrayBody || type instanceof MapBody || type instanceof TupleBody
                 || type instanceof ChoiceBody || type instanceof ReferenceBody;
+    }
+
+    /** The field a dependent type in place takes its type from, or empty where {@code of} is no {@link DependentBody}. */
+    public Optional<String> dependentOn() {
+        return of instanceof DependentBody dependent ? Optional.of(dependent.on()) : Optional.empty();
     }
 
     /** The application this record in place closes, as written, where it is known. */
@@ -169,6 +178,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
     public String text(Function<TypeExpr, String> slot) {
         return switch (of) {
             case RecordBody record -> application != null ? application.text() : fields(record, slot);
+            case DependentBody dependent -> dependent.text();
             case ArrayBody array when constructor.equals("meta.array") -> "[" + slot.apply(array.elementType())
                     + (array.voidable() ? "?" : "") + size(array.minItems(), array.maxItems()) + "]";
             case MapBody map when constructor.equals("meta.map") -> "{" + slot.apply(map.keyType()) + " => "
@@ -187,7 +197,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound TypeRef 
     private static String fields(RecordBody record, Function<TypeExpr, String> slot) {
         List<String> written = new ArrayList<>();
         record.fields().forEach((name, field) -> written.add(name + (field.optional() ? "?" : "") + ": "
-                + (field.type() instanceof TypeExpr type ? slot.apply(type) : field.type().text())
+                + slot.apply(field.type())
                 + (field.voidable() ? "?" : "")));
         return written.isEmpty() ? "{}" : "{ " + String.join("  ", written) + " }";
     }

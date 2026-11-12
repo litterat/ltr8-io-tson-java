@@ -20,7 +20,6 @@ import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.HashMap;
@@ -149,23 +148,24 @@ final class RecordPlan {
                         stated[i] = FieldValue.of(context.linked(), type.name(), field.value().get());
                     }
                 }
+                // A dependent field's type is chosen per instance by its sibling's value, which the record hands it.
+                case io.ltr8.tson.schema.meta.TypeInline inline when inline.dependentOn().isPresent() -> {
+                    String sibling = inline.dependentOn().get();
+                    int at = order.indexOf(sibling);
+                    if (at < 0) {
+                        throw new IllegalStateException("'" + name + "': dependent field '" + declared + "' names no "
+                                + "field '" + sibling + "'; the linker refuses one");
+                    }
+                    siblingOf[i] = at;
+                    typesADependent[at] = true;
+                    dependents = true;
+                    schemaReaders[i] = new DependentReader(declared, sibling, context);
+                }
                 case io.ltr8.tson.schema.meta.TypeInline inline -> {
                     schemaReaders[i] = context.readers().resolve(inline);
                     if (field.value().isPresent()) {
                         stated[i] = FieldValue.of(inline, field.value().get());
                     }
-                }
-                // A dependent field's type is chosen per instance by its sibling's value, which the record hands it.
-                case SiblingRef sibling -> {
-                    int at = order.indexOf(sibling.field());
-                    if (at < 0) {
-                        throw new IllegalStateException("'" + name + "': dependent field '" + declared + "' names no "
-                                + "field '" + sibling.field() + "'; the linker refuses one");
-                    }
-                    siblingOf[i] = at;
-                    typesADependent[at] = true;
-                    dependents = true;
-                    schemaReaders[i] = new DependentReader(declared, sibling.field(), context);
                 }
             }
         }

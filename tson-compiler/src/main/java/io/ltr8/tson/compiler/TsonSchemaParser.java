@@ -856,7 +856,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * kind!?} do not parse. Where it may stand is §5.2's position rule, {@code SchemaDesugarer}'s to state.
      */
     private SiblingRef parseSiblingRef(Token head) {
-        if (!ReferenceGrammar.isSiblingField(head.text())) {
+        if (head.text().indexOf('.') >= 0 || io.ltr8.tson.atom.IdentifierGrammar.validate(head.text()).isPresent()) {
             throw new ParseException("'" + head.text() + "!' is no sibling reference -- the '!' marks one field of "
                     + "the same record, named by one identifier, a single segment ([TSON-DATA] §7.4)", head.start());
         }

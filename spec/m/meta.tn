@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=8cf5710ef573a031c118095db3444757bd4b8eb2b1cd2aa45257eabbd846e67e"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=12e42ca0b29ba5589c95864d043cd83d4a0687c930c8b7c6e7d255293d9baa5f"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -562,15 +562,16 @@
       never supplied.
 
       `type` holds a type's name, a type written in place (`meta.type_inline`),
-      a sibling, or a parameter of the enclosing record (`meta.param`), and no
-      label says which name it is: a parameter is a reference value. `value` is
-      a literal and never a parameter.
+      or a parameter of the enclosing record (`meta.param`), and no label says
+      which name it is: a parameter is a reference value. `value` is a literal
+      and never a parameter.
 
-      A field whose `type` is a sibling reference, `kind!`, is a dependent
-      field ([TSON-SCHEMA] §5.2): each instance's value is read against the
-      type that instance's `kind` names. The sibling is declared before it, is
-      typed by a reference naming types or by `meta.type_expr` or
-      `meta.field_type_expr`, is never voidable, and is there to read whenever
+      A field whose `type` is a `meta.dependent` written in place,
+      `{ of: !meta.dependent { on: kind } }` and in source `kind!`, is a
+      dependent field ([TSON-SCHEMA] §5.2): each instance's value is read
+      against the type that instance's `kind` names. The sibling is declared
+      before it, is typed by a reference naming types or by `meta.type_expr`,
+      is never voidable, and is there to read whenever
       the dependent field is: required,
       defaulted, pinned, or a member of a field group with the dependent field
       optional, a group's own member counting as optional. Its default or pin
@@ -594,7 +595,7 @@
       container's part is never missing, so a container has no `optional`.
       """
     record_field => {
-      type:      meta.field_type_expr
+      type:      meta.type_expr
       optional?: boolean ~ false
       voidable?: boolean ~ false
       role?:     meta.field_role ~ FREE
@@ -879,6 +880,17 @@
     declared => !meta.declared_type {}
 
     @doc:"""
+      The sum in which a sibling field names the type: a value at a position of
+      this type is read against the type the field `on` of the same record
+      instance names ([TSON-SCHEMA] §5.2). Where `declared` takes the type from
+      the value's tag, this takes it from the record the value sits in. It is
+      written in place, directly at a record field's `type`, and never declared:
+      `{ of: !meta.dependent { on: kind } }`, spelled `kind!` in source. `on`
+      names a field of the nearest enclosing record, judged by its `name_type`.
+      """
+    dependent => meta.sum & { on: text }
+
+    @doc:"""
       A name held in a slot: an atom whose values are names, each naming an
       entry whose value's type, past the entry's alias hops ([TSON-SCHEMA]
       §8.3), is `of` or IS-A it. Every entry is a name and a value, and the
@@ -949,46 +961,24 @@
       refinement is IS-A its source. `meta.identifier_ref` is `meta.type_ref`
       narrowed to the identifier families.
 
-      A value may instead be a sibling reference, `kind!` ([TSON-DATA] §7.4):
-      one identifier with an adjacent `!` followed by whitespace, naming the
-      field `kind` of the same record instance, whose value names the type
-      ([TSON-SCHEMA] §5.2). A reference is a name, an application, a
-      parameter or a sibling reference, and `allow_sibling` says whether the
-      last is admitted: as
-      `allow_nan` is of `numeric.float_type`, it is a permission, true by
-      default, and a refinement may withdraw it and never grant it back. It is
-      true only at a record field's type, `meta.field_type_ref`; every other
-      reference sets it false and refuses a sibling reference. Resolved output
-      writes a sibling reference as it is written.
+      A reference is a name, an application or a parameter.
       """
     reference_type => meta.atom & {
-      of:             meta.type_ref
-      allow_sibling?: boolean ~ true
+      of: meta.type_ref
     }
 
     @doc:"""
-      The reference an author writes, without the sibling form: `meta.ref<T>`
-      is the construction `!meta.ref { of: T }`. Where `T` is a constructor it
-      holds the names of the types built with it, `meta.ref<net.uuid_type>`,
-      and otherwise the names of values of `T`, `meta.ref<method>`.
+      The reference an author writes: `meta.ref<T>` is the construction
+      `!meta.ref { of: T }`. Where `T` is a constructor it holds the names of
+      the types built with it, `meta.ref<net.uuid_type>`, and otherwise the
+      names of values of `T`, `meta.ref<method>`.
       """
-    ref => meta.reference_type ^ { allow_sibling?: = false }
+    ref => meta.reference_type ^ {}
 
     @doc:"""
-      The type of a record field: the name of a type a value can have, or a
-      sibling reference, `kind!`, naming the field of the same record whose
-      value names the field's type ([TSON-SCHEMA] §5.2). It is the reference
-      variant of `meta.field_type_expr`, which types `record_field.type` and no
-      other slot.
+      The names of the types a value can have.
       """
-    field_type_ref => !meta.reference_type { of: meta.type }
-
-    @doc:"""
-      The names of the types a value can have: `meta.field_type_ref` without
-      the sibling reference, a refinement of it, so a type reference stands
-      wherever a field's type can.
-      """
-    type_ref => !meta.field_type_ref ^ { allow_sibling: false }
+    type_ref => !meta.reference_type { of: meta.type }
 
     @doc:"""
       The names of the identifier families, which a `name_type` names: a
@@ -1000,8 +990,9 @@
       A type written where it is used. `of` holds the type, a construction
       tagged by its constructor and carrying no chain:
       `{ of: !meta.array { element_type: text } }`. The construction is one of
-      `array`, `map`, `tuple`, `choice` or `reference_type`, or of a constructor
-      refining one of them, `set_type` and `ref` among them. A record, an enum,
+      `array`, `map`, `tuple`, `choice`, `reference_type` or `dependent`, or of
+      a constructor refining one of them, `set_type` and `ref` among them; a
+      `dependent` only directly at a record field's `type`. A record, an enum,
       every other atom and a namespace type, whose values carry its name as
       their tag, are declared and named. It is not itself a type, so one never
       holds another directly.
@@ -1012,18 +1003,11 @@
       What a type slot holds: a type's name (`meta.type_ref`), or a type written
       in place (`meta.type_inline`). A name is string-class and a
       `meta.type_inline` brace-class, so the two are told apart by form
-      ([TSON-SCHEMA] §5.4). It types `array.element_type`,
-      `map.value_type`, `tuple_element.element_type` and each of
-      `choice.variants`.
+      ([TSON-SCHEMA] §5.4). It types `record_field.type`,
+      `array.element_type`, `map.value_type`, `tuple_element.element_type` and
+      each of `choice.variants`.
       """
     type_expr => @meta.disjoint ( meta.type_ref | meta.type_inline )
-
-    @doc:"""
-      What a record field's `type` holds: a type's name or a sibling reference
-      (`meta.field_type_ref`), or a type written in place (`meta.type_inline`).
-      `record_field.type` is typed by it, and no other slot is.
-      """
-    field_type_expr => @meta.disjoint ( meta.field_type_ref | meta.type_inline )
 
     @doc:"""
       Resolver output: a schema map, from each name to the value its entry

@@ -83,7 +83,8 @@ class DependentFieldTest {
                 "records => meta.ref<meta.record>\n  shape => { kind: records  v?: kind! }",
                 "base => { kind: meta.type_ref }\n  cell => base & { v?: kind! }",
                 "pair => <T> { kind: meta.type_ref  v?: kind!  w: T }\n  p => pair<text>",
-                "cell => !meta.record { fields: { kind => meta.type_ref  v => !meta.record_field { type: kind! } } }",
+                "cell => !meta.record { fields: { kind => meta.type_ref  v => !meta.record_field { "
+                        + "type: { of: !meta.dependent { on: kind } } } } }",
                 "cell => abstract { kind: meta.type_ref =?  v?: kind! }\n  int_cell => cell & { kind?: = int32 }")) {
             assertEquals(List.of(), Tson.standard().validateSchema(schema(declarations)), declarations);
         }
@@ -138,10 +139,13 @@ class DependentFieldTest {
 
     @Test
     void aDependentFieldIsNeverVoidableAndCarriesNoValue() {
-        assertTrue(refusal("cell => { kind: meta.type_ref  v?: kind! ~ 5 }").contains("carries a default"));
-        assertTrue(refusal("cell => { kind: meta.type_ref  v?: kind! = 5 }").contains("carries a pin"));
+        String defaulted = refusal("cell => { kind: meta.type_ref  v?: kind! ~ 5 }");
+        assertTrue(defaulted.contains("cannot have a default"), defaulted);
+        String pin = refusal("cell => { kind: meta.type_ref  v?: kind! = 5 }");
+        assertTrue(pin.contains("cannot have a fixed value") || pin.contains("cannot have a"), pin);
         assertTrue(refusal("cell => !meta.record { fields: { kind => meta.type_ref  v => !meta.record_field { "
-                + "type: kind!  optional: true  voidable: true } } }").contains("is voidable"));
+                + "type: { of: !meta.dependent { on: kind } }  optional: true  voidable: true } } }")
+                .contains("is voidable"));
     }
 
     @Test
@@ -225,7 +229,8 @@ class DependentFieldTest {
     @Test
     void aSiblingNamingNoReadableTypeIsRefusedAtTheSibling() {
         assertEquals(Optional.of("/kind"), only(validate("!cell { kind: box  v: { item: 5 } }")).path());
-        assertEquals(Optional.of("/kind"), only(validate("!cell { kind: kind!  v: 5 }")).path());
+        assertEquals(Optional.of("/kind"), only(validate("!cell { kind: { of: !meta.dependent { on: kind } }  "
+                + "v: 5 }")).path());
         assertEquals(Optional.of("/kind"), only(validate("!cell { kind: box }")).path());
     }
 
@@ -256,19 +261,21 @@ class DependentFieldTest {
                 .contains("typed by the parameter 'T' and carries the literal value 'x'"));
     }
 
-    /** {@code record_field.type} admits a sibling reference in a tree read; every other slot refuses it. */
+    /**
+     * A dependent type stands directly at a record field's type, written in place: declared, or at any other slot, it
+     * is refused at link, since nothing else binds its field.
+     */
     @Test
-    void theFacetAdmitsASiblingAtAFieldsTypeAlone() {
+    void aDependentTypeStandsDirectlyAtAFieldsTypeAlone() {
         Tson tson = Tson.standard();
         String meta = "!!import:\"https://tson.io/2026/40/m/meta.tn\"\n";
         assertEquals(List.of(), tson.validate(meta + "!meta.record { fields: { kind => { type: meta.type_ref }  "
-                + "value => { type: kind!  optional: true } } }"));
-        assertEquals(Optional.of("/element_type"), only(tson.validate(meta + "!meta.array { element_type: kind! }"))
-                .path());
-        assertTrue(refusal("wide => !meta.type_ref ^ { allow_sibling: true }")
-                .contains("allow_sibling re-enables what the source forbids"));
-        assertEquals(List.of(), Tson.standard().validateSchema(schema(
-                "slots => !meta.reference_type { of: meta.record }\n  records => !slots ^ { allow_sibling: false }")));
+                + "value => { type: { of: !meta.dependent { on: kind } }  optional: true } } }"));
+        assertTrue(refusal("x => !meta.dependent { on: kind }").contains("stands only directly at a record field's"));
+        assertTrue(refusal("cell => !meta.record { fields: { kind => !meta.record_field { type: meta.type_ref }  "
+                + "v => !meta.record_field { type: { of: !meta.array { element_type: { of: !meta.dependent { "
+                + "on: kind } } } } } } }").contains("stands only directly at a record field's"));
+        assertTrue(refusal("wide => !meta.type_ref ^ { allow_sibling: true }").contains("allow_sibling"));
     }
 
     // ── Reading, bind mode ────────────────────────────────────────────────

@@ -416,9 +416,9 @@ final class WaitGraph {
                                     + " (" + path + ")");
                             continue;
                         }
-                        if (field(declared, "type") != null && field(declared, "type").coreValue()
-                                instanceof io.ltr8.tson.compiler.ast.ReferenceValue(
-                                        io.ltr8.tson.schema.meta.SiblingRef ignored)) {
+                        DataValue type = field(declared, "type");
+                        DataValue of = type == null ? null : field(type, "of");
+                        if (of != null && of.typeRef().filter("meta.dependent"::equals).isPresent()) {
                             // A dependent field's value in a schema document is held as written, and so waits on
                             // nothing.
                             annotations(field.value().annotations(), path + "." + field.name());

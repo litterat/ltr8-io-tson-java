@@ -20,7 +20,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -359,8 +358,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             return switch (field.type()) {
                 case TypeRef type when !type.arguments().isEmpty() -> new UnclosedApplicationReader(name, type);
                 case TypeRef type -> resolver.resolve(type.name());
+                case io.ltr8.tson.schema.meta.TypeInline inline when inline.dependentOn().isPresent() ->
+                        new DependentFieldReader(name, inline.dependentOn().get(), resolver, context);
                 case io.ltr8.tson.schema.meta.TypeInline inline -> resolver.resolve(inline);
-                case SiblingRef sibling -> new DependentFieldReader(name, sibling.field(), resolver, context);
             };
         }
     }
@@ -565,7 +565,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 }
                 int before = ctx.reported();
                 decoded = fields.get(schemaIndex).parser().read(fieldCtx);
-                io.ltr8.tson.schema.meta.FieldTypeExpr named = null;
+                io.ltr8.tson.schema.meta.TypeExpr named = null;
                 if (dependents != null && typesADependent[schemaIndex] || held != null && typesAHeld[schemaIndex]) {
                     named = ctx.reported() > before ? null : DependentFieldReader.typeIn(decoded);
                 }
@@ -644,7 +644,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         CompiledField sibling = fields.get(at);
         TsonReadContext fieldCtx = ctx.schemaField(written, field.name(), field.schema().position());
         TsonReadContext siblingCtx = ctx.schemaField(sibling.name(), sibling.name(), sibling.schema().position());
-        io.ltr8.tson.schema.meta.FieldTypeExpr named;
+        io.ltr8.tson.schema.meta.TypeExpr named;
         if (fixedCheck[at] != null) {
             named = DependentFieldReader.typeIn(precomputedValue[at]);
         } else if (seen[at]) {
@@ -682,13 +682,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     private static final class Dependents {
 
-        final io.ltr8.tson.schema.meta.FieldTypeExpr[] named;
+        final io.ltr8.tson.schema.meta.TypeExpr[] named;
         final boolean[] heldInPlace;
         final String[] readBefore;
         final TsonReadContext[] readBeforeAt;
 
         Dependents(int size) {
-            named = new io.ltr8.tson.schema.meta.FieldTypeExpr[size];
+            named = new io.ltr8.tson.schema.meta.TypeExpr[size];
             heldInPlace = new boolean[size];
             readBefore = new String[size];
             readBeforeAt = new TsonReadContext[size];
@@ -728,12 +728,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
         final List<List<TsonEvent>> written;
         final TsonReadContext[] at;
-        final io.ltr8.tson.schema.meta.FieldTypeExpr[] named;
+        final io.ltr8.tson.schema.meta.TypeExpr[] named;
 
         Held(int size) {
             written = new ArrayList<>(java.util.Collections.nCopies(size, null));
             at = new TsonReadContext[size];
-            named = new io.ltr8.tson.schema.meta.FieldTypeExpr[size];
+            named = new io.ltr8.tson.schema.meta.TypeExpr[size];
         }
 
         /** Field {@code index}'s value, at {@code fieldCtx}'s cursor, before it is read. */
@@ -752,7 +752,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     continue;
                 }
                 int sibling = record.heldSiblingOf[i];
-                io.ltr8.tson.schema.meta.FieldTypeExpr holds;
+                io.ltr8.tson.schema.meta.TypeExpr holds;
                 if (record.fixedCheck[sibling] != null) {
                     holds = DependentFieldReader.typeIn(record.precomputedValue[sibling]);
                 } else if (seen[sibling]) {

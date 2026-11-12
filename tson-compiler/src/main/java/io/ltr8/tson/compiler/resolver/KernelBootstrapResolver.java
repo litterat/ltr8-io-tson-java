@@ -101,16 +101,14 @@ public final class KernelBootstrapResolver {
     /**
      * The kernel's named instances and refinements on its one wait cycle, built by hand: the {@code boolean} and
      * {@code meta.field_role} enums, {@code enum}'s member set, the {@code integer} and {@code text} atoms, {@code
-     * meta.field_type_ref}, the reference a record field's type is read by, {@code field_map}, the map type a
-     * record's fields are a value of, the two refinements, {@code numeric.count} and {@code meta.type_ref}, and the
-     * two choices a type slot is typed by, {@code meta.type_expr} and {@code meta.field_type_expr}: a choice's own
-     * {@code variants} is a list of {@code meta.type_expr}, so reading {@code type_expr}'s declaration reaches
-     * {@code type_expr}. The {@code value} of {@code record_field} is not among them: it is typed {@code type!}, a
-     * dependent field whose value a schema document holds as written, which waits on no entry.
+     * meta.type_ref}, the reference a type slot's name is read by, {@code field_map}, the map type a record's fields
+     * are a value of, the refinement {@code numeric.count}, and the choice a type slot is typed by, {@code
+     * meta.type_expr}: a choice's own {@code variants} is a list of {@code meta.type_expr}, so reading {@code
+     * type_expr}'s declaration reaches {@code type_expr}.
      */
     private static final Set<String> PRE_LOADED = Set.of("boolean", "meta.field_role", "meta.enum_set",
-            "integer", "numeric.count", "text", "meta.field_type_ref", "meta.type_ref", "meta.field_map",
-            "meta.type_expr", "meta.field_type_expr", "meta.record_extension_type", "void");
+            "integer", "numeric.count", "text", "meta.type_ref", "meta.field_map",
+            "meta.type_expr", "meta.record_extension_type", "void");
 
     /** The kernel's wrapper for a type written in place, {@code { of: meta.type }}. */
     private static final String TYPE_INLINE = KernelNames.of("type_inline");
@@ -291,8 +289,7 @@ public final class KernelBootstrapResolver {
 
         /**
          * Every chain transitively closed, as {@link SchemaResolver} closes a schema's once every entry is ready: an
-         * entry IS-A every entry its supertypes are, so {@code meta.identifier_ref}, refining {@code meta.type_ref},
-         * which refines {@code meta.field_type_ref}, IS-A both. The kernel applies no template in a chain, so the
+         * entry IS-A every entry its supertypes are. The kernel applies no template in a chain, so the
          * closure is over names alone, to a fixed point.
          */
         private void completeChains() {
@@ -330,17 +327,13 @@ public final class KernelBootstrapResolver {
     }
 
     /**
-     * The hand-written merge for the pre-loaded set's two atom refinements, bounded as {@link #instanceBody} is: for
-     * {@code numeric.count} the integer family's {@code min}, {@code max} and {@code size}, for {@code meta.type_ref}
-     * a reference's {@code of} and {@code allow_sibling} ({@link #refinedReference}), and the rest refused by name
-     * rather than pretending to be general. Ordinary resolution merges through a {@code DataClassObjectWriter}
+     * The hand-written merge for the pre-loaded set's atom refinement, bounded as {@link #instanceBody} is: for
+     * {@code numeric.count} the integer family's {@code min}, {@code max} and {@code size}, and the rest refused by
+     * name rather than pretending to be general. Ordinary resolution merges through a {@code DataClassObjectWriter}
      * round trip and the compiled reader of the vocabulary declaring the constructor ({@code
      * DefinitionResolver.resolveAtomRefinement}), which is the reader being produced.
      */
     private static Type refinedBody(String name, AtomRefinement refinement, Top target) {
-        if (target instanceof ReferenceBody reference) {
-            return refinedReference(name, refinement, reference);
-        }
         if (!(target instanceof IntegerType source)) {
             throw new IllegalStateException("'" + name + "' refines '" + refinement.target() + "', whose body is a "
                     + target.getClass().getSimpleName() + "; the bootstrap merges a pre-loaded refinement of the "
@@ -360,25 +353,6 @@ public final class KernelBootstrapResolver {
         }
         return new IntegerType(size, min, source.exclusiveMin(), max, source.exclusiveMax(),
                 source.multipleOf(), source.members());
-    }
-
-    /**
-     * The merge for the pre-loaded set's reference refinement, {@code meta.type_ref => !meta.field_type_ref ^ {
-     * allow_sibling: false }}: a reference's two authored facets, {@code of} and {@code allow_sibling}, and nothing
-     * else.
-     */
-    private static Type refinedReference(String name, AtomRefinement refinement, ReferenceBody source) {
-        String of = source.of().name();
-        boolean allowSibling = source.allowSibling();
-        for (RecordValue.Field binding : bindingFields(name, refinement)) {
-            switch (binding.name()) {
-                case "of" -> of = bindingText(name, binding);
-                case "allow_sibling" -> allowSibling = Boolean.parseBoolean(bindingText(name, binding));
-                default -> throw new IllegalStateException("'" + name + "' refines '" + refinement.target()
-                        + "' with '" + binding.name() + "'; the bootstrap merges of and allow_sibling only");
-            }
-        }
-        return new ReferenceBody(TypeRef.of(of), allowSibling);
     }
 
     /** A {@code size} binding, {@code { bits: N  signed: B }}: a record of two tokens, as {@code integer_size} reads. */
@@ -438,10 +412,9 @@ public final class KernelBootstrapResolver {
                 yield TextType.UNCONSTRAINED;
             }
             case "enum" -> toEnumBody(instance.value());
-            // `!meta.reference_type { of: type }`: `of` and `allow_sibling`, true where the instance leaves it out, are
-            // the authored fields, and the index is derived when the kernel links, as every reference's is.
-            case "meta.reference_type" -> new ReferenceBody(TypeRef.of(bindingField(instance.value(), "of")),
-                    fieldToken(instance.value(), "allow_sibling").map(Boolean::parseBoolean).orElse(true));
+            // `!meta.reference_type { of: type }`: `of` is the authored field, and the index is derived when the
+            // kernel links, as every reference's is.
+            case "meta.reference_type" -> new ReferenceBody(TypeRef.of(bindingField(instance.value(), "of")));
             // `field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }`.
             case "meta.map" -> new MapBody(TypeRef.of(bindingField(instance.value(), "key_type")),
                     TypeRef.of(bindingField(instance.value(), "value_type")),

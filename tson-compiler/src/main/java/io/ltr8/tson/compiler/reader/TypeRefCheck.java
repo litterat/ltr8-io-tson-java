@@ -132,8 +132,6 @@ final class TypeRefCheck {
             case ArrayStart ignored -> "an array";
             case EmptyBraceEvent ignored -> "{}";
             case VoidEvent ignored -> "the void sentinel '_'";
-            case ReferenceEvent(io.ltr8.tson.schema.meta.SiblingRef sibling, _) ->
-                    "the sibling reference " + sibling.text();
             case ReferenceEvent reference -> "the reference " + reference.reference().text();
             default -> String.valueOf(core);
         };

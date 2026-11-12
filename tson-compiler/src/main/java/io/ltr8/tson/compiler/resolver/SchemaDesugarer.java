@@ -121,6 +121,9 @@ final class SchemaDesugarer {
     /** §5.4's desugar target for {@code (A | B)}. */
     private static final String CHOICE = KernelNames.of("choice");
 
+    /** §5.2's desugar target for {@code kind!} at a field's type. */
+    private static final String DEPENDENT = KernelNames.of("dependent");
+
 
     /** The vocabulary fields the desugar table binds -- fixed by the table, not looked up in a governing meta. */
     private static final String ELEMENT_TYPE = "element_type";
@@ -332,11 +335,16 @@ final class SchemaDesugarer {
         }
     }
 
+    /** The position rule's refusal of {@code field!} at {@code slot}, as a message names the slot. */
+    static String siblingRefusedAt(String field, String slot) {
+        return "a sibling reference ('" + field + "!') stands only at a record field's type ([TSON-SCHEMA] §5.2), "
+                + "not at " + slot;
+    }
+
     /** {@code ref}, standing at {@code slot}, refused where it is a sibling reference or holds one at any depth. */
     private static void siblingRefused(TypeExpr ref, String slot) {
         switch (ref) {
-            case SiblingRef sibling -> throw new SchemaValidationException(
-                    io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field()).refusedAt(slot));
+            case SiblingRef sibling -> throw new SchemaValidationException(siblingRefusedAt(sibling.field(), slot));
             case NameRef _ -> { }
             case ApplicationRef application ->
                     application.args().forEach(argument -> siblingRefused(argument, "a template argument"));
@@ -567,7 +575,8 @@ final class SchemaDesugarer {
     private TypeExpr typeRef(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> simple;
-            case SiblingRef sibling -> sibling; // a field's type, as written: a sibling, which no rewrite touches
+            case SiblingRef sibling -> new InlineConstruction(construction(new Binding(DEPENDENT,
+                    List.of(WireForm.nameField("on", sibling.field())))));
             case ArrayExpr array -> container(ref, List.of(elementRef(array.elementType())));
             case MapExpr map -> container(ref, List.of(typeRef(map.keyType()), elementRef(map.valueType())));
             case TupleExpr tuple -> container(ref, tuple.elementTypes().stream().map(this::elementRef).toList());

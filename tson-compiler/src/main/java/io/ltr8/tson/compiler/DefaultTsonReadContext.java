@@ -363,7 +363,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
-    public void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.FieldTypeExpr named,
+    public void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.TypeExpr named,
                               List<TsonEvent> written) {
         if (cursor.heldByName == null) {
             return;

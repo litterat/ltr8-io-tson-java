@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.InlineConstruction;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
@@ -16,6 +17,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
+import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
@@ -487,22 +489,27 @@ class SchemaDesugarerTest {
 
     // ── §5.2's position rule: a sibling reference stands only at a record field's type ─────────────
 
-    /** At a record field's type, and a group member's, a sibling reference passes through as written. */
+    /** At a record field's type, and a group member's, a sibling reference is the dependent type in place. */
     @Test
     void aSiblingReferenceAtAFieldsTypeIsKeptAsWritten() {
         SchemaDocument document = desugar("  cell => { kind: meta.type_ref  v?: kind!  ( a: kind! | b: text ) }");
         StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get("cell").typeDef();
         FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);
-        assertEquals(new SiblingRef("kind"), field.type().orElseThrow().typeRef());
+        assertEquals("meta.dependent", dependentOn(field.type().orElseThrow().typeRef()));
     }
 
-    /** An open record's field keeps it in the record body as written, as a closed record's does. */
+    /** The constructor a construction in place applies, where the slot holds one. */
+    private static String dependentOn(TypeExpr written) {
+        return ((InlineConstruction) written).value().typeRef().orElseThrow();
+    }
+
+    /** An open record's field holds it in the record body, as a closed record's does. */
     @Test
     void anOpenRecordFieldKeepsASiblingReference() {
         StructuralTypeDef typeDef = assertInstanceOf(StructuralTypeDef.class, desugar(
                 "  cell => <T> { kind: meta.type_ref  v?: kind!  w: T }").body().declarations().get("cell").typeDef());
         FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);
-        assertEquals(new SiblingRef("kind"), field.type().orElseThrow().typeRef());
+        assertEquals("meta.dependent", dependentOn(field.type().orElseThrow().typeRef()));
     }
 
     /** Anywhere else in sugar it is refused before the form is rewritten, naming the slot. */

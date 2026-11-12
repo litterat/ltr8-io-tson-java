@@ -16,7 +16,8 @@ import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.FieldRole;
 
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.SiblingRef;
+import io.ltr8.tson.schema.meta.DependentBody;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Param;
@@ -150,7 +151,7 @@ class TsonSchemaLinkerTest {
         entries.put("token", textEntry());
         entries.put("message", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("kind", RecordField.required(TypeRef.of("token"))),
-                Map.entry("payload", RecordField.required(SiblingRef.of("kind"))))));
+                Map.entry("payload", RecordField.required(new TypeInline(DependentBody.on("kind")))))));
 
         SchemaValidationException refused = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));

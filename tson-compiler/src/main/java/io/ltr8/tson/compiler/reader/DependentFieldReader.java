@@ -8,8 +8,8 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.SiblingRef;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonAtom;
@@ -28,7 +28,7 @@ import java.util.function.Function;
  *
  * <p><b>The sibling's value is a type a value can be read against</b>, or the value is not read. A name is read
  * through its entry's reader, and a type written in place ({@code { of: !meta.ref { of: method } }}) through its own;
- * a sibling reference names a field and no type, a template is no type until it is applied and reading never starts a
+ * a dependent type names a field and no type, a template is no type until it is applied and reading never starts a
  * materialisation, and an application names no entry. Each is refused naming the sibling,
  * since that is the value the author has to change; the dependent value is skipped unjudged. The rule is {@link
  * #typeNamed}, which a value's qualified name going on through a dependent field is judged by too ({@code
@@ -41,7 +41,7 @@ import java.util.function.Function;
  * layer governing it do not hold, so a schema's value is judged when the schema links, against that type, as a
  * default or pin is (a held value orders nothing, [TSON-SCHEMA] §5.2): the record reader hands its events to the
  * read's sink ({@link TsonReadContext#heldAsWritten}). Holding the value waits on nothing, so the kernel's {@code
- * record_field}, whose {@code value} is typed {@code type!}, waits on no entry for it.
+ * record_field}, whose {@code value} is a dependent field over {@code type}, waits on no entry for it.
  * A bound {@code Token} component never reaches here ({@code RecordBindReader.tokenAware}), though its record hands the
  * value on the same.
  *
@@ -66,15 +66,16 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
     }
 
     /**
-     * What a sibling holding {@code named} types its dependent field by: the entry a value is read against, or why
-     * there is none. {@code entries} is the namespace the entry is found in, null where none is known and the entry is
-     * taken as named. A value holds a reference as a name ([TSON-SCHEMA] §4.2), so an application names no entry: the
-     * sibling's own read refuses one first, and this answers the same where a held value is judged.
+     * What a sibling holding {@code named} types its dependent field by: the entry a value is read against, the type written
+     * in place itself, or why there is none. {@code entries} is the namespace the entry is found in, null where none is
+     * known and the entry is taken as named. A value holds a reference as a name ([TSON-SCHEMA] §4.2), so an application
+     * names no entry: the sibling's own read refuses one first, and this answers the same where a held value is judged.
      */
-    public static TypeNamed typeNamed(Reference named, Function<String, ? extends Top> entries) {
+    public static TypeNamed typeNamed(TypeExpr named, Function<String, ? extends Top> entries) {
         return switch (named) {
-            case SiblingRef reference -> new TypeNamed.None("the sibling reference '" + reference.text()
-                    + "', which names a field and no type");
+            case TypeInline inline when inline.dependentOn().isPresent() -> new TypeNamed.None("the dependent type '"
+                    + inline.text() + "', which names a field and no type");
+            case TypeInline inline -> new TypeNamed.InPlace(inline);
             case TypeRef reference -> {
                 if (!reference.arguments().isEmpty()) {
                     yield new TypeNamed.None("'" + reference.text() + "', an application, where a value names the "
@@ -101,6 +102,10 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
         record Entry(String name) implements TypeNamed {
         }
 
+        /** The type written in place the dependent value is read against, as it stands (§5.2). */
+        record InPlace(TypeInline type) implements TypeNamed {
+        }
+
         /**
          * No type a value can be read against: {@code held} says what the sibling holds, in the words {@link
          * RecordDiagnostics#siblingNamesNoType} takes.
@@ -125,7 +130,7 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
      * refusal of the sibling's value is reported, in {@code rules}' words. {@code named} is null where the sibling's
      * own read was refused, which has been reported: the value is then skipped unjudged.
      */
-    Object readAgainst(TsonReadContext ctx, io.ltr8.tson.schema.meta.FieldTypeExpr named, TsonReadContext siblingCtx,
+    Object readAgainst(TsonReadContext ctx, TypeExpr named, TsonReadContext siblingCtx,
                        RecordDiagnostics rules) {
         if (ctx.readsSchemaNames()) {
             return HELD.read(ctx);
@@ -134,11 +139,9 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
             TsonReadContext.skipUnjudged(ctx);
             return null;
         }
-        if (named instanceof io.ltr8.tson.schema.meta.TypeInline inline) {
-            return readers.resolve(inline).read(ctx);
-        }
-        return switch (typeNamed((Reference) named, context == null ? null : context.schema().entries()::get)) {
+        return switch (typeNamed(named, context == null ? null : context.schema().entries()::get)) {
             case TypeNamed.Entry entry -> readers.resolve(entry.name()).read(ctx);
+            case TypeNamed.InPlace inline -> readers.resolve(inline.type()).read(ctx);
             case TypeNamed.None none -> {
                 siblingCtx.report(rules.siblingNamesNoType(sibling, field, none.held(), named.text()));
                 TsonReadContext.skipUnjudged(ctx);
@@ -152,7 +155,7 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
      * itself, a token held as written, a host's {@code Ref}, or the canonical text a string component holds -- or a
      * type written in place; null where the read produced nothing.
      */
-    public static io.ltr8.tson.schema.meta.FieldTypeExpr typeIn(Object decoded) {
+    public static TypeExpr typeIn(Object decoded) {
         if (decoded instanceof io.ltr8.tson.tree.TsonValue tree && !(tree instanceof TsonAtom)) {
             return null; // a tree's void or missing node: the read produced no reference
         }
@@ -162,14 +165,14 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
         }
         return switch (value) {
             case null -> null;
-            case Reference reference -> reference;
+            case TypeRef reference -> reference;
             // A type written in place is read against as it stands, a reference among them (§5.2).
-            case io.ltr8.tson.schema.meta.TypeInline inline -> inline;
+            case TypeInline inline -> inline;
             case io.ltr8.tson.schema.meta.Token token -> typeIn(token.text());
             case io.ltr8.tson.schema.meta.Ref<?> ref -> typeIn(ref.name());
             case CharSequence text -> {
                 try {
-                    yield ReferenceGrammar.parseReference(text.toString());
+                    yield ReferenceGrammar.parse(text.toString());
                 } catch (AtomParseException e) {
                     yield null;
                 }

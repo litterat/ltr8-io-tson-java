@@ -79,6 +79,7 @@ public final class SchemaModelNameBinder {
             Map.entry("meta.namespace", "meta.namespace_body"),
             Map.entry("meta.tuple", "meta.tuple_body"),
             Map.entry("meta.choice", "meta.choice_body"),
+            Map.entry("meta.dependent", "meta.dependent_body"),
             Map.entry("meta.reference_type", "meta.reference_body"),
             Map.entry("meta.ref", "meta.reference_body"),
             Map.entry("meta.enum_type", "meta.enum_body"),

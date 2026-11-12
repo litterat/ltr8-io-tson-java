@@ -6,7 +6,6 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.compiler.TsonTreeWriter;
-import io.ltr8.tson.tree.TsonSiblingReference;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -100,17 +99,5 @@ class SiblingReferenceTest {
 
         Diagnostic quoted = only(tson.validate("!!import:\"" + ID + "\"\n!typed { t: \"kind!\" }"));
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, quoted.code());
-    }
-
-    /** A schemaless read keeps it as a structured value, and the writer writes it back with whitespace after. */
-    @Test
-    void aSchemalessReadKeepsASiblingAndWritesItBack() {
-        TsonValue read = new TsonTreeReader().read("{ type: kind!  in: [ a kind! ]  m: { kind! => x } }");
-        TsonSiblingReference sibling = assertInstanceOf(TsonSiblingReference.class, read.get("type"));
-        assertEquals("kind", sibling.field());
-        assertTrue(sibling.isReference());
-        String written = new TsonTreeWriter().toTson(read);
-        assertTrue(written.contains("type: kind! "), written);
-        assertEquals(read, new TsonTreeReader().read(written));
     }
 }

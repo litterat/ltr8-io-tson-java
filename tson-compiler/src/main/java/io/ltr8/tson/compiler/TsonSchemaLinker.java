@@ -32,6 +32,7 @@ import io.ltr8.tson.schema.numeric.ComplexType;
 import io.ltr8.tson.schema.temporal.DateTimeType;
 import io.ltr8.tson.schema.temporal.DateType;
 import io.ltr8.tson.schema.meta.DeclaredType;
+import io.ltr8.tson.schema.meta.DependentBody;
 import io.ltr8.tson.schema.numeric.DecimalType;
 import io.ltr8.tson.schema.temporal.DurationType;
 import io.ltr8.tson.schema.temporal.PeriodType;
@@ -77,7 +78,6 @@ import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.TypeChain;
-import io.ltr8.tson.schema.meta.SiblingRef;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -1551,6 +1551,13 @@ public final class TsonSchemaLinker {
             }
             case DeclaredType ignored -> {
             }
+            // A record's dependent field is judged with its sibling (DependentFields) and never reaches here, so a
+            // dependent type that does is declared, or written in place at some other slot: it is bound by the
+            // record whose field's type it is, and nowhere else has a sibling to name (§5.2).
+            case DependentBody dependent -> throw new SchemaValidationException("'" + entryName + "' is the dependent "
+                    + "type '" + dependent.text() + "', which stands only directly at a record field's type, written "
+                    + "in place: its field '" + dependent.on() + "' is a sibling in that record, and a declaration or "
+                    + "any other slot has none (§5.2)");
             // A value entry was read against its type, so the read judged its shape; every reference it holds is at a
             // slot typed by a kind or a reference, recorded by the read and judged by its slot (ValuesByName), so
             // nothing is asked of the host class a value binds to.
@@ -1674,8 +1681,7 @@ public final class TsonSchemaLinker {
         }
         switch (body) {
             case RecordBody record -> record.fields().values().forEach(field -> {
-                // A sibling names a field of this record, never an entry, so it contributes no name.
-                field.ownType().ifPresent(type -> collectNames(type, into));
+                collectNames(field.type(), into);
                 // A routed parameter rides `value` like any other token, so it is named here too -- which is
                 // what keeps `<S> base ^ { status: = S }` from reading as a template that never uses S.
                 field.value().map(Token::text).ifPresent(into::add);
@@ -1694,6 +1700,7 @@ public final class TsonSchemaLinker {
             case Alias alias -> collectNames(alias.target(), into);
             case Atom ignored -> { } // an atom body names no type
             case DeclaredType ignored -> { } // its variants are the closure's, named by no field
+            case DependentBody ignored -> { } // it names a field of the enclosing record, never an entry
             case ValueEntry ignored -> { } // a value names no type of its own
         }
     }
@@ -1802,7 +1809,7 @@ public final class TsonSchemaLinker {
                         restated);
                 if (dependent.isPresent()) {
                     violations.add(dependent.get());
-                } else if (!(restated.type() instanceof SiblingRef) && !narrows(inherited.getValue(), restated,
+                } else if (restated.sibling().isEmpty() && !narrows(inherited.getValue(), restated,
                         namespace)) {
                     boolean oneIsANameOneInPlace = restated.typeExpr() instanceof TypeInline
                             != inherited.getValue().typeExpr() instanceof TypeInline;

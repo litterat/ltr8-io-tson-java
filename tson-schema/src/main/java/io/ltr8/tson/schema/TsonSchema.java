@@ -6,7 +6,6 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -178,7 +177,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * written} is the value as written, opaque to this model: what the engine that read it replays to judge it.
      */
     public record HeldValue(List<String> slot, String field, String sibling,
-                            Optional<io.ltr8.tson.schema.meta.FieldTypeExpr> named, Object written) {
+                            Optional<io.ltr8.tson.schema.meta.TypeExpr> named, Object written) {
 
         public HeldValue {
             slot = List.copyOf(slot);

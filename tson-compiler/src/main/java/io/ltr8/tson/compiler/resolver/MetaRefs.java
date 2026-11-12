@@ -5,7 +5,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.DeclaredType;
-import io.ltr8.tson.schema.meta.FieldTypeExpr;
+import io.ltr8.tson.schema.meta.DependentBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -20,7 +20,6 @@ import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.ValueEntry;
-import io.ltr8.tson.schema.meta.SiblingRef;
 
 
 /**
@@ -67,18 +66,6 @@ final class MetaRefs {
         return mapBodyRefs(definition, map);
     }
 
-    /** A field's type with {@code map} applied; a sibling names a field, which no rewrite of type names touches. */
-    private static FieldTypeExpr mapField(FieldTypeExpr type, Rewrite map) {
-        return switch (type) {
-            case TypeRef reference -> switch (map.atSlot(reference)) {
-                case TypeRef name -> name;
-                case TypeInline inline -> inline;
-            };
-            case TypeInline inline -> mapInline(inline, map);
-            case SiblingRef sibling -> sibling;
-        };
-    }
-
     /** What a type slot holds with {@code map} applied: a name rewritten, a type written in place walked into. */
     private static TypeExpr mapSlot(TypeExpr type, Rewrite map) {
         return switch (type) {
@@ -101,7 +88,7 @@ final class MetaRefs {
             // parameter at any depth waits for substitution to supply the argument.
             case RecordBody record -> record.withFields(record.mapFields(field ->
                     OpenEntry.parameterIn(field.type()).isPresent() ? field
-                            : field.withType(mapField(field.type(), map))));
+                            : field.withType(mapSlot(field.type(), map))));
             case ArrayBody array -> new ArrayBody(array.chain(), mapSlot(array.elementType(), map),
                     array.voidable(), array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(mapBody.chain(),
@@ -120,10 +107,12 @@ final class MetaRefs {
             // `of` holds a name (§4.2), and maps as one: an application there is refused, to be declared. The index
             // is carried, derived at link.
             case ReferenceBody reference -> new ReferenceBody(reference.chain(), map.atName(reference.of()),
-                    reference.allowSibling(), reference.index());
+                    reference.index());
             // Every other atom's facets are values, never references; a declared type holds its chain alone.
             case Atom atom -> atom;
             case DeclaredType declared -> declared;
+            // `on` names a field of the enclosing record, which no rewrite of type names touches.
+            case DependentBody dependent -> dependent;
 
             // A value is data: a name it holds is judged at link against the closure (`ValuesByName`), and
             // data writes no sugar form, so none names an entry a rewrite here could move.

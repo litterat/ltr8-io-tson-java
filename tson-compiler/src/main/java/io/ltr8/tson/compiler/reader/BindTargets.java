@@ -11,11 +11,9 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.FieldTypeExpr;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Ref;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -113,10 +111,9 @@ final class BindTargets {
         // A component holding what a type slot holds -- a name, or a name or a type written in place -- reads a name
         // at a kind as a TypeRef component does; a type written in place reaches it through the choice that types
         // the slot (meta.type_expr), whose own reader this leaves as it is.
-        boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == Reference.class
-                || payload.typeClass() == TypeExpr.class || payload.typeClass() == FieldTypeExpr.class;
+        boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == TypeExpr.class;
         boolean byName = typeRef || payload.typeClass() == Ref.class;
-        boolean slot = payload.typeClass() == TypeExpr.class || payload.typeClass() == FieldTypeExpr.class;
+        boolean slot = payload.typeClass() == TypeExpr.class;
         if (slot && RecordAbstractReader.unwrapped(reader) instanceof NamedDispatchReader choice
                 && choice.recovers(DiscriminationClass.STRING)) {
             // A type slot's choice (meta.type_expr): a name at it is read as a TypeRef component reads one, so the
@@ -126,7 +123,7 @@ final class BindTargets {
             if (readsAKind(named)) {
                 Map<DiscriminationClass, TsonTypeReader<?>> readers = new EnumMap<>(DiscriminationClass.class);
                 readers.put(DiscriminationClass.STRING, new TypeNameSlotReader(slotAtom(named),
-                        site.annotationTypes(), what, payload.typeClass() == FieldTypeExpr.class));
+                        site.annotationTypes()));
                 if (choice.recovers(DiscriminationClass.BRACE)) {
                     readers.put(DiscriminationClass.BRACE, new TypeInlineReader(
                             site.resolver().resolve(choice.recoveredTo(DiscriminationClass.BRACE)), site.terminal()));
@@ -145,9 +142,8 @@ final class BindTargets {
         } else if (typeRef && readsAKind(reader)) {
             // The same for a type's name or an application: the reader produces the TypeRef itself, so the atom's
             // own bridge (the reference's text form) is not applied on top of it.
-            boolean siblingHeld = payload.typeClass() == Reference.class || payload.typeClass() == FieldTypeExpr.class;
-            return AnnotationBoxing.wrap(new TypeNameSlotReader(slotAtom(reader), site.annotationTypes(), what,
-                    siblingHeld), target, site.annotationTypes());
+            return AnnotationBoxing.wrap(new TypeNameSlotReader(slotAtom(reader), site.annotationTypes()), target,
+                    site.annotationTypes());
         } else if (byName && (recordHeldByName(reader) || readsAnAtom(reader))) {
             site.mismatches().add(what + " is not a reference, and " + where + " holds a "
                     + payload.typeClass().getSimpleName() + " -- a value stands by name only at a position typed "
@@ -162,7 +158,7 @@ final class BindTargets {
                 AtomTypeReader<?> atom = slotAtom(reader);
                 TsonTypeReader<?> refusing = readsARef(reader)
                         ? new ReferenceNameReader(expectedAt(reader, what), false, atom.slotType(), bound)
-                        : new TypeNameSlotReader(atom, site.annotationTypes(), what, false);
+                        : new TypeNameSlotReader(atom, site.annotationTypes());
                 bound = new RecordedNameReader(bound, atom.slotType(), refusing);
             }
         }

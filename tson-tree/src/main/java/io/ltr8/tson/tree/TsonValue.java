@@ -66,7 +66,6 @@ public sealed interface TsonValue
             case TsonAtom n -> new TsonAtom(n.value(), n.typeRef(), merged);
             case TsonApplicationReference n ->
                     new TsonApplicationReference(n.segments(), n.arguments(), n.typeRef(), merged);
-            case TsonSiblingReference n -> new TsonSiblingReference(n.field(), n.typeRef(), merged);
             case TsonVoid n -> new TsonVoid(n.typeRef(), merged);
             case TsonMissing n -> n;
         };

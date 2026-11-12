@@ -119,6 +119,7 @@ final class TypeInhabitance {
 
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
+            case io.ltr8.tson.schema.meta.DependentBody ignored -> true; // as a declared type, chosen by its sibling
             case ValueEntry ignored -> true; // a value, which nothing is typed by
         };
     }

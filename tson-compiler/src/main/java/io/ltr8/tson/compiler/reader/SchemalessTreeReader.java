@@ -118,13 +118,9 @@ public final class SchemalessTreeReader {
                 ctx.next();
                 yield leaf(ctx, token, typeRef, atom, annotations);
             }
-            case ReferenceEvent(io.ltr8.tson.schema.meta.TypeRef reference, _) -> {
+            case ReferenceEvent(var reference, _) -> {
                 ctx.next();
                 yield reference(reference, typeRef, annotations);
-            }
-            case ReferenceEvent(io.ltr8.tson.schema.meta.SiblingRef sibling, _) -> {
-                ctx.next();
-                yield new TsonSiblingReference(sibling.field(), typeRef, annotations);
             }
             default -> throw new IllegalStateException("unexpected event where a value was expected: " + e);
         };
@@ -317,7 +313,6 @@ public final class SchemalessTreeReader {
             case TsonAtom atom -> ValueIdentity.of(atom.value());
             case TsonApplicationReference reference -> List.of(KeyKind.REFERENCE, reference.segments(),
                     reference.arguments().stream().map(SchemalessTreeReader::keyIdentity).toList());
-            case TsonSiblingReference sibling -> List.of(KeyKind.SIBLING, sibling.field());
             case TsonArray array -> array.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonTuple tuple -> tuple.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonRecord record -> {
@@ -337,5 +332,5 @@ public final class SchemalessTreeReader {
     }
 
     /** Identity stand-ins for the payload-free node kinds -- see {@link #keyIdentity}. */
-    private enum KeyKind { VOID, MISSING, REFERENCE, SIBLING }
+    private enum KeyKind { VOID, MISSING, REFERENCE }
 }

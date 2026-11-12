@@ -53,7 +53,7 @@
   - A slot that holds the type of a value (`meta.record_field.type`,
     `meta.array.element_type`, `meta.map.value_type`,
     `meta.tuple_element.element_type`, choice variants) is typed
-    `meta.type_expr`, `meta.field_type_expr` at a record field, and
+    `meta.type_expr`, and
     holds a type's name or a type written in place, a
     `meta.type_inline`: the construction the author's sugar or applied
     constructor denotes, at its `of`, tagged by its constructor and
@@ -213,7 +213,7 @@
   meta => !meta.schema {
     top => !meta.record {
       chain: {
-        subtypes: [binary.bytes_type enum meta.alias meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.alias meta.array meta.atom meta.choice meta.declared_type meta.dependent meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.type meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {}
       extension: ABSTRACT
@@ -228,7 +228,7 @@
     type => !meta.record {
       chain: {
         supertypes: [meta.top]
-        subtypes: [binary.bytes_type enum meta.array meta.atom meta.choice meta.declared_type meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
+        subtypes: [binary.bytes_type enum meta.array meta.atom meta.choice meta.declared_type meta.dependent meta.enum_type meta.map meta.namespace meta.product meta.record meta.ref meta.reference_type meta.set_type meta.sum meta.tuple meta.void_type net.iri_type numeric.integer_type unicode.identifier_type unicode.regex_type unicode.text_type]
       }
       fields: {
         chain => !meta.record_field { type: meta.type_chain  optional: true }
@@ -253,7 +253,7 @@
       size_type      => !meta.record_field { type: meta.product_size_type }
     }  extension: ABSTRACT }
 
-    sum => !meta.record { chain: { supertypes: [meta.top meta.type]  subtypes: [meta.choice meta.declared_type] }  fields: {
+    sum => !meta.record { chain: { supertypes: [meta.top meta.type]  subtypes: [meta.choice meta.declared_type meta.dependent] }  fields: {
       chain => !meta.record_field { type: meta.type_chain  optional: true }
     }  extension: ABSTRACT }
 
@@ -291,11 +291,11 @@
     application => @meta.annotation !meta.alias { target: meta.type_ref }
 
     record_field => !meta.record { fields: {
-      type     => !meta.record_field { type: meta.field_type_expr }
+      type     => !meta.record_field { type: meta.type_expr }
       optional => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       voidable => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: false }
       role     => !meta.record_field { type: meta.field_role  optional: true  role: DEFAULT  value: FREE }
-      value    => !meta.record_field { type: type!  optional: true }
+      value    => !meta.record_field { type: { of: !meta.dependent { on: type } }  optional: true }
     } }
 
     field_group => !meta.record { fields: {
@@ -408,39 +408,30 @@
 
     declared => !meta.declared_type {}
 
+    dependent => !meta.record { chain: { supertypes: [meta.sum meta.top meta.type] }  fields: {
+      chain => !meta.record_field { type: meta.type_chain  optional: true }
+      on    => !meta.record_field { type: text }
+    } }
+
     reference_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type]  subtypes: [meta.ref] }  fields: {
-      chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      of            => !meta.record_field { type: meta.type_ref }
-      allow_sibling => !meta.record_field { type: boolean  optional: true  role: DEFAULT  value: true }
+      chain => !meta.record_field { type: meta.type_chain  optional: true }
+      of    => !meta.record_field { type: meta.type_ref }
     } }
 
     ref => !meta.record { chain: { supertypes: [meta.atom meta.reference_type meta.top meta.type] }  fields: {
-      chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      of            => !meta.record_field { type: meta.type_ref }
-      allow_sibling => !meta.record_field { type: boolean  optional: true  role: FIXED  value: false }
+      chain => !meta.record_field { type: meta.type_chain  optional: true }
+      of    => !meta.record_field { type: meta.type_ref }
     } }
 
-    field_type_ref => !meta.reference_type { chain: { subtypes: [meta.identifier_ref meta.type_ref] }  of: meta.type }
+    type_ref => !meta.reference_type { chain: { subtypes: [meta.identifier_ref] }  of: meta.type }
 
-    type_ref => !meta.reference_type {
-      chain: { supertypes: [meta.field_type_ref]  subtypes: [meta.identifier_ref] }
-      of: meta.type
-      allow_sibling: false
-    }
-
-    identifier_ref => !meta.reference_type {
-      chain: { supertypes: [meta.field_type_ref meta.type_ref] }
-      of: unicode.identifier_type
-      allow_sibling: false
-    }
+    identifier_ref => !meta.reference_type { chain: { supertypes: [meta.type_ref] }  of: unicode.identifier_type }
 
     type_inline => !meta.record { fields: {
       of => !meta.record_field { type: meta.type }
     } }
 
     type_expr => @meta.disjoint !meta.choice { variants: [meta.type_ref meta.type_inline]  disjoint: true }
-
-    field_type_expr => @meta.disjoint !meta.choice { variants: [meta.field_type_ref meta.type_inline]  disjoint: true }
 
     schema => !meta.namespace { key_type: meta.type_name  value_type: meta.declared }
   }

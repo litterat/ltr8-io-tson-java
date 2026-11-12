@@ -9,9 +9,7 @@ import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.ReferenceBody;
-import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.KernelNames;
@@ -25,10 +23,10 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * [TSON-SCHEMA] §5.2's rules for a dependent field, {@code v?: kind!}, checked at the declaration against the
- * flattened record: a field whose type is a sibling reference, read per instance against the type its sibling's
- * value names. The linker asks {@link #check} of every closed record, so an open record's member is judged once its
- * application closes it.
+ * [TSON-SCHEMA] §5.2's rules for a dependent field, {@code v?: kind!}, checked at the declaration against the flattened
+ * record: a field whose type is a {@code meta.dependent} in place, read per instance against the type its sibling's value
+ * names. The linker asks {@link #check} of every closed record, so an open record's member is judged once its application
+ * closes it.
  *
  * <ul>
  *   <li><b>The sibling is declared before the dependent field.</b> The fields are a telescope: a field depends only on
@@ -64,10 +62,11 @@ final class DependentFields {
         for (int at = 0; at < order.size(); at++) {
             String name = order.get(at);
             RecordField field = record.fields().get(name);
-            if (!(field.type() instanceof SiblingRef sibling)) {
+            if (field.sibling().isEmpty()) {
                 continue;
             }
-            String dependent = "'" + entryName + "': field '" + name + "' is typed '" + sibling.text() + "'";
+            String sibling = field.sibling().get();
+            String dependent = "'" + entryName + "': field '" + name + "' is typed '" + field.type().text() + "'";
             if (field.voidable()) {
                 throw new SchemaValidationException(dependent + ", a dependent field, and is voidable -- a dependent "
                         + "field may be optional but is never voidable: when present it has a value, read against the "
@@ -77,16 +76,16 @@ final class DependentFields {
                 throw new SchemaValidationException(dependent + ", a dependent field, and carries "
                         + (field.role() == FieldRole.FIXED ? "a pin" : "a default") + " -- a dependent field's type is "
                         + "not fixed at its declaration, so neither is the type a value of it would be read against; "
-                        + "pin the sibling '" + sibling.field() + "' instead (§5.2)");
+                        + "pin the sibling '" + sibling + "' instead (§5.2)");
             }
-            int siblingAt = order.indexOf(sibling.field());
+            int siblingAt = order.indexOf(sibling);
             if (siblingAt < 0) {
                 throw new SchemaValidationException(dependent + ", but '" + entryName + "' has no field '"
-                        + sibling.field() + "' -- a sibling reference names a field of the same record, never a "
+                        + sibling + "' -- a dependent type names a field of the same record, never a "
                         + "schema entry; it declares " + String.join(", ", order) + " (§5.2)");
             }
             if (siblingAt >= at) {
-                throw new SchemaValidationException(dependent + ", but '" + sibling.field() + "' is declared "
+                throw new SchemaValidationException(dependent + ", but '" + sibling + "' is declared "
                         + (siblingAt == at ? "as the field itself" : "after it") + " -- a record's fields are a "
                         + "telescope, each depending only on the fields declared before it, so the sibling precedes "
                         + "its dependent field (§5.2)");
@@ -96,11 +95,11 @@ final class DependentFields {
     }
 
     /** The rules a dependent field's sibling answers to: typed by a reference to types, and there to read. */
-    private static void checkSibling(String entryName, String dependent, SiblingRef sibling, RecordBody record,
+    private static void checkSibling(String entryName, String dependent, String sibling, RecordBody record,
                                      Map<String, Top> namespace) {
-        RecordField field = record.fields().get(sibling.field());
-        String about = "'" + entryName + "': field '" + dependent + "' takes its type from '" + sibling.field() + "'";
-        if (field.type() instanceof SiblingRef) {
+        RecordField field = record.fields().get(sibling);
+        String about = "'" + entryName + "': field '" + dependent + "' takes its type from '" + sibling + "'";
+        if (field.sibling().isPresent()) {
             throw new SchemaValidationException(about + ", which is itself a dependent field ('" + field.type().text()
                     + "') and names no types -- a sibling is typed by a reference whose values name types, "
                     + "meta.type_ref or a meta.ref<C> over a constructor (§5.2)");
@@ -108,8 +107,8 @@ final class DependentFields {
         if (!namesTypes(field.typeExpr(), namespace)) {
             throw new SchemaValidationException(about + ", which is typed '" + field.type().text() + "' -- a sibling "
                     + "is typed by a reference whose values name types, meta.type_ref, a meta.ref<C> over a "
-                    + "constructor, or a refinement of either, or by what a type slot holds (meta.type_expr, "
-                    + "meta.field_type_expr), so that every value it holds names a type to read '" + dependent
+                    + "constructor, or a refinement of either, or by what a type slot holds (meta.type_expr), "
+                    + "so that every value it holds names a type to read '" + dependent
                     + "' against (§5.2)");
         }
         if (field.voidable()) {
@@ -117,7 +116,7 @@ final class DependentFields {
                     + "' written beside it would have none to be read against; a sibling is there to read whenever "
                     + "its dependent field is (§5.2)");
         }
-        boolean member = record.groups().stream().anyMatch(group -> group.hasMember(sibling.field()));
+        boolean member = record.groups().stream().anyMatch(group -> group.hasMember(sibling));
         if (member && !record.fields().get(dependent).optional()) {
             throw new SchemaValidationException(about + ", which is a member of a field group, and '" + dependent
                     + "' is required -- a member is present only when its option is chosen and is never supplied, so "
@@ -139,17 +138,12 @@ final class DependentFields {
      */
     private static void checkSiblingValue(String about, RecordField field, Token value, Map<String, Top> namespace) {
         String noun = field.role() == FieldRole.FIXED ? "pin" : "default";
-        Reference named;
+        TypeRef type;
         try {
-            named = ReferenceGrammar.parseReference(value.text());
+            type = ReferenceGrammar.parse(value.text());
         } catch (AtomParseException e) {
             return; // not a reference at all: the field-value check refuses it as a value of the wrong type
         }
-        if (named instanceof SiblingRef nested) {
-            throw new SchemaValidationException(about + ", whose " + noun + " is the sibling reference '"
-                    + nested.text() + "', which names no type a value can be read against (§5.2)");
-        }
-        TypeRef type = (TypeRef) named;
         if (!type.arguments().isEmpty()) {
             return; // an application is judged a member, through the entry it denotes, by the field-value check
         }
@@ -163,7 +157,7 @@ final class DependentFields {
 
     /**
      * Whether a sibling typed {@code type} holds type names: a reference naming types, written by name or in place
-     * ({@code meta.ref<C>}), or the kernel's {@code meta.type_expr} or {@code meta.field_type_expr}, whose names are
+     * ({@code meta.ref<C>}), or the kernel's {@code meta.type_expr}, whose names are
      * a reference naming types and whose other variant, a type written in place, names no entry -- a value is never
      * read against one, a value being admitted only on an atom or an enum.
      */
@@ -183,9 +177,8 @@ final class DependentFields {
         return target instanceof ReferenceBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get);
     }
 
-    /** The kernel's two choices a type slot is typed by: a type's name, or a type written in place. */
-    private static final java.util.Set<String> SLOT_CHOICES = java.util.Set.of(KernelNames.of("type_expr"),
-            KernelNames.of("field_type_expr"));
+    /** The kernel's choice a type slot is typed by: a type's name, or a type written in place. */
+    private static final java.util.Set<String> SLOT_CHOICES = java.util.Set.of(KernelNames.of("type_expr"));
 
     /**
      * Why {@code restated} is no restatement of {@code inherited} where either is a dependent field, or empty where
@@ -194,15 +187,15 @@ final class DependentFields {
      * what fixes the type.
      */
     static Optional<String> restates(String fieldName, RecordField inherited, RecordField restated) {
-        boolean wasDependent = inherited.type() instanceof SiblingRef;
-        boolean isDependent = restated.type() instanceof SiblingRef;
+        boolean wasDependent = inherited.sibling().isPresent();
+        boolean isDependent = restated.sibling().isPresent();
         if (!wasDependent && !isDependent || inherited.type().equals(restated.type())) {
             return Optional.empty();
         }
         return Optional.of(wasDependent
                 ? "field '" + fieldName + "' is the dependent field '" + inherited.type().text() + "' and is "
                         + "restated '" + restated.type().text() + "' -- a dependent field is restated only as itself; "
-                        + "to fix its type, pin its sibling '" + ((SiblingRef) inherited.type()).field() + "' (§5.2)"
+                        + "to fix its type, pin its sibling '" + inherited.sibling().get() + "' (§5.2)"
                 : "field '" + fieldName + "' is typed '" + inherited.type().text() + "' and is restated as the "
                         + "dependent field '" + restated.type().text() + "', which is not '" + inherited.type().text()
                         + "' or IS-A it");
