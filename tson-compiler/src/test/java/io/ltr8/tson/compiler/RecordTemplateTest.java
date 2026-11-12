@@ -369,21 +369,6 @@ class RecordTemplateTest {
                 "the bound the open form states is the one that is enforced");
     }
 
-    /**
-     * §8.2's deferred check: {@code <K> { m: meta.namespace<K text> }} is a fine declaration -- {@code K} could name
-     * an identifier family -- and {@code keyed<int32>} is where it stops being one, because substitution is what
-     * finally hands {@code key_type} something to judge.
-     */
-    @Test
-    void anArgumentTheSlotCannotTakeIsReportedAtTheApplication() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> compile("""
-                          keyed  => <K> { m: meta.namespace<K text> }
-                          holder => { t: keyed<int32> }"""));
-
-        assertTrue(thrown.getMessage().contains("int32"), thrown.getMessage());
-    }
-
     /** A declaration's own body is the construction, with a template beside it as without. */
     @Test
     void aDeclarationsOwnBodyIsTheConstruction() {

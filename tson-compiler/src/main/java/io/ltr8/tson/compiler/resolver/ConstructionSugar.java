@@ -47,6 +47,8 @@ public final class ConstructionSugar {
 
     private static final String TYPE = KernelNames.of("type");
 
+    private static final String NAMESPACE = KernelNames.of("namespace");
+
     /** The kernel's {@code meta.type_expr}: what a type slot holds, a type's name or a type written in place. */
     private static final String TYPE_EXPR = KernelNames.of("type_expr");
 
@@ -61,6 +63,29 @@ public final class ConstructionSugar {
     public static boolean constructs(String name, Top definition) {
         return definition instanceof RecordBody record && !record.isOpen()
                 && (TYPE.equals(name) || TypeChain.supertypesOf(record).contains(TYPE));
+    }
+
+    /**
+     * Refuses {@code application}, written at a type slot, where its constructor {@code name} builds a namespace type:
+     * the kernel's {@code namespace} or a constructor refining it ([TSON-SCHEMA] §4.2, §5.2). A namespace value carries
+     * its type's name as its tag, and a type written in place has none, so a namespace type is declared and named.
+     *
+     * @param types where the constructor's slots are looked up, for the declaration the message suggests
+     * @throws SchemaValidationException where it builds one
+     */
+    static void refuseNamespaceInPlace(TypeRef application, String name, Top definition, Function<String, Top> types) {
+        if (!NAMESPACE.equals(name) && !TypeChain.supertypesOf(definition).contains(NAMESPACE)) {
+            return;
+        }
+        List<String> slots = slots((RecordBody) definition, types);
+        List<String> written = new ArrayList<>();
+        for (int i = 0; i < slots.size() && i < application.arguments().size(); i++) {
+            written.add(slots.get(i) + ": " + application.arguments().get(i).text());
+        }
+        throw new SchemaValidationException("'" + application.text() + "' constructs a namespace type where it is "
+                + "used, and a namespace value carries its type's name as its tag, which a type written in place does "
+                + "not have (§4.2, §5.2): declare it ('my_" + application.segments().getLast() + " => !"
+                + application.name() + " { " + String.join("  ", written) + " }') and write that name");
     }
 
     /**

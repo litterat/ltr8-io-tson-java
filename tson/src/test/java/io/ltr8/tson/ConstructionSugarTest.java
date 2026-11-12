@@ -170,7 +170,7 @@ class ConstructionSugarTest {
 
     @Test
     void anArgumentIsJudgedByItsFieldsOwnReference() {
-        assertRefused(problems("of", "  post => { a: meta.namespace<int32 text> }"), "no identifier family");
+        assertRefused(problems("of", "  post => meta.namespace<int32 text>"), "no identifier family");
     }
 
     @Test

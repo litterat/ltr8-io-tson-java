@@ -23,7 +23,9 @@ derived — and the static check that runs before any of it.
   application, which an open record holds for `{text => [T]}`, in place too), and the slot holds `TypeInline` of it,
   under the head past its alias hops (`pair_of<int32>` under `pair_of`, `set<text>` under `meta.set_type`).
   Only a container, a tuple, a choice or a reference is constructed in place (`TypeInline.constructible`); any other
-  construction is refused, to be declared.
+  construction is refused, to be declared. A namespace type is no such container, its values tagged by its name: one
+  is refused by its head before it is read (`ConstructionSugar.refuseNamespaceInPlace`), here and, held in an open
+  record, at that record's declaration (`ParameterTypes`).
 - **Where only a name may stand an application closes nowhere** (§4.2): at a slot `MetaRefs` walks with `atName` — a
   map's key, a reference's `of`, an alias's target — a construction and an application of an open record are both
   refused (`closeName`, `nameRequired`), and so is an application at a parameter's bound (`ParameterTypes.requireType`).

@@ -248,7 +248,7 @@ Open questions are recorded here and are NOT reflected as open text in the speci
 33. **§13.2** — `TSON-DATA` and `TSON-JSON` at `/2026/40/`, `TSON-GUIDE` left at
     `/2026/39/`; the six artifact rows carry the Revision 40 pins (§6).
 
-Items 34–57 carry #5, inline types. Each names the rule before and after.
+Items 34–58 carry #5, inline types. Each names the rule before and after.
 
 34. **Header** — the summary gains a sentence: a type slot holds a name or a type written in
     place, nothing is lifted or minted, and `@meta.synthetic` is gone.
@@ -376,6 +376,13 @@ Items 34–57 carry #5, inline types. Each names the rule before and after.
     them, and a recursive record reached on a cycle the declaration is not on means no
     application of it could close. The remedy is the closed type taken as a parameter,
     `wrap => <N> { n: N }` applied to `node_text`.
+58. **§4.2, §5.2, §5.10** — a namespace type could be written in place
+    (`f: meta.namespace<meta.identifier method>`), the kernel's `type_inline` doc naming
+    `namespace` among the constructors admitted there. A namespace value carries its type's
+    name as its tag, and a type written in place has none, so a namespace type is declared
+    and named, as a record and an enum are; one written in place is a resolver error at the
+    declaration that wrote it. §5.10's example of a parameter passed to a constructor's slot
+    reads `<K> { m: {K => text} }`.
 
 ### 3.3 Companion artifacts
 
@@ -482,9 +489,9 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `c3d71e31…` (Revision 39 `c9b069b6…`), numeric `4ff6ac2f…` (`dfa66c5d…`), temporal
-   `07864e40…` (`fb4ada8f…`), net `9285bfb1…` (`371fc20c…`), core `e669ac24…`
-   (`4e8d9c43…`), policy `d34d967e…` (`e9cb5b93…`), each re-stamped for #5's kernel. The chain is consistent — numeric,
+   `8cf5710e…` (Revision 39 `c9b069b6…`), numeric `47503916…` (`dfa66c5d…`), temporal
+   `19b98a9d…` (`fb4ada8f…`), net `a16522c5…` (`371fc20c…`), core `4815bf2e…`
+   (`4e8d9c43…`), policy `482b787b…` (`e9cb5b93…`), each re-stamped for #5's kernel and its declared namespace type. The chain is consistent — numeric,
    temporal, net and policy each pin the kernel; core pins the three libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of
@@ -499,7 +506,7 @@ carries no open questions.
 1. **The examples.** Every Part 2 example written or changed by this revision was run
    through the first implementation's command line against the bundled `/2026/40/` schemas:
    §1.6's schema and data document validate; §5.10's declarations, the family and its data,
-   `outcome<text>`, `rebox`, `<K> { m: meta.namespace<K text> }`, `page<[uuid; 1..]>`,
+   `outcome<text>`, `rebox`, `<K> { m: {K => text} }`, `page<[uuid; 1..]>`,
    `created`, `text_pair`, `nested`, the one-position tuples (`[a]` admitted, `[_]` refused,
    and admitted with `voidable: true`), `nonempty<uuid>`, `meta.array<user_id>`,
    `x => box<text> ^ { … }`, `<T> !meta.record { … }` and a parameterised subtraction

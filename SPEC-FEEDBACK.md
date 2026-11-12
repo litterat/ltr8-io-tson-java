@@ -147,7 +147,7 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   applied parent. With `boxed => <T: text> { v: T }`, `rebox => <T: text> { b: boxed<T> }`
   and `<T: non_empty_text>` resolve, `rebox => <T> { b: boxed<T> }` is a resolver error at `rebox` naming `boxed`'s
   `T: text`, and `<T: int32>` stays refused. An imported template's recorded bound binds the same way, being the
-  one its author wrote. A parameter passed to a constructor's slot (`<K> { m: meta.namespace<K text> }`) needs no
+  one its author wrote. A parameter passed to a constructor's slot (`<K> { m: {K => text} }`) needs no
   bound: the slot judges the argument that arrives when the record is applied. A closed argument is judged against
   the written bound as before; one in an application closed while declarations are still being made ready is judged
   once every declaration is, since an argument is a name at a type position and orders nothing (§3.4.1), and is

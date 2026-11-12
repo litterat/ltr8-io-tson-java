@@ -76,7 +76,7 @@ public final class JsonSchemaCompiler {
         }
 
         JsonTypeReader<?> build(TypeInline type) {
-            Top read = type.of() instanceof NamespaceBody namespace ? namespace.read() : type.of();
+            Top read = type.of();
             return factories.resolve(constructorOf(read)).create(type.text(), read,
                     new ValueReaderContext(linked, readers));
         }

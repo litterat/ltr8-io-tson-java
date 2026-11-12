@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=c3d71e31fc369d2c8074e86a3ec47e8aa7a090d8de03cc35d33b4638a9116c74"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=8cf5710ef573a031c118095db3444757bd4b8eb2b1cd2aa45257eabbd846e67e"
 @doc:"""
   TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
 
@@ -1001,9 +1001,10 @@
       tagged by its constructor and carrying no chain:
       `{ of: !meta.array { element_type: text } }`. The construction is one of
       `array`, `map`, `tuple`, `choice` or `reference_type`, or of a constructor
-      refining one of them, `set_type`, `ref` and `namespace` among them. A
-      record, an enum and every other atom are declared and named. It is not
-      itself a type, so one never holds another directly.
+      refining one of them, `set_type` and `ref` among them. A record, an enum,
+      every other atom and a namespace type, whose values carry its name as
+      their tag, are declared and named. It is not itself a type, so one never
+      holds another directly.
       """
     type_inline => { of: meta.type }
 

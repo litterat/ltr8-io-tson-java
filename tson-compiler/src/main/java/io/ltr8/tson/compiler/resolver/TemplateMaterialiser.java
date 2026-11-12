@@ -408,6 +408,7 @@ final class TemplateMaterialiser {
         if (!ConstructionSugar.constructs(constructor, definition)) {
             return Optional.empty();
         }
+        ConstructionSugar.refuseNamespaceInPlace(application, constructor, definition, this::lookup);
         RecordValue wire = ConstructionSugar.payload(application, (RecordBody) definition, this::lookup);
         Top body;
         try {
