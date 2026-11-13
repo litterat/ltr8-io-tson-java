@@ -19,6 +19,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 
 /**
@@ -574,6 +575,20 @@ final class DefaultTsonReadContext implements TsonReadContext {
         return schemaRoot != null
                 ? this
                 : anchoredOn(declaration.pointer(), declaration.schemaId(), declaration.position());
+    }
+
+    @Override
+    public void typeNamed(String name) {
+        if (cursor.heldByName != null) {
+            cursor.heldByName.typeNamed(name);
+        }
+    }
+
+    @Override
+    public void pinsUnmatched(String base, Set<String> selectors, BiPredicate<String, String> samePin) {
+        if (cursor.heldByName != null) {
+            cursor.heldByName.pinsUnmatched(base, selectors, samePin);
+        }
     }
 
     /** A schema document's read tells its sink each declaration a reader reads against ({@link HeldByName#reached}). */

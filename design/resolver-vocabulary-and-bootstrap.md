@@ -2,8 +2,8 @@
 
 The facts the resolver phases share rather than own: the leaf classes (`WireForm`, `CanonicalApplication`, and the
 model's `TypeSlots`), how an alias chain is kept in resolved output and walked, the one derived key annotation, the
-compiled vocabulary a resolution reads `!C` bodies and annotation values through, and the special-cased bootstrap that
-resolves the kernel, meta.tn, itself. Current form only; history lives in git.
+checkpoints a resolution reads every value at, and the special-cased bootstrap that resolves the kernel, meta.tn,
+itself. Current form only; history lives in git.
 
 **Invariants**
 
@@ -35,13 +35,9 @@ resolves the kernel, meta.tn, itself. Current form only; history lives in git.
   entry ready by `WaitOrder`, the one algorithm every schema's resolution runs. The order is the waits', never source
   order. `KernelBootstrapResolverTest` holds the set to the measured cycle and the output to the kernel's ordinary
   resolution in any declaration order.
-- A `!C { … }` body, a value entry's payload or an annotation value is read in the reading document's closure. Against
-  an entry of the same document it is read through readers compiled from that document's entries ready so far
-  (`WaitOrder.read`). Against an imported entry it is read through the compiled form of the schema that declared it
-  (`SchemaResolver.Vocabulary`, by the origin the import merge recorded) only where no tag in the value names an entry
-  that compile lacks and no ready entry it lacks joins an imported family (§5.2); otherwise through the entries ready
-  so far, compiled over the same imports. Each entry of the document the value selects is waited on before the read.
-  The kernel's ordinary resolution alone reads every head through its pre-loaded stand-in.
+- Every value a schema document reads is read at a checkpoint of that document, in its namespace, and a read is atomic
+  within one checkpoint (below). The kernel's ordinary resolution alone reads every head through its pre-loaded
+  stand-in.
 - Only a resolution in progress links with references pending or compiles with entries pending
   (`TsonSchemaLinker.linkReady`, `TsonSchemaCompiler.compileReady`, through `TsonCompiledSchemaLoader.compileReady`).
   The partial link reports nothing, each entry being judged when the whole schema links; a finished schema's link
@@ -162,40 +158,42 @@ one fact the entry's value does not state. An author writing it is a resolver er
   record closes into the declaration naming it or in place at its slot, so every entry has an author-written name and
   nothing else marks a key.
 
-## The compiled vocabulary (`SchemaResolver.Vocabulary`)
+## Checkpoints (`SchemaResolver.Vocabulary`, `WaitOrder`)
 
-One namespace per schema (§3.3) puts every construction head and annotation type in the closure, and
-a head's instance is read by a compiled reader. `SchemaResolver` records, for each imported entry, the canonical
-identity of the schema that declared it, and its private `Vocabulary` reads `!C { … }` through
-`TsonCompiledSchemaLoader.vocabularyOf(origin of C).reader(C)` and an annotation value through that schema's entry
-reader, where that compile reads the value as the importer's closure would. Each declaring schema is compiled once and
-cached by identity (`design/compiled-registries.md`). A member of a nested map is read through the compile of the
-document that declared it — `!meta.record` through meta.tn's, `!numeric.decimal_type` through numeric.tn's, a member a
-user schema contributes to `meta` through that schema's.
+Every value a schema document reads -- a construction's payload, a value entry's, an annotation's value and a key
+annotation's, in bind or tree mode -- is read at a **checkpoint**: the imports and the document's entries ready so far
+(`loader.compileReady(readySoFar(…), pending, tree)`), each declaration not yet ready a `PendingTypeReader`. An entry
+joins whole, when it is ready. The value is read in the reading document's namespace, annotation names included (§3.3.3).
 
-- **The declaring schema's compile does not hold the importer's subtypes** (§3.3.4's open `subtypes`): the importer's
-  own entries and a sibling import's are beyond it. Such a subtype is reached only by being selected, by a tag or by
-  its pin at a family's selector (§5.2), so the value is read through the entries ready so far exactly when a tag names
-  an entry the declaring compile lacks, or a ready entry it lacks is IS-A an imported base dispatching on members.
-  Neither check compiles anything, and the second runs only where an import declares such a base.
-- **Lost: compiling the entries so far for every imported head.** Every `{ … }` record is `!meta.record { … }`, so
-  that recompiles per declaration; a compile per import closure is a second cache keyed on nothing a schema names.
-- **Selected entries are waited on before the read** (`WaitOrder.read`'s `selected`): a tag naming one of the
-  document's entries, and each ready member of an imported family it declares. A position admits only the subtypes its
-  compile holds, so a selected entry not yet ready would be refused, never stop the read at a `PendingTypeReader`. A
-  value selecting its own entry is the ordinary wait cycle. Two gaps follow (`BACKLOG.md`): a tag inside a held value
-  is waited on too, and a family member not yet ready is not seen.
-- **A local head or annotation type is read through the entries ready so far.** `Vocabulary` tells a local name
-  from an import by the recorded origins, and reads a local one through `WaitOrder.read`: readers compiled by
-  `loader.compileReady(readySoFar(…), pending, tree)` from this document's ready entries over the same imports, each
-  declaration not yet ready a `PendingTypeReader`. A read reaching one throws `NotReady`, the order makes that entry
-  ready, and the read restarts; each declaration the read reaches is a wait of the entry being made ready
-  (`TsonReadContext.HeldByName.reached`), which is what wait depth counts (`design/processor-policy.md`).
+- **A read is atomic within one checkpoint.** One that reaches what its readers lack stops (`PendingTypeReader.NotReady`),
+  the entry is made ready as a wait of the entry being made ready, and the read reruns. It never carries on with readers
+  that lack the entry, so its verdict at its checkpoint is its verdict in the full closure; `CheckpointSoundnessTest`
+  rereads every value over the corpus and the bundled schemas to hold that. A held value is held as written and orders
+  nothing (§3.4.1 rule 3).
+- **The stops are choke points, not refusal sites.** A declaration by position stops at its `PendingTypeReader`; a tag at
+  `EventSkip.typeRefAhead`, which every reader deciding by a tag reads it through; an annotation's name in
+  `AnnotationCapture`, where every one is resolved; a pin no held member states in `RecordMemberDispatchReader`, the one
+  reader placing a value by its pins, which waits on every declaration `FamilyJoiners` says may be the member. A hook
+  before each refusal could not be shown complete, and a new reader would have to remember it.
+- **Readers outlive the checkpoint they were compiled at.** Every fact a reader takes from the closure -- a position's
+  subtypes, the aliases it admits, an annotation's type, a family's members -- is reached by a name or a pin at which a
+  read stops, so keeping them across a join is sound, and a read against a type they lack compiles afresh. The one fact
+  not reached that way is an entry materialisation rewrites in place, which exists only once every entry is ready, and the
+  readers are dropped there (`WaitOrder.settled`).
+- **A checkpoint's compile defers what may depend on what it lacks** (`compileReady` alone): a bind mismatch is the
+  read's that reaches the entry, and a reader that fails to build stops first at the value's tag, then at each
+  declaration that may be a subtype of its entry, since which reader a record gets depends on its subtypes.
+- **The restart state is per resolution.** The held readers and the read in progress are `WaitOrder`'s, one per
+  `resolveSchema` call on one thread; nothing is cached in the loader.
+- **Lost: dropping the readers on every join.** It needs no argument about what readers take from the closure, and it
+  is quadratic: 21 s against 39 ms on 2,000 payloads.
+- **Lost: reading through the declaring schema's compile.** It is a snapshot of another closure, where a position
+  admitting subtypes admits fewer (§3.3.4's open `subtypes`) and an annotation names fewer types, and telling when it
+  reads alike took a guess at what the value selects.
 - **A payload is a value body exactly when its head is no constructor**: a value entry's payload is read against the type,
   under the loader's identifier policy, and closes nothing; a construction's binding record is read under no policy
   (`SchemaResolver`'s `ConstructionReader`, `design/namespace-types-and-value-entries.md`). The value is bound where the
-  context binds its type, and otherwise read in tree mode (the declaring schema's `treeVocabularyOf`, or a tree-mode compile
-  of the entries ready so far) and held as a tree.
+  context binds its type, and otherwise read at a tree-mode checkpoint and held as a tree.
 - **The kernel reads through itself.** Its resolution is handed the pre-loaded stand-in, which answers for every
   name, the one cycle being closed by pre-loading (§3.4).
 
@@ -262,15 +260,10 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   and stay off it: `meta.namespace => meta.map ^ { … }` waits on its source `meta.map`, and `meta.identifier_ref =>
   !meta.type_ref ^ { … }` on `meta.type_ref`, hand-built; the names their `key_type` and `of` hold order nothing, so
   neither is a wait of the cycle's entries and the measurements above stand.
-- **Every other instance is read through the ordinary path.** `DefinitionResolver.resolveInstance` binds through a
-  `ConstructionReader` that reads through `WaitOrder.read`, against readers compiled from the entries ready now:
-  `TsonSchemaLinker.linkReady(ready, null, pending)` then `TsonSchemaCompiler.compileReady(linked, factories,
-  pending)`, `pending` naming the kernel's declarations not yet ready. A pending name compiles to a
-  `PendingTypeReader`. A read that reaches one throws `PendingTypeReader.NotReady`; the order makes that entry
-  ready, drops the compile, and reads again. A held value reached through one
-  binds as written — what base type resolution gives the token, carried to its component by the field's bridge — and
-  is judged when the whole kernel links. That is how `iri` is read against `net.iri_type`, whose `spec` pin is typed by
-  `iri` itself: rule 3 says the pin orders nothing, and binding it as written is what makes that true here.
+- **Every other instance is read at a checkpoint**, as every schema's is (above), its readers compiled by
+  `TsonSchemaLinker.linkReady(ready, null, pending)` then `TsonSchemaCompiler.compileReady`. A held value binds as
+  written -- base type resolution's token, carried by the field's bridge -- and is judged when the whole kernel links:
+  so `iri` is read against `net.iri_type`, whose `spec` pin is typed by `iri` itself (rule 3).
 - **The order is computed.** The bootstrap is `WaitOrder`'s `Readiness` (`handBuilt` for the pre-loaded set,
   `DefinitionResolver` for the rest), and the order is the `DefinitionGetter` every lookup goes through, making an
   entry ready the first time anything asks for it. An entry waiting on itself is the `SchemaValidationException`
@@ -295,6 +288,5 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   constructions written in place at the fields that write them, and every sugar target is the kernel's own.
 - **Cost.** The two partial links and compiles make a warm bootstrap about 11 ms, and it runs once per registry:
   `loadVocabulary` builds the stand-in on the first lookup of meta.tn's identity and reuses it until the ordinarily
-  resolved kernel is registered (`registerBundled`), after which the kernel's vocabulary is that registered schema's
-  compile. The whole of `Tson.standard()`, all six bundled schemas resolved and registered, is about 440 ms as a
-  fresh JVM's first call and 65 ms warm.
+  resolved kernel is registered (`registerBundled`). The whole of `Tson.standard()`, all six bundled schemas resolved
+  and registered, is about 440 ms as a fresh JVM's first call and 70 ms warm.

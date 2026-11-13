@@ -17,10 +17,11 @@ import java.util.Set;
  *   <li>{@link #resolveLinked} -- an {@code !!import} target (or a user schema being read): its
  *       <i>resolved</i> form, merged into the importer's namespace, or compiled per-mode by a {@code
  *       TsonCompiledSchemaRegistry}.
- *   <li>{@link #loadVocabulary} -- the <i>compiled</i> vocabulary of the schema that declared a constructor or an
- *       annotation type the importer applies: its {@code !enum}/{@code !integer} instances are read into {@code
- *       schema.meta} objects during the importer's own resolution.
+ *   <li>{@link #loadVocabulary} -- a schema's <i>compiled</i> vocabulary: the kernel's is what the kernel's own
+ *       resolution reads every head through ([TSON-SCHEMA] §3.4).
  * </ul>
+ *
+ * <p>Every other resolution reads its values through readers it compiles itself ({@link #compileReady}).
  *
  * <p>Not a plain registry lookup, because the kernel is never resolved from a document: it is pre-loaded
  * ([TSON-SCHEMA] §3.4), and an implementation answers a request for it directly, via {@link
@@ -45,32 +46,12 @@ public interface TsonCompiledSchemaLoader {
     TsonLinkedSchema resolveLinked(String uri);
 
     /**
-     * Resolves {@code uri} to its compiled vocabulary -- the readers a schema importing it reads a construction
-     * head or an annotation value through, where {@code uri} declared the constructor or the annotation type. Any
-     * schema: one namespace per schema ([TSON-SCHEMA] §3.3.1) puts every schema's constructors in reach of the
-     * schemas importing it.
+     * Resolves {@code uri} to its compiled vocabulary: its entries compiled in object-binding mode, with the reader
+     * for an instance of each constructor it holds.
      *
      * @throws RuntimeException whatever {@link #resolveLinked} may throw
      */
     TsonCompiledVocabulary loadVocabulary(String uri);
-
-    /**
-     * {@link #loadVocabulary} for a schema already registered, named by its canonical identity ({@code
-     * CanonicalIdentity.canonicalize}) -- the origin an imported entry records, which is the schema whose compiled
-     * readers read an instance of it.
-     *
-     * @throws IllegalStateException if no schema is registered under {@code identity}
-     */
-    TsonCompiledVocabulary vocabularyOf(String identity);
-
-    /**
-     * The registered schema named by {@code identity}, compiled in tree mode: what a value entry's payload is read
-     * through where no class binds its type, so the value is held as a {@code TsonValue} and the schema holding it
-     * still loads and validates ([TSON-SCHEMA] §4.1).
-     *
-     * @throws IllegalStateException if no schema is registered under {@code identity}
-     */
-    TsonCompiledSchema treeVocabularyOf(String identity);
 
     /**
      * The readers of a schema whose resolution is in progress, compiled from its entries ready so far ({@code

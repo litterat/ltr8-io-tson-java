@@ -19,7 +19,6 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
 
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
@@ -28,14 +27,11 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The resolution core: the registry of compiled <b>vocabulary</b>, and the on-demand {@link
- * TsonCompiledSchemaLoader} that fills it. It pairs with a {@link TsonSchemaRegistry}'s store of resolved schemas,
- * adding the compiled half a resolution reads through: a schema whose constructors or annotation types another
- * schema's closure reaches is compiled here, in object-binding mode, once per identity ({@link #loadVocabulary}). In
- * practice that is the kernel, meta.tn, and numeric.tn, temporal.tn and net.tn, plus any library declaring
- * constructors of its own. Every schema is
- * <i>resolved</i> here -- registered into the paired {@link TsonSchemaRegistry} via {@link #resolveLinked} -- and
- * compiled per mode for reading data in a {@link TsonCompiledSchemaRegistry}.
+ * The resolution core: the on-demand {@link TsonCompiledSchemaLoader} over a {@link TsonSchemaRegistry}'s store of
+ * resolved schemas. Every schema is <i>resolved</i> here -- registered into the paired {@link TsonSchemaRegistry} via
+ * {@link #resolveLinked} -- and compiled per mode for reading data in a {@link TsonCompiledSchemaRegistry}. A
+ * resolution reads its values through readers of its own ({@link #compileReady}); the one compiled vocabulary kept
+ * here is the kernel's ({@link #loadVocabulary}), which the kernel's own resolution reads through.
  *
  * <p><b>As a loader</b> it resolves a schema on demand from its URI, so a resolver reaching an {@code !!import}
  * target needn't have it pre-registered -- {@link #loadVocabulary} for a schema's compiled vocabulary, {@link
@@ -65,7 +61,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * #get} are {@code synchronized} and the content-hash map is concurrent, but {@link #loadVocabulary}/{@link
  * #resolveLinked} deliberately are not: they recurse into themselves and holding a lock across a fetch
  * would serialize unrelated loads. So two threads reaching the same cold identity both do the work, and the
- * caches settle it -- {@link TsonSchemaRegistry#registerIfAbsent} and {@link #compileAndCache} both keep the
+ * caches settle it -- {@link TsonSchemaRegistry#registerIfAbsent} and {@link #compiled} both keep the
  * first entry and hand it to everyone, rather than failing the loser or leaving two equivalent instances
  * for one identity. What is duplicated on a race is work, never state.
  *
@@ -83,8 +79,8 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     /** What {@link #resolver} binds with, and so what every namespace value the resolver reads is bound under. */
     private final DataBindContext context;
     private final SchemaSource source;
-    private final Map<String, TsonCompiledVocabulary> compiled = new LinkedHashMap<>();
-    private final Map<String, TsonCompiledSchema> trees = new ConcurrentHashMap<>();
+    /** The registered kernel's compiled vocabulary, once {@link #loadVocabulary} or {@link #register} compiled it. */
+    private TsonCompiledVocabulary kernel;
     /**
      * The kernel's bootstrap stand-in, compiled on the first lookup of its identity and reused until the
      * ordinarily resolved kernel is registered. The bootstrap is a function of the bundled bytes and this
@@ -265,8 +261,7 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     /**
      * Fetches one bundled schema's own source straight from {@link TsonBundledSchemas}, records its content
      * hash (so a later hash-pinned reference to it is verified), resolves it against this registry (its
-     * {@code !!import} targets already loaded) and registers it. Its compiled vocabulary is built on
-     * first use ({@link #loadVocabulary}), so a bundled schema no resolution reads through is never compiled here.
+     * {@code !!import} targets already loaded) and registers it. Nothing is compiled here.
      */
     private void registerBundled(String id) {
         String sourceText = TsonBundledSchemas.fetch(id);
@@ -281,11 +276,10 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     }
 
     /**
-     * Resolves {@code uri} to its compiled vocabulary, fetching/resolving/compiling on demand -- a cache hit
-     * ({@link #get}), the kernel's pre-loaded bootstrap while the kernel is not yet registered (built once per
-     * registry, the kernel being pre-loaded, [TSON-SCHEMA] §3.4), or the generic path ({@link #resolveLinked} then
-     * compile+cache). Any schema compiles: one namespace per schema puts every schema's constructors in reach of
-     * the schemas importing it.
+     * Resolves {@code uri} to its compiled vocabulary, fetching/resolving/compiling on demand -- the kernel's compile
+     * once cached ({@link #get}), the kernel's pre-loaded bootstrap while the kernel is not yet registered (built once
+     * per registry, the kernel being pre-loaded, [TSON-SCHEMA] §3.4), or {@link #resolveLinked} then compile. Only the
+     * kernel's is cached: no resolution reads through another schema's.
      * Deliberately not {@code synchronized}: it recurses into itself (via {@link #resolveLinked}), and
      * holding a lock across a whole fetch would serialize unrelated loads for no real benefit.
      */
@@ -314,36 +308,7 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
             }
             return standIn;
         }
-        return compileAndCache(resolveLinked(uri));
-    }
-
-    /**
-     * The compiled vocabulary of the registered schema whose canonical identity is {@code identity} -- the schema
-     * an imported entry records as its origin, which is how a resolution reaches the readers of a head it applies.
-     * Compiled on first use and cached; the kernel's identity is answered by its pre-loaded stand-in until the
-     * kernel is registered.
-     *
-     * @throws IllegalStateException if no schema is registered under {@code identity}: an origin names a schema the
-     *                               import that carried the entry was linked against
-     */
-    @Override
-    public TsonCompiledVocabulary vocabularyOf(String identity) {
-        TsonCompiledVocabulary cached;
-        synchronized (this) {
-            cached = compiled.get(identity);
-        }
-        if (cached != null) {
-            return cached;
-        }
-        Optional<TsonLinkedSchema> registered = schemaRegistry.getByCanonicalIdentity(identity);
-        if (registered.isPresent()) {
-            return compileAndCache(registered.get());
-        }
-        if (KERNEL_IDENTITY.equals(identity)) {
-            return loadVocabulary(TsonBundledSchemas.META_ID);
-        }
-        throw new IllegalStateException("'" + identity + "' is named as the schema that declared an imported entry, "
-                + "and no schema is registered under it");
+        return compiled(resolveLinked(uri));
     }
 
     /**
@@ -550,58 +515,41 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
      * registers the result (via {@link TsonSchemaRegistry#register}, so the usual {@code
      * !!import}-merging/reference-validation rules all apply exactly as they would calling that
      * directly), then compiles the *registered* result as vocabulary (never the raw input -- a compiled
-     * reader needs linking already done) and stores it keyed by {@code schema}'s own {@code !!id}. The
-     * result is returned directly, so a caller building a chain by hand doesn't have to {@link #get} it again.
+     * reader needs linking already done), caching it where it is the kernel's.
      */
     public synchronized TsonCompiledVocabulary register(TsonSchema schema) {
         TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry,
                 IdentifierPolicy.defaults(), context));
-        return compileAndCache(registered);
+        return compiled(registered);
     }
 
     /**
-     * Compiles an already-linked, already-registered schema as vocabulary ({@link TsonCompiledVocabulary#compile})
-     * and caches it by canonical identity. The compiled-cache half of resolution, split from {@link
-     * #resolveLinked}'s register-only half.
+     * Compiles an already-linked, already-registered schema as vocabulary ({@link TsonCompiledVocabulary#compile}),
+     * the kernel's cached.
      *
      * <p><b>First one wins, rather than last.</b> {@link #loadVocabulary} checks the cache before doing the work,
-     * so two threads reaching the same uncached identity together both compile it; storing both would leave two
-     * equivalent instances for one identity, with whichever readers were built against the loser holding a
-     * reference nothing else shares. Overwriting is not an error -- the two are equivalent -- but one
-     * instance per identity is the property a cache is supposed to have. {@link #register}'s own path
-     * cannot reach a duplicate at all: {@code schemaRegistry.register} refuses one first.
+     * so two threads reaching the uncached kernel together both compile it; storing both would leave two
+     * equivalent instances, with whichever readers were built against the loser holding a reference nothing else
+     * shares.
      */
-    @Override
-    public TsonCompiledSchema treeVocabularyOf(String identity) {
-        TsonCompiledSchema cached = trees.get(identity);
-        if (cached != null) {
-            return cached;
+    private synchronized TsonCompiledVocabulary compiled(TsonLinkedSchema registered) {
+        if (!KERNEL_IDENTITY.equals(CanonicalIdentity.canonicalize(registered.schema().id()))) {
+            return TsonCompiledVocabulary.compile(registered, resolver);
         }
-        TsonLinkedSchema registered = schemaRegistry.getByCanonicalIdentity(identity).orElseThrow(
-                () -> new IllegalStateException("'" + identity + "' is named as the schema that declared a value "
-                        + "entry's type, and no schema is registered under it"));
-        return trees.computeIfAbsent(identity,
-                id -> TsonSchemaCompiler.compile(registered, ValueReaderFactoryRegistry.tree()));
-    }
-
-    private synchronized TsonCompiledVocabulary compileAndCache(TsonLinkedSchema registered) {
-        String identity = CanonicalIdentity.canonicalize(registered.schema().id());
-        TsonCompiledVocabulary existing = compiled.get(identity);
-        if (existing != null) {
-            return existing;
+        if (kernel == null) {
+            kernel = TsonCompiledVocabulary.compile(registered, resolver);
         }
-        TsonCompiledVocabulary result = TsonCompiledVocabulary.compile(registered, resolver);
-        compiled.put(identity, result);
-        return result;
+        return kernel;
     }
 
     /**
      * The compiled vocabulary cached under {@code id}, if any -- matched by canonical identity ({@link
-     * CanonicalIdentity#canonicalize}), so any spelling (pinned or plain) of a registered schema's own {@code !!id}
-     * finds it. Present once {@link #loadVocabulary} or {@link #register} compiled it.
+     * CanonicalIdentity#canonicalize}), so any spelling (pinned or plain) finds it. Only the registered kernel's is
+     * cached, once {@link #loadVocabulary} or {@link #register} compiled it.
      */
     public synchronized Optional<TsonCompiledVocabulary> get(String id) {
-        return Optional.ofNullable(compiled.get(CanonicalIdentity.canonicalize(id)));
+        return KERNEL_IDENTITY.equals(CanonicalIdentity.canonicalize(id)) ? Optional.ofNullable(kernel)
+                : Optional.empty();
     }
 
     /**

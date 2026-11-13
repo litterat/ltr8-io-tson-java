@@ -97,17 +97,18 @@ class TsonCompiledSchemaRegistryTest {
         assertEquals(new MyRecord(7), bindValue);
     }
 
+    /**
+     * A resolution reads every value through readers of its own checkpoints, and the kernel's through its pre-loaded
+     * stand-in, so resolving the bundled schemas registers each and caches no compiled vocabulary.
+     */
     @Test
-    void theCoreCompilesOnlyTheSchemasAResolutionReadsThrough() {
+    void aResolutionCompilesNothingIntoTheCore() {
         TsonCompiledVocabularyRegistry core = core();
 
-        // The kernel documents are the vocabulary every bundled schema's constructions read through -- compiled and
-        // cached here.
-        assertTrue(core.get(TsonBundledSchemas.META_ID).isPresent());
-
-        // net.tn is read through by no other bundled schema -- resolved+registered, but never compiled here.
-        assertTrue(core.schemaRegistry().get(TsonBundledSchemas.NET_ID).isPresent());
-        assertTrue(core.get(TsonBundledSchemas.NET_ID).isEmpty());
+        for (String id : TsonBundledSchemas.IDS) {
+            assertTrue(core.schemaRegistry().get(id).isPresent(), id);
+            assertTrue(core.get(id).isEmpty(), id);
+        }
     }
 
     // ── Facade readers over a registry (one compiled-schema cache, not one per reader) ──

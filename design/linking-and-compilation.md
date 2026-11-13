@@ -204,8 +204,8 @@ form for the on-demand resolve path, where two threads resolving one document bo
 it overwrites nothing either. `get(uri)` canonicalizes; `getByCanonicalIdentity` trusts its caller to have.
 `TsonSchemaLoader` is the pluggable import lookup, registered-only by default (nothing fetched).
 `TsonSchemaLinker.linkBootstrap` is the one sanctioned way to link the kernel's raw bootstrap output without
-registering it. `linkReady(ready, loader, pending)` is the one partial link: a resolution in progress links its
-document's entries ready so far to compile readers for the next read (`WaitOrder`), a reference to a pending
+registering it. `linkReady(ready, loader, pending)` is the one partial link: a resolution in progress links a
+checkpoint, its document's entries ready so far, to compile readers for its reads (`WaitOrder`), a reference to a pending
 declaration is passed over there and nowhere else, and it reports nothing, each entry being judged when the whole
 schema links. In a partial link every pending name is a member of each reference naming types (`computeKinds`), so a
 pin naming a declaration not yet ready (enum's `name_type: = meta.identifier` mid-bootstrap) is judged then too;

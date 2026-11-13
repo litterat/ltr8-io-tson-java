@@ -69,15 +69,10 @@ spec-required case:
   `meta.record` `@doc` says such a record must be ABSTRACT and the mark `final` beside `=?` is refused. A record
   written in place keeps its stated `extension`, and its `discriminators` decide nothing at read. Decide refusal or
   derivation for the canonical form, and apply it in both places.
-- [ ] **An annotation in a construction's payload resolves against the governing schema** ([TSON-SCHEMA] §3.3.3).
-  With `note => text` declared beside it, `r => !meta.record { fields: { a => @note:"hi" { type: int32 } } }` is
-  refused: "the body is not valid data for 'meta.record' … annotation '@note' names no type the governing schema
-  declares (§6)". The payload is read through the constructor's compiled reader (`DefinitionResolver.bindAtomInstance`),
-  whose annotation types are the meta layer's (`AnnotationCapture`), where §3.3.3 resolves an annotation a schema
-  document writes in that document's namespace. The same annotation on a declared field, `r => { @note:"hi" a: int32
-  }`, loads, and so does one on a field of a record written in place as sugar, whose annotations the desugarer keeps
-  off the payload (`SchemaPositions.WrittenField`). Read a payload's annotations in the writing schema's namespace,
-  then drop that carrying, and add a `schema/valid` vector.
+- [ ] **A record written in place carries its fields' annotations beside its payload** ([TSON-SCHEMA] §3.3.3).
+  The desugarer keeps the annotations on a field of `r => { at: { @note:"hi" a: int32 } }` off the `meta.record_field`
+  payload it writes, in `SchemaPositions.WrittenField`, for `DefinitionResolver` to resolve in the schema's namespace;
+  a payload's annotations resolve there now, so write them on the payload and keep only the position beside it.
 - [ ] **A value at an abstract record in place is refused with a reason that cannot apply** ([TSON-SCHEMA] §5.10.1,
   §7.2). Under `r => { at?: { kind: text =?  x: int32 } }`, `!r { at: { kind: a  x: 1 } }` reports "no schema in this
   closure declares a subtype of '{ kind: text  x: int32 }', and it is abstract, so nothing can stand here -- the schema
@@ -118,18 +113,6 @@ spec-required case:
   `TsonCompiledVocabularyRegistry.withStandardLibrary` already does, which is scoped to just the six bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
-- [ ] **A value read while a schema resolves selects its document's entries by guessing from the value**
-  ([TSON-SCHEMA] §3.4.1, §5.2). `SchemaResolver.Vocabulary` waits, before the read, on each of the document's entries
-  a tag in the value names and on each ready member of an imported family. Two cases come out wrong. A family member
-  not yet ready is not seen: with `link-handler-api.tn`'s `routed` and `route` imported, `c => posts & { x?: text }`
-  before `posts => !routed { r: { kind: put  path: "/" } }` and `put => route & { kind?: = "put" }` refuses `posts`
-  ("no member of 'route' pins kind to put"), `c`'s lookup of its operand reading `posts` before `put` is ready; in a
-  valid schema only an annotation value of an imported record type, read in bind mode on a declaration that reads no
-  value, reaches it. And a tag inside a held value (a default or pin in an explicit `!meta.record` payload) is waited
-  on, where §3.4.1 orders nothing. Let the readers stop a schema-document read themselves
-  (`PendingTypeReader.NotReady`): the record dispatchers and `Subsumption`'s guard at a tag naming a pending entry, a
-  member dispatch at a pin no ready member holds while a declaration that may join the family is pending; then drop
-  the guess.
 - [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1's
   "Reading a resolved form"; the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
   `meta.schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an
@@ -160,12 +143,6 @@ spec-required case:
   form is read today only where a caller says it is one (`TsonDataParser.parseResolvedForm`, a reader's
   `readAs(text, "schema")`), with nothing verified.
 
-- [ ] **An entry reached by two import routes keeps only the first route's `subtypes`** ([TSON-SCHEMA] §3.3.4, §8.2).
-  `SchemaResolver.mergeImports` and `TsonSchemaLinker.mergeImports` keep the first copy of an entry several imports
-  bring, carrying the `subtypes` that route's own link derived; a subtype only the second route's link credited is
-  dropped, so the importer's view of the entry is incomplete and its chain facts depend on import order. No bundled
-  closure hits it. Union the `subtypes` of the copies (the entry's body otherwise agreeing, as the identity check
-  already requires), or derive `subtypes` once over the importer's whole closure rather than carrying them in.
 
 - [ ] **A value named through a FIXED field** ([TSON-SCHEMA] §5.12). A qualified name whose segment selects a
   FIXED field of a record value is reported as `NOT_IMPLEMENTED`: bind agreement exempts a FIXED field from having a
@@ -215,14 +192,6 @@ spec-required case:
   `link/valid` one. A consumer pins today's behaviour (`ltr8-io-tson-java-http`,
   `UpstreamGapsTest.aReferenceInsideAnAnnotationValueIsNotJudged`).
 
-- [ ] **An annotation inside a value read through an imported type's reader resolves in the declaring schema's
-  namespace.** [TSON-SCHEMA] §3.3.3 resolves an annotation in the annotating document's namespace, and a value
-  entry's payload (or any value) read through a reader its type's declaring schema compiled looks the annotation up
-  in that schema's closure: `@title` on a value inside `!api { … }`, where `api` is declared by a schema
-  importing meta.tn alone, is refused though the annotating schema imports core, which declares `title`. The read
-  needs
-  the annotating document's annotation scope beside the reader's own (`AnnotationTypes`), consulted where the reader's
-  misses ([TSON-SCHEMA] §3.3.3, §9).
 
 - [ ] **A restatement that changes a pin is accepted** ([TSON-SCHEMA] §5.7, §5.2). With `base => { pet_type: text =
   "pet"  name: text }`, `dog => base & { pet_type: = "dog" }` loads; §5.7's restatement "MUST NOT change a pin", and a

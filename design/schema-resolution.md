@@ -75,11 +75,9 @@ Related: `design/constructor-application.md` (what `!C { … }` may apply and ho
 and the merge of every `!!import`'s namespace (`TsonSchema.namespaceSources`) *before* any
 local declaration resolves, recording each imported entry's origin. That merge mirrors `TsonSchemaLinker.mergeImports`
 — transitive, collisions decided by entry identity (§2.2.3) — because it is the same concept met one phase earlier,
-and the two are kept in step deliberately. The origins key its vocabulary: each `!C` body and annotation value is
-read through the compiled form of the schema that declared `C` or the type, unless it selects a subtype beyond that
-schema's closure (`design/resolver-vocabulary-and-bootstrap.md`); one of this document's own, and one that does, is
-read through readers compiled from its entries ready so far. Local declarations are made ready in wait order (below),
-`OnDemand` being the `Readiness` that resolves one declaration and reports its failure.
+and the two are kept in step deliberately. Every value the document reads is read at a checkpoint of it, its imports
+and its entries ready so far (`design/resolver-vocabulary-and-bootstrap.md`). Local declarations are made ready in wait
+order (below), `OnDemand` being the `Readiness` that resolves one declaration and reports its failure.
 
 `DefinitionResolver` (package-private) resolves one `SchemaMap.Declaration` and never sees a document. Everything it
 consults is fixed at construction: two `DefinitionGetter`s, `namespaceDefinitions` the whole namespace and
@@ -101,9 +99,9 @@ goes through, so an entry is made ready the first time anything asks for it, and
   types of its annotations, and every type a read of its value reaches. A name at a type position (a field's, a
   variant's, an element's) is carried as a name for the linker and orders nothing, as a held value (a default or pin)
   does, which a read reaching a pending declaration binds as written.
-- **Reads restart.** A value read against an entry of the same document goes through `WaitOrder.read`: readers
-  compiled from the entries ready so far, every declaration not yet ready a `PendingTypeReader`. A read reaching one
-  throws `NotReady`, that entry is made ready as a wait of the one being made ready, and the read starts over.
+- **Reads restart.** Every value goes through `WaitOrder.read`, at a checkpoint; a read reaching what its readers lack
+  throws `NotReady`, that entry is made ready as a wait of the one being made ready, and the read starts over
+  (`design/resolver-vocabulary-and-bootstrap.md`).
 - **An application written inline at a field type is not yet closed there.** A use site names the entry an
   application closes to once materialisation runs, after every declaration is ready, so a record ready so far may still
   have a field typed `meta.ref<order>` or `box<text>`. Its compiled reader is an `UnclosedApplicationReader`, never

@@ -52,9 +52,8 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   `temporal.*`, `net.*`) binds to the schema model, every other to the consumer's binder, a member a consumer contributes
   to an open map included, so a
   value entry binds to the consumer's class by the type's name. **A value entry no class binds is held as a `TsonValue`**,
-  read in tree mode (the declaring schema's `TsonCompiledSchemaLoader.treeVocabularyOf`, or `compileReady(…, tree)` for a
-  type of the same document and for a value selecting a subtype beyond the declaring schema), so the schema loads and
-  validates. The bind registry refuses such an entry in the closure it
+  read at a tree-mode checkpoint (`compileReady(…, tree)`), so the schema loads and validates. The bind registry refuses
+  such an entry in the closure it
   compiles, `BIND_MISMATCH` at `/entry` (`TsonCompiledSchemaRegistry.refuseUnbound`); the tree registry refuses nothing.
 - A host declares none of its references; the slot declares them, by the reference's `of`. A slot naming a type is
   typed by a reference over a constructor (`request: meta.ref<meta.record>`), a slot naming a value by a reference over any
@@ -175,14 +174,14 @@ implements nothing; `@Typename` is needed only where the binder's convention wou
 themselves.
 
 **No class is a tree, not an error, until something binds.** `SchemaResolver` reads the payload in bind mode; a
-`MissingBindingException` there reads it again in tree mode, through whichever compile the bind-mode read used, and the
-entry holds the `TsonValue`. So `tson validate`, tree reads, `Tson.resolve` and `validateSchema`
-load a schema whose value entries no Java class describes. A consumer binding under the schema expects every value
-of its closure as the class its context names, so `TsonCompiledSchemaRegistry` in bind mode -- `get(uri)`,
-`get(uri, receiver)`, `get(imports, receiver)` and `compile(linked)` -- refuses a tree-held entry anywhere in the
-closure it compiles: `MissingBindingException` (a `BIND_MISMATCH`) naming the entry, or one `BIND_MISMATCH` per entry
-through the receiver, `schemaPointer` `/entry`. That is the narrowest point a consumer first obtains a schema for
-binding; a missing line of wiring says nothing about the schema (`design/schema-side-diagnostics.md`).
+`MissingBindingException` there reads it again at a tree-mode checkpoint, and the entry holds the `TsonValue`. So `tson
+validate`, tree reads, `Tson.resolve` and `validateSchema` load a schema whose value entries no Java class describes. A
+consumer binding under the schema expects every value of its closure as the class its context names, so
+`TsonCompiledSchemaRegistry` in bind mode -- `get(uri)`, `get(uri, receiver)`, `get(imports, receiver)` and
+`compile(linked)` -- refuses a tree-held entry anywhere in the closure it compiles: `MissingBindingException` (a
+`BIND_MISMATCH`) naming the entry, or one `BIND_MISMATCH` per entry through the receiver, `schemaPointer` `/entry`. That
+is the narrowest point a consumer first obtains a schema for binding; a missing line of wiring says nothing about the
+schema (`design/schema-side-diagnostics.md`).
 
 ## Names inside a value: the slot declares the spelling (§4.2, §5.12)
 
