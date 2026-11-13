@@ -391,8 +391,8 @@ public final class SchemaResolver {
             Top visible = waitOrder.definition(name);
             return visible != null ? visible : heads.definition(name);
         }, declarations::containsKey);
-        TemplateMaterialiser materialiser = new TemplateMaterialiser(waitOrder, reads,
-                heads::definition, waitOrder::current, facts, applications, kernel, heldRecursion);
+        TemplateMaterialiser materialiser = new TemplateMaterialiser(waitOrder, heads::definition, waitOrder::current,
+                facts, applications, kernel, heldRecursion);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
@@ -450,15 +450,15 @@ public final class SchemaResolver {
             resolvedLocals.put(name, namespace.get(name));
         }
 
-        // §5.10's regularity boundary, before anything closes: a template that grows its argument on every
-        // recursive step has no finite set of types to build, and catching it at the declaration means a
-        // broken template is rejected even if nobody ever applies it.
+        // §5.10.1's regularity boundary, before anything closes: a recursive application passes each parameter
+        // through unchanged, judged at the declaration, so a template refused for it is refused even if nobody
+        // ever applies it.
         Set<String> irregular = TemplateRegularity.check(resolvedLocals, problems.collecting()
                 ? (name, error) -> problems.report(declarations.get(name), error) : null);
 
         // A condemned template is replaced before materialisation, on the same terms as a declaration that
-        // failed to resolve: the verdict is in, and closing an application of one would never end, an irregular
-        // application never repeating to tie or be refused. Both maps, because the two are read by
+        // failed to resolve: the verdict is in, and closing an application of one would only report its
+        // consequence against whichever entry applied it. Both maps, because the two are read by
         // different halves: `materialise` walks `resolvedLocals`, while the application's head is looked up
         // through the getter over `namespace`.
         condemn(irregular, resolvedLocals, namespace);
@@ -664,7 +664,7 @@ public final class SchemaResolver {
         Map<ApplyBody, String> byApplication = new LinkedHashMap<>();
         namespace.keySet().forEach(entryName -> Optional.ofNullable(applications.get(entryName))
                 .ifPresent(application -> byApplication.putIfAbsent(
-                        CanonicalApplication.of(application.head().name(), application.names()), entryName)));
+                        CanonicalApplication.of(application.head().name(), application.arguments()), entryName)));
         // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the chains the
         // previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs `ok_of`'s own
         // edge to `result_of` to exist before `great_of` can inherit it. Bounded by the entry count: each round
@@ -737,7 +737,7 @@ public final class SchemaResolver {
             }
             // A parent written through an alias of its open record is that open record's application (§8.3).
             String head = Ancestry.templateHead(application.head().name(), namespace::get);
-            String owner = byApplication.get(CanonicalApplication.of(head, application.names()));
+            String owner = byApplication.get(CanonicalApplication.of(head, application.arguments()));
             if (owner != null) {
                 chain.add(owner);
             }

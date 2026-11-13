@@ -9,14 +9,14 @@ import java.util.Objects;
 /**
  * The kernel's {@code meta.apply}: an application, {@code box<T>}, written in place ([TSON-SCHEMA] §5.10). A reference
  * holds a name only, so an application is a construction of its own: {@code head} names what is applied, and {@code
- * arguments} supply it, positionally.
+ * arguments} supply it, positionally, each a name or a parameter, as the kernel types them ({@code [meta.type_ref;
+ * 1..]}, §5.3).
  *
  * <p><b>Where one stands.</b> In resolved output, only inside an open record, at a type slot or among its parents,
  * with one of the record's parameters among its arguments and an open record as its head: every other application
  * has closed, a constructor's to its construction and an open record's to its record. It is also the value of the
- * {@code meta.application} annotation, where every argument is a name. While a schema resolves it stands wherever an
- * author wrote {@code head<args>}, and an argument may then be an application in turn, written in place, which a
- * constructor's construction lands at its slot; an open record's argument is a name or a parameter.
+ * {@code meta.application} annotation. A constructor's application is its construction before anything reads it, so
+ * while a schema resolves one applies an open record, or a head nothing names.
  *
  * <p><b>No kind of its own.</b> It composes {@code meta.type} directly, being none of an atom, a product or a sum: it
  * stands for a type that exists only once its open record is applied, and nothing reads a value against it.
@@ -24,7 +24,7 @@ import java.util.Objects;
  * <p>Identity is the head and the arguments, compared as values (§8.2), so two applications written alike are one.
  */
 @Typename(name = "meta.apply")
-public record ApplyBody(TypeChain chain, TypeRef head, List<TypeExpr> arguments) implements Type {
+public record ApplyBody(TypeChain chain, TypeRef head, List<TypeRef> arguments) implements Type {
 
     @Record
     public ApplyBody {
@@ -37,7 +37,7 @@ public record ApplyBody(TypeChain chain, TypeRef head, List<TypeExpr> arguments)
     }
 
     /** {@code head} applied to {@code arguments}, placed in no chain. */
-    public ApplyBody(TypeRef head, List<? extends TypeExpr> arguments) {
+    public ApplyBody(TypeRef head, List<? extends TypeRef> arguments) {
         this(TypeChain.EMPTY, head, List.copyOf(arguments));
     }
 
@@ -51,19 +51,13 @@ public record ApplyBody(TypeChain chain, TypeRef head, List<TypeExpr> arguments)
         return new TypeInline(this);
     }
 
-    /** The arguments that are names or parameters, in order; empty where any is written in place. */
-    public List<TypeRef> names() {
-        return arguments.stream().allMatch(TypeRef.class::isInstance)
-                ? arguments.stream().map(TypeRef.class::cast).toList() : List.of();
-    }
-
     /** {@code head} with the same arguments: how an alias hop is followed. */
     public ApplyBody withHead(TypeRef head) {
         return new ApplyBody(chain, head, arguments);
     }
 
     /** The same head over {@code arguments}. */
-    public ApplyBody withArguments(List<? extends TypeExpr> arguments) {
+    public ApplyBody withArguments(List<? extends TypeRef> arguments) {
         return new ApplyBody(chain, head, List.copyOf(arguments));
     }
 
@@ -85,7 +79,7 @@ public record ApplyBody(TypeChain chain, TypeRef head, List<TypeExpr> arguments)
 
     /**
      * The source spelling, for a message: the head, then {@code <}, each argument's text separated by one space, and
-     * {@code >} -- {@code pair<text integer>}, a nested application spelled the same way.
+     * {@code >} -- {@code pair<text integer>}.
      */
     public String text() {
         StringBuilder out = new StringBuilder(head.name()).append('<');

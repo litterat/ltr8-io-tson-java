@@ -14,23 +14,19 @@ derived — and the static check that runs before any of it.
 - A template that fails the regularity check, or whose parameters stand where none may, is replaced with the
   error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
   application's head resolves).
-- The pass runs over the **resolved** form through `schema.meta.TypeSlots`, whose `Rewrite` tells a type slot
-  (`atSlot`) from a slot that holds a name (`atName`). In an open record (`openRewrite`) it closes each reference
-  that names none of its parameters, constructs in place each constructor's application over one, and leaves each
-  open record's application over one for substitution.
-- An application over a **constructor** (`construction`, `design/constructor-application.md`) is the construction
-  written in place at a type slot: construction sugar builds the binding record the braced form writes, the
-  constructor's reader reads it, the body is walked so each argument closes where it landed (a nested constructor's
-  application, which an open record holds for `{text => [T]}`, in place too), and the slot holds `TypeInline` of it,
-  under the head past its alias hops (`pair_of<int32>` under `pair_of`, `set<text>` under `meta.set_type`).
-  Only a container, a tuple, a choice or a reference is constructed in place (`TypeInline.constructible`); any other
-  construction is refused, to be declared. A namespace type is no such container, its values tagged by its name: one
-  is refused by its head before it is read (`ConstructionSugar.refuseNamespaceInPlace`), here and, held in an open
-  record, at that record's declaration (`ParameterTypes`).
-- **Where only a name may stand an application closes nowhere** (§4.2): at a slot `TypeSlots` walks with `atName` — a
-  map's key, a reference's `of`, an alias's target — a construction and an application of an open record are both
-  refused (`closeName`, `nameRequired`), and so is an application at a parameter's bound (`ParameterTypes.requireType`).
-  Each is a `SchemaValidationException` at the declaration that wrote it, naming the declaration to write.
+- The pass runs over the **resolved** form through `schema.meta.TypeSlots`. In an open record (`openRewrite`) it
+  closes each application that names none of its parameters and leaves each over one for substitution.
+- **Every application it meets applies an open record**, or a head nothing names. A constructor's application is
+  its construction before anything is read (`ConstructionRewrite`, `design/constructor-application.md`), so
+  `meta.map<text meta.array<box<T>>>` reaches here as `{text => [box<T>]}` holding `box<T>`, and an application's
+  arguments are names or parameters, as the kernel types `meta.apply.arguments`. The explicit `{ of: !meta.apply
+  { head: meta.array  arguments: [text] } }` is rewritten the same way where its arguments are names, so nothing
+  constructs here.
+- **Where only a name may stand an application closes nowhere** (§4.2): a map's key, a reference's `of`, an alias's
+  target, a refinement source, a parameter's bound (`ParameterTypes.requireType`). A construction and an application
+  of an open record are both refused there (`nameRequired`), spelled as the author wrote them, at the declaration
+  that wrote them, naming the declaration to write. A constructor's slot that holds only a name is judged where its
+  application is rewritten (`ConstructionSugar.slotsInPlace`).
 - An application of an **open record** closes into the declaration that names it (`closeApplicationInto`): the
   record itself, recorded with its application. **At a type slot it closes in place** (`instantiate`) -- at a field of
   a closed record, or left in another record's body by closing it: the substituted record, closed, its chain dropped,
@@ -55,14 +51,12 @@ derived — and the static check that runs before any of it.
     application at a slot is never looked up. Regularity passes each parameter through unchanged and an argument is a
     name, so every cycle repeats an application exactly and the closing ends.
 - An argument of an open record's application is a name or a parameter (§5.3): a construction or an application
-  there is refused (`closeArgument`, `argumentNotAName`), to be declared under a name and passed by it. Inside an open
-  record the held applications are judged at its declaration (`ParameterTypes`' `requireNames`): every argument of an
-  open record's application, and every argument of a constructor's that lands at a slot holding only a name
-  (`ConstructionSugar.slotsInPlace`); one at a constructor's type slot is held and closes there. An application's
-  arguments are dereferenced before it is closed, and only a reference is dereferenced.
+  there is refused where the application is first met (`ConstructionRewrite`, `argumentNotAName`), open record or
+  closed, to be declared under a name and passed by it. An application's arguments are dereferenced before it is
+  closed.
 - Every instantiation records its application in the map `SchemaResolver` shares with the materialiser, in its reduced
-  form, which the applied-parent fold keys on; the entry's key carries it as `@meta.application` **as written**
-  (`asWritten`, `writtenApplications`).
+  form, which the applied-parent fold keys on; the entry's key carries it as `@meta.application` **as written**, each
+  argument past its alias hops (`asWritten`, `writtenApplications`).
 - A composition operand never closes, open or closed: it is absorbed by value. Which parents were applications is
   read off the open record's chain `parents`; a closed type keeps no `parents` once `closeChains` has run.
 - No application is IS-A its template (§5.10): its edges are what its template's written parents reach, each closed
@@ -113,11 +107,7 @@ checks), `design/schema-resolution.md` (chains, applied parents),
     application (`CanonicalApplication.of`) and folds each owner and its ancestors into `supertypes` to a
     fixed point. An application no declaration names contributes no edge: nobody declared that type.
 - **An application is `meta.apply` written in place** (`ApplyBody`), closed by one walk (`TypeSlots`, the
-  materialiser's `Closing`), innermost first, the application as written kept beside the one whose arguments closed so
-  a refusal names what the author wrote. An argument of an open record's application closes nothing: it is a name or
-  a parameter (§5.3), so an application or a construction there is refused (`arguments`); an argument of a
-  constructor's application lands at the construction's slot through a stand-in name
-  (`ConstructionSugar.StandIns`), a reference reading names only, and closes there.
+  materialiser's `Closing`). Its arguments are names, so closing one closes nothing inside it.
 - **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head abstraction),
   but it may be one *among an application's arguments*, which is what recursion looks like; binding only the outer
   name leaves `T` in `chain<T>` unbound.
@@ -194,8 +184,8 @@ resolves, before the batch pass runs. They are handled differently.
   where an entry waiting on itself is refused, so a cycle reached through an application
   (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on
   'a'`) rather than recursing (`RecordTemplateTest.aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle`).
-- **An argument is a name or a parameter** (§5.3): an operand's argument list holds no application, which
-  `ParameterTypes`' `requireNames` refuses at the open record's declaration and `closeArgument` at a closed one.
+- **An argument is a name or a parameter** (§5.3): an operand's argument list holds no application, refused where the
+  operand resolves (`DefinitionResolver.typeArguments`).
 - **What an operand may not be.** Each is refused at the declaration that writes it:
   - a parameter as a head, `<T> { v: T<text> }` (`SchemaResolver.refuseHeadAbstraction`, over the open record's
     applications, `OpenEntry.applications`): §5.10 admits no head abstraction. The linker's arity check reads the
@@ -239,24 +229,21 @@ resolves, before the batch pass runs. They are handled differently.
 §5.10.1's regularity rule, checked over the resolved entries before anything materialises: **within a template body,
 a recursive application — direct or mutual — must pass each parameter through unchanged.**
 
-- **A static rule, not a runtime limit** (§5.10.1: "the check is static, at declaration time"). A template that grows
-  its argument every level (`weird => <T> { next: weird<box<T>>? }`) reaches `weird<box<text>>`,
-  `weird<box<box<text>>>`, …, so every application is distinct, none repeats to tie or be refused, and there is no
-  finite set of types to build; no portable depth limit tells that from legitimate depth. Checked at the declaration,
-  a template nobody applies is still rejected, at the line that wrote it.
+- **Growth is unwritable before it runs.** An argument is a name or a parameter (§5.3), so `weird => <T> { next?:
+  weird<box<T>> }` is refused where its field resolves, and every application a closing reaches draws its arguments
+  from the schema's finitely many names: each recursion repeats an application, which ties or is refused. What the
+  rule still refuses at the declaration is a recursive application that permutes the parameters (`swap<B, A>`),
+  duplicates one (`dup<A, A>`) or passes a name for one (`c<text>` inside `c => <T> { … }`). Each would terminate:
+  closing ties it to a declaration of the repeated application or refuses it at a slot. The rule keeps
+  `HeldRecursion` sound, a cycle of heads then being a cycle of applications, so a template it cannot close is
+  refused at its declaration rather than at whichever application meets it.
 - **Mutual recursion needs reachability, not a self-edge**: neither template in an `a → b → a` cycle applies
-  itself, so an application is checked whenever its head can reach the declaration it sits in.
-- **Applications nested inside arguments are checked too** (`box<deep<box<T>>>`), so the walk recurses through
-  `ApplyBody.arguments`. The applications come from the open record's type slots (`OpenEntry.applications`), the
-  ones `refuseHeadAbstraction` and the linker's arity check also read: every application at any depth of a type in
-  place (`TypeSlots.applications`), so `kids?: [tree<T>]` and `m: { next?: tree<T> }` are judged as `next?: tree<T>` is. An
-  argument is a name or a parameter, and a sugar form is never one, so growth can only come through an application
-  among the arguments, which this walk sees wherever it stands.
-- **Deliberately stricter than termination requires.** What bounds the work is weaker — every argument a bare
-  parameter reference, at any position — since arguments are only copied, so permuting
-  (`swap => <A, B> { x: swap<B, A> }`) or duplicating still reaches finitely many instantiations. Positional
-  identity is the standard restriction §5.10.1 names, and an over-restriction simple to state can be loosened later
-  where the reverse cannot. `TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate` pins it.
+  itself, so an application is checked whenever its head can reach the declaration it sits in. The applications
+  come from the open record's type slots (`OpenEntry.applications`), at any depth of a type in place
+  (`TypeSlots.applications`), so `kids?: [tree<T>]` is judged as `next?: tree<T>` is.
+- **Deliberately stricter than termination requires**: positional identity is the restriction §5.10.1 names, and an
+  over-restriction simple to state can be loosened later where the reverse cannot.
+  `TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate` pins it.
 - **Arity is not checked here**; the linker checks it over an open record's references (`TsonSchemaLinker`, §5.10), so
   this compares positionally only where the arity already matches.
 - **A condemned template does not reach materialisation.** `check` returns the names it rejected and

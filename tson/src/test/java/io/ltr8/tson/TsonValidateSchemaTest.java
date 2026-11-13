@@ -298,13 +298,11 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * A regularity violation is reported where it is declared, once. The condemned template is replaced
-     * before materialisation, so nothing goes on to apply it, and no application of it runs to the depth
-     * backstop to report the same defect a second time against the entry that applied it. The depth guard
-     * guards against a hole in this check, not a template this check already condemned.
+     * A growing recursion is reported where it is declared, once: its argument is no name (§5.3), the declaration
+     * fails, and an application of it closes against the placeholder left in its place, reporting nothing further.
      */
     @Test
-    void anIrregularTemplateIsReportedAtItsDeclarationAndNotAgainAtItsApplication() {
+    void aGrowingTemplateIsReportedAtItsDeclarationAndNotAgainAtItsApplication() {
         List<Diagnostic> problems = check("""
                 {
                   box => <T> { v: T }
@@ -314,7 +312,7 @@ class TsonValidateSchemaTest {
                 """);
 
         assertEquals(List.of("/weird"), problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList());
-        assertTrue(problems.get(0).message().contains("does not pass 'T' through unchanged"),
+        assertTrue(problems.get(0).message().contains("'box<T>' is passed as an argument of 'weird<box<T>>'"),
                 problems.get(0).message());
     }
 

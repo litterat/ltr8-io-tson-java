@@ -46,13 +46,6 @@ spec-required case:
   IS-A the base kind. In Java delete `EntryKind` and both `kindOf` methods, give `isConstructor` another home,
   reword the refinement diagnostic that prints `kind=`, and have the tests assert on the value's class.
 
-- [ ] **A constructor's application passes an argument written in place through a generated name.** A
-  constructor's application is built by reading a binding record of its arguments, and a reference there reads a
-  name, so an argument that is an application or a type in place (`meta.array<box<T>>`) travels as
-  `in_place_<uuid>` and is swapped back (`ConstructionSugar.StandIns`, `DefinitionResolver.argumentStandingIn`).
-  Build the construction from the model's arguments directly, so no name is invented and nothing random is in
-  the pipeline.
-
 - [ ] **A tree read does not read a dependent value against a sibling written in place** ([TSON-SCHEMA] §5.2).
   `setting => { kind: meta.type_expr  v?: kind! }` with `kind: { of: !meta.array { element_type: int32 } }` reads `v`
   against the array in bind mode, where the sibling binds to its `TypeInline`; a tree read holds the sibling as the
@@ -445,6 +438,14 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **A bind read does not judge an annotation on an atom, a container or an element** ([TSON-SCHEMA] §6). With
+  `feed => { url: text  n: int32  tags: [text] }` bound to a host record, `url: @nosuch:"x" "/"`, `n: @nosuch:"x" 1`,
+  `tags: @nosuch:"x" [a]`, `tags: [@nosuch:"x" a]` and `url: @title:{ a: 1 } "/"` all bind, in a data document and in
+  a value entry's payload alike; a tree read refuses the first four as `UNKNOWN_TYPE_REF` and the last as
+  `TYPE_MISMATCH`. An annotation on a record value or on the root is judged in both modes. Only the record, boxing
+  and type-reference bind readers resolve an annotation (`AnnotationCapture.bound`); every other bind reader skips
+  it unread. Judge the name and the value at each of them as the tree readers do, discarding what no component
+  receives, add a `CrossEncodingParityTest`-style case per position, and check `tson-json`'s bind path for the same.
 - [ ] **A map keyed by a record type admits a token key** ([TSON-SCHEMA] §4.2, §5.3; [TSON-DATA] §2.5). §4.2 says
   "a map's keys may be records, tuples or arrays, each declared and named", and a key is a data value read at the
   key type. Under `order => { id: text }` and `r => { keyed: {order => int32} }`, `!r { keyed: { o => 1 } }` reads

@@ -7,12 +7,17 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
+import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
 import io.ltr8.tson.compiler.reader.PendingTypeReader;
+import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -213,6 +218,36 @@ final class WaitOrder implements DefinitionGetter {
         }
         entries.put(name, resolved);
         return resolved;
+    }
+
+    /**
+     * Answered over the declarations not yet ready by their parameter lists and alias targets as written, so asking
+     * waits on nothing: an open record applied inside its own declaration, or inside one its declaration waits on,
+     * would otherwise wait on itself.
+     */
+    @Override
+    public boolean opens(String name) {
+        Set<String> seen = new HashSet<>();
+        for (String at = name; at != null && seen.add(at); ) {
+            Top ready = entries.get(at);
+            if (ready != null) {
+                if (!(ready instanceof Alias alias)) {
+                    return OpenEntry.isOpen(ready);
+                }
+                at = alias.target().name();
+                continue;
+            }
+            SchemaMap.Declaration declaration = declarations.get(at);
+            if (declaration == null) {
+                return false;
+            }
+            if (!SchemaDesugarer.typeParams(declaration.typeDef()).isEmpty()) {
+                return true;
+            }
+            at = declaration.typeDef() instanceof TypeExprDef reference && reference.ref() instanceof NameRef target
+                    ? target.name() : null;
+        }
+        return false;
     }
 
     /** {@link #read(String, boolean, Function)} in object-binding mode. */

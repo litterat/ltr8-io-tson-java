@@ -97,8 +97,9 @@ import java.util.function.Predicate;
  *   <li><b>An alias</b> ({@code name => other_name}, §8.3) -- an {@code ALIAS}-kind entry whatever the
  *   name resolves to, carried unverified; the linker validates it. <b>An application</b>
  *   ({@code bx => box<text>}, {@link #resolveTemplateApplication}) is the same declaration carrying
- *   arguments, each a reference, nested applications included: over an open record it closes <em>into</em> the
- *   declared name, and over a constructor it is the construction it spells.</li>
+ *   arguments: over a constructor it is the construction it spells, a constructor's application among its arguments
+ *   constructed in turn, and over an open record, its arguments names, it closes <em>into</em> the declared
+ *   name.</li>
  *   <li><b>Constructor application</b> ({@code !C value}, §5.5/§5.6, {@link #resolveInstance}) -- bound
  *   through the compiled reader of the schema declaring {@code C} ({@link #bindAtomInstance}), with no
  *   name-to-class table --
@@ -148,8 +149,7 @@ import java.util.function.Predicate;
  *   #closedApplication}) -- a resolver built standalone, without the whole-schema materialiser {@link
  *   SchemaResolver} supplies.</li>
  * </ul>
- * {@link #resolveTemplateApplication} and {@link #closedApplication} also rethrow one from below with the
- * declaration's name in front. What §5.7 leaves unchecked is not reported at all: a restated FIXED field
+ * What §5.7 leaves unchecked is not reported at all: a restated FIXED field
  * MUST NOT change its pinned value, and {@link #resolveTighteningField} does not compare the two.
  *
  * <p>Declarations resolve in one namespace per schema (§3.3, §3.3.1): the schema's own entries and its
@@ -211,6 +211,9 @@ final class DefinitionResolver {
     /** {@code type}'s one field ([TSON-SCHEMA] §4.1): a type's IS-A chain, which no declaration writes. */
     private static final String CHAIN = "chain";
 
+    /** The kernel's {@code meta.apply}, which no declaration's body constructs. */
+    private static final String APPLY = KernelNames.of("apply");
+
     /** The {@code _} a bare annotation stands for (§6), read against the annotation's type like a written one. */
     private static final DataValue VOID = new DataValue(List.of(), Optional.empty(), new VoidValue());
 
@@ -225,6 +228,9 @@ final class DefinitionResolver {
     private final AnnotationValueReader annotationValueReader;
     private final DefinitionGetter vocabularyDefinitions;
     private final DefinitionGetter namespaceDefinitions;
+
+    /** Each constructor's application written as its construction before it is read ([TSON-SCHEMA] §5.3). */
+    private final ConstructionRewrite rewrite;
 
     /**
      * Whether a name in this namespace denotes the kernel's own entry -- what a kind and a constructor are
@@ -300,6 +306,10 @@ final class DefinitionResolver {
         this.vocabularyDefinitions = Objects.requireNonNull(vocabularyDefinitions, "vocabularyDefinitions");
         this.namespaceDefinitions = Objects.requireNonNull(namespaceDefinitions, "namespaceDefinitions");
         this.applicationCloser = applicationCloser;
+        this.rewrite = new ConstructionRewrite(type -> {
+            Top found = vocabularyDefinitions.definition(type);
+            return found != null ? found : namespaceDefinitions.definition(type);
+        }, namespaceDefinitions::opens);
     }
 
     /**
@@ -681,6 +691,23 @@ final class DefinitionResolver {
     }
 
     /**
+     * Refuses {@code meta.apply} constructed as a declaration's body ([TSON-SCHEMA] §5.10): an application is written
+     * in place, and a declared one is written {@code name => H<args>}, whose value is what it closes or constructs to
+     * (§8.2), whatever its head is. Tested at the end of the head's alias chain (§8.3).
+     */
+    private static void refuseDeclaredApplication(String name, ConstructorHead head, DataValue written) {
+        if (!head.name().equals(APPLY)) {
+            return;
+        }
+        String spelled = ConstructionRewrite.text(readAs(written, APPLY));
+        throw new SchemaValidationException("'" + name + "': '!" + written.typeRef().orElse(APPLY) + " { ... }' is "
+                + "written as a declaration's body, and an application is written in place, never as a declaration's "
+                + "body (§5.10): declare it as '" + name + " => "
+                + (spelled.matches("[^<]+<.+>") ? spelled : "H<args>")
+                + "', whose value is the type it closes or constructs to (§8.2)");
+    }
+
+    /**
      * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance filled
      * with {@code value}.
      *
@@ -705,8 +732,17 @@ final class DefinitionResolver {
      * than check: see the note at the binding site.
      */
     private Top resolveInstance(String name, Instance instance) {
+        return resolveInstance(name, instance, positions.desugared(instance.value()));
+    }
+
+    /**
+     * {@link #resolveInstance(String, Instance)}, {@code desugared} saying desugaring wrote the payload, so every
+     * application in it is the author's sugar ({@link ConstructionRewrite}).
+     */
+    private Top resolveInstance(String name, Instance instance, boolean desugared) {
         String target = instance.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
+        refuseDeclaredApplication(name, head, instance.value());
         refuseWrittenParameters(name, head, instance.value());
         Top constructor = head.definition();
         List<String> constructorParameters = OpenEntry.parameterNames(constructor);
@@ -728,7 +764,10 @@ final class DefinitionResolver {
         // shape
         // comes with an empty chain, since IS-A stops at construction (§4.1), and so is read as a value entry.
         // Parameters empty and IS-A `top` therefore imply a record body.
-        Top body = asWritten(bindAtomInstance(name, readAs(instance.value(), head.name())), instance.value());
+        // Read as constructed, restored as written: a field of a record in place is found by the identity of the value
+        // desugaring wrote for it, and the rewrite rebuilds what holds an application it constructs.
+        DataValue payload = rewrite.inPlace(instance.value(), desugared);
+        Top body = asWritten(bindAtomInstance(name, readAs(payload, head.name())), instance.value());
         if (body instanceof io.ltr8.tson.schema.meta.Alias) {
             // `!meta.alias { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
             // denotes the same entry: `kind: ALIAS` (§4.1 -- a meta.type_ref, not one the supertype chain
@@ -943,7 +982,8 @@ final class DefinitionResolver {
         checkTemplateBindings(name, WireForm.RECORD, vocabulary, bindings);
         ParameterTypes.checkSlots(template.typeParams(), payload, vocabularyDefinitions::definition);
         refuseLiteralOnParameter(payload, template.typeParams());
-        List<RecordValue.Field> withParameters = new ArrayList<>(bindings.fields());
+        List<RecordValue.Field> withParameters = new ArrayList<>(
+                ((RecordValue) rewrite.inPlace(payload, false).coreValue()).fields());
         withParameters.add(new RecordValue.Field(WireForm.PARAMETERS, WireForm.plain(new ArrayValue(
                 template.typeParams().stream().map(parameter -> WireForm.plain(new RecordValue(List.of(
                         WireForm.nameField(WireForm.NAME, parameter))))).toList()))));
@@ -1440,22 +1480,29 @@ final class DefinitionResolver {
 
     /**
      * A declaration whose body is an application, {@code bx => box<text>} or {@code text_list => meta.array<text>}.
-     * Over a constructor it is the construction it spells ({@link #construction}); over an open record it <b>is</b> the
-     * entry it denotes (§8.2): the closed record itself, the canonical application among its facts. §8.2 makes a
-     * declared entry's identity its name, and a declaration that <em>constructs</em> a type keeps it ({@code
-     * text_list => [text]} is the entry), so one that <em>denotes</em> a type obeys the same rule.
+     * Over a constructor it is the construction it spells ({@link ConstructionRewrite#body}), resolved exactly as
+     * {@code text_list => !meta.array { element_type: text }} is: its value states the constructor and the arguments,
+     * its tag is the head as written, and it records no application, since nothing was substituted. Over an open
+     * record it <b>is</b> the entry it denotes (§8.2): the closed record itself, the canonical application among its
+     * facts. §8.2 makes a declared entry's identity its name, and a declaration that <em>constructs</em> a type keeps
+     * it ({@code text_list => [text]} is the entry), so one that <em>denotes</em> a type obeys the same rule.
      */
     private Top resolveTemplateApplication(String name, ApplicationRef generic) {
-        ApplyBody target;
-        try {
-            target = application(generic);
-        } catch (UnsupportedOperationException e) {
-            throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
-        }
-        Optional<Top> constructed = construction(name, target);
+        Optional<DataValue> constructed = rewrite.body(generic);
         if (constructed.isPresent()) {
-            return constructed.get();
+            return resolveInstance(name, new Instance(constructed.get()), true);
         }
+        if (!ConstructionRewrite.namesOnly(generic)) {
+            // Which open record is applied, and to how many arguments, is judged before what the arguments are.
+            Top definition = namespaceDefinitions.definition(Ancestry.templateHead(generic.name(),
+                    namespaceDefinitions));
+            if (!OpenEntry.isOpen(definition)
+                    || OpenEntry.parameterNames(definition).size() != generic.args().size()) {
+                throw unclosed(name, generic.name(), generic.args().size());
+            }
+            throw ConstructionRewrite.argumentNotAName(generic);
+        }
+        ApplyBody target = ConstructionRewrite.names(generic);
         if (applicationCloser != null) {
             // This declaration owns the entry. A null answer means it cannot -- an unresolved head or an arity
             // mismatch -- and the reference form below is the fallback, for the ordinary path to report.
@@ -1464,16 +1511,15 @@ final class DefinitionResolver {
                 return owned;
             }
         }
-        throw unclosed(name, target);
+        throw unclosed(name, generic.name(), generic.args().size());
     }
 
     /**
-     * Why a declaration naming {@code application} could not be closed into it: its head names nothing, takes no
-     * arguments, or takes another number of them (§5.10). The application has no entry to be in that case, so the
-     * verdict is given here rather than left to a later phase.
+     * Why a declaration naming {@code head} applied to {@code supplied} arguments could not be closed into it: its head
+     * names nothing, takes no arguments, or takes another number of them (§5.10). The application has no entry to be
+     * in that case, so the verdict is given here rather than left to a later phase.
      */
-    private SchemaValidationException unclosed(String name, ApplyBody application) {
-        String head = application.head().name();
+    private SchemaValidationException unclosed(String name, String head, int supplied) {
         Top definition = namespaceDefinitions.definition(Ancestry.templateHead(head, namespaceDefinitions));
         if (definition == null) {
             return new SchemaValidationException("'" + name + "' has an unresolved reference '" + head + "'");
@@ -1484,33 +1530,8 @@ final class DefinitionResolver {
                     + "<...>' applies arguments to something that takes none (§5.10); drop the argument list");
         }
         return new SchemaValidationException("'" + head + "' takes " + parameters.size() + " type argument"
-                + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but " + application.arguments().size()
-                + " " + (application.arguments().size() == 1 ? "was" : "were") + " applied (§5.10)");
-    }
-
-    /**
-     * A declaration whose body applies a <b>constructor</b> -- {@code text_list => meta.array<text>} -- is the
-     * construction it denotes ({@link ConstructionSugar}), resolved exactly as {@code text_list => !meta.array {
-     * element_type: text }} is: its value states the constructor and the arguments, its tag is the head as written,
-     * and it records no application, since nothing was substituted. Empty where the head, past its alias hops, is
-     * no constructor, for the template path to take.
-     */
-    private Optional<Top> construction(String name, ApplyBody application) {
-        java.util.function.Function<String, Top> types = type -> {
-            Top found = vocabularyDefinitions.definition(type);
-            return found != null ? found : namespaceDefinitions.definition(type);
-        };
-        String head = application.head().name();
-        String constructor = AliasChain.terminal(head, types);
-        Top definition = types.apply(constructor);
-        if (!ConstructionSugar.constructs(constructor, definition)) {
-            return Optional.empty();
-        }
-        ConstructionSugar.StandIns standIns = ConstructionSugar.StandIns.of(application.arguments());
-        RecordValue payload = ConstructionSugar.payload(head, ConstructionSugar.slots((RecordBody) definition, types),
-                standIns.written());
-        return Optional.of(standIns.placed(resolveInstance(name, new Instance(
-                new DataValue(List.of(), Optional.of(head), payload)))));
+                + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but " + supplied
+                + " " + (supplied == 1 ? "was" : "were") + " applied (§5.10)");
     }
 
 
@@ -2162,13 +2183,11 @@ final class DefinitionResolver {
                     + application.name() + "<...>' needs a whole-schema materialiser, and this resolver was "
                     + "built without one");
         }
-        ApplyBody resolved;
-        try {
-            resolved = application(application);
-        } catch (UnsupportedOperationException e) {
-            throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
+        if (!ConstructionRewrite.namesOnly(application)) {
+            throw rewrite.constructor(application.name()).isPresent() ? ConstructionRewrite.nameRequired(application)
+                    : ConstructionRewrite.argumentNotAName(application);
         }
-        return applicationCloser.closeApplication(resolved);
+        return applicationCloser.closeApplication(ConstructionRewrite.names(application));
     }
 
     /**
@@ -2176,14 +2195,10 @@ final class DefinitionResolver {
      * application or a sugar form there is refused, to be declared under a name first.
      */
     private List<io.ltr8.tson.schema.meta.TypeRef> typeArguments(String name, ApplicationRef application) {
-        List<io.ltr8.tson.schema.meta.TypeRef> args = new ArrayList<>();
-        for (TypeExpr arg : application.args()) {
-            if (!(argument(arg) instanceof io.ltr8.tson.schema.meta.TypeRef named)) {
-                throw TemplateMaterialiser.argumentNotAName(argument(arg), application(application));
-            }
-            args.add(named);
+        if (!ConstructionRewrite.namesOnly(application)) {
+            throw ConstructionRewrite.argumentNotAName(application);
         }
-        return args;
+        return ConstructionRewrite.names(application).arguments();
     }
 
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────
@@ -2654,53 +2669,66 @@ final class DefinitionResolver {
     }
 
     /**
-     * A type-ref at a position that holds a name -- a parameter's written type, an argument -- as one of the two
-     * shapes that reach resolution there: a bare {@link NameRef}, or an {@link ApplicationRef}, a §5.10 application
-     * or a constructor's own generic vocabulary such as {@code set<T>}.
+     * A type-ref at a position that holds a name -- a parameter's written type -- which is a bare {@link NameRef}: an
+     * application there closes nowhere ([TSON-SCHEMA] §4.2), and is refused.
      *
      * <p><b>A sugar form or a construction in place is a broken invariant here</b>: {@link SchemaDesugarer} writes a
      * construction in place only at a field's type, and refuses one as an argument ({@link #unlifted}).
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeExpr ref) {
-        return switch (argument(ref)) {
-            case io.ltr8.tson.schema.meta.TypeRef named -> named;
-            case io.ltr8.tson.schema.meta.TypeInline applied -> throw TemplateMaterialiser.nameRequired(applied);
-        };
-    }
-
-    /**
-     * A type-ref at a slot that names a type or holds one written in place: a name, or an application, the
-     * construction {@link ApplyBody} written in place, its arguments each the same in turn. Resolution closes it where
-     * it can ({@code TemplateMaterialiser}).
-     */
-    private io.ltr8.tson.schema.meta.TypeExpr argument(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-            case ApplicationRef generic -> application(generic).inPlace();
+            case ApplicationRef generic -> throw ConstructionRewrite.nameRequired(generic);
             case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, RecordExpr _, InlineConstruction _ ->
                     throw unlifted("a type-ref position", ref);
         };
     }
 
-    /** {@code generic} as the application it writes: its head, and each argument as {@link #argument} reads it. */
-    private ApplyBody application(ApplicationRef generic) {
-        return new ApplyBody(io.ltr8.tson.schema.meta.TypeRef.of(generic.name()),
-                generic.args().stream().map(this::argument).toList());
-    }
-
     /**
-     * A field's or group member's type: a type-ref as {@link #resolveTypeRef} resolves one, or a construction
-     * written in place, {@code !meta.dependent { on: kind }} among them, read through its constructor's reader as a
-     * declaration's {@code !C { ... }} is ({@link #bindAtomInstance}) and held at the field
-     * ({@link io.ltr8.tson.schema.meta.TypeInline}). Reading it waits on its constructor, and on each type the read
-     * reaches, as reading any value does ([TSON-SCHEMA] §3.4.1).
+     * A field's or group member's type: a name, an application ({@link #applicationAt}), or a construction written in
+     * place, {@code !meta.dependent { on: kind }} among them, read through its constructor's reader as a declaration's
+     * {@code !C { ... }} is ({@link #bindAtomInstance}) and held at the field ({@link
+     * io.ltr8.tson.schema.meta.TypeInline}). Reading it waits on its constructor, and on each type the read reaches, as
+     * reading any value does ([TSON-SCHEMA] §3.4.1).
      */
     private io.ltr8.tson.schema.meta.TypeExpr resolveFieldType(String field, FieldTypeExpr ref) {
         return switch (ref) {
             case InlineConstruction inline -> inlineType(field, inline);
             case DependentType _ -> throw unlifted("field '" + field + "'", ref);
-            case TypeExpr type -> argument(type);
+            case ApplicationRef generic -> applicationAt(field, generic);
+            case TypeExpr type -> resolveTypeRef(type);
         };
+    }
+
+    /**
+     * An application at field {@code field}'s type: over a constructor, its construction written in place, read once
+     * through the constructor's reader ({@link ConstructionRewrite#atSlot}); over anything else the application written
+     * in place, its arguments names, for materialisation to close. Only a container, a tuple, a choice or a reference
+     * is constructed in place ({@link io.ltr8.tson.schema.meta.TypeInline#constructible}); any other construction is
+     * declared under a name.
+     */
+    private io.ltr8.tson.schema.meta.TypeExpr applicationAt(String field, ApplicationRef generic) {
+        Optional<DataValue> constructed = rewrite.atSlot(generic);
+        if (constructed.isEmpty()) {
+            return ConstructionRewrite.names(generic).inPlace();
+        }
+        String constructor = constructed.get().typeRef().orElseThrow();
+        String written = ConstructionRewrite.text(generic);
+        Top body;
+        try {
+            body = constructionReader.read(constructor, constructed.get());
+        } catch (ReadException e) {
+            throw payloadFailure("'" + written + "' constructs a body that", "'" + written + "' constructs '!"
+                    + constructor + " { ... }', which is not valid data for '" + constructor + "' -- "
+                    + e.getMessage(), e);
+        }
+        if (!(body instanceof Type type) || !io.ltr8.tson.schema.meta.TypeInline.constructible(type)) {
+            throw new SchemaValidationException("'" + written + "' constructs a " + (body instanceof Type ? "type"
+                    : "value") + " that is no container, tuple, choice or reference, and only those are written where "
+                    + "they are used (§5.2): declare it under a name ('my_" + generic.name().substring(
+                    generic.name().lastIndexOf('.') + 1) + " => " + written + "') and write that name");
+        }
+        return new io.ltr8.tson.schema.meta.TypeInline(constructor, type.withChain(TypeChain.EMPTY));
     }
 
     /**
@@ -2712,9 +2740,7 @@ final class DefinitionResolver {
         // The head is made ready first, as a declaration's `!C { ... }` makes its own (§3.4.1): reading a value
         // against a type waits on the type.
         String constructor = resolveConstructorTarget("field '" + field + "'", inline.constructor()).name();
-        Map<String, io.ltr8.tson.schema.meta.TypeInline> standIns = new LinkedHashMap<>();
-        Top body = ConstructionSugar.StandIns.of(standIns).placed(bindAtomInstance("field '" + field + "'",
-                standingIn(field, inline.value(), standIns)));
+        Top body = bindAtomInstance("field '" + field + "'", rewrite.inPlace(inline.value(), true));
         if (!(body instanceof io.ltr8.tson.schema.meta.Type type)
                 || !io.ltr8.tson.schema.meta.TypeInline.constructible(type)
                         && !(type instanceof io.ltr8.tson.schema.meta.DependentBody) && !(type instanceof RecordBody)) {
@@ -2724,52 +2750,6 @@ final class DefinitionResolver {
         }
         return new io.ltr8.tson.schema.meta.TypeInline(constructor,
                 ((Type) asWritten(type, inline.value())).withChain(io.ltr8.tson.schema.meta.TypeChain.EMPTY));
-    }
-
-    /**
-     * {@code written} with each argument written in place in an application it holds replaced by a stand-in name, the
-     * argument read and kept in {@code standIns}. The sugar writes an application at a slot in place, {@code [box<T>]},
-     * and a reference reads a name only, so an application nested as an argument, which a constructor's construction
-     * lands at its slot ({@code [meta.array<box<T>>]}), is read on its own and put back where the read placed it.
-     */
-    private DataValue standingIn(String field, DataValue written,
-                                 Map<String, io.ltr8.tson.schema.meta.TypeInline> standIns) {
-        boolean applies = written.typeRef().filter(KernelNames.of("apply")::equals).isPresent();
-        CoreValue core = switch (written.coreValue()) {
-            case RecordValue record -> new RecordValue(record.fields().stream().map(each -> new RecordValue.Field(
-                    each.name(), applies && "arguments".equals(each.name())
-                            && each.value().coreValue() instanceof ArrayValue arguments
-                            ? new DataValue(each.value().annotations(), each.value().typeRef(), new ArrayValue(
-                                    arguments.elements().stream().map(argument -> argumentStandingIn(field, argument,
-                                            standIns)).toList()))
-                            : standingIn(field, each.value(), standIns))).toList());
-            case ArrayValue array -> new ArrayValue(array.elements().stream()
-                    .map(element -> standingIn(field, element, standIns)).toList());
-            case MapValue map -> new MapValue(map.entries().stream().map(entry -> new MapValue.MapEntry(entry.key(),
-                    standingIn(field, entry.value(), standIns))).toList());
-            default -> written.coreValue();
-        };
-        // The same value where nothing stood in, so what is keyed on it -- a field written in place -- still finds it.
-        return core.equals(written.coreValue()) ? written : new DataValue(written.annotations(), written.typeRef(), core);
-    }
-
-    /** One argument of an application: a name as it is, and one written in place read and stood in for. */
-    private DataValue argumentStandingIn(String field, DataValue argument,
-                                         Map<String, io.ltr8.tson.schema.meta.TypeInline> standIns) {
-        if (!(argument.coreValue() instanceof RecordValue wrapper)) {
-            return argument;
-        }
-        Optional<DataValue> of = member(wrapper, WireForm.OF);
-        if (of.isEmpty()) {
-            return argument; // no wrapper: the reader refuses it in its own words
-        }
-        Map<String, io.ltr8.tson.schema.meta.TypeInline> inner = new LinkedHashMap<>();
-        Top read = ConstructionSugar.StandIns.of(inner).placed(bindAtomInstance("field '" + field + "'",
-                standingIn(field, of.get(), inner)));
-        String standIn = "in_place_" + java.util.UUID.randomUUID().toString().replace("-", "");
-        standIns.put(standIn, new io.ltr8.tson.schema.meta.TypeInline(((Type) read).withChain(
-                io.ltr8.tson.schema.meta.TypeChain.EMPTY)));
-        return new DataValue(List.of(), Optional.empty(), new TokenValue(standIn, TokenForm.UNQUOTED));
     }
 
     /**

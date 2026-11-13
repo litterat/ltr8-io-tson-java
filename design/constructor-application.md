@@ -30,9 +30,11 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
 - Construction transfers kind and no supertypes (§5.5), so an instance carries an empty chain and is not itself a
   constructor. Any schema may declare a constructor; nothing ties it to what the document imports.
 - `C<args>` over a constructor (a closed record IS-A `meta.type`) is the construction `!C { … }` over its argument
-  slots (§5.3, `ConstructionSugar`), and resolves through the very path the braced form takes: a declaration through
-  `resolveInstance`, a use site through the constructor's reader into a type written in place. No verdict is the
-  sugar's own but the argument count and an argument that is no reference.
+  slots (§5.3, `ConstructionSugar`), **rewritten on the written form before anything reads it** (`ConstructionRewrite`),
+  innermost first: `meta.map<text meta.array<box<T>>>` is `!meta.map { key_type: text  value_type: { of: !meta.array {
+  element_type: { of: !meta.apply { head: box  arguments: [T] } } } } }`, every argument then kernel data, read once. No
+  verdict is the sugar's own but the argument count, an argument written in place at a slot that holds only a name,
+  and a namespace type in place.
 
 Related: `design/schema-resolution.md` (the resolution phase around this), `design/atom-refinement-and-coherence.md`
 (`!I ^ { ... }`), `design/template-materialisation.md` and `design/open-records.md` (how `C<...>` closes),
@@ -128,16 +130,28 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   constructs `!meta.set_type { element_type: text }` through it, and `meta.ref<method>` is `!meta.ref { of: method }`.
   A refined constructor's construction is an instance of the refinement, a subtype constructor, so a question about
   what a body is goes by the constructor's chain (`meta.set_type` IS-A `meta.array`).
-- **A declaration is the construction** (`DefinitionResolver.construction`): the payload is built and handed to
-  `resolveInstance` as `!C { … }`, so `text_list => meta.array<text>` gets every check and fact the braced form does,
-  its tag the head as written, and records no application. **A use site writes the construction in place**
-  (`TemplateMaterialiser.construction`): the payload is read by the terminal constructor's reader, each application
-  among its arguments then closed where it landed, and the slot holds a `TypeInline` under that constructor, past its
-  alias hops, so `meta.array<text>` is the construction `[text]` is and an application through an alias of the
-  constructor the same one. Arguments are written as the author wrote them, not dereferenced, as the sugar forms
-  write theirs. A use site is never looked up to a declaration of the same construction (§8.2).
+- **Where an application is first met, it is rewritten.** A declaration's body (`x => meta.array<text>`) becomes
+  `!C { … }` tagged by the head as written and goes through `resolveInstance`, so it gets every check and fact the
+  braced form does and records no application. A field's or group member's type (`f: meta.array<text>`) becomes the
+  construction tagged by the constructor past its alias hops, read by that constructor's reader and held as a
+  `TypeInline` under it. A payload -- a construction in place the desugarer wrote, a declaration's sugar body
+  (`x => [meta.array<box<text>>]`), an author's `!C { … }` or `<T> !meta.record { … }` -- is rewritten at every
+  `meta.apply` in it, then read once. Arguments are written as the author wrote them, not dereferenced. A use site is
+  never looked up to a declaration of the same construction (§8.2).
+- **Who wrote an application decides how much is rewritten.** One desugaring wrote from `head<args>` is sugar: a
+  constructor's is constructed whatever its arguments, and any other's argument that is no name is refused (§5.3).
+  The desugarer marks the bodies it writes for declarations (`SchemaPositions.desugared`); everything at a field is
+  its own. An author's explicit `{ of: !meta.apply { … } }` means the same where its arguments are names (§5.10) and
+  is rewritten then; one whose arguments hold a type in place is left for the kernel's reader to refuse. Rewriting
+  every payload's applications alike would accept that explicit form, which the kernel's `meta.apply` refuses.
+- **Asking whether a head constructs never waits on an open record** (`DefinitionGetter.opens`, answered by
+  `WaitOrder` from parameter lists and alias targets as written): an application of one orders nothing (§3.4.1), so
+  `chain => <T> { next?: chain<T> }` and mutual recursion are no wait cycles. Any other head is made ready before it
+  is asked, as reading a construction against it would make it.
+- **`meta.apply` is never a declaration's body** (`refuseDeclaredApplication`, §5.10): `x => !meta.apply { … }` is
+  refused where it resolves, whatever the head, naming `x => H<args>`.
 - **The sugar decides where an argument lands and nothing else.** The arity (`requireArity`, also the linker's
-  `checkArity` over a held reference such as `set<T>` in an open record) is refused here; a literal
+  `checkArity` over a held reference) is refused here; a literal
   argument (`meta.array<3>`) never arrives, the grammar refusing it where it is written (§5.10); an argument a slot's
   `of` refuses is refused at link as the braced form's is; a required field no
   slot fills leaves the construction incomplete and the constructor's reader refuses it. A refined constructor's

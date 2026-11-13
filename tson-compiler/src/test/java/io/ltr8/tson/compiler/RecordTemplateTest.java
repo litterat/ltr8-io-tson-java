@@ -488,12 +488,10 @@ class RecordTemplateTest {
     }
 
     /**
-     * <b>Non-regular recursion never reaches materialisation.</b> {@code weird<text>} would close to
-     * {@code weird<box<text>>}, then {@code weird<box<box<text>>>}, … -- the argument grows every level, so
-     * every instantiation is distinct and the knot-tying memo never fires. {@code TemplateRegularity}
-     * rejects the declaration before any of that, so this is the author's error rather than a library gap,
-     * and it does not depend on anyone applying the template. The full rule is exercised by
-     * {@code TemplateRegularityTest}; this pins the contrast with the regular case below.
+     * <b>Non-regular recursion never reaches materialisation.</b> {@code weird<box<T>>} would grow its argument every
+     * level, and an argument of an open record's application is a name or a parameter (§5.3), so the declaration is
+     * refused where its field resolves, whether or not anyone applies it. This pins the contrast with the regular case
+     * below.
      */
     @Test
     void nonRegularRecursionIsRejectedBeforeAnythingCloses() {
@@ -503,7 +501,8 @@ class RecordTemplateTest {
                           weird => <T> { next?: weird<box<T>>? }
                           use   => { w: weird<text> }"""));
 
-        assertTrue(thrown.getMessage().contains("does not pass 'T' through unchanged"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'box<T>' is passed as an argument of 'weird<box<T>>'"),
+                thrown.getMessage());
     }
 
     /** Regular recursion, by contrast, closes into its declaration -- the contrast is the point of the rule. */

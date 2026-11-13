@@ -133,7 +133,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      */
     public SchemaPositions schemaPositions() {
         return new SchemaPositions(new IdentityHashMap<>(declarationPositions), new IdentityHashMap<>(fieldPositions),
-                new IdentityHashMap<>());
+                new IdentityHashMap<>(), SchemaPositions.identitySet(java.util.Set.of()));
     }
 
     /** Parses fail-fast: the first syntax error anywhere in the document leaves as a {@link ParseException}. */

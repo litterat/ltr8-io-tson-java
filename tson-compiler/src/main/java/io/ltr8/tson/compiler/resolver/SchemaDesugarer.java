@@ -334,7 +334,9 @@ final class SchemaDesugarer {
                 // declaration-level tier.
                 Optional<Binding> binding = binding(reference.ref());
                 if (binding.isPresent()) {
-                    yield instance(binding.get());
+                    DataValue body = construction(binding.get());
+                    positions.desugared().add(body);
+                    yield new Instance(body);
                 }
                 TypeExpr ref = argumentsOnly(reference.ref());
                 yield ref == reference.ref() ? reference : new TypeExprDef(reference.typeParams(), ref);
@@ -648,7 +650,7 @@ final class SchemaDesugarer {
      * {@code generic} as the construction it is, {@code !meta.apply { head: H  arguments: [...] }}: a reference holds a
      * name, so an application at a slot is written in place ([TSON-SCHEMA] §5.10), each argument a slot value in turn.
      */
-    private static DataValue application(ApplicationRef generic) {
+    static DataValue application(ApplicationRef generic) {
         List<DataValue> arguments = new ArrayList<>();
         for (TypeExpr argument : generic.args()) {
             arguments.add(WireForm.plain(slotValue(argument)));
@@ -927,11 +929,6 @@ final class SchemaDesugarer {
      */
     private static DataValue construction(Binding binding) {
         return new DataValue(List.of(), Optional.of(binding.head()), new RecordValue(binding.fields()));
-    }
-
-    /** A declaration whose body is a sugar form is the construction it denotes (§5.3). */
-    private static TypeDef instance(Binding binding) {
-        return new Instance(construction(binding));
     }
 
     /**

@@ -49,23 +49,41 @@ class TemplateRegularityTest {
         return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
     }
 
-    /** The whole point: rejected at the declaration, with nothing applying it. */
+    /**
+     * A growing argument is unwritable: an argument of an open record's application is a name or a parameter (§5.3),
+     * refused at the declaration, with nothing applying it, before regularity is asked.
+     */
     @Test
-    void aGrowingArgumentIsRejectedEvenWhenTheTemplateIsNeverApplied() {
+    void aGrowingArgumentIsRefusedAsNoNameEvenWhenTheTemplateIsNeverApplied() {
         String message = rejected("  weird => <T> { next: weird<box<T>>? }");
 
-        assertTrue(message.contains("'weird' applies 'weird' recursively"), message);
-        assertTrue(message.contains("does not pass 'T' through unchanged"), message);
-        assertTrue(message.contains("the application 'box<...>'"), "names what argument 1 actually is: " + message);
+        assertTrue(message.contains("'box<T>' is passed as an argument of 'weird<box<T>>'"), message);
+        assertTrue(message.contains("is a name or a parameter (§5.3)"), message);
     }
 
-    /** A growing argument held in a constructor's application is checked as any argument is. */
+    /** A growing argument held in a constructor's application is refused as any argument is. */
     @Test
-    void aGrowingArgumentInsideAConstructionIsRejected() {
+    void aGrowingArgumentInsideAConstructionIsRefusedAsNoName() {
         String message = rejected(
                 "  weird => <T> { m: meta.namespace<meta.identifier weird<box<T>>>  t: T }");
 
-        assertTrue(message.contains("'weird' applies 'weird' recursively"), message);
+        assertTrue(message.contains("'box<T>' is passed as an argument of 'weird<box<T>>'"), message);
+    }
+
+    /** A recursive application passing a name where its parameter stands is irregular, at the declaration. */
+    @Test
+    void aNameForTheParameterIsIrregular() {
+        String message = rejected("  c => <T> { v: T  next?: c<text> }");
+
+        assertTrue(message.contains("'c' applies 'c' recursively but does not pass 'T' through unchanged"), message);
+        assertTrue(message.contains("argument 1 is 'text'"), message);
+    }
+
+    /** A recursive application duplicating a parameter is irregular, though its applications are finitely many. */
+    @Test
+    void duplicatingAParameterIsIrregular() {
+        assertTrue(rejected("  dup => <A, B> { a: A  b: B  x?: dup<A, A> }")
+                .contains("'dup' applies 'dup' recursively but does not pass 'B' through unchanged"));
     }
 
     @Test
@@ -73,11 +91,11 @@ class TemplateRegularityTest {
         assertNotNull(compile("  chain => <T> { head: T  tail: chain<T>? }"));
     }
 
-    /** A recursive application nested inside another application's arguments is checked too. */
+    /** An application nested inside another's arguments is no name, the innermost refused first (§5.3). */
     @Test
-    void aGrowingArgumentNestedInsideAnotherApplicationIsCaught() {
-        assertTrue(rejected("  deep => <T> { x: box<deep<box<T>>>? }")
-                .contains("'deep' applies 'deep' recursively"));
+    void aGrowingArgumentNestedInsideAnotherApplicationIsRefusedAsNoName() {
+        String message = rejected("  deep => <T> { x: box<deep<box<T>>>? }");
+        assertTrue(message.contains("'box<T>' is passed as an argument of 'deep<box<T>>'"), message);
     }
 
     /** Mutual recursion needs reachability, not a self-edge: neither template applies itself. */
@@ -88,9 +106,9 @@ class TemplateRegularityTest {
                   mb => <U> { a?: ma<U>? }"""), "regular across the cycle");
 
         String message = rejected("""
-                  na => <T> { b?: nb<box<T>>? }
-                  nb => <U> { a?: na<U>? }""");
-        assertTrue(message.contains("'na' applies 'nb' recursively"), message);
+                  na => <T> { b?: nb<T>? }
+                  nb => <U> { a?: na<text>? }""");
+        assertTrue(message.contains("'nb' applies 'na' recursively"), message);
     }
 
     /**

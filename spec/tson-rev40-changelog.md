@@ -698,6 +698,10 @@ after.
      family's selectors whose pins no ready member states waits on each declaration not yet
      ready that may be that member, judged from what it writes: its written operands reach the
      family's base, and the nearest pin written along them does not differ from the value's.
+103. **§5.10** — "Application" said `meta.apply` is written in place and closes there, and was
+     silent on one written as a declaration's body. It gains: `x => !meta.apply { … }` is a
+     resolver error, a declared application being written `x => H<args>`, whose resolved value
+     is the record it closes to (§8.2).
 
 ### 3.3 Companion artifacts
 
