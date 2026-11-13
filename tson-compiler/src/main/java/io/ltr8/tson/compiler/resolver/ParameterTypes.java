@@ -53,9 +53,9 @@ import java.util.function.Function;
  * argument to a bounded parameter of another template must itself be written with a bound that IS-A that one, so
  * {@code rebox => <T> { b: boxed<T> }} over {@code boxed => <T: text> { v: T }} is refused at {@code rebox}. Each
  * declaration is checked once, against the bounds its callees wrote, so no order among templates is needed. A
- * constructor's slot judges the argument that arrives when the record is applied, so a parameter passed to one
- * ({@code meta.map<K text>}, {@code [T]}) needs no bound, the applications nested in its arguments or held at its
- * other slots ({@code [boxed<T>]}) being judged in turn.
+ * constructor's slot judges the argument that arrives when the record is applied, so a parameter at one ({@code
+ * meta.map<K text>}, {@code [T]}) needs no bound, an application held at its other slots ({@code [boxed<T>]}) being
+ * judged in turn.
  */
 final class ParameterTypes {
 
@@ -175,51 +175,18 @@ final class ParameterTypes {
         /**
          * Each argument of {@code application} that is one of the declaration's parameters ({@code parameterOf}
          * maps a name to it, or to {@code null}), against the head's parameter at that position. A head that is no
-         * open record -- a constructor's construction sugar -- has no parameters to bound. An application nested in
-         * the arguments is one of the declaration's own, judged in its turn.
+         * open record has no parameters to bound.
          */
         void passedOn(ApplyBody application, Function<String, Param> parameterOf) {
             String name = application.head().name();
             Top head = entries.get(name);
             List<Param> heads = OpenEntry.isOpen(head) && !refused.contains(name)
                     ? OpenEntry.parameters(head) : List.of();
-            requireNames(application);
             for (int i = 0; i < application.arguments().size() && i < heads.size(); i++) {
-                Param mine = application.arguments().get(i) instanceof TypeRef argument
-                        ? parameterOf.apply(argument.name()) : null;
+                Param mine = parameterOf.apply(application.arguments().get(i).name());
                 if (mine != null) {
                     Param theirs = heads.get(i);
                     theirs.bound().ifPresent(bound -> requireBound(mine, name, theirs.name(), bound));
-                }
-            }
-        }
-
-        /**
-         * Refuses an argument of {@code application} that must be a name and is an application ([TSON-SCHEMA] §4.2,
-         * §5.3): any argument of an open record's application, and one of a constructor's that lands at a slot
-         * holding only a name ({@code meta.ref<box<T>>}). An argument at a constructor's type slot is written in place
-         * there ({@code meta.array<box<T>>}).
-         */
-        private void requireNames(ApplyBody application) {
-            Function<String, Top> lookup = name -> lookup(name, true, entries::get, meta);
-            String terminal = AliasChain.terminal(application.head().name(), lookup);
-            Top head = lookup.apply(terminal);
-            boolean constructs = !OpenEntry.isOpen(head) && ConstructionSugar.constructs(terminal, head);
-            if (constructs) {
-                ConstructionSugar.refuseNamespaceInPlace(application, terminal, head, lookup);
-            }
-            List<Boolean> inPlace = OpenEntry.isOpen(head) ? null
-                    : constructs ? ConstructionSugar.slotsInPlace((RecordBody) head, lookup) : List.of();
-            for (int i = 0; i < application.arguments().size(); i++) {
-                TypeExpr argument = application.arguments().get(i);
-                if (argument instanceof TypeRef) {
-                    continue;
-                }
-                if (inPlace == null) {
-                    throw TemplateMaterialiser.argumentNotAName(argument, application);
-                }
-                if (i < inPlace.size() && !inPlace.get(i)) {
-                    throw TemplateMaterialiser.nameRequired(argument);
                 }
             }
         }

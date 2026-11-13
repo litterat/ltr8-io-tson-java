@@ -8,7 +8,6 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
-import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeSlots;
 
 import java.util.ArrayDeque;
@@ -153,7 +152,7 @@ final class HeldRecursion {
     private static SchemaValidationException refused(String name, List<String> parameters, Held held) {
         String parameter = fresh(parameters);
         boolean closed = held.written().arguments().stream()
-                .noneMatch(argument -> argument instanceof TypeRef named && parameters.contains(named.name()));
+                .noneMatch(argument -> parameters.contains(argument.name()));
         String declared = closed
                 ? TemplateMaterialiser.suggestedName(held.written()) + " => " + held.written().text()
                 : "my_" + held.written().head().segments().getLast() + " => " + held.written().head().name() + "<"

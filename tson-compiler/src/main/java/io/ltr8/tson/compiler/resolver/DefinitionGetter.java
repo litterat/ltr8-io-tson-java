@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Top;
 
 /**
@@ -23,4 +24,13 @@ import io.ltr8.tson.schema.meta.Top;
 interface DefinitionGetter {
 
     Top definition(String name);
+
+    /**
+     * Whether {@code name}, past its alias hops, is an open record. An application of one orders nothing (a name at a
+     * type position, [TSON-SCHEMA] §3.4.1), so an implementation that makes entries ready answers without waiting on
+     * the declaration.
+     */
+    default boolean opens(String name) {
+        return OpenEntry.isOpen(definition(AliasChain.terminal(name, this::definition)));
+    }
 }

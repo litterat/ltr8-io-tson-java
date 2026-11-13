@@ -260,11 +260,17 @@ class TypeInPlaceSubstitutionTest {
         assertTrue(refusal.message().contains(fragment), refusal.message());
     }
 
-    /** A recursion growing its argument is irregular wherever it is held, inside a type in place included. */
+    /**
+     * A recursion growing its argument passes an application as an argument, which is no name (§5.3), wherever it is
+     * held; one passing a name for its parameter is irregular wherever it is held, inside a type in place included.
+     */
     @Test
     void anIrregularRecursionInsideATypeInPlaceIsRefused() {
-        refused("  weird => <T> { next?: [weird<box<T>>] }", "does not pass 'T' through unchanged");
-        refused("  weird => <T> { m: { next?: weird<box<T>> } }", "does not pass 'T' through unchanged");
+        refused("  weird => <T> { next?: [weird<box<T>>] }", "'box<T>' is passed as an argument of 'weird<box<T>>'");
+        refused("  weird => <T> { m: { next?: weird<box<T>> } }",
+                "'box<T>' is passed as an argument of 'weird<box<T>>'");
+        refused("  weird => <T> { v: T  next?: [weird<text>] }", "does not pass 'T' through unchanged");
+        refused("  weird => <T> { v: T  m: { next?: weird<text> } }", "does not pass 'T' through unchanged");
     }
 
     /** A recursive open record held in place with no declaration to tie to is refused where the slot closes it. */

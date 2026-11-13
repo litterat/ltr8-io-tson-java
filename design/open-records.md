@@ -40,8 +40,8 @@ application of one closes is `design/template-materialisation.md`'s. Current for
   holds, a type or a value entry, its own or an import's, is refused at the declaration. With every argument a
   reference, a name an absorbed field's type writes is an entry, so this one rule covers absorbed fields too.
 - **An application where a type in place holds only a name is refused at the declaration**: `{box<T> => text}` by the
-  desugarer (a map's key holds a name), and `meta.map<box<T> text>` by `ParameterTypes`' `requireNames`, rather than
-  only at each application.
+  desugarer (a map's key holds a name), and `meta.map<box<T> text>` where the application is rewritten to its
+  construction (`ConstructionRewrite`), rather than only at each application.
 - **An open record's application over a parameter is `meta.apply` written in place** (`ApplyBody`), at any slot of a
   field's type and among `chain.parents`; its arguments are scoped like any reference, and substitution replaces them.
   The linker holds an open record to where one may stand (`TsonSchemaLinker.requireOpen`): over one of its parameters,

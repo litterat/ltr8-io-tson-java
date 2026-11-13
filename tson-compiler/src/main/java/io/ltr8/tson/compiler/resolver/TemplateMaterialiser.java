@@ -2,9 +2,6 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -14,16 +11,13 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.ParamRef;
-import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeSlots;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -41,13 +35,12 @@ import java.util.function.Supplier;
  * application reaches here as an {@code ApplyBody} written in place, so closing is a walk over {@code schema.meta}
  * values ({@link TypeSlots}).
  *
- * <p><b>Two operations share the spelling</b> ([TSON-SCHEMA] §5.10, §5.3). Over a constructor, {@code
- * meta.array<text>} constructs: the binding record {@code [text]} writes, built by the constructor's own reader
- * ({@link #construction}), and held in place at the slot that wrote it, {@code { of: !meta.array { element_type:
- * text } }} ({@link TypeInline}). Over an open record, {@code page<order>} substitutes: the record's parameters are
- * replaced by the arguments on the model and each application at a slot of a field's type closed in turn ({@link
- * #closeOpenRecord}). An application held inside an open record, {@code box<T>} at a field or in {@code [box<T>]},
- * closes the same way once the record holding it is applied and its parameter substituted.
+ * <p><b>Every application here applies an open record</b> ([TSON-SCHEMA] §5.10, §5.3), or a head nothing names: a
+ * constructor's application is its construction before anything reads it ({@link ConstructionRewrite}), so {@code
+ * meta.array<text>} arrives as the construction {@code [text]} is. {@code page<order>} substitutes: the record's
+ * parameters are replaced by the arguments on the model and each application at a slot of a field's type closed in
+ * turn ({@link #closeOpenRecord}). An application held inside an open record, {@code box<T>} at a field or in {@code
+ * [box<T>]}, closes the same way once the record holding it is applied and its parameter substituted.
  *
  * <p><b>Nothing is minted.</b> A declaration naming an application of an open record, {@code page_order =>
  * page<order>}, is the record under that name with the application recorded ({@link #closeApplicationInto}, {@code
@@ -60,11 +53,9 @@ import java.util.function.Supplier;
  * declared type ({@code k: dog_of<text>} over {@code dog_of => <T> pet & { … }}, §5.2), and a recursive one with no
  * declaration closing it ({@code f: node<text>}, §5.10.1).
  *
- * <p><b>Where a name is required</b> -- an argument of an open record's application, a map's key, a reference's {@code
- * of}, an alias's target -- an application closes nowhere: a construction and an application of an open record are
- * each refused there, and declared under a name first ([TSON-SCHEMA] §4.2, §5.3). An argument of a constructor's
- * application lands at a type slot of the construction, so a construction there is written in place in turn: {@code
- * meta.map<text meta.array<text>>} closes to a map whose value is the array in place.
+ * <p><b>Where a name is required</b> -- an argument of an application, a map's key, a reference's {@code of}, an alias's
+ * target, a refinement source -- an application closes nowhere: a construction and an application of an open record
+ * are each refused there, and declared under a name first ([TSON-SCHEMA] §4.2, §5.3).
  */
 final class TemplateMaterialiser {
 
@@ -108,18 +99,10 @@ final class TemplateMaterialiser {
     private final Map<ApplyBody, ApplyBody> closingInPlace = new LinkedHashMap<>();
 
     /**
-     * The application each declaration naming one closes into it, as written, its nested arguments unreduced: what
-     * {@code @meta.application} states on the entry's key, so a reader and a message see the reference the author
-     * wrote.
+     * The application each declaration naming one closes into it, as written: what {@code @meta.application} states on
+     * the entry's key, so a reader and a message see the reference the author wrote.
      */
     private final Map<String, ApplyBody> writtenApplications = new LinkedHashMap<>();
-
-    /**
-     * How a construction becomes an ordinary constructor body -- the constructor's own compiled reader, the same one
-     * a written {@code !meta.array { ... }} binds through. Using it is what makes an argument the slot refuses an
-     * ordinary read error rather than a check this class would have to grow.
-     */
-    private final ConstructionReader constructionReader;
 
     /** Which open records are refused at their own declaration for a recursion they hold (§5.10.1). */
     private final HeldRecursion heldRecursion;
@@ -157,8 +140,7 @@ final class TemplateMaterialiser {
                                       ApplyBody written) {
     }
 
-    TemplateMaterialiser(DefinitionGetter namespace, ConstructionReader constructionReader,
-                         Function<String, Top> importedTypes, Supplier<String> resolving,
+    TemplateMaterialiser(DefinitionGetter namespace, Function<String, Top> importedTypes, Supplier<String> resolving,
                          Map<String, TsonSchema.EntryFacts> facts, Map<String, ApplyBody> applications,
                          Predicate<String> kernel, HeldRecursion heldRecursion) {
         this.heldRecursion = Objects.requireNonNull(heldRecursion, "heldRecursion");
@@ -166,7 +148,6 @@ final class TemplateMaterialiser {
         this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.facts = Objects.requireNonNull(facts, "facts");
         this.applications = Objects.requireNonNull(applications, "applications");
-        this.constructionReader = Objects.requireNonNull(constructionReader, "constructionReader");
         this.importedTypes = Objects.requireNonNull(importedTypes, "importedTypes");
         this.resolving = Objects.requireNonNull(resolving, "resolving");
     }
@@ -203,9 +184,8 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * Closes every application reachable from {@code entries}, rewritten in place: a constructor's to the
-     * construction at the slot that wrote it, and one this pass cannot close reported against the entry that wrote
-     * it, which is left as it was.
+     * Closes every application reachable from {@code entries}, rewritten in place, and reports one this pass cannot
+     * close against the entry that wrote it, which is left as it was.
      */
     void materialise(Map<String, Top> entries, MaterialisationFailureReporter reporter) {
         TypeSlots.Rewrite rewrite = slotRewrite();
@@ -229,53 +209,30 @@ final class TemplateMaterialiser {
     /**
      * What {@link #materialise} applies inside an open record. An application naming none of its parameters means the
      * same thing in every application, so it is closed now and every application holds the one type, which is what
-     * {@code FamilySelectors} reads a selector's type from. A constructor's application over a parameter is its
-     * construction in place, the parameter at its slot ([TSON-SCHEMA] §5.10), so {@code meta.array<T>} and {@code [T]}
-     * are one resolved form. An open record's application over a parameter stays the application written in place,
-     * which substitution closes.
+     * {@code FamilySelectors} reads a selector's type from. One over a parameter stays the application written in
+     * place, which substitution closes.
      */
     private TypeSlots.Rewrite openRewrite() {
-        return new Closing() {
-            @Override
-            TypeExpr close(ApplyBody application, ApplyBody written) {
-                if (OpenEntry.parameterIn(application.inPlace()).isEmpty()) {
-                    return TemplateMaterialiser.this.close(application, written, slotRewrite());
-                }
-                return constructs(application) ? construction(application, written, this).orElseThrow()
-                        : application.inPlace();
-            }
-        };
+        return (Closing) application -> OpenEntry.parameterIn(application.inPlace()).isEmpty()
+                ? closeApplicationOfRecord(application) : application.inPlace();
     }
 
-    /**
-     * A walk that closes each application written in place where it stands, its arguments closed first. It keeps
-     * each application as written while its arguments close, so a refusal names the argument the author wrote
-     * ({@code meta.array<text>}) and not what it closed to.
-     */
-    private abstract static class Closing implements TypeSlots.Rewrite {
-
-        private final Deque<ApplyBody> written = new ArrayDeque<>();
+    /** A walk that closes each application written in place where it stands. */
+    @FunctionalInterface
+    private interface Closing extends TypeSlots.Rewrite {
 
         @Override
-        public TypeRef atName(TypeRef reference) {
+        default TypeRef atName(TypeRef reference) {
             return reference;
         }
 
         @Override
-        public Type inPlace(Type body) {
-            if (body instanceof ApplyBody application) {
-                written.push(application);
-            }
-            return body;
+        default TypeExpr atInPlace(TypeInline inline) {
+            return inline.of() instanceof ApplyBody application ? close(application) : inline;
         }
 
-        @Override
-        public TypeExpr atInPlace(TypeInline inline) {
-            return inline.of() instanceof ApplyBody application ? close(application, written.pop()) : inline;
-        }
-
-        /** What {@code application}, its arguments closed, closes to; {@code written} is it as written. */
-        abstract TypeExpr close(ApplyBody application, ApplyBody written);
+        /** What {@code application} closes to. */
+        TypeExpr close(ApplyBody application);
     }
 
     /** Where an application this pass cannot close is reported, entry by entry. */
@@ -293,9 +250,9 @@ final class TemplateMaterialiser {
      */
     String closeApplication(ApplyBody application) {
         if (constructs(application)) {
-            throw nameRequired(application.inPlace());
+            throw nameRequired(application.text(), suggestedName(application));
         }
-        return switch (closeApplicationOfRecord(application, application)) {
+        return switch (closeApplicationOfRecord(application)) {
             case TypeRef named -> named.name();
             case TypeInline inline when inline.of() instanceof ApplyBody -> application.head().name();
             case TypeInline inline -> throw new IllegalStateException("'" + application.text() + "' closed in place "
@@ -322,7 +279,7 @@ final class TemplateMaterialiser {
         // §8.2 keys an instantiation on the *canonical* application -- "arguments compared after following
         // alias chains" -- so an argument naming a pure rename is replaced by the entry at the end of it
         // before anything is derived from the list.
-        List<TypeRef> arguments = arguments(application, application);
+        List<TypeRef> arguments = arguments(application);
         checkArguments(head, template, arguments);
         ApplyBody canonical = CanonicalApplication.of(head, arguments);
         if (closingInto.putIfAbsent(canonical, declaredName) != null) {
@@ -338,29 +295,12 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * What an application written at a type slot closes to: the construction written in place where it applies a
-     * constructor, and otherwise an application of an open record, closed in place or into the declaration closing
-     * it ({@link #instantiate}). {@code nested} closes what the construction's own slots hold.
+     * The arguments of an open record's {@code application} past their alias hops. A name naming a template is
+     * refused, as no position names one bare.
      */
-    private TypeExpr close(ApplyBody application, ApplyBody written, TypeSlots.Rewrite nested) {
-        Optional<TypeInline> constructed = construction(application, written, nested);
-        if (constructed.isPresent()) {
-            return constructed.get();
-        }
-        return closeApplicationOfRecord(application, written);
-    }
-
-    /**
-     * The arguments of an open record's {@code application}, each a name or a parameter ([TSON-SCHEMA] §5.3) past its
-     * alias hops. A type written in place there is refused, to be declared under a name first, and so is a name
-     * naming a template, which no position names bare.
-     */
-    private List<TypeRef> arguments(ApplyBody application, ApplyBody written) {
+    private List<TypeRef> arguments(ApplyBody application) {
         List<TypeRef> arguments = new ArrayList<>();
-        for (int i = 0; i < application.arguments().size(); i++) {
-            if (!(application.arguments().get(i) instanceof TypeRef name)) {
-                throw argumentNotAName(written.arguments().get(i), written);
-            }
+        for (TypeRef name : application.arguments()) {
             if (appliesAnOpenRecord(name.name())) {
                 // A template is no type, and no position names one bare, an argument included (§5.10).
                 throw new SchemaValidationException("'" + name.name() + "', passed as an argument of '"
@@ -378,26 +318,26 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * The refusal of an application where only a name may stand -- a map's key, a reference's {@code of}, a
-     * parameter's bound, an alias's target, a refinement source ([TSON-SCHEMA] §4.2) -- naming the declaration to
-     * write instead.
+     * The refusal of an application, spelled {@code written}, where only a name may stand -- a map's key, a
+     * reference's {@code of}, a parameter's bound, an alias's target, a refinement source ([TSON-SCHEMA] §4.2) --
+     * naming the declaration to write instead, {@code suggested => written}.
      */
-    static SchemaValidationException nameRequired(TypeExpr written) {
-        return new SchemaValidationException("'" + written.text() + "' is an application, and it stands where only a "
+    static SchemaValidationException nameRequired(String written, String suggested) {
+        return new SchemaValidationException("'" + written + "' is an application, and it stands where only a "
                 + "name may stand -- a map's key, a reference's 'of', a parameter's bound or an alias's target -- where "
-                + "an application closes nowhere (§4.2): declare it ('" + suggestedName(written) + " => "
-                + written.text() + "') and write that name");
+                + "an application closes nowhere (§4.2): declare it ('" + suggested + " => " + written
+                + "') and write that name");
     }
 
     /**
-     * The refusal of an application or a construction passed as an argument of an open record's {@code application}
-     * ([TSON-SCHEMA] §5.3), naming the declaration to write instead.
+     * The refusal of an application or a construction, spelled {@code argument}, passed as an argument of {@code
+     * application} over an open record ([TSON-SCHEMA] §5.3), naming the declaration to write instead, {@code suggested
+     * => argument}.
      */
-    static SchemaValidationException argumentNotAName(TypeExpr argument, ApplyBody application) {
-        return new SchemaValidationException("'" + argument.text() + "' is passed as an argument of '"
-                + application.text() + "', and an argument of an open record's application is a name or a parameter "
-                + "(§5.3): declare it ('" + suggestedName(argument) + " => " + argument.text()
-                + "') and pass that name");
+    static SchemaValidationException argumentNotAName(String argument, String suggested, String application) {
+        return new SchemaValidationException("'" + argument + "' is passed as an argument of '" + application
+                + "', and an argument of an open record's application is a name or a parameter (§5.3): declare it ('"
+                + suggested + " => " + argument + "') and pass that name");
     }
 
     /**
@@ -406,32 +346,19 @@ final class TemplateMaterialiser {
      */
     static String suggestedName(ApplyBody application) {
         StringBuilder name = new StringBuilder(application.head().segments().getLast());
-        for (TypeExpr argument : application.arguments()) {
-            name.append('_').append(argument instanceof TypeRef named ? named.segments().getLast() : "my");
+        for (TypeRef argument : application.arguments()) {
+            name.append('_').append(argument.segments().getLast());
         }
         return name.toString();
-    }
-
-    /** {@link #suggestedName(ApplyBody)} where {@code written} is an application, and a stand-in otherwise. */
-    static String suggestedName(TypeExpr written) {
-        if (written instanceof TypeInline inline) {
-            if (inline.of() instanceof ApplyBody application) {
-                return suggestedName(application);
-            }
-            if (inline.closes().isPresent()) {
-                return suggestedName(inline.closes().get());
-            }
-        }
-        return "my_type";
     }
 
     /**
      * An application of an open record at a slot, which stays written in place where its head names nothing this pass
      * can close: the list is the evidence the author supplied arguments, and the linker reports on what it is handed.
      */
-    private TypeExpr closeApplicationOfRecord(ApplyBody application, ApplyBody written) {
-        List<TypeRef> arguments = arguments(application, written);
-        TypeExpr closed = instantiate(templateHead(application.head().name()), arguments, written);
+    private TypeExpr closeApplicationOfRecord(ApplyBody application) {
+        List<TypeRef> arguments = arguments(application);
+        TypeExpr closed = instantiate(templateHead(application.head().name()), arguments, application);
         return closed == null ? application.withArguments(arguments).inPlace() : closed;
     }
 
@@ -441,58 +368,9 @@ final class TemplateMaterialiser {
         return ConstructionSugar.constructs(constructor, lookup(constructor));
     }
 
-    /**
-     * The construction an application over a <b>constructor</b> denotes, written in place, or empty where the head,
-     * past its alias hops, is no constructor ({@link ConstructionSugar}). {@code meta.array<text>} is the
-     * construction {@code !meta.array { element_type: text }}, built by the constructor's own reader from the binding
-     * record its arguments write. Only a container, a tuple, a choice or a reference is written in place ({@link
-     * TypeInline}); any other construction is declared under a name.
-     *
-     * <p><b>An argument written in place lands at its slot as it stands</b> ({@link ConstructionSugar.StandIns}).
-     *
-     * <p><b>No {@code @meta.application}, and no entry.</b> The value states its constructor and its arguments, and
-     * nothing is substituted, so there is nothing to record beside it.
-     */
-    private Optional<TypeInline> construction(ApplyBody application, ApplyBody written, TypeSlots.Rewrite nested) {
-        String constructor = AliasChain.terminal(application.head().name(), this::lookup);
-        Top definition = lookup(constructor);
-        if (!ConstructionSugar.constructs(constructor, definition)) {
-            return Optional.empty();
-        }
-        ConstructionSugar.refuseNamespaceInPlace(application, constructor, definition, this::lookup);
-        ConstructionSugar.StandIns standIns = ConstructionSugar.StandIns.of(application.arguments(),
-                written.arguments());
-        RecordValue wire = ConstructionSugar.payload(application.head().name(),
-                ConstructionSugar.slots((RecordBody) definition, this::lookup), standIns.written());
-        Top body;
-        try {
-            body = constructionReader.read(constructor, new DataValue(List.of(), Optional.of(constructor), wire));
-        } catch (ReadException e) {
-            throw DefinitionResolver.payloadFailure("'" + application.text() + "' constructs a body that",
-                    "'" + application.text() + "' constructs '!" + constructor + " { ... }', which is not valid "
-                            + "data for '" + constructor + "' -- " + e.getMessage(), e);
-        }
-        if (!(body instanceof Type type) || !TypeInline.constructible(type)) {
-            throw new SchemaValidationException("'" + application.text() + "' constructs a "
-                    + (body instanceof Type ? "type" : "value") + " that is no container, tuple, choice or reference, "
-                    + "and only those are written where they are used (§5.2): declare it under a name ('my_"
-                    + application.head().segments().getLast() + " => " + application.text() + "') and write that "
-                    + "name");
-        }
-        Type placed = (Type) standIns.placed(type);
-        // Each argument landed at a slot of the construction; closing the body closes each one where it stands.
-        return Optional.of(new TypeInline(constructor,
-                (Type) TypeSlots.mapBody(placed.withChain(TypeChain.EMPTY), nested)));
-    }
-
     /** What {@link #materialise} applies to a closed body: each application written in place closed where it stands. */
     private TypeSlots.Rewrite slotRewrite() {
-        return new Closing() {
-            @Override
-            TypeExpr close(ApplyBody application, ApplyBody written) {
-                return TemplateMaterialiser.this.close(application, written, this);
-            }
-        };
+        return (Closing) this::closeApplicationOfRecord;
     }
 
     /** The open record an application's head names, past its alias hops ({@link Ancestry#templateHead}). */
@@ -523,8 +401,8 @@ final class TemplateMaterialiser {
      *
      * <p>Two applications are refused first, being what a record in place may not be: one that would be a member of a
      * declared type (§5.2), and one that reaches itself while it closes in place, with no declaration to tie to
-     * (§5.10.1). Every recursion through records in place ends at a declaration being closed or is refused: regularity
-     * passes each parameter through unchanged, and an argument is a name, so a cycle repeats an application exactly.
+     * (§5.10.1). Every recursion through records in place ends at a declaration being closed or is refused: an argument
+     * is a name, so the applications a closing reaches are finitely many, and a cycle repeats one.
      */
     private TypeExpr instantiate(String head, List<TypeRef> arguments, ApplyBody written) {
         Top template = closable(head, namespace.definition(head));
@@ -607,7 +485,7 @@ final class TemplateMaterialiser {
                 continue;
             }
             ApplyBody canonical = CanonicalApplication.of(templateHead(applied.head().name()),
-                    applied.names().stream().map(this::dereferenced).toList());
+                    applied.arguments().stream().map(this::dereferenced).toList());
             Optional<String> member = applications.entrySet().stream()
                     .filter(entry -> entry.getValue().equals(canonical)).map(Map.Entry::getKey).findFirst();
             if (member.isPresent()) {
@@ -679,8 +557,8 @@ final class TemplateMaterialiser {
      * followed through its alias chain, since §8.2 compares arguments after alias flattening.
      */
     private ApplyBody asWritten(ApplyBody application) {
-        return new ApplyBody(TypeRef.of(application.head().name()), application.arguments().stream()
-                .map(argument -> argument instanceof TypeRef name ? dereferenced(name) : argument).toList());
+        return new ApplyBody(TypeRef.of(application.head().name()),
+                application.arguments().stream().map(this::dereferenced).toList());
     }
 
     /** The application {@code name}'s entry closes, as written, where it is a declared application. */
@@ -709,8 +587,7 @@ final class TemplateMaterialiser {
 
     /**
      * Each argument against the bound of the parameter it binds ({@code meta.param}, [TSON-SCHEMA] §5.10).
-     * An argument this cannot judge is left for others to refuse: an application as an argument ({@link
-     * #closeArgument}), and a name nothing declares (the linker's verdict).
+     * A name nothing declares is left for the linker to refuse.
      */
     private void checkBounds(String head, Top template, List<TypeRef> arguments) {
         List<Param> parameters = OpenEntry.parameters(template);

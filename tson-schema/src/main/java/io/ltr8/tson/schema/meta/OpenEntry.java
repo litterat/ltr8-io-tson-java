@@ -40,8 +40,7 @@ public final class OpenEntry {
 
     /**
      * Every application an open record writes ({@link ApplyBody}), in its fields' types and its parents, at any depth
-     * of types written in place, each as written, an application nested in another's arguments after it. Empty for a
-     * closed entry.
+     * of types written in place, each as written. Empty for a closed entry.
      */
     public static List<ApplyBody> applications(Top value) {
         if (!isOpen(value)) {
@@ -67,7 +66,7 @@ public final class OpenEntry {
     }
 
     /**
-     * The first parameter {@code type} names, as itself, at a slot of a type written in place, or in an argument, at
+     * The first parameter {@code type} names, as itself, at a slot of a type written in place, or as an argument, at
      * any depth -- empty where {@code type} means the same thing in every application, and so is closed already.
      */
     public static Optional<String> parameterIn(TypeExpr type) {

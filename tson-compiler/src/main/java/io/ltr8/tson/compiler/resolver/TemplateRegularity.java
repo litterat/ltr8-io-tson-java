@@ -3,9 +3,6 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.ApplyBody;
-import io.ltr8.tson.schema.meta.TypeExpr;
-import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -22,26 +19,19 @@ import java.util.Set;
  * §5.10's regularity boundary, checked where a template is <em>declared</em>: within a template body, a
  * recursive application -- direct or mutual -- must pass each parameter through unchanged.
  *
- * <p><b>Why a static rule rather than a runtime limit.</b> Non-regular recursion grows its argument every
- * level ({@code weird => <T> { next: weird<box<T>>? } } reaches {@code weird<box<text>>}, then
- * {@code weird<box<box<text>>>}, …), so every application is distinct, none repeats to tie or be refused, and
- * there is no finite set of types to build. Caught only while materialising, it costs a depth counter --
- * a non-portable limit, and the same retrofit C++ reached for after shipping templates without a regularity
- * restriction. Caught here it is an ordinary schema error at the line that wrote it, and a template nobody
- * ever applies is still rejected rather than shipping broken.
+ * <p><b>Growth is unwritable before this runs.</b> An argument is a name or a parameter (§5.3), so {@code weird => <T>
+ * { next?: weird<box<T>> } } is refused where its field resolves, and every application a closing reaches draws its
+ * arguments from the schema's finitely many names: each recursion repeats an application, which ties to the
+ * declaration closing it or is refused where none does ({@code TemplateMaterialiser}). What this rule still refuses
+ * is a recursive application that permutes the parameters ({@code swap => <A, B> { x?: swap<B, A> } }), duplicates
+ * one ({@code dup => <A, B> { x?: dup<A, A> } }) or passes a name for one ({@code c => <T> { next?: c<text> } }), at
+ * the declaration, applied or not: with it a cycle of heads is a cycle of applications, which is what lets {@link
+ * HeldRecursion} judge at the declaration from the heads alone. It is §5.10.1's positional identity, the restriction
+ * ML makes of polymorphic recursion. {@code TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate}
+ * pins it.
  *
- * <p><b>Mutual recursion needs reachability, not just a self-edge.</b> {@code a => <T> { b: b_t<box<T>> } }
- * with {@code b_t => <U> { a: a_t<U> } } grows the argument across the cycle, so an application is checked
- * whenever its head can reach the declaration it sits in.
- *
- * <p><b>Deliberately stricter than termination requires.</b> The condition that actually bounds the work is
- * weaker -- every argument a bare parameter reference, at any position -- because arguments are only ever
- * copied, never constructed, so permuting ({@code swap => <A, B> { x: swap<B, A> } }) or duplicating
- * ({@code dup => <A, B> { x: dup<A, A> } }) still reaches finitely many instantiations. Positional identity
- * is what §5.10's cited precedent uses (ML restricts polymorphic recursion the same way) and what the
- * change report proposes, and an over-restriction that is simple to state can be loosened later; the
- * reverse cannot. {@code design/template-materialisation.md} records the narrowing, and
- * {@code TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate} pins it.
+ * <p><b>Mutual recursion needs reachability, not just a self-edge.</b> Neither template in an {@code a → b → a}
+ * cycle applies itself, so an application is checked whenever its head can reach the declaration it sits in.
  *
  * <p>Arity is <em>not</em> checked here: {@code TsonSchemaLinker} checks it over every application an open record
  * writes, whether or not the template is ever applied. This compares positionally only where the arity already
@@ -57,9 +47,8 @@ final class TemplateRegularity {
      * that wrote it. {@code reporter} may be {@code null}, in which case the first failure throws.
      *
      * @return the templates found irregular, for the caller to replace before anything closes an application
-     *         of one. A condemned template left in place would close without end, an irregular application
-     *         never repeating. Always empty when {@code reporter} is {@code null}, that mode having
-     *         thrown at the first failure.
+     *         of one, so an application of one reports nothing further. Always empty when {@code reporter} is
+     *         {@code null}, that mode having thrown at the first failure.
      */
     static Set<String> check(Map<String, Top> entries, Reporter reporter) {
         Set<String> irregular = new LinkedHashSet<>();
@@ -98,7 +87,7 @@ final class TemplateRegularity {
     }
 
     /** One application written inside a template body: the head it applies and the arguments it applies to. */
-    private record Application(String head, List<TypeExpr> arguments) {
+    private record Application(String head, List<TypeRef> arguments) {
     }
 
     /**
@@ -111,22 +100,17 @@ final class TemplateRegularity {
             return null;
         }
         for (int i = 0; i < parameters.size(); i++) {
-            TypeExpr argument = application.arguments().get(i);
-            if (argument instanceof TypeRef named && named.name().equals(parameters.get(i))) {
+            TypeRef argument = application.arguments().get(i);
+            if (argument.name().equals(parameters.get(i))) {
                 continue;
             }
             return "'" + name + "' applies '" + application.head() + "' recursively but does not pass '"
-                    + parameters.get(i) + "' through unchanged: argument " + (i + 1) + " is " + shown(argument)
+                    + parameters.get(i) + "' through unchanged: argument " + (i + 1) + " is '" + argument.text() + "'"
                     + ". A recursive application must be applied to the enclosing declaration's own "
                     + "parameters, in order (§5.10) -- otherwise the argument grows at every level and there "
                     + "is no finite set of types to build";
         }
         return null;
-    }
-
-    private static String shown(TypeExpr argument) {
-        return argument instanceof TypeInline inline && inline.of() instanceof ApplyBody application
-                ? "the application '" + application.head().name() + "<...>'" : "'" + argument.text() + "'";
     }
 
     /** Whether {@code from} reaches {@code target} by applying templates, {@code from == target} included. */
@@ -150,8 +134,7 @@ final class TemplateRegularity {
     }
 
     /**
-     * Every application a template's body writes, including ones nested inside another application's
-     * arguments ({@code box<chain<T>>} at a field position applies both), and inside types written in place.
+     * Every application a template's body writes, at any depth of types written in place.
      *
      * <p>Every entry with parameters is an open record, which answers which applications it writes ({@link
      * OpenEntry#applications}), the same kind of declared question as its names, which is what keeps this rule at the

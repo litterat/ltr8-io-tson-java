@@ -46,8 +46,8 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, reporting),
   the closed choice would be.
 - **An explicit constructor's application over a parameter is its construction too, one phase later**
   (`meta.array<T>`, `set<T>`, `meta.ref<T>`): the desugarer cannot tell a constructor from an open record, so it
-  passes the application through, and the materialiser constructs it in place at the open record's declaration
-  (`TemplateMaterialiser.openRewrite`). The sugar and the explicit spelling are one resolved form, and an application
+  passes the application through, and the resolver rewrites it to its construction where it is first met, before it
+  is read (`ConstructionRewrite`). The sugar and the explicit spelling are one resolved form, and an application
   left in resolved output always applies an open record.
 
 ## Template bodies (`refuseTemplateBody`)

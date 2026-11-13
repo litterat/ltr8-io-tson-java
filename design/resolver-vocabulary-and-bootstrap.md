@@ -56,7 +56,7 @@ phase happens to need it first, such a fact ends up stated more than once.
 every producer goes through, and `refValue`, which writes a reference as a bare token; an application at a slot is
 written by `SchemaDesugarer` as the `{ of: !meta.apply { … } }` construction it is. Its producers are `SchemaDesugarer`,
 writing a sugar form's binding record (a nested construction in its `{ of: … }` wrapper, `SchemaDesugarer.slotValue`),
-and `ConstructionSugar`, writing an applied constructor's arguments at its slots. A quoted token is never a reference,
+and `ConstructionRewrite`, writing an applied constructor's arguments at its slots. A quoted token is never a reference,
 so a text slot holding `"box<T>"` is text whatever it spells. `TsonObjectWriter` cannot build a binding record: its
 output is canonical-explicit and fully quoted, a different language from the one a binding is written in.
 
@@ -65,18 +65,17 @@ written in place, its chain left as written. It lives in the model because `Reco
 record scopes its parameters at every slot, and `references()` is every reference at every depth. Its other callers
 are materialisation (closing an application where it stands, an open record's fields only where they name none of
 its parameters), `Substitution`, `HeldRecursion`, and the declaration checks over an open record's types in place. No
-pass rewrites a use site onto the end of an alias chain — see "References are hops" below. A walk is a `Rewrite`
-with two arms and a hook: `atSlot` for a reference at a type slot, which may come back as a construction written in
-place, `atName` for one at a slot that holds a name alone, and `inPlace` for the body of a type in place before its
-slots. Which body shape carries which references is a fact about the value model, stated once, where the model is
-walked:
+pass rewrites a use site onto the end of an alias chain — see "References are hops" below. A walk is a `Rewrite`:
+`atName` for a reference, which gives a name back, `inPlace` for the body of a type in place before its slots, and
+`atInPlace` for one after them, which may come back as another type. Which body shape carries which references is a
+fact about the value model, stated once, where the model is walked:
 
 - A record's field types, an array's element, a map's and a namespace type's `value_type`, a tuple's elements and a
   choice's variants are type slots; a type written in place there is walked into, each slot inside it mapped the same
   way.
-- A map's and a namespace type's `key_type`, a reference's `of` and an alias's target hold a name: a construction has
-  nowhere to stand there. A chain's parents are no slot: an open record substitutes them, and linking derives the
-  rest.
+- A map's and a namespace type's `key_type`, a reference's `of`, an alias's target and an application's head and
+  arguments hold a name: a construction has nowhere to stand there. A chain's parents are no slot: an open record
+  substitutes them, and linking derives the rest.
 - Nothing in any other atom (its facets are values), a declared type, or a value entry.
 
 §5.10's regularity check does not use the walk: every entry with parameters is an open record, and reads its

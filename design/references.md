@@ -51,15 +51,18 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   reference's text is a qualified name (`ReferenceGrammar`), so a JSON string or a quoted token holding an argument
   list fails that grammar, a resolver error, the message saying the same (SPEC-FEEDBACK.md #2 holds whether a quoted
   token is a reference at all).
-- **An application is `meta.apply` written in place** (`ApplyBody`): `head` a name, `arguments` names, and while a
-  schema resolves an argument may be an application in place, which a constructor's construction lands at its slot
-  (`ConstructionSugar.StandIns`). The schema grammar's `head<args>` at a type slot is its sugar, and the explicit
-  `{ of: !meta.apply { … } }` means the same. In resolved output one stands only inside an open record, over one of its
-  parameters, applying an open record; the linker refuses one anywhere else (`TsonSchemaLinker.validateBody`'s
-  apply arm, `requireOpen`), which is how a resolved form read as output is held to it. `meta.apply` composes
-  `meta.type` alone and is final: it has no kind (`EntryKind.of` refuses one), and no constructor refines it. Identity
-  is the head and the arguments (`ApplyBody.equals`), so `CanonicalApplication` and the applied-parent fold compare
-  structure, never text.
+- **An application is `meta.apply` written in place** (`ApplyBody`): `head` a name, `arguments` names or parameters,
+  exactly as the kernel types them (`[meta.type_ref; 1..]`). The schema grammar's `head<args>` at a type slot is its
+  sugar, and the explicit `{ of: !meta.apply { … } }` means the same. A constructor's application is its construction
+  before anything reads it (`ConstructionRewrite`, `design/constructor-application.md`), so an argument written in
+  place is either a construction at a type slot or refused. The model is no wider than the kernel because a wider one
+  is a shape the kernel's reader cannot produce, and carrying one means reading a payload with names standing in for the
+  arguments and putting them back after: two opinions of what an application holds. In resolved output one stands only
+  inside an open record, over one of its parameters, applying an open record; the linker refuses one anywhere else
+  (`TsonSchemaLinker.validateBody`'s apply arm, `requireOpen`), which is how a resolved form read as output is held to
+  it. `meta.apply` composes `meta.type` alone and is final: it has no kind (`EntryKind.of` refuses one), and no
+  constructor refines it. Identity is the head and the arguments (`ApplyBody.equals`), so `CanonicalApplication` and
+  the applied-parent fold compare structure, never text.
 - **A dependent field's type is no reference** (§5.2): `kind!` is schema-grammar sugar for `{ of: !meta.dependent { on:
   kind } }`, a type written in place at the field's type (`design/schema-resolution.md`). No reference production,
   data or JSON, reads a marked name, so `kind`, `kind<T>` and a type written in place are the only shapes a type slot

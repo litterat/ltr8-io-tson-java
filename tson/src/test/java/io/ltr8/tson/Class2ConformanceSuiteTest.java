@@ -91,7 +91,7 @@ class Class2ConformanceSuiteTest {
         return Vectors.in("class2", "validate", Class2ConformanceSuiteTest::checkValidateVector);
     }
 
-    private static Tson newTson() {
+    static Tson newTson() {
         // The schema.meta-resolving context, because a `schema/` vector binds a resolved-form document back
         // into the value model to compare it. It changes nothing for the other two layers. Both it and the meta
         // name binder add a host class for each record a corpus fixture's namespace types hold (SuiteBindings): a

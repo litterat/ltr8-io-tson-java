@@ -174,7 +174,8 @@ edited in place; a release fixes the document under its identity (§10). Use `.t
 One line each; the class Javadoc and the note carry the why. Read before touching the class involved.
 
 - A `TypeRef` is a name, never an application: an application is an `ApplyBody` written in place, whose arguments are
-  names (or, while resolving, applications in place), compared by head and arguments.
+  names, compared by head and arguments. A constructor's application is no `ApplyBody`: it is rewritten to its
+  construction before anything reads it (`ConstructionRewrite`).
 - `SchemaDesugarer` returns un-rewritten nodes **by identity** — positions live in an `IdentityHashMap`.
 - A desugar-reported declaration is replaced with an absorbing stand-in that **keeps its type parameters**.
 - A type slot holds a `TypeExpr`: a `TypeRef`, or a `TypeInline` wrapping a body with its constructor. A `TypeInline`

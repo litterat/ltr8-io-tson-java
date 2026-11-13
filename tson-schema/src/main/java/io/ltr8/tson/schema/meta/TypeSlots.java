@@ -6,12 +6,12 @@ import java.util.function.Consumer;
  * The walk over every {@link TypeRef} a value of this model holds, at any depth of types written in place: the one
  * place that says which body shape carries which references.
  *
- * <p><b>Two kinds of slot.</b> A type slot ({@link TypeExpr}: an element, a map's value, a tuple position, a choice
- * variant, a record field's type) holds a name or a type written in place, so a rewrite there may put a type in place
- * in the name's stead ({@link Rewrite#atSlot}); a slot that holds a name alone (a map's key, a reference's {@code of},
- * an alias's target) takes a name back ({@link Rewrite#atName}). A type written in place is walked into, each slot
- * inside it rewritten the same way, and stays in place under its constructor. A chain is never walked: its parents are
- * an open record's to substitute, and its supertypes are names linking computes.
+ * <p><b>A rewrite takes a name and gives a name back</b> ({@link Rewrite#atName}), at a type slot ({@link TypeExpr}: an
+ * element, a map's value, a tuple position, a choice variant, a record field's type) and at a slot that holds a name
+ * alone (a map's key, a reference's {@code of}, an alias's target, an application's head and arguments) alike. A type
+ * written in place is walked into, each slot inside it rewritten the same way, and may come back as another type in
+ * its stead ({@link Rewrite#atInPlace}). A chain is never walked: its parents are an open record's to substitute, and
+ * its supertypes are names linking computes.
  *
  * <p><b>The switch over {@link Top} is exhaustive, with no default.</b> {@code Top} is sealed all the way down, so a
  * body shape added to the model fails to compile here until someone says which references it holds; a default arm
@@ -25,13 +25,8 @@ public final class TypeSlots {
     /** What a walk does with each reference it meets, by the kind of slot holding it. */
     public interface Rewrite {
 
-        /** A reference at a slot that holds a name alone; a name comes back. */
+        /** A reference; a name comes back. */
         TypeRef atName(TypeRef reference);
-
-        /** A reference at a type slot, which may take a type written in place in the name's stead. */
-        default TypeExpr atSlot(TypeRef reference) {
-            return atName(reference);
-        }
 
         /** The body of a type written in place, met before its own slots are walked; the walk goes on in what returns. */
         default Type inPlace(Type body) {
@@ -50,7 +45,7 @@ public final class TypeSlots {
     /** What a type slot holds with {@code rewrite} applied: a name rewritten, a type written in place walked into. */
     public static TypeExpr map(TypeExpr type, Rewrite rewrite) {
         return switch (type) {
-            case TypeRef reference -> rewrite.atSlot(reference);
+            case TypeRef reference -> rewrite.atName(reference);
             case TypeInline inline -> rewrite.atInPlace(inline.withOf((Type) mapBody(rewrite.inPlace(inline.of()),
                     rewrite)));
         };
@@ -66,7 +61,7 @@ public final class TypeSlots {
         mapBody(body, visitor(visit));
     }
 
-    /** Every application written in place in {@code type}, at any depth, an outer one before those it holds. */
+    /** Every application written in place in {@code type}, at any depth of types written in place. */
     public static void applications(TypeExpr type, Consumer<ApplyBody> visit) {
         map(type, new Rewrite() {
             @Override
@@ -118,10 +113,8 @@ public final class TypeSlots {
             case DeclaredType declared -> declared;
             // `on` names a field of the enclosing record, which no rewrite of type names touches.
             case DependentBody dependent -> dependent;
-            // `head` holds a name. An argument is a name in resolved output, and while a schema resolves it may be an
-            // application written in place, which a constructor's construction lands at a type slot: a type slot.
             case ApplyBody apply -> new ApplyBody(apply.chain(), rewrite.atName(apply.head()),
-                    apply.arguments().stream().map(argument -> map(argument, rewrite)).toList());
+                    apply.arguments().stream().map(rewrite::atName).toList());
             // A value is data: a name it holds is judged at link against the closure.
             case ValueEntry value -> value;
         };

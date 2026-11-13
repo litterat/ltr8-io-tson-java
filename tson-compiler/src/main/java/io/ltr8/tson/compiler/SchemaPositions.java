@@ -6,10 +6,12 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.base.SourcePosition;
 
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Where the things a schema document declares sit in its source text -- what {@link TsonSchemaParser}
@@ -39,9 +41,12 @@ import java.util.Optional;
  *                     sits in, which is what lets {@code /person/age} be positioned at {@code age}
  * @param inPlace      each field of a record written in place, as its source wrote it, keyed by the {@code
  *                     meta.record_field} value desugaring writes for it -- the field is no node of the tree by then
+ * @param desugared    each declaration's body desugaring wrote as its construction ({@code x => [T]}), so an
+ *                     application in it is the author's sugar and not an explicit {@code !meta.apply} (§5.10)
  */
 public record SchemaPositions(Map<SchemaMap.Declaration, SourcePosition> declarations,
-                               Map<FieldDef, SourcePosition> fields, Map<DataValue, WrittenField> inPlace) {
+                               Map<FieldDef, SourcePosition> fields, Map<DataValue, WrittenField> inPlace,
+                               Set<DataValue> desugared) {
 
     /**
      * What a field of a record written in place states that its {@code meta.record_field} value does not carry: where
@@ -57,13 +62,21 @@ public record SchemaPositions(Map<SchemaMap.Declaration, SourcePosition> declara
 
     /** Empty tables -- a caller that parsed nothing, or resolves a document whose source it never saw. */
     public static SchemaPositions none() {
-        return new SchemaPositions(new IdentityHashMap<>(), new IdentityHashMap<>(), new IdentityHashMap<>());
+        return new SchemaPositions(new IdentityHashMap<>(), new IdentityHashMap<>(), new IdentityHashMap<>(),
+                identitySet(Set.of()));
     }
 
     /** A mutable, identity-keyed copy -- what a phase that rewrites nodes takes before carrying positions over. */
     public SchemaPositions copy() {
         return new SchemaPositions(new IdentityHashMap<>(declarations), new IdentityHashMap<>(fields),
-                new IdentityHashMap<>(inPlace));
+                new IdentityHashMap<>(inPlace), identitySet(desugared));
+    }
+
+    /** A mutable identity-keyed set holding {@code values}. */
+    public static Set<DataValue> identitySet(Set<DataValue> values) {
+        Set<DataValue> set = Collections.newSetFromMap(new IdentityHashMap<>());
+        set.addAll(values);
+        return set;
     }
 
     /** Where {@code declaration} was written, if this document's source is known. */
@@ -79,6 +92,11 @@ public record SchemaPositions(Map<SchemaMap.Declaration, SourcePosition> declara
     /** The field of a record in place desugaring wrote as {@code field}, as written, if it wrote one. */
     public Optional<WrittenField> inPlace(DataValue field) {
         return Optional.ofNullable(inPlace.get(field));
+    }
+
+    /** Whether desugaring wrote {@code body} as a declaration's construction. */
+    public boolean desugared(DataValue body) {
+        return desugared.contains(body);
     }
 
     /**

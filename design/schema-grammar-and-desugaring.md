@@ -14,9 +14,10 @@ The schema grammar itself is in `design/schema-grammar.md`.
   group member's type it is an `InlineConstruction` holding that binding record; nested inside a binding record it is
   the `{ of: !C { … } }` wrapper (`meta.type_inline`), written untagged, a type slot's choice being disjoint by class.
 - An `ApplicationRef` in the AST is an application, an open record's or a constructor's. At a sugar slot it is written
-  as the `meta.apply` record in place, since a reference is a name; resolution makes it an `ApplyBody`, which
-  materialisation closes: a constructor's to the construction in place, an open record's into the declaration that
-  names it.
+  as the `meta.apply` record in place, since a reference is a name; resolution rewrites a constructor's to its
+  construction before reading it (`ConstructionRewrite`), and an open record's becomes an `ApplyBody` over names,
+  which materialisation closes. A declaration's body the phase writes as a construction is marked
+  (`SchemaPositions.desugared`), so an application in it is read as the author's sugar.
 - An argument of an application is a name or a parameter ([TSON-SCHEMA] §5.10): a sugar form there is refused, to be
   declared under a name and passed by it. A map's key is a name; the grammar admits no sugar form there.
 - The phase is purely syntactic and consults no other schema: the sugar table is fixed, its targets the kernel's
