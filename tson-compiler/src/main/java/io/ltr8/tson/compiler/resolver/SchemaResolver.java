@@ -39,6 +39,7 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.NamespaceBody;
@@ -53,6 +54,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -963,18 +965,21 @@ public final class SchemaResolver {
     }
 
     /**
-     * The compiled readers one schema's resolution reads through. For an imported entry, the compiled form of the
-     * schema that declared it ({@link TsonCompiledSchemaLoader#vocabularyOf}): one namespace per schema (§3.3,
-     * §3.3.1) puts every construction head and annotation type in the closure, and the closure is the
-     * union of the imported schemas' own, so an entry's reader, compiled over its declaring schema's closure, reads
-     * everything its body can name. Nothing is compiled per closure for those -- each declaring schema is compiled
-     * once and cached by identity, and a schema that applies only the kernel's constructors reaches exactly the
-     * kernel's.
+     * The compiled readers one schema's resolution reads through. For an entry of this document, readers compiled from
+     * the entries ready so far ({@link WaitOrder#read}): the entry is made ready before the value read against it, and
+     * a read reaching another not yet ready makes that one ready first.
      *
-     * <p>For an entry of this document, readers compiled from the entries ready so far ({@link WaitOrder#read}): the
-     * entry is made ready before the value read against it, and a read reaching another not yet ready makes that one
-     * ready first. The kernel's own resolution reads through its pre-loaded stand-in for every name, its one
-     * cycle being closed by pre-loading (§3.4).
+     * <p>For an imported entry, the compiled form of the schema that declared it ({@link
+     * TsonCompiledSchemaLoader#vocabularyOf}), compiled once and cached by identity, wherever that compile reads the
+     * value whole. It reads every type the value names by position, but a position admitting subtypes admits only
+     * those the declaring schema's closure holds, and this document's closure may hold more (§3.3.4's open {@code
+     * subtypes}): its own entries, and a sibling import's. Such a type is reached only by being selected -- by a tag
+     * naming it, or by its pin at a family's selector (§5.2) -- so a value whose tags all name entries the declaring
+     * compile holds, read where no entry beyond that compile joins an imported family, reads alike under either
+     * compile; any other value is read through the entries ready so far, which are compiled over the same imports.
+     *
+     * <p>The kernel's own resolution reads through its pre-loaded stand-in for every name, its one cycle being closed
+     * by pre-loading (§3.4).
      */
     private final class Vocabulary {
 
@@ -986,19 +991,35 @@ public final class SchemaResolver {
         /** This document's entries made ready in wait order; {@code null} for the kernel, which reads through itself. */
         private final WaitOrder local;
 
+        /** The namespace as it fills, this document's entries joining it as each is made ready. */
+        private final Map<String, Top> ready;
+
+        /** The imported bases whose members are selected by their pins ([TSON-SCHEMA] §5.2). */
+        private final Set<String> families;
+
         Vocabulary(TsonCompiledVocabulary self) {
             this.self = self;
             this.imported = self.schema().entries().entries();
             this.origins = Map.of();
             this.local = null;
+            this.ready = Map.of();
+            this.families = Set.of();
         }
 
-        /** Over the imported entries, which this resolution adds no local entry to, and this document's own. */
+        /** Over the imported entries, and this document's own as {@code namespace} gains them. */
         Vocabulary(Map<String, Top> namespace, Map<String, String> origins, WaitOrder local) {
             this.self = null;
             this.imported = Map.copyOf(namespace);
             this.origins = Map.copyOf(origins);
             this.local = local;
+            this.ready = namespace;
+            Set<String> bases = new LinkedHashSet<>();
+            imported.forEach((name, definition) -> {
+                if (FamilySelectors.dispatchesOnMembers(definition)) {
+                    bases.add(name);
+                }
+            });
+            this.families = Set.copyOf(bases);
         }
 
         /** Whether {@code name} is read through this document's own entries rather than an import's compile. */
@@ -1019,6 +1040,11 @@ public final class SchemaResolver {
             return loader.vocabularyOf(origin);
         }
 
+        /** The same in tree mode. */
+        private TsonCompiledSchema treeOf(String name) {
+            return loader.treeVocabularyOf(origins.get(name));
+        }
+
         /** An imported entry, or {@code null}: where the kernel's own resolution resolves a head. */
         Top definition(String name) {
             return imported.get(name);
@@ -1031,27 +1057,79 @@ public final class SchemaResolver {
         }
 
         /**
+         * The entries of this document a read of {@code value} selects, each waited on before the read: those its
+         * tags name, and, where an imported family has members, every member this document holds.
+         */
+        private Set<String> selected(io.ltr8.tson.compiler.ast.DataValue value) {
+            Set<String> selected = new LinkedHashSet<>();
+            tags(value, tag -> {
+                if (local.declares(tag)) {
+                    selected.add(tag);
+                }
+            });
+            if (!families.isEmpty()) {
+                ready.forEach((name, definition) -> {
+                    if (local.declares(name) && joinsFamily(definition)) {
+                        selected.add(name);
+                    }
+                });
+            }
+            return selected;
+        }
+
+        /**
+         * Whether {@code value}, read against an import whose declaring schema compiled {@code declaring}, may select a
+         * type that compile does not hold: a tag naming one, or a ready entry beyond it joining an imported family. A
+         * member not yet ready is not seen (`BACKLOG.md`).
+         */
+        private boolean selectsBeyond(io.ltr8.tson.compiler.ast.DataValue value, TsonCompiledSchema declaring) {
+            boolean[] beyond = {false};
+            tags(value, tag -> beyond[0] |= !declaring.schema().entries().containsKey(tag));
+            if (beyond[0] || families.isEmpty()) {
+                return beyond[0];
+            }
+            for (Map.Entry<String, Top> entry : ready.entrySet()) {
+                if (!declaring.schema().entries().containsKey(entry.getKey()) && joinsFamily(entry.getValue())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** Whether {@code definition} is a member of one of the imported families. */
+        private boolean joinsFamily(Top definition) {
+            for (String supertype : TypeChain.supertypesOf(definition)) {
+                if (families.contains(supertype)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
          * An instance of the constructor {@code name}, {@code !name { ... }}: its binding record read under no policy,
          * in object-binding mode, or in tree mode where {@code tree} is true.
          */
         Object instance(String name, io.ltr8.tson.compiler.ast.DataValue value,
                         Map<Object, HeldInBody> heldByName, boolean tree) {
-            if (isLocal(name)) {
-                return local.read(name, tree,
-                        readers -> read(readers.get(name), value, IdentifierPolicy.none(), heldByName, false, local));
+            TsonCompiledSchema declaring = isLocal(name) ? null : tree ? treeOf(name) : of(name);
+            if (declaring != null && (local == null || !selectsBeyond(value, declaring))) {
+                TsonTypeReader<?> reader = tree ? declaring.get(name) : of(name).reader(name);
+                return read(reader, value, IdentifierPolicy.none(), heldByName, false);
             }
-            TsonTypeReader<?> reader = tree ? loader.treeVocabularyOf(origins.get(name)).get(name)
-                    : of(name).reader(name);
-            return read(reader, value, IdentifierPolicy.none(), heldByName, false);
+            return local.read(name, selected(value), tree,
+                    readers -> read(readers.get(name), value, IdentifierPolicy.none(), heldByName, false, local));
         }
 
         /** An annotation's value, read against the type {@code name} under {@code names}. */
         Object annotation(String name, io.ltr8.tson.compiler.ast.DataValue value, IdentifierPolicy names,
                           Map<Object, HeldInBody> heldByName) {
-            if (isLocal(name)) {
-                return local.read(name, readers -> read(readers.get(name), value, names, heldByName, false, local));
+            TsonCompiledSchema declaring = isLocal(name) ? null : of(name);
+            if (declaring != null && (local == null || !selectsBeyond(value, declaring))) {
+                return read(declaring.get(name), value, names, heldByName, false);
             }
-            return read(of(name).get(name), value, names, heldByName, false);
+            return local.read(name, selected(value), false,
+                    readers -> read(readers.get(name), value, names, heldByName, false, local));
         }
 
         /**
@@ -1069,19 +1147,21 @@ public final class SchemaResolver {
          */
         Object value(String type, io.ltr8.tson.compiler.ast.DataValue value, IdentifierPolicy names,
                      Map<Object, HeldInBody> heldByName) {
-            if (isLocal(type)) {
+            TsonCompiledSchema declaring = isLocal(type) ? null : of(type);
+            if (declaring != null && (local == null || !selectsBeyond(value, declaring))) {
                 try {
-                    return local.read(type,
-                            readers -> read(asValue(readers, type), value, names, heldByName, true, local));
+                    return read(asValue(declaring, type), value, names, heldByName, true);
                 } catch (MissingBindingException unbound) {
-                    return local.read(type, true,
-                            readers -> read(asValue(readers, type), value, names, heldByName, true, local));
+                    return read(asValue(treeOf(type), type), value, names, heldByName, true);
                 }
             }
+            Set<String> selected = selected(value);
             try {
-                return read(asValue(of(type), type), value, names, heldByName, true);
+                return local.read(type, selected, false,
+                        readers -> read(asValue(readers, type), value, names, heldByName, true, local));
             } catch (MissingBindingException unbound) {
-                return read(asValue(loader.treeVocabularyOf(origins.get(type)), type), value, names, heldByName, true);
+                return local.read(type, selected, true,
+                        readers -> read(asValue(readers, type), value, names, heldByName, true, local));
             }
         }
 
@@ -1090,6 +1170,24 @@ public final class SchemaResolver {
             TsonTypeReader<?> reader = compiled.get(type);
             return compiled.schema().entries().get(type) instanceof NamespaceBody
                     ? new NamespaceInstanceReader(type, reader) : reader;
+        }
+
+        /** Every tag {@code value} writes, at any depth, its annotations' values included. */
+        private static void tags(io.ltr8.tson.compiler.ast.DataValue value, Consumer<String> sink) {
+            value.typeRef().ifPresent(sink);
+            for (io.ltr8.tson.compiler.ast.Annotation annotation : value.annotations()) {
+                annotation.value().ifPresent(held -> tags(held, sink));
+            }
+            switch (value.coreValue()) {
+                case io.ltr8.tson.compiler.ast.RecordValue record ->
+                        record.fields().forEach(field -> tags(field.value(), sink));
+                case io.ltr8.tson.compiler.ast.MapValue map -> map.entries().forEach(entry -> {
+                    tags(entry.key(), sink);
+                    tags(entry.value(), sink);
+                });
+                case io.ltr8.tson.compiler.ast.ArrayValue array -> array.elements().forEach(element -> tags(element, sink));
+                default -> { }
+            }
         }
     }
 

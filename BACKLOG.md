@@ -118,6 +118,18 @@ spec-required case:
   `TsonCompiledVocabularyRegistry.withStandardLibrary` already does, which is scoped to just the six bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
+- [ ] **A value read while a schema resolves selects its document's entries by guessing from the value**
+  ([TSON-SCHEMA] §3.4.1, §5.2). `SchemaResolver.Vocabulary` waits, before the read, on each of the document's entries
+  a tag in the value names and on each ready member of an imported family. Two cases come out wrong. A family member
+  not yet ready is not seen: with `link-handler-api.tn`'s `routed` and `route` imported, `c => posts & { x?: text }`
+  before `posts => !routed { r: { kind: put  path: "/" } }` and `put => route & { kind?: = "put" }` refuses `posts`
+  ("no member of 'route' pins kind to put"), `c`'s lookup of its operand reading `posts` before `put` is ready; in a
+  valid schema only an annotation value of an imported record type, read in bind mode on a declaration that reads no
+  value, reaches it. And a tag inside a held value (a default or pin in an explicit `!meta.record` payload) is waited
+  on, where §3.4.1 orders nothing. Let the readers stop a schema-document read themselves
+  (`PendingTypeReader.NotReady`): the record dispatchers and `Subsumption`'s guard at a tag naming a pending entry, a
+  member dispatch at a pin no ready member holds while a declaration that may join the family is pending; then drop
+  the guess.
 - [ ] **Read a resolved form by the wait order over its own entries** ([TSON-SCHEMA] §3.4.1, §8.1's
   "Reading a resolved form"; the proposal's "Resolved forms"). A resolved form is read as a value of the kernel's
   `meta.schema` under its source's imports (`ResolvedForm.readResolved`, the Class 2 runner's `schema/` layer), so an

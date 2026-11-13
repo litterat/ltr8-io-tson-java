@@ -35,10 +35,13 @@ resolves the kernel, meta.tn, itself. Current form only; history lives in git.
   entry ready by `WaitOrder`, the one algorithm every schema's resolution runs. The order is the waits', never source
   order. `KernelBootstrapResolverTest` holds the set to the measured cycle and the output to the kernel's ordinary
   resolution in any declaration order.
-- A `!C { … }` body or an annotation value against an imported entry is read through the compiled form of the schema
-  that declared it (`SchemaResolver.Vocabulary`, by the origin the import merge recorded), never through one compiled
-  per closure; against an entry of the same document, through readers compiled from that document's entries ready so
-  far (`WaitOrder.read`). The kernel's ordinary resolution alone reads every head through its pre-loaded stand-in.
+- A `!C { … }` body, a value entry's payload or an annotation value is read in the reading document's closure. Against
+  an entry of the same document it is read through readers compiled from that document's entries ready so far
+  (`WaitOrder.read`). Against an imported entry it is read through the compiled form of the schema that declared it
+  (`SchemaResolver.Vocabulary`, by the origin the import merge recorded) only where no tag in the value names an entry
+  that compile lacks and no ready entry it lacks joins an imported family (§5.2); otherwise through the entries ready
+  so far, compiled over the same imports. Each entry of the document the value selects is waited on before the read.
+  The kernel's ordinary resolution alone reads every head through its pre-loaded stand-in.
 - Only a resolution in progress links with references pending or compiles with entries pending
   (`TsonSchemaLinker.linkReady`, `TsonSchemaCompiler.compileReady`, through `TsonCompiledSchemaLoader.compileReady`).
   The partial link reports nothing, each entry being judged when the whole schema links; a finished schema's link
@@ -165,12 +168,23 @@ One namespace per schema (§3.3) puts every construction head and annotation typ
 a head's instance is read by a compiled reader. `SchemaResolver` records, for each imported entry, the canonical
 identity of the schema that declared it, and its private `Vocabulary` reads `!C { … }` through
 `TsonCompiledSchemaLoader.vocabularyOf(origin of C).reader(C)` and an annotation value through that schema's entry
-reader. **Why the declaring schema's compile suffices**: an entry's reader was compiled over its declaring schema's
-closure, which is inside the importer's, so it reads everything its body can name. Nothing is compiled per closure;
-each declaring schema is compiled once and cached by identity (`design/compiled-registries.md`). A member of a nested map
-is read through the compile of the document that declared it — `!meta.record` through meta.tn's,
-`!numeric.decimal_type` through numeric.tn's, a member a user schema contributes to `meta` through that schema's.
+reader, where that compile reads the value as the importer's closure would. Each declaring schema is compiled once and
+cached by identity (`design/compiled-registries.md`). A member of a nested map is read through the compile of the
+document that declared it — `!meta.record` through meta.tn's, `!numeric.decimal_type` through numeric.tn's, a member a
+user schema contributes to `meta` through that schema's.
 
+- **The declaring schema's compile does not hold the importer's subtypes** (§3.3.4's open `subtypes`): the importer's
+  own entries and a sibling import's are beyond it. Such a subtype is reached only by being selected, by a tag or by
+  its pin at a family's selector (§5.2), so the value is read through the entries ready so far exactly when a tag names
+  an entry the declaring compile lacks, or a ready entry it lacks is IS-A an imported base dispatching on members.
+  Neither check compiles anything, and the second runs only where an import declares such a base.
+- **Lost: compiling the entries so far for every imported head.** Every `{ … }` record is `!meta.record { … }`, so
+  that recompiles per declaration; a compile per import closure is a second cache keyed on nothing a schema names.
+- **Selected entries are waited on before the read** (`WaitOrder.read`'s `selected`): a tag naming one of the
+  document's entries, and each ready member of an imported family it declares. A position admits only the subtypes its
+  compile holds, so a selected entry not yet ready would be refused, never stop the read at a `PendingTypeReader`. A
+  value selecting its own entry is the ordinary wait cycle. Two gaps follow (`BACKLOG.md`): a tag inside a held value
+  is waited on too, and a family member not yet ready is not seen.
 - **A local head or annotation type is read through the entries ready so far.** `Vocabulary` tells a local name
   from an import by the recorded origins, and reads a local one through `WaitOrder.read`: readers compiled by
   `loader.compileReady(readySoFar(…), pending, tree)` from this document's ready entries over the same imports, each

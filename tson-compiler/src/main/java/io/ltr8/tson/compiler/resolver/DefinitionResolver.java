@@ -129,8 +129,8 @@ import java.util.function.Predicate;
  * namespace ({@link #resolveConstructorTarget}, {@link #resolveAtomRefinement}); a {@code !} form used
  * against the wrong kind of target -- refining a constructor, applying a non-constructor, refining a
  * non-atom -- each answered with the form the author probably meant; a supertype chain reaching two base
- * kinds ({@link #determineKind}); and a body or annotation value the declaring schema's compiled reader
- * rejects, which arrives as a {@link ReadException} and is restated as a schema error
+ * kinds ({@link #determineKind}); and a body or annotation value the compiled reader rejects, which
+ * arrives as a {@link ReadException} and is restated as a schema error
  * ({@link #bodyIsNotValidData}).
  *
  * <p><b>No construct of the schema grammar is a gap.</b> Every {@code UnsupportedOperationException} this
