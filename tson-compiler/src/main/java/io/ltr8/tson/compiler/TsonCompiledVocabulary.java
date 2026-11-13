@@ -12,16 +12,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A schema compiled in object-binding mode as <b>vocabulary</b>: what a schema importing it reads its construction
- * heads and annotation values through. One namespace per schema ([TSON-SCHEMA] §3.3, §3.3.1) puts
- * every constructor of the import closure in reach, and the resolver reads {@code !C value} through the compiled form
- * of the schema that declared {@code C} ({@code SchemaResolver}'s vocabulary), which is one of these. Any schema
- * compiles to one -- meta.tn, numeric.tn, temporal.tn, net.tn, a library declaring constructors of its own -- and
- * {@link TsonCompiledVocabularyRegistry#loadVocabulary} caches each by identity.
- *
- * <p>Holds, beside the compiled entries, the reader for an <em>instance</em> of each constructor it declares or
- * imports ({@link #reader}): every entry IS-A {@code top}, keyed by its own name. The factory that builds a reader for
- * an entry whose body <em>is</em> such a construction is the library's global set, consulted by {@link #compile}.
+ * A schema compiled in object-binding mode as <b>vocabulary</b>: its entries, and the reader for an <em>instance</em>
+ * of each constructor it declares or imports ({@link #reader}). The kernel's pre-loaded stand-in is one, which the
+ * kernel's own resolution reads every head through ([TSON-SCHEMA] §3.4); a resolution's checkpoints are others
+ * ({@link TsonCompiledVocabularyRegistry#compileReady}). Every entry IS-A {@code top}, keyed by its own name. The
+ * factory that builds a reader for an entry whose body <em>is</em> such a construction is the library's global set,
+ * consulted by {@link #compile}.
  */
 public final class TsonCompiledVocabulary extends TsonCompiledSchema {
 
@@ -39,7 +35,7 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
      * schema compiles and only reading a value against that entry fails.
      */
     static TsonCompiledVocabulary compile(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver) {
-        return compileReady(linked, resolver, Set.of());
+        return compileWith(linked, resolver, Set.of(), false);
     }
 
     /**
@@ -48,13 +44,18 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
      */
     static TsonCompiledVocabulary compileReady(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver,
                                                Set<String> pending) {
-        return new TsonCompiledVocabulary(TsonSchemaCompiler.compileReady(linked, name -> {
+        return compileWith(linked, resolver, pending, true);
+    }
+
+    private static TsonCompiledVocabulary compileWith(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver,
+                                                      Set<String> pending, boolean checkpoint) {
+        return new TsonCompiledVocabulary(TsonSchemaCompiler.compileWith(linked, name -> {
             try {
                 return resolver.resolve(name);
             } catch (RuntimeException noFactory) {
                 return unbuildable(linked.originOf(name), name, noFactory);
             }
-        }, pending));
+        }, pending, checkpoint));
     }
 
     /**

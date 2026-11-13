@@ -46,7 +46,7 @@ final class RecordDispatch {
                 // member, so an alias is not a second member. Where it compares a written tag it admits
                 // aliases (`deeper`).
                 case ABSTRACT -> FamilySelectors.dispatchesOnMembers(definition)
-                        ? new RecordMemberDispatchReader(selfNames, displayName,
+                        ? new RecordMemberDispatchReader(name, selfNames, displayName,
                                 FamilySelectors.of(definition),
                                 Set.copyOf(context.subtypesOf(name, definition)), context, context.readers())
                         : tagDispatch(selfNames, displayName,

@@ -69,6 +69,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
      */
     private final Set<String> selfNames;
 
+    /** The base's entry name, which a resolution asks of the declarations that may join it. */
+    private final String base;
+
     private final List<Selector> selectors;
 
     /** Each selector's name in the base's name form (§5.5), to the name as declared -- what the scan matches. */
@@ -85,10 +88,11 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
      * Taking the fields rather than a {@code RecordBody} is what keeps the choice of "which fields select" in that
      * one derivation.
      */
-    RecordMemberDispatchReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
-                                Set<String> subtypes, ValueReaderContext context,
-                                TsonTypeReaderResolver readerFor) {
+    RecordMemberDispatchReader(String base, Set<String> selfNames, String displayName,
+                               SequencedMap<String, RecordField> selectorFields, Set<String> subtypes,
+                               ValueReaderContext context, TsonTypeReaderResolver readerFor) {
         Namespace<Top> entries = context.schema().entries();
+        this.base = base;
         this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
         this.selectors = selectorFields.entrySet().stream()
@@ -190,6 +194,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         }
         String selected = members.get(key);
         if (selected == null) {
+            // The one place a value is placed by its pins, so the one place a schema document's read stops for a
+            // member its readers do not hold.
+            ctx.pinsUnmatched(base, Set.copyOf(selectorNames.values()), (selector, pin) -> samePin(selector, pin, found));
             ctx.report(extension.unmatchedDiscriminator(named(), render(key), pinned));
             EventSkip.dataValue(ctx);
             return null;
@@ -228,6 +235,17 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             EventSkip.dataValue(ctx);
         }
         return found;
+    }
+
+    /** Whether {@code pin}, written for the selector {@code name}, is the value {@code found} holds there. */
+    private boolean samePin(String name, String pin, Map<String, TokenEvent> found) {
+        for (Selector selector : selectors) {
+            if (selector.name().equals(Nfc.of(name)) && found.get(selector.name()) != null) {
+                Object written = decode(selector, pin);
+                return written != null && written.equals(decode(selector, found.get(selector.name()).text()));
+            }
+        }
+        return false;
     }
 
     private Object decode(Selector selector, String text) {

@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.SequencedSet;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -36,11 +37,12 @@ import java.util.function.Predicate;
  *       {@code &} operands and the types of its annotations, an alias on its target. Each such wait is a lookup here
  *       made while another entry is being made ready ({@link #current()}), or a declaration a read through {@link
  *       #read} reaches: one ready already ({@link #reached}), or one not yet ready, which the read stops at.</li>
- *   <li><b>Reads.</b> A value read against an entry of this document is read through readers compiled from the
- *       entries ready so far ({@link Readers}), every declaration not yet ready compiling to a {@link
- *       PendingTypeReader}. A read that reaches one stops ({@link PendingTypeReader.NotReady}); the entry it names is
- *       made ready, as a wait of the entry being made ready, and the read starts over against a compile that holds
- *       it. A held value reached through one binds as written: a reference and a held value order nothing.</li>
+ *   <li><b>Reads.</b> Every value this document reads is read through the readers of a checkpoint, the imports and
+ *       the entries ready so far ({@link Readers}), every declaration not yet ready compiling to a {@link
+ *       PendingTypeReader}. A read that reaches what its readers lack stops ({@link PendingTypeReader.NotReady});
+ *       the entry it names is made ready, as a wait of the entry being made ready, and the read starts over at a
+ *       checkpoint that holds it. A held value reached through one binds as written: a reference and a held value
+ *       order nothing.</li>
  *   <li><b>Cycles.</b> An entry reached again while it is being made ready waits on itself: a {@link
  *       SchemaValidationException} naming the entries on the cycle in wait order ({@code "'a' waits on 'b' waits on
  *       'a'"}).</li>
@@ -98,9 +100,16 @@ final class WaitOrder implements DefinitionGetter {
     /** The head of a chain refused as too deep while its entries were being made ready; {@code null} otherwise. */
     private String refusedHead;
 
-    /** The readers of the entries ready when each was compiled; {@code null} until a read needs them. */
+    /**
+     * The readers of the latest checkpoint; {@code null} until a read needs them. Kept across a join, since every fact
+     * they take from the closure is reached by a name or a pin at which a read stops; dropped when a read stops, and
+     * once every entry is ready ({@link #settled}).
+     */
     private TsonCompiledSchema bound;
     private TsonCompiledSchema tree;
+
+    /** The readers the read in progress holds, innermost; {@code null} outside a read. */
+    private TsonCompiledSchema reading;
 
     /**
      * @param identity     the canonical identity of the document being resolved, which its entries' readers locate
@@ -133,11 +142,6 @@ final class WaitOrder implements DefinitionGetter {
     /** The entry being made ready innermost, or {@code null} when none is. */
     String current() {
         return resolving.isEmpty() ? null : resolving.getLast();
-    }
-
-    /** Whether {@code name} is one of this document's declarations, as opposed to an import. */
-    boolean declares(String name) {
-        return declarations.containsKey(name);
     }
 
     /**
@@ -211,40 +215,66 @@ final class WaitOrder implements DefinitionGetter {
         return resolved;
     }
 
-    /**
-     * Reads a value against {@code type}, an entry of this document already ready, through readers compiled from
-     * the entries ready now ({@link #read(String, Set, boolean, Function)} in object-binding mode, selecting nothing).
-     */
+    /** {@link #read(String, boolean, Function)} in object-binding mode. */
     <T> T read(String type, Function<TsonCompiledSchema, T> read) {
-        return read(type, Set.of(), false, read);
+        return read(type, false, read);
     }
 
     /**
-     * Reads a value against {@code type} through readers compiled from the entries ready now, in tree mode where
-     * {@code tree} is true. A read that reaches an entry not yet ready makes it ready, as a wait of the entry being
-     * made ready, and starts over against a compile that holds it.
-     *
-     * <p>{@code selected} are this document's entries the value selects, each made ready first, as a wait of the entry
-     * being made ready, and held by the readers: a position admitting subtypes admits those its compile holds, by tag
-     * or by a selector's pin, so an entry selected there is never a {@link PendingTypeReader} the read could stop at.
+     * Reads a value against {@code type}, an import or an entry of this document already ready, through the readers
+     * of a checkpoint, in tree mode where {@code tree} is true. A read is atomic within its checkpoint: one that
+     * reaches what its readers lack -- a declaration by position, a tag or an annotation's name ({@link #typeNamed}),
+     * a pin a declaration may state ({@link #pinsUnmatched}) -- is abandoned, that declaration made ready as a wait
+     * of the entry being made ready, and the read run again over readers that hold it.
      */
-    <T> T read(String type, Set<String> selected, boolean tree, Function<TsonCompiledSchema, T> read) {
-        for (String name : selected) {
-            definition(name);
-        }
-        while (true) {
-            TsonCompiledSchema compiled = readersFor(type, selected, tree);
-            try {
-                return read.apply(compiled);
-            } catch (PendingTypeReader.NotReady wait) {
-                if (entries.containsKey(wait.entry()) && compiled.schema().entries().containsKey(wait.entry())) {
-                    throw new IllegalStateException("'" + wait.entry() + "' is ready and compiled, and its reader "
-                            + "still reports it pending", wait);
+    <T> T read(String type, boolean tree, Function<TsonCompiledSchema, T> read) {
+        TsonCompiledSchema outer = reading;
+        try {
+            while (true) {
+                TsonCompiledSchema compiled = readersFor(type, tree);
+                reading = compiled;
+                try {
+                    return read.apply(compiled);
+                } catch (PendingTypeReader.NotReady wait) {
+                    if (compiled.schema().entries().containsKey(wait.entry())) {
+                        throw new IllegalStateException("'" + wait.entry() + "' is compiled at this checkpoint, "
+                                + "and a read still reports it pending", wait);
+                    }
+                    definition(wait.entry());
+                    bound = null;
+                    this.tree = null;
                 }
-                definition(wait.entry());
-                bound = null;
-                this.tree = null;
             }
+        } finally {
+            reading = outer;
+        }
+    }
+
+    /**
+     * A read is about to decide by {@code name}, written as a tag or an annotation's name: where it is a declaration
+     * of this document its readers do not hold, the read stops, to run again once it is ready.
+     */
+    void typeNamed(String name) {
+        if (reading != null && declarations.containsKey(name) && !reading.schema().entries().containsKey(name)) {
+            throw PendingTypeReader.notReady(name);
+        }
+    }
+
+    /**
+     * A read met a value of the family {@code base} that no member its readers hold pins as the value does: it waits
+     * on each declaration its readers do not hold that may be that member ({@link FamilyJoiners}), and stops, to run
+     * again once they are ready.
+     */
+    void pinsUnmatched(String base, Set<String> selectors, BiPredicate<String, String> samePin) {
+        if (reading == null) {
+            return;
+        }
+        TsonCompiledSchema held = reading;
+        List<String> joiners = FamilyJoiners.of(base, selectors, samePin, declarations, entries,
+                name -> !held.schema().entries().containsKey(name));
+        if (!joiners.isEmpty()) {
+            joiners.forEach(this::definition);
+            throw PendingTypeReader.notReady(joiners.getLast());
         }
     }
 
@@ -271,11 +301,10 @@ final class WaitOrder implements DefinitionGetter {
         tree = null;
     }
 
-    /** The readers of every entry ready now, compiled again where {@code type} or one of {@code selected} has none. */
-    private TsonCompiledSchema readersFor(String type, Set<String> selected, boolean inTree) {
+    /** The checkpoint's readers, compiled where none are held or those held lack {@code type}. */
+    private TsonCompiledSchema readersFor(String type, boolean inTree) {
         TsonCompiledSchema compiled = inTree ? tree : bound;
-        if (compiled == null || !compiled.schema().entries().containsKey(type)
-                || !selected.stream().allMatch(compiled.schema().entries()::containsKey)) {
+        if (compiled == null || !compiled.schema().entries().containsKey(type)) {
             Set<String> pending = new LinkedHashSet<>(declarations.keySet());
             pending.removeAll(entries.keySet());
             compiled = readers.compile(pending, inTree);

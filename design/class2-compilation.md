@@ -13,7 +13,8 @@ choices. Current form only; history lives in git.
 - Building a reader resolves its parts' readers and reads through none of them. Work that reads through one (a
   record's defaults and pins) goes to `CompiledReaders.afterEveryReader` and runs in `settle`, once, after the walk.
 - `ErrorReader` reports `NOT_IMPLEMENTED` and skips the value. Two causes are deliberately not reported that way: a
-  `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile.
+  `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile -- but at a
+  checkpoint (`compileReady`), where it is the read's that reaches the entry.
 - An open record never reaches a factory: a template, a `RecordBody` with `parameters`, is no type (§5.10) and compiles
   to an `OpenTemplateReader`. A value entry (`ValueEntry`) never
   reaches one either: it compiles to a `ValueEntryReader`, which refuses a data tag naming it as `TYPE_MISMATCH`.
@@ -84,7 +85,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   delegate rather than falling back to it, which is what actually makes that invariant true.
   `CompiledReadersTest` pins the handover; a second `bind` is rejected.
 - **A compile of a resolution in progress is the one in which a name may have no entry** (`compileReady`). A
-  resolution compiles its document's entries ready so far to read a value against one of them (`WaitOrder`), and a
+  resolution compiles a checkpoint, its imports and its entries ready so far, to read every value at (`WaitOrder`), and a
   declaration not yet ready compiles to a `PendingTypeReader`: a schema-document read that reaches one throws
   `NotReady` for the resolution to make the entry ready and read again, and a held value decoded through one at
   `settle` binds as written. A finished schema's compile has no pending set, and an absent name stays the linker's
@@ -118,7 +119,9 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
       that application as itself; wrapped, a service's missing configuration goes out as a 501.
     - **A `BindMismatchException` is the other, and it never becomes an `ErrorReader` at all**: it is
       rethrown from the compile, so a schema and a class that disagree fail at startup rather than at the
-      first read.
+      first read. A checkpoint is the exception: it holds entries before their applications close and their
+      subtypes join, so the class may disagree with what is not yet the entry, and only a read reaching it fails
+      (`design/resolver-vocabulary-and-bootstrap.md`).
   - A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and propagates
     uncaught.
 - **An open record never reaches a factory.** `TsonSchemaCompiler.build` asks `OpenEntry.isOpen` before any factory

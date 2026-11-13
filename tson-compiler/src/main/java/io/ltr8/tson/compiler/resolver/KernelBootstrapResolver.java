@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiPredicate;
 
 /**
  * Resolves the kernel's own source text into the {@link TsonSchema} that governs its ordinary resolution: the
@@ -276,6 +277,17 @@ public final class KernelBootstrapResolver {
                         @Override
                         public void reached(SchemaLocation declaration) {
                             order.reached(declaration);
+                        }
+
+                        @Override
+                        public void typeNamed(String name) {
+                            order.typeNamed(name);
+                        }
+
+                        @Override
+                        public void pinsUnmatched(String base, Set<String> selectors,
+                                                  BiPredicate<String, String> samePin) {
+                            order.pinsUnmatched(base, selectors, samePin);
                         }
                     }, false)));
         }

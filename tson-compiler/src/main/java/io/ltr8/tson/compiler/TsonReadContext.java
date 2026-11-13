@@ -19,6 +19,8 @@ import io.ltr8.tson.compiler.stream.TsonEventSource;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiPredicate;
 
 /**
  * Carried through every {@link TsonTypeReader#read(TsonReadContext)} call -- the read's own pull
@@ -242,7 +244,7 @@ public interface TsonReadContext {
 
     /**
      * Whether this read is of a value inside a <b>schema document</b> -- a constructor's binding record or a value
-     * entry's payload, replayed through the readers of the schema declaring its head by the resolver ({@link
+     * entry's payload, replayed through the readers of a checkpoint of that document by the resolver ({@link
      * #schemaDocument}).
      * There, and only there, a bare name at a record position is a value written by name rather than §5.6's
      * positional fill ([TSON-SCHEMA] §5.6): a schema has a namespace to resolve the name in, and a data document
@@ -308,7 +310,29 @@ public interface TsonReadContext {
          */
         default void reached(SchemaLocation declaration) {
         }
+
+        /**
+         * The read is about to decide by {@code name}, written as a tag or an annotation's name. A resolution stops
+         * the read here ({@code PendingTypeReader.NotReady}) where {@code name} is a declaration of its document the
+         * readers do not hold ([TSON-SCHEMA] §3.4.1), and returns otherwise.
+         */
+        default void typeNamed(String name) {
+        }
+
+        /**
+         * The read met a value of the family {@code base} whose pins at {@code selectors} no member the readers hold
+         * states, {@code samePin} telling whether a pin written for a selector is the value's there. A resolution stops
+         * the read where a declaration the readers do not hold may be that member ([TSON-SCHEMA] §3.4.1, §5.2).
+         */
+        default void pinsUnmatched(String base, Set<String> selectors, BiPredicate<String, String> samePin) {
+        }
     }
+
+    /** {@link HeldByName#typeNamed} of a schema document's read; nothing anywhere else. */
+    void typeNamed(String name);
+
+    /** {@link HeldByName#pinsUnmatched} of a schema document's read; nothing anywhere else. */
+    void pinsUnmatched(String base, Set<String> selectors, BiPredicate<String, String> samePin);
 
     /**
      * How many problems have been reported through this read so far, counting every scoped copy since they

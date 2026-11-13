@@ -24,6 +24,10 @@ applies, the continuation policy, and what a read leaves behind.
 - Records are closed under their type and a repeated field or map key is an error, on the schemaless path too.
 - A dependent field is read through its record (`DependentFieldReader.readAgainst`), never on its own: the record
   knows the sibling's value in this instance. A record with none keeps no per-read state for it.
+- A reader deciding by a tag reads it through `EventSkip.typeRefAhead`, an annotation's name is resolved in
+  `AnnotationCapture` alone, and `RecordMemberDispatchReader` alone places a value by its pins: those are where a schema
+  document's read stops for an entry its readers lack, so a reader that bypasses them refuses at a checkpoint what the
+  full closure admits (`design/resolver-vocabulary-and-bootstrap.md`).
 
 Related: `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`, `design/record-dispatch.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,

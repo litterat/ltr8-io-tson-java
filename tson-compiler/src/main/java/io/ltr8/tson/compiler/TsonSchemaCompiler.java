@@ -14,6 +14,7 @@ import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.compiler.reader.Subsumption;
+import io.ltr8.tson.compiler.stream.EventSkip;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -79,7 +80,7 @@ public final class TsonSchemaCompiler {
      * stand-in ({@link TsonSchema#bootstrap()}) among it.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {
-        return compileWith(linkedSchema, factories::resolve, Set.of());
+        return compileWith(linkedSchema, factories::resolve, Set.of(), false);
     }
 
     /**
@@ -92,16 +93,18 @@ public final class TsonSchemaCompiler {
      */
     public static TsonCompiledSchema compileReady(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
                                                   Set<String> pending) {
-        return compileWith(linkedSchema, factories::resolve, Set.copyOf(pending));
+        return compileWith(linkedSchema, factories::resolve, Set.copyOf(pending), true);
     }
 
     /**
      * The shared eager walk (see the "Eager, not lazy" note) over {@code factoryFor}'s factories, {@code pending}
-     * naming the declarations of a resolution in progress not yet ready (empty for every finished schema).
+     * naming the declarations of a resolution in progress not yet ready, {@code checkpoint} whether this compiles
+     * one ({@link #compileReady}).
      */
-    private static TsonCompiledSchema compileWith(
-            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, Set<String> pending) {
-        Compilation compilation = new Compilation(linkedSchema, factoryFor, pending);
+    static TsonCompiledSchema compileWith(
+            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, Set<String> pending,
+            boolean checkpoint) {
+        Compilation compilation = new Compilation(linkedSchema, factoryFor, pending, checkpoint);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -195,8 +198,13 @@ public final class TsonSchemaCompiler {
         /** The entries a compile of a resolution in progress reads as {@link PendingTypeReader}s; else empty. */
         private final Set<String> pending;
 
-        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor, Set<String> pending) {
+        /** Whether this compiles a checkpoint of a resolution in progress ({@link #compileReady}). */
+        private final boolean checkpoint;
+
+        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor, Set<String> pending,
+                    boolean checkpoint) {
             this.pending = pending;
+            this.checkpoint = checkpoint;
             this.linked = linked;
             this.schema = linked.schema();
             this.factoryFor = factoryFor;
@@ -233,20 +241,45 @@ public final class TsonSchemaCompiler {
                     // mode unusable. It reaches the first read of this specific type still saying what it is.
                     built = new ErrorReader(name, e);
                 } catch (BindMismatchException e) {
-                    // Deliberately not an ErrorReader. Every other build failure is one entry's problem and
-                    // deferring it keeps the rest of the schema usable; this one is a wiring mistake between
-                    // the schema and the caller's own classes, and deferring it to the first document that
-                    // happens to have that type is exactly what makes it expensive to find. See the
-                    // exception's own Javadoc.
-                    throw e;
+                    if (!checkpoint) {
+                        // Deliberately not an ErrorReader. Every other build failure is one entry's problem and
+                        // deferring it keeps the rest of the schema usable; this one is a wiring mistake between
+                        // the schema and the caller's own classes, and deferring it to the first document that
+                        // happens to have that type is exactly what makes it expensive to find. See the
+                        // exception's own Javadoc.
+                        throw e;
+                    }
+                    // A checkpoint holds entries before materialisation closes their applications and before
+                    // their subtypes join, so a class may disagree with what is not yet the entry: the mismatch is
+                    // a read's that reaches it, and the finished schema's compile judges the rest.
+                    built = refusedAtCheckpoint(name, ctx -> {
+                        throw e;
+                    });
                 } catch (RuntimeException e) {
                     built = new ErrorReader(name, e);
+                    if (checkpoint) {
+                        built = refusedAtCheckpoint(name, built);
+                    }
                 }
                 finished.put(name, built);
                 return built;
             } finally {
                 building.remove(name);
             }
+        }
+
+        /**
+         * {@code failing}, a reader a checkpoint could not build, which may have failed for want of an entry the
+         * checkpoint lacks: which reader a record gets depends on its subtypes. So a read stops first where a later
+         * checkpoint may build it otherwise -- at the value's tag ({@link EventSkip#typeRefAhead}) and at a declaration
+         * not held that may be IS-A {@code name} -- and the failure is the read's only where neither holds.
+         */
+        private static TsonTypeReader<?> refusedAtCheckpoint(String name, TsonTypeReader<?> failing) {
+            return ctx -> {
+                EventSkip.typeRefAhead(ctx);
+                ctx.pinsUnmatched(name, Set.of(), (selector, pin) -> true);
+                return failing.read(ctx);
+            };
         }
 
         private TsonTypeReader<?> build(String name, Top definition) {

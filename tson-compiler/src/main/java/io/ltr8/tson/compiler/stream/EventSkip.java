@@ -74,9 +74,20 @@ public final class EventSkip {
         });
     }
 
-    /** The name of the type-ref {@link #aheadOfValue} finds, if it found one. Consumes nothing. */
+    /**
+     * The name of the type-ref {@link #aheadOfValue} finds, if it found one, for a reader about to decide by it.
+     * Consumes nothing.
+     *
+     * <p>Every reader that decides by a tag reads it here, so this is where a schema document's read stops at a tag
+     * naming a declaration its readers do not hold ({@link TsonReadContext#typeNamed}): a tag a reader refuses for
+     * want of an entry is never refused at a checkpoint the full closure would admit it at ([TSON-SCHEMA] §3.4.1).
+     */
     public static Optional<String> typeRefAhead(TsonReadContext ctx) {
-        return aheadOfValue(ctx) instanceof TypeRef typeRef ? Optional.of(typeRef.name()) : Optional.empty();
+        if (!(aheadOfValue(ctx) instanceof TypeRef typeRef)) {
+            return Optional.empty();
+        }
+        ctx.typeNamed(typeRef.name());
+        return Optional.of(typeRef.name());
     }
 
     /**

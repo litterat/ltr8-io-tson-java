@@ -692,6 +692,12 @@ after.
 100. **Header** — "`meta.ref` is a refined constructor" becomes "`meta.ref` is the one
      reference constructor, `meta.reference_type` gone".
 101. **§13.2** — every pin changes (§6); the kernel measures 82 entries.
+102. **§3.4.1** — rule 1 named the parts of a value a read waits on, a field's type, an
+     element's, a nested tag's and an annotation's, and was silent on a value a family places by
+     its pins (§5.2), whose member nothing in the value names. Rule 1 gains: a value read at a
+     family's selectors whose pins no ready member states waits on each declaration not yet
+     ready that may be that member, judged from what it writes: its written operands reach the
+     family's base, and the nearest pin written along them does not differ from the value's.
 
 ### 3.3 Companion artifacts
 
@@ -803,6 +809,11 @@ Changes a Revision 39 implementer must act on:
 15. **One reference constructor** (§3.2 items 98–101): `meta.ref => meta.atom & { of:
     meta.type_ref }`; `meta.reference_type` is gone, and a schema writing it names nothing.
     `meta.ref<T>` keeps its spelling and its meaning.
+16. **A value placed by its pins waits on the member it may be** (§3.2 item 102): read at a
+    family's selectors where no ready member states its pins, it waits on each declaration
+    not yet ready whose written operands reach the base and whose nearest written pin does not
+    differ, so a value selecting a member declared after it loads, and one whose member waits
+    on the reading entry is a wait cycle.
 
 ---
 
