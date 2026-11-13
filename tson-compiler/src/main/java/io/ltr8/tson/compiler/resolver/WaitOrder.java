@@ -213,20 +213,27 @@ final class WaitOrder implements DefinitionGetter {
 
     /**
      * Reads a value against {@code type}, an entry of this document already ready, through readers compiled from
-     * the entries ready now ({@link #read(String, boolean, Function)} in object-binding mode).
+     * the entries ready now ({@link #read(String, Set, boolean, Function)} in object-binding mode, selecting nothing).
      */
     <T> T read(String type, Function<TsonCompiledSchema, T> read) {
-        return read(type, false, read);
+        return read(type, Set.of(), false, read);
     }
 
     /**
      * Reads a value against {@code type} through readers compiled from the entries ready now, in tree mode where
      * {@code tree} is true. A read that reaches an entry not yet ready makes it ready, as a wait of the entry being
      * made ready, and starts over against a compile that holds it.
+     *
+     * <p>{@code selected} are this document's entries the value selects, each made ready first, as a wait of the entry
+     * being made ready, and held by the readers: a position admitting subtypes admits those its compile holds, by tag
+     * or by a selector's pin, so an entry selected there is never a {@link PendingTypeReader} the read could stop at.
      */
-    <T> T read(String type, boolean tree, Function<TsonCompiledSchema, T> read) {
+    <T> T read(String type, Set<String> selected, boolean tree, Function<TsonCompiledSchema, T> read) {
+        for (String name : selected) {
+            definition(name);
+        }
         while (true) {
-            TsonCompiledSchema compiled = readersFor(type, tree);
+            TsonCompiledSchema compiled = readersFor(type, selected, tree);
             try {
                 return read.apply(compiled);
             } catch (PendingTypeReader.NotReady wait) {
@@ -264,10 +271,11 @@ final class WaitOrder implements DefinitionGetter {
         tree = null;
     }
 
-    /** The readers of every entry ready now, compiled again only where {@code type} has none yet. */
-    private TsonCompiledSchema readersFor(String type, boolean inTree) {
+    /** The readers of every entry ready now, compiled again where {@code type} or one of {@code selected} has none. */
+    private TsonCompiledSchema readersFor(String type, Set<String> selected, boolean inTree) {
         TsonCompiledSchema compiled = inTree ? tree : bound;
-        if (compiled == null || !compiled.schema().entries().containsKey(type)) {
+        if (compiled == null || !compiled.schema().entries().containsKey(type)
+                || !selected.stream().allMatch(compiled.schema().entries()::containsKey)) {
             Set<String> pending = new LinkedHashSet<>(declarations.keySet());
             pending.removeAll(entries.keySet());
             compiled = readers.compile(pending, inTree);

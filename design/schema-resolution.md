@@ -76,10 +76,10 @@ and the merge of every `!!import`'s namespace (`TsonSchema.namespaceSources`) *b
 local declaration resolves, recording each imported entry's origin. That merge mirrors `TsonSchemaLinker.mergeImports`
 — transitive, collisions decided by entry identity (§2.2.3) — because it is the same concept met one phase earlier,
 and the two are kept in step deliberately. The origins key its vocabulary: each `!C` body and annotation value is
-read through the compiled form of the schema that declared `C` or the type
-(`design/resolver-vocabulary-and-bootstrap.md`); one of this document's own is read through readers compiled from
-its entries ready so far. Local declarations are made ready in wait order (below), `OnDemand` being the `Readiness`
-that resolves one declaration and reports its failure.
+read through the compiled form of the schema that declared `C` or the type, unless it selects a subtype beyond that
+schema's closure (`design/resolver-vocabulary-and-bootstrap.md`); one of this document's own, and one that does, is
+read through readers compiled from its entries ready so far. Local declarations are made ready in wait order (below),
+`OnDemand` being the `Readiness` that resolves one declaration and reports its failure.
 
 `DefinitionResolver` (package-private) resolves one `SchemaMap.Declaration` and never sees a document. Everything it
 consults is fixed at construction: two `DefinitionGetter`s, `namespaceDefinitions` the whole namespace and

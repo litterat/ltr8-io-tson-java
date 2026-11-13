@@ -12,7 +12,8 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   the entry at the end, while the entry's facts record the name the author wrote as its constructor.
 - A head declared in the same document is made ready before its instance is read, in wait order (`WaitOrder`,
   `design/schema-resolution.md`), whichever is written first; the body is read through readers compiled from the
-  entries ready so far. An imported head's body is read through the compiled form of the schema that declared it
+  entries ready so far. An imported head's body is read through the compiled form of the schema that declared it,
+  unless it selects a type beyond that schema's closure, which the entries ready so far hold
   (`design/resolver-vocabulary-and-bootstrap.md`).
 - An instance of a constructor meta.tn, numeric.tn, temporal.tn or net.tn declares is the schema model's body. An instance of
   any other constructor is held as a `ValueEntry` where the head composes `meta.top` and not `meta.type` (its instances are
