@@ -1,53 +1,15 @@
-!!id:"https://tson.io/2026/40/m/net.tn?sha256=f60bed4ead684a54c759472bdb5720e38a1c779a176b784dca5d6367e4e2a7e7"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=5d3259d67c67b615d17eb182e6f5a2d46e9e904d2d5552735518d8a91cfb2e11"
+!!id:"https://tson.io/2026/40/m/net.tn?sha256=a7ecf6cc57c1e04836ab319e2f2d882b6f5a5fcb826e7c30931a6e3bf83a5761"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=fba10509f9c9db688ee01d2921635a24b1879d80b19f43c59edba3674c18252d"
 @doc:"""
-  TSON net — the network and identifier type library (2026 Revision 40
-  draft).
-
-  Its root holds the network and identifier types a data schema writes:
-  `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `hostname`, `host`,
-  `media_type`, `uri_reference`, `uri` and `uuid`. Their constructors are
-  machinery, members of `net`, a schema map nested in its root, each named by
-  its path: `net.ipv4_type`, `net.hostname_type`, `net.uri_type`,
-  `net.uuid_type`. The kernel contributes to the same map: `net.iri_type`,
-  the constructor of the kernel's `iri`, and its schemes, `net.scheme_set`
-  and `net.scheme_name`. The instances are empty, but for `uri`, which
-  refines `uri_reference` to require a scheme. The schemaless annotations of
-  the same names ([TSON-DATA] §5.5) denote these types.
-
-  It imports the kernel, meta.tn, alone: the kernel's constructors,
-  `atom.specification`, `net.scheme_set` and classifying annotations are
-  what it builds on, and it needs nothing of numeric.tn or
-  temporal.tn. A schema importing it reserves its root names beside the
-  kernel's, `net` among those ([TSON-SCHEMA] §2.2.3), so a schema imports it
-  when it wants these names, and only then. core.tn imports it with numeric.tn and
-  temporal.tn, for a schema that wants every bundled type.
-
-  Hash pins here are real digests over the bytes of this copy; see meta.tn's
-  note.
-
-  References:
-    RFC 1123              Host name syntax (§2.1)
-    RFC 3492              Punycode
-    RFC 3986              URI syntax, and the IPv4address grammar
-    RFC 3987              Internationalized Resource Identifiers (ihost)
-    RFC 4291              IPv6 addressing architecture
-    RFC 4632              Classless Inter-domain Routing (CIDR)
-    RFC 5321, RFC 5322    Email address format
-    RFC 5890-5893         IDNA2008: definitions, protocol, code points, Bidi
-    RFC 5952              IPv6 address text representation
-    RFC 6838, RFC 6839    Media type specifications, structured suffixes
-    RFC 9110 §8.3.1       Media type parameters
-    RFC 9542              IEEE 802 parameters (EUI-48 format)
-    RFC 9562              UUID format
+  The TSON network library: `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`,
+  `hostname`, `host`, `media_type`, `uri`, `uri_reference` and `uuid`. A schema
+  imports it, or core.tn, to write them ([TSON-DATA] §5.5, [TSON-SCHEMA] §5.5).
   """
 !schema {
   @doc:"The network constructors, each named by its path, `net.ipv4_type`."
   net => !schema {
     @doc:"""
-      Email constraint vocabulary. Instance is `email`. An address is
-      its text as written: a mailbox's local part is case-sensitive (RFC 5321
-      §2.4), so a form over the whole text could merge two mailboxes.
+      The constructor of `email` (RFC 5322). An address is its text as written.
       """
     email_type => unicode.text_type & atom.specification & {
       spec?:          = "https://www.rfc-editor.org/rfc/rfc5322"
@@ -55,12 +17,10 @@
     }
 
     @doc:"""
-      IPv4 address constraint vocabulary. Instance is `ipv4`. The spec pin cites
-      RFC 3986 for its `IPv4address` production — the normative dotted-quad
-      grammar ([TSON-DATA] §5.5). `within` and `excluding` list IPv4 networks,
-      each a `cidr4`: the address must lie inside at least one `within` network
-      when the field is present, and inside no `excluding` network. `excluding`
-      carves holes out of `within`.
+      The constructor of `ipv4`: RFC 3986's `IPv4address`, a dotted quad. An
+      address lies inside at least one `within` network, where any is given, and
+      inside no `excluding` network:
+      `private => !ipv4 ^ { within: ["10.0.0.0/8"] }`.
       """
     ipv4_type => meta.atom & atom.specification & {
       spec?:      = "https://www.rfc-editor.org/rfc/rfc3986"
@@ -69,10 +29,8 @@
     }
 
     @doc:"""
-      IPv6 address constraint vocabulary. Instance is `ipv6`. `within` and
-      `excluding` list IPv6 networks, each a `cidr6`: the address must lie
-      inside at least one `within` network when the field is present, and inside
-      no `excluding` network.
+      The constructor of `ipv6`: RFC 4291 §2.2 text, with no zone identifier.
+      `within` and `excluding` are as `ipv4_type`'s.
       """
     ipv6_type => meta.atom & atom.specification & {
       spec?:      = "https://www.rfc-editor.org/rfc/rfc4291"
@@ -81,12 +39,11 @@
     }
 
     @doc:"""
-      IPv4 network constraint vocabulary. Instance is `cidr4`.
-      `min_prefix`/`max_prefix` narrow the prefix length within the family range
-      0-32; bounds outside that range are invalid at the schema level. `within`
-      lists IPv4 networks, each a `cidr4`: the value must be a subnet of at
-      least one. `excluding`: the value must not overlap any listed network —
-      overlap, not containment.
+      The constructor of `cidr4`: an address, `/` and a prefix length.
+      `min_prefix` and `max_prefix` lie in 0-32. A value is a subnet of at least
+      one `within` network, where any is given, and overlaps no `excluding`
+      network. Ordering is by containment, and disjoint networks are
+      incomparable.
       """
     cidr4_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc4632"
@@ -97,11 +54,7 @@
     }
 
     @doc:"""
-      IPv6 network constraint vocabulary. Instance is `cidr6`.
-      `min_prefix`/`max_prefix` narrow the prefix length within the family range
-      0-128. `within` and `excluding` list IPv6 networks, each a `cidr6`, with
-      the semantics of `cidr4_type`: subnet-of for `within`, non-overlap for
-      `excluding`.
+      The constructor of `cidr6`: as `cidr4_type`, with prefix lengths in 0-128.
       """
     cidr6_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc4291"
@@ -111,23 +64,26 @@
       excluding?:  [cidr6]
     }
 
-    @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac`."
+    @doc:"""
+      The constructor of `mac`. EUI-48: six hex octets, colon- or
+      hyphen-separated.
+      """
     mac_type => meta.atom & atom.specification & {
       spec?: = "https://www.rfc-editor.org/rfc/rfc9542"
     }
 
     @doc:"""
-      Host name constraint vocabulary. Instance is `hostname`. A domain name as
-      a host names it: labels of ASCII letters, digits and hyphens (RFC 1123
-      §2.1), or internationalized labels judged by IDNA2008 (RFC 5890 to RFC
-      5893), written as U-labels or as their A-labels, in any mix. `A`-`Z` read
-      as `a`-`z`; nothing else is mapped, so uppercase beyond ASCII, a U-label
-      not in NFC and percent-encoding are not host names. A label is at most 63
-      octets and the name at most 253, counted in the A-label form; no label is
-      empty, none begins or ends with `-`, and there is no trailing `.`. The
-      last label does not begin with a digit, so a dotted-quad is never a host
-      name. The value is the name: every spelling of one name is one value, and
-      its canonical text has each internationalized label as its U-label.
+      The constructor of `hostname`. A domain name: labels of ASCII letters,
+      digits and hyphens (RFC 1123 §2.1), or internationalized labels judged by
+      IDNA2008 (RFC 5890 to RFC 5893), written as U-labels or as their A-labels,
+      in any mix. `A`-`Z` read as `a`-`z`; nothing else is mapped, so uppercase
+      beyond ASCII, a U-label not in NFC and percent-encoding are not host
+      names. A label is at most 63 octets and the name at most 253, counted in
+      the A-label form; no label is empty, none begins or ends with `-`, and
+      there is no trailing `.`. The last label does not begin with a digit.
+
+      The value is the name: every spelling of one name is one value, and its
+      canonical text has each internationalized label as its U-label.
       `allow_idn` false admits only names with no internationalized label, in
       either spelling.
       """
@@ -137,37 +93,40 @@
     }
 
     @doc:"""
-      Host constraint vocabulary. Instance is `host`. RFC 3987's `ihost`
-      with a DNS name: a host name as `hostname_type` has it, an IPv4 address in
-      dotted-quad, or an IPv6 address, written with or without the brackets a
-      URI puts around one. No zone identifier. The value is the name or the
-      address, never both; a name compares by name, an address by its octets,
-      and an IPv4 address never equals an IPv6 one, IPv4-mapped included. The
-      canonical text is the member's: the name's U-labels, the dotted-quad, or
-      RFC 5952 text without brackets.
+      The constructor of `host`. RFC 3987's `ihost` with a DNS name: a host name
+      as `hostname_type` has it, an IPv4 address in dotted-quad, or an IPv6
+      address, with or without the brackets a URI puts around one, and no zone
+      identifier.
+
+      The value is the name or the address, never both: a name compares by name,
+      an address by its octets, and an IPv4 address never equals an IPv6 one,
+      IPv4-mapped included. The canonical text is the member's: the name's
+      U-labels, the dotted-quad, or RFC 5952 text without brackets.
       """
     host_type => meta.atom & atom.specification & {
       spec?: = "https://www.rfc-editor.org/rfc/rfc3987"
     }
 
     @doc:"""
-      Media type constraint vocabulary. Instance is `media_type`. A media
-      type (RFC 6838) and its parameters (RFC 9110 §8.3.1): the type and subtype
-      are RFC 6838 §4.2's `restricted-name`, and each parameter is a token name,
-      `=` and a token or quoted-string value, after a `;` with optional
-      whitespace around it. Nothing beyond US-ASCII. A media range (`text/*`) is
-      not a media type. The value is the type, the subtype and a map of
-      parameters: the type, subtype and parameter names compare without ASCII
-      case, a quoted value equals its token form, parameter order carries no
-      meaning and a repeated name is a resolver error, and a parameter value
-      keeps its case except `charset`'s, which folds. The canonical text is
-      lowercase, with `charset` folded and parameters sorted by name, each value
-      a token where it is one, joined by `;` without whitespace.
-      `allow_parameters` admits parameters, false by default. `types` lists the
-      top-level types admitted. `suffixes` lists RFC 6839 structured suffixes: a
-      suffix admits a subtype ending `+` and the suffix, and the subtype that is
-      the suffix itself. A refinement withdraws `allow_parameters` and shrinks
-      `types` and `suffixes`; it never widens them.
+      The constructor of `media_type`. A media type (RFC 6838) and its
+      parameters (RFC 9110 §8.3.1): the type and subtype are RFC 6838 §4.2's
+      `restricted-name`, and each parameter is a token name, `=` and a token or
+      quoted-string value, after a `;` with optional whitespace around it.
+      Nothing beyond US-ASCII. A media range (`text/*`) is not a media type.
+
+      The value is the type, the subtype and a map of parameters: the type,
+      subtype and parameter names compare without ASCII case, a quoted value
+      equals its token form, parameter order carries no meaning and a repeated
+      name is a resolver error, and a parameter value keeps its case except
+      `charset`'s, which folds. The canonical text is lowercase, with `charset`
+      folded and parameters sorted by name, each value a token where it is one,
+      joined by `;` without whitespace.
+
+      Parameters are admitted only where `allow_parameters` is set, as in
+      `content_type => !net.media_type_type { allow_parameters: true }`. `types`
+      lists the top-level types admitted. `suffixes` lists RFC 6839 structured
+      suffixes: a suffix admits a subtype ending `+` and the suffix, and the
+      subtype that is the suffix itself.
       """
     media_type_type => meta.atom & atom.specification & {
       spec?:             = "https://www.rfc-editor.org/rfc/rfc6838"
@@ -177,14 +136,9 @@
     }
 
     @doc:"""
-      URI constraint vocabulary per RFC 3986. Instances are `uri` and
-      `uri_reference`. The facets are `net.iri_type`'s, over RFC 3986's
-      grammar: `schemes` lists the admitted schemes as `net.scheme_name` values,
-      which fold case; `allow_relative` admits a relative reference (§4.2)
-      beside a URI (§3), so its default is a URI-reference (§4.1);
-      `allow_fragment` admits a fragment (§3.5), and withdrawing it beside
-      `allow_relative` leaves an absolute-URI (§4.3). A URI is US-ASCII (§2),
-      and its text as written, as an IRI is.
+      The constructor of `uri` and `uri_reference`: RFC 3986's grammar,
+      US-ASCII, with `net.iri_type`'s facets. Withdrawing `allow_fragment`
+      beside `allow_relative` leaves an absolute-URI (§4.3).
       """
     uri_type => unicode.text_type & atom.specification & {
       spec?:           = "https://www.rfc-editor.org/rfc/rfc3986"
@@ -194,80 +148,52 @@
       normalization?:  = NONE
     }
 
-    @doc:"UUID constraint vocabulary. Instance is `uuid`."
+    @doc:"""
+      The constructor of `uuid` (RFC 9562). `version` admits one UUID version:
+      `!uuid ^ { version: 4 }`.
+      """
     uuid_type => meta.atom & atom.specification & {
       spec?:    = "https://www.rfc-editor.org/rfc/rfc9562"
       version?: numeric.count
     }
   }
 
-  @doc:"Email address per RFC 5322."
+  @doc:"An email address (RFC 5322)."
   @atom.ordering:NONE @atom.bounded:false
   email => !net.email_type {}
 
-  @doc:"""
-    IPv4 address, dotted-quad per the RFC 3986 IPv4address production. Totally
-    ordered by numeric address value over a finite 32-bit space.
-    """
+  @doc:"An IPv4 address, `192.0.2.1`."
   @atom.ordering:TOTAL @atom.bounded:true
   ipv4 => !net.ipv4_type {}
 
-  @doc:"""
-    IPv6 address, RFC 4291 §2.2 text representation. Zone identifiers (RFC 4007,
-    `fe80::1%eth0`) are host-local and excluded from the contract. Totally
-    ordered by numeric address value over a finite 128-bit space. (TSON text:
-    contains colons, so quote it.)
-    """
+  @doc:"An IPv6 address (RFC 4291 §2.2), with no zone identifier."
   @atom.ordering:TOTAL @atom.bounded:true
   ipv6 => !net.ipv6_type {}
 
-  @doc:"""
-    IPv4 network, address `/` prefix length 0-32 (RFC 4632). PARTIAL ordering is
-    by containment: a network precedes another when its address range is a
-    strict subset; CIDR blocks never partially overlap, so any two are nested or
-    disjoint, and disjoint networks are incomparable. (TSON text: contains `/`,
-    so quote it.)
-    """
+  @doc:"An IPv4 network, an address and a prefix length: `10.0.0.0/8`."
   @atom.ordering:PARTIAL @atom.bounded:false
   cidr4 => !net.cidr4_type {}
 
-  @doc:"""
-    IPv6 network, address `/` prefix length 0-128 (RFC 4291 §2.3). PARTIAL
-    ordering is by containment, as for cidr4. (TSON text: contains colons and
-    `/`, so quote it.)
-    """
+  @doc:"An IPv6 network, an address and a prefix length."
   @atom.ordering:PARTIAL @atom.bounded:false
   cidr6 => !net.cidr6_type {}
 
-  @doc:"""
-    MAC address, EUI-48: six hex octets, colon- or hyphen-separated (RFC 9542).
-    An opaque hardware identifier — like uuid, ordering is not semantically
-    meaningful. (TSON text: the colon form must be quoted; the hyphen form may
-    go unquoted.)
-    """
+  @doc:"A MAC address (EUI-48)."
   @atom.ordering:NONE @atom.bounded:false
   mac => !net.mac_type {}
 
   @doc:"""
-    Internet host name, in either label form: `Example.COM` and `example.com`
-    are one value, and so are `xn--bcher-kva.example` and `bücher.example`,
-    whose canonical text is the second. See `net.hostname_type`.
+    An Internet host name. `Example.COM` and `example.com` are one value, and so
+    are `xn--bcher-kva.example` and `bücher.example`.
     """
   @atom.ordering:NONE @atom.bounded:false
   hostname => !net.hostname_type {}
 
-  @doc:"""
-    A host: a `hostname`, an IPv4 address or an IPv6 address, one string-class
-    type, so `localhost`, `"127.0.0.1"`, `"::1"` and `"[::1]"` need no tag. See
-    `net.host_type`.
-    """
+  @doc:"A host: a `hostname`, an IPv4 address or an IPv6 address."
   @atom.ordering:NONE @atom.bounded:false
   host => !net.host_type {}
 
-  @doc:"""
-    A media type without parameters: `text/html`, `application/ld+json`. See
-    `net.media_type_type`.
-    """
+  @doc:"A media type without parameters: `text/html`, `application/ld+json`."
   @atom.ordering:NONE @atom.bounded:false
   media_type => !net.media_type_type {}
 
@@ -279,7 +205,7 @@
   @atom.ordering:NONE @atom.bounded:false
   uri => !uri_reference ^ { allow_relative: false }
 
-  @doc:"128-bit identifier per RFC 9562."
+  @doc:"A UUID (RFC 9562)."
   @atom.ordering:NONE @atom.bounded:false
   uuid => !net.uuid_type {}
 }

@@ -88,7 +88,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   source left unset widens the profile, so no set-once form of the rule is sound (`IdentifierType`). Every text
   family's `normalization` is identity-only on the same terms (`TextType`): turning folding on would make
   `Content-Type` one value under the source and another under the refinement.
-- **A reference narrows `of` by IS-A, and the link judges it** (§5.7, `meta.ref`'s own `@doc`). The refined `of`
+- **A reference narrows `of` by IS-A, and the link judges it** (§5.7). The refined `of`
   is the source's or a type IS-A it -- a constructor IS-A one by its chain (`unicode.identifier_type` lists
   `meta.type`), an ordinary type by its own (`big_order => order ^ {}`) -- so every name the refinement admits, the
   source admits too: `meta.identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }` is the kernel's case.
@@ -115,12 +115,11 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the same verdict — they are one type, and a rule kept in the desugar phase would only ever see the
   first. `TsonSchemaLinker` asks it a second time for the bodies **materialisation** produces, which
   resolution never saw closed: §8.2's "family coherence rules whose operands were parameters" is exactly a
-  template whose bounds were `MIN`/`MAX` until an application supplied both. numeric.tn's and temporal.tn's header
-  `@doc`s state the same obligation from the other side: bounds are field
-  groups so an inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
-  lower bound not exceeding the upper) is a schema-load check". `net.cidr4_type`'s `@doc` adds the family
-  range — prefixes narrow "within the family range 0-32", and "bounds outside that range are invalid at the
-  schema level" — so the CIDR pair is judged against its address width as well as against itself.
+  template whose bounds were `MIN`/`MAX` until an application supplied both. numeric.tn's header `@doc` states the
+  same obligation from the other side, for its families and temporal.tn's: bounds are field groups, so an
+  inclusive/exclusive pair on one side is unrepresentable, while "a lower bound does not exceed the upper" is a
+  rule over the body. `net.cidr4_type`'s `@doc` adds the family range, `min_prefix` and `max_prefix` lying in
+  0-32, so the CIDR pair is judged against its address width as well as against itself.
   - **The linker asks every family, and needs no list to do it.** `TsonSchemaLinker` asks **every** family the
     same question again for the bodies materialisation produces, which is how §8.2's "every family coherence rule
     ... asked once more of the closed record" is met without a list — "a resolver needs no list", as it puts it.

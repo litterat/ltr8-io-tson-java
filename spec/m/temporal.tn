@@ -1,60 +1,20 @@
-!!id:"https://tson.io/2026/40/m/temporal.tn?sha256=64cb1d318a89aff586f4dfe5d86e9a30ee48b3b65eb1d60892cf6bf9652c04d5"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=5d3259d67c67b615d17eb182e6f5a2d46e9e904d2d5552735518d8a91cfb2e11"
+!!id:"https://tson.io/2026/40/m/temporal.tn?sha256=e839a87b7e98ca1185a4a9fb2f364e770603a0f4f60cc4b4e26faa4cc02759b8"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=fba10509f9c9db688ee01d2921635a24b1879d80b19f43c59edba3674c18252d"
 @doc:"""
-  TSON temporal — the temporal type library (2026 Revision 40 draft).
-
-  Its root holds the temporal types a data schema writes: `date`, `time`,
-  `datetime`, `duration` and `period`. Their constructors are machinery,
-  members of `temporal`, a schema map nested in its root, each named by its
-  path: `temporal.date_type`, `temporal.time_type`, `temporal.datetime_type`,
-  `temporal.duration_type` and `temporal.period_type`.
-
-  It imports the kernel, meta.tn, alone: the kernel's constructors,
-  `numeric.count` and classifying annotations are what it builds on, and it
-  needs nothing of numeric.tn or net.tn. A schema
-  importing it reserves `temporal` and its root names beside the kernel's
-  ([TSON-SCHEMA] §2.2.3), and sees none of numeric.tn's: importing temporal.tn
-  gives `date` and no `int32`. core.tn imports it with numeric.tn and net.tn,
-  for a schema that wants every bundled type.
-
-  Hash pins here are real digests over the bytes of this copy; see meta.tn's
-  note.
-
-  An annotation never changes a value, its type, or whether it is valid:
-  validation is over values, and a schema with every annotation erased admits
-  exactly the same values. A value space is described without reference to
-  any encoding, and where a doc mentions how TSON text spells a value it says
-  so by name.
-
-  Every constructor here binds to a governing specification, RFC 3339: it
-  composes with the kernel's `atom.specification` mixin and pins the
-  spec field with `=`.
-
-  A bound or a step is of the constrained family and is typed by that
-  family's instance at this document's root: a `date_type` bound is a `date`,
-  a `period_type` step a `period`. A precision counts digits and is typed by
-  the kernel's `numeric.count`. The bounds are field groups
-  ([TSON-SCHEMA] §5.11): one inclusive-or-exclusive group per side, so an
-  inclusive and an exclusive bound on the same side is unrepresentable.
-  Value-level coherence (the lower bound not exceeding the upper) is a
-  schema-load check.
-
-  `multiple_of`, on `temporal.duration_type` and `temporal.period_type`,
-  follows the one rule numeric.tn states for every step: strictly positive,
-  sign-blind, tightened by a refinement only to an integer multiple of the
-  inherited step, and composed with every other facet present.
-
-  References:
-    RFC 3339              Internet date/time profile; Appendix A is
-                          the duration/period grammar (ISO 8601-1:2019
-                          is the informative source behind it)
-    ISO/IEC 11404:2007    General Purpose Datatypes
-    W3C XSD Part 2        Facet model and constraint vocabulary
+  The TSON temporal library: `date`, `time`, `datetime`, `duration` and
+  `period`, each RFC 3339's. A schema imports it, or core.tn, to write them
+  ([TSON-DATA] §5.4, [TSON-SCHEMA] §5.5). numeric.tn's shared rules for bounds
+  and `multiple_of` apply.
   """
 !schema {
-  @doc:"The temporal constructors, each named by its path, `temporal.date_type`."
+  @doc:"""
+    The temporal constructors, each named by its path, `temporal.date_type`.
+    """
   temporal => !schema {
-    @doc:"Date constraint vocabulary. Instance is `date`."
+    @doc:"""
+      The constructor of `date`: RFC 3339 `full-date`. An author refines the
+      instance: `recent => !date ^ { min: 2000-01-01 }`.
+      """
     date_type => meta.atom & atom.specification & {
       spec?: = "https://www.rfc-editor.org/rfc/rfc3339"
       ( min: date | exclusive_min: date )?
@@ -62,14 +22,14 @@
     }
 
     @doc:"""
-      Time constraint vocabulary. Instance is `time`. `precision` is a
-      constraint on the value, not on a spelling: `precision: N` admits a value
-      that is a whole number of 10^-N seconds, so `precision: 3` is millisecond
-      resolution and `precision: 0` whole seconds. The atom is exact — nothing
-      is truncated; a value off the grid is rejected ([TSON-SCHEMA] §5.5).
-      Reading admits any spelling of an admitted value, trailing zeros included,
-      so `12:00:00.500` is admitted under `precision: 1`; a text encoding
-      writing the value writes at most N fractional digits, `12:00:00.5`.
+      The constructor of `time`: RFC 3339 `full-time`. The value is the time of
+      day in UTC, on [00:00:00, 24:00:00): the offset is a spelling, so
+      `10:00:00+01:00` and `09:00:00Z` are one value, and `23:30:00-02:00` is
+      `01:30:00Z`. A leap second, `23:59:60`, is refused.
+
+      `precision: N` admits a value that is a whole number of 10^-N seconds, N
+      at most 9. It constrains the value and not a spelling: `12:00:00.500` is
+      admitted under `precision: 1`, and is written `12:00:00.5`.
       """
     time_type => meta.atom & atom.specification & {
       spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
@@ -79,9 +39,11 @@
     }
 
     @doc:"""
-      Datetime constraint vocabulary. Instance is `datetime`.
-      `precision` as for `time_type`: the value is a whole number of 10^-N
-      seconds, a constraint on the value ([TSON-SCHEMA] §5.5).
+      The constructor of `datetime`: RFC 3339 `date-time`. The value is the
+      instant on the UTC timeline: the offset is a spelling, so
+      `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are one value, and
+      `-00:00` is the same instant as `Z`. A leap second is refused. `precision`
+      is `time_type`'s.
       """
     datetime_type => meta.atom & atom.specification & {
       spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
@@ -91,35 +53,23 @@
     }
 
     @doc:"""
-      Elapsed-time constraint vocabulary. Instance is `duration`.
-      Lexical form is the RFC 3339 Appendix A `duration` production with three
-      extensions and one restriction: an optional leading `-`; a fraction on the
-      seconds component only, written with `.` (`PT0.5S`, never `PT1.5H` or
-      `PT0,5S`); any subset of D, H, M, S may be omitted provided at least one
-      component is present and order is kept (`PT1H30S` is admitted); and the Y
-      and month-M components are not admitted — `P1M` is one month and belongs
-      to `period`; a minute is `PT1M`. `PnW` stands alone, as in the ABNF
-      (`P1W2D` is an error). A day is exactly 86400 s and a week 7 days.
+      The constructor of `duration`. The value is a signed exact decimal number
+      of seconds: `PT90M`, `PT1H30M` and `P0DT5400S` are one value, and so are
+      `PT0S`, `P0D` and `-PT0S`. A day is 86400 s and a week 7 days.
 
-      The value is a signed exact decimal number of seconds — numeric.tn's
-      `number`'s value space, in seconds: nothing is rounded. So `PT90M`, `PT1H30M` and
-      `P0DT5400S` are one value, `PT0S`, `P0D` and `-PT0S` are one value, and
-      ordering is TOTAL. Bounds compare the value, not the token.
+      The lexical form is RFC 3339 Appendix A's `duration` with an optional
+      leading `-`; a fraction on the seconds component only, written with `.`
+      (`PT0.5S`, never `PT1.5H`); any of D, H, M, S omitted, at least one
+      present and in order; and no Y or month-M component (`P1M` is a `period`,
+      a minute `PT1M`). `PnW` stands alone (`P1W2D` is an error).
 
-      Both ends of that space are fixed at a signed 64-bit count of nanoseconds.
-      The seconds component admits at most nine fractional digits, and a
-      magnitude may not exceed 2^63 - 1 nanoseconds (about 292 years) — stated
-      as a magnitude, so negating an admitted duration always yields an admitted
-      one. A processor MUST represent every value in that range and MUST reject
-      one outside it whether or not its own representation could hold it.
+      The seconds component has at most nine fractional digits, and a magnitude
+      does not exceed 2^63 - 1 nanoseconds. A processor MUST represent every
+      value in that range and MUST reject one outside it whether or not its own
+      representation could hold it.
 
-      `precision` as for `time_type`, and it is `fraction_digits` on the seconds
-      count: the value is a whole number of 10^-N seconds, so `precision: 0`
-      admits whole seconds only and `precision: 9` is the nanosecond grid. A
-      constraint on the value and not on a spelling — `PT0.50S` is a whole
-      number of tenths — and it may not exceed 9. `multiple_of` is
-      `numeric.decimal_type`'s `multiple_of` on that same count, under the
-      header's uniform rule: `PT15M` admits only quarter-hour values.
+      `precision` is `time_type`'s. `multiple_of` is a step over the seconds
+      count: `PT15M` admits only quarter-hour values.
       """
     duration_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
@@ -130,16 +80,11 @@
     }
 
     @doc:"""
-      Calendar-span constraint vocabulary. Instance is `period`. Lexical
-      form is the RFC 3339 Appendix A `duration` production restricted to an
-      optional leading `-`, then `P` followed by a Y component, an M component,
-      or both in that order; no fraction, no W or D component and no `T` part
-      (`P1M15D`, `P1Y0D` and `P1YT1H` are errors — use `duration`, or a record
-      with a `period` field and a `duration` field, for mixed spans). The value
-      is a signed integer number of months, so `P1Y` and `P12M` are equal,
-      `P0Y`, `P0M` and `-P0M` are equal, and ordering is TOTAL. Bounds compare
-      the value, not the token. `multiple_of` is a period under the header's
-      uniform rule: `P3M` admits only whole quarters.
+      The constructor of `period`. The value is a signed integer number of
+      months: `P1Y` and `P12M` are one value, and so are `P0Y`, `P0M` and
+      `-P0M`. The lexical form is RFC 3339 Appendix A's `duration` restricted to
+      an optional leading `-`, then `P` with a Y component, an M component, or
+      both in that order: no fraction, no W or D component and no `T` part.
       """
     period_type => meta.atom & atom.specification & {
       spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
@@ -149,54 +94,32 @@
     }
   }
 
-  @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
+  @doc:"A calendar date, `2026-01-31`."
   @atom.ordering:TOTAL @atom.bounded:true
   date => !temporal.date_type {}
 
   @doc:"""
-    Time of day. RFC 3339 full-time HH:MM:SS[.s…] with a mandatory offset. The
-    value is the time of day in UTC, on the finite interval [00:00:00,
-    24:00:00), so `10:00:00+01:00` and `09:00:00Z` are one value, and ordering
-    is TOTAL. Normalising to UTC wraps at midnight (`23:30:00-02:00` is
-    `01:30:00Z`): a local time of day — "09:00 wherever you are" — is not this
-    type. Equality and bounds compare the value. The offset is a spelling: TSON
-    text preserves it as written, an encoding that stores the instant may drop
-    it. A leap second, `23:59:60`, which RFC 3339's grammar admits, lies outside
-    the interval and is refused.
+    A time of day with a mandatory offset. Two spellings of one UTC time are one
+    value.
     """
   @atom.ordering:TOTAL @atom.bounded:true
   time => !temporal.time_type {}
 
   @doc:"""
-    Date and time. RFC 3339 date-time with a mandatory offset. The value is the
-    instant on the UTC timeline, so `2026-01-01T10:00:00+01:00` and
-    `2026-01-01T09:00:00Z` are one value, and ordering is TOTAL. An offset of
-    `-00:00` (offset unknown, RFC 3339 §4.3) is the same instant as `Z` and
-    compares as such. A local datetime — a wall clock with no offset — is not
-    this type. Equality and bounds compare the value. The offset is a spelling:
-    TSON text preserves it as written, an encoding that stores the instant may
-    drop it, and a value for which the offset is data — an appointment shown in
-    its booked zone — is a different value space, not this type. A leap second,
-    second 60, which RFC 3339's grammar admits, is not an instant on that
-    timeline and is refused.
+    A date and time with a mandatory offset: an instant, so two spellings of one
+    instant are one value.
     """
   @atom.ordering:TOTAL @atom.bounded:true
   datetime => !temporal.datetime_type {}
 
   @doc:"""
-    Elapsed time — a signed exact decimal number of seconds, within the range
-    `duration_type` fixes. No Y or month-M component, so every value has a fixed
-    length and ordering is TOTAL. `P1M` is a month and belongs to `period`; a
-    minute is `PT1M`. A day is exactly 86400 s and a week 7 days, so `PT90M`,
-    `PT1H30M` and `P0DT5400S` are one value.
+    Elapsed time as an exact number of seconds, `PT1H30M`. It has no year or
+    month component: a calendar span is a `period`.
     """
   @atom.ordering:TOTAL @atom.bounded:true
   duration => !temporal.duration_type {}
 
-  @doc:"""
-    Calendar span — a signed integer number of months. `P1Y` and `P12M` are one
-    value. A span that is genuinely both is a record with a field of each.
-    """
+  @doc:"A calendar span as a whole number of months, `P1Y6M`."
   @atom.ordering:TOTAL @atom.bounded:false
   period => !temporal.period_type {}
 }

@@ -58,8 +58,8 @@ spec-required case:
 - [ ] **A declared record stating `discriminators` is made abstract whatever its `extension` says** ([TSON-SCHEMA]
   §5.2). `d => !meta.record { fields: { x => !meta.record_field { type: int32 } }  extension: FINAL  discriminators:
   [x] }` loads, and `!d { x: 1 }` is refused as a tag naming an abstract record: the definition-mark step in
-  `DefinitionResolver` derives ABSTRACT from `discriminators` over a stated `OPEN` or `FINAL`, where the kernel's
-  `meta.record` `@doc` says such a record must be ABSTRACT and the mark `final` beside `=?` is refused. A record
+  `DefinitionResolver` derives ABSTRACT from `discriminators` over a stated `OPEN` or `FINAL`, where §5.2 makes such
+  a record ABSTRACT and refuses the mark `final` beside `=?`. A record
   written in place keeps its stated `extension`, and its `discriminators` decide nothing at read. Decide refusal or
   derivation for the canonical form, and apply it in both places.
 - [ ] **A record written in place carries its fields' annotations beside its payload** ([TSON-SCHEMA] §3.3.3).

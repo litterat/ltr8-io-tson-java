@@ -582,3 +582,21 @@ reading of the text. In the HTTP layer (`ltr8-io-tson-java-http`) `@binds` and a
 slots the rule reaches, with the namespace and the time above; and in §6, beside "conforming to `T`", a pointer to
 it. No rule changes: §6's "an annotation never changes whether a value is valid" is about the annotated value, and
 an annotation whose own value does not conform is already an error.
+
+## 9. [TSON-SCHEMA] §5.5, §9, [TSON-DATA] §5.5 — `net.uuid_type.version` has no stated meaning
+
+**Problem.** net.tn declares `uuid_type => meta.atom & atom.specification & { spec?: = "…/rfc9562"  version?:
+numeric.count }`. Nothing says what `version` constrains: §5.5's per-family list has no entry for `uuid`, §5.7's
+facet kinds name no `version`, [TSON-DATA] §5.5 gives the lexical form only, and the entry's own `@doc` was "UUID
+constraint vocabulary. Instance is `uuid`." Three readings fit the declaration: the value's RFC 9562 version field
+equals `version`; it is at least `version`; or `version` is advice to a generator. Which facet kind it is under
+§5.7 is unstated too, so whether `!v4 ^ { version: 7 }` is a refinement is undecided.
+
+**What is running.** The first reading: a value whose version field differs from `version` is a validation error
+("is version 1, expected version 4"). Under refinement it is settable once: `!v4 ^ { version: 7 }` over
+`v4 => !uuid ^ { version: 4 }` is refused, "a set version may be restated but not changed". The entry's `@doc` now
+says "`version` admits one UUID version", which is this reading.
+
+**Resolution proposed.** One clause in §5.5's list: `version` admits a UUID whose RFC 9562 version field equals it,
+a value outside it being a validation error; and in §5.7, `version` among the settable-once facets, since two
+versions admit disjoint values and a change would narrow nothing.
