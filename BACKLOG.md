@@ -128,6 +128,16 @@ spec-required case:
   then read the instance as its source's body with the facet held. An instance of a constructor composing `atom`,
   `product` or `sum` directly stays refused: it is a type of a new form, which a processor backs with readers and
   writers of its own.
+- [ ] **An instance of a constructor composed with `&` that adds no field is refused** ([TSON-SCHEMA] §5.7, §5.8).
+  `my_list => meta.array ^ { min_items?: = 1 }` and `my_list2 => meta.array & { min_items?: = 1 }` resolve to one
+  entry, and §5.8 makes each a constructor. `my_list<text>` and `!my_list { element_type: text }` load, bound as the
+  array body; `my_list2<text>` and `!my_list2 { element_type: text }` are refused as `NOT_IMPLEMENTED` ("this library
+  models the body of a type built only by the bundled schemas' constructors"). `ValueReaderContext.tightenedBy` finds
+  the source's host class by the fact recorded when the declaration was written with `^`, the one place main code
+  tells the two operators apart after resolution. Derive it from the entry: a constructor whose single direct parent
+  is a constructor with the same field names binds as that parent. Then check a refined constructor read back from a
+  resolved form, which carries no recorded fact. Add `schema/valid` vectors for the `&` spelling, applied and
+  constructed.
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
   so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest re-runs the
   family checks (no record written in place a member of anything) over the ingested map and its closure, the §5.11 group
@@ -193,6 +203,18 @@ spec-required case:
   field type's own equality (§5.5, so `= 255` over `= 0xFF` is the identity case), in composition and refinement
   bodies alike, at the restating declaration. Add `schema/invalid` vectors for both operators and a `schema/valid` one
   for the identity restatement.
+- [ ] **A record written as `!meta.record` is not judged against the `meta.record_field` invariants**
+  ([TSON-SCHEMA] §8.1). The field syntax cannot write a field that breaks them; the construction can, and each of
+  these loads in `r => !meta.record { fields: { a => { … } } }`: `{ type: text  optional: true  role: DEFAULT }` and
+  `{ type: text  optional: true  value: "x" }` (`value` is present exactly when `role` is not `FREE`), `{ type: int32
+  role: DEFAULT  value: 5 }` (`DEFAULT` requires `optional: true`; `!r {}` then fails as a missing required field),
+  and `{ type: int32  optional: true  voidable: true  role: FIXED  value: 5 }` (`FIXED` requires `voidable: false`).
+  Verify the three per field wherever a `meta.record` value is resolved, at the declaration, with a `schema/invalid`
+  vector for each.
+- [ ] **`extension: FINAL` on an open record written as `!meta.record` is accepted** ([TSON-SCHEMA] §5.2).
+  `box => final <T> { x: T }` is refused, the mark forbidding the composition every application exists for;
+  `box => <T> !meta.record { fields: { v => { type: T } }  extension: FINAL }` is the same record and loads. Refuse
+  it on the lowered form, so both spellings meet one check, and add a `schema/invalid` vector.
 - [ ] **A nested schema map declared twice in one document is accepted** ([TSON-SCHEMA] §2.1, §2.2.3;
   [TSON-DATA] §2.6). `geo => !schema { a => … }` beside `geo => !schema { b => … }` in one schema map loads, its
   members merged. The schema body is a map "in syntax and in semantics" (§2.1), so the repeated key is a duplicate
