@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=fba10509f9c9db688ee01d2921635a24b1879d80b19f43c59edba3674c18252d"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=ee2394b1554c4ea15cee5441b1622f8ddee19c171a7425b07aeab63da9fafc0a"
 @doc:"""
   The TSON kernel: the vocabulary every schema is written in. Its root holds the
   names an author writes: `text`, `integer`, `int64`, `boolean`, `bytes`, `iri`,
@@ -403,7 +403,7 @@
       a qualified name selects a key of a namespace value, `orders.place`, and
       of no other map ([TSON-SCHEMA] §4.1, §5.12).
       """
-    namespace => meta.map ^ {
+    namespace => meta.map & {
       key_type:  meta.identifier_ref
       voidable?: = false
     }

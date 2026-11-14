@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/40/m/net.tn?sha256=a7ecf6cc57c1e04836ab319e2f2d882b6f5a5fcb826e7c30931a6e3bf83a5761"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=fba10509f9c9db688ee01d2921635a24b1879d80b19f43c59edba3674c18252d"
+!!id:"https://tson.io/2026/40/m/net.tn?sha256=30a36db1b57b61c871b5763eace80ff1b2fa19c5ae2c3c58776295abc2f4e38d"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=ee2394b1554c4ea15cee5441b1622f8ddee19c171a7425b07aeab63da9fafc0a"
 @doc:"""
   The TSON network library: `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`,
   `hostname`, `host`, `media_type`, `uri`, `uri_reference` and `uuid`. A schema

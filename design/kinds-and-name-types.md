@@ -23,7 +23,7 @@ is why they are the linker's. Current form only; history lives in git.
 - A constructor is a member where the walk says so, as any type is: one whose declaration is a record (`net.uuid_type
   => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
   `meta.ref<meta.product>` hold it, `meta.namespace` and `meta.ref` among them. A namespace type is built with
-  `meta.namespace`, a refinement of `meta.map`, so it is a member of `meta.type_ref`, `meta.ref<meta.product>`,
+  `meta.namespace`, which composes `meta.map`, so it is a member of `meta.type_ref`, `meta.ref<meta.product>`,
   `meta.ref<meta.map>` and `meta.ref<meta.namespace>`, and of no `meta.ref<meta.record>`. A value entry is a member of
   no kind: its tag names an ordinary type, which no walk reaches a constructor through.
 - A refinement of a reference (`!meta.type_ref ^ { of: … }`) narrows `of` to the source's or a type IS-A it, judged

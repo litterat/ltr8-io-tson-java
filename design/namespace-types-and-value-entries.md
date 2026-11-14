@@ -21,7 +21,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
 - `Top` is sealed all the way down (`permits Type, Alias, ValueEntry`). A switch over a body's kind
   is exhaustive with an explicit `ValueEntry` arm and no `default`: `EntryKind.of`, `TypeInhabitance`,
   `DiscriminationClass`, and the linker's `validateBody`, `collectNames` and coherence check.
-- **`meta.namespace` is a refinement of `meta.map`** (`meta.map ^ { key_type: meta.identifier_ref voidable?: = false
+- **`meta.namespace` composes `meta.map`** (`meta.map & { key_type: meta.identifier_ref voidable?: = false
   }`), IS-A `meta.map` and `meta.product`, and a namespace type is an instance of it, resolved to a `NamespaceBody`
   (`key_type`, `value_type`, `ordered`, `min_items`, `max_items`; `voidable` is pinned false): the kernel's one,
   `meta.schema => !meta.namespace { key_type: meta.type_name value_type: meta.declared }`, and a schema's own `api =>
@@ -126,8 +126,9 @@ interface  => { extends?: [meta.type_name]  methods: method_map }
 interfaces => !meta.namespace { key_type: meta.identifier  value_type: interface }
 ```
 
-**A refinement of `meta.map`.** `meta.namespace` narrows `map`'s `key_type` from `meta.type_ref` to
-`meta.identifier_ref`, the refinement of `meta.type_ref` to the identifier families, and pins `voidable` false;
+**A composition of `meta.map`.** It declares a constructor: `meta.namespace` narrows the declared type of `map`'s
+`key_type` from `meta.type_ref` to `meta.identifier_ref`, the refinement of `meta.type_ref` to the identifier
+families, and pins `voidable` false;
 `ordered` and the size bounds are `map`'s and bound a value as a map's do. So `meta.ref<meta.map>` holds every namespace
 type, and a map that is no namespace is still never entered by a qualified name. Both compilers read a namespace type
 through the map factory with the map `NamespaceBody.read()` states (`design/linking-and-compilation.md`).

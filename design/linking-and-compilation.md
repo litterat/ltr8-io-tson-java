@@ -213,7 +213,7 @@ pin naming a declaration not yet ready (enum's `name_type: = meta.identifier` mi
 
 ## Namespace types (§4.1)
 
-A namespace type is an instance of the kernel's `meta.namespace` constructor, a refinement of `meta.map`,
+A namespace type is an instance of the kernel's `meta.namespace` constructor, which composes `meta.map`,
 `!meta.namespace { key_type: …  value_type: … ordered: … }` (`meta.schema` in the kernel, `headers => !meta.namespace {
 key_type: header_name value_type: text }` in any schema), and resolves to a `NamespaceBody`. A value of it is a map from
 `key_type` to `value_type`.
