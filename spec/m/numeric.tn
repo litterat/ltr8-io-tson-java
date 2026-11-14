@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/40/m/numeric.tn?sha256=44b6423f588662106c5cc68f398e3ea2f0734196e80defb928a4b218d4cb83a8"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=fba10509f9c9db688ee01d2921635a24b1879d80b19f43c59edba3674c18252d"
+!!id:"https://tson.io/2026/40/m/numeric.tn?sha256=75307965147171882e8623c9b75cdde1fd70e9cb189d33d6d7af5d73c561f6ba"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=ee2394b1554c4ea15cee5441b1622f8ddee19c171a7425b07aeab63da9fafc0a"
 @doc:"""
   The TSON numeric library: the exact `number` and `rational`, `complex`, the
   sized integers `int8` to `uint256` and the IEEE 754 `float32` and `float64`. A

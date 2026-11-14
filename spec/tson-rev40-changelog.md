@@ -708,6 +708,11 @@ after.
      listing also typed `parents` `[meta.type_ref]` where the kernel has `[meta.type_expr]`.
 105. **§13.2** — every pin changes (§6), for item 104 and for the artifacts' documentation
      (§3.3).
+106. **§4.1, §5.7** — `meta.namespace` was written `meta.map ^ { key_type:
+     meta.identifier_ref  voidable?: = false }`, a refinement. It restates a field under a
+     narrower type and pins another, which declares a constructor and narrows no value, so it
+     is the composition `meta.map & { … }`, restating by §5.8. The entry's resolved form, its
+     chain and every namespace type are unchanged; `meta.tn`'s pin changes (§13.2).
 
 ### 3.3 Companion artifacts
 

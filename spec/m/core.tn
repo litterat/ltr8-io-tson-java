@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/40/m/core.tn?sha256=1d57dbba4a89ee2649a1cc32446d27bfeb33ba722b684a1a0bac84b46a835472"
-!!import:"https://tson.io/2026/40/m/numeric.tn?sha256=44b6423f588662106c5cc68f398e3ea2f0734196e80defb928a4b218d4cb83a8"
-!!import:"https://tson.io/2026/40/m/temporal.tn?sha256=e839a87b7e98ca1185a4a9fb2f364e770603a0f4f60cc4b4e26faa4cc02759b8"
-!!import:"https://tson.io/2026/40/m/net.tn?sha256=a7ecf6cc57c1e04836ab319e2f2d882b6f5a5fcb826e7c30931a6e3bf83a5761"
+!!id:"https://tson.io/2026/40/m/core.tn?sha256=aa7b52ccfaa0210a13045d315f5c7fe9739e529892b86f295a79e579641afc06"
+!!import:"https://tson.io/2026/40/m/numeric.tn?sha256=75307965147171882e8623c9b75cdde1fd70e9cb189d33d6d7af5d73c561f6ba"
+!!import:"https://tson.io/2026/40/m/temporal.tn?sha256=d3ef3009d3fb42219473259830e9e901ae5f9f4e1d89cbe95fa9627b49accbaa"
+!!import:"https://tson.io/2026/40/m/net.tn?sha256=30a36db1b57b61c871b5763eace80ff1b2fa19c5ae2c3c58776295abc2f4e38d"
 @doc:"""
   TSON core: every bundled type in one import. It imports numeric.tn,
   temporal.tn and net.tn, and declares the author annotations, none of which

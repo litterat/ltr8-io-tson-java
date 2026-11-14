@@ -255,8 +255,8 @@ constructor, positions included (the bootstrap resolves with the parser's positi
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record (`meta.ref` among them), an alias — as `SchemaResolver` resolves one. The bootstrap readies these
   and
-  the pre-loaded set first, so the first compile holds every head a read applies. Two refinements wait on the cycle
-  and stay off it: `meta.namespace => meta.map ^ { … }` waits on its source `meta.map`, and `meta.identifier_ref =>
+  the pre-loaded set first, so the first compile holds every head a read applies. Two entries wait on the cycle
+  and stay off it: `meta.namespace => meta.map & { … }` waits on its parent `meta.map`, and `meta.identifier_ref =>
   !meta.type_ref ^ { … }` on `meta.type_ref`, hand-built; the names their `key_type` and `of` hold order nothing, so
   neither is a wait of the cycle's entries and the measurements above stand.
 - **Every other instance is read at a checkpoint**, as every schema's is (above), its readers compiled by

@@ -108,7 +108,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   `boxed<net.uuid_type>` and `[net.uuid_type]` close as any
   application does (`ConstructorAsRecordTypeTest`). A declaration read as data is judged by its record shape alone:
   it is not resolved, so a derived field such as `chain` is admitted as written.
-- A namespace type is an instance of `meta.namespace` (`meta.schema`, a schema's own `api`), a refinement of `meta.map`,
+- A namespace type is an instance of `meta.namespace` (`meta.schema`, a schema's own `api`), which composes `meta.map`,
   so `meta.type_ref`, `meta.ref<meta.product>`, `meta.ref<meta.map>` and `meta.ref<meta.namespace>` hold it and
   `meta.ref<meta.record>` does not. A value entry, `myapi => !api { … }`, is a member of no kind: its tag names an
   ordinary type, which no walk reaches a constructor through. `meta.ref<api>` names
