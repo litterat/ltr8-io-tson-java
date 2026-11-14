@@ -130,7 +130,7 @@ class TsonSchemaStripperTest {
             String source = TsonBundledSchemas.fetch(id);
             String stripped = TsonSchemaStripper.strip(source);
 
-            assertTrue(stripped.length() < source.length() / 2, id);
+            assertTrue(stripped.length() < source.length(), id);
             assertFalse(stripped.contains("@doc"), id);
             assertFalse(stripped.contains("sha256"), id);
             assertTrue(stripped.lines().allMatch(line -> line.equals("}") || !line.isBlank()), id);

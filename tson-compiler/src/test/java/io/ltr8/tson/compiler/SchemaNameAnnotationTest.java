@@ -51,8 +51,8 @@ class SchemaNameAnnotationTest {
     void aDeclarationsDocArrivesAsAString() {
         Namespace<Top> core = entriesOf(TsonBundledSchemas.CORE_ID);
 
-        assertEquals("128-bit identifier per RFC 9562.",
-                core.getAnnotations("uuid").value("doc", String.class).orElseThrow());
+        assertEquals("A note for a schema's maintainers, which a documentation tool leaves out.",
+                core.getAnnotations("comment").value("doc", String.class).orElseThrow());
     }
 
     /** The plain-key interface is untouched, which is the whole point of the facade. */

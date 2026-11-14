@@ -223,8 +223,8 @@
 
     type_chain => !meta.record { fields: {
       parents    => !meta.record_field { type: { of: !meta.array { element_type: meta.type_expr } }  optional: true }
-      supertypes => !meta.record_field { type: { of: !meta.array { element_type: meta.type_ref } }  optional: true }
-      subtypes   => !meta.record_field { type: { of: !meta.array { element_type: meta.type_ref } }  optional: true }
+      supertypes => !meta.record_field { type: { of: !meta.set_type { element_type: meta.type_ref } }  optional: true }
+      subtypes   => !meta.record_field { type: { of: !meta.set_type { element_type: meta.type_ref } }  optional: true }
     } }
 
     type => !meta.record {

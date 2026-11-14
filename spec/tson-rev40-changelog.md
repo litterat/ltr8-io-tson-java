@@ -702,11 +702,23 @@ after.
      silent on one written as a declaration's body. It gains: `x => !meta.apply { … }` is a
      resolver error, a declared application being written `x => H<args>`, whose resolved value
      is the record it closes to (§8.2).
+104. **§4.1** — `meta.type_chain`'s `supertypes` and `subtypes` were arrays, and an array's
+     order is part of its value, so one chain in two orders was two values. Each is a set,
+     `meta.set_type<meta.type_ref>`; `supertypes` is still written sorted (§8.1). The section's
+     listing also typed `parents` `[meta.type_ref]` where the kernel has `[meta.type_expr]`.
+105. **§13.2** — every pin changes (§6), for item 104 and for the artifacts' documentation
+     (§3.3).
 
 ### 3.3 Companion artifacts
 
-The revised artifacts carry the baseline of §1. Their entries are not edited by this
-revision of the text; §6 lists the pins.
+The revised artifacts carry the baseline of §1. One entry is edited by this revision of the
+text, `meta.type_chain` (item 104), and every artifact's documentation is rewritten for a
+reader looking at one entry who has not read this text: what the entry is, how it is written
+in the basic case, the facts about its values that its declaration does not show, and the
+section to read further. A rule this text states in full is cited and no longer restated,
+which is what the six entries whose documentation had drifted from it restated (`meta.top`,
+`meta.sum`, `meta.type_chain`, `meta.apply`, `meta.annotation`, `meta.record`). `void`,
+`integer`, `text` and `regex` gain documentation. §6 lists the pins.
 
 ### 3.4 Part 3 — JSON Encoding
 
@@ -858,14 +870,15 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `5d3259d6…` (Revision 39 `c9b069b6…`), numeric `b0f26fd6…` (`dfa66c5d…`), temporal
-   `64cb1d31…` (`fb4ada8f…`), net `f60bed4e…` (`371fc20c…`), core `a0e317b3…`
-   (`4e8d9c43…`), policy `85f90a35…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   `fba10509…` (Revision 39 `c9b069b6…`), numeric `44b6423f…` (`dfa66c5d…`), temporal
+   `e839a87b…` (`fb4ada8f…`), net `a7ecf6cc…` (`371fc20c…`), core `1d57dbba…`
+   (`4e8d9c43…`), policy `a236c4fd…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
    78–84's documentation of a parameter in a type written in place, for items 85–93's
    `meta.apply` and final constructors, and for items 94–97's documentation of a reference
-   with no argument list, and for items 98–101's one reference constructor. The chain is
+   with no argument list, for items 98–101's one reference constructor, and for items
+   104–105's chain sets and rewritten documentation. The chain is
    consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
    libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
@@ -880,7 +893,9 @@ carries no open questions.
    and rewrite the documentation of `meta.type`, `meta.reference_type`, `meta.type_inline`,
    `meta.type_expr` and `meta.type_chain`: the kernel measures 83 entries. Items 94–97
    rewrite `meta.reference_type`'s again. Items 98–101 merge `meta.reference_type` into
-   `meta.ref`: the kernel measures 82 entries. `meta-resolved.tn` follows; the four library fixtures change only their identities.
+   `meta.ref`: the kernel measures 82 entries. Item 104 retypes `type_chain.supertypes` and
+   `type_chain.subtypes`, and every artifact's documentation is rewritten (§3.3).
+   `meta-resolved.tn` follows; the four library fixtures change only their identities.
 
 ---
 

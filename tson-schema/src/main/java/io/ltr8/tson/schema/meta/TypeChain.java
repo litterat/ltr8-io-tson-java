@@ -16,8 +16,8 @@ import java.util.List;
  * declaration's applied parents until {@code SchemaResolver} folds them into edges. It is the only list that ever
  * holds an application, and a closed type carries none once linked. {@link #supertypes} is the closed chain: every
  * entry this one IS-A, complete to a fixed point through applied parents (§5.8), each a bare name, sorted; empty for
- * a fresh record, an instance and a subtracted record alike. {@link #subtypes} is the inverse, over this schema map
- * only (§3.3.4).
+ * a fresh record, an instance and a subtracted record alike. {@link #subtypes} is the inverse, over the namespace of
+ * the schema being resolved (§3.3.4).
  *
  * <p>A declaration never writes the record: the resolver computes it and the linker inverts it, and ingest reads
  * it as stated, since a flat body and its chain cannot be recomputed from each other. Absent and empty are one

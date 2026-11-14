@@ -1,137 +1,40 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=5d3259d67c67b615d17eb182e6f5a2d46e9e904d2d5552735518d8a91cfb2e11"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=fba10509f9c9db688ee01d2921635a24b1879d80b19f43c59edba3674c18252d"
 @doc:"""
-  TSON meta — the pre-loaded meta kernel (2026 Revision 40 draft).
+  The TSON kernel: the vocabulary every schema is written in. Its root holds the
+  names an author writes: `text`, `integer`, `int64`, `boolean`, `bytes`, `iri`,
+  `iri_reference`, `regex`, `void`, the `enum` constructor, `set<T>`, `@doc` and
+  the `schema` tag. Its maps hold the machinery behind them: the type system
+  (`meta`), the atom constructors (`numeric`, `unicode`, `net`, `binary`) and
+  the classifying annotations (`atom`).
 
-  The kernel holds the series' structural vocabulary: the one wait cycle a
-  processor closes by pre-loading, the one holding `meta.record` ([TSON-SCHEMA]
-  §3.4), every name its declarations reference, so it resolves and links on
-  its own, and the concepts that belong with them — the map, tuple and choice
-  constructors, the parameters of an open record, the `meta.ref<T>`
-  reference, the octet-sequence constructor, and the
-  classifying annotations the data-format libraries state their types with
-  (`atom.ordering`, `atom.bounded`, `atom.exact`, `atom.numeric`).
-
-  Its root holds the vocabulary an author writes: `void`, `boolean`,
-  `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`,
-  `doc`, the `enum` constructor, the `set<T>` spelling and `schema`, the tag
-  of a schema map. Everything else is machinery, a member of one of six
-  schema maps nested in this document's root, each member named by its path
-  from the root:
-
-    meta      the type system: the kinds and constructors, fields,
-              collections, references, parameters, aliases, `meta.schema`,
-              the name families (`meta.identifier`, `meta.type_name`,
-              `meta.field_name`, `meta.param_name`) and `meta.disjoint`
-    atom      the datatype properties of ISO/IEC 11404 (`@atom.ordering`,
-              `@atom.bounded`, `@atom.exact`, `@atom.numeric`) and the
-              `atom.specification` mixin
-    numeric   the integer constructor `numeric.integer_type`, its facet
-              vocabulary, and `numeric.count`
-    unicode   the text constructors `unicode.text_type`,
-              `unicode.identifier_type` and `unicode.regex_type`, and their
-              facet vocabulary
-    net       the IRI constructor `net.iri_type` and its schemes
-    binary    the octet-sequence constructor `binary.bytes_type` and its
-              encodings
-
-  A schema whose import closure holds this document reserves those six map
-  names and the thirteen root names ([TSON-SCHEMA] §2.2.3). Every name resolves
-  from the root, so an entry here naming a member of a map writes its path,
-  as an importer does.
-
-  Every map is open: any schema may add a member to it. A schema map declared
-  by several documents of one closure is the union of their members, and a
-  member path two of them declare collides as any name does ([TSON-SCHEMA]
-  §2.2.3).
-
-  The kernel imports nothing and is never resolved from a document: it is
-  pre-loaded by special resolution ([TSON-SCHEMA] §3.4), and must be the
-  revision the processor was built for. Its root tag and the tag of each map
-  it nests, `!schema`, name its own `schema`, an alias of `meta.schema`, as
-  every schema document's root tag does. Implementations ship the kernel's
-  resolved structure, and this document describes it.
-
-  The data-format libraries build on it, each importing this document alone
-  and declaring its constructors under the map named for it, numeric.tn and
-  net.tn adding to this document's `numeric` and `net`, and its instances at
-  its root: numeric.tn (`number`, `int32`, `float64`, `numeric.float_type`),
-  temporal.tn (`date`, `datetime`, `duration`, `temporal.date_type`) and
-  net.tn (`uuid`, `uri`, `ipv4`, `net.uuid_type`). core.tn imports the three,
-  so a schema importing it has every bundled type, and declares the author
-  annotations (`@title`, `@deprecated`, …). policy.tn declares the processor
-  policy's vocabulary.
-
-  Hash pins are real digests: sha256 over every byte of a document past its
-  `!!id` line ([TSON-DATA] §2.2.1), which is what lets an `!!id` carry the
-  digest of the document it identifies. Each library pins this file and
-  core.tn pins the libraries, so an edit here moves every pin above it.
-
-  References:
-    ISO/IEC 11404:2007    General Purpose Datatypes (the classifying
-                          annotations)
-    RFC 3987              Internationalized Resource Identifiers (IRIs)
-    RFC 4648              Base encodings (text spellings of `bytes`)
-    RFC 9485              I-Regexp, the interoperable regular expression
-    CommonMark 0.31.2     The text of `doc`
+  Every processor pre-loads it ([TSON-SCHEMA] §3.4). §9 lists what each bundled
+  document holds, and §5 is the grammar the examples here are written in.
   """
 !schema {
 
   numeric => !schema {
     @doc:"""
-      Fixed-width integer representation: a bit width paired with its
-      two's-complement signedness. A width above zero is a schema-load
-      coherence check: zero or a negative `bits` is a schema-load error.
+      A fixed width for an integer: `size: { bits: 32  signed: true }`. Signed
+      n-bit is [-2^(n-1), 2^(n-1)-1], unsigned [0, 2^n-1]. `bits` is above zero.
       """
     integer_size => {
       bits:    integer
       signed:  boolean
     }
 
-    @doc:"""
-      The members of an integer_type. Member identity is [TSON-DATA] §4.3's, so
-      80 and 0x50 are one member and a duplicate rather than two.
-      """
+    @doc:"The members of an integer_type."
     integer_member_set => !meta.set_type { element_type: integer  min_items: 1 }
 
     @doc:"""
-      Integer constraint vocabulary. Atom constructor whose instance,
-      `integer`, is the arbitrary-precision integer. Its field types name
-      `integer`, the constructor's own instance; a name at a type position
-      orders nothing, so the mutual reference closes. Both reach every schema
-      whose import closure includes this document.
+      The constructor of `integer`. An author refines the instance,
+      `age => !integer ^ { min: 0  max: 150 }`, with bounds, a width (`size`), a
+      step (`multiple_of`) or the admitted values (`members`).
 
-      Bounds: each side is a field group ([TSON-SCHEMA] §5.11) — the inclusive
-      `min` or the exclusive `exclusive_min`; likewise `max` or `exclusive_max`
-      — so at most one bound per side holds by shape. That the lower bound not
-      exceed the upper (across whichever forms are present) is a schema-load
-      coherence check.
-
-      Fixed width: `size` gives a fixed representation width; when absent the
-      integer is unbounded arbitrary precision (the base `integer`). Width and
-      signedness derive the representable range — signed n-bit is [-2^(n-1),
-      2^(n-1)-1], unsigned n-bit is [0, 2^n-1] — so `size` and the bound groups
-      are equivalent ways to state a bound. The two compose: bounds and
-      `multiple_of` narrow within the width-derived range, and a bound outside
-      that range is a resolver error. Signedness is two's complement. `size`
-      names the target representation a consumer decodes into, not the source
-      form. Resolver output stores `size` as written and does not expand it to
-      bounds.
-
-      Step: `multiple_of` is strictly positive; zero or a negative value is a
-      schema-load error. The test ignores the sign of the value, so -30 is a
-      multiple of 15. A refinement may only tighten `multiple_of` to an integer
-      multiple of the inherited value (15 under 5 is a tightening; 10 under 15
-      is an error). It composes with every other facet present: a value must
-      satisfy all of them.
-
-      Enumeration: `members` lists the admitted values outright — the spelling
-      for numeric codes, an enum's members being text
-      (`!integer ^ { members: [1 2 3] }`, not `!enum [1 2 3]`). Every
-      member must itself satisfy the bounds, the width and `multiple_of` present
-      on the same body — a member outside them is a schema-load error — and a
-      refinement may only shrink the set (the member-set rule of the tightening
-      table). A value must be a member and satisfy the other facets; with a
-      coherent set the second test is implied by the first.
+      A bound lies inside the range `size` gives, and the lower bound does not
+      exceed the upper. `multiple_of` is strictly positive and tests the value's
+      magnitude, so -30 is a multiple of 15. Every member satisfies the other
+      facets on the same body ([TSON-SCHEMA] §5.5; §5.7 for what a refinement
+      may tighten).
       """
     integer_type => meta.atom & {
       size?: numeric.integer_size
@@ -142,40 +45,27 @@
     }
 
     @doc:"""
-      The type of every facet that counts something: lengths, item counts,
-      digit counts, prefix lengths, fractional-second precision. It is the
-      non-negative half of `int64`, 0 to 2^63-1, so every implementation holds
-      a count in a native type (JavaScript in a BigInt).
+      A non-negative `int64`: the type of every facet that counts something, a
+      length, an item count, a digit count.
       """
     count => !int64 ^ { min: 0 }
   }
 
   unicode => !schema {
-    @doc:"""
-      The members of a text_type. The set's own uniqueness compares the text as
-      written; each member is then put into the constrained type's normalization
-      form, and two that are one value there are a duplicate, as text_type says.
-      """
+    @doc:"The members of a text_type."
     text_member_set => !meta.set_type { element_type: text  min_items: 1 }
 
     @doc:"""
-      Text constraint vocabulary. Atom constructor whose instance, `text`, is
-      the kernel's Unicode code point sequence type. Lengths count code points.
+      The constructor of `text`. An author refines the instance:
+      `name => !text ^ { min_length: 1  max_length: 80 }`,
+      `code => !text ^ { pattern: "[A-Z]{3}" }`. Lengths count code points,
+      `pattern` is an I-Regexp (RFC 9485) the whole value matches, and `members`
+      lists the admitted strings.
 
-      `members` lists the admitted strings outright. Every member must satisfy
-      the other facets on the same body, the pattern included.
-
-      `normalization` is the form a value is put into. A value is its token's
-      text, unquoted, unescaped and then put into that form; every other facet
-      judges the value and never the spelling, and so does every comparison of
-      two values. A member is a value too, and two members that are one value
-      are refused.
-
-      `pattern` and `members` are each settable once: a refinement may set one
-      the source left unset, or restate the source's own, and never change it.
-      `normalization` is fixed where the type is constructed: a refinement
-      restates it or leaves it, since changing it would change what a token
-      means rather than narrow the values admitted.
+      A value is its token's text put into `normalization`'s form, and every
+      other facet, and every comparison of two values, judges that value and
+      never the spelling ([TSON-SCHEMA] §5.5; §5.7 for what a refinement may
+      tighten).
       """
     text_type => meta.atom & {
       min_length?:    numeric.count
@@ -187,74 +77,36 @@
     }
 
     @doc:"""
-      The base a UAX #31 Start or Continue set is drawn from: XID_Start /
-      XID_Continue, ID_Start / ID_Continue, their ASCII members (Start A-Z a-z,
-      Continue adding 0-9 and "_"), or the empty set.
+      What a profile's Start or Continue set is drawn from (UAX #31): XID_Start
+      and XID_Continue, ID_Start and ID_Continue, their ASCII members (Start A-Z
+      a-z, Continue adding 0-9 and "_"), or the empty set.
       """
     identifier_base => !enum [XID ID ASCII NONE]
 
     @doc:"""
-      The form a text value is put into. NONE keeps the text as written. NFC and
-      NFKC are Unicode's normalization forms. NFKC_CASEFOLD is toNFKC_Casefold,
-      UAX #31's form for names compared without case: over ASCII it lowercases,
-      so Content-Type and content-type are one value. ASCII_CASEFOLD maps A-Z to
-      a-z and changes nothing else, the comparison of case-insensitive ASCII
-      names such as URI schemes and HTTP field names.
+      The form a text value is put into. NONE keeps the text as written.
+      NFKC_CASEFOLD is toNFKC_Casefold. ASCII_CASEFOLD maps A-Z to a-z and
+      changes nothing else ([TSON-SCHEMA] §5.5).
       """
     normalization => !enum [NONE NFC NFKC NFKC_CASEFOLD ASCII_CASEFOLD]
 
     @doc:"""
-      Identifier constraint vocabulary: a UAX #31 identifier profile, with the
-      text facets applied inside it. It composes text_type's record shape, so it
-      takes lengths, a pattern such as a naming convention, and members for a
-      closed vocabulary of names. The profile is UAX #31's R1 default identifier
-      syntax:
+      The constructor of an identifier family: a UAX #31 profile (R1), with
+      text_type's facets applied inside it. `meta.identifier` is the kernel's,
+      and a schema declares its own for another naming convention,
+      `snake => !unicode.identifier_type { start: ASCII  continue: ASCII }`:
 
-        meta.identifier := Start Continue* (Medial Continue+)*
+        identifier := Start Continue* (Medial Continue+)*
         Start      := (start ∪ start_add) − exclude
         Continue   := (continue ∪ continue_add) − exclude
         Medial     := medial
 
-      where start and continue name the base each set is drawn from, and each of
-      start_add, continue_add, medial and exclude is the set of code points its
-      text holds. A medial character stands only between two others and never
-      beside another medial, so medial must be disjoint from Start and Continue.
-      The profile judges the value, which is the text put into the normalization
-      form; the form defaults to NFC here. A join control (U+200C, U+200D) is
-      admitted only in the contexts UTS #39 §3.1.1.1 permits, whatever the
-      profile.
-
-      The profile facets are fixed where the profile is constructed: a
-      refinement restates each or leaves it, and narrows only the text facets. A
-      different profile is a fresh `!unicode.identifier_type`.
-
-      identifier is [TSON-DATA] §7.7's instance, and the type of every naming
-      position in the series — type names, field names and parameter names,
-      through the three roles below. A rule stated here reaches all of them. An
-      identifier is a name, not a lexeme: it is the decoded text of a token,
-      after unquoting, escape processing and normalisation, and it is
-      constrained however it was spelled. Its profile is stated beside the
-      unquoted-token profile of [TSON-DATA] §7.1:
-
-        Start    = XID_Start
-        Continue = XID_Continue + "-"
-
-      and its value is the text in NFC. The profile is the token profile minus
-      the extensions the number grammar requires, so an identifier never begins
-      with a digit or a sign, which subsumes the rule that numbers are not
-      declarable names. "+" is dropped from Continue, and "." is reserved as a
-      future identifier separator. Everything else follows from XID membership:
-      whitespace, control characters, emoji, unassigned code points and every
-      format character but the two join controls are none of them XID_Continue.
-
-      Every part of identifier's profile lies inside the unquoted-token profile,
-      so every identifier is a well-formed unquoted token and none ever needs
-      quoting. Another profile carries no such guarantee, and a value under it
-      may need quoting.
-
-      A schema that types a value or a map key as a name of another family
-      declares its own identifier_type instance under a name of its own, such as
-      `slug => !unicode.identifier_type { continue_add: "-" }`.
+      `start_add`, `continue_add`, `medial` and `exclude` are each the set of
+      code points their text holds, and `medial` is disjoint from Start and
+      Continue. The profile judges the value, the text in its normalization
+      form. A join control (U+200C, U+200D) is admitted only in the contexts UTS
+      #39 §3.1.1.1 permits, whatever the profile ([TSON-DATA] §7.7,
+      [TSON-SCHEMA] §7.4).
       """
     identifier_type => unicode.text_type & atom.specification & {
       spec?:          = "https://www.unicode.org/reports/tr31/"
@@ -267,11 +119,7 @@
       normalization?: unicode.normalization ~ NFC
     }
 
-    @doc:"""
-      Regex constraint vocabulary. Same shape pattern as iri_type, pinned to
-      I-Regexp. A regex is its text as written: putting it into another form
-      would change what it matches.
-      """
+    @doc:"The constructor of `regex`: an I-Regexp (RFC 9485), kept as written."
     regex_type => unicode.text_type & atom.specification & {
       spec?:          = "https://www.rfc-editor.org/rfc/rfc9485"
       normalization?: = NONE
@@ -282,30 +130,16 @@
     @doc:"The schemes an iri_type or uri_type admits."
     scheme_set => !meta.set_type { element_type: net.scheme_name  min_items: 1 }
 
-    @doc:"""
-      A URI scheme (RFC 3986 §3.1): a letter, then letters, digits, "+", "-" and
-      ".". A scheme compares without case, so its value is the text folded.
-      """
+    @doc:"A URI scheme (RFC 3986 §3.1), compared without case."
     scheme_name => !unicode.identifier_type { start: ASCII  continue: ASCII
       continue_add: "+-."  exclude: "_"  normalization: ASCII_CASEFOLD }
 
     @doc:"""
-      IRI constraint vocabulary per RFC 3987. Composes with the text_type
-      constructor to inherit its record shape (length and pattern fields) plus
-      the atom.specification mixin's spec field plus iri-specific fields.
-      `schemes` lists the admitted schemes as net.scheme_name values, which
-      fold case as RFC 3986 §3.1 compares a scheme, and a value's scheme is
-      compared in that form; a value with no scheme is outside it.
-      `allow_relative` admits a relative reference beside an IRI, so its default
-      is an IRI-reference; withdrawing it requires a scheme. `allow_fragment`
-      admits a fragment; withdrawing it refuses one. An IRI's characters beyond
-      US-ASCII are RFC 3987's `ucschar`, and `iprivate` within the query, and an
-      IRI is judged through the URI it maps to (RFC 3987 §3.1). `uri_type` is
-      the US-ASCII family with the same facets.
-
-      An IRI is its text as written: RFC 3986 says which of its parts compare
-      without case, and a form over the whole text would fold a path or a query
-      that is case-sensitive.
+      The constructor of `iri` and `iri_reference` (RFC 3987). `schemes` lists
+      the admitted schemes, `web => !iri ^ { schemes: [https] }`, and a value
+      with no scheme is outside every list. `allow_relative` admits a relative
+      reference and `allow_fragment` a fragment. An IRI is judged through the
+      URI it maps to (RFC 3987 §3.1).
       """
     iri_type => unicode.text_type & atom.specification & {
       spec?:           = "https://www.rfc-editor.org/rfc/rfc3987"
@@ -319,158 +153,103 @@
 
   atom => !schema {
     @doc:"""
-      Mixin record contributing the `spec` field to specification-bound atoms.
+      A mixin for an atom constructor that follows a published specification:
+      `spec` is its IRI, which the constructor pins.
       """
     specification => { spec: iri }
 
     @doc:"""
-      Ordering classification (ISO/IEC 11404 / XSD fundamental facet): whether
-      the value space has an order relation. Not a container's `ordered` facet,
-      which says whether element order is part of a value.
+      ISO/IEC 11404: whether the value space has an order relation. Written on
+      an atom, `@atom.ordering:TOTAL`.
       """
     ordering => @meta.annotation !enum [NONE PARTIAL TOTAL]
 
     @doc:"""
-      Boundedness classification (ISO/IEC 11404 / XSD fundamental facet): true
-      when the value space has a finite least and greatest value.
+      ISO/IEC 11404: true when the value space has a least and a greatest value.
       """
     bounded => @meta.annotation boolean
 
     @doc:"""
-      Exactness classification (ISO/IEC 11404 characterizing property): true for
-      exact types (values preserved as written), false for approximate types
-      (values rounded to a representation grid).
+      ISO/IEC 11404: true where a value is kept as written, false where it is
+      rounded to a grid.
       """
     exact => @meta.annotation boolean
 
-    @doc:"Numeric type marker annotation."
+    @doc:"ISO/IEC 11404: marks a numeric type, written bare, `@atom.numeric`."
     numeric => @meta.annotation void
 
   }
 
-  @doc:"The type system, each member named by its path, `meta.record`."
+  @doc:"""
+    The type system: the constructors every type is built with, each named by
+    its path, `meta.record`.
+    """
   meta => !schema {
     @doc:"""
-      The structural root: every constructor IS-A `top`. Every constructor
-      transitively IS-A `atom`, `product` or `sum`, except `alias`, which
-      composes with `top` directly; `atom`, `product` and `sum` IS-A `type`,
-      which IS-A `top`. Construction transfers kind, not IS-A, so instances and
-      fresh records sit under the kinds with empty chains. `top` and the kinds
-      beneath it are abstract: none has instances of its own, so a direct
-      application of one is refused as any abstract record's is, naming the
-      subtypes that would satisfy it.
-
-      A schema map's entries are types or values (`schema`). An entry whose
-      value is built by a constructor IS-A `type` is a type; one whose value is
-      built by `alias` is an alias; a record with `parameters` is an open
-      record, named only as the head of an application; and one whose value is
-      an instance of an ordinary type, `orders => !api { ... }` or
-      `create_order => !operation { ... }`, is a value, marked by nothing but
-      its tag.
+      The root of the type system: every constructor IS-A `top` ([TSON-SCHEMA]
+      §4.1).
       """
     top       => abstract {}
 
     @doc:"""
-      Where an entry sits in the IS-A order. `parents` is what was written: the
-      parents of an open record, one of which may be an application written in
-      place, `{ of: !meta.apply { head: result  arguments: [T] } }` for
-      `<T> result<T> & { ... }`, kept on the open record once they resolve; a
-      closed instantiation keeps none. It is the only list that ever holds an
-      application. `supertypes` is the closed chain: every entry this one IS-A,
-      complete to a fixed point through applied parents ([TSON-SCHEMA] §5.8),
-      each a name without arguments, sorted, and empty for a fresh record, an
-      instance and a subtracted record alike. `subtypes` is the inverse, over
-      the entries of this map only ([TSON-SCHEMA] §3.3.4).
+      Where a type sits in the IS-A order. Derived, never written by a
+      declaration: `parents` is an open record's parents as written,
+      `supertypes` the closed IS-A chain, and `subtypes` its inverse
+      ([TSON-SCHEMA] §4.1, §8.1).
       """
     type_chain => {
       parents?:    [meta.type_expr]
-      supertypes?: [meta.type_ref]
-      subtypes?:   [meta.type_ref]
+      supertypes?: meta.set_type<meta.type_ref>
+      subtypes?:   meta.set_type<meta.type_ref>
     }
 
     @doc:"""
-      The kind of kinds that describe the shape of a data value: `atom`,
-      `product` and `sum` IS-A `type`, and so does `apply`, an application
-      written in place inside an open record, which has no kind of its own.
-      An entry whose value is a body whose constructor IS-A `type` is a type;
-      an `alias` is not, composing `top`, and an entry whose value is an
-      instance of an ordinary type is a value, never a type.
-
-      A type carries its IS-A chain. A declaration never writes `chain`, and a
-      constructor never declares a field of that name: the resolver computes the
-      chain from composition and refinement and the linker inverts it. On ingest
-      it is read as stated and never recomputed, because a flat body and its
-      chain cannot be recomputed from each other.
+      What every type's body is: `atom`, `product` and `sum` are its kinds, and
+      `chain` its place in the IS-A order ([TSON-SCHEMA] §4.1).
       """
     type      => abstract meta.top & {
       chain?: meta.type_chain
     }
 
-    @doc:"""
-      The kind of a scalar: a value written as one token, which its atom family
-      reads into a value.
-      """
+    @doc:"The kind of a scalar: a value written as one token."
     atom      => abstract meta.type & {}
 
-    @doc:"""
-      The kind of a compound value of parts: a record, an array, a map or a
-      tuple. `access_pattern` says whether a part is reached by position or by
-      name, and `size_type` whether the number of parts is fixed by the type.
-      """
+    @doc:"The kind of a compound value: a record, an array, a map or a tuple."
     product   => abstract meta.type & {
       access_pattern: meta.product_access_type
       size_type:      meta.product_size_type
     }
 
     @doc:"""
-      The kind of a value that is one of several types: a choice or a scope.
+      The kind of a value that is one of several types: a choice, a declared
+      type or a dependent type.
       """
     sum       => abstract meta.type & {}
 
     @doc:"""
-      Aliasing body — the entry `target` names: a type, or a constructor, since
-      an alias of a constructor is applied as its target is ([TSON-SCHEMA]
-      §3.3.1), a constructor's value being a record. The root's `set` is one:
-      `set<text>` constructs `meta.set_type`.
-
-      An alias is a hop, not a rewrite: resolved output states the chain as the
-      author wrote it, and a use site names whatever entry it names. A processor
-      collapses the chain when it compiles readers, after linking, once per
-      entry.
+      Another name for an entry: `user_id => uuid` makes `user_id` the same type
+      as `uuid` ([TSON-SCHEMA] §8.3).
       """
     alias => meta.top & {
       target: meta.type_ref
     }
 
     @doc:"""
-      One parameter of an open record ([TSON-SCHEMA] §5.10): its name, and the
-      bound an argument must IS-A, written as `<T: text>` and otherwise absent.
-      Nothing about a parameter is derived: it is what its declaration writes.
-
-      Every parameter is a type. It is written where it stands as its name, a
-      reference value (`meta.ref`), and stands at a field's `type`,
-      at a slot naming a type of a type written in place there, at any depth
-      (`[T]`, `{ cursor: T }`), or as an argument of an application at any of
-      those or in a parent, and nowhere else: a field's `value` is never a
-      parameter. Applying the record replaces it wherever it stands. A
-      parameter passed on as an argument to a bounded parameter is written
-      with a bound that IS-A that bound.
+      A parameter of an open record, `<T>`, or with a bound every argument must
+      IS-A, `<T: text>` ([TSON-SCHEMA] §5.10).
       """
     param => {
       name:   meta.param_name
       bound?: meta.type_ref
     }
 
-    @doc:"""
-      Void primitive. The instance of void_type, an atom constructor with no
-      constraint vocabulary whose parsing contract admits only the void sentinel
-      `_`. It binds no host value. void is the target type for bare annotations
-      (`@T` with no value); the resolver fills the implicit `_` and validates
-      against this contract. See [TSON-SCHEMA] §6.
-      """
+    @doc:"The constructor of `void`: it admits only the void sentinel `_`."
     void_type => meta.atom & {}
 
-    @doc:"The default identifier type used for types/fields/params"
+    @doc:"""
+      The default name: XID_Start, then XID_Continue or `-`, in NFC. The type of
+      type, field and parameter names ([TSON-DATA] §7.7).
+      """
     identifier => !unicode.identifier_type { continue_add: "-" }
 
     @doc:"A type's name: a schema-map key, and a segment of a reference."
@@ -489,112 +268,42 @@
     product_size_type   => !enum [FIXED VARIABLE]
 
     @doc:"""
-      What a record field's `value` is for: FREE has none, DEFAULT is injected
-      when the field is omitted and may be overridden, and FIXED is the only
-      value the field admits.
+      What a field's `value` is for. FREE has none, DEFAULT is injected when the
+      field is omitted, written `~ value`, and FIXED is the only value the field
+      admits, written `= value` ([TSON-SCHEMA] §5.2).
       """
     field_role          => !enum [FREE DEFAULT FIXED]
 
     @doc:"""
-      How a record may be realised ([TSON-SCHEMA] §5.2). OPEN is the ordinary
-      case and the default: the record has instances of its own and may be
-      composed onto or refined. ABSTRACT has no instances of its own, so a value
-      at a position typed by it is a value of some subtype. FINAL has instances
-      and admits no subtype: no composition or refinement may name it as a
-      source. Subtraction stays admissible against a FINAL record — a subtracted
-      record's chain is empty, so it mints no IS-A edge, which is the only thing
-      FINAL constrains.
-
-      **How a subtype is selected is no part of this enum.** An ABSTRACT record
-      naming no `discriminators` is selected by the tag; one naming them is
-      selected by reading those fields.
-
-      Extensibility is never inherited. A subtype of an ABSTRACT record is OPEN
-      unless it says otherwise.
-
-      **A field written `=?` implies ABSTRACT.** Writing `abstract` beside a
-      selector asserts what the body already says and is admitted; `final`
-      beside one is refused.
-
-      **A family is open across schemas.** [TSON-SCHEMA] §3.3.4 makes `subtypes`
-      open, so an importing schema may declare a further member. A host
-      language's own closed-set construct, generated from a family, is therefore
-      relative to one closure and not a promise the schema makes.
-
-      The member is written as a word at the declaration —
-      `pet => abstract { … }`, [TSON-SCHEMA] §12.1 — and OPEN is the absence of
-      one.
+      How a record may be realised, written as a mark: `pet => abstract { … }`
+      has no values of its own, `final { … }` admits no subtype, and OPEN is the
+      unmarked default ([TSON-SCHEMA] §5.2).
       """
     record_extension_type => !enum [ABSTRACT FINAL OPEN]
 
     @doc:"""
-      The annotation type marker: a type carrying it is meant as annotation
-      metadata ([TSON-SCHEMA] §6).
+      Marks a type as meant for use as an annotation:
+      `title => @meta.annotation text` declares what `@title:"Order"` is read
+      against. An alias of `void`, so it carries no force ([TSON-SCHEMA] §6).
       """
     annotation => void
 
     @doc:"""
-      Resolver-attached and derived: on an entry's schema-map key, the
-      application of an open record the entry is the instantiation of
-      ([TSON-SCHEMA] §8.2). The resolver writes it wherever an entry closes
-      one: the entry's value is a record, which states its fields and its
-      chain and not the head it was substituted from. A construction carries
-      none, `!meta.set_type { element_type: text }` stating its constructor and
-      its arguments. On ingest it is read as stated: it is the one fact the
-      entry's value does not state. A declaration never writes it, as it never
-      writes `chain`. Its value is the application as written, each argument a
-      name: `@meta.application:{ head: pair  arguments: [text integer] }`.
+      Resolver-attached to an entry's key, never written: the application of an
+      open record the entry closes, `{ head: pair  arguments: [text integer] }`
+      ([TSON-SCHEMA] §8.2).
       """
     application => @meta.annotation meta.apply
 
     @doc:"""
-      Supporting records. A record field is the four facts a reader consults:
-      `optional`, that the key may be missing; `voidable`, that the value may be
-      void, the void sentinel `_` written in its place; `role`, what `value` is
-      for; and `value`, a concrete default or fixed value read against the
-      field's declared type — for a `meta.type_ref` slot, a type name. `value`
-      is typed `type!`, a dependent field: each record field's `value` is read
-      against the type its own `type` names. Its name
-      is not among them: a field is a value of `record.fields`, keyed by its
-      name. Each fact is one mark of the spelling `name?: type? ~ value`: the
-      name's `?`, the type's `?`, and `~` or `=` with its value. What omission
-      yields is derived, never stored: a missing field that is not optional is
-      an error, and a missing optional one with a value has it injected — except
-      at a field group's member, whose presence is the group's and which is
-      never supplied.
+      One field of a record, the spelling `name?: type? ~ value`. `optional` is
+      the name's `?`, the key may be missing; `voidable` is the type's `?`, the
+      value may be `_`; `role` and `value` are the default after `~` or the
+      fixed value after `=`.
 
-      `type` holds a type's name, a type written in place (`meta.type_inline`),
-      or a parameter of the enclosing record (`meta.param`), and no label says
-      which name it is: a parameter is a reference value. `value` is a literal
-      and never a parameter.
-
-      A field whose `type` is a `meta.dependent` written in place,
-      `{ of: !meta.dependent { on: kind } }` and in source `kind!`, is a
-      dependent field ([TSON-SCHEMA] §5.2): each instance's value is read
-      against the type that instance's `kind` names. The sibling is declared
-      before it, is typed by a reference naming types or by `meta.type_expr`,
-      is never voidable, and is there to read whenever
-      the dependent field is: required,
-      defaulted, pinned, or a member of a field group with the dependent field
-      optional, a group's own member counting as optional. Its default or pin
-      names a type a value can be read against. A member is absent when another
-      option is chosen, and a dependent field written without its sibling is
-      refused where it is read. A dependent field is never voidable, carries no
-      value of its own, and is restated only as itself; pinning its sibling
-      fixes its type.
-
-      Which fields a member-dispatched family dispatches on is the enclosing
-      record's own statement, `record.discriminators`, and no field says it of
-      itself. A field it names is required and not voidable, no member of a
-      field group, typed by an atom or an enum, and carries no value of its own;
-      each subtype restates it FIXED, the pins pairwise distinct under the field
-      type's own equality.
-
-      The two facts are the series' two kinds of nothing, and each has one name
-      wherever it applies: a slot that may be missing is `optional`, on a record
-      field and a field group; a slot whose value may be void is `voidable`, on
-      a record field, an array's element, a map's value and a tuple position. A
-      container's part is never missing, so a container has no `optional`.
+      `value` is read against the type `type` names, and is present exactly when
+      `role` is not FREE. DEFAULT requires `optional`, and FIXED a field that is
+      not `voidable` ([TSON-SCHEMA] §5.2).
       """
     record_field => {
       type:      meta.type_expr
@@ -605,21 +314,11 @@
     }
 
     @doc:"""
-      Field group — a presence rule over fields of a record ([TSON-SCHEMA]
-      §5.11). `members` lists the group's options in source order, each the
-      fields it holds; a group has at least one option, and an option at least
-      one field. Every member is declared in the enclosing record's `fields`,
-      `optional` there and carrying no value, and sits in one option of one
-      group. An option is chosen when any of its members is present.
-
-      `optional_members` names the members that may be missing once their option
-      is chosen, and never the only member of an option; a chosen option holds
-      every member it does not name. `optional` says whether the group may be
-      missing as a whole, as an optional field's key may: without it exactly one
-      option is chosen, with it at most one. A group of one option is either not
-      optional with every member named in `optional_members`, so at least one is
-      present, or optional with at least two members and one not named. The
-      flattened fields-plus-groups encoding is canonical.
+      A presence rule over a record's fields, written
+      `( min: integer | exclusive_min: integer )?`. `members` lists the options,
+      each the fields it holds: exactly one option is present, or at most one
+      where `optional`. `optional_members` names the members that may be missing
+      from a chosen option ([TSON-SCHEMA] §5.11).
       """
     field_group => {
       members:           [[text; 1..]; 1..]
@@ -628,56 +327,21 @@
     }
 
     @doc:"""
-      The fields of a record ([TSON-SCHEMA] §5.2): each field's name mapped to
-      its facts, in declaration order, which is part of the value. The map's own
-      key uniqueness compares the text as written; each key is then read as a
-      value of the record's `name_type`, and two that are one value under that
-      type's equality are a duplicate, a resolver error. A field name is text
-      within its own record and is no namespace key: no qualified name selects
-      a field declaration.
+      The fields of a record: each field's name mapped to its facts, in
+      declaration order.
       """
     field_map => !meta.map { key_type: text  value_type: meta.record_field  ordered: true }
 
     @doc:"""
-      A record: named fields, fixed by the type, with the field groups over
-      them. Closed — `parameters` absent — it is what readers and writers are
-      built for. Open — `parameters` present — it is an open record
-      ([TSON-SCHEMA] §5.10): a reference names it only as the head of an
-      application, never bare, and each application substitutes its arguments
-      into the reference slots the parameters stand in and closes to a record
-      without them. An open record's chain is computed per application, after
-      substitution, since a parent may be an application
-      (`<T> base<T> & { … }`), and its `chain.parents` holds the parents as
-      written. `groups`, `discriminators` and `extension` are each
-      application's, unchanged by substitution, and `name_type` names no
-      parameter: the record's own field names are read by it, at the
-      declaration.
+      The constructor of every record type, written in braces:
+      `person => { name: text  age?: integer }`.
 
-      `extension` states how the record may be realised, and is OPEN unless the
-      record says otherwise. Of the constructors, only `record` carries it.
-
-      Its chain is `type`'s. `fields` is flattened: a composition's fields are
-      its operands' and its own, merged, so a consumer that reads values against
-      it never repeats the merge.
-
-      `discriminators` names the fields this record's members are selected by,
-      in the order their pins are compared as a tuple, and its presence is what
-      makes the family member-dispatched rather than tag-dispatched. Every name
-      must name a field the enclosing record declares, and the record must be
-      ABSTRACT. The author writes `=?` on the field, which is what lowers into
-      this list ([TSON-SCHEMA] §5.2).
-
-      `name_type` names the family this record's field names belong to, as an
-      enum_type's names its members': every name in `fields`, `discriminators`
-      and the groups is a value of it, and so is every field name a data value
-      of this record writes. It names an identifier family, a member of
-      `meta.identifier_ref`, so every field name is a name under its profile,
-      and the field name slots are therefore `text`, each judged by this type. A
-      record's name type is set where it is declared and a subtype cannot change
-      it: absent, it is its supertypes' one name type, and `meta.identifier`,
-      which this document names `meta.field_name`, for a record with none; stated
-      beside supertypes, it is theirs. Supertypes with different name types do
-      not compose.
+      `fields` is flattened, a composition's fields being its operands' and its
+      own. `parameters` makes it an open record, `<T> { item: T }`. `extension`
+      is its `abstract` or `final` mark, `discriminators` names the fields its
+      members are selected by, and `name_type` the type its field names are
+      values of ([TSON-SCHEMA] §5.2; §5.8 for composition, §5.10 for open
+      records).
       """
     record => meta.product & {
       access_pattern?: meta.product_access_type = NAMED
@@ -691,26 +355,9 @@
     }
 
     @doc:"""
-      A sequence of elements of one type. The container constructors carry no
-      parameters: a type slot (array's element_type, map's key_type and
-      value_type) is an ordinary required field, filled by the construction or
-      by a sugar form's desugaring like any other required field, its binding
-      record being ordinary data of this vocabulary. `element_type` is a
-      `meta.type_expr`: a type's name, `!meta.array { element_type: person }`,
-      or a type written in place, so `[[text]]` is
-      `!meta.array { element_type: { of: !meta.array { element_type: text } } }`.
-      A constructor is applied as it is constructed: `meta.array<person>` is
-      that construction, its arguments filling the required fields that hold a
-      type (typed `meta.type_expr` or by a reference naming types), in
-      declaration order ([TSON-SCHEMA] §5.3), and inside an open record an
-      argument may be one of the record's parameters. `voidable` says whether an
-      element may be void, spelled `[T?]`.
-
-      `ordered` says whether order is part of a container's value: true for an
-      array unless it says otherwise, false for a set. It never changes what a
-      document may write, and output keeps the order written either way
-      ([TSON-SCHEMA] §7.5) — the facet says whether two values differing only in
-      order are one value.
+      The constructor of `[T]`, with a size as `[T; 1..10]` and void elements as
+      `[T?]`. `ordered` says whether two values differing only in order are
+      distinct ([TSON-SCHEMA] §5.3).
       """
     array => meta.product & {
       access_pattern?: meta.product_access_type = INDEX
@@ -724,12 +371,8 @@
     }
 
     @doc:"""
-      The unordered, unique refinement of array. Its bounds are array's: the
-      empty set is a set, and a set that must be non-empty says `min_items: 1`.
-
-      The name an author writes is the root's `set`, an alias of this
-      constructor, so a field reads `tags: set<text>`, the construction
-      `!meta.set_type { element_type: text }`.
+      The constructor of `set<T>`: an array whose elements are distinct and
+      whose order is no part of its value ([TSON-SCHEMA] §7.5).
       """
     set_type => meta.array ^ {
       voidable?:     = false
@@ -738,19 +381,9 @@
     }
 
     @doc:"""
-      Entries keyed by distinct values of one type. `voidable` says whether an
-      entry's value may be void, spelled `{K => V?}`, as array's says it of an
-      element; a key is never void. `value_type` is a `meta.type_expr`, as
-      array's `element_type` is. `key_type` holds a type's name: a container,
-      tuple or choice that types a map's keys is declared under a name of its
-      own.
-
-      `ordered` is false unless the map says otherwise, as for a JSON object:
-      two maps holding the same entries in different orders are one value. An
-      ordered map, `!meta.map { … ordered: true }`, is one whose entry order is
-      part of its value, so those two are distinct, and a host binds it to a map
-      that keeps its order. Either way output keeps the order written
-      ([TSON-SCHEMA] §7.5).
+      The constructor of `{K => V}`, with void values as `{K => V?}`; a key is
+      never void. `ordered` is as `array`'s, and false unless the map says
+      otherwise ([TSON-SCHEMA] §5.3).
       """
     map => meta.product & {
       access_pattern?: meta.product_access_type = NAMED
@@ -764,38 +397,26 @@
     }
 
     @doc:"""
-      A map keyed by names: the constructor of a namespace type, a refinement
-      of `map` whose `key_type` narrows from `meta.type_ref` to
-      `meta.identifier_ref`, which is IS-A it, and whose entries are never
-      void. A namespace type is an instance, as a map type is one of `map`:
+      The constructor of a namespace type, a map keyed by names:
       `api => !meta.namespace { key_type: meta.identifier  value_type: method }`,
-      and an entry holding a value of it, `orders => !api { ... }`, is an
-      ordinary value of the type `api`. Its keys are names, of an identifier
-      family, which is what a qualified name's segment is, and a segment selects
-      a key of a namespace value and of no other map.
-
-      `key_type` is the family every key is read and judged under. `ordered`
-      and the size bounds are map's. The schema map (`schema`) is the kernel's
-      one.
+      and then a value of it, `orders => !api { place => { … } }`. A segment of
+      a qualified name selects a key of a namespace value, `orders.place`, and
+      of no other map ([TSON-SCHEMA] §4.1, §5.12).
       """
     namespace => meta.map ^ {
       key_type:  meta.identifier_ref
       voidable?: = false
     }
 
-    @doc:"""
-      One position of a tuple: its type, and whether its value may be void. A
-      position is never missing, so `[A, B?]` admits `[a _]` and refuses `[a]`.
-      """
+    @doc:"One position of a tuple: its type, and whether its value may be void."
     tuple_element => {
       element_type: meta.type_expr
       voidable?:    boolean ~ false
     }
 
     @doc:"""
-      A fixed sequence of positions, each with a type of its own. The bracket
-      sugar spells two or more, `[T]` being an array; a tuple of one position
-      is constructed, `!meta.tuple [{ element_type: text }]`.
+      The constructor of `[A, B]`: a fixed sequence of positions, each with a
+      type of its own ([TSON-SCHEMA] §5.3).
       """
     tuple => meta.product & {
       access_pattern?: meta.product_access_type = INDEX
@@ -803,30 +424,14 @@
       elements:        [meta.tuple_element]
     }
 
-    @doc:"""
-      The members of an enum_type. The set's own uniqueness compares the text as
-      written; each member is then read as a value of the enum's `name_type`,
-      and two that are one value under that type's equality are a duplicate.
-      """
+    @doc:"The members of an enum_type."
     enum_set => !meta.set_type { element_type: text  min_items: 1 }
 
     @doc:"""
-      An enumeration: a closed set of names, and the type they are drawn from
-      ([TSON-SCHEMA] §7.4), as a record's `name_type` is its field names'.
-      `name_type` names an identifier family — a member of
-      `meta.identifier_ref`, a type built with identifier_type — and each
-      member must be a value of it, distinct from the others under its equality,
-      and is a name under its profile ([TSON-DATA] §8.2). A closed set of text
-      that is no name is the text family's own `members` facet,
-      `!text ^ { members: [...] }`; an enumeration of names a profile admits
-      beyond the kernel's identifier, such as words separated by single spaces,
-      is an enum_type over the author's own identifier_type.
-
-      A value `name_type` takes from a constructor resolves where that
-      constructor is declared; one an author writes resolves in the author's own
-      namespace, so a schema may enumerate names of a naming vocabulary it
-      declares itself. `name_type` is fixed once an enum is constructed: a
-      refinement narrows the members and never the type.
+      The constructor behind `enum`: a closed set of names, each a value of
+      `name_type`. An author writes `!enum [OPEN DONE]`, and refines this
+      constructor only for names of another naming convention ([TSON-SCHEMA]
+      §7.4).
       """
     enum_type => meta.atom & {
       name_type: meta.identifier_ref
@@ -834,13 +439,9 @@
     }
 
     @doc:"""
-      Closed sum, each of `variants` a `meta.type_expr`, a type's name or a type
-      written in place. `disjoint` is a resolver-derived index over the variant
-      list, parallel to `subtypes`: true or false by discrimination-class
-      distinctness ([TSON-SCHEMA] §5.4). Declarations never set it; on ingest
-      it MUST be discarded and recomputed. It carries the encoding-independent
-      fact each encoding's discrimination rules consume ([TSON-SCHEMA] §5.4,
-      §7.2).
+      The constructor of `( A | B )`: a value of one of the variants. `disjoint`
+      is derived, never written: whether the variants are told apart by form,
+      without a tag ([TSON-SCHEMA] §5.4).
       """
     choice => meta.sum & {
       variants:  [meta.type_expr]
@@ -848,65 +449,33 @@
     }
 
     @doc:"""
-      Author's assertion that a choice's variants are distinguishable by an
-      encoding's form resolution — discrimination-class distinctness, not
-      disjointness of inhabitance — checked against the resolver's derived
-      `disjoint` fact in the `!meta.choice` body ([TSON-SCHEMA] §5.4, §8.1). The
-      fact is class-stable: a variant whose forms straddle classes (an
-      approximate atom still admitting NaN or the infinities, a map with a
-      compound key) has no class, so the untagged values of a choice are one set
-      in every encoding. A void-targeted presence marker like `@atom.numeric`:
-      written bare, and presence is the assertion. Carries no decode force — the
-      resolver computes disjointness whether or not the annotation is present.
-      The derivation is total: present and refuted is a schema-load error;
-      present and verified, or absent, is silent.
+      An author's assertion that a choice's variants are told apart by form,
+      checked against the derived `disjoint` ([TSON-SCHEMA] §5.4).
       """
     disjoint => @meta.annotation void
 
     @doc:"""
-      Constructor for the open sum over the governing closure: the value names
-      its own type by its tag, among the types of the closure ([TSON-SCHEMA]
-      §2.2.3), and is validated in full against it. A value naming no type is
-      invalid. Where `choice` is the closed sum, enumerating its variants, this
-      is the open one, drawing them from the closure; `disjoint` is absent, as
-      on every non-choice sum.
+      The open sum: a value names its own type by its tag, among the types of
+      the closure ([TSON-SCHEMA] §7.8).
       """
     declared_type => meta.sum & {}
 
     @doc:"""
-      A value of a type the closure declares, chosen by the value: the tag names
-      the type, the name resolves in the closure exactly as it does anywhere
-      else, and the value is validated in full against it. What a schema map's
-      entries are.
+      A value of any type the closure declares, named by its tag. What a schema
+      map's entries are.
       """
     declared => !meta.declared_type {}
 
     @doc:"""
-      The sum in which a sibling field names the type: a value at a position of
-      this type is read against the type the field `on` of the same record
-      instance names ([TSON-SCHEMA] §5.2). Where `declared` takes the type from
-      the value's tag, this takes it from the record the value sits in. It is
-      written in place, directly at a record field's `type`, and never declared:
-      `{ of: !meta.dependent { on: kind } }`, spelled `kind!` in source. `on`
-      names a field of that record, declared before the field this types. It
-      is final: nothing composes or refines it.
+      A value is read against the type the sibling field `on` names. Written in
+      place at a record field's `type`, `kind!` in source ([TSON-SCHEMA] §5.2).
       """
     dependent => final meta.sum & { on: text }
 
     @doc:"""
-      An application of an open record that cannot close yet: `head` names the
-      open record, and `arguments` supply its parameters in order, each a name
-      or a parameter of the enclosing open record ([TSON-SCHEMA] §5.10). It is
-      written in place, `{ of: !meta.apply { head: box  arguments: [T] } }`,
-      spelled `box<T>` in source, and only inside an open record with one of
-      its parameters among the arguments: applying that record substitutes the
-      argument and closes it, to the record it denotes. Every other
-      application has closed by then: a constructor's to its construction, and
-      an open record's, all its arguments names, to its record, declared, in
-      place, or absorbed. It stands for a type that exists only once its open
-      record is applied, so it has no kind of its own: it composes `type`
-      alone, and nothing reads a value against it. It is final: nothing
-      composes or refines it, so no constructor is built on it.
+      An application, `box<T>` in source. Written in place it stands only inside
+      an open record, with one of that record's parameters among its arguments;
+      closed, it is the value of `@meta.application` ([TSON-SCHEMA] §5.10).
       """
     apply => final meta.type & {
       head:      meta.type_ref
@@ -914,153 +483,50 @@
     }
 
     @doc:"""
-      A name held in a slot: an atom whose values are names, each naming an
-      entry whose value's type, past the entry's alias hops ([TSON-SCHEMA]
-      §8.3), is `of` or IS-A it. Every entry is a name and a value, and the
-      value has a type, its tag: `order => { ... }` holds a value of `record`,
-      `int32 => !integer ^ { ... }` a value of `integer_type`, and
-      `orders => !api { ... }` a value of `api`. A field's type position, a
-      `meta.ref<meta.record>` slot and a `meta.ref<method>` slot all admit a
-      name by that one predicate, and differ only in `of`.
-
-      `of` names any type or constructor of the writer's namespace
-      ([TSON-SCHEMA] §3.3.1), never a value or an open record. Where it is a
-      constructor, `top` or IS-A it, the values it admits are types, and a slot
-      holds a type's name, which takes part in structural identity
-      ([TSON-SCHEMA] §8.2). A record written in braces is built with `record`,
-      and so is `top` itself and a constructor whose declaration is a record, so
-      `meta.ref<meta.record>` holds all of them. An open record is built with
-      `record` too, and no reference names it bare: it is named only as the
-      head of an application. Where `of` is any other type, the values it admits
-      are values, and a slot holds a value's qualified name: the first segment
-      resolves in the writer's namespace and names an entry, and each further
-      segment selects a key of a namespace value or a field of a record value.
-      A map that is no namespace is not entered.
-
-      A type's name is its entry's path from the document's root: `order`, or
-      `geo.address` for a member of a schema map nested as
-      `geo => !schema { ... }`, and every name resolves from the root.
-
-      A value is the name, never a value of the type it names. In a data
-      document it resolves in the namespace of the governing schema and is
-      judged there. In a schema document its grammar is read where it is
-      written, and the name is judged when that schema links: the set of names
-      a reference admits is the closure's, derived and never written.
-
-      A value is a name, never an application: an argument list is no part of
-      a value, and `geo.address<T>` in one is a parse error ([TSON-DATA]
-      §7.2.5), in data and in a schema value alike. An application is schema
-      source's: at a type slot `box<T>` is the construction `apply` written in
-      place, `{ of: !meta.apply { head: box  arguments: [T] } }`, which closes
-      where it stands -- a constructor's to its construction, `set<text>` to
-      `!meta.set_type { element_type: text }`, and an open record's to the
-      record it denotes -- and stays written in place only inside an open
-      record, over one of its parameters ([TSON-SCHEMA] §5.3, §5.10).
-
-      Inside an open record a value may be one of the record's parameters,
-      written as its name, alone or among an `apply`'s arguments, and
-      looked up before the namespace ([TSON-SCHEMA] §3.3). A parameter is a
-      type: it stands at a field's `type`, at a slot of a type written in place
-      there, or as an argument of an application at either or in a parent,
-      and never at a field's `value`. The slot judges the argument that
-      arrives when the record is applied.
-
-      A refinement narrows `of`: the refined `of` is the source's or IS-A it,
-      so every name the refinement admits the source admits too, and the
-      refinement is IS-A its source. `meta.identifier_ref` is `meta.type_ref`
-      narrowed to the identifier families.
-
-      A reference is a name or a parameter. An author writes one as
-      `meta.ref<T>`, the construction `!meta.ref { of: T }`: where `T` is a
-      constructor it holds the names of the types built with it,
-      `meta.ref<net.uuid_type>`, and otherwise the names of values of `T`,
-      `meta.ref<method>`.
+      A name held in a slot, written `handler: meta.ref<method>`. It names an
+      entry whose value's type, past alias hops, is `of` or IS-A it: where `of`
+      is a constructor the names are types', and otherwise they are values'
+      ([TSON-SCHEMA] §4.2, §5.12).
       """
     ref => meta.atom & {
       of: meta.type_ref
     }
 
-    @doc:"""
-      The names of the types a value can have.
-      """
+    @doc:"A slot holding a type's name."
     type_ref => !meta.ref { of: meta.type }
 
     @doc:"""
-      The names of the identifier families, which a `name_type` names: a
-      refinement of `meta.type_ref`, an identifier family being a type.
+      A slot holding the name of an identifier family, as a `name_type` does.
       """
     identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }
 
     @doc:"""
-      A type written where it is used. `of` holds the type, a construction
-      tagged by its constructor and carrying no chain: `{ of: !meta.array {
-      element_type: text } }`. The construction is one of `array`, `map`,
-      `tuple`, `choice` or `ref`, or of a constructor refining one of them,
-      `set_type` among them; a `record` without `parameters`; an `apply`, only
-      inside an open record over one of its parameters; or a `dependent`, only
-      directly at a record field's `type`. An enum, every other atom and a
-      namespace type, whose values carry its name as their tag, are declared
-      and named, and so is a declared sum (`declared_type`). It is not itself
-      a type, so one never holds another directly. Inside an open record a
-      slot in it may hold one of the record's parameters, replaced when the
-      record is applied.
+      A type written where it is used, `tags: [text]`, and not declared under a
+      name ([TSON-SCHEMA] §4.2).
       """
     type_inline => { of: meta.type }
 
-    @doc:"""
-      What a type slot holds: a type's name (`meta.type_ref`), or a type written
-      in place (`meta.type_inline`). A name is string-class and a
-      `meta.type_inline` brace-class, so the two are told apart by form
-      ([TSON-SCHEMA] §5.4). It types `record_field.type`,
-      `array.element_type`, `map.value_type`, `tuple_element.element_type`,
-      each of `choice.variants` and each of `type_chain.parents`.
-      """
+    @doc:"What a type slot holds: a type's name, or a type written in place."
     type_expr => @meta.disjoint ( meta.type_ref | meta.type_inline )
 
     @doc:"""
-      Resolver output: a schema map, from each name to the value its entry
-      resolves to, a type or a value, each naming its type by its tag. Resolved
-      output and source are one grammar — output is source with sugar expanded,
-      bodies flattened and chains computed, and an entry written as a
-      constructor application resolves to itself. A value of `schema` nested as
-      an entry, `geo => !schema { ... }`, declares as the root does: its members
-      are entries of the document, each named by its path from the root,
-      `geo.address`. A map of one path declared by several documents of a
-      closure is one map, the union of their members, and a member's identity
-      is its declaring document and its path; a member path two of them
-      declare collides as any name does ([TSON-SCHEMA] §2.2.3). The
-      annotations written on a map's entry are its declaring document's.
+      A schema map: each name mapped to the type or value its entry resolves to
+      ([TSON-SCHEMA] §2.1, §8.1).
       """
     schema => !meta.namespace { key_type: meta.type_name  value_type: meta.declared }
   }
 
   binary => !schema {
-    @doc:"""
-      The base encodings of RFC 4648 that a text encoding may spell a `bytes`
-      value in (HEX is §8's base16).
-      """
+    @doc:"RFC 4648's base encodings; HEX is its base16."
     bytes_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
 
     @doc:"""
-      Octet-sequence constraint vocabulary. Instance is `bytes`, at the root. The
-      value is the octets: equality, identity, content addressing and the length
-      facets are all over octets, never over a spelling — `length: 32` is a
-      32-byte digest whether it arrives as 64 hex characters, 44 base64
-      characters, or 32 raw bytes — so a round trip through any encoding
-      preserves the value.
-
-      `encoding` is a selector ([TSON-SCHEMA] §5.7): it picks which RFC 4648
-      alphabet the text class of encodings — TSON text, JSON, and any encoding
-      whose values are character sequences — spells the octets in, and an
-      encoding whose values are octets ignores it. A selector picks a spelling,
-      so it never changes what two values compare as. It defaults to BASE64 (§4,
-      padded), so a `bytes` position is base64 in every text encoding.
-
-      `encoding` is not refinable. Another alphabet is another type, declared as
-      its own instance:
-      `hexdigest => !binary.bytes_type { encoding: HEX  length: 4 }`. Refining
-      for length inherits the alphabet: `sha256 => !bytes ^ { length: 32 }` is a
-      base64 sha256.
+      The constructor of `bytes`. The value is the octets: equality and the
+      length facets are over octets, never a spelling, so
+      `sha256 => !bytes ^ { length: 32 }` is 32 octets. `encoding` picks the
+      alphabet a text encoding spells them in and changes no value; another
+      alphabet is another instance, `!binary.bytes_type { encoding: HEX }`
+      ([TSON-SCHEMA] §5.5).
       """
     bytes_type => meta.atom & {
       encoding?:   binary.bytes_encoding ~ BASE64
@@ -1070,11 +536,18 @@
     }
   }
 
+  @doc:"""
+    The absence of a value, written `_` ([TSON-DATA] §2.9, [TSON-SCHEMA] §7.6).
+    """
   void => !meta.void_type {}
 
-  @doc:"The two-valued type of a constraint field that is a switch."
+  @doc:"`true` or `false`."
   boolean => !enum [true false]
 
+  @doc:"""
+    An integer of any size. Refine it for a range or a width:
+    `age => !integer ^ { min: 0  max: 150 }` ([TSON-SCHEMA] §5.5).
+    """
   @atom.ordering:TOTAL @atom.bounded:false @atom.exact:true @atom.numeric
   integer => !numeric.integer_type {}
 
@@ -1082,26 +555,22 @@
   @atom.ordering:TOTAL @atom.bounded:true @atom.exact:true @atom.numeric
   int64 => !integer ^ { size: { bits: 64  signed: true } }
 
+  @doc:"""
+    Unicode text. Refine it to constrain it:
+    `name => !text ^ { min_length: 1  max_length: 80 }` ([TSON-SCHEMA] §5.5).
+    """
   @atom.ordering:NONE @atom.bounded:false
   text => !unicode.text_type {}
 
   @doc:"""
-    Octet sequence. The universal binary type, and the only one: a field is
-    `avatar: bytes`, a digest `sha256 => !bytes ^ { length: 32 }`. Equality and
-    the length facets are over octets; the type says nothing about spelling. The
-    text class of encodings spells `bytes` in base64 (RFC 4648 §4). Another
-    alphabet is another type, declared as its own instance of the constructor
-    (`hexdigest => !binary.bytes_type { encoding: HEX  length: 4 }`) — never as
-    a refinement of this one. An encoding whose values are octets writes them
-    raw.
+    An octet sequence, written in base64 in TSON text. A digest is
+    `sha256 => !bytes ^ { length: 32 }`, the length counting octets ([TSON-DATA]
+    §5.3).
     """
   @atom.ordering:NONE @atom.bounded:false
   bytes => !binary.bytes_type {}
 
-  @doc:"""
-    An IRI-reference (RFC 3987 §2.2): an IRI or a relative reference, its
-    characters drawn from RFC 3987's grammar, beyond US-ASCII included.
-    """
+  @doc:"An IRI-reference (RFC 3987 §2.2): an IRI or a relative reference."
   @atom.ordering:NONE @atom.bounded:false
   iri_reference => !net.iri_type {}
 
@@ -1109,35 +578,31 @@
   @atom.ordering:NONE @atom.bounded:false
   iri => !iri_reference ^ { allow_relative: false }
 
+  @doc:"A regular expression in I-Regexp (RFC 9485), the type of a `pattern`."
   @atom.ordering:NONE @atom.bounded:false
   regex => !unicode.regex_type {}
 
   @doc:"""
-    Documentation for a declaration, a field or a document. The text is
-    CommonMark 0.31.2 (https://spec.commonmark.org/0.31.2/) with no extensions.
-    Every string is valid CommonMark, so this refuses nothing and says only how
-    the text is displayed. Raw HTML in it is never executed, and a renderer need
-    not render it.
+    Documentation for a declaration, a field or a document, written before it.
+    The text is CommonMark 0.31.2, with no extensions, and raw HTML in it is
+    never executed ([TSON-SCHEMA] §6).
     """
   doc => @meta.annotation text
 
   @doc:"""
-    An enumeration of identifiers, the enumeration constructor an author
-    writes bare: the positional `!enum [OPEN DONE]`.
+    A closed set of names: `status => !enum [OPEN DONE]` ([TSON-SCHEMA] §7.4).
     """
   enum => meta.enum_type ^ { name_type?: = meta.identifier }
 
   @doc:"""
-    The set spelling an author writes: `set<text>` is the construction
-    `!meta.set_type { element_type: text }`. An alias of the constructor,
-    applied as its target is.
+    `set<T>`: a collection of distinct elements whose order is no part of its
+    value, `tags: set<text>` ([TSON-SCHEMA] §7.5).
     """
   set => meta.set_type
 
   @doc:"""
-    The tag of a schema map, an alias of `meta.schema`: a schema document's
-    root, `!schema { … }`, and a map nested as an entry,
-    `geo => !schema { … }`.
+    The tag of a schema map: a schema document's root is `!schema { … }`, and so
+    is a map nested as an entry, `geo => !schema { … }` ([TSON-SCHEMA] §2.1).
     """
   schema => meta.schema
 }

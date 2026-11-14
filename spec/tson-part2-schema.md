@@ -386,9 +386,9 @@ namespace => meta.map ^ { key_type: meta.identifier_ref  voidable?: = false }
 
 ```
 type_chain => {
-  parents?:    [meta.type_ref]   -- the parents as written; an open record's, one of which may be an application
-  supertypes?: [meta.type_ref]   -- the closed chain: every entry this one IS-A, complete, each a name without arguments
-  subtypes?:   [meta.type_ref]   -- the inverse, over the namespace of the schema being resolved (§3.3.4)
+  parents?:    [meta.type_expr]              -- the parents as written; an open record's, one of which may be an application
+  supertypes?: meta.set_type<meta.type_ref>  -- the closed chain: every entry this one IS-A, complete, each a name without arguments
+  subtypes?:   meta.set_type<meta.type_ref>  -- the inverse, over the namespace of the schema being resolved (§3.3.4)
 }
 ```
 
@@ -2098,12 +2098,12 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/40/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/40/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/39/tson-guide |
-| meta.tn | TSON Kernel (companion artifact, pre-loaded) | https://tson.io/2026/40/m/meta.tn?sha256=5d3259d67c67b615d17eb182e6f5a2d46e9e904d2d5552735518d8a91cfb2e11 |
-| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/40/m/numeric.tn?sha256=b0f26fd6284a1942e8d791b24f84e7e7e42a689592fd4dc6aac0b54790fc238f |
-| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=64cb1d318a89aff586f4dfe5d86e9a30ee48b3b65eb1d60892cf6bf9652c04d5 |
-| net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=f60bed4ead684a54c759472bdb5720e38a1c779a176b784dca5d6367e4e2a7e7 |
-| core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=a0e317b3c4b72155bb13f98c3e24c5d46b040f5f7da95b2013df312d76d8b189 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=85f90a35c2b34f662d905e9808284b61a0324996c91682690ad01d5e784062a6 |
+| meta.tn | TSON Kernel (companion artifact, pre-loaded) | https://tson.io/2026/40/m/meta.tn?sha256=fba10509f9c9db688ee01d2921635a24b1879d80b19f43c59edba3674c18252d |
+| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/40/m/numeric.tn?sha256=44b6423f588662106c5cc68f398e3ea2f0734196e80defb928a4b218d4cb83a8 |
+| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=e839a87b7e98ca1185a4a9fb2f364e770603a0f4f60cc4b4e26faa4cc02759b8 |
+| net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=a7ecf6cc57c1e04836ab319e2f2d882b6f5a5fcb826e7c30931a6e3bf83a5761 |
+| core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=1d57dbba4a89ee2649a1cc32446d27bfeb33ba722b684a1a0bac84b46a835472 |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=a236c4fdbc85611a5c2c1e198ef809a49ff90854428d2992c54fa03d2cc5c3b7 |
 
 ### 13.3 Informative References
 

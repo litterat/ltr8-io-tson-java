@@ -1,27 +1,12 @@
-!!id:"https://tson.io/2026/40/m/policy.tn?sha256=85f90a35c2b34f662d905e9808284b61a0324996c91682690ad01d5e784062a6"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=5d3259d67c67b615d17eb182e6f5a2d46e9e904d2d5552735518d8a91cfb2e11"
+!!id:"https://tson.io/2026/40/m/policy.tn?sha256=a236c4fdbc85611a5c2c1e198ef809a49ff90854428d2992c54fa03d2cc5c3b7"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=fba10509f9c9db688ee01d2921635a24b1879d80b19f43c59edba3674c18252d"
 @doc:"""
-  TSON processor policy — what a processor admits and spends (2026 Revision 40
-  draft).
-
-  A processor's policy is a property of the deployment, never of a schema
-  ([TSON-DATA] §8.2): a schema that declared its own strictness would choose
-  its own check. This document declares the policy's vocabulary, so a
-  processor states the policy it judged under in one shape, and a deployment
-  that writes its policy down writes a data document of type
-  `policy.processor`. Such a document is named at the call site and never
-  resolved by identity, and no document may name, import or otherwise select
-  the policy it is judged under.
-
-  `policy.identifier_policy` and `policy.script_policy` are §8.2's two
-  policies, and `policy.limits` is §9.1's and [TSON-SCHEMA] §11.5's. A script
-  is named by its Unicode Script property value alias (UAX #24), `Latin`,
-  `Cyrillic`, `Han`.
-
-  It imports meta.tn alone, every field typed by the kernel's vocabulary or by
-  an entry of its own. Its entries are members of the schema map `policy`
-  nested in its root, each named by its path from the root, and a schema
-  whose import closure holds this document reserves that map name.
+  The TSON processor policy: what a processor admits as a name and what it
+  spends ([TSON-DATA] §8.2, §9.1; [TSON-SCHEMA] §11.5). A policy is the
+  deployment's, never a schema's: no document names, imports or selects the
+  policy it is judged under. A deployment that writes its policy down writes a
+  data document of type `policy.processor`. A script is named by its Unicode
+  Script property value alias (UAX #24), `Latin`, `Cyrillic`, `Han`.
   """
 !schema {
   policy => !schema {
@@ -31,19 +16,16 @@
     ]
 
     @doc:"""
-      [TSON-DATA] §8.2's token policy: the restriction level over each whole
-      token, and any script combinations admitted over the level (UTS #39
-      §5.2's own device for Latn+Jpan and its siblings), each entry in
-      `permitting` one such combination.
+      The token policy: the level over each whole token. Each entry of
+      `permitting` is a script combination admitted over the level (UTS #39
+      §5.2).
       """
     script_policy => { level: policy.restriction_level  permitting: [[text]] }
 
     @doc:"""
-      [TSON-DATA] §8.2's identifier policy: the restriction level, whether it
-      applies to each segment of a name rather than to the whole of it,
-      whether no two names in one scope may share a UTS #39 skeleton, and any
-      script combinations admitted over the level, as `policy.script_policy`
-      states them.
+      The identifier policy. `per_segment` applies the level to each segment of
+      a name rather than to the whole of it, and `skeleton_distinctness` forbids
+      two names in one scope sharing a UTS #39 skeleton.
       """
     identifier_policy => {
       level: policy.restriction_level
@@ -53,30 +35,16 @@
     }
 
     @doc:"""
-      One resource limit: a count, a depth, or a size in code points, octets
-      or bytes, a positive `int64`, 1 to 2^63-1. A processor that holds a
-      limit in a narrower type than this range caps a larger value at the
-      widest it holds.
+      One resource limit: a count, a depth or a size. A processor that holds a
+      limit in a narrower type caps a larger value at the widest it holds.
       """
     limit => !int64 ^ { min: 1 }
 
     @doc:"""
-      [TSON-DATA] §9.1's resource limits and [TSON-SCHEMA] §11.5's: what a
-      processor will spend reading one document, and resolving one schema, as
-      against what it admits as a name. Every limit defaults to the spec's own
-      value, set at the tight end so that a document fitting it fits every
-      processor above, and a deployment writes only what it raises. A limit
-      refusal names the limit and the threshold, and is not a verdict on the
-      document.
-
-      The §9.1 limits bound a document, a schema document among them. Every
-      limit is a `policy.limit`.
-      The §11.5 limits bound the work resolution adds over a schema: the
-      schemas one header reaches through `!!import`, the
-      declarations in one schema map (instantiation entries
-      included), the hops from a use site to a terminal entry, the length of
-      one type's supertype chain, and the longest chain of waits one schema's
-      resolution runs, an entry waiting on the next being ready.
+      What a processor will spend reading one document and resolving one schema.
+      Each default is the specification's value, and a deployment writes only
+      what it raises. A limit refusal names the limit and the threshold, and is
+      not a verdict on the document ([TSON-DATA] §9.1, [TSON-SCHEMA] §11.5).
       """
     limits => {
       max_depth?:                  policy.limit ~ 64
@@ -98,11 +66,9 @@
     }
 
     @doc:"""
-      The policy a processor judges a document under: §8.2's identifier and
-      token policies and §9.1's limits. `unicode_data_version` is the UCD
-      release whose tables the §8.2 rules read, which a report states beside
-      the policy (§8.2) and a deployment's own policy document leaves out, the
-      tables being the processor's rather than the deployment's choice.
+      The policy a processor judges a document under. `unicode_data_version` is
+      the UCD release whose tables the name rules read: a report states it, and
+      a deployment's own policy document leaves it out.
       """
     processor => {
       identifier_policy: policy.identifier_policy

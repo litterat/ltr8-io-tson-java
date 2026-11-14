@@ -76,35 +76,31 @@ beside the document.
 
 ### Writing the bundled schemas' docs
 
-A bundled schema's `@doc` states the **contract** of its entry and nothing else. The test for every sentence: would a
-schema author or a processor implementer get something wrong without it? If not, it belongs in the spec, not here —
-the schemas ship in the library and are read as the normative vocabulary, so an argument in them reads as a rule.
+**A bundled schema's `@doc` serves someone looking at that one entry, reading or writing a schema, who has not read
+[TSON-SCHEMA].** Nobody reads a schema language's specification before writing a schema, so the doc carries the
+basic case and names where the rest is. A doc that restates a rule in full has to be kept in step with the spec by
+hand and drifts: each of the six kernel docs found contradicting the kernel or the spec was such a restatement.
 
-- **Stays:** what the entry is, and for a type its value space — which values, how equality and ordering work; what
-  each field or facet means, with its unit; coherence rules and schema-load/resolver errors; refinement rules (what a
-  refinement may set, tighten, never change); defaults and what omission yields; cross-layer name-resolution facts
-  (a root name a schema importing core reserves, or a member of `meta`, `atom`, `numeric`, `unicode`, `net`, `binary` or
-  `temporal`, maps any schema may add to); how TSON text
-  spells a value, said by name; mappings a converter needs (JSON Schema `number`, a host language's closed-set construct);
-  one short example where the spelling is not obvious; the spec citations attached to sentences that stay.
-- **Goes:** history ("earlier revisions called", "was removed", "unchanged", "now", "remains"); rationale ("because",
-  "which is why", "considered and rejected"); comparisons made to persuade (Java's `BigDecimal.equals`, "as
-  `java.time.Duration` writes it"); restatements — a rule a file header states for several entries (numeric.tn's bounds,
-  `multiple_of` and `members` rules) is stated once there and an entry refers to it. The exception is the kernel's
-  `numeric.integer_type`, which keeps its own statement: a schema importing meta.tn alone never reads numeric.tn's
-  header.
-- **Form:** open with what the entry is, then fields or facets, then rules. Present tense, plain declarative
-  sentences. A one-sentence doc is `@doc:"…"` on one line; a longer one, or one that does not fit in 80 columns, is a
-  `"""` block indented as the file does. Doc text is filled to **80 columns, indentation included**; a backtick code
-  span is never split across lines, and preformatted text (a grammar, the References table, indented examples)
-  keeps its own layout. A member-set entry says whose members it holds ("The members of an integer_type.").
-- **File headers** keep what the file is, how it is reached through `!!import`, what it contains, rules
-  shared by several entries, and the hash-pin note.
-- **Shortening a rule never changes it.** Where tighter wording could strengthen or weaken it, the sentence stays
-  verbatim. A doc that contradicts its declaration or another doc is reported, never silently reconciled.
+- **What it is**, in a sentence, and **how it is written in the basic case**, with one example where the spelling
+  is not obvious (`age => !integer ^ { min: 0  max: 150 }`). Every example is a line that loads.
+- **What its declaration does not show about its values:** an atom family's value space where it differs from its
+  lexical space, its canonical text and the quirks of its lexical form, which [TSON-SCHEMA] §5.5 delegates to the
+  family's own `@doc`; what a facet means where its name does not say, with its unit; a rule over the body that no
+  type states.
+- **Where to read further:** the section that owns the rule, `([TSON-SCHEMA] §5.2)`, or the standard. A rule the
+  spec states in full is cited, never restated.
+- **Not in a doc:** how a refinement may move a facet (§5.7's), resolver, linker and reader behaviour, rationale,
+  history, comparisons, and a file's contents retold in its header.
+- **One place.** A family's value space and facets sit on its constructor; its instance says what it is and shows
+  the refinement an author writes. A rule several families share is stated once in a file header.
+- **Form.** Present tense, plain declarative sentences. A one-sentence doc is `@doc:"…"` on one line; a longer one
+  is a `"""` block indented as the file does, filled to **80 columns, indentation included**; a backtick code span
+  is never split across lines.
+- **Shortening a rule never changes it.** A doc that contradicts its declaration or another doc is reported, never
+  silently reconciled.
 
-Text that leaves a doc is not discarded: it goes to the spec author as a removed-text list, verbatim and categorised,
-so the argument can land in Part 2. The `*-resolved.tn` fixtures carry none of these docs.
+`TsonSchemaStripper` removes the docs for a reader that wants declarations alone. The `*-resolved.tn` fixtures
+carry none of them.
 
 ## Branches and revisions
 
