@@ -102,6 +102,17 @@ class TimeParserTest {
         assertEquals(OffsetTime.parse("10:00:01+01:00"), type.read("10:00:01+01:00"));
     }
 
+    /** A time is its time of day in UTC (§5.5), so {@code 23:30:00-02:00} is {@code 01:30:00Z} and not a day later. */
+    @Test
+    void aValueWhoseOffsetCarriesItPastMidnightIsJudgedAsItsUtcTimeOfDay() {
+        TimeParser beforeTwo = new TimeParser(Optional.empty(), Optional.of(OffsetTime.parse("02:00:00Z")));
+        assertEquals(OffsetTime.parse("23:30:00-02:00"), beforeTwo.read("23:30:00-02:00"));
+        assertThrows(AtomValidationException.class, () -> beforeTwo.read("00:30:00-02:00"));
+        TimeParser afterTen = new TimeParser(Optional.of(OffsetTime.parse("22:00:00Z")), Optional.empty());
+        assertEquals(OffsetTime.parse("01:00:00+02:00"), afterTen.read("01:00:00+02:00"));
+        assertThrows(AtomValidationException.class, () -> afterTen.read("23:00:00+02:00"));
+    }
+
     @Test
     void writeRoundTripsThroughRead() {
         assertEquals("10:15:30+01:00",

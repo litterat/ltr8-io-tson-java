@@ -5,7 +5,6 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.temporal.TimeType;
 import java.time.OffsetTime;
 import java.time.format.DateTimeParseException;
-import java.util.Comparator;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -68,12 +67,9 @@ public record TimeParser(TimeType constraints) implements AtomTypeParser<OffsetT
 
     private void validate(OffsetTime value, String text) {
         FractionalSeconds.check(constraints.fractionDigits(), value.getNano(), text, "time");
-        Bounds.check(value, text, INSTANT_ORDER, Bounds.CHRONOLOGICAL, constraints.min(),
+        Bounds.check(value, text, TimeType.INSTANT_ORDER, Bounds.CHRONOLOGICAL, constraints.min(),
                 constraints.exclusiveMin(), constraints.max(), constraints.exclusiveMax());
     }
-
-    /** Never {@code compareTo}, whose tie-break on the local time would make the offset part of the value (§5.5). */
-    private static final Comparator<OffsetTime> INSTANT_ORDER = (a, b) -> a.isBefore(b) ? -1 : a.isAfter(b) ? 1 : 0;
 
     /**
      * Its own value, or the RFC 3339 text -- this family's wire form is text, so a component keeping the

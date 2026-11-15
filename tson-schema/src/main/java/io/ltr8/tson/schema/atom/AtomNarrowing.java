@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.atom;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.numeric.ComplexType;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -77,14 +78,28 @@ public final class AtomNarrowing {
      * vacuously, which is what lets a refinement restate a facet it doesn't actually change.
      */
     public static <T extends Comparable<? super T>> boolean lowerTightens(Bound<T> source, Bound<T> refined) {
-        int order = refined.value().compareTo(source.value());
-        return order != 0 ? order > 0 : !refined.inclusive() || source.inclusive();
+        return lowerTightens(source, refined, Comparator.naturalOrder());
+    }
+
+    /**
+     * {@link #lowerTightens(Bound, Bound)} over the family's own order, for a host type whose {@code compareTo}
+     * separates two spellings of one value.
+     */
+    public static <T extends Comparable<? super T>> boolean lowerTightens(Bound<T> source, Bound<T> refined,
+            Comparator<? super T> order) {
+        int sign = order.compare(refined.value(), source.value());
+        return sign != 0 ? sign > 0 : !refined.inclusive() || source.inclusive();
     }
 
     /** The {@link #lowerTightens} twin: a lower ceiling, or the same ceiling made exclusive. */
     public static <T extends Comparable<? super T>> boolean upperTightens(Bound<T> source, Bound<T> refined) {
-        int order = refined.value().compareTo(source.value());
-        return order != 0 ? order < 0 : !refined.inclusive() || source.inclusive();
+        return upperTightens(source, refined, Comparator.naturalOrder());
+    }
+
+    public static <T extends Comparable<? super T>> boolean upperTightens(Bound<T> source, Bound<T> refined,
+            Comparator<? super T> order) {
+        int sign = order.compare(refined.value(), source.value());
+        return sign != 0 ? sign < 0 : !refined.inclusive() || source.inclusive();
     }
 
     /**
@@ -109,14 +124,24 @@ public final class AtomNarrowing {
 
     /** A refined lower bound must not sit below the source's own -- {@code min: -10} under a source whose floor is 0. */
     public static <T extends Comparable<? super T>> void checkLower(List<String> out, Bound<T> source, Bound<T> refined) {
-        if (source != null && refined != null && !lowerTightens(source, refined)) {
+        checkLower(out, source, refined, Comparator.naturalOrder());
+    }
+
+    public static <T extends Comparable<? super T>> void checkLower(List<String> out, Bound<T> source, Bound<T> refined,
+            Comparator<? super T> order) {
+        if (source != null && refined != null && !lowerTightens(source, refined, order)) {
             out.add(refined + " is below the source's own " + source);
         }
     }
 
     /** A refined upper bound must not sit above the source's own -- {@code max: 300} under a source whose ceiling is 255. */
     public static <T extends Comparable<? super T>> void checkUpper(List<String> out, Bound<T> source, Bound<T> refined) {
-        if (source != null && refined != null && !upperTightens(source, refined)) {
+        checkUpper(out, source, refined, Comparator.naturalOrder());
+    }
+
+    public static <T extends Comparable<? super T>> void checkUpper(List<String> out, Bound<T> source, Bound<T> refined,
+            Comparator<? super T> order) {
+        if (source != null && refined != null && !upperTightens(source, refined, order)) {
             out.add(refined + " is above the source's own " + source);
         }
     }
