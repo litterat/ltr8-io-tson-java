@@ -1,5 +1,12 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.Annotations;
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassField;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -24,6 +31,7 @@ import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.tree.TsonVoid;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,8 +46,9 @@ import java.util.Optional;
  * untagged, as that entry. Inside, the read is the foreign schema's (its readers resolve every name in its
  * namespace), the cursor, receiver, policy and limits the document's ({@link ScopeCrossing}).
  *
- * <p>Built in tree mode only: in bind mode one bind context's name binder serves this schema and every foreign
- * one, so two schemas' {@code card} would bind to one class, and the read reports the gap ({@link #unbound}).
+ * <p>In both modes the foreign reader is the foreign schema's own, so in bind mode each class it binds is asked by
+ * the identity of the entry's declaring schema, and two schemas' {@code card} bind apart. The annotations in front of
+ * the value reach a tree as its annotations and a bound record through its carrier, as a record's own do.
  */
 public final class ExternReader implements TsonTypeReader<Object> {
 
@@ -60,13 +69,15 @@ public final class ExternReader implements TsonTypeReader<Object> {
     private final String admissible;
     private final ScopeCrossing crossing;
     private final TsonLinkedSchema outer;
+    private final DataBindContext binding;
 
     /**
      * @param admitted every name this scope may tag the value with, mapped to how the value crosses
      * @param narrower the admitted names landing on a subtype or a variant of this one's landing, joined for a message
+     * @param binding  the context the foreign readers bind with, {@code null} where they read trees
      */
     public ExternReader(String name, ValueReaderContext context, Crossing own, Map<String, Crossing> admitted,
-                        String narrower, ScopeCrossing crossing) {
+                        String narrower, ScopeCrossing crossing, DataBindContext binding) {
         this.name = name;
         this.location = context.locationOf(name);
         this.annotations = AnnotationTypes.of(context);
@@ -76,13 +87,14 @@ public final class ExternReader implements TsonTypeReader<Object> {
         this.narrower = narrower;
         this.crossing = crossing;
         this.outer = context.linked();
+        this.binding = binding;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
         ctx = ctx.underDeclaration(location);
         EventSkip.typeRefAhead(ctx);
-        List<TsonAnnotation> leading = AnnotationCapture.annotations(ctx, annotations);
+        Annotations leading = AnnotationCapture.bound(ctx, annotations);
         Crossing through = own;
         String outerName = name;
         if (ctx.peek() instanceof TypeRef tag) {
@@ -108,7 +120,57 @@ public final class ExternReader implements TsonTypeReader<Object> {
             return null;
         }
         Object read = crossing.read(ctx, through.scope(), through.reader());
-        return read instanceof TsonValue value ? named(value, outerName).withAnnotations(leading) : read;
+        if (read instanceof TsonValue value) {
+            return named(value, outerName).withAnnotations(nodes(leading));
+        }
+        return leading.values().isEmpty() || read == null || binding == null ? read : carrying(read, leading);
+    }
+
+    /** The annotations a tree read captured, as a node's: a tree read's readers yield a node for every value. */
+    private static List<TsonAnnotation> nodes(Annotations leading) {
+        if (leading.values().isEmpty()) {
+            return List.of();
+        }
+        List<TsonAnnotation> nodes = new ArrayList<>(leading.values().size());
+        for (Annotation annotation : leading.values()) {
+            nodes.add(new TsonAnnotation(annotation.name(),
+                    annotation.value().filter(TsonValue.class::isInstance).map(TsonValue.class::cast)));
+        }
+        return nodes;
+    }
+
+    /**
+     * {@code read}, a bound object, carrying {@code leading} ahead of what its carrier holds, as a record read with
+     * them in front of it would. The value crossed untagged and unannotated, so its carrier holds nothing of the
+     * boundary's; a class with no carrier drops them, as a record's reader does, the boundary having checked them.
+     */
+    private Object carrying(Object read, Annotations leading) {
+        try {
+            DataClass described = binding.getDescriptor(read.getClass());
+            if (!(described instanceof DataClassRecord record) || record.bridge().isPresent()
+                    || record.annotationsCarrier().isEmpty()) {
+                return read;
+            }
+            DataClassField carrier = record.annotationsCarrier().get();
+            DataClassField[] fields = record.fields();
+            Object[] arguments = new Object[fields.length];
+            for (DataClassField field : fields) {
+                arguments[field.index()] = field.get(read);
+            }
+            Annotations.Builder merged = new Annotations.Builder();
+            leading.values().forEach(merged::add);
+            if (arguments[carrier.index()] instanceof Annotations own) {
+                own.values().forEach(merged::add);
+            }
+            arguments[carrier.index()] = merged.build();
+            return record.constructor().invoke(arguments);
+        } catch (DataBindException e) {
+            throw new IllegalStateException(read.getClass() + " was bound by a reader and has no descriptor", e);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new IllegalStateException("rebuilding " + read.getClass() + " with its annotations failed", e);
+        }
     }
 
     /** A tag this boundary does not admit: unresolved in this scope, or reaching a type the target does not admit. */
@@ -175,22 +237,5 @@ public final class ExternReader implements TsonTypeReader<Object> {
     public static boolean namesASubtype(Top definition) {
         return FamilySelectors.extensionOf(definition).filter(RecordExtensionType.ABSTRACT::equals).isPresent()
                 && FamilySelectors.namesOf(definition).isEmpty();
-    }
-
-    /**
-     * The reader an extern compiles to in bind mode: binding a foreign value waits for binding by entry identity, so
-     * the read reports the gap and skips the value, as {@link ErrorReader} does.
-     */
-    public static TsonTypeReader<Object> unbound(String name, Extern extern, SchemaLocation location) {
-        return ctx -> {
-            TsonReadContext at = ctx.underDeclaration(location);
-            at.report(Diagnostic.Code.NOT_IMPLEMENTED, "'" + name + "' is " + Externs.describe(extern) + ", and "
-                    + "binding a value read through an extern is not implemented yet: one bind context names the "
-                    + "classes of this schema and of every foreign one, so two schemas' names would bind to one "
-                    + "class until binding is by entry identity; read it as a tree ([TSON-SCHEMA] §7.9)",
-                    "a type this library can bind", "");
-            EventSkip.dataValue(at);
-            return null;
-        };
     }
 }

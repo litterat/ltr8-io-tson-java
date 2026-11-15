@@ -371,6 +371,7 @@ public final class TsonObjectWriter {
     public TsonObjectWriter();
     public TsonObjectWriter(DataBindContext context);
     public TsonObjectWriter describing(String schemaUri, String rootTypeName);   // both, always
+    public TsonObjectWriter describing(TsonLinkedSchema schema, String rootTypeName); // + tags at an extern
     public TsonObjectWriter identifiedBy(String documentId);
     public String toTson(Object|TsonObjectDocument<?> value);
     public void   write(Object|TsonObjectDocument<?> value, OutputStream|Appendable out);
@@ -550,6 +551,8 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
                                Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
     public String originOf(String entryName);       // which document declared it, transitively
+    public String declaringIdentity(String entryName); // originOf, canonical: what a binder is asked within
+    public List<String> dependencies();             // every schema depended on directly: imports, then externs
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
     public Optional<Top> nameType(String entryName); // a record's name_type, where not meta.field_name
     public boolean isKernel(String entryName);      // declared by meta.tn, judged by origin
@@ -637,10 +640,15 @@ public class DataBindContext {
     public Optional<String> profile();
     public DataClass getDescriptor(Class<?> targetClass) throws DataBindException;
     public DataClass getDescriptor(Class<?> targetClass, Type parameterizedType) throws DataBindException;
-    public DataClass getDescriptor(String schemaTypeName) throws DataBindException;
+    public DataClass getDescriptor(String schemaTypeName) throws DataBindException;   // the name alone
+    public DataClass getDescriptor(String namespace, String schemaTypeName) throws DataBindException;
     public Supplier<DataClass> componentSource(Class<?> targetClass, Type parameterizedType);
 }
 ```
+
+`DataNameBinder` has one abstract method, `resolve(String name)`; `resolve(String namespace, String name)` defaults to
+it, and the engine always asks that one, with the canonical identity of the schema declaring the type. `ofMap`,
+`orElse`, `byNamespace(Map<String, DataNameBinder>, DataNameBinder fallback)` and `DefaultDataNameBinder` build one.
 
 **Everything is fixed at `build()`** — atoms, the name binder and the profile are the builder's, and the
 built context has no mutators.

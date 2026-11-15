@@ -142,11 +142,21 @@ public final class SchemaModelNameBinder {
      * ({@code enum}, {@code set}) is still not the consumer's; and a name outside the vocabulary never reaches the
      * schema model, whatever class it would mangle to. A {@link DataBindException} from {@code additional}
      * propagates as it stands: it names what that consumer's own binder searched, which is where the name was
-     * expected to be.
+     * expected to be. A type asked within its namespace reaches {@code additional} with it.
      */
     public static DataNameBinder extendedWith(DataNameBinder additional) {
         Objects.requireNonNull(additional, "additional");
-        return name -> Vocabulary.NAMES.contains(name) ? INSTANCE.resolve(name) : additional.resolve(name);
+        return new DataNameBinder() {
+            @Override
+            public Class<?> resolve(String name) throws DataBindException {
+                return Vocabulary.NAMES.contains(name) ? INSTANCE.resolve(name) : additional.resolve(name);
+            }
+
+            @Override
+            public Class<?> resolve(String namespace, String name) throws DataBindException {
+                return Vocabulary.NAMES.contains(name) ? INSTANCE.resolve(name) : additional.resolve(namespace, name);
+            }
+        };
     }
 
     private static DataBindContext context(DataNameBinder binder) {

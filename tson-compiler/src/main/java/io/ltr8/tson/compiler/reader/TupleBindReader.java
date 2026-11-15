@@ -182,7 +182,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
             StringBuilder tried = new StringBuilder();
             for (String candidate : vctx.bindingNamesFor(name)) {
                 try {
-                    return context.getDescriptor(candidate);
+                    return context.getDescriptor(vctx.namespaceOf(candidate), candidate);
                 } catch (UnboundNameException e) {
                     first = first == null ? e : first;
                     tried.append(tried.isEmpty() ? "" : "' or '").append(candidate);

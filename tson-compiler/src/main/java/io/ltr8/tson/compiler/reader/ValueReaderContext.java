@@ -51,6 +51,14 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
+     * The namespace a bind lookup asks entry {@code name} within: the canonical identity of the schema declaring it,
+     * so one entry reached through several schemas binds once, and two schemas' entries of one name bind apart.
+     */
+    public String namespaceOf(String name) {
+        return linked.declaringIdentity(name);
+    }
+
+    /**
      * The {@link SchemaLocation} the reader for entry {@code name} offers as its own declaration. The only
      * place one is built: the identity has to come from {@link TsonLinkedSchema#originOf} so that it and the
      * position are the same document's -- an imported entry's line belongs to the schema that declared it,

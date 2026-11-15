@@ -139,8 +139,12 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       namespace; judged through the hop by the foreign entry's identity, and sealed. A value through one is read in
       TSON text, in tree mode, by the foreign schema's own compiled reader: the tag and the annotations in front of it
       in the enclosing scope, every name inside in the foreign schema's, at every position a type's name stands, the
-      root and an annotation's value included, and scopes nest. Binding one, and reading one in JSON, report
-      `NOT_IMPLEMENTED`
+      root and an annotation's value included, and scopes nest; bound in bind mode, each class by its entry's
+      identity, and written back by `TsonObjectWriter.describing(linked, root)` under the enclosing scope's names.
+      Reading one in JSON reports `NOT_IMPLEMENTED`
+- [x] Binding by entry identity — a `DataNameBinder` is asked `resolve(namespace, name)`, the namespace the
+      canonical identity of the schema declaring the entry, so two schemas' `order` bind two classes through one
+      context (`DataNameBinder.byNamespace`); a binder answering by name alone answers every schema alike
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
       reads against real TSON data documents (see the README's [Schema pipeline](README.md#schema-pipeline))

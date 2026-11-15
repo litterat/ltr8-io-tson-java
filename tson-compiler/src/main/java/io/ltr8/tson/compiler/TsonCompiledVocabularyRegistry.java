@@ -97,20 +97,11 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     // no hash for the identity and silently verifies nothing, which is §10.2's MUST quietly skipped.
     private final Map<String, String> contentHashes = new ConcurrentHashMap<>();
 
-    /** Each schema a foreign value is read in, compiled in tree mode once for every checkpoint ({@link #foreign}). */
-    private final Map<String, TsonCompiledSchema> foreignTrees = new ConcurrentHashMap<>();
+    /** Each schema a foreign value is read in, compiled once per mode for every checkpoint ({@link Foreign}). */
+    private final Foreign foreignTreeSchemas = new Foreign(ValueReaderFactoryRegistry.tree());
 
-    private final TsonSchemaCompiler.ForeignSchemas foreignTreeSchemas = new TsonSchemaCompiler.ForeignSchemas() {
-        @Override
-        public TsonCompiledSchema compiled(TsonLinkedSchema linked) {
-            return foreign(linked);
-        }
-
-        @Override
-        public Optional<TsonCompiledSchema> compiled(String identity) {
-            return schemaRegistry.getByCanonicalIdentity(identity).map(TsonCompiledVocabularyRegistry.this::foreign);
-        }
-    };
+    /** {@link #foreignTreeSchemas}, compiled in this registry's object-binding mode. */
+    private final Foreign foreignBoundSchemas;
 
     /**
      * Recorded for an identity whose document cannot be content-addressed at all -- no line terminator
@@ -193,6 +184,7 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
                                           SchemaSource source) {
         this.schemaRegistry = schemaRegistry;
         this.resolver = ValueReaderFactoryRegistry.bind(context);
+        this.foreignBoundSchemas = new Foreign(resolver);
         this.context = context;
         this.source = source;
     }
@@ -260,23 +252,39 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     public TsonCompiledSchema compileReady(TsonSchema ready, Set<String> pending, boolean tree) {
         TsonLinkedSchema linked = TsonSchemaLinker.linkReady(ready, schemaRegistry, pending);
         return tree ? TsonSchemaCompiler.compileReady(linked, ValueReaderFactoryRegistry.tree(), pending, foreignTreeSchemas)
-                : TsonCompiledVocabulary.compileReady(linked, resolver, pending);
+                : TsonCompiledVocabulary.compileReady(linked, resolver, pending, foreignBoundSchemas);
     }
 
     /**
-     * A schema an extern names, compiled in tree mode for a checkpoint's read through the extern ([TSON-SCHEMA]
-     * §7.9), once per identity: every checkpoint of every resolution shares it.
+     * The schemas an extern names, compiled in one mode for a checkpoint's read through the extern ([TSON-SCHEMA]
+     * §7.9), once per identity: every checkpoint of every resolution shares each. A miss compiles outside any lock and
+     * {@code putIfAbsent}s, the compile reaching this cache again for each schema the foreign one's externs name.
      */
-    private TsonCompiledSchema foreign(TsonLinkedSchema linked) {
-        String identity = CanonicalIdentity.canonicalize(linked.schema().id());
-        TsonCompiledSchema cached = foreignTrees.get(identity);
-        if (cached != null) {
-            return cached;
+    private final class Foreign implements TsonSchemaCompiler.ForeignSchemas {
+
+        private final ValueReaderFactoryResolver factories;
+        private final Map<String, TsonCompiledSchema> compiled = new ConcurrentHashMap<>();
+
+        Foreign(ValueReaderFactoryResolver factories) {
+            this.factories = factories;
         }
-        TsonCompiledSchema fresh = TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.tree(),
-                foreignTreeSchemas);
-        TsonCompiledSchema raced = foreignTrees.putIfAbsent(identity, fresh);
-        return raced != null ? raced : fresh;
+
+        @Override
+        public TsonCompiledSchema compiled(TsonLinkedSchema linked) {
+            String identity = CanonicalIdentity.canonicalize(linked.schema().id());
+            TsonCompiledSchema cached = compiled.get(identity);
+            if (cached != null) {
+                return cached;
+            }
+            TsonCompiledSchema fresh = TsonSchemaCompiler.compile(linked, factories, this);
+            TsonCompiledSchema raced = compiled.putIfAbsent(identity, fresh);
+            return raced != null ? raced : fresh;
+        }
+
+        @Override
+        public Optional<TsonCompiledSchema> compiled(String identity) {
+            return schemaRegistry.getByCanonicalIdentity(identity).map(this::compiled);
+        }
     }
 
     /**

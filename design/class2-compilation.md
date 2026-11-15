@@ -167,6 +167,10 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   chain: the kernel's set and enum are incomplete entries, whose completions are the constructor's own construction
   (§5.5). Lost: binding an entry by its supertype's class, which an ordinary record composing another could not share
   without silently losing a narrower class.
+  **Every lookup is by entry identity**: a name is asked within the canonical identity of the schema declaring it
+  (`ValueReaderContext.namespaceOf`, `DataNameBinder.resolve(namespace, name)`), never the scope it was reached
+  through, so a type two schemas share binds once, and two schemas' entries of one name bind apart through one
+  context. Lost: the scope's identity, which binds a shared import once per importer.
   **Only a derived entry is reached this way**, which is the test `EntryDisplayName` already applies: an entry
   with a source position was declared, so its own name is the one the author wrote and an alias naming it must
   never redirect its binding. The index is built once per compile beside `namesMeaning`, for that one's

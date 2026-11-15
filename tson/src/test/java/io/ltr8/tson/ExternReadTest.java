@@ -1,11 +1,14 @@
 package io.ltr8.tson;
 
+import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.tree.TsonDocument;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -22,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A value read through an extern ([TSON-SCHEMA] §7.9): its body in the foreign schema's scope, its tag and the
  * annotations in front of it in the scope that holds it, at every position an extern types.
  */
-class ExternReadTest {
+public class ExternReadTest {
 
     static final String LIB = "https://example.test/lib.tn";
     static final String SHIPPING = "https://example.test/shipping.tn";
@@ -176,6 +179,20 @@ class ExternReadTest {
         assertEquals(Optional.of("card"), root.at("/o/payment").typeRef());
     }
 
+    public record Memo(String note) {
+    }
+
+    public record Rec(String a, Memo memo) {
+    }
+
+    /** The diagnostics validating a schema of {@code body}, {@code lib.tn}'s {@code rec} and {@code memo} bound. */
+    private List<String> validateBindingLib(String body) {
+        Tson tson = world.tson(DataNameBinder.byNamespace(Map.of(CanonicalIdentity.canonicalize(LIB),
+                DataNameBinder.ofMap(Map.of("rec", Rec.class, "memo", Memo.class))), DataNameBinder.ofMap(Map.of())));
+        return tson.validateSchema(ExternWorld.text("https://example.test/subject.tn", body)).stream()
+                .map(ExternWorld::shown).toList();
+    }
+
     @Test
     void anAnnotationThroughAnExternInASchemaDocumentIsReadAgainstTheTargetInItsScope() {
         assertEquals(List.of(), world.validate(extern("label_x", LIB, "label") + extern("rec_x", LIB, "rec")
@@ -184,8 +201,15 @@ class ExternReadTest {
     }
 
     @Test
+    void anAnnotationThroughAnExternInASchemaDocumentIsBoundAsTheTargetInItsScope() {
+        assertEquals(List.of(), validateBindingLib(extern("label_x", LIB, "label") + extern("rec_x", LIB, "rec")
+                + "memo => { other: int32 }\n@label_x:\"hello\" y => { a: text }\n"
+                + "z => @rec_x:{ a: x  memo: !memo { note: n } } { b: text }\n"));
+    }
+
+    @Test
     void anAnnotationsValueThroughAnExternIsJudgedByTheTargetInItsScope() {
-        List<String> got = world.validate(extern("count_x", LIB, "count") + extern("rec_x", LIB, "rec")
+        List<String> got = validateBindingLib(extern("count_x", LIB, "count") + extern("rec_x", LIB, "rec")
                 + "memo => { other: int32 }\n@count_x:-1 y => { a: text }\n"
                 + "z => @rec_x:{ a: x  memo: !memo { other: 1 } } { b: text }\n");
         assertEquals(2, got.size(), String.join("\n", got));

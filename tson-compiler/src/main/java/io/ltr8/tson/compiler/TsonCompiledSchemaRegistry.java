@@ -190,7 +190,7 @@ public final class TsonCompiledSchemaRegistry {
      */
     public TsonCompiledSchema compile(TsonLinkedSchema linked) {
         refuseUnbound(linked, null);
-        return TsonSchemaCompiler.compile(linked, factories, mode == Mode.TREE ? foreignSchemas : null);
+        return TsonSchemaCompiler.compile(linked, factories, foreignSchemas);
     }
 
     /** This registry's cache, as a compile obtains the schema a foreign value is read in. */
