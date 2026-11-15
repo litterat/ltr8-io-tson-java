@@ -238,7 +238,7 @@ public class DataBindContext {
 		return builder;
 	}
 
-	/** The binder this context resolves a bare type name to a class with ({@link #getDescriptor(String)}). */
+	/** The binder this context resolves a type name to a class with ({@link #getDescriptor(String, String)}). */
 	public DataNameBinder nameBinder() {
 		return nameBinder;
 	}
@@ -345,9 +345,9 @@ public class DataBindContext {
 	/**
 	 * Resolves {@code schemaTypeName} to a Java class via this context's own {@link DataNameBinder}
 	 * (see {@link Builder#nameBinder}/{@link Builder#nameBinderPackages}/{@link
-	 * Builder#nameBinderAliases}), then returns its descriptor exactly as {@link
-	 * #getDescriptor(Class)} would -- one call in place of resolving the class and fetching its
-	 * descriptor as two separate steps.
+	 * Builder#nameBinderAliases}), asked by the name alone, then returns its descriptor exactly as {@link
+	 * #getDescriptor(Class)} would. For a caller with one namespace; {@link #getDescriptor(String, String)} asks
+	 * within the namespace declaring the type.
 	 *
 	 * @throws UnboundNameException where the binder resolves the name to no class
 	 * @throws DataBindException    where it does, and that class cannot be analysed -- the message names both
@@ -359,6 +359,29 @@ public class DataBindContext {
 		} catch (DataBindException e) {
 			throw new UnboundNameException(e.getMessage(), e);
 		}
+		return describe(schemaTypeName, target);
+	}
+
+	/**
+	 * The descriptor of the class the type {@code schemaTypeName}, declared in {@code namespace}, binds to under
+	 * this context's {@link DataNameBinder} ({@link DataNameBinder#resolve(String, String)}) -- one call in place
+	 * of resolving the class and fetching its descriptor as two separate steps.
+	 *
+	 * @param namespace the namespace declaring the type, opaque and matched by equality
+	 * @throws UnboundNameException where the binder resolves the type to no class
+	 * @throws DataBindException    where it does, and that class cannot be analysed -- the message names both
+	 */
+	public DataClass getDescriptor(String namespace, String schemaTypeName) throws DataBindException {
+		Class<?> target;
+		try {
+			target = nameBinder.resolve(namespace, schemaTypeName);
+		} catch (DataBindException e) {
+			throw new UnboundNameException(e.getMessage(), e);
+		}
+		return describe(schemaTypeName, target);
+	}
+
+	private DataClass describe(String schemaTypeName, Class<?> target) throws DataBindException {
 		try {
 			return getDescriptor(target);
 		} catch (DataBindException e) {
