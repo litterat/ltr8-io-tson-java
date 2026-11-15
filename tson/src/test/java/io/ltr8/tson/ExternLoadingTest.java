@@ -25,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ExternLoadingTest {
 
+    private static final String SUBJECT = ExternWorld.SUBJECT;
+
     private final ExternWorld world = new ExternWorld();
 
     private static String only(List<String> diagnostics) {
@@ -157,7 +159,51 @@ class ExternLoadingTest {
                 refused);
     }
 
+    @Test
+    void aSchemaLoadedByIdentityThatExternsItselfIsACycle() {
+        for (String spelling : List.of("https://example.test/x.tn", "HTTPS://EXAMPLE.TEST/x.tn")) {
+            ExternWorld world = new ExternWorld();
+            world.schema("https://example.test/x.tn", "a => {}\n" + extern("me", spelling, "a"));
+            String refused = cycleThrough("https://example.test/x.tn", world);
+            assertTrue(refused.contains("is part of a reference cycle through an extern (example.test/x.tn -[extern "
+                    + "'me']-> example.test/x.tn)"), refused);
+        }
+    }
+
+    @Test
+    void aSchemaValidatedAsTextThatExternsItsOwnIdentityIsACycleWhetherOrNotTheSourceServesIt() {
+        String body = "a => {}\n" + extern("me", SUBJECT + "?sha256=" + "0".repeat(64), "a");
+        String unserved = only(world.validate(body));
+        world.schema(SUBJECT, body);
+        assertEquals(unserved, only(world.validate(body)));
+        assertTrue(unserved.startsWith("SCHEMA_ERROR : 'me' is an extern of 'a' in '" + SUBJECT + "?sha256="),
+                unserved);
+        assertTrue(unserved.endsWith("whose schema does not load: 'example.test/subject.tn' is part of a reference "
+                + "cycle through an extern (example.test/subject.tn -[extern 'me']-> example.test/subject.tn) -- the "
+                + "reference relation over imports and externs together is acyclic, so a schema reaches itself "
+                + "through neither, nor through a mix of the two ([TSON-SCHEMA] §3.4.1, §5.13). Break the cycle by "
+                + "moving what both need into a third schema they each reference"), unserved);
+    }
+
+    @Test
+    void aSchemaValidatedAsTextWhoseImportExternsItBackIsACycleNamingBoth() {
+        world.schema("https://example.test/b.tn", "b => {}\n" + extern("back", SUBJECT, "a"));
+        Tson tson = world.tson();
+        String refused = only(tson.validateSchema(ExternWorld.text(SUBJECT, "a => { b: b }", "https://example.test/b.tn"))
+                .stream().map(ExternWorld::shown).toList());
+        assertTrue(refused.startsWith("SCHEMA_ERROR "), refused);
+        assertTrue(refused.contains("(example.test/subject.tn -> example.test/b.tn -[extern 'back']-> "
+                + "example.test/subject.tn)"), refused);
+        assertTrue(tson.schemaRegistry().get(SUBJECT).isEmpty(), "a refused schema is not registered");
+        assertTrue(tson.validateSchema(ExternWorld.text(SUBJECT, "a => {}")).isEmpty(),
+                "nothing is left in flight for the next validation");
+    }
+
     private String cycleThrough(String uri) {
+        return cycleThrough(uri, world);
+    }
+
+    private static String cycleThrough(String uri, ExternWorld world) {
         Tson tson = world.tson();
         List<String> messages = new ArrayList<>();
         try {

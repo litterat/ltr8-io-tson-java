@@ -25,6 +25,7 @@ final class ExternWorld {
     static final String CORE = "https://tson.io/2026/40/m/core.tn";
     static final String ORDER_1 = "https://example.test/order-1.tn";
     static final String ORDER_2 = "https://example.test/order-2.tn";
+    static final String SUBJECT = "https://example.test/subject.tn";
 
     final Map<String, String> documents = new LinkedHashMap<>();
 
@@ -86,7 +87,7 @@ final class ExternWorld {
 
     /** The diagnostics validating a schema of {@code body} reports, as one string per diagnostic. */
     List<String> validate(String body, String... imports) {
-        return validateText(text("https://example.test/subject.tn", body, imports));
+        return validateText(text(SUBJECT, body, imports));
     }
 
     List<String> validateText(String text) {

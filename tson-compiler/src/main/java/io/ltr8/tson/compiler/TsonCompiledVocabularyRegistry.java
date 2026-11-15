@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * The resolution core: the on-demand {@link TsonCompiledSchemaLoader} over a {@link TsonSchemaRegistry}'s store of
@@ -133,8 +134,9 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     private LimitsPolicy limits = LimitsPolicy.defaults();
 
     /**
-     * The identities this thread is part-way through resolving, outermost first -- [TSON-DATA] §2.2.3's
-     * import-cycle guard ({@link #loadVocabulary} reaches every link through {@link #resolveLinked}).
+     * The identities this thread is part-way through resolving, outermost first -- [TSON-SCHEMA] §2.2.3's
+     * import-cycle guard ({@link #loadVocabulary} reaches every link through {@link #resolveLinked}, and a
+     * document held as text enters it first, through {@link #resolveAndLink}).
      *
      * <p><b>Why a guard is needed at all:</b> an {@code !!import} is resolved through this
      * registry, and a schema is registered only once it is fully linked -- so while {@code a.tn} is resolving it is in
@@ -150,7 +152,10 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
      */
     private final ThreadLocal<Map<String, String>> resolving = ThreadLocal.withInitial(LinkedHashMap::new);
 
-    /** The edge a link in {@link #resolving} was reached by: an extern's names its entry, an import's is null. */
+    /**
+     * The edge a link in {@link #resolving} was reached by: an extern's names its entry, an import's is null, as is
+     * the outermost link's.
+     */
     private static final String IMPORT = null;
 
     /**
@@ -420,19 +425,53 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
             verifyPin(uri, identity);
             return cached.get();
         }
+        return inFlight(identity, edge, () -> {
+            if (!KERNEL_IDENTITY.equals(identity) && TsonBundledSchemas.isKernelOfAnyRevision(identity)
+                    && resolving.get().values().stream().anyMatch(Objects::nonNull)) {
+                throw new SchemaValidationException("its closure holds the kernel '" + identity + "', and the "
+                        + "schema naming it holds the kernel '" + KERNEL_IDENTITY + "' -- an extern's schema holds "
+                        + "the importer's kernel, one kernel by identity ([TSON-SCHEMA] §5.13)");
+            }
+            return resolveUncached(uri, identity, receiver);
+        });
+    }
+
+    /**
+     * Resolves and links {@code document}, a schema a caller holds as text rather than reaching by reference,
+     * registering nothing. Throws at the first problem.
+     *
+     * <p>The document is in flight under its own {@code !!id} meanwhile, as a schema reached by reference is: any
+     * import or extern reaching that identity, its own or one further down, closes a cycle ([TSON-SCHEMA] §2.2.3,
+     * §3.4.1, §5.13) rather than fetching the identity from the source as another document.
+     */
+    public TsonLinkedSchema resolveAndLink(SchemaDocument document, SchemaPositions positions) {
+        return inFlightAsItself(document, () -> resolvedAndLinked(document, positions, null));
+    }
+
+    /**
+     * {@link #resolveAndLink(SchemaDocument, SchemaPositions)} reporting each problem to {@code problems}, linking
+     * only if resolution reported nothing, and returning {@code null} when anything was reported.
+     */
+    public TsonLinkedSchema resolveAndLink(SchemaDocument document, SchemaPositions positions,
+                                           DiagnosticsCollector problems) {
+        Objects.requireNonNull(problems, "problems");
+        return inFlightAsItself(document, () -> resolvedAndLinked(document, positions, problems));
+    }
+
+    /** A document with no {@code !!id} has no identity to be in flight under; resolution refuses it. */
+    private TsonLinkedSchema inFlightAsItself(SchemaDocument document, Supplier<TsonLinkedSchema> work) {
+        return document.id().isEmpty() ? work.get()
+                : inFlight(CanonicalIdentity.canonicalize(document.id().get()), IMPORT, work);
+    }
+
+    private TsonLinkedSchema inFlight(String identity, String edge, Supplier<TsonLinkedSchema> work) {
         Map<String, String> chain = resolving.get();
         if (chain.containsKey(identity)) {
             throw referenceCycle(chain, identity, edge);
         }
-        if (!KERNEL_IDENTITY.equals(identity) && TsonBundledSchemas.isKernelOfAnyRevision(identity)
-                && (edge != IMPORT || chain.values().stream().anyMatch(Objects::nonNull))) {
-            throw new SchemaValidationException("its closure holds the kernel '" + identity + "', and the schema "
-                    + "naming it holds the kernel '" + KERNEL_IDENTITY + "' -- an extern's schema holds the "
-                    + "importer's kernel, one kernel by identity ([TSON-SCHEMA] §5.13)");
-        }
         chain.put(identity, edge);
         try {
-            return resolveUncached(uri, identity, receiver);
+            return work.get();
         } finally {
             chain.remove(identity);
         }
@@ -469,7 +508,7 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
         if (!throughExtern) {
             return new SchemaValidationException("'" + identity + "' is part of an import cycle ("
                     + path + ") -- a schema cannot depend, directly or transitively, on one that "
-                    + "depends on it, since neither can be resolved before the other ([TSON-DATA] §2.2.3). "
+                    + "depends on it, since neither can be resolved before the other ([TSON-SCHEMA] §2.2.3). "
                     + "Break the cycle by moving what both need into a third schema they each import");
         }
         return new SchemaValidationException("'" + identity + "' is part of a reference cycle through an extern ("
@@ -534,27 +573,38 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
         if (receiver == null) {
             SchemaDocument document = parser.parseSchemaDocument();
             crossCheckId(document, uri, identity);
-            TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.schemaPositions());
-            return schemaRegistry.registerIfAbsent(link(resolved));
+            return schemaRegistry.registerIfAbsent(resolvedAndLinked(document, parser.schemaPositions(), null));
         }
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         Optional<SchemaDocument> parsed = parser.parseSchemaDocument(problems);
-        if (parsed.isEmpty()) {
-            problems.diagnostics().forEach(receiver::report);
-            return null;
-        }
-        SchemaDocument document = parsed.get();
-        crossCheckId(document, uri, identity);
-        TsonSchema resolved = new SchemaResolver(this)
-                .resolveSchema(document, parser.schemaPositions(), problems);
-        if (problems.isEmpty()) {
-            TsonLinkedSchema linked = link(resolved, problems);
-            if (problems.isEmpty()) {
+        if (parsed.isPresent()) {
+            crossCheckId(parsed.get(), uri, identity);
+            TsonLinkedSchema linked = resolvedAndLinked(parsed.get(), parser.schemaPositions(), problems);
+            if (linked != null) {
                 return schemaRegistry.registerIfAbsent(linked);
             }
         }
         problems.diagnostics().forEach(receiver::report);
         return null;
+    }
+
+    /**
+     * The phase boundary {@code Tson.validateSchema} draws, for a document already in flight: link only if
+     * resolution reported nothing, and {@code null} when anything was reported. {@code problems} is {@code null} to
+     * throw at the first problem instead.
+     */
+    private TsonLinkedSchema resolvedAndLinked(SchemaDocument document, SchemaPositions positions,
+                                               DiagnosticsCollector problems) {
+        SchemaResolver resolver = new SchemaResolver(this);
+        if (problems == null) {
+            return link(resolver.resolveSchema(document, positions));
+        }
+        TsonSchema resolved = resolver.resolveSchema(document, positions, problems);
+        if (!problems.isEmpty()) {
+            return null;
+        }
+        TsonLinkedSchema linked = link(resolved, problems);
+        return problems.isEmpty() ? linked : null;
     }
 
     /**
