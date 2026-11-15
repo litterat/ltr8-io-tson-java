@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Composing and refining against a template application that is <b>still open</b> -- one applied to the
+ * Composing against a template application that is <b>still open</b> -- one applied to the
  * absorbing declaration's own parameter, so it denotes no entry: {@code vip => <T> customer & box<T>}.
  *
  * <p><b>The fields need no materialisation, which is why absorption happens here.</b> The operand's body is
@@ -200,13 +200,13 @@ class OpenOperandCompositionTest {
                 () -> intBox + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(intBox)));
     }
 
-    /** §5.7 against an open source: the same absorption, and the same two omissions. */
+    /** A body that only restates absorbed fields (§5.7): the same absorption, and the same two omissions. */
     @Test
-    void aRefinementTightensAFieldSetAbsorbedFromAnOpenSource() {
+    void aRestatementTightensAFieldSetAbsorbedFromAnOpenOperand() {
         TsonCompiledSchema compiled = compile("""
                   base => { tag: text  note: text }
                   box  => <T> base & { value: T }
-                  vip  => <T> box<T> ^ { note?: text = "fixed" }
+                  vip  => <T> box<T> & { note?: text = "fixed" }
                   use  => vip<text>
                 """);
 
@@ -221,7 +221,7 @@ class OpenOperandCompositionTest {
                 .get(aliasTarget(compiled, "use"));
         assertEquals(List.of("tag", "note", "value"), closed.fields().keySet().stream().toList());
         assertEquals("text", closed.fields().values().stream().toList().get(2).typeExpr().text(),
-                "the parameter survived the refinement");
+                "the parameter survived the restatement");
     }
 
     /**

@@ -122,7 +122,7 @@ class KernelUnderMetaTest {
         TsonLinkedSchema linked = Tson.standard().resolve("""
                 !!id:"https://example.test/contributes.tn"
                 !!import:"https://tson.io/2026/40/m/core.tn"
-                !schema { meta => !schema { code_type => unicode.text_type ^ { max_length?: = 4 } } }
+                !schema { meta => !schema { code_type => unicode.text_type & { max_length?: = 4 } } }
                 """);
         Namespace<?> members = (Namespace<?>) ((ValueEntry) linked.schema().entries().get("meta")).value();
         assertTrue(members.containsKey("record") && members.containsKey("code_type"), members.keySet()::toString);

@@ -264,8 +264,8 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   and a type written in place reaches every constructor's record through `meta.type`, so the disjoint assertion,
   `void` and `meta.record_extension_type` are on it too. Of the 31, 12 are hand-built; the other 19 are records and
   compositions resolved from their grammar.
-- **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
-  a refinement of a record (`meta.ref` among them), an alias — as `SchemaResolver` resolves one. The bootstrap readies these
+- **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition
+  (`meta.ref` among them), an alias — as `SchemaResolver` resolves one. The bootstrap readies these
   and
   the pre-loaded set first, so the first compile holds every head a read applies. `meta.namespace => meta.map & { … }`
   waits on the cycle and stays off it: it waits on its parent `meta.map`, and the name its `key_type` holds orders

@@ -540,7 +540,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
                          Map<String, List<ValueByName>> valuesByName, Map<String, EntryFacts> facts) {
     public List<String> namespaceSources();              // the imports, deduplicated by identity
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
-                             Optional<String> constructor, Optional<String> refines) {}
+                             Optional<String> constructor) {}
     public EntryFacts factsOf(String name);              // NONE for a name with no facts
     public Optional<SourcePosition> positionOf(String name); // absent where no source was read
     public Optional<String> constructorOf(String name);  // the constructor tag the entry's value applies
@@ -604,7 +604,7 @@ map's entry is its value: a `Type` carries its own chain (`Type.chain()`, a `Typ
 application an entry is the instantiation of is the derived `@meta.application` on its key
 (`TsonSchema.applicationOf`), a `meta.apply` stated as written, each argument a name (`@meta.application:{ head: pair
 arguments: [box_text int32] }`); and what is not part of the value — where it was declared, its value annotations, its
-constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The host values the atoms read to are not
+constructor tag — is in `TsonSchema.facts`. The host values the atoms read to are not
 here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`, `Alias`,
 `TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a map of them,
 a namespace type (`operations => !meta.namespace { key_type: meta.identifier  value_type: operation }`, a

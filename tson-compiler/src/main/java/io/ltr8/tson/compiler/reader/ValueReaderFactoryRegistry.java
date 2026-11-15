@@ -18,14 +18,10 @@ import java.util.function.UnaryOperator;
  * dependency on {@code reader.TsonParserFactoryRegistry} (which is going away) or anything else in
  * {@code reader} -- deliberate, while this package's own shape is still settling.
  *
- * <p><b>{@code set} registers to the exact same {@code array} factory instance</b> -- it resolves to an
- * {@code ArrayBody} like {@code array} itself, refinement never adding or removing a field, so there is
- * no separate shape to build a distinct factory for. This is
- * a *lookup-by-constructor-name* convenience only -- it says nothing about whether an {@code
- * array}-typed position should ever dispatch to {@code !set [...]} at read time, which {@link
- * RecordBindReader.Factory}'s own Javadoc deliberately does not attempt for any composite kind but
- * {@code record}. {@code namespace} registers to the {@code map} factory on the same footing: it composes
- * {@code map} and adds no field.
+ * <p><b>{@code namespace} registers to the {@code map} factory instance</b>: it composes {@code map} and adds no
+ * field, so there is no separate shape to build a distinct factory for. This is a lookup-by-constructor-name
+ * convenience only, as {@link RecordBindReader.Factory}'s own Javadoc states for every composite kind but
+ * {@code record}.
  *
  * <p><b>{@code enum}</b> uses {@link AtomTypeReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
  * #bind} (dispatching {@code boolean} to a real {@code Boolean} via the vocabulary's own

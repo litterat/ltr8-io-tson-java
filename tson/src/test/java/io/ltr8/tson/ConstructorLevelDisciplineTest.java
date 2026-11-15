@@ -53,12 +53,6 @@ class ConstructorLevelDisciplineTest {
                 """));
     }
 
-    /** Refining a kernel constructor is the same case. */
-    @Test
-    void aSchemaMayRefineAConstructor() {
-        assertEquals(List.of(), problems(KERNEL, KERNEL, "  refined => meta.array ^ { ordered?: = false }"));
-    }
-
     /** The derived entry IS-A {@code top}, so it is constructor level and applicable. */
     @Test
     void theDerivedEntryIsItselfConstructorLevel() {

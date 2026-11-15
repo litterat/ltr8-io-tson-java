@@ -24,7 +24,6 @@ import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 
 import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
-import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
@@ -90,12 +89,8 @@ import java.util.function.Predicate;
  *   <em>tightening</em> entry (§5.7, {@link #resolveTighteningField}) that replaces it in place, checked
  *   against §5.7's transition table ({@link #refines}), with an elided type-ref inheriting
  *   the source field's type. A supertype may be an application of an open record, absorbed by value whether its
- *   arguments are concrete or the declaration's own parameters ({@link #openOperand}).</li>
- *   <li><b>Refinement</b> ({@code source ^ { ... }}, §5.7, {@link #resolveRefinement}) -- copies the source's
- *   whole field set and admits no new fields: every body entry tightens an inherited field or restates an
- *   inherited group ({@link #restatesInheritedGroup}: same member labels in the same order, state tightening
- *   OPTIONAL&#8594;REQUIRED only). A closed source heads the result's chain. An application of an open record
- *   as the source is absorbed on composition's terms.</li>
+ *   arguments are concrete or the declaration's own parameters ({@link #openOperand}). A body group naming an
+ *   inherited group restates it ({@link #restatesInheritedGroup}).</li>
  *   <li><b>An alias</b> ({@code name => other_name}, §8.3) -- an {@code ALIAS}-kind entry whatever the
  *   name resolves to, carried unverified; the linker validates it. <b>An application</b>
  *   ({@code bx => box<text>}, {@link #resolveTemplateApplication}) is the same declaration carrying
@@ -114,7 +109,7 @@ import java.util.function.Predicate;
  *
  * <p><b>A declaration carrying type parameters (§5.10) is an open record</b>: a {@code meta.record} carrying
  * {@code parameters}, read at its declaration against {@code record}'s own vocabulary as any record is -- a fresh
- * record, a composition or a refinement built over the builder's own fields ({@link Built}), or the explicit {@code
+ * record or a composition built over the builder's own fields ({@link Built}), or the explicit {@code
  * <T> !meta.record { … }} bound through {@code record}'s reader ({@link #openInstance}). Inside it a name its
  * parameters declare is a parameter, which {@link RecordBody} holds as a {@code ParamRef}. Any other head under a
  * parameter list is refused ({@link #openInstance}). Nothing is substituted here -- that is {@code
@@ -130,9 +125,9 @@ import java.util.function.Predicate;
  * correct understanding of the spec is this library's fault. Schema errors include: an atom refinement that
  * loosens its source ({@link #checkNarrows}); a name in a {@code !} position that resolves nowhere in the
  * namespace ({@link #resolveConstructorTarget}, {@link #resolveAtomRefinement}); a {@code !} form used
- * against the wrong kind of target -- refining a constructor, applying a non-constructor, refining a
- * non-atom -- each answered with the form the author probably meant; a supertype chain reaching two base
- * kinds ({@link #determineKind}); and a body or annotation value the compiled reader rejects, which
+ * against the wrong kind of target -- refining a constructor of values or a record, applying a non-constructor,
+ * refining a non-atom -- each answered with the form the author probably meant; a supertype chain reaching two
+ * base kinds ({@link #determineKind}); and a body or annotation value the compiled reader rejects, which
  * arrives as a {@link ReadException} and is restated as a schema error
  * ({@link #bodyIsNotValidData}).
  *
@@ -147,9 +142,6 @@ import java.util.function.Predicate;
   *   <li><b>A failed write round-trip</b> -- re-serialising an atom refinement's source
  *   ({@link #sourceSerializedFields}). The value was bound by this library, so failing to write it back is
  *   no verdict on the schema.</li>
- *   <li><b>A closed application at a refinement source with no {@link ApplicationCloser}</b> ({@link
- *   #closedApplication}) -- a resolver built standalone, without the whole-schema materialiser {@link
- *   SchemaResolver} supplies.</li>
  * </ul>
  * What §5.7 leaves unchecked is not reported at all: a restated FIXED field
  * MUST NOT change its pinned value, and {@link #resolveTighteningField} does not compare the two.
@@ -159,7 +151,7 @@ import java.util.function.Predicate;
  * namespace, required constructor parameters fixed for as long as this resolver is used:
  * <ul>
  *   <li>{@code namespaceDefinitions} -- the whole namespace, consulted by composition's supertype lookup
- *   (§5.8), refinement's source lookup (§5.7), and atom refinement's source lookup (§5.5). Never populated
+ *   (§5.8) and atom refinement's source lookup (§5.5). Never populated
  *   by this class: the caller supplies a {@link DefinitionGetter} over a map it owns. A supertype or source
  *   must be answerable when asked for, so a caller wanting forward references resolves on demand, as
  *   {@link SchemaResolver} does.</li>
@@ -256,12 +248,12 @@ final class DefinitionResolver {
     /**
      * The materialiser's on-demand half, for what a declaration needs of an application while it resolves, before
      * the rest of §5.10 materialisation runs as a pass afterwards: a declaration naming an application closes into
-     * its own name ({@link ApplicationCloser#closeApplicationInto}), and a refinement source whose head is no open
-     * record is handed over ({@link #closedApplication}). Everywhere else an application is carried as a reference
-     * with arguments and closed by that pass.
+     * its own name ({@link ApplicationCloser#closeApplicationInto}). Everywhere else an application is carried as a
+     * reference with arguments and closed by that pass.
      *
-     * <p>Defaults to refusing, for the callers that resolve a declaration outside a whole-schema pass (the
-     * kernel bootstrap, and unit tests) -- there is no materialiser in those.
+     * <p>{@code null} for the callers that resolve a declaration outside a whole-schema pass (the kernel bootstrap,
+     * and unit tests): there is no materialiser in those, so a declared application keeps its reference form and an
+     * operand's arguments go unchecked.
      */
     private final ApplicationCloser applicationCloser;
 
@@ -527,7 +519,6 @@ final class DefinitionResolver {
                 yield (switch (structural.body()) {
                     case RecordDef recordDef -> resolveRecordBody(recordDef.entries(), parameters);
                     case ConstructionDef construction -> resolveComposition(name, construction, parameters);
-                    case RefinedDef refined -> resolveRefinement(name, refined, parameters);
                 }).finish(parameters);
             }
             case TypeExprDef typeExprDef -> {
@@ -575,7 +566,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * A record body as resolution builds it -- a fresh record, a composition or a refinement, flattened -- before it
+     * A record body as resolution builds it -- a fresh record or a composition, flattened -- before it
      * is the record the declaration is. Its fields are {@link BuiltField}s, the builder's own working value.
      */
     private record Built(TypeChain chain, SequencedMap<String, BuiltField> fields, List<FieldGroup> groups,
@@ -970,8 +961,8 @@ final class DefinitionResolver {
         if (head.name().equals(WireForm.RECORD)) {
             return openRecord(name, template);
         }
-        String prefix = "'" + name + "': a template's body is a record body -- braces, a composition or a refinement "
-                + "(§5.10) -- and '!" + target + " { ... }' ";
+        String prefix = "'" + name + "': a template's body is a record body -- braces or a composition (§5.10) -- "
+                + "and '!" + target + " { ... }' ";
         if (EntryKind.isConstructor(head.name(), head.definition(), vocabularyKernel)) {
             String open = head.name().equals(KernelNames.of("array"))
                     ? "'nonempty => !" + target + " ^ { min_items: 1 }'"
@@ -1234,8 +1225,9 @@ final class DefinitionResolver {
                     + (EntryKind.isConstructor(sourceName, source, kernel)
                             ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
                                     + "constructor application ('!" + sourceName + " { ... }')?"
-                            : source instanceof RecordBody
-                                    ? "a record, refined without '!': '" + sourceName + " ^ { ... }' (§5.7)"
+                            : source instanceof RecordBody record
+                                    ? "a record, which takes no '^' -- its fields are restated in a composition, '"
+                                            + sourceName + (record.isOpen() ? "<...>" : "") + " & { ... }' (§5.8)"
                                     : "kind=" + EntryKind.of(source, kernel) + ", which is finished and takes no "
                                             + "refinement"));
         }
@@ -1803,8 +1795,8 @@ final class DefinitionResolver {
             }
             if (!(supertypeRef instanceof NameRef simple)) {
                 // A choice or an inline array/tuple at a supertype position. §12.1 lets these through only
-                // because `construction-def` draws its operands from `type-ref` where `refined-def` takes a
-                // name -- nothing here could ever denote a record, so there is no field set to compose with
+                // because `construction-def` draws its operands from `type-ref` -- nothing here could ever
+                // denote a record, so there is no field set to compose with
                 // and no implementation to wait for; §12.1's `supertype-ref` narrows the operands to named
                 // references, so this shape is the grammar's own error to refuse.
                 throw new SchemaValidationException("'" + name + "': a "
@@ -1813,7 +1805,7 @@ final class DefinitionResolver {
                         + (supertypeRef instanceof ChoiceExpr ? "variants" : "elements") + ", not fields (§5.8)");
             }
             String supertypeName = simple.name();
-            refuseParameterOperand(name, supertypeName, parameters, "supertype", "&");
+            refuseParameterOperand(name, supertypeName, parameters, "supertype");
             Top supertypeDef = namespaceDefinitions.definition(supertypeName);
             if (supertypeDef == null) {
                 // Not a library gap: composition copies the supertype's own fields, so the name has to
@@ -1837,7 +1829,7 @@ final class DefinitionResolver {
             // shape does, and how the author spelled it is no part of the question (§8.2: what is
             // canonicalised is identity, not provenance). Any other body fails this same test on its own: an
             // array, a map or a choice has no fields to contribute (§4.3).
-            refuseUnappliedTemplate(name, supertypeName, terminalSupertype, "supertype", "&");
+            refuseUnappliedTemplate(name, supertypeName, terminalSupertype, "supertype");
             refuseIncomplete(name, supertypeName, terminalSupertype, "supertype");
             if (!(terminalSupertype instanceof RecordBody supertypeBody)) {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
@@ -2052,157 +2044,6 @@ final class DefinitionResolver {
     private static final Set<String> BASE_KINDS = Set.of(KernelNames.of("atom"), KernelNames.of("product"),
             KernelNames.of("sum"), KernelNames.of("namespace"));
 
-    // ── Refinement (§5.7): T ^ { ... } ─────────────────────────────────────
-
-    /**
-     * {@code source ^ { ... }}, optionally parameterized, {@code x => box<text> ^ { ... }}: copies the *entire*
-     * inherited field set and any groups from the (already-resolved) source's own {@link RecordBody} -- unlike
-     * composition, refinement never adds fields, so every body entry MUST tighten one of them ({@link
-     * #resolveTighteningField}, the same machinery composition-body tightening uses); a body field naming nothing
-     * inherited is a resolver error (§5.7: "adding fields is a resolver error"), as is a group naming no inherited
-     * group. A group that <em>does</em> name one restates it (§5.11, {@link #restatesInheritedGroup}). The chain
-     * accumulates by the same induction composition uses: {@code [sourceName] + source.supertypes}, deduplicated. A
-     * template's body keeps the source as its one written parent instead, which closing completes ({@link Ancestry}).
-     * The kind is determined the same way composition determines it (the transitive chain's literal atom/product/sum
-     * name, not the source's own resolved kind).
-     */
-    private Built resolveRefinement(String name, RefinedDef refined, List<String> parameters) {
-        if (refined.target() instanceof ApplicationRef generic && (namesOwnParameter(generic, parameters)
-                || OpenEntry.isOpen(namespaceDefinitions.definition(
-                        Ancestry.templateHead(generic.name(), namespaceDefinitions))))) {
-            // §5.7 against an application of an open record, over this declaration's parameters or closed: the same
-            // absorption composition does (§5.8). The application names no entry: its ancestors are types and its
-            // whole field set arrives, which is what `^` re-emits and then tightens, and the application stays the
-            // written parent -- an open record's, substituted when it closes, and a closed declaration's, which
-            // SchemaResolver folds into the edge to the entry declared for it where one is, so nothing is IS-A the
-            // template itself.
-            OpenOperand operand = openOperand(name, generic, parameters, "refinement source");
-            return refineOnto(name, refined, parameters,
-                    new ApplyBody(io.ltr8.tson.schema.meta.TypeRef.of(generic.name()),
-                            namesOwnParameter(generic, parameters) ? typeArguments(name, generic)
-                                    : operand.arguments()).inPlace(),
-                    new ArrayList<>(operand.ancestors()), operand.fields(), operand.groups(), operand.nameType());
-        }
-        if (refined.target() instanceof NameRef simple) {
-            refuseParameterOperand(name, simple.name(), parameters, "refinement source", "^");
-        }
-        io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target(), parameters);
-        String sourceName = sourceRef.name();
-        Top sourceDef = namespaceDefinitions.definition(sourceName);
-        if (sourceDef == null) {
-            // As with a supertype: a refinement reads the source's own field set, so the source must resolve.
-            throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName
-                    + "' names no type this schema declares or imports");
-        }
-        // §5.7 states the walk explicitly -- "the source of `^`, after following its alias chain (§8.3)"
-        // -- and §4.3 states it for both operator families. What is *finished* is a body with no vocabulary
-        // to tighten: a top-level constructor application (§5.6), a choice, or an alias resolving to either.
-        // What the walk adds is the case that is not finished: an alias of a record, which has that record's
-        // vocabulary to tighten -- a declaration naming an open record's application included (§4.3).
-        String sourceTerminal = AliasChain.terminal(sourceName, namespaceDefinitions::definition);
-        boolean sourceHops = !sourceTerminal.equals(sourceName);
-        Top terminalSource = sourceHops
-                ? namespaceDefinitions.definition(sourceTerminal) : sourceDef;
-        // §4.3's test is the body and nothing beside it, and §5.7 states the same of its own source: a
-        // definition whose body is a `!meta.record` has a vocabulary to tighten. A declared application has
-        // one -- `text_box => box<text>` closes to a `!meta.record` carrying fields -- so it refines like the
-        // hand-written record of the same shape, and what polices a value the substitution already fixed
-        // is §5.7's own per-field rule, which refuses re-fixing a FIXED field to a different value
-        // whoever wrote it. Any other body fails on its own (§4.3).
-        refuseUnappliedTemplate(name, sourceName, terminalSource, "refinement source", "^");
-        refuseIncomplete(name, sourceName, terminalSource, "refinement source");
-        if (!(terminalSource instanceof RecordBody sourceBody)) {
-            throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName + "'"
-                    + (sourceHops ? " resolves through its alias chain to '" + sourceTerminal
-                            + "', which" : "")
-                    + " has no vocabulary to tighten -- its body is a binding record, so it is "
-                    + "finished and '^' on it is a resolver error (§4.3, §5.7). Refine the "
-                    + "head it derives from, or, for an atom instance, use atom refinement "
-                    + "('!" + sourceName + " ^ { ... }', §5.5)");
-        }
-
-        List<String> transitiveSupertypes = new ArrayList<>();
-        Set<String> seenTransitive = new HashSet<>();
-        addIfAbsent(transitiveSupertypes, seenTransitive, sourceName);
-        if (sourceHops) {
-            addIfAbsent(transitiveSupertypes, seenTransitive, sourceTerminal);
-        }
-        for (String ancestor : Ancestry.closedNames(sourceBody)) {
-            addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
-        }
-        return refineOnto(name, refined, parameters, sourceRef, transitiveSupertypes, closedFields(sourceBody),
-                sourceBody.groups(), sourceBody.nameType());
-    }
-
-    /**
-     * §5.7's tightening, over a field set already obtained. The two callers differ only in where that field
-     * set came from and in what the source can be named: a closed source is an entry, so it heads the chain; an
-     * open one names no entry, so only its own ancestors reach the chain until a template closing it reaches the
-     * rest. Everything after that -- restating groups, tightening fields, the presence check, the kind -- is
-     * one rule and lives here once. {@code source} is the parent as written, what an open record keeps.
-     */
-    private Built refineOnto(String name, RefinedDef refined,
-            List<String> parameters, io.ltr8.tson.schema.meta.TypeExpr source, List<String> transitiveSupertypes,
-            SequencedMap<String, BuiltField> sourceFields, List<FieldGroup> sourceGroups,
-            Optional<String> nameType) {
-        SequencedMap<String, BuiltField> fields = new LinkedHashMap<>(sourceFields);
-        List<FieldGroup> groups = new ArrayList<>(sourceGroups);
-        Set<String> inheritedFields = Set.copyOf(sourceFields.keySet());
-        refuseDeclaredChain(name, refined.body().entries(), transitiveSupertypes);
-
-        for (RecordEntry entry : refined.body().entries()) {
-            if (entry instanceof GroupDef groupDef) {
-                if (!restatesInheritedGroup(name, groupDef, parameters, fields, groups, inheritedFields)) {
-                    throw new SchemaValidationException("'" + name + "': the group ("
-                            + groupDef.fieldGroup().describe() + ") names no inherited group -- a "
-                            + "refinement copies its source's whole field set and admits no new fields or "
-                            + "groups; composition (`&`) is what adds one (§5.7, §5.11)");
-                }
-                continue;
-            }
-            FieldDef fieldDef = (FieldDef) entry;
-            BuiltField inherited = fields.get(fieldDef.name());
-            if (inherited == null) {
-                throw new SchemaValidationException("'" + name + "': refinement body field '" + fieldDef.name()
-                        + "' names no inherited field -- a refinement copies its source's whole field set and "
-                        + "admits no new fields; composition (`&`) is what adds one (§5.7)");
-            }
-            fields.put(fieldDef.name(), resolveTighteningField(name, fieldDef, inherited, parameters, groups));
-        }
-
-        determineKind(name, transitiveSupertypes);
-        // §5.7's one written parent: an open record keeps it in its chain, as a closed declaration keeps an applied
-        // one for SchemaResolver's fold.
-        TypeChain chain = TypeChain.of(transitiveSupertypes);
-        if (!parameters.isEmpty() || !(source instanceof io.ltr8.tson.schema.meta.TypeRef)) {
-            chain = chain.withParents(List.of(source));
-        }
-        return new Built(chain, fields, groups, markedNames(refined.body().entries()), nameType);
-    }
-
-    /**
-     * A refinement's source ({@code target}) is always a {@link NameRef} or an {@link
-     * ApplicationRef} by grammar (see {@code RefinedDef}'s own Javadoc) -- a bare name resolves to a
-     * reference without arguments; a generic application whose head is no open record is handed to the
-     * materialiser ({@link #closedApplication}), one of an open record being absorbed by {@link
-     * #resolveRefinement} before this is asked.
-     */
-    private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeExpr target,
-            List<String> typeParams) {
-        if (target instanceof NameRef simple) {
-            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-        }
-        if (target instanceof ApplicationRef generic) {
-            // A construction is refused here, as at any slot that holds a name; any other application whose
-            // head is no open record is the materialiser's to judge (ApplicationCloser#closeApplication).
-            return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, "refinement source"));
-        }
-        // Not a gap and not the author's error: the two shapes above are the two §12.1's `atom-refinement`
-        // can produce, so a third means this resolver was handed a tree the grammar cannot build.
-        throw new IllegalStateException(
-                "'" + name + "': a refinement source is always a simple or generic type-ref by grammar, got " + target);
-    }
-
     /**
      * One source's fields and groups copied into the record being built. Shared by the two composition paths
      * -- a closed supertype's own {@code RecordBody} and an open operand's substituted one -- so an operand
@@ -2228,15 +2069,14 @@ final class DefinitionResolver {
     }
 
     /**
-     * A template named at an operand with no arguments: {@code &} and {@code ^} read the operand's fields, and a
-     * template's are its applications', each with its parameters bound (§5.8, §5.10). A template is no type, so
-     * nothing names one bare, an operand included.
+     * A template named at an operand with no arguments: {@code &} reads the operand's fields, and a template's are
+     * its applications', each with its parameters bound (§5.8, §5.10). A template is no type, so nothing names one
+     * bare, an operand included.
      */
-    private static void refuseUnappliedTemplate(String name, String operand, Top definition, String position,
-                                                String operator) {
+    private static void refuseUnappliedTemplate(String name, String operand, Top definition, String position) {
         if (OpenEntry.isOpen(definition)) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' is a template "
-                    + "and is applied to no arguments -- '" + operator + "' takes the fields of a record, and a "
+                    + "and is applied to no arguments -- '&' takes the fields of a record, and a "
                     + "template is not a type: it has fields once its parameters are bound. Write '" + operand
                     + "<...>' with its arguments, or name the record its applications compose (§5.8, §5.10)");
         }
@@ -2251,17 +2091,16 @@ final class DefinitionResolver {
     }
 
     /**
-     * A parameter is never an operand of {@code &} or {@code ^} ([TSON-SCHEMA] §5.10): both read the operand's
-     * field set to flatten, and a parameter has none until the template is applied, so {@code <T> T & { … }} and
-     * {@code <T> T ^ { … }} have no body to hold. An operand applied <em>to</em> a parameter, {@code result<T>},
+     * A parameter is never an operand of {@code &} ([TSON-SCHEMA] §5.10): it reads the operand's field set to
+     * flatten, and a parameter has none until the template is applied, so {@code <T> T & { … }} has no body to hold.
+     * An operand applied <em>to</em> a parameter, {@code result<T>},
      * is a different thing and is admitted. Checked before the name is looked up, as §5.10's shadowing rule
      * reads it: a parameter hides a schema entry of the same name.
      */
-    private static void refuseParameterOperand(String name, String operand, List<String> parameters, String position,
-                                               String operator) {
+    private static void refuseParameterOperand(String name, String operand, List<String> parameters, String position) {
         if (parameters.contains(operand)) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' is a parameter of"
-                    + " this declaration, and a parameter is never an operand of '" + operator + "' -- its fields are"
+                    + " this declaration, and a parameter is never an operand of '&' -- its fields are"
                     + " unknown until the template is applied, so there is nothing to flatten (§5.10)");
         }
     }
@@ -2367,26 +2206,6 @@ final class DefinitionResolver {
     private record OpenOperand(List<String> ancestors, SequencedMap<String, BuiltField> fields,
                                List<FieldGroup> groups, Optional<String> nameType,
                                List<io.ltr8.tson.schema.meta.TypeRef> arguments) {
-    }
-
-    /**
-     * A fully-bound application at a refinement source whose head, past its alias hops, is no open record, handed
-     * to the materialiser ({@link ApplicationCloser#closeApplication}). An application of an open record goes to
-     * {@link #openOperand} instead, which absorbs its fields without closing anything.
-     */
-    private String closedApplication(String name, ApplicationRef application, String position) {
-        if (applicationCloser == null) {
-            throw new UnsupportedOperationException("'" + name + "': closing the " + position + " '"
-                    + application.name() + "<...>' needs a whole-schema materialiser, and this resolver was "
-                    + "built without one");
-        }
-        if (rewrite.constructor(application.name()).isPresent()) {
-            throw ConstructionRewrite.nameRequired(application);
-        }
-        if (!ConstructionRewrite.namesOnly(application)) {
-            throw ConstructionRewrite.argumentNotAName(application);
-        }
-        return applicationCloser.closeApplication(ConstructionRewrite.names(application));
     }
 
     /**
@@ -2696,11 +2515,11 @@ final class DefinitionResolver {
             // new field". Reaching here means there was nothing to elide toward: either a fresh record body
             // ("every field MUST have an explicit type-ref, and the resolver MUST reject modifier-only entries
             // there") or a composition body entry naming no inherited field. Both are the author's error, not
-            // a gap in this resolver -- the two positions where elision *is* legal resolve above.
+            // a gap in this resolver -- a tightening entry, where elision *is* legal, has an inherited field.
             throw new SchemaValidationException("field '" + field.name() + "' states only a modifier and no "
                     + "type-ref, but names no inherited field to take a type from -- a modifier-only entry is "
-                    + "always a tightening, so it is only meaningful in a refinement or composition body, "
-                    + "against a field the source declares (§5.7)");
+                    + "always a tightening, so it is only meaningful in a composition body, against a field a "
+                    + "supertype declares (§5.7, §5.8)");
         }
         // The type's `?` sits in the type slot, so an entry that elides the type -- a modifier-only
         // tightening, `min: = 0` -- inherits the voidability of the field it tightens with the type itself.
@@ -2750,14 +2569,14 @@ final class DefinitionResolver {
     }
 
     /**
-     * §5.11's group restatement, shared by a refinement body and a composition body -- "a body entry may also
+     * §5.11's group restatement in a composition body -- "a body entry may also
      * restate a group: the restated group MUST have the same member labels in the same order (member
      * type-refs restated verbatim), and may tighten state OPTIONAL→REQUIRED; REQUIRED→OPTIONAL is a resolver
      * error, and changing membership is a resolver error."
      *
      * <p>Returns {@code true} having applied the restatement, or {@code false} when this group names nothing
-     * inherited and is therefore a genuinely new one -- which a composition body appends and a refinement
-     * body rejects, each at its own call site. A fresh record reaches here with an empty {@code
+     * inherited and is therefore a genuinely new one, which the body appends. A fresh record reaches here with an
+     * empty {@code
      * inheritedFields} and so always takes the {@code false} path.
      *
      * <p>Only the <em>group's</em> state changes. Members flatten as {@code OPTIONAL} whatever the group says

@@ -38,7 +38,7 @@ import java.util.function.Predicate;
  *
  * <ul>
  *   <li><b>The rule.</b> Reading a value against a type waits on that type being ready, and on each type a part of
- *       the value is read against as the read reaches it; a declaration waits as well on its refinement source, its
+ *       the value is read against as the read reaches it; a declaration waits as well on its atom refinement source, its
  *       {@code &} operands and the types of its annotations, an alias on its target. Each such wait is a lookup here
  *       made while another entry is being made ready ({@link #current()}), or a declaration a read through {@link
  *       #read} reaches: one ready already ({@link #reached}), or one not yet ready, which the read stops at.</li>

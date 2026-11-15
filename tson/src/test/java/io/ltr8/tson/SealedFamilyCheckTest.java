@@ -164,17 +164,17 @@ class SealedFamilyCheckTest {
     }
 
     @Test
-    void refiningAFinalRecordIsRefused() {
-        assertTrue(problems(Tson.standard(), "refine", """
+    void aCompositionOnlyRestatingAFinalRecordsFieldIsRefused() {
+        assertTrue(problems(Tson.standard(), "restate", """
                 {
                   base => final { x: int32 }
-                  sub  => base ^ { x?: int32 = 1 }
+                  sub  => base & { x?: int32 = 1 }
                 }""").contains("is final and admits none"));
     }
 
     /**
      * §5.9 leaves a subtracted record's chain empty and adds no IS-A edge, which is the only thing FINAL
-     * constrains -- so subtracting from a final record is admissible where composing and refining are not.
+     * constrains -- so subtracting from a final record is admissible where composing is not.
      */
     @Test
     void subtractingFromAFinalRecordIsAdmissible() {

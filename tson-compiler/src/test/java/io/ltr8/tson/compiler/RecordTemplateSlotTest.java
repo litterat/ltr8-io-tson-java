@@ -163,7 +163,7 @@ class RecordTemplateSlotTest {
         assertTrue(capped.contains("a template's body is a record body"), capped);
     }
 
-    /** A parameter has no fields until the template is applied, so neither operator has a body to flatten. */
+    /** A parameter has no fields until the template is applied, so composition has no body to flatten. */
     @Test
     void aParameterIsNeverAnOperand() {
         String composed = rejected("""
@@ -171,16 +171,9 @@ class RecordTemplateSlotTest {
                   person => { age: int32 }
                   m => mixin<person>
                 """);
-        String refined = rejected("""
-                  narrowed => <T> T ^ { }
-                  person => { age: int32 }
-                  m => narrowed<person>
-                """);
 
         assertTrue(composed.contains("supertype 'T' is a parameter of this declaration, and a parameter is never an "
                 + "operand of '&'"), composed);
-        assertTrue(refined.contains("refinement source 'T' is a parameter of this declaration, and a parameter is "
-                + "never an operand of '^'"), refined);
     }
 
     /**

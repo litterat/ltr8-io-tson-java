@@ -94,7 +94,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   `Content-Type` one value under the source and another under the refinement.
 - **A reference narrows `of` by IS-A, and the link judges it** (§5.7). The refined `of`
   is the source's or a type IS-A it -- a constructor IS-A one by its chain (`unicode.identifier_type` lists
-  `meta.type`), an ordinary type by its own (`big_order => order ^ {}`) -- so every name the refinement admits, the
+  `meta.type`), an ordinary type by its own (`big_order => order & {}`) -- so every name the refinement admits, the
   source admits too: `meta.identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }` is the kernel's case.
   The two names are a namespace's, not the bodies', and `of` holds names that order nothing
   (`design/resolver-vocabulary-and-bootstrap.md`), so at resolution neither need be ready:

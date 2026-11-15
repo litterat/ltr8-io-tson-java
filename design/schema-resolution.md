@@ -35,7 +35,7 @@ applications, field facts and refinement, groups, subtraction, and the exception
   tightening inherits the type's with the elided type. A restated group member stays a member: its name `?` may be
   dropped, never added (a `+` group's members are restated as written); it takes no default, and a pin on it is
   never supplied.
-- Refinement of a field is three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
+- A restated field moves along three orders, never a state matrix (`DefinitionResolver.refines`); nothing stores what
   omission yields, so that order is asked of `RecordField.omitted`.
 - An entry is its value (§8.1). Every type body, an open record's included, carries its own chain, `type`'s one
   field `chain`, a `TypeChain`: `parents` as written, `supertypes`, `subtypes`. The application an entry
@@ -95,7 +95,7 @@ what is ready before it starts — the kernel's hand-built pre-loaded set, or th
 (`design/resolver-vocabulary-and-bootstrap.md`). `WaitOrder` is the `DefinitionGetter` every lookup of a resolution
 goes through, so an entry is made ready the first time anything asks for it, and `readyAll` drives the rest.
 
-- **What waits.** A declaration waits on its head (`C` in `!C { … }`), its refinement source and `&` operands, the
+- **What waits.** A declaration waits on its head (`C` in `!C { … }`), its atom refinement source and `&` operands, the
   types of its annotations, and every type a read of its value reaches. A name at a type position (a field's, a
   variant's, an element's) is carried as a name for the linker and orders nothing, as a held value (a default or pin)
   does, which a read reaching a pending declaration binds as written.
@@ -112,7 +112,7 @@ goes through, so an entry is made ready the first time anything asks for it, and
   is refused as `NOT_IMPLEMENTED`, never as a payload that is no value of its type (`resolveValueEntry`).
 - **Cycles are the author's error.** An entry reached again while it is being made ready is a
   `SchemaValidationException` naming the cycle in wait order: `'a' waits on 'b' waits on 'a': entries waiting on each
-  other are never ready -- …`, or `'step' waits on 'step'`. A composition or refinement cycle is this same rule,
+  other are never ready -- …`, or `'step' waits on 'step'`. A composition cycle is this same rule,
   reached through an application too (`design/template-materialisation.md`). An alias loop is §8.3's reference-chain
   refusal, not a wait (`WaitOrderTest.anAliasLoopIsRefusedAsAnAliasChainNotAWaitCycle`).
 - **Wait depth is counted here**, order-independently, and a chain past `LimitsPolicy.maxWaitDepth` refuses its head
@@ -149,8 +149,8 @@ position admits, which §6 makes the line between a kernel fact and an annotatio
 `abstract`, `final`, `sealed` or `discriminator` as annotation names: the meta declares none, so each written as
 one is the ordinary unknown-annotation error.
 
-**The mark is applied once, in `withExtension`.** A fresh record, a composition and a refinement each build their
-own `RecordBody`, and a mark read three times is a mark two of them can disagree about. Applying it there is also
+**The mark is applied once, in `withExtension`.** A fresh record and a composition each build their own
+`RecordBody`, and a mark read in each is a mark they can disagree about. Applying it there is also
 why extensibility is never inherited: a composition's body arrives OPEN from its operands. A mark on a non-record
 is the author's error.
 
@@ -180,7 +180,7 @@ A template is an open record, a `RecordBody` carrying `parameters` (`design/open
 (§5.10): no position names it bare (`TsonSchemaLinker.checkArity` at a position,
 `DefinitionResolver.refuseUnappliedTemplate` at an operand), it is in no `subtypes` index, no reference holds it, no
 `FamilySelectors` question treats it as a base, and it compiles to `OpenTemplateReader`, the refusal a data tag naming
-it gets. It is built as a closed record is (`resolveRecordBody`, `resolveComposition`, `resolveRefinement`, then
+it gets. It is built as a closed record is (`resolveRecordBody`, `resolveComposition`, then
 `Built.finish` with the declaration's parameters), its explicit spelling `<T> !meta.record { … }` through `openRecord`;
 a parameter in it is the `ParamRef` the record's constructor makes of a name its parameters declare. `checked` refuses
 a field or `name_type` named like a parameter, a selector typed by one and a literal value on a parameter-typed field;
@@ -264,7 +264,7 @@ order, then the body's. A modifier-only entry has no type slot, so it inherits t
 it its voidability; its name's `?` is always its own. That is why `resolveField` takes the whole inherited
 `RecordField`.
 
-**Refinement is three orders** (`refines`), each least to most determined: what omission yields, absent →
+**A restatement is three orders** (`refines`), each least to most determined: what omission yields, absent →
 missing-field error → injected (`RecordField.omitted`, asked of a plain field); voidable → not; role FREE → DEFAULT
 → FIXED. A restatement refines its source when no order moves backwards, which reproduces §5.7's transition matrix
 cell for cell without the matrix existing in code.
@@ -281,7 +281,7 @@ entry its application denotes. One denoting none is judged against the closed pa
 subtraction's tightening entry is not judged, its chain being empty (`BACKLOG.md`).
 
 **A restated field's annotations are the restatement's, in source order, then the inherited field's** (`merged`,
-§5.8), one path for refinement and composition. Concatenation, because [TSON-DATA] §3.1 makes an annotation name
+§5.8). Concatenation, because [TSON-DATA] §3.1 makes an annotation name
 repeatable — "the inherited `@doc`" names nothing when two were written. Restatement first, because
 `Annotations.get`/`value` take the first occurrence, so the nearer declaration wins at every lookup. No annotation
 the kernel declares changes how a value reads, so the ordering is pinned over resolved output
@@ -292,7 +292,7 @@ the kernel declares changes how a value reads, so the ordering is pinned over re
 A field whose type is `{ of: !meta.dependent { on: kind } }`, `v?: kind!` in sugar, is a **dependent field**: each
 instance's value is read against the type that instance's `kind` names (`RecordField.sibling()`). It is a type written
 in place like any other, so it flows through `BuiltField`, flattening, substitution and closing unchanged, and a pinned
-sibling's refinement still holds it. A `meta.dependent` anywhere but directly at a field's type — declared, or in place
+sibling's restatement still holds it. A `meta.dependent` anywhere but directly at a field's type — declared, or in place
 at any other slot — is refused at link (`TsonSchemaLinker.validateBody`): nothing else binds its `on`.
 
 The rules are checked when the record links, against its flattened fields (`DependentFields.check`, called from
@@ -306,7 +306,7 @@ judged once its application closes it:
   (`KindMembers.namesTypes`), or `meta.type_expr`.
 - **There to read whenever the dependent field is**: required, defaulted, pinned, or a field group's member with the
   dependent field optional; never voidable, and never optional with no default. A group's members are declared
-  `optional`, so a dependent field that is a member counts as optional, and a refinement making one required is judged
+  `optional`, so a dependent field that is a member counts as optional, and a restatement making one required is judged
   on the flattened record. A member is absent when another option is chosen, so a dependent field written without it is
   refused where it is read (`design/readers-and-diagnostics.md`); nothing refuses a sibling and its dependent field
   in two options of one group, where the field can be written in no document.
@@ -338,8 +338,8 @@ present, a chosen option holds every member `optional_members` does not name, an
 whether no option may be chosen. `GroupDef.fieldGroup` is the one lowering, for a fresh body and a held one: `+`
 becomes the non-optional group of one option whose members are all optional within it, so a one-option non-optional group is
 always a `+` group. Members flatten as optional fields whatever the group says. The parser refuses the shapes that
-restate plain fields or another group (`TsonSchemaParser.checkGroupShape`); a group restatement in a refinement or
-composition body is checked by `restatesInheritedGroup`.
+restate plain fields or another group (`TsonSchemaParser.checkGroupShape`); a group restatement in a composition body is
+checked by `restatesInheritedGroup`.
 
 **A restated member stays a member** (`resolveTighteningField`, `restateMemberMark`). Its presence is the group's, so
 the field stays optional whatever it writes. Its name `?` speaks for its option and is never inherited, so leaving it

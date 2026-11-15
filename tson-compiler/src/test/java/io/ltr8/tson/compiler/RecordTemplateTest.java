@@ -352,8 +352,8 @@ class RecordTemplateTest {
     }
 
     /**
-     * The whole arc for a refined constructor applied over a parameter: held in the open record, constructed when the
-     * record is applied, compiled, and reading real data -- and rejecting data the constructor's own pins refuse.
+     * The whole arc for an incomplete entry completed over a parameter: held in the open record, constructed when the
+     * record is applied, compiled, and reading real data -- and rejecting data the bounds the entry writes refuse.
      */
     @Test
     void anOpenFormClosedByAnApplicationReadsRealData() {
@@ -380,8 +380,8 @@ class RecordTemplateTest {
                 compiled.schema().entries().get("ids"), "the construction in place");
     }
 
-    // ── The two field-absorbing positions (§5.7, §5.8) ───────────────────
-    //    A composition supertype and a refinement source copy the source's *fields*, so an application
+    // ── The field-absorbing position (§5.7, §5.8) ───────────────────────
+    //    A composition supertype copies its *fields*, so an application
     //    there has to be closed during resolution rather than carried and closed by the later pass --
     //    an open application has no field set to copy.
 
@@ -399,15 +399,15 @@ class RecordTemplateTest {
     }
 
     /**
-     * Refining an application refines the closed entry, so the template's parameters are bound before the body
-     * tightens anything: the field carries the argument, never an unresolved reference to a parameter the
-     * author did not write.
+     * A composition restating an application's field restates the closed entry's, so the template's parameters are
+     * bound before the body tightens anything: the field carries the argument, never an unresolved reference to a
+     * parameter the author did not write.
      */
     @Test
-    void refiningAnApplicationTightensTheClosedEntrysFields() {
+    void restatingAnApplicationsFieldTightensTheClosedEntrysFields() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
-                  pinned => box<text> ^ { v?: = "fixed" }""");
+                  pinned => box<text> & { v?: = "fixed" }""");
 
         assertEquals(TypeRef.of("text"), fieldOf(compiled, "pinned", "v").type());
         assertEquals("fixed", fieldOf(compiled, "pinned", "v").value().orElseThrow().text());

@@ -23,7 +23,11 @@ history lives in git.
   braced `record-def`.
 - `{` opening a type dispatches by one rule at every position, a declaration's body and a type slot alike: one consumed
   token plus one of lookahead (§12.2) decide a record body or the map. At a slot the record is a `RecordExpr`.
-- Nothing composes, refines or subtracts at a slot: `&`, `^` or `-` after a slot's type, and a name before `{`, are
+- `^` follows `!` and a name alone: after a bare name, an application or a parameter list at a type-def, and at a
+  slot, it is a parse error naming the composition to write, for a record and a constructor alike. Only resolution
+  knows what a name is, so a grammar that read `name ^` and let resolution refuse a constructor would carry one
+  production for two verdicts. Lost: `name ^ { … }` refining a record, which spelled a derived record two ways.
+- Nothing composes or subtracts at a slot: `&` or `-` after a slot's type, and a name before `{`, are
   parse errors naming the declaration to write (`inPlace`). A composition operand is read by `parseTypeRef`, which
   does not ask.
 - `abstract` and `final` are marks at the type-def head and ordinary identifiers everywhere else — the parser decides
@@ -48,7 +52,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   construction `meta.apply` (`ApplyBody`), since an application is sugar for it. The structural forms are expressions,
   not references: `ChoiceExpr`, `ArrayExpr`, `TupleExpr`, `MapExpr`. `TypeExpr` is any of them, a reference or a
   structural form, and is what §12.1's `type-expr` production parses to. A slot the grammar holds to a reference is
-  typed by it: `MapExpr.keyType` and `RefinedDef.target` are a `TypeRef` (`parseTypeRefHead`). `kind!` is no
+  typed by it: `MapExpr.keyType` is a `TypeRef` (`parseTypeRefHead`). `kind!` is no
   reference: a `DependentType`, a `FieldTypeExpr` beside `TypeExpr`.
 - **The header is the data grammar's; the root's tag is this parser's rule.** `SchemaDocument(id, imports, body)`
   takes its `!!id` and `!!import`s off the stream's `DocumentStart`, then reads the root's annotations and requires
@@ -178,8 +182,8 @@ materialization, no validation (those are the resolver's/linker's jobs).
   field is missing its `:`. A `{` or `[` after the brace is refused there, a map's key being a name. At a slot the
   record is a `RecordExpr`, wherever a container may stand; at an argument or a parameter's bound it parses and a
   later phase refuses it, as it does a container there.
-  - **A record body stays a record body wherever the grammar already fixed one** — a refinement body, a
-    composition tail, a constructor vocabulary — so `config ^ {text => text}` fails at the `=>`, named as
+  - **A record body stays a record body wherever the grammar already fixed one** — a composition tail, a
+    constructor vocabulary — so `config & {text => text}` fails at the `=>`, named as
     "a record body's entries are `name: type`; `=>` begins a map type only where a type is expected".
   - **One consequence of the dispatch is worth knowing before you write the test.** `{text? => integer}` is
     `name` followed by `?`, so it commits to a *record* before the `=>` is read, and the author gets a

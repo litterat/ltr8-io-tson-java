@@ -876,30 +876,6 @@ class DefinitionResolverTest {
         assertEquals(List.of(), incomplete.bases());
     }
 
-    /**
-     * A refinement body field naming nothing inherited is the author's error (§5.7: a refinement copies its
-     * source's whole field set and admits no new fields) -- distinct from composition, where a non-matching
-     * name is simply a new field. Hence a {@link SchemaValidationException}: telling an author their
-     * schema is unsupported, when it is in fact rejected by the spec, sends them looking for the wrong fix.
-     */
-    @Test
-    void refinementRejectsABodyFieldThatAddsRatherThanTightens() throws IOException {
-        SchemaMap schemaMap = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/40/m/meta.tn"
-                !schema {
-                  base => { count: integer }
-                  refined => base ^ { extra: text }
-                }""").parseSchemaDocument().body();
-        resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
-
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolver.resolve(schemaMap.declarations().get("refined")));
-        assertTrue(thrown.getMessage().contains("'extra'"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("admits no new fields"), thrown.getMessage());
-        // the AST's own toString never reaches an author-facing message
-        assertFalse(thrown.getMessage().contains("FieldDef["), thrown.getMessage());
-    }
-
     // ── A field typed by a named constructor application ──────────────────
 
     @Test
@@ -1674,9 +1650,9 @@ class DefinitionResolverTest {
      * whatever the group says.
      */
     @Test
-    void restatingAGroupInARefinementBodyTightensItsStateOnly() {
+    void restatingAGroupTightensItsStateOnly() {
         Map<String, Top> entries = resolveAll(BOUNDS
-                + "  strict => bounds ^ { ( min: integer | exclusive_min: integer ) }");
+                + "  strict => bounds & { ( min: integer | exclusive_min: integer ) }");
 
         RecordBody body = bodyOf(entries.get("strict"));
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), false)), body.groups());
@@ -1688,9 +1664,8 @@ class DefinitionResolverTest {
     }
 
     /**
-     * §5.11 says "in a refinement <em>or composition</em> body", and the composition side was not merely
-     * unimplemented -- it rejected a legal restatement as a duplicate member name, citing the paragraph that
-     * permits it. The restatement replaces the inherited group in place rather than appending a second one.
+     * Beside a new field the restatement replaces the inherited group in place rather than appending a second one,
+     * and is never taken for a duplicate member name.
      */
     @Test
     void restatingAGroupInACompositionBodyTightensItInPlace() {
@@ -1707,7 +1682,7 @@ class DefinitionResolverTest {
     @Test
     void restatingAGroupWithoutChangingItsStateIsANoOp() {
         Map<String, Top> entries = resolveAll(BOUNDS
-                + "  same => bounds ^ { ( min: integer | exclusive_min: integer )? }");
+                + "  same => bounds & { ( min: integer | exclusive_min: integer )? }");
 
         assertEquals(List.of(FieldGroup.ofSingles(List.of("min", "exclusive_min"), true)),
                 bodyOf(entries.get("same")).groups());
@@ -1717,7 +1692,7 @@ class DefinitionResolverTest {
     void rejectsARestatementThatMakesAGroupOptional() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("bounds => { ( min: integer | exclusive_min: integer ) }"
-                        + "  loose => bounds ^ { ( min: integer | exclusive_min: integer )? }"));
+                        + "  loose => bounds & { ( min: integer | exclusive_min: integer )? }"));
         assertTrue(thrown.getMessage().contains("never add one"), thrown.getMessage());
     }
 
@@ -1725,12 +1700,12 @@ class DefinitionResolverTest {
     void rejectsARestatementThatReordersOrDropsAMember() {
         SchemaValidationException reordered = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
-                        + "  odd => bounds ^ { ( exclusive_min: integer | min: integer ) }"));
+                        + "  odd => bounds & { ( exclusive_min: integer | min: integer ) }"));
         assertTrue(reordered.getMessage().contains("their members in the same order"), reordered.getMessage());
 
         SchemaValidationException added = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
-                        + "  odd => bounds ^ { ( min: integer | exclusive_min: integer | other: "
+                        + "  odd => bounds & { ( min: integer | exclusive_min: integer | other: "
                         + "integer ) }"));
         assertTrue(added.getMessage().contains("changing membership"), added.getMessage());
     }
@@ -1740,7 +1715,7 @@ class DefinitionResolverTest {
     void rejectsARestatementThatChangesAMembersType() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
-                        + "  odd => bounds ^ { ( min: text | exclusive_min: integer ) }"));
+                        + "  odd => bounds & { ( min: text | exclusive_min: integer ) }"));
         assertTrue(thrown.getMessage().contains("restated verbatim"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("'min'"), thrown.getMessage());
     }
@@ -1750,20 +1725,10 @@ class DefinitionResolverTest {
     void rejectsAGroupOverInheritedFieldsThatWereNeverAGroup() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("pair => { x: integer  y: integer }"
-                        + "  odd => pair ^ { ( x: integer | y: integer ) }"));
+                        + "  odd => pair & { ( x: integer | y: integer ) }"));
         assertTrue(thrown.getMessage().contains("not a group"), thrown.getMessage());
     }
 
-    /** A refinement adds nothing, groups included -- the group analogue of the no-new-fields rule. */
-    @Test
-    void rejectsAWhollyNewGroupInARefinementBody() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveAll("bounds => { a: text }"
-                        + "  odd => bounds ^ { ( p: integer | q: integer ) }"));
-        assertTrue(thrown.getMessage().contains("names no inherited group"), thrown.getMessage());
-    }
-
-    /** A composition body may still introduce a genuinely new group -- the false branch of the same check. */
     @Test
     void aCompositionBodyStillAddsAWhollyNewGroup() {
         Map<String, Top> entries = resolveAll("base => { a: text }"
@@ -1846,7 +1811,7 @@ class DefinitionResolverTest {
     void restatesAnInheritedFieldAsVoid() {
         Map<String, Top> entries = resolveAll("""
                 base => { name: text  nickname?: text? }
-                anonymous => base ^ { nickname?: void? }
+                anonymous => base & { nickname?: void? }
                 """);
 
         RecordField nickname = bodyOf(entries.get("anonymous")).fields().values().stream().toList().get(1);
@@ -1861,7 +1826,7 @@ class DefinitionResolverTest {
     void rejectsAModifierOnlyPinToVoid() {
         assertRefused("""
                 base => { name: text  nickname?: text? }
-                anonymous => base ^ { nickname?: = _ }
+                anonymous => base & { nickname?: = _ }
                 """, "'_' is none of them");
     }
 
@@ -1873,7 +1838,7 @@ class DefinitionResolverTest {
     void aParameterPinnedOnAnInheritedFieldIsRefused() {
         assertRefused("""
                 base => { bound?: integer }
-                bounded => <MIN> base ^ { bound: = MIN }
+                bounded => <MIN> base & { bound: = MIN }
                 """, "parameter 'MIN' stands at the value of field 'bound'");
     }
 
@@ -1888,7 +1853,7 @@ class DefinitionResolverTest {
     @Test
     void aRestatedMemberMayBePinnedAndIsNeverSupplied() {
         RecordBody body = bodyOf(resolveAll(BOUNDS
-                + "  pinned => bounds ^ { min: = 0  exclusive_min: integer = 1 }").get("pinned"));
+                + "  pinned => bounds & { min: = 0  exclusive_min: integer = 1 }").get("pinned"));
 
         RecordField min = body.fields().values().stream().toList().get(1);
         assertEquals(RecordField.fixed(TypeRef.of("integer"), new Token("0", Token.Form.UNQUOTED)), min);
@@ -1903,8 +1868,8 @@ class DefinitionResolverTest {
      */
     @Test
     void aRestatedMemberTakesNoNewNameMarkAndNoDefault() {
-        assertRefused(BOUNDS + "  pinned => bounds ^ { min?: integer = 0 }", "adding one loosens its option");
-        assertRefused(BOUNDS + "  pinned => bounds ^ { min: integer ~ 0 }", "takes no default");
+        assertRefused(BOUNDS + "  pinned => bounds & { min?: integer = 0 }", "adding one loosens its option");
+        assertRefused(BOUNDS + "  pinned => bounds & { min: integer ~ 0 }", "takes no default");
     }
 
     // ── Options of several fields ([TSON-SCHEMA] §5.11) ──────────────────
@@ -1936,11 +1901,11 @@ class DefinitionResolverTest {
     /** A restated member's name {@code ?} is never inherited: leaving it off makes the member required there. */
     @Test
     void aRestatedMemberWithoutItsMarkIsRequiredInItsOption() {
-        RecordBody body = bodyOf(resolveAll(FRAGMENT + "  strict => fragment ^ { name: text }").get("strict"));
+        RecordBody body = bodyOf(resolveAll(FRAGMENT + "  strict => fragment & { name: text }").get("strict"));
         assertEquals(List.of("type"), body.groups().getFirst().optionalMembers());
         assertTrue(body.fields().values().stream().allMatch(RecordField::optional), "and still an optional field");
 
-        RecordBody kept = bodyOf(resolveAll(FRAGMENT + "  same => fragment ^ { name?: text }").get("same"));
+        RecordBody kept = bodyOf(resolveAll(FRAGMENT + "  same => fragment & { name?: text }").get("same"));
         assertEquals(List.of("name", "type"), kept.groups().getFirst().optionalMembers());
     }
 
@@ -1948,22 +1913,22 @@ class DefinitionResolverTest {
     @Test
     void aPlusGroupsMemberIsRestatedAsWritten() {
         String contact = "contact => { ( email: text | phone: text )+ }";
-        RecordBody body = bodyOf(resolveAll(contact + "  narrow => contact ^ { email: text }").get("narrow"));
+        RecordBody body = bodyOf(resolveAll(contact + "  narrow => contact & { email: text }").get("narrow"));
         assertEquals(List.of("email", "phone"), body.groups().getFirst().optionalMembers());
 
-        assertRefused(contact + "  marked => contact ^ { email?: text }", "written with '+'");
+        assertRefused(contact + "  marked => contact & { email?: text }", "written with '+'");
     }
 
     /** A restated group may drop a member's {@code ?} and never add one. */
     @Test
     void aRestatedGroupMayDropAMarkAndNotAddOne() {
         RecordBody body = bodyOf(resolveAll(FRAGMENT
-                + "  strict => fragment ^ { ( include: text | name: text  type?: text ) }").get("strict"));
+                + "  strict => fragment & { ( include: text | name: text  type?: text ) }").get("strict"));
         assertEquals(List.of("type"), body.groups().getFirst().optionalMembers());
 
         assertRefused("base => { ( a: text | b: text  c?: text ) }"
-                + "  loose => base ^ { ( a: text | b?: text  c?: text ) }", "never add one");
-        assertRefused(FRAGMENT + "  odd => fragment ^ { ( include: text  name: text | type: text ) }",
+                + "  loose => base & { ( a: text | b?: text  c?: text ) }", "never add one");
+        assertRefused(FRAGMENT + "  odd => fragment & { ( include: text  name: text | type: text ) }",
                 "the same options");
     }
 
@@ -1996,7 +1961,7 @@ class DefinitionResolverTest {
         assertEquals("optional", noB.fields().values().iterator().next().describe());
     }
 
-    // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
+    // ── Composition rejections (§5.7, §5.8, §5.11) ──────────────────────
     //    Every one is the author's error under a MUST in the spec, so each is a
     //    SchemaValidationException. What varies is only which rule was broken,
     //    and the message has to say which -- that is what decides the author's fix.
@@ -2034,24 +1999,8 @@ class DefinitionResolverTest {
     }
 
     /**
-     * §5.7's "Refinement requires a vocabulary body": a definition whose body is a binding record -- here a
-     * top-level constructor application -- is <em>finished</em>, and {@code ^} on it is a resolver error. The
-     * message points at the form that does work on an atom instance, {@code !I ^ { ... }} (§5.5), because
-     * that is what an author reaching for this actually wants.
-     */
-    @Test
-    void rejectsRefiningADefinitionWhoseBodyIsABindingRecord() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("""
-                        bounded => integer ^ { min?: = 0 }
-                        """));
-        assertTrue(thrown.getMessage().contains("finished"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("!integer ^"), thrown.getMessage());
-    }
-
-    /**
-     * The composition twin of the case above: §4.3 generalises §5.7's vocabulary-body requirement to
-     * composition, which needs it for the same reason -- a binding record has no fields to copy.
+     * §4.3: a composition operand needs a vocabulary body, and a definition whose body is a binding record -- here a
+     * top-level constructor application -- has no fields to copy.
      */
     @Test
     void rejectsComposingWithASupertypeWhoseBodyIsABindingRecord() {
@@ -2064,7 +2013,7 @@ class DefinitionResolverTest {
 
     /**
      * §12.1 draws {@code construction-def}'s operands from {@code type-ref}, which admits {@code paren-type}
-     * and {@code inline-array} -- where {@code refined-def} takes a name. Neither could ever denote a record,
+     * and {@code inline-array}. Neither could ever denote a record,
      * so both are rejected here as the author's error rather than deferred: there is no field set for any
      * future implementation to compose with, and §12.1's {@code supertype-ref} now narrows the operands to
      * named references.
@@ -2204,7 +2153,7 @@ class DefinitionResolverTest {
         assertTrue(thrown.getMessage().contains("own body also declares"), thrown.getMessage());
     }
 
-    /** Rule 2, symmetric with refinement's existing-fields-only rule: nothing to remove is an author error. */
+    /** Rule 2: nothing to remove is an author error. */
     @Test
     void rejectsARemovalNamingAFieldThatIsNotThere() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,

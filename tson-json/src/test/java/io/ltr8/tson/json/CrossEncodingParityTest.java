@@ -153,7 +153,7 @@ class CrossEncodingParityTest {
               ided        => { id: meta.ref<net.uuid_type> }
               typed       => { t: meta.type_ref }
               cell        => { kind: meta.type_ref  v?: kind! }
-              int_cell    => cell ^ { kind?: = int32 }
+              int_cell    => cell & { kind?: = int32 }
               defaulted   => { kind?: meta.type_ref ~ int32  v?: kind! }
               grouped     => { ( kind: meta.type_ref | name: text )  v?: kind! }
               tmpl        => <T> { item: T }

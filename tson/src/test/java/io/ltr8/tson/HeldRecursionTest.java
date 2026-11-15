@@ -104,7 +104,7 @@ class HeldRecursionTest {
     void aRecursionTakenThroughAnAppliedParentIsRefused() {
         refusedAt(NODE + "  labelled => <T> node<T> & { label: text }", "labelled",
                 "'labelled' holds 'node<T>' at 'next'");
-        refusedAt(NODE + "  labelled => <T> node<T> ^ { value: T }", "labelled", "'labelled' holds 'node<T>'");
+        refusedAt(NODE + "  labelled => <T> node<T> & { value: T }", "labelled", "'labelled' holds 'node<T>'");
     }
 
     /**

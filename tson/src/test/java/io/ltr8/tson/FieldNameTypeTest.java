@@ -260,15 +260,15 @@ class FieldNameTypeTest {
                     """)));
     }
 
-    /** A composition absorbs its supertypes' names, so it takes their name_type; a refinement keeps its own. */
+    /** A composition absorbs its supertypes' names, so it takes their name_type, whether it adds or restates. */
     @Test
-    void aCompositionAndARefinementInheritTheFieldNameType() {
+    void aCompositionInheritsTheFieldNameType() {
         var schema = Tson.standard().resolve(schema("inherit", """
               json_name => !unicode.identifier_type { start_add: "@$" }
               node => !meta.record { name_type: json_name  fields: {
                 "@id" => { type: text }  "$ref" => { type: text  optional: true } } }
               labelled => node & { label: text }
-              tightened => node ^ { "$ref": text }
+              tightened => node & { "$ref": text }
             """));
         assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("labelled"))
                 .nameTypeName());
@@ -380,7 +380,7 @@ class FieldNameTypeTest {
     }
 
     /**
-     * A schema's own references to its fields -- a group's members, a refinement's restated field -- match the
+     * A schema's own references to its fields -- a group's members, a composition's restated field -- match the
      * declared names exactly, under a folding name type too: the schema is one author's text, and only a
      * document's spelling is matched in the type's form.
      */
@@ -391,7 +391,7 @@ class FieldNameTypeTest {
                         + "  email => { type: text  optional: true } }\n"
                         + "  groups: [ { members: [ [NAME] [email] ] } ] }",
                 "row => !meta.record { name_type: folded  fields: { name => { type: text } } }\n"
-                        + "tight => row ^ { NAME: text }"}) {
+                        + "tight => row & { NAME: text }"}) {
             org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                     () -> Tson.standard().resolve(schema("exact",
                             "folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }\n" + body)), body);

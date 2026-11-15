@@ -737,6 +737,28 @@ after.
      kernel's wait cycle loses `meta.set_type` and gains `meta.identifier_ref`, which `enum`'s
      `name_type` is read by where it is written, and is 31 entries as before. `meta.tn`'s pin
      and every pin above it change (§13.2).
+109. **Header, §1, §4.1, §4.2, §4.3, §5.1, §5.2, §5.5, §5.7, §5.8, §5.9, §5.10, §5.11, §8.1,
+     §12.1, §12.2** — record refinement goes. `T ^ { … }` refined a record, a constructor among
+     them, and declared a refined record or a refined constructor beside `&`'s composition. The
+     operator now decides the body: `^` follows `!name` and its body is values, and it never
+     declares a record or a constructor; `&` follows a bare name and its body is field
+     definitions, the one way to derive a record and so the one way to declare a constructor.
+     `refined-def` leaves §12.1, so a bare `name ^ {`, `name<args> ^ {` and `<T> name<T> ^ {` at a
+     type-def, or `^` after a name at a type slot, is a parse error for a record and a
+     constructor alike, its diagnostic naming `name & { … }`; `!R ^ { … }` over a record is a
+     resolver error naming `R & { … }`, a record stating no rule for a body of values (§4.3). The
+     re-spellings: `employee => person ^ { age: adult }` is `person & { age: adult }`,
+     `vip => person ^ {}` is `person & {}`, `x => box<text> ^ { … }` is `box<text> & { … }`, and
+     `minlist => meta.array ^ { min_items?: = 1 }` is `!meta.array ^ { min_items: 1 }`, its
+     construction left open (item 107), or `meta.array & { min_items?: = 1 }` for a new
+     constructor; over a constructor with no required field, a type is constructed and refined
+     (`t => !unicode.text_type {}`, then `!t ^ { max_length: 4 }`). A restated field in an `&` body
+     follows the rules it followed in a refinement body, unchanged: §5.7 keeps them, worded as
+     the rules for a restated field, so its citations stand. The removal clause's refinement-head
+     exclusion goes with the head, and §8.1's table loses the refinement and constructor-refinement
+     rows. **Lost:** `^` refused a new field and `&` does not, so `person & { agee: adult }` adds a
+     field where `person ^ { agee: adult }` was refused. A modifier-only entry naming no inherited
+     field is still refused. There is no replacement.
 
 ### 3.3 Companion artifacts
 

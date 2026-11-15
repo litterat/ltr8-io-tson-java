@@ -45,6 +45,9 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   anywhere. A chain naming `X` lost for that reason: the same type would be two entries by spelling. What a declared
   completion closed is the key's `@meta.completion` instead, which changes no value
   (`design/resolver-vocabulary-and-bootstrap.md`).
+- `!R ^ { … }` over a record that builds no types is refused naming `R & { … }` (`resolveAtomRefinement`): a record
+  states no rule for a body of values. `&` is the one way to derive a record, so the one way to declare a
+  constructor; a bare `name ^` is the parser's to refuse (`design/schema-grammar.md`).
 - A tag or an annotation's value naming an incomplete entry is refused: only a construction's payload is rewritten
   (`ConstructionRewrite`), an annotation's value being data, so `@slot:{ of: !rows { … } }` over an incomplete
   `rows` is no completion.
@@ -130,7 +133,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   element_type: T  min_items: 1 }` has no home for `parameters`, so `openInstance` refuses it, naming the remedy -- the
   application where it is used (`meta.array<T>`, `[T]`), or its construction left open once and completed where used
   (`nonempty => !meta.array ^ { min_items: 1 }`, then `nonempty<T>`). A pin is a field's value, so a
-  refinement template pinning a slot to its parameter -- `my_set => <T> meta.array ^ { element_type?: = T }` -- is refused
+  template pinning a slot to its parameter -- `my_set => <T> meta.array & { element_type?: = T }` -- is refused
   with every other parameter at a value (`ParameterTypes.atValue`).
 
 ## Construction sugar (`resolver/ConstructionSugar.java`)
@@ -151,10 +154,9 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
 - **The kernel applies its own constructors this way**, `meta.ref<method>` being `!meta.ref { of: method }`, and
   completes its own incomplete entries the way a schema does: `set<text>` through the root's alias `set` is
   `!meta.array { element_type: text  ordered: false  unique_items: true }`, `!enum [A B]` is `!meta.enum_type { … }`.
-  **A body is bound by its constructor's own class and nothing else**: there is no fallback along a refined
-  constructor's chain, so `!x { … }` over `x => meta.array ^ { … }` has no class and is a gap. Lost: binding a refined
-  constructor as the one it refines, which let a set and an enum each be a constructor of their own; as incomplete
-  entries they need no class, a completion being the plain construction.
+  **A body is bound by its constructor's own class and nothing else**, so an instance of a constructor a schema
+  composes (`!x { … }` over `x => meta.array & { … }`) has no class and is a gap; a set and an enum are incomplete
+  entries and need none, a completion being the plain construction.
 - **Where an application is first met, it is rewritten.** A declaration's body (`x => meta.array<text>`) becomes
   `!C { … }` tagged by the head as written and goes through `resolveInstance`, so it gets every check and fact the
   braced form does and records no application. A field's or group member's type (`f: meta.array<text>`) becomes the
@@ -182,5 +184,5 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   slot fills leaves the construction incomplete and the constructor's reader refuses it. `ConstructionSugarTest` pins
   all of it.
 - **The desugarer cannot tell a constructor from a record**, so `checkTemplateApplication` refuses an argument list
-  only on a local head whose body says it is none: a fresh record or a construction. A composition, a refinement, an
+  only on a local head whose body says it is none: a fresh record or a construction. A composition, an
   alias or an atom refinement (an incomplete entry, completed by application) passes through for resolution to judge.

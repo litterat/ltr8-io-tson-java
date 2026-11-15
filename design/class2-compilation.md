@@ -164,10 +164,9 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
   an `ALIAS` body, in declaration order, then the entry's own name — and `RecordBindReader` and `TupleBindReader`
   try them in that order, so `ping => msg_of<"ping", ping_body>` binds under `ping`. Nothing falls back along a
-  chain: a refined constructor has no class of its own, so its instance is a gap, and the kernel's set and enum are
-  incomplete entries, whose completions are the constructor's own construction (§5.5). Lost: binding a tightening as
-  the constructor it tightens, which an ordinary record refining another could not share without losing a narrower
-  class silently.
+  chain: the kernel's set and enum are incomplete entries, whose completions are the constructor's own construction
+  (§5.5). Lost: binding an entry by its supertype's class, which an ordinary record composing another could not share
+  without silently losing a narrower class.
   **Only a derived entry is reached this way**, which is the test `EntryDisplayName` already applies: an entry
   with a source position was declared, so its own name is the one the author wrote and an alias naming it must
   never redirect its binding. The index is built once per compile beside `namesMeaning`, for that one's

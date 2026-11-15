@@ -121,7 +121,7 @@ class NamespaceTypeTest {
     }
 
     /**
-     * {@code namespace} refines {@code map}, so its size bounds are a map's: a value entry of a namespace type holds
+     * {@code namespace} composes {@code map}, so its size bounds are a map's: a value entry of a namespace type holds
      * no fewer than {@code min_items} entries and no more than {@code max_items}.
      */
     @Test

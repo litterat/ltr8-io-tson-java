@@ -27,7 +27,6 @@ import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
-import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -420,15 +419,18 @@ public final class TsonSchemaParser extends TsonDataParser {
 
         TypeRef head = parseTypeRefHead();
         if (check(TokenType.CARET)) {
-            advance();
-            return new StructuralTypeDef(typeParams, new RefinedDef(head, parseRecordDef()));
+            String written = switch (head) {
+                case NameRef name -> name.name();
+                case ApplicationRef generic -> generic.name() + "<...>";
+            };
+            throw parseError("'^' follows '!name' and takes values (§5.5, §5.7), and '" + written + "' has no '!': "
+                    + "a record's fields are restated in a composition, '" + written + " & { ... }' (§5.8)");
         }
         if (check(TokenType.AMPERSAND) || check(TokenType.MINUS)) {
             return new StructuralTypeDef(typeParams, parseConstructionDefContinuation(head));
         }
         if (check(TokenType.LBRACE)) {
-            throw parseError("expected '^' (refinement) or '&' (composition) after a bare type-ref, "
-                    + "found '{'");
+            throw parseError("expected '&' (composition) after a bare type-ref, found '{'");
         }
         return new TypeExprDef(typeParams, head);
     }
@@ -629,8 +631,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         boolean omittable = consumeAdjacentQuestion();
         if (check(TokenType.MAP_ARROW)) {
             throw parseError("a record body's entries are 'name: type'; '=>' begins a map type only where a "
-                    + "type is expected (§12.2), not in a refinement body, a composition tail or a "
-                    + "constructor vocabulary");
+                    + "type is expected (§12.2), not in a composition tail or a constructor vocabulary");
         }
         expect(TokenType.COLON, "a record field's ':'");
 
@@ -837,20 +838,21 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * A type at a slot, past which nothing composes, refines or subtracts: those are written at a declaration and
-     * never in place (§5.2), since what they make would be named by nothing. {@code at: point & { z: int32 }} and
-     * {@code at: point ^ { x?: = 0 }} are each refused naming the declaration to write, and so is a name followed by
-     * {@code '{'}, the same reach without the operator, or a definition mark, which marks a declaration alone.
+     * A type at a slot, past which nothing composes or subtracts: those are written at a declaration and never in
+     * place (§5.2), since what they make would be named by nothing. {@code at: point & { z: int32 }} is refused naming
+     * the declaration to write, and so is a name followed by {@code '{'}, the same reach without the operator, or a
+     * definition mark, which marks a declaration alone. A {@code '^'} there is refused as at a declaration: it follows
+     * {@code !name}.
      */
     private TypeExpr inPlace(TypeExpr written) {
-        String operator = check(TokenType.AMPERSAND) ? "&" : check(TokenType.CARET) ? "^"
-                : check(TokenType.MINUS) ? "-" : null;
+        if (check(TokenType.CARET)) {
+            throw parseError("'^' follows '!name' and takes values (§5.5, §5.7), and a record's fields are restated "
+                    + "in a composition, declared under a name ('my_type => base & { ... }') and named here (§5.2)");
+        }
+        String operator = check(TokenType.AMPERSAND) ? "&" : check(TokenType.MINUS) ? "-" : null;
         if (operator != null) {
-            String what = switch (operator) {
-                case "&" -> "composes a type, and a composition";
-                case "^" -> "refines a type, and a refinement";
-                default -> "removes fields from a type, and a subtraction";
-            };
+            String what = operator.equals("&") ? "composes a type, and a composition"
+                    : "removes fields from a type, and a subtraction";
             throw parseError("'" + operator + "' " + what + " is declared, never written in place (§5.2): declare it "
                     + "under a name ('my_type => base " + operator + " { ... }') and write that name");
         }
@@ -859,15 +861,14 @@ public final class TsonSchemaParser extends TsonDataParser {
                     ? "'" + name.name() + "' marks how a declared record may be realised (§5.2), and a record "
                             + "written in place is its bare body, '{ ... }': declare the record to mark it"
                     : "'" + name.name() + "' followed by '{' is no type: a record written in place is its bare body, "
-                            + "'{ ... }', and a refinement ('^') or composition ('&') of a named type is declared "
-                            + "(§5.2)");
+                            + "'{ ... }', and a composition ('&') of a named type is declared (§5.2)");
         }
         return written;
     }
 
     /**
      * {@code type-name ["<" type-args ">"]} -- the name-based tail shared by every type-ref position and by
-     * refinement/construction heads. An adjacent {@code <} makes it an application; an adjacent {@code !} is a
+     * construction heads. An adjacent {@code <} makes it an application; an adjacent {@code !} is a
      * dependent field's type off a field's type ({@link #parseFieldType}), refused naming where it stands.
      */
     private TypeRef parseTypeRefHead() {

@@ -138,10 +138,9 @@ final class RecordExtension {
             if (target instanceof RecordBody parent
                     && parent.extension() == RecordExtensionType.FINAL) {
                 violations.add(new Violation(name, "'" + name + "' names '" + supertype + "' as a supertype, "
-                        + "but '" + supertype + "' is final and admits none -- composition and refinement are "
-                        + "both refused, in the declaring schema and in any that imports it. Subtraction is "
-                        + "not: §5.9 empties the chain and adds no IS-A edge, which is the only "
-                        + "thing final constrains (§5.2, §5.9)"));
+                        + "but '" + supertype + "' is final and admits none -- composition is refused, in the "
+                        + "declaring schema and in any that imports it. Subtraction is not: §5.9 empties the chain "
+                        + "and adds no IS-A edge, which is the only thing final constrains (§5.2, §5.9)"));
             }
         }
     }

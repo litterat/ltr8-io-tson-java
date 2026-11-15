@@ -542,14 +542,14 @@ handful of well-defined stages, each with its own class, deliberately named afte
 vocabulary — parse → resolve → link → register → compile → read:
 
 1. **Parse** (`TsonSchemaParser`) — schema document text into a faithful AST (`SchemaDocument`):
-   records, compositions (`&`), refinements (`^`), type references, and so on. No interpretation yet —
+   records, compositions (`&`), refinements (`!I ^`), type references, and so on. No interpretation yet —
    a name is still just a name.
 2. **Desugar** (`SchemaDesugarer`) — an AST→AST rewrite turning every sugar form (`[T]`, `[T; 1..5]`,
    `[T, U]`, `{K => V}`, `(A | B)`) into the constructor application it denotes, off a fixed table. At a
    declaration's own position the form simply *is* that application; at any other type slot it is that construction
    written in place, `{ of: !meta.array { … } }`, with no entry of its own, and equal forms are one type.
 3. **Resolve** (`TsonSchemaResolver`) — one declaration at a time, the AST becomes a concrete
-   value (`Top`): composition induces supertypes and flattens fields, refinement tightens an
+   value (`Top`): composition induces supertypes, flattens fields and tightens a restated
    inherited field against a state-transition table, a constructor application (`!C value`) transfers
    its constructor's own kind, and so on. A reference to another declaration is still a bare, unverified
    name at this point.

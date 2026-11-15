@@ -43,7 +43,7 @@ import java.util.function.Function;
  * #atValue}), a size bound, a field name, a group member, a field's {@code optional}, {@code voidable} or {@code
  * role}, the record's {@code extension}, {@code name_type} or {@code discriminators}. Each would leave the open record
  * without one shape its applications share, and a field's value in particular is never a parameter, whatever the
- * field's type: a pin on a slot typed {@code meta.type_ref} ({@code <T> meta.array ^ { element_type?: = T }}) is
+ * field's type: a pin on a slot typed {@code meta.type_ref} ({@code <T> meta.array & { element_type?: = T }}) is
  * refused with every other parameter at a value. An open record built from a record body holds a parameter only where
  * it may stand, its fields' types, at any depth, and its parents' arguments being the only references it has; the
  * explicit spelling, {@code <T> !meta.record { … }}, is walked against {@code record}'s own vocabulary before it is

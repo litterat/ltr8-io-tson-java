@@ -42,26 +42,26 @@ class RestatedFieldTypeTest {
     }
 
     @Test
-    void aRefinementRestatingAFieldAsAnUnrelatedTypeIsRefused() {
+    void aFieldRestatedAsAnUnrelatedTypeIsRefused() {
         String message = refused("""
                 {
                   a => { x: text }
-                  b => a ^ { x: int32 }
+                  b => a & { x: int32 }
                 }
                 """);
 
-        assertTrue(message.contains("'b': not a valid refinement of 'a' (§5.7): field 'x' is typed 'int32', "
-                + "which is not 'text' or IS-A it"), message);
+        assertTrue(message.contains("'b': not a valid restatement of 'a''s fields (§5.7): field 'x' is typed "
+                + "'int32', which is not 'text' or IS-A it"), message);
     }
 
     @Test
-    void aRefinementRestatingAFieldAsItsSupertypeIsRefused() {
+    void aFieldRestatedAsItsSupertypeIsRefused() {
         String message = refused("""
                 {
                   person   => { name: text }
                   employee => person & { badge: text }
                   team     => { lead: employee }
-                  loose    => team ^ { lead: person }
+                  loose    => team & { lead: person }
                 }
                 """);
 
@@ -69,7 +69,7 @@ class RestatedFieldTypeTest {
     }
 
     @Test
-    void aCompositionsTighteningEntryFollowsTheSameRule() {
+    void aRestatementBesideANewFieldFollowsTheSameRule() {
         String message = refused("""
                 {
                   a => { x: text }
@@ -77,7 +77,8 @@ class RestatedFieldTypeTest {
                 }
                 """);
 
-        assertTrue(message.contains("'b': not a valid refinement of 'a' (§5.7): field 'x' is typed 'int32'"), message);
+        assertTrue(message.contains("'b': not a valid restatement of 'a''s fields (§5.7): field 'x' is typed 'int32'"),
+                message);
     }
 
     @Test
@@ -87,7 +88,7 @@ class RestatedFieldTypeTest {
                   person    => { name: text }
                   employee  => person & { badge: text }
                   team      => { lead: person  size: integer }
-                  staffed   => team ^ { lead: employee }
+                  staffed   => team & { lead: employee }
                   counted   => team & { size: count  label: text }
                   count     => !integer ^ { min: 0 }
                 }
@@ -105,9 +106,9 @@ class RestatedFieldTypeTest {
                 {
                   label     => text
                   a         => { x: text  y?: text?  z: [int32] }
-                  same      => a ^ { x: text  z: [int32] }
-                  renamed   => a ^ { x: label }
-                  forbidden => a ^ { y?: void? }
+                  same      => a & { x: text  z: [int32] }
+                  renamed   => a & { x: label }
+                  forbidden => a & { y?: void? }
                 }
                 """));
     }
@@ -118,7 +119,7 @@ class RestatedFieldTypeTest {
         TsonLinkedSchema linked = link("""
                 {
                   slot  => { of: meta.type_ref }
-                  names => slot ^ { of: meta.identifier_ref }
+                  names => slot & { of: meta.identifier_ref }
                 }
                 """);
 
@@ -134,7 +135,7 @@ class RestatedFieldTypeTest {
         String message = refused("""
                 {
                   a => { x: [int32] }
-                  b => a ^ { x: [int8] }
+                  b => a & { x: [int8] }
                 }
                 """);
 
@@ -148,25 +149,25 @@ class RestatedFieldTypeTest {
                 {
                   either => (int32 | text)
                   a      => { x: either }
-                  b      => a ^ { x: int32 }
+                  b      => a & { x: int32 }
                 }
                 """);
 
         assertTrue(message.contains("field 'x' is typed 'int32', which is not 'either' or IS-A it"), message);
     }
 
-    /** A refinement of a closed application is judged against the fields that application closed with. */
+    /** A restatement over a closed application is judged against the fields that application closed with. */
     @Test
-    void aRefinementOfAClosedApplicationIsJudgedAgainstItsSubstitutedFields() {
+    void aRestatementOverAClosedApplicationIsJudgedAgainstItsSubstitutedFields() {
         String message = refused("""
                 {
                   box  => <T> { v: T }
                   held => box<text>
-                  b    => held ^ { v: int32 }
+                  b    => held & { v: int32 }
                 }
                 """);
 
-        assertTrue(message.contains("'b': not a valid refinement of 'held' (§5.7): field 'v' is typed 'int32', "
+        assertTrue(message.contains("'b': not a valid restatement of 'held''s fields (§5.7): field 'v' is typed 'int32', "
                 + "which is not 'text' or IS-A it"), message);
     }
 }

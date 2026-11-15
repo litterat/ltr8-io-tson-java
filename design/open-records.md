@@ -27,10 +27,10 @@ application of one closes is `design/template-materialisation.md`'s. Current for
   parent, and nowhere else.** A field's `value` is never one (`ParameterTypes.atValue`, at the source spelling in
   `DefinitionResolver.resolveFieldEntry`); a field name or a group member named like one, and a `name_type` naming
   one, are refused by `DefinitionResolver.checked` (`ParameterTypes.at`); a size bound naming one by
-  `SchemaDesugarer.refuseParameterBound`; a parameter as an operand of `&`/`^` by `refuseParameterOperand`; a
+  `SchemaDesugarer.refuseParameterBound`; a parameter as an operand of `&` by `refuseParameterOperand`; a
   parameter applied to arguments (`T<text>`) by `SchemaResolver.refuseHeadAbstraction`.
-- **A template's body is a record body**: braces, a composition (`base & { … }`, an applied parent included) or a
-  refinement. A parameter list before anything else is refused at the declaration with the remedy in the message --
+- **A template's body is a record body**: braces or a composition (`base & { … }`, an applied parent included). A
+  parameter list before anything else is refused at the declaration with the remedy in the message --
   before a sugar form or a bare reference by `SchemaDesugarer.refuseTemplateBody`, before a construction by
   `DefinitionResolver.openInstance` (a constructor: write the application or leave its construction open and complete it; an
   ordinary type: one value per instantiation). The one construction admitted is `<T> !meta.record { … }`
@@ -89,7 +89,7 @@ open record, and the bodies refused), `design/schema-resolution.md` (`openRecord
   the declaration's parameter names; `Built.finish` makes the `RecordBody` with `parameters` (each unbounded until
   `withBounds`) and runs `checked`. The fields are the builder's own `BuiltField`s, a field's four facts; no label says
   a type is a parameter -- the record's constructor does that by scope.
-- **A composition or refinement** (`<T> base & { v: T }`, `<T> box<T> ^ { … }`) is the flattened record, built over a
+- **A composition** (`<T> base & { v: T }`, `<T> box<T> & { … }`) is the flattened record, built over a
   closed source's fields as they are and an open operand's substituted on the model (`openOperand`, `Substitution`)
   with the absorbing declaration's arguments, written as its names, which its own record then holds as its
   parameters. The chain keeps the parents as written beside the closed entries they reach (`Ancestry.ofTemplate`).
@@ -129,7 +129,7 @@ stands is only ever checked, never derived from.
   parameter's bound, following alias chains. An application as an argument, or an unresolved name, falls to the
   substituted record.
   - **An application closed during resolution is checked once every declaration is ready.** A declaration naming one
-    (`held => boxed<int32>`), a composition operand, a refinement source and an argument nested in any of them close
+    (`held => boxed<int32>`), a composition operand and an argument nested in either close
     in the driving loop. Judging an argument reads its chain, and an argument is a name at a type position, which
     orders nothing (§3.4.1): checking it then would make the declaration wait on it, and `a => boxed<b> & { … }`
     beside `b => boxed<a> & { … }` would become a wait cycle. So the materialiser defers each such check, with the
