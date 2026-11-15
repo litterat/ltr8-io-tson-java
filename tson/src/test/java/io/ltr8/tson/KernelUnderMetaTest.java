@@ -196,12 +196,15 @@ class KernelUnderMetaTest {
         assertFalse(problems("meta => !schema { map => { id: uuid } }").isEmpty());
     }
 
-    /** A schema may contribute a constructor to {@code meta}, and an ordinary declaration names it by its path. */
+    /**
+     * A schema may contribute an incomplete entry or a constructor to {@code meta}, and an ordinary declaration names
+     * it by its path.
+     */
     @Test
     void aSchemaContributesAConstructorToMeta() {
         assertEquals(List.of(), problems("""
-                meta => !schema { short_text_type => unicode.text_type ^ { max_length?: = 16 } }
-                name => !meta.short_text_type {}
+                meta  => !schema { short_list => !meta.array ^ { max_items: 16 } }
+                names => !meta.short_list { element_type: text }
                 """));
         assertEquals(List.of(), problems("""
                 meta => !schema { pick_type => meta.atom & atom.specification & { picks?: numeric.count } }

@@ -340,7 +340,7 @@ class RecordTemplateTest {
                 List.of("nonempty<T>", "[ \"x\" ]"))) {
             String field = form.get(0);
             TsonCompiledSchema compiled = compile("""
-                      nonempty => meta.array ^ { min_items?: = 1 }
+                      nonempty => !meta.array ^ { min_items: 1 }
                       tmpl     => <T> { a: %s }
                       use      => { u: tmpl<text> }""".formatted(field));
 
@@ -358,7 +358,7 @@ class RecordTemplateTest {
     @Test
     void anOpenFormClosedByAnApplicationReadsRealData() {
         TsonCompiledSchema compiled = compile("""
-                  two_of => meta.array ^ { min_items?: = 2  max_items?: = 2 }
+                  two_of => !meta.array ^ { min_items: 2  max_items: 2 }
                   tags   => <T> { xs: two_of<T> }
                   holder => { t: tags<text> }""");
 

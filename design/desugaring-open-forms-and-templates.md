@@ -53,7 +53,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, reporting),
 ## Template bodies (`refuseTemplateBody`)
 
 - **Before a sugar form**: `<T> [T]` and `<V> {text => V}` are constructions, written where they are used
-  (`meta.array<T>`, `[T]`) or declared as a refined constructor and applied; `<T> ( T | error )` is a discriminated
+  (`meta.array<T>`, `[T]`) or left open once and completed where used; `<T> ( T | error )` is a discriminated
   record family or a field group; `<A, B> [A, B]` an open record's fields, or one tuple per type.
 - **Before a bare reference** -- an alias template, `uuid_pair => <B> pair<uuid, B>` or `ident => <T> T` -- the body is
   no record, and names a partial application nothing could close (§5.10: there is no partial application). The

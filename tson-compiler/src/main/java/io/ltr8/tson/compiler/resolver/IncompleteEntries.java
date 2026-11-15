@@ -33,8 +33,8 @@ public final class IncompleteEntries {
     /** Why {@code name}, naming {@code incomplete}, is refused where a type is named. */
     public static String noType(String name, IncompleteEntry incomplete) {
         return "an incomplete '" + incomplete.constructor() + "' with " + incomplete.absent() + " absent, which is "
-                + "no type -- complete it where it is used ('" + name + "<...>' or '!" + name + " { ... }'), or "
-                + "declare its completion and name that";
+                + "no type -- complete it where it is used ('!" + name + " { ... }'), or declare its completion and "
+                + "name that";
     }
 
     /** {@code constructor}'s fields a construction writes, in declaration order: neither optional nor pinned. */
@@ -112,19 +112,19 @@ public final class IncompleteEntries {
      * a required field absent. One writing the last is refused, a refinement keeping what its base is.
      */
     static IncompleteEntry refined(String name, String baseName, IncompleteEntry base, DataValue payload,
-                                   SequencedMap<String, DataValue> written, Map<String, Object> read) {
+                                   SequencedMap<String, DataValue> written, Map<String, Object> read, String closed) {
         List<String> absent = base.absent().stream().filter(field -> !written.containsKey(field)).toList();
         if (absent.isEmpty()) {
             throw new SchemaValidationException("'" + name + "': '!" + baseName + " ^ { ... }' writes " + base.absent()
                     + ", every required field '" + baseName + "' leaves absent, so nothing is left open and '^' keeps "
-                    + "what its base is -- complete it with '!" + baseName + " { ... }' or '" + baseName + "<...>'");
+                    + "what its base is -- complete it with '!" + baseName + " { ... }'");
         }
         SequencedMap<String, DataValue> merged = new LinkedHashMap<>(written(base));
         merged.putAll(written);
         Map<String, Object> mergedRead = new LinkedHashMap<>(base.read());
         mergedRead.putAll(read);
         return new IncompleteEntry(base.constructor(), absent, record(payload, base.constructor(), merged),
-                mergedRead);
+                mergedRead, closedThrough(closed, base));
     }
 
     /**
@@ -150,6 +150,16 @@ public final class IncompleteEntries {
         SequencedMap<String, DataValue> merged = new LinkedHashMap<>(written(base));
         merged.putAll(written);
         return record(payload, base.constructor(), merged);
+    }
+
+    /**
+     * The incomplete entries a construction from {@code base}, the entry named {@code closed} past its alias hops,
+     * is built through: {@code closed}, then {@code base}'s own bases, nearest first.
+     */
+    static List<String> closedThrough(String closed, IncompleteEntry base) {
+        List<String> through = new ArrayList<>(List.of(closed));
+        through.addAll(base.bases());
+        return List.copyOf(through);
     }
 
     private static SequencedMap<String, DataValue> positional(String name, String baseName, IncompleteEntry base,

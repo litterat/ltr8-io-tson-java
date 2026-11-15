@@ -1,9 +1,9 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=ee2394b1554c4ea15cee5441b1622f8ddee19c171a7425b07aeab63da9fafc0a"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=83ac33fed8b62d3bd567ff2ee652e22b64227acd4bdb30c3efd0bc9f6ff9b04a"
 @doc:"""
   The TSON kernel: the vocabulary every schema is written in. Its root holds the
   names an author writes: `text`, `integer`, `int64`, `boolean`, `bytes`, `iri`,
-  `iri_reference`, `regex`, `void`, the `enum` constructor, `set<T>`, `@doc` and
-  the `schema` tag. Its maps hold the machinery behind them: the type system
+  `iri_reference`, `regex`, `void`, `enum`, `set<T>`, `@doc` and the `schema`
+  tag. Its maps hold the machinery behind them: the type system
   (`meta`), the atom constructors (`numeric`, `unicode`, `net`, `binary`) and
   the classifying annotations (`atom`).
 
@@ -296,6 +296,17 @@
     application => @meta.annotation meta.apply
 
     @doc:"""
+      Resolver-attached to an entry's key, never written: the incomplete entries
+      the entry's declaration completed, nearest first, each by its own name
+      past alias hops, so `tags => set<text>` carries
+      `{ of: [meta.set_type] }`. The names are text and not references: those
+      entries are in no resolved form ([TSON-SCHEMA] §8.1).
+      """
+    completion => @meta.annotation {
+      of: [text; 1..]
+    }
+
+    @doc:"""
       One field of a record, the spelling `name?: type? ~ value`. `optional` is
       the name's `?`, the key may be missing; `voidable` is the type's `?`, the
       value may be `_`; `role` and `value` are the default after `~` or the
@@ -371,14 +382,13 @@
     }
 
     @doc:"""
-      The constructor of `set<T>`: an array whose elements are distinct and
-      whose order is no part of its value ([TSON-SCHEMA] §7.5).
+      An array left open, its `element_type` absent: elements distinct, never
+      void, and their order no part of the value. It is no type; completing it
+      with the element type makes one, `meta.set_type<text>`, which is
+      `!meta.array { element_type: text  ordered: false  unique_items: true }`
+      ([TSON-SCHEMA] §5.5, §7.5).
       """
-    set_type => meta.array ^ {
-      voidable?:     = false
-      ordered?:      = false
-      unique_items?: = true
-    }
+    set_type => !meta.array ^ { voidable: false  ordered: false  unique_items: true }
 
     @doc:"""
       The constructor of `{K => V}`, with void values as `{K => V?}`; a key is
@@ -428,9 +438,9 @@
     enum_set => !meta.set_type { element_type: text  min_items: 1 }
 
     @doc:"""
-      The constructor behind `enum`: a closed set of names, each a value of
-      `name_type`. An author writes `!enum [OPEN DONE]`, and refines this
-      constructor only for names of another naming convention ([TSON-SCHEMA]
+      The constructor of an enum: a closed set of names, each a value of
+      `name_type`. An author writes `!enum [OPEN DONE]`, and constructs this
+      directly only for names of another naming convention ([TSON-SCHEMA]
       §7.4).
       """
     enum_type => meta.atom & {
@@ -590,13 +600,17 @@
   doc => @meta.annotation text
 
   @doc:"""
-    A closed set of names: `status => !enum [OPEN DONE]` ([TSON-SCHEMA] §7.4).
+    An enum over identifiers, its `members` absent: `status => !enum [OPEN
+    DONE]` completes it, `!meta.enum_type { name_type: meta.identifier  members:
+    [OPEN DONE] }`. It is no type, so a field holding an enum type is typed
+    `meta.enum_type` ([TSON-SCHEMA] §5.5, §7.4).
     """
-  enum => meta.enum_type ^ { name_type?: = meta.identifier }
+  enum => !meta.enum_type ^ { name_type: meta.identifier }
 
   @doc:"""
     `set<T>`: a collection of distinct elements whose order is no part of its
-    value, `tags: set<text>` ([TSON-SCHEMA] §7.5).
+    value, `tags: set<text>`. Another name for `meta.set_type`, which `set<T>`
+    completes ([TSON-SCHEMA] §7.5).
     """
   set => meta.set_type
 

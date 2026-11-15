@@ -67,11 +67,11 @@ class WaitOrderTest {
     @Test
     void aConstructorAndItsInstanceShareADocumentInEitherOrder() {
         for (String declarations : List.of("""
-                  counted => meta.array ^ { ordered?: = false }
+                  counted => !meta.array ^ { ordered: false }
                   counts  => !counted { element_type: int32 }
                 """, """
                   counts  => !counted { element_type: int32 }
-                  counted => meta.array ^ { ordered?: = false }
+                  counted => !meta.array ^ { ordered: false }
                 """)) {
             Tson tson = tson(declarations);
             assertEquals(List.of(), tson.validateSchema(schema(declarations)));

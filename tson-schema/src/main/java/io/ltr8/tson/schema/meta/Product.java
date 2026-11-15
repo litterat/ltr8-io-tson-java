@@ -5,10 +5,9 @@ import java.util.List;
 /**
  * The kernel's {@code product => type & { access_pattern: ... size_type: ... } }} base kind
  * (Part 2 §4.1) -- every PRODUCT-kind {@link Top} variant IS-A this: {@link RecordBody},
- * {@link ArrayBody} (and {@code set}, which refines it), {@link MapBody} (and {@link NamespaceBody}, whose
- * constructor refines it), and {@link TupleBody} -- exactly {@code record}/{@code array}/{@code set}/{@code
- * map}/{@code namespace}/{@code tuple}, the kernel's own structural-type family (Part 2
- * §4.1: "record, array, set, map, and tuple compose with product, fixing access_pattern and size_type").
+ * {@link ArrayBody} (a set among them), {@link MapBody} (and {@link NamespaceBody}, whose constructor composes
+ * it), and {@link TupleBody} -- exactly {@code record}/{@code array}/{@code map}/{@code namespace}/{@code tuple}, the
+ * kernel's own structural-type family (Part 2 §4.1).
  */
 public sealed interface Product extends Type
         permits RecordBody, ArrayBody, MapBody, TupleBody, NamespaceBody {

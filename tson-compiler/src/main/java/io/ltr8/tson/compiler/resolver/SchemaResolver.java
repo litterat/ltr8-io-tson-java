@@ -550,6 +550,10 @@ public final class SchemaResolver {
                 localOnly.put(name, localOnly.get(name),
                         TsonSchema.withApplication(localOnly.getAnnotations(name), application));
             }
+            // §8.1's other derived key annotation: a declared completion states the incomplete entries it closed,
+            // which are in no resolved form.
+            resolver.completionOf(name).ifPresent(completion -> localOnly.put(name, localOnly.get(name),
+                    TsonSchema.withCompletion(localOnly.getAnnotations(name), completion)));
         }
         Map<String, List<TsonSchema.ValueByName>> valuesByName = new LinkedHashMap<>();
         Map<String, List<TsonSchema.HeldValue>> heldValues = new LinkedHashMap<>();

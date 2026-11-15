@@ -167,8 +167,8 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   through aliases to a constructor, a closed record IS-A `meta.type`, is the construction `!C { f1: a1 … fn: an }`
   over `C`'s required fields typed by a reference naming types, in declaration order. `meta.array<text>` is the entry
   `[text]` is, and `meta.map<text int32>` the entry `{text => int32}` is. A declared `x => meta.array<text>` is that
-  construction and carries no `@meta.application`. A refined constructor applied, `nonempty_type<uuid>` over
-  `nonempty_type => meta.array ^ { min_items?: = 1 }`, is an entry of its own and not the one `[uuid; 1..]` is. A
+  construction and carries no `@meta.application`. An incomplete entry applied, `nonempty<uuid>` over
+  `nonempty => !meta.array ^ { min_items: 1 }`, is its completion, the entry `[uuid; 1..]` is (§5.5). A
   wrong argument count, an argument the field's `of` refuses (`meta.namespace<int32 text>`) and a construction left
   incomplete (`meta.enum_type<meta.identifier>`, with `members` unwritten) are refused. Three points the rule leaves
   open are settled as built: a field with a default is no argument slot; a use-site construction names its
@@ -336,9 +336,10 @@ of it describes a value: two schemas that differ only in how their resolvers nam
 **The proposal.** A type slot holds a name or a type written where it is used, and the kernel's type says so:
 `type_inline => { of: meta.type }` and `type_expr => @meta.disjoint ( meta.type_ref | meta.type_inline )`, which
 types every type slot, a record field's included (#6). `tags: [text]` resolves to
-`type: { of: !meta.array { element_type: text } }`; a refined constructor's construction carries its own tag
-(`!meta.set_type`, `!meta.ref`). The slots are a record field's `type`, `array.element_type`, `map.value_type`,
-`tuple_element.element_type` and each of `choice.variants`. What may be written in place is a container, a tuple, a
+`type: { of: !meta.array { element_type: text } }`; a construction carries its constructor's tag (`!meta.ref`), and a
+completion its constructor's (`set<text>` under `!meta.array`). The slots are a record field's `type`,
+`array.element_type`, `map.value_type`, `tuple_element.element_type` and each of `choice.variants`. What may be written
+in place is a container, a tuple, a
 choice or a reference, or a construction of a constructor refining one, or a record: a record body written at the
 slot or the record an application of an open record closes to, one form. An enum and every other atom are declared
 and named, as §5.2 already requires. A map's key is a name. A type written in place is no entry: structural

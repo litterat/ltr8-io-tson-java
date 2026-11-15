@@ -117,12 +117,12 @@ class ConstructorLevelDisciplineTest {
     @Test
     void theDeclaringDocumentAppliesItsOwnConstructorInEitherOrder() {
         assertEquals(List.of(), problems(META, CORE, """
-                  my_array => meta.array ^ { ordered?: = false }
+                  my_array => !meta.array ^ { ordered: false }
                   tags     => !my_array { element_type: text }
                 """));
         assertEquals(List.of(), problems(META, CORE, """
                   tags     => !my_array { element_type: text }
-                  my_array => meta.array ^ { ordered?: = false }
+                  my_array => !meta.array ^ { ordered: false }
                 """));
     }
 

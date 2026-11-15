@@ -199,8 +199,8 @@ public final class DataClassObjectWriter {
             }
             if (value instanceof TypeInline inline) {
                 // A type written in place is the untagged wrapper the kernel declares, `{ of: ... }`, and its body
-                // goes under the constructor that built it, which the body's class cannot say: `set<T>` is
-                // `{ of: !meta.set_type { ... } }`, not the `!meta.array` its class names.
+                // goes under the constructor that built it, which the body's class cannot say: a schema's own
+                // constructor of arrays is `{ of: !list_type { ... } }`, not the `!meta.array` its class names.
                 writer.beginRecord();
                 writer.field("of");
                 write(inline.of(), context.getDescriptor(inline.of().getClass()), writer, inline.constructor());

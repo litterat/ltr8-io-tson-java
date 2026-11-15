@@ -165,7 +165,8 @@ for a verdict.
 format: §1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a valid vector's subject
 is a schema document and its expected side is that document's resolved output in §8's own form, read back through
 `ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question of `spec/fixtures/*-resolved.tn`) and
-compared entry for entry, `@meta.application` key annotations included. Names are compared as written: every entry is
+compared entry for entry, `@meta.application` and `@meta.completion` key annotations included, incomplete entries
+left out on both sides. Names are compared as written: every entry is
 declared. A nested schema map is walked into: `ResolvedForm.entries` keys each member under its path, `readResolved`
 adds the path keys a schema holds (`SchemaPaths.withPaths`), and the nested map's own entry compares as its member
 names. `link/` states individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived
@@ -184,8 +185,8 @@ letting one satisfy an error vector is how a corpus comes to pass on the strengt
 parameters written where they stand as their names (`type: T`, `element_type: T` in place, `parents: [result<T>]`), so it
 is a schema-map value like any other, read back through `record`'s own reader with the record's `parameters`
 consulted before the namespace, and compared by `ResolvedForm` as every other entry is. An application of one is a
-closed `!meta.record` carrying `@meta.application` at its key; a construction (`meta.ref<X>`, `set<text>`) is an
-instance of its constructor and carries none.
+closed `!meta.record` carrying `@meta.application` at its key; a construction (`meta.ref<X>`) is an instance of its
+constructor and carries none, and a declared completion (`set<text>`) carries `@meta.completion`.
 
 **Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
 with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, so a Part 1

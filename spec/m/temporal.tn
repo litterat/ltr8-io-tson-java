@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/40/m/temporal.tn?sha256=d3ef3009d3fb42219473259830e9e901ae5f9f4e1d89cbe95fa9627b49accbaa"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=ee2394b1554c4ea15cee5441b1622f8ddee19c171a7425b07aeab63da9fafc0a"
+!!id:"https://tson.io/2026/40/m/temporal.tn?sha256=3f788a9e5927b72770d7cec1ce61ac172eb573f948459b84371a7e0c0de1689c"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=83ac33fed8b62d3bd567ff2ee652e22b64227acd4bdb30c3efd0bc9f6ff9b04a"
 @doc:"""
   The TSON temporal library: `date`, `time`, `datetime`, `duration` and
   `period`, each RFC 3339's. A schema imports it, or core.tn, to write them

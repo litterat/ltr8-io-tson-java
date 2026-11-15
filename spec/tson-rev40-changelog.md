@@ -721,6 +721,22 @@ after.
      chain. It is refused wherever a type is named, is checked whole where it is completed,
      and is not written in resolver output. A type `meta.array` or `meta.map` built is refined
      by `!T ^ { values }`, its facets taking §5.7's kinds, and the result IS-A `T`.
+108. **§3.4, §4.1, §5.3, §5.6, §6, §7.4, §7.5, §8.1, §8.3, §9, §13.2** — the kernel's
+     `meta.set_type` and root `enum` were constructors refining `meta.array` and
+     `meta.enum_type`, and a processor bound their instances as the constructor each refined.
+     Each is now an incomplete entry (item 107): `meta.set_type => !meta.array ^ { voidable:
+     false  ordered: false  unique_items: true }` and `enum => !meta.enum_type ^ { name_type:
+     meta.identifier }`, so `set<text>` is `!meta.array { element_type: text  ordered: false
+     unique_items: true }` and `!enum [A B]` is `!meta.enum_type { name_type: meta.identifier
+     members: [A B] }`. Neither is a type: `a: enum` is written `a: meta.enum_type`,
+     `meta.set_type & { … }` is `meta.array & { … }` restating the set's facets, and
+     `!meta.ref { of: meta.set_type }` is `of: meta.array`. Both, and the root's `set`, leave
+     `meta.tn`'s resolved form. A declared completion carries the new derived key annotation
+     `@meta.completion:{ of: [X …] }`, the incomplete entries it closed, nearest first and past
+     alias hops; an author writing it is a resolver error, and it is read as stated. The
+     kernel's wait cycle loses `meta.set_type` and gains `meta.identifier_ref`, which `enum`'s
+     `name_type` is read by where it is written, and is 31 entries as before. `meta.tn`'s pin
+     and every pin above it change (§13.2).
 
 ### 3.3 Companion artifacts
 

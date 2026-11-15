@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.stream.ListEventSource;
+import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledVocabulary;
@@ -28,6 +29,7 @@ import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.net.EmailType;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
@@ -137,11 +139,25 @@ class DefinitionResolverTest {
     private static DefinitionResolver definitionResolverFor(TsonCompiledVocabulary vocabulary,
                                                             DefinitionGetter definitionGetter,
                                                             Map<String, TsonSchema.EntryFacts> facts) {
-        return new DefinitionResolver((type, value) -> (Top) vocabulary.reader(type)
-                        .read(TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)),
-                                IdentifierPolicy.none(), (slot, slotType, reference, cell) -> { }, false)), null,
-                vocabulary.schema().entries()::get, definitionGetter, null, SchemaPositions.none(), facts,
-                n -> true, vocabulary.compiledSchema()::isKernel);
+        ConstructionReader reader = new ConstructionReader() {
+
+            @Override
+            public Top read(String type, DataValue value) {
+                return (Top) vocabulary.reader(type).read(context(value));
+            }
+
+            @Override
+            public Object readValue(String type, DataValue value) {
+                return vocabulary.compiledSchema().get(type).read(context(value));
+            }
+
+            private static TsonReadContext context(DataValue value) {
+                return TsonReadContext.schemaDocument(new ListEventSource(DataValueEvents.of(value)),
+                        IdentifierPolicy.none(), (slot, slotType, reference, cell) -> { }, false);
+            }
+        };
+        return new DefinitionResolver(reader, null, vocabulary.schema().entries()::get, definitionGetter, null,
+                SchemaPositions.none(), facts, n -> true, vocabulary.compiledSchema()::isKernel);
     }
 
     /** The facts {@link #resolveSnippet} and {@link #resolveSnippetsAgainstMetaKernel} recorded. */
@@ -843,40 +859,21 @@ class DefinitionResolverTest {
         assertTrue(composed.getMessage().contains("'port'"), composed.getMessage());
     }
 
-    // ── The ^ refinement operator (§5.7): set ─────────────────────────────
-    //    A refinement re-emits the ENTIRE inherited field set (no new fields), tightening
-    //    only the fields the body actually names -- verified end-to-end against the real
-    //    fixture, resolving "array" first so each refinement's own source is visible.
+    // ── An incomplete entry of the kernel's (§5.5): set_type ──────────────
 
     @Test
-    void resolvesSetFromTheRealMetaKernelFixtureRefiningArray() throws IOException, DataBindException {
-        // set => array ^ { state: = REQUIRED  ordered: = false  unique_items: = true } --
-        // array's own state/ordered/unique_items were REQUIRED_DEFAULT; set's body fixes them,
-        // an allowed REQUIRED_DEFAULT -> REQUIRED_FIXED transition (§5.7's table).
+    void metaSetTypeIsAnArrayLeftOpenItsElementTypeAbsent() throws IOException {
+        // set_type => !meta.array ^ { voidable: false  ordered: false  unique_items: true }: a construction left
+        // open, no type and no constructor, each written field read where it is written.
         resolveUpToArray();
+        Top set = definitionResolverFor(compiledKernel(), resolved::get)
+                .resolve(schemaMapFromFixture().declarations().get("meta.set_type"));
 
-        Top set = resolver.resolve(schemaMapFromFixture().declarations().get("meta.set_type"));
-
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(set, n -> true));
-        assertEquals(List.of(), OpenEntry.parameterNames(set), "the container constructors carry no parameters");
-        assertTrue(TypeChain.supertypesOf(set).contains("meta.top"), "a constructor: IS-A meta.top");
-        assertEquals(List.of("meta.array", "meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(set));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.array\" \"meta.product\" \"meta.top\" \"meta.type\" ] "
-                        + "subtypes: [] } parameters: [] fields: { \"chain\" => { type: meta.type_chain optional: true "
-                        + "voidable: false "
-                        + "role: "
-                        + "\"FREE\" } \"access_pattern\" => { type: meta.product_access_type optional: true voidable: false "
-                        + "role: \"FIXED\" value: INDEX } \"size_type\" => { type: meta.product_size_type optional: true "
-                        + "voidable: false role: \"FIXED\" value: VARIABLE } \"element_type\" => { type: meta.type_expr "
-                        + "optional: false voidable: false role: \"FREE\" } \"voidable\" => { type: boolean optional: "
-                        + "true voidable: false role: \"FIXED\" value: false } \"ordered\" => { type: boolean optional: "
-                        + "true voidable: false role: \"FIXED\" value: false } \"unique_items\" => { type: boolean "
-                        + "optional: true voidable: false role: \"FIXED\" value: true } \"min_items\" => { type: "
-                        + "numeric.count optional: true voidable: false role: \"FREE\" } \"max_items\" => { "
-                        + "type: numeric.count optional: true voidable: false role: \"FREE\" } } groups: [] "
-                        + "extension: "
-                        + "\"OPEN\" discriminators: [] }",
-                write(set));
+        IncompleteEntry incomplete = assertInstanceOf(IncompleteEntry.class, set);
+        assertEquals("meta.array", incomplete.constructor());
+        assertEquals(List.of("element_type"), incomplete.absent());
+        assertEquals(Map.of("voidable", false, "ordered", false, "unique_items", true), incomplete.read());
+        assertEquals(List.of(), incomplete.bases());
     }
 
     /**
@@ -913,9 +910,10 @@ class DefinitionResolverTest {
         resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
         Top enumType = resolver.resolve(schemaMap.declarations().get("meta.enum_type"));
         resolved.put("meta.enum_type", enumType);
-        Top enumDef = resolver.resolve(schemaMap.declarations().get("enum"));
+        Top enumDef = definitionResolverFor(compiledKernel(), resolved::get)
+                .resolve(schemaMap.declarations().get("enum"));
 
-        // enum_type => atom & { type: meta.type_name  members: meta.enum_set }: the constructor, `type` required.
+        // enum_type => atom & { name_type: meta.identifier_ref  members: meta.enum_set }: the constructor.
         assertEquals(EntryKind.ATOM, EntryKind.of(enumType, n -> true));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
                 + "parameters: [] "
@@ -925,26 +923,19 @@ class DefinitionResolverTest {
                         + "[] "
                         + "extension: \"OPEN\" discriminators: [] }",
                 write(enumType));
-        // enum => enum_type ^ { name_type?: = meta.identifier }: a constructor tightening, `name_type` pinned and
-        // injected, so `members` is the one unmarked field and `!enum [A B]` stays the positional form.
-        assertEquals(EntryKind.ATOM, EntryKind.of(enumDef, n -> true));
-        assertEquals(List.of("meta.atom", "meta.enum_type", "meta.top", "meta.type"), TypeChain.supertypesOf(enumDef));
-        assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.enum_type\" \"meta.top\" \"meta.type\" ] "
-                        + "subtypes: [] } parameters: [] fields: { \"chain\" => { type: meta.type_chain optional: true "
-                        + "voidable: false "
-                        + "role: "
-                        + "\"FREE\" } \"name_type\" => { type: meta.identifier_ref optional: true voidable: false role: "
-                        + "\"FIXED\" value: meta.identifier } \"members\" => { type: meta.enum_set optional: false "
-                        + "voidable: false "
-                        + "role: \"FREE\" } } groups: [] extension: \"OPEN\" discriminators: [] }",
-                write(enumDef));
+        // enum => !meta.enum_type ^ { name_type: meta.identifier }: its construction left open, `members` absent, so
+        // `!enum [A B]` is the positional form of its completion.
+        IncompleteEntry incomplete = assertInstanceOf(IncompleteEntry.class, enumDef);
+        assertEquals("meta.enum_type", incomplete.constructor());
+        assertEquals(List.of("members"), incomplete.absent());
+        assertEquals(Map.of("name_type", io.ltr8.tson.schema.meta.TypeRef.of("meta.identifier")), incomplete.read());
     }
 
     // ── Constructor application (§5.5, §5.6, Phase B step 4) ──────────────
 
     @Test
     void resolvesProductAccessTypeInstanceFromTheRealMetaKernelFixture() throws IOException {
-        // product_access_type => !enum [INDEX NAMED] -- enum itself is declared *later* in the
+        // product_access_type => !enum [INDEX NAMED], completing `enum` -- which is declared *later* in the
         // real file, so it's resolved into `resolved` by hand here first (DefinitionResolver has no
         // forward-reference support of its own; KernelBootstrapResolver's own two-pass ordering is what
         // handles that for the whole file -- see its class Javadoc).
@@ -953,19 +944,21 @@ class DefinitionResolverTest {
         resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
         resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
         resolved.put("meta.enum_type", resolver.resolve(schemaMap.declarations().get("meta.enum_type")));
-        resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
 
-        // "enum" (the constructor bindAtomInstance reads against) is compiled from the full the kernel
+        // "meta.enum_type" (the constructor bindAtomInstance reads against) is compiled from the full kernel
         // rather than from this test's own narrow `resolved` map, which holds none of the entries its
         // fields name.
         TsonCompiledVocabulary kernelVocabulary = compiledKernel();
         DefinitionResolver accessResolver = definitionResolverFor(kernelVocabulary, resolved::get);
+        resolved.put("enum", accessResolver.resolve(schemaMap.declarations().get("enum")));
         Top accessType = accessResolver.resolve(schemaMap.declarations().get("meta.product_access_type"));
 
         assertEquals(EntryKind.ATOM, EntryKind.of(accessType, n -> true));
         assertFalse(TypeChain.supertypesOf(accessType).contains("meta.top"), "an instance: IS-A stops at construction");
         assertEquals(List.of(), TypeChain.supertypesOf(accessType));
-        assertEquals(Optional.of("enum"), accessResolver.factsOf("meta.product_access_type").constructor());
+        assertEquals(Optional.of("meta.enum_type"), accessResolver.factsOf("meta.product_access_type").constructor());
+        assertEquals(Optional.of(new io.ltr8.tson.schema.meta.Completion(List.of("enum"))),
+                accessResolver.completionOf("meta.product_access_type"));
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), accessType);
     }
 
@@ -974,7 +967,7 @@ class DefinitionResolverTest {
      * bare array element carries no type-ref of its own, so an identification-first binder would
      * misidentify {@code "true"}/{@code "false"} as real Java booleans before ever treating them as
      * enum member text. {@code bindAtomInstance}'s own compiled-reader dispatch is schema-driven
-     * (looked up by the constructor's own name, {@code enum}, fixed at compile time) rather than
+     * (looked up by the constructor's own name, {@code meta.enum_type}, fixed at compile time) rather than
      * token-identification-driven, so {@code "true"}/{@code "false"} are read correctly as the
      * enum's own raw member text, the same as every other real enum instance. {@link
      * KernelBootstrapResolver} builds the kernel's {@code boolean} by hand, it being on the kernel's
@@ -987,11 +980,10 @@ class DefinitionResolverTest {
         resolved.put("meta.type", resolver.resolve(schemaMap.declarations().get("meta.type")));
         resolved.put("meta.atom", resolver.resolve(schemaMap.declarations().get("meta.atom")));
         resolved.put("meta.enum_type", resolver.resolve(schemaMap.declarations().get("meta.enum_type")));
-        resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
 
-        TsonCompiledVocabulary kernelVocabulary = compiledKernel();
-        Top booleanDef = definitionResolverFor(kernelVocabulary, resolved::get).resolve(
-                schemaMap.declarations().get("boolean"));
+        DefinitionResolver kernelResolver = definitionResolverFor(compiledKernel(), resolved::get);
+        resolved.put("enum", kernelResolver.resolve(schemaMap.declarations().get("enum")));
+        Top booleanDef = kernelResolver.resolve(schemaMap.declarations().get("boolean"));
 
         assertEquals(new EnumBody(List.of("true", "false")), booleanDef);
     }
@@ -1155,7 +1147,7 @@ class DefinitionResolverTest {
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("needs an atom-family instance to narrow"),
+        assertTrue(thrown.getMessage().contains("needs an atom instance, an array or a map type to narrow"),
                 thrown.getMessage());
     }
 

@@ -44,10 +44,7 @@ import java.util.stream.Stream;
  * shape of the {@code *Body} class that represents a bound instance of it ({@link
  * io.ltr8.tson.schema.meta.RecordBody}, {@link io.ltr8.tson.schema.meta.ArrayBody}, ...), and each such class's own
  * {@code @Typename} is the constructor's path, so the schema-name-to-class direction needs the {@code "_body"}
- * suffix added explicitly ({@link #ALIASES}: {@code meta.record} is {@code meta.RecordBody}). A constructor that
- * tightens another -- {@code meta.set_type} over {@code meta.array}, {@code enum} over {@code meta.enum_type} -- needs
- * no alias: it restates fields and adds none, and the bind lookup falls back along its chain to the constructor it
- * tightens ({@code ValueReaderContext.bindingNamesFor}).
+ * suffix added explicitly ({@link #ALIASES}: {@code meta.record} is {@code meta.RecordBody}).
  *
  * <p>Some entries resolve to a class that is not a record: {@code meta.atom}/{@code meta.product}/{@code
  * meta.sum}/{@code meta.top} mangle to the sealed marker interfaces {@link io.ltr8.tson.schema.meta.Atom}/{@link
@@ -117,7 +114,7 @@ public final class SchemaModelNameBinder {
      *
      * <p>Composition, never replacement: a name in {@link #INSTANCE}'s vocabulary binds there and {@code
      * additional} is asked for every other name ({@link #extendedWith}). So a consumer cannot shadow {@code
-     * record}/{@code enum}, and cannot lose {@link ResolverBindContext}'s registrations by building a context
+     * meta.record}/{@code meta.enum_type}, and cannot lose {@link ResolverBindContext}'s registrations by building a context
      * that forgets them -- what the extension adds is names, and nothing else.
      */
     public static DataBindContext contextExtendedWith(DataNameBinder additional) {
@@ -142,8 +139,7 @@ public final class SchemaModelNameBinder {
      * binder half of {@link #contextExtendedWith}, for a caller assembling a {@link DataBindContext} themselves.
      *
      * <p>Decided by the name, never by a failed lookup: a vocabulary name {@link #INSTANCE} binds no class for
-     * ({@code enum}, {@code set}) is still not the consumer's, so the bind lookup moves on to the constructor it
-     * tightens rather than to a consumer class of that name; and a name outside the vocabulary never reaches the
+     * ({@code enum}, {@code set}) is still not the consumer's; and a name outside the vocabulary never reaches the
      * schema model, whatever class it would mangle to. A {@link DataBindException} from {@code additional}
      * propagates as it stands: it names what that consumer's own binder searched, which is where the name was
      * expected to be.

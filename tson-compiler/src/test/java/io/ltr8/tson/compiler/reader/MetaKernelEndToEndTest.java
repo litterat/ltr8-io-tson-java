@@ -69,7 +69,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(82, registered.entries().size());
+        assertEquals(83, registered.entries().size());
     }
 
     /**
@@ -93,13 +93,12 @@ class MetaKernelEndToEndTest {
 
     @Test
     void readsEnumsOwnMembersFieldAgainstRealData() {
-        // enum => enum_type ^ { name_type?: = meta.identifier }: the pinned `name_type` is injected, and `members` reads
-        // through meta.enum_set, a genuine ArrayBody.
+        // `members` reads through meta.enum_set, a genuine ArrayBody.
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("enum")
-                .read(TestDocuments.document("{ members: [true false] }")));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("meta.enum_type")
+                .read(TestDocuments.document("{ name_type: meta.identifier  members: [true false] }")));
 
         assertEquals(List.of("true", "false"), result.get("members"));
     }

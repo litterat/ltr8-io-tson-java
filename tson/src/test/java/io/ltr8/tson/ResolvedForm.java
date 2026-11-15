@@ -133,10 +133,11 @@ final class ResolvedForm {
 
     /**
      * Annotation names a key comparison leaves out: {@code doc}, which the resolver carries from the source and
-     * a fixture leaves out of its entries, being compared rather than read, and {@code application}, which
-     * {@link #markedApplications} compares on its own terms.
+     * a fixture leaves out of its entries, being compared rather than read, and {@code application} and {@code
+     * completion}, which {@link #markedApplications} and {@link #markedCompletions} compare on their own terms.
      */
-    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", TsonSchema.APPLICATION);
+    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", TsonSchema.APPLICATION,
+            TsonSchema.COMPLETION);
 
     /**
      * Each schema-map key's {@code @meta.application} in a §8 resolved-schema document, as the reference's canonical text,
@@ -169,6 +170,45 @@ final class ResolvedForm {
             }
         });
         return marked;
+    }
+
+    /**
+     * Each schema-map key's {@code @meta.completion} in a §8 resolved-schema document, as the names it lists in order,
+     * read from the text parsed as data, as {@link #markedApplications} reads an application.
+     */
+    static Map<String, List<String>> markedCompletions(String resolvedText) {
+        Map<String, List<String>> marked = new TreeMap<>();
+        for (Map.Entry<String, MapValue.MapEntry> keyed : entries(resolvedText).entrySet()) {
+            keyed.getValue().key().annotations().stream()
+                    .filter(annotation -> annotation.name().equals(TsonSchema.COMPLETION))
+                    .forEach(annotation -> marked.put(keyed.getKey(),
+                            writtenCompletion(annotation.value().orElseThrow().coreValue())));
+        }
+        return marked;
+    }
+
+    /** The same, from this resolver: the {@code @meta.completion} on the keys of the schema's own entries. */
+    static Map<String, List<String>> ourCompletions(Tson tson, String id) {
+        var linked = tson.bindRegistry().core().resolveLinked(id);
+        String canonical = CanonicalIdentity.canonicalize(id);
+        Map<String, List<String>> marked = new TreeMap<>();
+        linked.schema().entries().keySet().forEach(name -> {
+            if (linked.originOf(name).equals(canonical)) {
+                linked.schema().completionOf(name).ifPresent(completion -> marked.put(name, completion.of()));
+            }
+        });
+        return marked;
+    }
+
+    /** A written completion, {@code { of: [capped bounded] }}, as the names it lists. */
+    private static List<String> writtenCompletion(CoreValue value) {
+        for (RecordValue.Field field : ((RecordValue) value).fields()) {
+            if (field.name().equals("of")) {
+                return ((ArrayValue) field.value().coreValue()).elements().stream()
+                        .map(element -> ((TokenValue) element.coreValue()).text()).toList();
+            }
+        }
+        throw new IllegalArgumentException("a completion states 'of': " + value);
     }
 
     /**
@@ -225,7 +265,7 @@ final class ResolvedForm {
         String canonical = CanonicalIdentity.canonicalize(id);
         Map<String, List<String>> keys = new TreeMap<>();
         entries.forEach((name, definition) -> {
-            if (linked.originOf(name).equals(canonical)) {
+            if (linked.originOf(name).equals(canonical) && !incomplete(name, linked)) {
                 keys.put(name, entries.getAnnotations(name).values().stream()
                         .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
                         .map(annotation -> "@" + annotation.name()

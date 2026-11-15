@@ -151,7 +151,7 @@ class OpenRecordShapeTest {
                 """)).getMessage();
 
         assertTrue(constructor.contains("a template's body is a record body")
-                && constructor.contains("declare a refined constructor"), constructor);
+                && constructor.contains("leave its construction open"), constructor);
         assertTrue(sugar.contains("'[T]' is an array") && sugar.contains("meta.array<T>"), sugar);
         assertTrue(choice.contains("is a choice") && choice.contains("field group"), choice);
         assertTrue(tuple.contains("is a tuple"), tuple);

@@ -160,6 +160,10 @@ class Class2ConformanceSuiteTest {
                 assertEquals(ResolvedForm.markedApplications(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourApplications(tson, identityOf(source)),
                         "the entries' @meta.application are not the ones the vector states");
+                // §8.1's other key annotation: each declared completion states the incomplete entries it closed.
+                assertEquals(ResolvedForm.markedCompletions(fieldText(outcomePayload(sidecar), "resolved")),
+                        ResolvedForm.ourCompletions(tson, identityOf(source)),
+                        "the entries' @meta.completion are not the ones the vector states");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
             case "refused" -> assertRefused(sidecar, problems, "schema");

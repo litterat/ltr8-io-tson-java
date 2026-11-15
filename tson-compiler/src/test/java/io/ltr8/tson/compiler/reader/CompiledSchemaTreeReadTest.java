@@ -64,7 +64,8 @@ class CompiledSchemaTreeReadTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) read(compiled, "{ members: [true false] }", "enum");
+        Map<String, Object> result = (Map<String, Object>) read(compiled,
+                "{ name_type: meta.identifier  members: [true false] }", "meta.enum_type");
 
         assertEquals(List.of("true", "false"), result.get("members"));
     }

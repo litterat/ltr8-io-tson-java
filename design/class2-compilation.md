@@ -52,7 +52,8 @@ choices. Current form only; history lives in git.
   alias hops, on the `TypeInline` the wrapper's own reader built. A natural reader's guess at an inline type's host
   class is its constructor's shape (`BindTargets.hostType`).
 - The writer (`DataClassObjectWriter`) writes a `TypeInline` as the untagged wrapper with its body under the recorded
-  constructor, `{ of: !meta.set_type { … } }`, never under the `@Typename` of the body's class.
+  constructor, never under the `@Typename` of the body's class: a schema's own constructor of arrays writes
+  `{ of: !list_type { … } }`.
 - A bind lookup redirects through an alias only for a derived entry (one with no source position).
 
 Related: `design/linking-and-compilation.md`, `design/choice-disjointness.md`, `design/compiled-registries.md`,
@@ -161,13 +162,12 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   named by content (§8.2 — resolver-chosen, fresh, unreachable from source), so a binding map cannot be keyed
   on one: the hash is not knowable when the map is written, and a generator emitting bindings cannot invent
   it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
-  an `ALIAS` body, in declaration order, then the entry's own name, then — for a constructor tightening
-  another — that constructor's, up its chain — and `RecordBindReader` and `TupleBindReader` try them in that
-  order, so `ping => msg_of<"ping", ping_body>` binds under `ping`, and `meta.set_type`, `enum` and a meta
-  layer's `kebab_enum => meta.enum_type ^ { name_type?: = kebab }` bind as the constructor they tighten: a tightening
-  restates fields and adds none (§5.7), so the source's class is theirs. It is tried last, and confined to
-  constructors — an ordinary record refining another may be bound to a narrower class, and falling back to
-  its parent's would lose that silently.
+  an `ALIAS` body, in declaration order, then the entry's own name — and `RecordBindReader` and `TupleBindReader`
+  try them in that order, so `ping => msg_of<"ping", ping_body>` binds under `ping`. Nothing falls back along a
+  chain: a refined constructor has no class of its own, so its instance is a gap, and the kernel's set and enum are
+  incomplete entries, whose completions are the constructor's own construction (§5.5). Lost: binding a tightening as
+  the constructor it tightens, which an ordinary record refining another could not share without losing a narrower
+  class silently.
   **Only a derived entry is reached this way**, which is the test `EntryDisplayName` already applies: an entry
   with a source position was declared, so its own name is the one the author wrote and an alias naming it must
   never redirect its binding. The index is built once per compile beside `namesMeaning`, for that one's

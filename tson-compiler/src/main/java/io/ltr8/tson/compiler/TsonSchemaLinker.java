@@ -1391,9 +1391,8 @@ public final class TsonSchemaLinker {
                                        Function<String, Optional<String>> constructors,
                                        Function<String, String> shown, ValuesByName byName) {
         checkOpenEntryUsesEveryParameter(name, def);
-        // A chain reaches a constructor whenever a refinement derives from one -- the kernel's own `set_type =>
-        // array ^ {...}` resolves with [array, product, top, type] -- and every name on it is in the one namespace,
-        // the defining schema's closure being inside the importer's (§2.2.3).
+        // Every name on a chain is in the one namespace, the defining schema's closure being inside the
+        // importer's (§2.2.3).
         for (String supertype : TypeChain.supertypesOf(def)) {
             if (!namespace.containsKey(supertype)) {
                 throw new SchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");

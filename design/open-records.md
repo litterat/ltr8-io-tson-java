@@ -32,7 +32,7 @@ application of one closes is `design/template-materialisation.md`'s. Current for
 - **A template's body is a record body**: braces, a composition (`base & { … }`, an applied parent included) or a
   refinement. A parameter list before anything else is refused at the declaration with the remedy in the message --
   before a sugar form or a bare reference by `SchemaDesugarer.refuseTemplateBody`, before a construction by
-  `DefinitionResolver.openInstance` (a constructor: write the application or declare a refined constructor; an
+  `DefinitionResolver.openInstance` (a constructor: write the application or leave its construction open and complete it; an
   ordinary type: one value per instantiation). The one construction admitted is `<T> !meta.record { … }`
   (`DefinitionResolver.openRecord`).
 - **Recognising a parameter by its name is sound because the shadowing rule refuses the other reading**

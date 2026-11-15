@@ -39,6 +39,7 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.Completion;
 import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
@@ -279,6 +280,9 @@ final class DefinitionResolver {
      */
     private final Map<String, TsonSchema.EntryFacts> facts;
 
+    /** What each declared completion closed ({@link #completionOf}). */
+    private final Map<String, Completion> completions = new LinkedHashMap<>();
+
     /** The judgements left for after every entry is ready ({@link #judgeDeferred}). */
     private final List<Deferred> deferred = new ArrayList<>();
 
@@ -355,6 +359,14 @@ final class DefinitionResolver {
         declaration.parameterTypes().forEach((parameter, written) -> bounded.put(parameter,
                 new Param(parameter, Optional.of(parameterType(parameter, written)))));
         return OpenEntry.withParameters(resolved, bounded);
+    }
+
+    /**
+     * The incomplete entries {@code name}'s declaration completed, nearest first, where it is a completion: what its
+     * key states as {@code @meta.completion} ([TSON-SCHEMA] §8.1).
+     */
+    Optional<Completion> completionOf(String name) {
+        return Optional.ofNullable(completions.get(name));
     }
 
     /** {@code name}'s facts as resolution has recorded them so far. */
@@ -456,7 +468,7 @@ final class DefinitionResolver {
             if (annotationsResolve && vocabularyDefinitions.definition(annotation.name()) == null) {
                 throw unresolvedAnnotation(name, annotation.name());
             }
-            refuseWrittenApplication(name, annotation.name());
+            refuseDerivedAnnotation(name, annotation.name());
             if (annotation.value().isEmpty()) {
                 bindAnnotationValue(name, annotation.name(), VOID);
             }
@@ -744,7 +756,7 @@ final class DefinitionResolver {
         String target = instance.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
         if (head.definition() instanceof IncompleteEntry incomplete) {
-            return complete(name, target, incomplete, instance.value(), desugared);
+            return complete(name, target, head.name(), incomplete, instance.value(), desugared);
         }
         refuseDeclaredApplication(name, head, instance.value());
         refuseWrittenParameters(name, head, instance.value());
@@ -869,18 +881,26 @@ final class DefinitionResolver {
     }
 
     /**
-     * Refuses an author-written {@code @meta.application}: the kernel's annotation is the resolver's, stating on an
-     * entry's key the application it is the instantiation of (§8.2), as {@code chain} states where it sits -- so
-     * a declaration writing it makes a claim no declaration can make. Judged by where the name is defined, so a
+     * Refuses an author-written {@code @meta.application} or {@code @meta.completion}: each is the resolver's,
+     * stating on an entry's key what its declaration closed (§8.1, §8.2), as {@code chain} states where it sits -- so
+     * a declaration writing one makes a claim no declaration can make. Judged by where the name is defined, so a
      * meta layer's own annotation of that name is its own.
      */
-    private void refuseWrittenApplication(String name, String annotation) {
-        if (TsonSchema.APPLICATION.equals(annotation) && vocabularyDefinitions.definition(annotation) != null
-                && vocabularyKernel.test(annotation)) {
+    private void refuseDerivedAnnotation(String name, String annotation) {
+        if (vocabularyDefinitions.definition(annotation) == null || !vocabularyKernel.test(annotation)) {
+            return;
+        }
+        if (TsonSchema.APPLICATION.equals(annotation)) {
             throw new SchemaValidationException("'" + name + "': '@meta.application' is written, which a declaration "
                     + "never writes -- it is the application an entry is the instantiation of, which the resolver "
                     + "states on the key of every entry that closes one (§8.2). Write the application itself: '"
                     + name + " => template<arguments>'");
+        }
+        if (TsonSchema.COMPLETION.equals(annotation)) {
+            throw new SchemaValidationException("'" + name + "': '@meta.completion' is written, which a declaration "
+                    + "never writes -- it is the incomplete entries an entry's declaration completed, which the "
+                    + "resolver states on the key of every declared completion (§8.1). Write the completion itself: '"
+                    + name + " => entry<arguments>' or '" + name + " => !entry { ... }'");
         }
     }
 
@@ -940,7 +960,8 @@ final class DefinitionResolver {
      * {@code <T> !C value} -- a parameter list before a construction. A template's body is a record body ([TSON-SCHEMA]
      * §5.10), so it is admitted before {@code record} alone, past its alias hops: {@code <T> !meta.record { … }} is the
      * explicit spelling of an open record ({@link #openRecord}). Before a constructor it is refused with what to write
-     * instead -- the application where it is used, or a refined constructor applied -- and before an ordinary type,
+     * instead -- the application where it is used, or its construction left open and completed -- and before an
+     * ordinary type,
      * whose value is no record body at all, with one declaration per instantiation.
      */
     private Top openInstance(String name, Instance template) {
@@ -952,12 +973,12 @@ final class DefinitionResolver {
         String prefix = "'" + name + "': a template's body is a record body -- braces, a composition or a refinement "
                 + "(§5.10) -- and '!" + target + " { ... }' ";
         if (EntryKind.isConstructor(head.name(), head.definition(), vocabularyKernel)) {
-            String refined = head.name().equals(KernelNames.of("array"))
-                    ? "'nonempty_type => " + target + " ^ { min_items?: = 1 }'"
-                    : "'my_" + target.substring(target.lastIndexOf('.') + 1) + " => " + target + " ^ { ... }'";
+            String open = head.name().equals(KernelNames.of("array"))
+                    ? "'nonempty => !" + target + " ^ { min_items: 1 }'"
+                    : "'my_" + target.substring(target.lastIndexOf('.') + 1) + " => !" + target + " ^ { ... }'";
             throw new SchemaValidationException(prefix + "constructs '" + target + "'. Write the application where it "
-                    + "is used ('" + target + "<...>'), or declare a refined constructor (" + refined
-                    + ") and apply it");
+                    + "is used ('" + target + "<...>'), or leave its construction open (" + open
+                    + ") and complete it where it is used");
         }
         throw new SchemaValidationException(prefix + "is a value of the type '" + target + "', no type, and a "
                 + "template over a value is no record. Declare one value per instantiation ('order_api => !" + target
@@ -1195,7 +1216,7 @@ final class DefinitionResolver {
         // either, and `integer_type` is ATOM-kinded exactly like its instances. It is also how the reader
         // stack decides everything of this shape (`Subsumption`), rather than trusting a stated kind.
         if (source instanceof IncompleteEntry incomplete) {
-            return refineIncomplete(name, refinement.target(), incomplete, refinement.bindings());
+            return refineIncomplete(name, refinement.target(), sourceName, incomplete, refinement.bindings());
         }
         if (ConstructionSugar.constructs(sourceName, source)) {
             return constructOpen(name, refinement.target(), sourceName, (RecordBody) source, refinement.bindings());
@@ -1207,12 +1228,16 @@ final class DefinitionResolver {
             // The construction hint is offered only where construction would actually work, which is the
             // same applicability question (§4.1) -- so `top`, not applicable, gets the plain answer rather
             // than advice that would fail in turn.
-            throw new SchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an "
-                    + "atom-family instance to narrow (§5.5), and '" + sourceName + "' is "
+            throw new SchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an atom "
+                    + "instance, an array or a map type to narrow, or a constructor of types to build from (§5.5), and '"
+                    + sourceName + "' is "
                     + (EntryKind.isConstructor(sourceName, source, kernel)
                             ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
                                     + "constructor application ('!" + sourceName + " { ... }')?"
-                            : "kind=" + EntryKind.of(source, kernel) + ", which has no atom constraints to tighten"));
+                            : source instanceof RecordBody
+                                    ? "a record, refined without '!': '" + sourceName + " ^ { ... }' (§5.7)"
+                                    : "kind=" + EntryKind.of(source, kernel) + ", which is finished and takes no "
+                                            + "refinement"));
         }
         // The tag the source's value carries, and failing a recorded one the constructor its class is the body
         // of -- every resolved instance records its tag, and a hand-assembled one is the class's own.
@@ -1252,14 +1277,15 @@ final class DefinitionResolver {
         Map<String, Object> read = readEachField(name, constructorName, constructor, written);
         constructedBy(name, constructorName);
         return new IncompleteEntry(constructorName, absent,
-                IncompleteEntries.record(payload, constructorName, written), read);
+                IncompleteEntries.record(payload, constructorName, written), read, List.of());
     }
 
     /**
      * {@code !X ^ { … }}, {@code X} incomplete: the fields {@code X} has not written, a required one left absent. The
      * result is another incomplete entry, with no IS-A to {@code X}.
      */
-    private Top refineIncomplete(String name, String target, IncompleteEntry base, DataValue bindings) {
+    private Top refineIncomplete(String name, String target, String baseName, IncompleteEntry base,
+                                 DataValue bindings) {
         RecordBody constructor = constructorOf(name, base);
         refuseWrittenChain(name, target + " ^", bindings);
         DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
@@ -1269,16 +1295,18 @@ final class DefinitionResolver {
         IncompleteEntries.requireWrittenOnce(name, target, base, written);
         Map<String, Object> read = readEachField(name, base.constructor(), constructor, written);
         constructedBy(name, base.constructor());
-        return IncompleteEntries.refined(name, target, base, payload, written, read);
+        return IncompleteEntries.refined(name, target, base, payload, written, read, baseName);
     }
 
     /**
      * {@code !X { … }}, {@code !X [ … ]} or a declaration's {@code X<A …>}, {@code X} incomplete: the plain
      * construction of {@code X}'s constructor over what {@code X} writes and what the completion adds, read whole by
      * that constructor's reader. It carries no chain: a completion is equal to the same construction written
-     * directly.
+     * directly. What it closed, {@code baseName} and {@code base}'s bases, is recorded for its key ({@link
+     * #completionOf}).
      */
-    private Top complete(String name, String target, IncompleteEntry base, DataValue payload, boolean desugared) {
+    private Top complete(String name, String target, String baseName, IncompleteEntry base, DataValue payload,
+                         boolean desugared) {
         RecordBody constructor = constructorOf(name, base);
         refuseWrittenChain(name, target, payload);
         DataValue body = IncompleteEntries.completed(name, target, base, constructor,
@@ -1288,6 +1316,7 @@ final class DefinitionResolver {
         refuseWrittenParameters(name, head, body);
         Top built = asWritten(bindAtomInstance(name, body, target), body);
         constructedBy(name, base.constructor());
+        completions.put(name, new Completion(IncompleteEntries.closedThrough(baseName, base)));
         return built;
     }
 
@@ -2026,18 +2055,16 @@ final class DefinitionResolver {
     // ── Refinement (§5.7): T ^ { ... } ─────────────────────────────────────
 
     /**
-     * {@code source ^ { ... }} (optionally {@code ~}-marked and/or parameterized, e.g. {@code
-     * set => <T> ~array<T> ^ { state: = REQUIRED ... }}): copies the *entire* inherited field set
-     * and any groups from the (already-resolved) source's own {@link RecordBody} -- unlike
-     * composition, refinement never adds fields, so every body entry MUST tighten one of them
-     * ({@link #resolveTighteningField}, the same machinery composition-body tightening uses); a
-     * body field naming nothing inherited is a resolver error (§5.7: "adding fields is a resolver
-     * error"), as is a group naming no inherited group. A group that <em>does</em> name one restates it
-     * (§5.11, {@link #restatesInheritedGroup}). The chain accumulates by the same induction composition
-     * uses: {@code [sourceName] + source.supertypes}, deduplicated -- {@code set_type}'s own {@code [array,
-     * product, top, type]}. A template's body keeps the source as its one written parent instead, which closing
-     * completes ({@link Ancestry}). The kind is determined the same way composition determines it (the
-     * transitive chain's literal atom/product/sum name, not the source's own resolved kind).
+     * {@code source ^ { ... }}, optionally parameterized, {@code x => box<text> ^ { ... }}: copies the *entire*
+     * inherited field set and any groups from the (already-resolved) source's own {@link RecordBody} -- unlike
+     * composition, refinement never adds fields, so every body entry MUST tighten one of them ({@link
+     * #resolveTighteningField}, the same machinery composition-body tightening uses); a body field naming nothing
+     * inherited is a resolver error (§5.7: "adding fields is a resolver error"), as is a group naming no inherited
+     * group. A group that <em>does</em> name one restates it (§5.11, {@link #restatesInheritedGroup}). The chain
+     * accumulates by the same induction composition uses: {@code [sourceName] + source.supertypes}, deduplicated. A
+     * template's body keeps the source as its one written parent instead, which closing completes ({@link Ancestry}).
+     * The kind is determined the same way composition determines it (the transitive chain's literal atom/product/sum
+     * name, not the source's own resolved kind).
      */
     private Built resolveRefinement(String name, RefinedDef refined, List<String> parameters) {
         if (refined.target() instanceof ApplicationRef generic && (namesOwnParameter(generic, parameters)
@@ -2145,12 +2172,9 @@ final class DefinitionResolver {
 
         determineKind(name, transitiveSupertypes);
         // §5.7's one written parent: an open record keeps it in its chain, as a closed declaration keeps an applied
-        // one for SchemaResolver's fold, and a closed refinement of a name records it as a fact, since its chain
-        // cannot tell `^` from a composition adding nothing (TsonSchema.EntryFacts).
+        // one for SchemaResolver's fold.
         TypeChain chain = TypeChain.of(transitiveSupertypes);
-        if (parameters.isEmpty() && source instanceof io.ltr8.tson.schema.meta.TypeRef named) {
-            facts.put(name, factsOf(name).withRefines(Optional.of(named.name())));
-        } else {
+        if (!parameters.isEmpty() || !(source instanceof io.ltr8.tson.schema.meta.TypeRef)) {
             chain = chain.withParents(List.of(source));
         }
         return new Built(chain, fields, groups, markedNames(refined.body().entries()), nameType);

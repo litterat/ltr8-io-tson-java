@@ -21,7 +21,7 @@ import java.util.function.Function;
  * kernel does and whatever makes one from what an author wrote asks {@link #refusal} before it is used:
  * <ul>
  *   <li>a construction of a container, a tuple, a choice or a reference ({@link #constructible}): an {@link
- *       ArrayBody} ({@code meta.array}, and {@code meta.set_type} refining it), a {@link MapBody}, a {@link
+ *       ArrayBody} ({@code meta.array}), a {@link MapBody}, a {@link
  *       TupleBody}, a {@link ChoiceBody} or a {@link RefBody} ({@code meta.ref});</li>
  *   <li>a closed {@link RecordBody}, under {@code meta.record}: the record an application of an open record closes to
  *       at a type slot ([TSON-SCHEMA] §5.10), or one a resolved form states.</li>
@@ -35,7 +35,8 @@ import java.util.function.Function;
  * tag, are declared and named.
  *
  * <p><b>{@code constructor} is the tag on {@code of}</b>, the entry the construction applies, past its alias hops
- * ([TSON-SCHEMA] §8.3): {@code set<T>} is {@code { of: !meta.set_type { element_type: T } }}, {@code meta.ref<T>} is
+ * ([TSON-SCHEMA] §8.3): {@code set<T>} is {@code { of: !meta.array { element_type: T  ordered: false  unique_items: true
+ * } }}, {@code meta.ref<T>} is
  * {@code { of: !meta.ref { of: T } }}, and a schema's own {@code nonempty_type<uuid>} is {@code { of: !nonempty_type {
  * element_type: uuid } }}. It is no field of the wrapper -- the kernel's {@code type_inline} declares {@code of} alone
  * -- so it is {@code @Unbound}, held beside the body as a declared entry's tag is held beside its value ({@code
@@ -195,6 +196,8 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound ApplyBod
             case RecordBody record -> application != null ? application.text() : fields(record, slot);
             case DependentBody dependent -> dependent.text();
             case ApplyBody apply -> apply.text();
+            case ArrayBody array when constructor.equals("meta.array") && isSet(array) ->
+                    "set<" + slot.apply(array.elementType()) + ">";
             case ArrayBody array when constructor.equals("meta.array") -> "[" + slot.apply(array.elementType())
                     + (array.voidable() ? "?" : "") + size(array.minItems(), array.maxItems()) + "]";
             case MapBody map when constructor.equals("meta.map") -> "{" + slot.apply(map.keyType()) + " => "
@@ -205,8 +208,14 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound ApplyBod
                             + (element.voidable() ? "?" : "")).toList()) + "]";
             case ChoiceBody choice when constructor.equals("meta.choice") -> "(" + String.join(" | ",
                     choice.variants().stream().map(slot).toList()) + ")";
-            default -> (constructor.equals("meta.set_type") ? "set" : constructor) + "<" + arguments(slot) + ">";
+            default -> constructor + "<" + arguments(slot) + ">";
         };
+    }
+
+    /** Whether {@code array} is what {@code set<T>} completes to, which the bracket form cannot spell. */
+    private static boolean isSet(ArrayBody array) {
+        return !array.ordered() && array.uniqueItems() && !array.voidable() && array.minItems().isEmpty()
+                && array.maxItems().isEmpty();
     }
 
     /** A record in place with no application known, as its fields: <code>{ v: int32  w?: text? }</code>. */

@@ -76,9 +76,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         Map<String, ValueReaderFactory> factories = vocabulary(TreeAtomReader::over);
         factories.put("meta.record", DispatchFactories.over(TreeRecordBuilder.FACTORY));
         factories.put("meta.array", TreeArrayBuilder.FACTORY);
-        // A `set` resolves to an ArrayBody like `array` itself -- refinement never adds or removes a field --
-        // so the same factory serves it and the body's own `unique_items` is what separates them.
-        factories.put("meta.set_type", TreeArrayBuilder.FACTORY);
         factories.put("meta.tuple", TreeTupleBuilder.FACTORY);
         factories.put("meta.map", TreeMapBuilder.FACTORY);
         factories.put("meta.choice", DispatchChoiceReader.FACTORY);
@@ -100,7 +97,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
         factories.put("meta.record", DispatchFactories.over(BindRecordBuilder.inPlace(binding)));
         factories.put("meta.array", BindArrayBuilder.FACTORY);
-        factories.put("meta.set_type", BindArrayBuilder.FACTORY);
         factories.put("meta.tuple", BindTupleBuilder.FACTORY);
         factories.put("meta.map", BindMapBuilder.FACTORY);
         factories.put("meta.choice", DispatchChoiceReader.FACTORY);
@@ -112,7 +108,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     private static Map<String, ValueReaderFactory> vocabulary(UnaryOperator<ValueReaderFactory> leaf) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
         factories.put("meta.void_type", leaf.apply(AtomReader.VOID));
-        factories.put("enum", leaf.apply(AtomReader.ENUM));
+        factories.put("meta.enum_type", leaf.apply(AtomReader.ENUM));
         for (String constructor : ATOM_CONSTRUCTORS) {
             factories.put(constructor, leaf.apply(AtomReader.ATOM));
         }

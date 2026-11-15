@@ -100,36 +100,35 @@ class ConstructionSugarTest {
     }
 
     /**
-     * A refined constructor's instance is its own type: written in place under its own constructor, and apart from the
-     * sugar admitting the same data, identity being the constructor and the fields (§1.2).
+     * A completion is the construction written in place: {@code nonempty<uuid>} over an incomplete entry is the type
+     * {@code [uuid; 1..]} is, under {@code meta.array}, and carries no chain (§5.5).
      */
     @Test
-    void aRefinedConstructorAppliedIsItsOwnType() {
-        TsonLinkedSchema linked = resolve("refined", """
-                  nonempty_type => meta.array ^ { min_items?: = 1 }
-                  post => { a: nonempty_type<uuid>  b: [uuid; 1..] }
+    void aCompletionInPlaceIsTheConstructionWrittenInPlace() {
+        TsonLinkedSchema linked = resolve("completed", """
+                  nonempty => !meta.array ^ { min_items: 1 }
+                  post => { a: nonempty<uuid>  b: [uuid; 1..] }
                 """);
         TypeInline a = inlineAt(linked, "post", "a");
-        TypeInline b = inlineAt(linked, "post", "b");
-        assertEquals(b.of(), a.of(), "the same body, built by two constructors");
-        assertNotEquals(b, a);
-        assertNotEquals(b.hashCode(), a.hashCode());
-        assertEquals("nonempty_type", a.constructor());
-        assertEquals("meta.array", b.constructor());
+        assertEquals(inlineAt(linked, "post", "b"), a);
+        assertEquals("meta.array", a.constructor());
         assertEquals(Optional.of(1L), ((ArrayBody) a.of()).minItems());
-        assertEquals("nonempty_type<uuid>", a.text());
     }
 
-    /** An alias of a refined constructor is written past its hop: {@code set<text>} is {@code meta.set_type}'s. */
+    /**
+     * An alias of an incomplete entry is another name for it: {@code set<text>} and {@code bag<text>} complete
+     * {@code meta.set_type}, each the array {@code set<text>} is.
+     */
     @Test
-    void anAliasedConstructorIsRecordedPastItsAlias() {
+    void anAliasOfAnIncompleteEntryCompletesItPastItsAlias() {
         TsonLinkedSchema linked = resolve("aliased", """
                   bag => set
                   post => { a: set<text>  b: bag<text>  c: [text] }
                 """);
-        assertEquals("meta.set_type", inlineAt(linked, "post", "a").constructor());
+        assertEquals("meta.array", inlineAt(linked, "post", "a").constructor());
         assertEquals(inlineAt(linked, "post", "a"), inlineAt(linked, "post", "b"));
         assertNotEquals(inlineAt(linked, "post", "c"), inlineAt(linked, "post", "a"));
+        assertEquals("set<text>", inlineAt(linked, "post", "a").text());
     }
 
     /** The type written in place at a record field. */

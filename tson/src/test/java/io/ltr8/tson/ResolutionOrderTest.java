@@ -45,7 +45,7 @@ class ResolutionOrderTest {
             !!import:"https://tson.io/2026/40/m/meta.tn"
             !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
-              counted => meta.array ^ { ordered?: = false }
+              counted => !meta.array ^ { ordered: false }
               counts  => !counted { element_type: int32  min_items: 1 }
               names   => !counted { element_type: label }
               label   => @kind_note:"a name" !text ^ { max_length: 32 }
@@ -66,7 +66,7 @@ class ResolutionOrderTest {
             !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               geo => !schema {
-                counted => meta.array ^ { ordered?: = false }
+                counted => !meta.array ^ { ordered: false }
                 counts  => !geo.counted { element_type: int32  min_items: 1 }
                 point   => { x: int32  y: int32 }
                 origin  => !geo.point { x: 0  y: 0 }

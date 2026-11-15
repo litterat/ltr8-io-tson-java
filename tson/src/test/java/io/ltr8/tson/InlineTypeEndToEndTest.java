@@ -31,7 +31,6 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -64,7 +63,7 @@ class InlineTypeEndToEndTest {
                 labels: set<text>
                 grid:   [[text]]
               }
-              nonempty_type => meta.array ^ { min_items?: = 1 }
+              nonempty_type => !meta.array ^ { min_items: 1 }
               bag => set
               shapes => {
                 ids:    nonempty_type<uuid>
@@ -127,8 +126,8 @@ class InlineTypeEndToEndTest {
         assertEquals(List.of(TypeRef.of("int32"), TypeRef.of("text")), id.variants());
         ArrayBody labels = assertInstanceOf(ArrayBody.class,
                 assertInstanceOf(TypeInline.class, order.fields().get("labels").type()).of());
-        assertTrue(labels.uniqueItems() && !labels.ordered(), "set<text> is the set constructor's array");
-        assertEquals("meta.set_type", ((TypeInline) order.fields().get("labels").type()).constructor());
+        assertTrue(labels.uniqueItems() && !labels.ordered(), "set<text> completes meta.set_type, an array");
+        assertEquals("meta.array", ((TypeInline) order.fields().get("labels").type()).constructor());
         assertEquals(inline(ArrayBody.of(inline(ArrayBody.of(TypeRef.of("text"))))),
                 order.fields().get("grid").type());
     }
@@ -160,40 +159,38 @@ class InlineTypeEndToEndTest {
     }
 
     /**
-     * Each type written in place records the constructor that built it, past its alias hops, and two constructions
-     * of one body by two constructors are two types (§1.2).
+     * Each type written in place records the constructor that built it, past its alias hops, and a completion is its
+     * constructor's construction, so {@code nonempty_type<uuid>} is the type {@code [uuid; 1..]} is (§5.5).
      */
     @Test
     void eachTypeInPlaceRecordsItsConstructor() {
         RecordBody shapes = (RecordBody) tson().resolve(SCHEMA).schema().entries().get("shapes");
-        assertEquals("nonempty_type", inlineAt(shapes, "ids").constructor());
-        assertEquals("meta.array", inlineAt(shapes, "plain").constructor());
-        assertEquals(inlineAt(shapes, "plain").of(), inlineAt(shapes, "ids").of());
-        assertNotEquals(inlineAt(shapes, "plain"), inlineAt(shapes, "ids"));
-        assertEquals("meta.set_type", inlineAt(shapes, "bagged").constructor());
+        assertEquals("meta.array", inlineAt(shapes, "ids").constructor());
+        assertEquals(inlineAt(shapes, "plain"), inlineAt(shapes, "ids"));
+        assertEquals("meta.array", inlineAt(shapes, "bagged").constructor());
         assertEquals(inlineAt(shapes, "labels"), inlineAt(shapes, "bagged"));
         assertEquals("meta.ref", inlineAt(shapes, "owner").constructor());
         MapBody nested = assertInstanceOf(MapBody.class, inlineAt(shapes, "nested").of());
-        assertEquals("nonempty_type", assertInstanceOf(TypeInline.class, nested.valueType()).constructor());
-        assertEquals("{text => nonempty_type<text>}", inlineAt(shapes, "nested").text());
+        assertEquals("meta.array", assertInstanceOf(TypeInline.class, nested.valueType()).constructor());
+        assertEquals("{text => [text; 1..]}", inlineAt(shapes, "nested").text());
     }
 
     /**
-     * Resolved output writes each constructor as the tag on {@code of} -- a schema's own refined constructor, and
-     * an aliased one past its alias -- and reading it back, in bind mode, keeps it: the record reads back equal.
+     * Resolved output writes each constructor as the tag on {@code of} -- a completion's under its constructor -- and
+     * reading it back, in bind mode, keeps it: the record reads back equal.
      */
     @Test
     void theResolvedFormRoundTripsEachConstructorInBindMode() {
         Tson tson = tson();
         RecordBody shapes = (RecordBody) tson.resolve(SCHEMA).schema().entries().get("shapes");
         String written = tson.objectWriter().toTson(shapes);
-        assertTrue(written.contains("\"ids\" => { type: { of: !nonempty_type {"), written);
+        assertTrue(written.contains("\"ids\" => { type: { of: !meta.array {"), written);
         assertTrue(written.contains("\"plain\" => { type: { of: !meta.array {"), written);
-        assertTrue(written.contains("\"bagged\" => { type: { of: !meta.set_type {"), written);
+        assertTrue(written.contains("\"bagged\" => { type: { of: !meta.array {"), written);
         assertTrue(written.contains("\"owner\" => { type: { of: !meta.ref {"), written);
-        assertTrue(written.contains("value_type: { of: !nonempty_type {"), written);
-        assertFalse(written.contains("!bag") || written.contains("!set ") || written.contains("meta.type_inline"),
-                written);
+        assertTrue(written.contains("value_type: { of: !meta.array {"), written);
+        assertFalse(written.contains("!bag") || written.contains("!set") || written.contains("!nonempty_type")
+                || written.contains("meta.type_inline"), written);
 
         // Field by field: the record's own dump writes its empty `parameters` and `discriminators`, which a resolved
         // form omits and `meta.record` refuses.
@@ -206,14 +203,16 @@ class InlineTypeEndToEndTest {
         });
     }
 
-    /** A constructor written through its alias is read as the entry the alias reaches, as resolution records it. */
+    /**
+     * A resolved form names no incomplete entry: a tag reaching one through an alias, {@code bag => set}, is refused
+     * where it is read (§5.5, §8.1).
+     */
     @Test
-    void aConstructorTaggedThroughItsAliasReadsPastIt() {
-        Object read = tson().objectReader().withImports(List.of(ID))
-                .readAs("{ type: { of: !bag { element_type: text } } }", "meta.record_field", Object.class);
-        TypeInline type = assertInstanceOf(TypeInline.class,
-                assertInstanceOf(io.ltr8.tson.schema.meta.RecordField.class, read).type());
-        assertEquals("meta.set_type", type.constructor());
+    void aTagReachingAnIncompleteEntryThroughItsAliasIsRefused() {
+        ReadException refused = assertThrows(ReadException.class, () -> tson().objectReader()
+                .withImports(List.of(ID))
+                .readAs("{ type: { of: !bag { element_type: text } } }", "meta.record_field", Object.class));
+        assertTrue(refused.getMessage().contains("bag"), refused.getMessage());
     }
 
     /** Each field's resolved form reads in tree mode with no diagnostic, its {@code of} under its constructor's tag. */
@@ -221,8 +220,8 @@ class InlineTypeEndToEndTest {
     void theResolvedFormReadsInTreeModeUnderEachConstructor() {
         Tson tson = tson();
         RecordBody shapes = (RecordBody) tson.resolve(SCHEMA).schema().entries().get("shapes");
-        Map<String, String> constructors = Map.of("ids", "nonempty_type", "plain", "meta.array",
-                "bagged", "meta.set_type", "owner", "meta.ref", "nested", "meta.map");
+        Map<String, String> constructors = Map.of("ids", "meta.array", "plain", "meta.array",
+                "bagged", "meta.array", "owner", "meta.ref", "nested", "meta.map");
         constructors.forEach((field, constructor) -> {
             String written = tson.objectWriter().toTson(shapes.fields().get(field));
             List<Diagnostic> problems = new java.util.ArrayList<>();
@@ -233,15 +232,15 @@ class InlineTypeEndToEndTest {
         });
     }
 
-    /** A refined constructor's construction in place refuses data by its own rule and is named by its application. */
+    /** A completion in place refuses data by its constructor's rule and is named by the construction it is. */
     @Test
-    void aRefinedConstructorInPlaceNamesItselfInARefusal() {
+    void aCompletionInPlaceIsNamedByTheConstructionItIs() {
         String data = """
                 !!import:"%s"
                 !shapes { ids: []  plain: [%s]  bagged: []  labels: []  owner: o  nested: {} }"""
                 .formatted(ID, "123e4567-e89b-12d3-a456-426614174000");
         List<Diagnostic> problems = tson().validate(data);
-        assertTrue(problems.stream().anyMatch(d -> d.message().startsWith("'nonempty_type<uuid>'")),
+        assertTrue(problems.stream().anyMatch(d -> d.message().startsWith("'[uuid; 1..]'")),
                 problems::toString);
     }
 

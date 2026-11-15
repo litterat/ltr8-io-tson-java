@@ -23,14 +23,17 @@ import java.util.Objects;
  * @param absent      the required fields of {@code constructor} it leaves absent, in declaration order, never empty
  * @param written     the binding record it writes, the fields every refinement and completion of it adds to
  * @param read        each field of {@code written} its declared type read, by name
+ * @param bases       the incomplete entries it was built from by {@code ^}, nearest first, each past its alias hops:
+ *                    what a completion of it states it closed besides it ({@code TsonSchema#completionOf})
  */
-public record IncompleteEntry(String constructor, List<String> absent, Object written, Map<String, Object> read)
-        implements Top {
+public record IncompleteEntry(String constructor, List<String> absent, Object written, Map<String, Object> read,
+                              List<String> bases) implements Top {
 
     public IncompleteEntry {
         Objects.requireNonNull(constructor, "constructor");
         Objects.requireNonNull(written, "written");
         absent = List.copyOf(absent);
+        bases = List.copyOf(bases);
         read = Collections.unmodifiableMap(new LinkedHashMap<>(read));
         if (absent.isEmpty()) {
             throw new IllegalStateException("an entry with no required field absent is complete");
