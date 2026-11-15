@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/40/m/policy.tn?sha256=7f41637f27d1f3b0eb17822f09683dad7821a621b17d181aa330e7adc3b95786"
-!!import:"https://tson.io/2026/40/m/meta.tn?sha256=ee2394b1554c4ea15cee5441b1622f8ddee19c171a7425b07aeab63da9fafc0a"
+!!id:"https://tson.io/2026/40/m/policy.tn?sha256=5aeeaa0499b641eda1ce15a88f7a28f97f226f0b60743e52ee7970fab431f7c1"
+!!import:"https://tson.io/2026/40/m/meta.tn?sha256=83ac33fed8b62d3bd567ff2ee652e22b64227acd4bdb30c3efd0bc9f6ff9b04a"
 @doc:"""
   The TSON processor policy: what a processor admits as a name and what it
   spends ([TSON-DATA] §8.2, §9.1; [TSON-SCHEMA] §11.5). A policy is the

@@ -119,23 +119,24 @@ class KindMembersTest {
 
     /**
      * A template is no type and no member (§5.10): it is an open record, built with {@code record}, and a kind of
-     * {@code record} holds its applications and not it. The root's {@code set} is an alias of the constructor {@code
-     * meta.set_type} itself, no instance of it, so no member of a kind over it.
+     * {@code record} holds its applications and not it. A set is an array, so a kind of {@code meta.array} holds it,
+     * and the root's {@code set}, an alias of an incomplete entry, is no type and no member.
      */
     @Test
     void anInstantiationIsAMemberOfItsConstructorsKindAndATemplateOfNone() {
         TsonLinkedSchema linked = link("""
                 {
-                  tags  => set<text>
-                  sets  => !meta.ref { of: meta.set_type }
-                  boxed => <T> { v: T }
-                  box_t => boxed<text>
-                  recs  => !meta.ref { of: meta.record }
+                  tags   => set<text>
+                  arrays => !meta.ref { of: meta.array }
+                  boxed  => <T> { v: T }
+                  box_t  => boxed<text>
+                  recs   => !meta.ref { of: meta.record }
                 }
                 """);
 
-        List<String> sets = kind(linked, "sets").memberNames();
-        assertTrue(sets.containsAll(List.of("tags", "meta.enum_set")) && !sets.contains("set"), sets.toString());
+        List<String> arrays = kind(linked, "arrays").memberNames();
+        assertTrue(arrays.containsAll(List.of("tags", "meta.enum_set")) && !arrays.contains("set")
+                && !arrays.contains("meta.set_type"), arrays.toString());
         List<String> recs = kind(linked, "recs").memberNames();
         assertTrue(recs.contains("box_t") && !recs.contains("boxed"), recs.toString());
     }
@@ -232,8 +233,8 @@ class KindMembersTest {
     /**
      * A map type and a namespace type are types: the kernel's {@code meta.type_ref} holds {@code field_map}, built with
      * {@code map}, and {@code schema}, built with {@code namespace}. A constructor is a member too, its value being a
-     * record whose instances are declarations: {@code record}, {@code namespace} and {@code set_type} alike. A held
-     * template is not.
+     * record whose instances are declarations: {@code record}, {@code namespace} and {@code array} alike. A held
+     * template is not, nor an incomplete entry, which is no type.
      */
     @Test
     void typeRefHoldsTheNamespaceTypesAndTheConstructors() {
@@ -243,10 +244,12 @@ class KindMembersTest {
                 }).resolveLinked(TsonBundledSchemas.META_ID);
         List<String> members = kind(kernel, "meta.type_ref").memberNames();
 
-        assertTrue(members.containsAll(List.of("meta.field_map", "meta.schema", "meta.declared", "meta.set_type",
+        assertTrue(members.containsAll(List.of("meta.field_map", "meta.schema", "meta.declared", "meta.array",
                 "meta.record", "meta.alias", "meta.namespace", "meta.ref", "meta.top")),
                 members::toString);
         assertFalse(members.contains("meta.kind"), members::toString);
+        assertFalse(members.contains("meta.set_type") || members.contains("enum") || members.contains("set"),
+                members::toString);
     }
 
     /**

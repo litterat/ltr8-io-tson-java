@@ -106,14 +106,14 @@ class EnumTypeTest {
                 { status => !enum [OPEN ACTIVE DONE]
                   live   => !status ^ { members: [OPEN ACTIVE] } }""")));
 
-        // Through a tightening that pins the type, the constructor itself refuses another value.
-        List<Diagnostic> pinned = Tson.standard().validateSchema(schema("retype-pinned", """
+        // A completion of `enum` is the construction written out, so the enum's own narrowing rule refuses both.
+        List<Diagnostic> completed = Tson.standard().validateSchema(schema("retype-completed", """
                 { upper  => !unicode.identifier_type { pattern: "[A-Z]+" }
                   names  => !enum [OPEN DONE]
                   strict => !names ^ { name_type: upper } }"""));
-        assertTrue(messages(pinned).contains("'name_type' is fixed on 'enum'"), messages(pinned));
+        assertTrue(messages(completed).contains("an enum's name_type is fixed where it is constructed"),
+                messages(completed));
 
-        // Through `enum_type` itself, the enum's own narrowing rule does.
         List<Diagnostic> free = Tson.standard().validateSchema(schema("retype-free", """
                 { upper  => !unicode.identifier_type { pattern: "[A-Z]+" }
                   names  => !meta.enum_type { name_type: meta.identifier  members: [OPEN DONE] }
@@ -178,7 +178,7 @@ class EnumTypeTest {
                 !!id:"%s"
                 !!import:"%s"
                 !schema { kebab      => !unicode.identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
-                  kebab_enum => meta.enum_type ^ { name_type?: = kebab } }
+                  kebab_enum => !meta.enum_type ^ { name_type: kebab } }
                 """.formatted(vocabularyId, TsonBundledSchemas.META_ID);
         String user = """
                 !!id:"%s"

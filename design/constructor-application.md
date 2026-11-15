@@ -42,7 +42,12 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   (`IncompleteEntries`): **write-once, never a narrowing judgement**, since narrowing is a relation between types and
   an incomplete entry only accumulates. A refinement keeps one required field absent; a completion is the plain
   construction of the constructor and **carries no chain**, so `nonempty<text>` equals `!meta.array { … }` written
-  anywhere. A chain naming `X` lost for that reason: the same type would be two entries by spelling.
+  anywhere. A chain naming `X` lost for that reason: the same type would be two entries by spelling. What a declared
+  completion closed is the key's `@meta.completion` instead, which changes no value
+  (`design/resolver-vocabulary-and-bootstrap.md`).
+- A tag or an annotation's value naming an incomplete entry is refused: only a construction's payload is rewritten
+  (`ConstructionRewrite`), an annotation's value being data, so `@slot:{ of: !rows { … } }` over an incomplete
+  `rows` is no completion.
 - Each field of an incomplete entry is read against its declared type where it is written (`readEachField`);
   required fields, defaults and coherence wait for the completion, which reads the whole. What each field read is
   kept on the entry (`IncompleteEntry.read`), and the names it holds are judged when its own schema links
@@ -123,8 +128,8 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   open work.
 - **A template over a constructor is refused; the constructor is applied instead** (§5.10): `<T> !meta.array {
   element_type: T  min_items: 1 }` has no home for `parameters`, so `openInstance` refuses it, naming the remedy -- the
-  application where it is used (`meta.array<T>`, `[T]`), or a refined constructor declared once and applied
-  (`nonempty_type => meta.array ^ { min_items?: = 1 }`, then `nonempty_type<T>`). A pin is a field's value, so a
+  application where it is used (`meta.array<T>`, `[T]`), or its construction left open once and completed where used
+  (`nonempty => !meta.array ^ { min_items: 1 }`, then `nonempty<T>`). A pin is a field's value, so a
   refinement template pinning a slot to its parameter -- `my_set => <T> meta.array ^ { element_type?: = T }` -- is refused
   with every other parameter at a value (`ParameterTypes.atValue`).
 
@@ -136,17 +141,20 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   construction needs none), and its type, past its alias hops, is a reference whose `of` names types
   (`KindMembers.namesTypes`). `meta.array` has one (`element_type`), `meta.map` two (`key_type value_type`),
   `meta.namespace` the same two, `meta.ref` one (`of`), `meta.enum_type` one (`name_type`, `members`
-  being a set of values), and `meta.tuple` and the root's `enum` none. Nothing is written on a constructor to permit
+  being a set of values), and `meta.tuple` none. Nothing is written on a constructor to permit
   it, and it is the rule `[T]` and `{K => V}` already follow.
 - **A constructor here is a closed record IS-A `meta.type`** (`ConstructionSugar.constructs`), read past the head's
   alias hops: its instances are types. A head composing `meta.top` alone builds values and is no constructor of this
   rule, and an open record substitutes (§5.10) whatever its chain reaches -- `listed => <T> meta.atom & { … }` composes
   `meta.top` and is still a template. The check runs before the template path in both places an application resolves,
   so a head is asked once which operation it stands for.
-- **The kernel applies its own constructors this way**: the root's `set => meta.set_type` is an alias, so `set<text>`
-  constructs `!meta.set_type { element_type: text }` through it, and `meta.ref<method>` is `!meta.ref { of: method }`.
-  A refined constructor's construction is an instance of the refinement, a subtype constructor, so a question about
-  what a body is goes by the constructor's chain (`meta.set_type` IS-A `meta.array`).
+- **The kernel applies its own constructors this way**, `meta.ref<method>` being `!meta.ref { of: method }`, and
+  completes its own incomplete entries the way a schema does: `set<text>` through the root's alias `set` is
+  `!meta.array { element_type: text  ordered: false  unique_items: true }`, `!enum [A B]` is `!meta.enum_type { … }`.
+  **A body is bound by its constructor's own class and nothing else**: there is no fallback along a refined
+  constructor's chain, so `!x { … }` over `x => meta.array ^ { … }` has no class and is a gap. Lost: binding a refined
+  constructor as the one it refines, which let a set and an enum each be a constructor of their own; as incomplete
+  entries they need no class, a completion being the plain construction.
 - **Where an application is first met, it is rewritten.** A declaration's body (`x => meta.array<text>`) becomes
   `!C { … }` tagged by the head as written and goes through `resolveInstance`, so it gets every check and fact the
   braced form does and records no application. A field's or group member's type (`f: meta.array<text>`) becomes the
@@ -171,9 +179,8 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `checkArity` over a held reference) is refused here; a literal
   argument (`meta.array<3>`) never arrives, the grammar refusing it where it is written (§5.10); an argument a slot's
   `of` refuses is refused at link as the braced form's is; a required field no
-  slot fills leaves the construction incomplete and the constructor's reader refuses it. A refined constructor's
-  instance is its own kind and is not normalised to its source's: `nonempty_type<uuid>` and `[uuid; 1..]` are two
-  entries. `ConstructionSugarTest` pins all of it.
+  slot fills leaves the construction incomplete and the constructor's reader refuses it. `ConstructionSugarTest` pins
+  all of it.
 - **The desugarer cannot tell a constructor from a record**, so `checkTemplateApplication` refuses an argument list
   only on a local head whose body says it is none: a fresh record or a construction. A composition, a refinement, an
   alias or an atom refinement (an incomplete entry, completed by application) passes through for resolution to judge.

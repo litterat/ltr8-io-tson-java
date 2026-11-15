@@ -123,21 +123,16 @@ spec-required case:
   reader (`!x { id: abc }` validates, in tree and bind mode) and its body holds `extra`. Today `x` is refused as
   `NOT_IMPLEMENTED` at `/x`, in either declaration order and with `extra?: text` left unwritten: no class binds `c`, so
   `vocabulary.instance` throws `MissingBindingException` and `SchemaResolver.constructed` sends it to `unmodelledType`.
-  A refinement adding no field already binds to its source's body (`my_array => array ^ { ordered?: = false }`,
-  `ConstructorLevelDisciplineTest`). Decide where an added facet lives in the schema model and in the resolved form,
+  Decide where an added facet lives in the schema model and in the resolved form,
   then read the instance as its source's body with the facet held. An instance of a constructor composing `atom`,
   `product` or `sum` directly stays refused: it is a type of a new form, which a processor backs with readers and
   writers of its own.
-- [ ] **An instance of a constructor composed with `&` that adds no field is refused** ([TSON-SCHEMA] §5.7, §5.8).
-  `my_list => meta.array ^ { min_items?: = 1 }` and `my_list2 => meta.array & { min_items?: = 1 }` resolve to one
-  entry, and §5.8 makes each a constructor. `my_list<text>` and `!my_list { element_type: text }` load, bound as the
-  array body; `my_list2<text>` and `!my_list2 { element_type: text }` are refused as `NOT_IMPLEMENTED` ("this library
-  models the body of a type built only by the bundled schemas' constructors"). `ValueReaderContext.tightenedBy` finds
-  the source's host class by the fact recorded when the declaration was written with `^`, the one place main code
-  tells the two operators apart after resolution. Derive it from the entry: a constructor whose single direct parent
-  is a constructor with the same field names binds as that parent. Then check a refined constructor read back from a
-  resolved form, which carries no recorded fact. Add `schema/valid` vectors for the `&` spelling, applied and
-  constructed.
+- [ ] **An instance of a constructor composed with `&` that adds no field is refused** ([TSON-SCHEMA] §5.8).
+  `my_list => meta.array & { min_items?: = 1 }` is a constructor, and `my_list<text>` and `!my_list { element_type:
+  text }` are refused as `NOT_IMPLEMENTED` ("this library models the body of a type built only by the bundled schemas'
+  constructors"): no class binds `my_list`, and nothing falls back to its parent's. Derive it from the entry, so a
+  resolved form read back needs no recorded fact: a constructor whose single direct parent is a constructor with the
+  same field names binds as that parent. Add `schema/valid` vectors, applied and constructed.
 - [ ] **A field of an incomplete entry typed by a type written in place is read only where the entry is completed**
   ([TSON-SCHEMA] §5.5). §5.5 reads each written field by its own type where it is written and judges the names it
   holds at link. A constructor's field whose type is written in place (`meta.choice.variants`, a `[meta.type_expr]`;

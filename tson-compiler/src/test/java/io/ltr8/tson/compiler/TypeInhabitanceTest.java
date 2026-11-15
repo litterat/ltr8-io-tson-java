@@ -133,7 +133,7 @@ class TypeInhabitanceTest {
     @Test
     void anUninhabitedTemplateIsRejectedWhereItCloses() {
         rejection("""
-                  nonempty => meta.array ^ { min_items?: = 1 }
+                  nonempty => !meta.array ^ { min_items: 1 }
                   tree => <T> { value: T  children: nonempty<tree<T>> }
                   use  => tree<text>""");
     }
@@ -147,7 +147,7 @@ class TypeInhabitanceTest {
     @Test
     void theChainIsSpelledTheWayTheAuthorWroteIt() {
         String message = rejection("""
-                  nonempty => meta.array ^ { min_items?: = 1 }
+                  nonempty => !meta.array ^ { min_items: 1 }
                   tree => <T> { value: T  children: nonempty<tree<T>> }
                   use  => tree<text>""");
 
@@ -160,7 +160,7 @@ class TypeInhabitanceTest {
     @Test
     void aTemplateNobodyAppliesGetsNoVerdict() {
         accepted("""
-                  nonempty => meta.array ^ { min_items?: = 1 }
+                  nonempty => !meta.array ^ { min_items: 1 }
                   tree => <T> { value: T  children: nonempty<tree<T>> }""");
     }
 

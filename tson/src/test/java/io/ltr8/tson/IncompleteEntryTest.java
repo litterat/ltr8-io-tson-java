@@ -293,7 +293,7 @@ class IncompleteEntryTest {
         refused("""
                 nonempty => !meta.array ^ { min_items: 1 }
                 filled   => !nonempty ^ { element_type: text }
-                """, "complete it with '!nonempty { ... }' or 'nonempty<...>'");
+                """, "complete it with '!nonempty { ... }'");
     }
 
     @Test
@@ -461,5 +461,19 @@ class IncompleteEntryTest {
         List<Diagnostic> problems = tson.validate(header + "!holder { names: [] }");
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Optional.of("/names"), problems.getFirst().path());
+    }
+
+    /**
+     * A tuple, a choice and a namespace value are finished, and the refusal says so rather than that the source has no
+     * atom constraints, an array or a map type being refinable too (§5.5).
+     */
+    @Test
+    void aFinishedTypeRefusesRefinementAndSaysSo() {
+        refused("""
+                  pair => [text, int32]
+                  bad  => !pair ^ { voidable: false }""", "kind=PRODUCT, which is finished and takes no refinement");
+        refused("""
+                  either => ( int32 | text )
+                  bad    => !either ^ { disjoint: true }""", "which is finished and takes no refinement");
     }
 }

@@ -180,6 +180,22 @@ class ResolvedFixtureTest {
     }
 
     /**
+     * <b>And every declared completion states the incomplete entries it closed</b> ([TSON-SCHEMA] §8.1): the kernel's
+     * enums complete {@code enum} and its member sets {@code meta.set_type}, which leave the resolved form, so the key
+     * annotation is the one record of them.
+     */
+    @Test
+    void everyDeclaredCompletionCarriesWhatItClosed() throws Exception {
+        for (Map.Entry<String, String> fixture : FIXTURES.entrySet()) {
+            assertEquals(ResolvedForm.markedCompletions(Files.readString(specDirectory().resolve(fixture.getKey()))),
+                    ResolvedForm.ourCompletions(tson(), fixture.getValue()),
+                    fixture.getKey() + ": a key's @meta.completion differs from this resolver's");
+        }
+        assertEquals(List.of("enum"), ResolvedForm.markedCompletions(Files.readString(specDirectory()
+                .resolve("meta-resolved.tn"))).get("boolean"), "meta-resolved.tn marks boolean a completion of enum");
+    }
+
+    /**
      * <b>And every entry's value carries the same annotations</b> -- {@code @meta.annotation} on the kernel's and
      * core's annotation types, {@code @atom.ordering}/{@code @atom.bounded} on meta's -- read from the fixture's text and
      * from this resolver's entry facts, a value's Java shape having no slot for them.

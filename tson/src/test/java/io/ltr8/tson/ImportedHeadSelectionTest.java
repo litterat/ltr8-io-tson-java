@@ -77,12 +77,12 @@ class ImportedHeadSelectionTest {
 
     // ── A construction's payload ──────────────────────────────────────────
 
-    private static final String ROWS = "  rows => meta.array ^ { min_items?: = 1 }\n";
+    private static final String ROWS = "  rows => !meta.array ^ { min_items: 1 }\n";
 
     private static final String RECORD_OF_ROWS =
             "  e => !meta.record { fields: { f => { type: { of: !rows { element_type: text } } } } }\n";
 
-    /** A refined constructor of the document's own, constructed in place in a payload of the kernel's constructor. */
+    /** An incomplete entry of the document's own, completed in place in a payload of the kernel's constructor. */
     @Test
     void aPayloadUnderAnImportedHeadConstructsTheDocumentsOwnConstructor() {
         for (String declarations : List.of(ROWS + RECORD_OF_ROWS, RECORD_OF_ROWS + ROWS)) {
@@ -101,13 +101,13 @@ class ImportedHeadSelectionTest {
                 + " { of: !meta.array { element_type: { of: !rows { element_type: text } } } } } } }\n")));
     }
 
-    /** The document's own constructor's pin holds in the payload: selected, it is read as itself. */
+    /** The document's own incomplete entry is completed in the payload, where a field it wrote is written once. */
     @Test
-    void aPinOnTheDocumentsOwnConstructorStillRefusesAnotherValue() {
+    void aCompletionInAPayloadWritesAFieldOnce() {
         assertOneProblem(validateSchema(schema("pin", META, ROWS
                         + "  e => !meta.record { fields: { f => { type: { of: !rows { element_type: text  min_items: 0 } }"
                         + " } } }\n")),
-                "/e", "'min_items' is fixed on 'rows'");
+                "/e", "[min_items] is written by 'rows' already");
     }
 
     /** A tag naming an entry of the document that is no type is still refused where a type stands. */
@@ -166,23 +166,26 @@ class ImportedHeadSelectionTest {
 
     // ── An annotation's value ─────────────────────────────────────────────
 
-    /** An annotation whose type is imported, its value constructing the document's own constructor. */
+    /**
+     * An annotation's value is data, not a construction, so a tag in it naming the document's own incomplete entry is
+     * refused as any tag naming one is (§5.5, §6), whether the annotation's type is imported or the kernel's.
+     */
     @Test
-    void anAnnotationValueUnderAnImportedTypeSelectsTheDocumentsOwnConstructor() {
-        assertEquals(List.of(), validateSchema(schema("slots", "!!import:\"https://example.test/lib.tn\"\n",
-                ROWS + "  r => @slot:{ of: !rows { element_type: text } } { a: text }\n")));
-        assertEquals(List.of(), validateSchema(schema("inline", META,
-                "  r => @meta.type_inline:{ of: !rows { element_type: text } } { a: text }\n" + ROWS)));
+    void anAnnotationValueTaggedByAnIncompleteEntryIsRefused() {
+        assertOneProblem(validateSchema(schema("slots", "!!import:\"https://example.test/lib.tn\"\n",
+                ROWS + "  r => @slot:{ of: !rows { element_type: text } } { a: text }\n")), "/r", "'rows'");
+        assertOneProblem(validateSchema(schema("inline", META,
+                "  r => @meta.type_inline:{ of: !rows { element_type: text } } { a: text }\n" + ROWS)), "/r", "'rows'");
     }
 
     /**
-     * Read while an entry that reads no value is being made ready, before the constructor it selects: the annotation
-     * waits on it.
+     * Read while an entry that reads no value is being made ready, before the entry it names: the annotation waits on
+     * it, and is refused once it is ready.
      */
     @Test
-    void anAnnotationValueWaitsOnTheConstructorItSelects() {
-        assertEquals(List.of(), validateSchema(schema("early", META,
-                "  al => @meta.type_inline:{ of: !rows { element_type: text } } text\n" + ROWS)));
+    void anAnnotationValueWaitsOnTheEntryItsTagNames() {
+        assertOneProblem(validateSchema(schema("early", META,
+                "  al => @meta.type_inline:{ of: !rows { element_type: text } } text\n" + ROWS)), "/al", "'rows'");
     }
 
     // ── Cycles ────────────────────────────────────────────────────────────
@@ -192,7 +195,7 @@ class ImportedHeadSelectionTest {
     void aValueSelectingTheEntryItIsReadForIsAWaitCycle() {
         assertOneProblem(validateSchema(schema("self", META,
                         "  rows => @meta.type_inline:{ of: !rows { element_type: text } }\n"
-                                + "    meta.array ^ { min_items?: = 1 }\n")),
+                                + "    !meta.array ^ { min_items: 1 }\n")),
                 "/rows", "'rows' waits on 'rows'");
         assertOneProblem(validateSchema(schema("selfrecord", META,
                         "  e => !meta.record { fields: { f => { type: { of: !e { fields: {} } } } } }\n")),
@@ -203,8 +206,8 @@ class ImportedHeadSelectionTest {
     @Test
     void twoValuesSelectingEachOthersEntryAreAWaitCycle() {
         List<Diagnostic> problems = validateSchema(schema("pair", META,
-                "  a => @meta.type_inline:{ of: !b { element_type: text } } meta.array ^ { min_items?: = 1 }\n"
-                        + "  b => @meta.type_inline:{ of: !a { element_type: text } } meta.array ^ { min_items?: = 1 }\n"));
+                "  a => @meta.type_inline:{ of: !b { element_type: text } } !meta.array ^ { min_items: 1 }\n"
+                        + "  b => @meta.type_inline:{ of: !a { element_type: text } } !meta.array ^ { min_items: 1 }\n"));
         assertTrue(problems.stream().anyMatch(problem -> problem.message().startsWith("'a' waits on 'b' waits on 'a'")),
                 problems::toString);
     }

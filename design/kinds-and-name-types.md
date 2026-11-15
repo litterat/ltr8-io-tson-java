@@ -76,8 +76,8 @@ that names values gets `namesTypes` false and no members.
   type, an alias stopping at an application, every open record (a template, no type, §5.10) and value entries
   excluded, then the constructor the value applies (its recorded tag, `EntryFacts.constructor`, else its body's
   `@Typename`) until `of` or a constructor IS-A it is reached. So an open record, built with `meta.record`, is a member
-  of no reference, `meta.ref<meta.record>` included; its declared applications are records. `set<text>` is a member of
-  `meta.ref<meta.set_type>` while the root's `set`, an alias of the constructor itself, is not, `meta.top` of
+  of no reference, `meta.ref<meta.record>` included; its declared applications are records. An incomplete entry is a
+  member of nothing and no `of`: `tags => set<text>` is a member of `meta.ref<meta.array>`, `meta.top` of
   `meta.type_ref`,
   `meta.ref<meta.product>` and `meta.ref<meta.record>`, and so is a constructor whose declaration is a record:
   membership is not `EntryKind.isConstructor`, which answers applicability.
@@ -105,8 +105,9 @@ that names values gets `namesTypes` false and no members.
   no field an author can write.
 - **A value at a kind-typed field is a name.** `checkFieldValue` hands a `~`/`=` value at a kind-typed field to
   `checkKindValue`, which resolves it in the schema's namespace and asks the walk. So
-  the kernel's `enum => meta.enum_type ^ { name_type?: = meta.identifier }` is a member at the kernel's link, a schema's pin
-  of its own `text_identifier` at that schema's, and a pin of a text family is refused where it is written.
+  a schema's pin of its own `text_identifier` is a member at that schema's link, and a pin of a text family is refused
+  where it is written. A field an incomplete entry writes there (`enum`'s `name_type: meta.identifier`) is judged the
+  same way, through `TsonSchemaLinker.validateHeld`.
 - **Readers judge membership where the names resolve.** A kind compiles as an atom (`AtomParsers.forRead`'s
   `TypeRefParser`, an `AtomTypeParser<TypeRef>`): a name token, or a JSON string holding one, read into the
   `TypeRef` it is and naming a member of the linked index. In a data document a reference is a name, so a reference
@@ -125,7 +126,7 @@ that names values gets `namesTypes` false and no members.
 
 ## What a name type is (`NameType`)
 
-An enum is an instance of `meta.enum_type` or a tightening of it (`enum` pins `name_type: meta.identifier`); a record carries
+An enum is an instance of `meta.enum_type` (a completion of `enum` writes `name_type: meta.identifier`); a record carries
 an optional `name_type` for its field names. Each body holds the name only, and what it denotes (which family, which parser,
 which equality, which profile) lives in a namespace the body cannot see.
 

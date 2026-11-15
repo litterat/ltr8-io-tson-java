@@ -35,7 +35,8 @@ class EntryKindHierarchyTest {
 
     @Test
     void anIncompleteEntryTakesTheIncompleteKindAndNamesItsConstructor() {
-        IncompleteEntry nonempty = new IncompleteEntry("meta.array", java.util.List.of("element_type"), "written", Map.of());
+        IncompleteEntry nonempty = new IncompleteEntry("meta.array", java.util.List.of("element_type"), "written", Map.of(),
+                java.util.List.of());
         assertEquals(EntryKind.INCOMPLETE, EntryKind.of(nonempty, name -> true));
         assertEquals("meta.array", io.ltr8.tson.schema.TsonSchema.constructorOf(nonempty));
     }
@@ -43,7 +44,7 @@ class EntryKindHierarchyTest {
     @Test
     void anIncompleteEntryWithNothingAbsentIsABrokenInvariant() {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
-                () -> new IncompleteEntry("meta.array", java.util.List.of(), "written", Map.of()));
+                () -> new IncompleteEntry("meta.array", java.util.List.of(), "written", Map.of(), java.util.List.of()));
     }
 
     @Test

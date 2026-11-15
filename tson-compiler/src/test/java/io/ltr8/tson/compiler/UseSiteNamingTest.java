@@ -40,7 +40,7 @@ class UseSiteNamingTest {
               small => !integer ^ { max: 100 }
               pct   => small
               outer => pct
-              pair_of => meta.array ^ { min_items?: = 1  max_items?: = 2 }
+              pair_of => !meta.array ^ { min_items: 1  max_items: 2 }
             """;
 
     /** Every diagnostic a read of {@code data} against {@code declarations} reports, message only. */
@@ -84,16 +84,15 @@ class UseSiteNamingTest {
     }
 
     /**
-     * <b>A construction written in place is named by the application as written</b> (§5.3): {@code pair_of<int32>}
-     * is the array written at the field under its refined constructor, which has no entry, and the message names it
-     * by that constructor rather than by the sugar its body would also fit.
+     * <b>A completion written in place is named by the construction it is</b> (§5.5): {@code pair_of<int32>} is the
+     * array {@code [int32; 1..2]} written at the field, equal to that array written anywhere, and has no entry.
      */
     @Test
-    void aConstructionInPlaceIsNamedByItsConstructor() {
+    void aCompletionInPlaceIsNamedByTheConstructionItIs() {
         List<String> found = messages("  r => { e: pair_of<int32> }", "!r { e: [1 2 3] }");
 
         assertEquals(1, found.size(), found::toString);
-        assertTrue(found.getFirst().startsWith("'pair_of<int32>'"), found.getFirst());
+        assertTrue(found.getFirst().startsWith("'[int32; 1..2]'"), found.getFirst());
     }
 
     /** The same for a set in place: {@code set<text>} is named as the application, not as the array {@code [text]}. */

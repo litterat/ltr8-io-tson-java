@@ -56,7 +56,7 @@ class MetaKernelSchemaRegistryTest {
         assertEquals(raw.entries().keySet(), linked.schema().entries().keySet());
 
         // Every §5.3 `[X]` at a field is the array written in place there, so no entry is added for one: the
-        // discriminators of a record hold `[text; 1..]` at the field. `enum`'s member set is a declaration the fixture
+        // discriminators of a record hold `[text; 1..]` at the field. An enum's member set is a declaration the fixture
         // writes, `meta.enum_set`, and `record.fields` the fixture's own ordered `field_map`.
         assertTrue(linked.schema().entries().keySet().stream().noneMatch(name -> name.matches(".*_[0-9a-f]{8}")),
                 linked.schema().entries().keySet().toString());
@@ -65,7 +65,7 @@ class MetaKernelSchemaRegistryTest {
                 false, true, false, java.util.Optional.of(1L), java.util.Optional.empty())),
                 record.fields().get("discriminators").type());
 
-        Top enumDef = linked.schema().entries().get("enum");
+        Top enumDef = linked.schema().entries().get("meta.enum_type");
         RecordBody enumBody = (RecordBody) enumDef;
         RecordField membersField = enumBody.fields().entrySet().stream()
                 .filter(f -> f.getKey().equals("members"))
@@ -106,8 +106,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.imports(), linked.schema().imports());
-        assertEquals(82, raw.entries().size());
-        assertEquals(82, linked.schema().entries().size());
+        assertEquals(83, raw.entries().size());
+        assertEquals(83, linked.schema().entries().size());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(SchemaValidationException.class, () -> registry.register(linked));
@@ -137,7 +137,7 @@ class MetaKernelSchemaRegistryTest {
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(82, registered.schema().entries().size());
+        assertEquals(83, registered.schema().entries().size());
         assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }

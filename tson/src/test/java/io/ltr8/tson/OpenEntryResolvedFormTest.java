@@ -272,6 +272,9 @@ class OpenEntryResolvedFormTest {
                 if (io.ltr8.tson.schema.SchemaPaths.isNestedMap(definition)) {
                     continue; // the kernel's `meta`: a value of meta.schema, whose members are checked on their own
                 }
+                if (definition instanceof io.ltr8.tson.schema.meta.IncompleteEntry) {
+                    continue; // no type and in no resolved form (§5.5), so it has no kind to derive
+                }
                 if (OpenEntry.isOpen(definition)) {
                     open++;
                 }

@@ -4,10 +4,9 @@ import io.ltr8.annotation.Typename;
 
 /**
  * The kernel's {@code alias} constructor's own vocabulary, resolved (Part 2 §4.1, §8.1): a {@code kind: ALIAS} entry's
- * body, {@code !meta.alias { target: E }} -- the kernel's aliasing shape, used by
- * {@code meta.type_name}/{@code meta.field_name}/{@code meta.param_name} (aliasing {@code meta.identifier}), the
- * annotation markers {@code annotation}/{@code doc}, and the root's {@code set}, an alias of
- * {@code meta.set_type}. It composes {@code top} directly and so carries no IS-A chain: a hop is not a type of its
+ * body, {@code !meta.alias { target: E }} -- the kernel's aliasing shape, used by {@code meta.type_name}/{@code
+ * meta.field_name}/{@code meta.param_name} (aliasing {@code meta.identifier}), the annotation markers {@code
+ * annotation}/{@code doc}. It composes {@code top} directly and so carries no IS-A chain: a hop is not a type of its
  * own.
  *
  * <p><b>{@code target} is a reference, typed {@code meta.type_ref}, and only a name stands there</b> ([TSON-SCHEMA]

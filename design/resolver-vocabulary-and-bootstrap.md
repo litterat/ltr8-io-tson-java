@@ -1,7 +1,7 @@
 # Resolver vocabulary, alias hops, `@meta.application`, and the kernel bootstrap
 
 The facts the resolver phases share rather than own: the leaf classes (`WireForm`, `CanonicalApplication`, and the
-model's `TypeSlots`), how an alias chain is kept in resolved output and walked, the one derived key annotation, the
+model's `TypeSlots`), how an alias chain is kept in resolved output and walked, the two derived key annotations, the
 checkpoints a resolution reads every value at, and the special-cased bootstrap that resolves the kernel, meta.tn,
 itself. Current form only; history lives in git.
 
@@ -19,8 +19,9 @@ itself. Current form only; history lives in git.
 - Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
   `ALIAS` entry. `AliasChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
 - `@meta.application` goes on the **key** of exactly the declarations that close an application of an open record,
-  and the linker re-attaches it (`withNameAnnotations`), imports included; it is read as stated on ingest, and an author
-  writing it is refused.
+  and `@meta.completion` on the key of exactly the declarations that complete an incomplete entry; the linker
+  re-attaches both (`withNameAnnotations`), imports included; each is read as stated on ingest, and an author writing
+  either is refused.
 - A bundled document's root holds only the vocabulary an author writes; its machinery is a member of a nested map
   and named by its path (§9): the kernel's root is `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`,
   `iri_reference`, `regex`, `doc`, `enum`, `set` and `schema`, and everything else it declares is under one of six maps,
@@ -31,7 +32,8 @@ itself. Current form only; history lives in git.
   `"meta.record"`, `KernelNames.of(KernelNames.UNICODE, "identifier_type")`, never the bare member; one naming a root entry
   is bare (`"text"`).
 - The bootstrap hand-builds exactly the pre-loaded set — the instances and the two refinements on the kernel's one
-  wait cycle (§3.4, §3.4.1 rule 4) — before anything is read, readies `meta.type_inline` with it, and makes every other
+  wait cycle (§3.4, §3.4.1 rule 4) — before anything is read, readies `meta.type_inline` and `unicode.identifier_type`
+  with it, and makes every other
   entry ready by `WaitOrder`, the one algorithm every schema's resolution runs. The order is the waits', never source
   order. `KernelBootstrapResolverTest` holds the set to the measured cycle and the output to the kernel's ordinary
   resolution in any declaration order.
@@ -118,9 +120,9 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `AL
   (`resolveAtomRefinement`: `!count ^ { … }` over `count => integer` IS-A `integer`). An annotation is identified by the
   entries on its alias chain, not by its end (`AliasChain.annotates`/`passesThrough`): `@meta.disjoint` reaches
   `meta.disjoint` and then `void`, and the linker asks whether `meta.disjoint` is on the way. An alias of a constructor is
-  applied as its target wherever it heads a body or an application (§3.3.1): over `labels => enum`, `!labels [a b]` applies
-  `enum` (the definition reader follows the chain and retags the value), and the root's `set => meta.set_type` makes
-  `set<text>` the construction `!meta.set_type { element_type: text }`.
+  applied as its target wherever it heads a body or an application (§3.3.1): over `list => meta.array`, `!list { … }`
+  applies `meta.array` (the definition reader follows the chain and retags the value). An alias of an incomplete entry
+  is another name for it, so the root's `set => meta.set_type` makes `set<text>` the completion of `meta.set_type`.
 - **Anything that needs the chain end walks it and says so.** `TsonSchemaLinker.checkFieldValue` walks to the
   terminal before checking a `~`/`=` value, since a field typed by an alias states a value of whatever the
   alias names; `FieldValueConformanceTest` pins both directions.
@@ -135,7 +137,7 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `AL
   diagnostic naming the hop the author wrote — and end to end by `ResolvedFixtureTest` against the spec's own
   `spec/fixtures/*-resolved.tn`.
 
-## The derived key annotation: `@meta.application` (`tson-compiler/.../resolver/SchemaResolver.java`)
+## The derived key annotations: `@meta.application`, `@meta.completion` (`tson-compiler/.../resolver/SchemaResolver.java`)
 
 **`@meta.application`** (§6, §8.1) goes on the key of every declaration that closes an application of an open
 record, the application it is the instantiation of, `@meta.application:{ head: box  arguments: [int32] }`, a value of
@@ -146,16 +148,20 @@ substituted from -- which is why it is no field of `meta.type_chain`. The materi
 map it shares with `SchemaResolver` (the applied-parent fold keys on it), and `SchemaResolver` writes it where it
 assembles the entry map; `TsonSchema.applicationOf` is the one accessor. **It is read as stated on ingest**: it is the
 one fact the entry's value does not state. An author writing it is a resolver error
-(`DefinitionResolver.refuseWrittenApplication`), as writing `chain` is.
+(`DefinitionResolver.refuseDerivedAnnotation`), as writing `chain` is.
 
 - **Key position, per §6.** An annotation before a declared name is metadata *about the declaration*, and a resolved
   schema is a `{type_name => top}` — so the marker lands on the map's key, which `TsonSchema.entries()` keeps
   reachable through `Namespace.getAnnotations(name)`, never on the entry's value.
 - **It survives linking and the import merge**: the linker rebuilds its entry map several times and re-attaches key
   annotations at the one point every entry passes through (`withNameAnnotations`), imports included.
-- **It is the one derived key annotation.** A sugar form is written in place at its slot, and an application of an open
-  record closes into the declaration naming it or in place at its slot, so every entry has an author-written name and
-  nothing else marks a key.
+- **`@meta.completion` is its sibling** (§8.1): the incomplete entries a declared completion closed, nearest first,
+  each past its alias hops (`IncompleteEntry.bases` carries the chain; `DefinitionResolver.complete` records it). The
+  names are text, not `meta.type_ref`: the entries are in no resolved form, and a reference would dangle at link. Lost:
+  a chain naming the incomplete entry, which made one type two entries by spelling (`design/constructor-application.md`).
+- **There are exactly two.** A sugar form is written in place at its slot, and an application of an open record closes
+  into the declaration naming it or in place at its slot, so every entry has an author-written name and nothing else
+  marks a key.
 
 ## Checkpoints (`SchemaResolver.Vocabulary`, `WaitOrder`)
 
@@ -206,8 +212,8 @@ own, and the concepts that belong with them: `meta.map`, `meta.tuple`, `meta.cho
 `bytes`, and the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric` the
 data-format libraries state their types with. It is the one kernel document. Its root is the thirteen names an author
 writes (`void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`
-and `schema`; `enum => meta.enum_type ^ { name_type?: = meta.identifier }`, so resolved output tags `!enum`, and `schema
-=> meta.schema`, the alias every schema map's tag names, and `set => meta.set_type` its alias); everything else is a
+and `schema`; `enum` is an incomplete entry and `set` an alias of `meta.set_type`, another, so neither is in the resolved
+form, and `schema => meta.schema` is the alias every schema map's tag names); everything else is a
 member of `meta => !schema { … }`, named by its path (§9), `meta.identifier` among them. It imports
 nothing, applies only its own constructors and declares no open record (§3.4's one cycle, closed by pre-loading, not
 resolution); `meta.param` and `record.parameters` describe an open record and are applied by none. It is never resolved
@@ -226,39 +232,44 @@ of the value is read against as the read reaches it; a reference and a held valu
 Its output is what ordinary resolution of the kernel against it produces, entry for entry and constructor for
 constructor, positions included (the bootstrap resolves with the parser's positions).
 
-- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the one refinement on the
+- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the two refinements on the
   kernel's one wait cycle, the one holding `meta.record`: `boolean`, `meta.field_role`, `meta.record_extension_type`,
-  `meta.enum_set`, `integer`, `numeric.count`, `text`, `void`, `meta.type_ref`, `meta.field_map`, and the choice a
+  `meta.enum_set`, `integer`, `numeric.count`, `text`, `void`, `meta.type_ref`, `meta.identifier_ref`, `meta.field_map`,
+  and the choice a
   type slot is typed by, `meta.type_expr` (`PRE_LOADED`). A choice's own `variants` is `[meta.type_expr]`, so reading
   `type_expr`'s declaration reaches `type_expr`; the hand-built choice states the `disjoint` its `@meta.disjoint`
   asserts, a slot of the records on the cycle being read against it before the whole kernel links.
   `record_field.value` is typed `type!`, a dependent field, whose value a schema document holds as written through a
   reader of its own (`DependentFieldReader`), so the record waits on no entry for it. `instanceBody` covers the shapes
-  those apply — a bare `{}` (each target's unconstrained constant, `void` among them), a bare token array (`enum`), a
-  record of tokens (`meta.ref` with its `of`, `meta.map` for
-  `meta.field_map`, `meta.set_type` for `meta.enum_set`, with its `min_items`/`max_items`), and a record holding a token
-  array (`meta.choice`) — and refuses any other target; `refinedBody` merges the integer family's `min`, `max` and
-  `size`. The set is built before anything is read, and
-  `meta.type_inline`, a record read from its grammar that reads nothing, is readied with it: a record's field written in
-  place is read against `meta.type_expr`, whose untagged recovery classifies both its variants. Once every entry is
-  ready the chains are closed transitively, as `SchemaResolver` closes a schema's (`completeChains`).
+  those apply — a bare `{}` (each target's unconstrained constant, `void` among them), a record of tokens (`meta.ref`
+  with its `of`, `meta.map` for `meta.field_map`, `meta.array` for `meta.enum_set`), and a record holding a token array
+  (`meta.choice`, `meta.enum_type`) — and refuses any other target; `refinedBody` merges the integer family's `min`,
+  `max` and `size`, and a reference's `of`. **A pre-loaded completion is merged on the written form**
+  (`completion`): `boolean => !enum [true false]` and `meta.enum_set => !meta.set_type { … }` take their incomplete
+  entry's fields from its declaration, since resolving `enum` reads `name_type` against `meta.identifier_ref` and
+  `meta.set_type` reads its facets against `boolean`, each of which waits on this cycle. The set is built before
+  anything is read, and `meta.type_inline`, a record read from its grammar that reads nothing, is readied with it: a
+  record's field written in place is read against `meta.type_expr`, whose untagged recovery classifies both its
+  variants. So is `unicode.identifier_type`, the `of` of `meta.identifier_ref`: whether a name read against a reference
+  is a type's is a fact about its `of`, and a partial link that lacks it reads the name as a value's. Once every entry
+  is ready the chains are closed transitively, as `SchemaResolver` closes a schema's (`completeChains`).
   `KernelBootstrapResolverTest` measures the cycle with `WaitGraph` from `spec/fixtures/meta-resolved.tn` (the six
   maps read as their members under their paths; a type written in place at a slot is no entry, and a read against it
   waits on what reading its construction reaches) and asserts the hand-built names equal it, so a kernel edit that
-  moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 76 entries (63 members of the six maps
-  and 13 at the root; the maps themselves make the kernel's 82 resolved entries), one cycle of 31, longest wait chain
-  3 — and asserts the kernel contains the cycle's closure (67 entries) and the related concepts. The type slots put
+  moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 74 entries (63 members of the six maps
+  and 11 at the root; the maps themselves make the kernel's 80 resolved entries), one cycle of 31, longest wait chain
+  3 — and asserts the kernel contains the cycle's closure (66 entries) and the related concepts. `enum` writing
+  `name_type` puts `meta.identifier_ref` on the cycle, through every enum on it. The type slots put
   the choice constructor on it: a record field's type is read against `meta.type_expr`, a choice asserted disjoint,
   and a type written in place reaches every constructor's record through `meta.type`, so the disjoint assertion,
-  `void` and `meta.record_extension_type` are on it too. Of the 31, 11 are hand-built; the other 20 are records and
+  `void` and `meta.record_extension_type` are on it too. Of the 31, 12 are hand-built; the other 19 are records and
   compositions resolved from their grammar.
 - **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition,
   a refinement of a record (`meta.ref` among them), an alias — as `SchemaResolver` resolves one. The bootstrap readies these
   and
-  the pre-loaded set first, so the first compile holds every head a read applies. Two entries wait on the cycle
-  and stay off it: `meta.namespace => meta.map & { … }` waits on its parent `meta.map`, and `meta.identifier_ref =>
-  !meta.type_ref ^ { … }` on `meta.type_ref`, hand-built; the names their `key_type` and `of` hold order nothing, so
-  neither is a wait of the cycle's entries and the measurements above stand.
+  the pre-loaded set first, so the first compile holds every head a read applies. `meta.namespace => meta.map & { … }`
+  waits on the cycle and stays off it: it waits on its parent `meta.map`, and the name its `key_type` holds orders
+  nothing, so it is no wait of the cycle's entries.
 - **Every other instance is read at a checkpoint**, as every schema's is (above), its readers compiled by
   `TsonSchemaLinker.linkReady(ready, null, pending)` then `TsonSchemaCompiler.compileReady`. A held value binds as
   written -- base type resolution's token, carried by the field's bridge -- and is judged when the whole kernel links:

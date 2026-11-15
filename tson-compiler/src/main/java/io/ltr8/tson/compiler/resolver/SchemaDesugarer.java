@@ -348,7 +348,7 @@ final class SchemaDesugarer {
     /**
      * A parameter list before a body that is no record ([TSON-SCHEMA] §5.10: a template's body is a record body --
      * braces, a composition or a refinement), refused with what to write instead. A sugar form is a construction,
-     * applied where it is used or declared as a refined constructor; a choice or a tuple is a discriminated record
+     * applied where it is used or left open and completed there; a choice or a tuple is a discriminated record
      * family or a field group; a bare reference is an alias template, which names a partial application nothing
      * could close.
      */
@@ -357,9 +357,9 @@ final class SchemaDesugarer {
                 + "refinement (§5.10) -- and '" + spell(body) + "' is ";
         return new SchemaValidationException(prefix + switch (body) {
             case ArrayExpr _ -> "an array. Write the application where it is used ('meta.array<T>', '[T]'), or "
-                    + "declare a refined constructor ('nonempty_type => meta.array ^ { min_items?: = 1 }') and apply it";
+                    + "leave its construction open ('nonempty => !meta.array ^ { min_items: 1 }') and complete it";
             case MapExpr _ -> "a map. Write the application where it is used ('meta.map<K V>', '{K => V}'), or "
-                    + "declare a refined constructor ('bounded_map => meta.map ^ { max_items?: = 10 }') and apply it";
+                    + "leave its construction open ('bounded_map => !meta.map ^ { max_items: 10 }') and complete it";
             case ChoiceExpr _ -> "a choice. Declare a discriminated record family instead (an abstract base with a "
                     + "selector, a template composing it, and members pinning it), or write the alternative as a "
                     + "field group inside a record, '( body: T | problem: problem )'";

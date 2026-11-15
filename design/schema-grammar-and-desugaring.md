@@ -78,8 +78,8 @@ does ([TSON-SCHEMA] §3.4.1).
   the annotations on its field keys), so `[T; 3]` and `[T; 3..3]`, and a radix-spelled bound and
   its decimal, are one construction. Nothing is named, so nothing is hashed. The constructor is held on the
   `TypeInline` beside its body (`TypeInline.constructor`, `@Unbound`: the tag on `of`, no field of the wrapper), the
-  entry the construction applies past its alias hops, so `nonempty_type<uuid>` and `[uuid; 1..]` are two types though
-  their bodies are equal, and `set<text>` is `meta.set_type`'s.
+  entry the construction applies past its alias hops, so a schema's own constructor's construction and the kernel's are
+  two types though their bodies are equal, and a completion, `set<text>`, is held under its constructor, `meta.array`.
 - **A name and a construction are never one type** (§8.2), even a name for the very construction written: a
   restated field's narrowing (`TsonSchemaLinker.narrows`) holds two constructions to equality and two names to IS-A,
   and refuses a name restated as its construction or the reverse, naming the inherited spelling to write; variant

@@ -39,7 +39,9 @@ class TypeInlineTest {
         assertEquals("nonempty_type<uuid>", new TypeInline("nonempty_type", AT_LEAST_ONE).text());
         ArrayBody set = new ArrayBody(TypeChain.EMPTY, TypeRef.of("text"), false, false, true, Optional.empty(),
                 Optional.empty());
-        assertEquals("set<text>", new TypeInline("meta.set_type", set).text());
+        assertEquals("set<text>", new TypeInline(set).text());
+        assertEquals("[text; 1..]", new TypeInline(new ArrayBody(TypeChain.EMPTY, TypeRef.of("text"), false, false,
+                true, Optional.of(1L), Optional.empty())).text(), "a bounded set, which set<T> cannot spell");
         assertEquals("meta.ref<order>", new TypeInline("meta.ref", RefBody.of("order")).text());
         assertEquals("{text => nonempty_type<uuid>}", new TypeInline(MapBody.of(TypeRef.of("text"),
                 new TypeInline("nonempty_type", AT_LEAST_ONE))).text());

@@ -107,7 +107,7 @@ class KernelBootstrapResolverTest {
     @Test
     void booleanResolvesEvenThoughEnumItselfIsDeclaredLaterInTheFile() {
         // boolean => !enum [true false] appears near the top of the file and enum much later: the order is the
-        // entries' waits, never the order they are written in.
+        // entries' waits, never the order they are written in. It completes `enum`, so it is that construction.
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         Top booleanDef = schema.entries().get("boolean");
@@ -153,14 +153,15 @@ class KernelBootstrapResolverTest {
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, and the phase
      * adds no declaration: each {@code [X]} at a field's type is the construction written in place there, so the
-     * output is the kernel's 77 declarations -- its six maps' members and the root's own -- and the six maps, and
+     * output is the kernel's 77 declarations -- its six maps' members and the root's own, its three incomplete
+     * entries and alias of one among them -- and the six maps, and
      * {@code record.parents} holds its array in place.
      */
     @Test
     void theFixtureDeclarationsResolveWithNoEntryAdded() {
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
-        assertEquals(82, schema.entries().size());
+        assertEquals(83, schema.entries().size());
         io.ltr8.tson.schema.meta.RecordBody chain =
                 (io.ltr8.tson.schema.meta.RecordBody) schema.entries().get("meta.type_chain");
         assertEquals(new io.ltr8.tson.schema.meta.TypeInline(io.ltr8.tson.schema.meta.ArrayBody.of(

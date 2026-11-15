@@ -113,10 +113,9 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("meta.void_type", voidFactory);
         factories.put("meta.record", RecordDispatch.over(record));
         factories.put("meta.array", array);
-        factories.put("meta.set_type", array);
         factories.put("meta.map", map);
         factories.put("meta.tuple", tuple);
-        factories.put("enum", leaf.apply(enumFactory));
+        factories.put("meta.enum_type", leaf.apply(enumFactory));
         factories.put("meta.choice", choice);
         factories.put("meta.declared_type", DeclaredReader.FACTORY);
 

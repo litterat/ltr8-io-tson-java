@@ -241,10 +241,10 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   the last mangled to PascalCase (`numeric.integer_type` to `numeric.IntegerType`, `unicode.text_type` to
   `unicode.TextType`), with an alias table keyed by full path where the entry's name does not reach its class (`meta.record`
   to `meta.RecordBody`, `temporal.datetime_type` to `temporal.DateTimeType`). The model has one package per namespace so that
-  rule holds: a class lives where its entry is declared. A vocabulary name the model binds no class for (`enum`, a root name,
-  which mangles into `io.ltr8.tson.schema` itself) falls back along its tightening chain rather than to a consumer class, and
-  a name no library schema declares never reaches the model's packages however it mangles -- they also hold the resolver's
-  own classes (`Token`, `EntryKind`, `OpenEntry`, `ValueEntry`), which are no schema's vocabulary. The libraries' roots,
+  rule holds: a class lives where its entry is declared. A vocabulary name the model binds no class for (`enum`, a root
+  name, which mangles into `io.ltr8.tson.schema` itself) is still never a consumer class's, and a name no library schema
+  declares never reaches the model's packages however it mangles -- they also hold the resolver's own classes (`Token`,
+  `EntryKind`, `OpenEntry`, `ValueEntry`), which are no schema's vocabulary. The libraries' roots,
   core.tn and policy.tn are outside the set: their values are data (the CLI binds policy.tn's `policy.processor` and its
   parts to its own classes). A value entry whose type the context binds no class for is held as a tree, so the schema still
   loads and validates; the bind registry refuses it (`design/compiled-registries.md`).

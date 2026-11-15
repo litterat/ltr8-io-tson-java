@@ -8,6 +8,7 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.Completion;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueRef;
 
@@ -37,8 +38,8 @@ import java.util.Optional;
  * so the two never disagree.
  *
  * <p><b>{@link #facts} holds what a value's Java shape cannot</b>, per entry ({@link EntryFacts}): where it was
- * declared, the annotations written on its value, the constructor its value applies and the entry a refinement
- * names. None of it is a field of any constructor, so binding a value never fills it, and none of it is written.
+ * declared, the annotations written on its value and the constructor its value applies. None of it is a field of any
+ * constructor, so binding a value never fills it, and none of it is written.
  *
  * <p><b>An instantiation's application is a key annotation</b>, {@code @meta.application} ({@link #applicationOf}):
  * the entry's value is the closed record, which states its fields and its chain and not the head it was substituted
@@ -98,47 +99,39 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     /**
      * An entry's facts beyond its value ({@link TsonSchema}'s own Javadoc). {@code position} is where the
      * declaration's name sits in the schema text it was resolved from. {@code annotations} are those written after
-     * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before
-     * the name are the key's ({@link #entries}). {@code constructor} is the constructor
-     * the value applies -- the tag resolved output writes, {@code !numeric.integer_type}, {@code !enum}, {@code
-     * !meta.set_type} -- which binding erases into a class that several constructors share. {@code refines} is the
-     * entry a {@code ^} declaration's head names, as written: §5.7's refinement restates fields and adds none,
-     * which is what lets a tightened constructor bind as the one it tightens, and the chain cannot tell it from a
-     * composition adding nothing. All of it is provenance, and none of it is written ([TSON-SCHEMA] §8.1).
+     * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before the
+     * name are the key's ({@link #entries}). {@code constructor} is the constructor the value applies -- the tag
+     * resolved output writes, {@code !numeric.integer_type}, {@code !meta.enum_type}, a schema's own {@code !list_type}
+     * -- which binding erases into a class that several constructors share. All of it is provenance, and none of it is
+     * written ([TSON-SCHEMA] §8.1).
      */
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
-                             Optional<String> constructor, Optional<String> refines) {
+                             Optional<String> constructor) {
 
-        /** An entry with none of the four. */
-        public static final EntryFacts NONE = new EntryFacts(Optional.empty(), Annotations.empty(), Optional.empty(),
-                Optional.empty());
+        /** An entry with none of the three. */
+        public static final EntryFacts NONE = new EntryFacts(Optional.empty(), Annotations.empty(), Optional.empty());
 
         public EntryFacts {
             position = position == null ? Optional.empty() : position;
             annotations = annotations == null ? Annotations.empty() : annotations;
             constructor = constructor == null ? Optional.empty() : constructor;
-            refines = refines == null ? Optional.empty() : refines;
         }
 
         /** Whether this holds nothing at all -- the facts a schema need not record. */
         public boolean isEmpty() {
-            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty() && refines.isEmpty();
+            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty();
         }
 
         public EntryFacts withPosition(Optional<SourcePosition> position) {
-            return new EntryFacts(position, annotations, constructor, refines);
+            return new EntryFacts(position, annotations, constructor);
         }
 
         public EntryFacts withAnnotations(Annotations annotations) {
-            return new EntryFacts(position, annotations, constructor, refines);
+            return new EntryFacts(position, annotations, constructor);
         }
 
         public EntryFacts withConstructor(Optional<String> constructor) {
-            return new EntryFacts(position, annotations, constructor, refines);
-        }
-
-        public EntryFacts withRefines(Optional<String> refines) {
-            return new EntryFacts(position, annotations, constructor, refines);
+            return new EntryFacts(position, annotations, constructor);
         }
 
         /** An entry declared at {@code position}. */
@@ -343,6 +336,25 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
         return Annotations.of(values);
     }
 
+    /**
+     * The incomplete entries {@code name}'s declaration completed ([TSON-SCHEMA] §8.1): the {@code @meta.completion}
+     * its key carries. Empty for an entry that completes none, a completion written in place having no key.
+     */
+    public Optional<Completion> completionOf(String name) {
+        return entries.getAnnotations(name).value(COMPLETION, Completion.class);
+    }
+
+    /** {@code annotations} with {@code @meta.completion:completion} added -- the key of a declared completion. */
+    public static Annotations withCompletion(Annotations annotations, Completion completion) {
+        List<io.ltr8.annotation.Annotation> values = new java.util.ArrayList<>(annotations.values());
+        values.removeIf(annotation -> annotation.name().equals(COMPLETION));
+        values.add(io.ltr8.annotation.Annotation.of(COMPLETION, completion));
+        return Annotations.of(values);
+    }
+
+    /** The kernel's {@code completion} annotation, derived and never author-written (§8.1). */
+    public static final String COMPLETION = "meta.completion";
+
     /** The kernel's {@code schema}, the namespace type the schema map is a value of. */
     public static final String SCHEMA = "meta.schema";
 
@@ -360,9 +372,8 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     }
 
     /**
-     * The constructor {@code value}'s class is named for, by its {@link Typename} -- exact where one constructor
-     * has that shape, and only one of them where several share it ({@code enum_type}, {@code enum} and a meta
-     * layer's own tightening of either are one class), which is why an entry's own facts are asked first. A
+     * The constructor {@code value}'s class is named for, by its {@link Typename}: the constructor past its alias
+     * hops, where an entry's own facts record the tag as written, which is why they are asked first. A
      * value entry names its own: the type it is a value of; an incomplete entry the constructor it builds.
      */
     public static String constructorOf(Top value) {

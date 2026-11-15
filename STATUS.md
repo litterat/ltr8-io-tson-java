@@ -73,10 +73,11 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] A bundled document's root holds only what an author writes (Part 2 §9) — the
       one kernel document, meta.tn, pre-loaded and importing nothing, is its wait cycle's closure plus the map, tuple,
       choice, template, reference and octet-sequence vocabulary and the classifying annotations; its root is `void`,
-      `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum` (`!enum [A B]`),
-      `set<T>` and `schema`, the alias of `meta.schema` every schema map's tag names, and all its machinery sits under
-      the open namespace `meta` (`meta.record`, `meta.identifier`, `meta.type_ref`, `meta.ref<meta.record>`,
-      `binary.bytes_type`, `@atom.ordering:TOTAL`, `@meta.application`).
+      `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum` (`!enum [A B]`) and
+      `set<T>`, each completing an incomplete entry, and `schema`, the alias of `meta.schema` every schema map's tag
+      names, and all its machinery sits under the open namespace `meta` (`meta.record`, `meta.identifier`,
+      `meta.type_ref`, `meta.ref<meta.record>`,
+      `binary.bytes_type`, `@atom.ordering:TOTAL`, `@meta.application`, `@meta.completion`).
       The data-format libraries numeric.tn, temporal.tn and net.tn each import the kernel alone, hold their
       instances at their root (`int32`, `date`, `uuid`) and their constructors under a map of their own
       (`numeric.decimal_type`, `temporal.date_type`, `net.uuid_type`). core.tn imports the three and its root holds

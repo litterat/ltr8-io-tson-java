@@ -180,7 +180,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         private DataClass descriptorFor(String name, Top definition, ValueReaderContext vctx) {
             DataBindException first = null;
             StringBuilder tried = new StringBuilder();
-            for (String candidate : vctx.bindingNamesFor(name, definition)) {
+            for (String candidate : vctx.bindingNamesFor(name)) {
                 try {
                     return context.getDescriptor(candidate);
                 } catch (UnboundNameException e) {

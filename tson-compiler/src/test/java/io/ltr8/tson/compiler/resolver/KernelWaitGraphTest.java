@@ -48,14 +48,13 @@ class KernelWaitGraphTest {
         int longest = depth.values().stream().mapToInt(Integer::intValue).max().orElse(0);
         assertTrue(longest <= WAIT_DEPTH_LIMIT, "the longest wait chain is " + longest);
     }
-
     /**
      * The kernel holds what its one cycle needs to resolve and link on its own -- the cycle, what reading the document
      * itself waits on (its root tag's {@code schema}, an alias of {@code meta.schema}, the key and value types that
-     * reads, the annotations on its header and on its keys, {@code @atom.ordering} and {@code @atom.bounded} among
-     * them), and every entry a declaration of that set names, closed to a fixed point -- and the concepts that belong
-     * with them, which nothing in the closure names: the tuple and choice constructors and the tuple's element, the
-     * {@code application} annotation, the {@code ref} reference with {@code field_name}, the root's {@code set}, the
+     * reads, the annotations on its header and on its keys, {@code @atom.ordering}, {@code @atom.bounded} and {@code
+     * @meta.completion} among them), and every entry a declaration of that set names, closed to a fixed point -- and
+     * the concepts that belong with them, which nothing in the closure names: the tuple and choice constructors and the
+     * tuple's element, the {@code application} annotation, the {@code ref} reference with {@code field_name}, the
      * {@code disjoint} assertion, and the octet-sequence constructor with its encodings and instance. An open record's
      * {@code param} and {@code param_name} are in the closure, reached through {@code record.parameters}. The choice
      * constructor and the disjoint assertion are on the cycle: a record field's type is read against {@code
@@ -87,12 +86,12 @@ class KernelWaitGraphTest {
 
         assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
         assertEquals(31, cycle.size(), "the cycle");
-        assertEquals(67, closure.size(), "the cycle's closure");
-        assertEquals(76, graph.entries().size(), "the kernel's entries");
+        assertEquals(66, closure.size(), "the cycle's closure");
+        assertEquals(74, graph.entries().size(), "the kernel's entries");
         assertTrue(closure.containsAll(List.of("meta.param", "meta.param_name")), "reached through record.parameters");
         assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application", "meta.apply",
                 "binary.bytes_encoding", "binary.bytes_type",
-                "meta.field_name", "meta.tuple", "meta.tuple_element", "set")),
+                "meta.field_name", "meta.tuple", "meta.tuple_element")),
                 new java.util.TreeSet<>(related), "the related concepts");
     }
 

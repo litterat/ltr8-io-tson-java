@@ -78,7 +78,7 @@ class CrossEncodingParityTest {
               in_place  => { grid: [[text]]  prices: {text => [int32]}  pair: [text, int32]  id: ( int32 | text ) }
               ip_page   => <T> { items: [T]  size?: int32 ~ 10 }
               ip_holder => { p: ip_page<text>  ps?: [ip_page<int32>] }
-              pair_of   => meta.array ^ { min_items?: = 1  max_items?: = 2 }
+              pair_of   => !meta.array ^ { min_items: 1  max_items: 2 }
               refined   => { few: pair_of<int32>  many: [int32; 1..2] }
               setting   => { kind: meta.type_expr  v?: kind! }
               scalars   => ( text | int32 | boolean )
@@ -1012,17 +1012,17 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A refined constructor applied in place is named by its application in both encodings, and the sugar its body
-     * also fits by its own form: the two are two types (§1.2), whatever data they admit alike.
+     * A completion in place is the construction it completes to, named alike in both encodings and alike with the
+     * sugar that writes the same construction (§5.5).
      */
     @Test
-    void aRefinedConstructorInPlaceIsNamedByItsApplication() {
+    void aCompletionInPlaceIsNamedByTheConstructionItIs() {
         sameRule("refined", "{ few: [1 2 3]  many: [1 2 3] }", """
                 {"few": [1, 2, 3], "many": [1, 2, 3]}""");
         List<String> messages = jsonDiagnostics("refined", """
                 {"few": [1, 2, 3], "many": [1, 2, 3]}""").stream().map(Diagnostic::message).toList();
         assertEquals(2, messages.size(), messages::toString);
-        assertTrue(messages.get(0).startsWith("'pair_of<int32>'"), messages.get(0));
+        assertTrue(messages.get(0).startsWith("'[int32; 1..2]'"), messages.get(0));
         assertTrue(messages.get(1).startsWith("'[int32; 1..2]'"), messages.get(1));
     }
 

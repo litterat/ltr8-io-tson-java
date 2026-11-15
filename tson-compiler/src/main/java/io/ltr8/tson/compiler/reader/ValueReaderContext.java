@@ -2,12 +2,10 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -142,65 +140,24 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
         return Map.copyOf(fixed);
     }
 
-    /** {@link #bindingNamesFor(String, Top)} for a name whose definition this looks up itself. */
-    public List<String> bindingNamesFor(String name) {
-        Top definition = schema().entries().get(name);
-        return definition == null ? List.of(name) : bindingNamesFor(name, definition);
-    }
-
     /**
-     * The names a bind lookup for entry {@code name} tries, in order: the names an author wrote for it, the
-     * entry's own, then -- for a constructor that tightens another -- that constructor's, up its chain.
+     * The names a bind lookup for entry {@code name} tries, in order: the names an author wrote for it, then the
+     * entry's own.
      *
      * <p><b>A binding map is written in the names the author wrote.</b> Only an entry with no source position --
      * one the kernel's bootstrap builds, or one read from a resolved form -- is also looked up under the names
      * that reach it through an alias, which is the same test {@code EntryDisplayName} applies: an entry with a
      * source position was declared, so its own name is the one the author wrote and an alias naming it must never
      * redirect its binding.
-     *
-     * <p><b>A tightened constructor binds as the one it tightens.</b> {@code set_type => array ^ { ... }} and
-     * {@code enum => enum_type ^ { name_type?: = meta.identifier }} restate fields and add none (§5.7), so their
-     * instances have the shape of the source's, and a class for the source is a class for them. Without the
-     * fallback every such constructor -- a meta layer's {@code kebab_enum => enum_type ^ { name_type?: = kebab }}
-     * included -- would need a class of its own for a shape it does not change. It is tried last, so a class
-     * mapped under the tightening's own name still wins, and it is confined to constructors: an ordinary record
-     * refining another may be bound to a narrower class, and falling back to its parent's would lose that
-     * silently.
      */
-    public List<String> bindingNamesFor(String name, Top definition) {
+    public List<String> bindingNamesFor(String name) {
+        if (schema().entries().get(name) == null) {
+            return List.of(name);
+        }
         List<String> written = schema().positionOf(name).isPresent()
                 ? List.of() : referrers.getOrDefault(name, List.of());
         List<String> candidates = new ArrayList<>(written);
         candidates.add(name);
-        for (String tightened = tightenedBy(name, definition); tightened != null; ) {
-            if (candidates.contains(tightened)) {
-                break;
-            }
-            candidates.add(tightened);
-            Top step = schema().entries().get(tightened);
-            tightened = step == null ? null : tightenedBy(tightened, step);
-        }
         return List.copyOf(candidates);
-    }
-
-    /**
-     * The constructor entry {@code name} tightens, or {@code null}: a constructor (IS-A the kernel's {@code top})
-     * declared by §5.7's refinement, whose one written parent -- recorded where the declaration resolved, since
-     * its chain cannot tell {@code ^} from a composition adding nothing -- is, at the end of its alias
-     * chain, a constructor too. A refinement restates fields and adds none, so its instances have its source's
-     * shape.
-     */
-    private String tightenedBy(String name, Top definition) {
-        if (!(definition instanceof RecordBody) || !linked.isConstructor(name, definition)) {
-            return null;
-        }
-        String refined = schema().factsOf(name).refines().orElse(null);
-        if (refined == null) {
-            return null;
-        }
-        String source = AliasChain.terminal(refined, schema().entries()::get);
-        boolean constructor = schema().entries().get(source) instanceof RecordBody body
-                && linked.isConstructor(source, body);
-        return constructor ? source : null;
     }
 }
