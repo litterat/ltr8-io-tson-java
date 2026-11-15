@@ -21,8 +21,8 @@ import java.util.regex.Pattern;
  * is not an instant on the UTC timeline core's {@code datetime} is. Holds a {@link DateTimeType} -- the pure
  * constraint values, unchanged by this split -- rather than declaring those fields itself.
  *
- * <p>{@code precision} constrains the value, not the spelling (§5.5), through {@link FractionalSeconds}, as
- * for {@link TimeParser}.
+ * <p>{@code fraction_digits} constrains the value, not the spelling (§5.5), through {@link FractionalSeconds},
+ * as for {@link TimeParser}.
  */
 public record DateTimeParser(DateTimeType constraints) implements AtomTypeParser<OffsetDateTime> {
 
@@ -64,7 +64,7 @@ public record DateTimeParser(DateTimeType constraints) implements AtomTypeParser
     }
 
     private void validate(OffsetDateTime value, String text) {
-        FractionalSeconds.check(constraints.precision(), value.getNano(), text, "datetime");
+        FractionalSeconds.check(constraints.fractionDigits(), value.getNano(), text, "datetime");
         constraints.min().ifPresent(m -> {
             if (value.isBefore(m)) {
                 throw new AtomValidationException("'" + text + "' is before the minimum " + m, ">= " + m);

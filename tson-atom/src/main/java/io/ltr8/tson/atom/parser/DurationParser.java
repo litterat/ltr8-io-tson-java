@@ -16,9 +16,9 @@ import java.util.regex.Pattern;
  * duration} atom): elapsed time, as a signed <b>exact decimal</b> number of seconds. The lexical form permits
  * a decimal fraction on the seconds component and nowhere else, so no non-terminating fraction is writable --
  * {@code PT1/3S} is not a token -- and every duration is therefore a terminating decimal count of seconds.
- * That is {@code number}'s value space measured in seconds, which is what makes {@code precision} exactly
- * {@code fraction_digits} on that count and {@code multiple_of} exactly {@code number}'s own: the facets are
- * definitions rather than rules of their own.
+ * That is {@code number}'s value space measured in seconds, which is what makes {@code fraction_digits} and
+ * {@code multiple_of} exactly {@code number}'s own on that count: the facets are definitions rather than rules
+ * of their own.
  *
  * <p><b>The grammar is RFC 3339 Appendix A's {@code duration} production with three extensions and one
  * restriction</b>, and the restriction is what makes the family orderable. Extensions: an optional leading
@@ -35,9 +35,9 @@ import java.util.regex.Pattern;
  * calendar and clock components the order was partial and the bounds it declared went unchecked.
  *
  * <p><b>Both ends of the value space are fixed at a signed 64-bit count of nanoseconds</b> -- see {@link
- * #MAX_FRACTION_DIGITS}. Within that, {@code precision} constrains the <em>value</em> and never the spelling,
- * as {@code time_type}'s own {@code @doc} states for the same facet: {@code PT0.50S} is a whole number of
- * tenths and {@code precision: 1} admits it. Nothing is truncated; a value genuinely off the grid is
+ * #MAX_FRACTION_DIGITS}. Within that, {@code fraction_digits} constrains the <em>value</em> and never the
+ * spelling, as {@code time_type}'s own {@code @doc} states for the same facet: {@code PT0.50S} is a whole number
+ * of tenths and {@code fraction_digits: 1} admits it. Nothing is truncated; a value genuinely off the grid is
  * rejected. {@code multiple_of} is tested on the magnitude, so {@code -PT30M} is a multiple of {@code PT15M}.
  */
 public record DurationParser(DurationType constraints) implements AtomTypeParser<Duration> {
@@ -154,14 +154,12 @@ public record DurationParser(DurationType constraints) implements AtomTypeParser
     private static final BigInteger NANOS_PER_SECOND = BigInteger.valueOf(1_000_000_000L);
 
     private void validate(Duration value, BigDecimal seconds, String text) {
-        // `precision: N` is `fraction_digits: N` on the seconds count, which is a constraint on the value and
-        // not on the spelling -- so PT0.50S is a whole number of tenths and `precision: 1` admits it, the
-        // same rule and the same wording time_type's own @doc already carries.
-        constraints.precision().ifPresent(precision -> {
-            if (Math.max(seconds.stripTrailingZeros().scale(), 0) > precision) {
-                throw new AtomValidationException("'" + text + "' is not a whole number of 10^-" + precision
+        // A constraint on the value and not on the spelling: PT0.50S is a whole number of tenths.
+        constraints.fractionDigits().ifPresent(digits -> {
+            if (Math.max(seconds.stripTrailingZeros().scale(), 0) > digits) {
+                throw new AtomValidationException("'" + text + "' is not a whole number of 10^-" + digits
                         + " seconds, which is the resolution this duration admits",
-                        "a whole number of 10^-" + precision + " seconds");
+                        "a whole number of 10^-" + digits + " seconds");
             }
         });
         constraints.min().ifPresent(min -> require(value.compareTo(min) >= 0, text, ">= " + min));

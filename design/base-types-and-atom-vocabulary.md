@@ -231,13 +231,13 @@ does narrow, such as a media type that must parse, is a type of its own.
   rationale it carries no `multiple_of`: a step cannot hold on a binary grid.
 - **No facet counts written digits, because scale is not part of the value.** numeric.tn and temporal.tn say it for both
   families that carry a digit-count facet — `numeric.decimal_type`'s "`1`, `1.0` and `1.00` are one value", and
-  `temporal.time_type`'s "`12:00:00.500` is admitted under `precision: 1`". So `precision: N` tests that the value is a whole
-  number of 10⁻ᴺ seconds (`FractionalSeconds`, over the parsed nanosecond field, for `time`/`datetime`; `DurationParser`,
-  over the seconds count's stripped scale, for `duration`), and `total_digits`/`fraction_digits` measure
-  `stripTrailingZeros()` (`DecimalParser`). The value handed back is exactly as written — only the measurement strips, the
-  same split `members` makes.
+  `temporal.time_type`'s "`12:00:00.500` is admitted under `fraction_digits: 1`". So on the temporal families
+  `fraction_digits: N` tests that the value is a whole number of 10⁻ᴺ seconds (`FractionalSeconds`, over the parsed
+  nanosecond field, for `time`/`datetime`; `DurationParser`, over the seconds count's stripped scale, for `duration`), and
+  on `decimal_type` `total_digits`/`fraction_digits` measure `stripTrailingZeros()` (`DecimalParser`). The value handed
+  back is exactly as written — only the measurement strips, the same split `members` makes.
 - **`duration` is a signed exact decimal number of seconds, bounded at both ends by a signed 64-bit count of
   nanoseconds** ([TSON-DATA] §5.4, [TSON-SCHEMA] §5.5) — the spec's range, not `java.time.Duration`'s, which is three
   orders of magnitude wider. `DurationParser` enforces it on read and `DurationType.coherenceCheck` on every bound and
-  `precision`, so a `DurationType` built in Java cannot carry one outside it either; that is what makes
+  `fraction_digits`, so a `DurationType` built in Java cannot carry one outside it either; that is what makes
   `DurationType.isMultiple`'s `toNanos` total.

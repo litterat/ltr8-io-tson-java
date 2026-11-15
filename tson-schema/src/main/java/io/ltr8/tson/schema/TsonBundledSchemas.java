@@ -67,13 +67,13 @@ public final class TsonBundledSchemas {
     public static final String NUMERIC_SHA256 = "232d69baaab99ddafae750f5421174a506749e736e50a3cce8856e13d5906049";
 
     /** temporal's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/temporal.tn}'s !!id. */
-    public static final String TEMPORAL_SHA256 = "3f788a9e5927b72770d7cec1ce61ac172eb573f948459b84371a7e0c0de1689c";
+    public static final String TEMPORAL_SHA256 = "f5e1dbd8dc17ee0893d6fb3ab39e608d05de34fd078068a13de1778638962339";
 
     /** net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code !!id}. */
     public static final String NET_SHA256 = "cb8a29d39a45c3ebd755293ccdb927c0c3821d0c8d7b4e0af9b1725867d5f29e";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. */
-    public static final String CORE_SHA256 = "8cd8be3d3c0d98d7c053029ab427ff117fa7d8754ed83b6c1269c79be9ee3f6d";
+    public static final String CORE_SHA256 = "815fabda0f7d6feee0599b70bbbb191de08b9bdaab468da58125b36a018b2a18";
 
     /** policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s !!id. */
     public static final String POLICY_SHA256 = "5aeeaa0499b641eda1ce15a88f7a28f97f226f0b60743e52ee7970fab431f7c1";

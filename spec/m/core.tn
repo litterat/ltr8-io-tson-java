@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/40/m/core.tn?sha256=8cd8be3d3c0d98d7c053029ab427ff117fa7d8754ed83b6c1269c79be9ee3f6d"
+!!id:"https://tson.io/2026/40/m/core.tn?sha256=815fabda0f7d6feee0599b70bbbb191de08b9bdaab468da58125b36a018b2a18"
 !!import:"https://tson.io/2026/40/m/numeric.tn?sha256=232d69baaab99ddafae750f5421174a506749e736e50a3cce8856e13d5906049"
-!!import:"https://tson.io/2026/40/m/temporal.tn?sha256=3f788a9e5927b72770d7cec1ce61ac172eb573f948459b84371a7e0c0de1689c"
+!!import:"https://tson.io/2026/40/m/temporal.tn?sha256=f5e1dbd8dc17ee0893d6fb3ab39e608d05de34fd078068a13de1778638962339"
 !!import:"https://tson.io/2026/40/m/net.tn?sha256=cb8a29d39a45c3ebd755293ccdb927c0c3821d0c8d7b4e0af9b1725867d5f29e"
 @doc:"""
   TSON core: every bundled type in one import. It imports numeric.tn,

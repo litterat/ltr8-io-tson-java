@@ -80,13 +80,13 @@ class TimeParserTest {
     }
 
     /**
-     * <b>{@code precision} constrains the value, not the spelling</b> (§5.5): {@code precision: N} admits an
-     * instant that is a whole number of 10⁻ᴺ seconds. temporal.tn's own {@code @doc} gives the example this
-     * turns on -- "{@code 12:00:00.500} is admitted under {@code precision: 1}". The atom is exact either way: an
-     * instant genuinely off the grid is refused rather than rounded onto it.
+     * <b>{@code fraction_digits} constrains the value, not the spelling</b> (§5.5): {@code fraction_digits: N}
+     * admits an instant that is a whole number of 10⁻ᴺ seconds. temporal.tn's own {@code @doc} gives the example
+     * this turns on -- "{@code 12:00:00.500} is admitted under {@code fraction_digits: 1}". The atom is exact
+     * either way: an instant genuinely off the grid is refused rather than rounded onto it.
      */
     @Test
-    void precisionConstrainsTheValueNotTheSpelling() {
+    void fractionDigitsConstrainsTheValueNotTheSpelling() {
         TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
                 Optional.of(3L)));
         assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));
@@ -118,9 +118,9 @@ class TimeParserTest {
         assertEquals("at most 9 fractional-second digits", refused.expected());
     }
 
-    /** {@code precision: 0} admits no fractional part at all (§5.5). */
+    /** {@code fraction_digits: 0} admits no fractional part at all (§5.5). */
     @Test
-    void precisionZeroAdmitsNoFraction() {
+    void fractionDigitsZeroAdmitsNoFraction() {
         TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
                 Optional.of(0L)));
         assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));

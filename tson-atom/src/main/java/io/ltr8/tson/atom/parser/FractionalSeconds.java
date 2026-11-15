@@ -5,16 +5,16 @@ import io.ltr8.tson.atom.AtomValidationException;
 import java.util.Optional;
 
 /**
- * The {@code precision} facet of the temporal atom families (§5.5), shared by {@link TimeParser} and
+ * The {@code fraction_digits} facet of the temporal atom families (§5.5), shared by {@link TimeParser} and
  * {@link DateTimeParser} because it is one rule stated once for both.
  *
  * <p><b>It is a constraint on the value, not on the spelling</b>, which temporal.tn's own {@code @doc} for
- * {@code time_type} states and gives the example for: {@code precision: N} admits a value that is a whole
- * number of 10⁻ᴺ seconds, and reading "admits any spelling of an admitted value, trailing zeros included, so
- * {@code 12:00:00.500} is admitted under {@code precision: 1}". So the test is on the
+ * {@code time_type} states and gives the example for: {@code fraction_digits: N} admits a value that is a
+ * whole number of 10⁻ᴺ seconds, and reading "admits any spelling of an admitted value, trailing zeros included,
+ * so {@code 12:00:00.500} is admitted under {@code fraction_digits: 1}". So the test is on the
  * fractional-second field of the parsed value and never on how many digits the author happened to type --
- * counting the token would refuse {@code 12:00:00.500} at {@code precision: 1}, which denotes exactly the
- * half-second {@code 12:00:00.5} does.
+ * counting the token would refuse {@code 12:00:00.500} at {@code fraction_digits: 1}, which denotes exactly
+ * the half-second {@code 12:00:00.5} does.
  *
  * <p>The atom is exact either way: nothing is truncated, and a value genuinely off the grid is rejected
  * rather than rounded onto it.
@@ -24,7 +24,10 @@ final class FractionalSeconds {
     private FractionalSeconds() {
     }
 
-    /** One second in nanoseconds -- the resolution {@code java.time} carries, and the finest {@code precision} can name. */
+    /**
+     * One second in nanoseconds -- the resolution {@code java.time} carries, and the finest {@code fraction_digits}
+     * can name.
+     */
     private static final int NANOS_PER_SECOND_DIGITS = 9;
 
     /**
@@ -66,13 +69,13 @@ final class FractionalSeconds {
     /**
      * Refuses {@code nanoOfSecond} when it is not a whole number of 10⁻ᴺ seconds.
      *
-     * @param precision the facet, absent when the family leaves it unconstrained
-     * @param nanoOfSecond the parsed value's own fractional second, in nanoseconds
-     * @param text      the token as written, for the diagnostic
-     * @param atom      the atom's name, for the diagnostic
+     * @param fractionDigits the facet, absent when the family leaves it unconstrained
+     * @param nanoOfSecond   the parsed value's own fractional second, in nanoseconds
+     * @param text           the token as written, for the diagnostic
+     * @param atom           the atom's name, for the diagnostic
      */
-    static void check(Optional<Long> precision, int nanoOfSecond, String text, String atom) {
-        precision.ifPresent(allowed -> {
+    static void check(Optional<Long> fractionDigits, int nanoOfSecond, String text, String atom) {
+        fractionDigits.ifPresent(allowed -> {
             // At nine digits and beyond the grid is finer than the value can be, so everything is on it.
             if (allowed >= NANOS_PER_SECOND_DIGITS) {
                 return;

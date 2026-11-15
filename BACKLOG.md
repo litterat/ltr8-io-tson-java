@@ -489,10 +489,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   built-in vocabulary (the kernel's `integer` and `regex`), and `!int64`, the other kernel row, is accepted. Add the
   two rows to the schemaless vocabulary, check the rest of §5.3–§5.6's table against it, and add `class1` vectors for
   each.
-- [ ] **A `precision` above 9 loads** ([TSON-SCHEMA] §5.5, §7.4's coherence paragraph). `!temporal.time_type {
-  precision: 10 }` and `!time ^ { precision: 10 }` resolve; a precision above 9 is a schema-load coherence error on
-  `time_type`, `datetime_type` and `duration_type`. Add the check beside the families' other coherence rules (so it
-  runs again at materialisation) and `schema/invalid` vectors.
 - [ ] **A float format this library does not implement crashes as a schema error.** `!numeric.float_type { format:
   BINARY16 }` reports `SCHEMA_ERROR` wrapping `IllegalArgumentException: No enum constant …FloatType.Format.BINARY16`:
   `numeric.ieee_format` declares `BINARY16`, `BINARY128` and `BINARY256`, and `FloatType.Format` holds only

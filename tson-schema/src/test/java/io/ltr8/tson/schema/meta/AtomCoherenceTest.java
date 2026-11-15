@@ -352,6 +352,18 @@ class AtomCoherenceTest {
                 "is above");
     }
 
+    @Test
+    void everyFractionalSecondFamilyRefusesFractionDigitsFinerThanANanosecond() {
+        assertCoherent(new TimeType(Optional.empty(), Optional.empty(), some(9)));
+        assertViolation(new TimeType(Optional.empty(), Optional.empty(), some(10)), "fraction_digits 10");
+        assertCoherent(new DateTimeType(Optional.empty(), Optional.empty(), some(9)));
+        assertViolation(new DateTimeType(Optional.empty(), Optional.empty(), some(10)), "fraction_digits 10");
+        assertCoherent(new DurationType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                some(9), Optional.empty()));
+        assertViolation(new DurationType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                some(10), Optional.empty()), "fraction_digits 10");
+    }
+
     /** And the calendar half, on the months it denotes -- {@code P1Y} is above {@code P6M}. */
     @Test
     void periodBoundsAreJudgedOnMonths() {
