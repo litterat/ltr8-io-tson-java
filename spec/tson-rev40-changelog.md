@@ -833,18 +833,31 @@ runs, a schema document's annotation value aside (§5).
      source of `^` is a type `meta.array` or `meta.map` built: the clause goes, so a
      namespace type, built by `meta.namespace`, takes no `^` (§5).
 
+One facet takes one name, on the spec author's ruling. The rule is unchanged.
+
+115. **§5.5, §7.4, §13.2, Temporal** — the fraction-digit grid was one facet under two
+     names: `numeric.decimal_type` called it `fraction_digits`, and `temporal.time_type`,
+     `temporal.datetime_type` and `temporal.duration_type` called it `precision`, §5.5
+     explaining it as "`fraction_digits` on the seconds count". Each is `fraction_digits`.
+     §5.5's bullet, §7.4's list of facets typed `numeric.count` and its coherence paragraph
+     name it so, and the three constructors declare it so. Its meaning, a whole number of
+     10⁻ᴺ seconds under `fraction_digits: N`, and its cap of 9 on the temporal families, a
+     larger value a schema-load coherence error, are unchanged. `temporal.tn`'s and
+     `core.tn`'s pins change (§6).
+
 ### 3.3 Companion artifacts
 
-The revised artifacts carry the baseline of §1. Four entries are edited by this revision of
+The revised artifacts carry the baseline of §1. Seven entries are edited by this revision of
 the text and one is added — `meta.type_chain` (item 104), `meta.namespace` (item 106),
-`meta.set_type` and `enum`, and the new `meta.completion` (item 108) — and every artifact's
-documentation is rewritten for a
-reader looking at one entry who has not read this text: what the entry is, how it is written
-in the basic case, the facts about its values that its declaration does not show, and the
-section to read further. A rule this text states in full is cited and no longer restated,
-which is what the six entries whose documentation had drifted from it restated (`meta.top`,
-`meta.sum`, `meta.type_chain`, `meta.apply`, `meta.annotation`, `meta.record`). `void`,
-`integer`, `text` and `regex` gain documentation. §6 lists the pins.
+`meta.set_type` and `enum`, and the new `meta.completion` (item 108), and
+`temporal.time_type`, `temporal.datetime_type` and `temporal.duration_type` (item 115) — and
+every artifact's documentation is rewritten for a reader looking at one entry who has not
+read this text: what the entry is, how it is written in the basic case, the facts about its
+values that its declaration does not show, and the section to read further. A rule this text
+states in full is cited and no longer restated, which is what the six entries whose
+documentation had drifted from it restated (`meta.top`, `meta.sum`, `meta.type_chain`,
+`meta.apply`, `meta.annotation`, `meta.record`). `void`, `integer`, `text` and `regex` gain
+documentation. §6 lists the pins.
 
 ### 3.4 Part 3 — JSON Encoding
 
@@ -989,6 +1002,10 @@ Changes a Revision 39 implementer must act on:
     the rules it did. One check is lost: `^` refused a new field and `&` adds it, so
     `person & { agee: adult }` loads where `person ^ { agee: adult }` was refused; a
     modifier-only entry naming no inherited field is still refused.
+20. **The temporal families' grid is `fraction_digits`** (§3.2 item 115), the name
+    `numeric.decimal_type` gives the same facet: `!time ^ { precision: 3 }` is re-spelled
+    `!time ^ { fraction_digits: 3 }`, `precision` being a field no temporal constructor
+    declares. Its meaning and its cap of 9 are unchanged.
 
 ---
 
@@ -1036,7 +1053,7 @@ carries no open questions.
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
    `83ac33fe…` (Revision 39 `c9b069b6…`), numeric `232d69ba…` (`dfa66c5d…`), temporal
-   `3f788a9e…` (`fb4ada8f…`), net `cb8a29d3…` (`371fc20c…`), core `8cd8be3d…`
+   `f5e1dbd8…` (`fb4ada8f…`), net `cb8a29d3…` (`371fc20c…`), core `815fabda…`
    (`4e8d9c43…`), policy `5aeeaa04…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
@@ -1044,7 +1061,8 @@ carries no open questions.
    `meta.apply` and final constructors, and for items 94–97's documentation of a reference
    with no argument list, for items 98–101's one reference constructor, for items
    104–105's chain sets and rewritten documentation, for item 106's `meta.namespace`, and
-   for item 108's incomplete entries and `meta.completion`. The chain is
+   for item 108's incomplete entries and `meta.completion`, and temporal and core again
+   for item 115's `fraction_digits`. The chain is
    consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
    libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
@@ -1065,7 +1083,8 @@ carries no open questions.
    incomplete entries and adds `meta.completion`: the kernel measures 83 entries, three of
    which — `enum`, `set` and `meta.set_type` — its resolved form does not write.
    `meta-resolved.tn` follows; `numeric-resolved.tn` writes its two enums and its set as the
-   constructor's construction with `@meta.completion`, and the other three library fixtures
+   constructor's construction with `@meta.completion`, `temporal-resolved.tn` names item
+   115's `fraction_digits` on its three constructors, and the other two library fixtures
    change only their identities.
 
 ---
@@ -1124,5 +1143,10 @@ carries no open questions.
    is refused and `!v4 ^ { version: 4 }` loads; `!api ^ { max_items: 3 }` over a
    `!meta.namespace` type is refused, and `!tags ^ { max_items: 3 }` and
    `!lookup ^ { max_items: 3 }` over a declared array and map load.
-7. **The build** — the implementation's full build, with the conformance corpus's Revision
+7. **Item 115's examples** — `!time ^ { fraction_digits: 3 }` loads, admits
+   `12:00:00.500Z` and refuses `12:00:00.5004Z`, not a whole number of milliseconds;
+   `fraction_digits: 10` is refused at load on `time`, `datetime` and `duration`, and on
+   `!temporal.datetime_type { … }`; `!time ^ { precision: 3 }` is refused, `precision` being
+   no field of `temporal.time_type`.
+8. **The build** — the implementation's full build, with the conformance corpus's Revision
    40 branch required, passes over the revised text.

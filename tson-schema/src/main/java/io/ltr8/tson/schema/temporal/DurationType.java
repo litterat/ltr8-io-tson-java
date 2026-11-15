@@ -26,7 +26,7 @@ import java.util.Optional;
  * could not be enforced.
  *
  * <p>Bounds compare the <em>value</em>, not the token, so {@code PT90M}, {@code PT1H30M} and {@code
- * P0DT5400S} are one value and compare equal. {@code precision} constrains the value exactly as {@link
+ * P0DT5400S} are one value and compare equal. {@code fraction_digits} constrains the value exactly as {@link
  * TimeType}'s does -- a whole number of 10⁻ᴺ seconds, whatever the spelling. {@code multiple_of} is a
  * strictly positive duration and ignores sign when testing, so {@code -PT30M} is a multiple of {@code
  * PT15M}.
@@ -42,7 +42,7 @@ public record DurationType(TypeChain chain,
         @Field("exclusive_min") Optional<Duration> exclusiveMin,
         Optional<Duration> max,
         @Field("exclusive_max") Optional<Duration> exclusiveMax,
-        Optional<Long> precision,
+        @Field("fraction_digits") Optional<Long> fractionDigits,
         @Field("multiple_of") Optional<Duration> multipleOf) implements Atom {
 
     /** {@code duration => !temporal.duration_type {}} -- the unconstrained duration. */
@@ -62,13 +62,13 @@ public record DurationType(TypeChain chain,
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public DurationType(Optional<Duration> min, Optional<Duration> exclusiveMin, Optional<Duration> max,
-            Optional<Duration> exclusiveMax, Optional<Long> precision, Optional<Duration> multipleOf) {
-        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, precision, multipleOf);
+            Optional<Duration> exclusiveMax, Optional<Long> fractionDigits, Optional<Duration> multipleOf) {
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, fractionDigits, multipleOf);
     }
 
     @Override
     public DurationType withChain(TypeChain chain) {
-        return new DurationType(chain, min, exclusiveMin, max, exclusiveMax, precision, multipleOf);
+        return new DurationType(chain, min, exclusiveMin, max, exclusiveMax, fractionDigits, multipleOf);
     }
 
     /** The inclusive bounds alone, for the callers that state neither an exclusive bound nor a step. */
@@ -80,7 +80,7 @@ public record DurationType(TypeChain chain,
      * {@inheritDoc}
      *
      * <p>Each side is a field group ([TSON-SCHEMA] §5.11), compared as one bound on {@link Duration}'s own
-     * ordering. {@code precision} is a ceiling and may only fall; {@code multiple_of} narrows when the
+     * ordering. {@code fraction_digits} is a ceiling and may only fall; {@code multiple_of} narrows when the
      * refined step is an integer multiple of the source's, sign ignored -- the numeric families' rule, on a
      * value space that is a signed number of seconds.
      */
@@ -94,7 +94,7 @@ public record DurationType(TypeChain chain,
                 AtomNarrowing.bound(other.min, other.exclusiveMin, "min", "exclusive_min"));
         AtomNarrowing.checkUpper(violations, AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"),
                 AtomNarrowing.bound(other.max, other.exclusiveMax, "max", "exclusive_max"));
-        AtomNarrowing.checkAtMost(violations, "precision", precision, other.precision);
+        AtomNarrowing.checkAtMost(violations, "fraction_digits", fractionDigits, other.fractionDigits);
         if (multipleOf.isPresent() && other.multipleOf.isPresent()
                 && !isMultiple(other.multipleOf.get(), multipleOf.get())) {
             violations.add("multiple_of " + other.multipleOf.get() + " is not itself a multiple of the source's own "
@@ -115,18 +115,13 @@ public record DurationType(TypeChain chain,
      * built in Java is not, and {@link Duration} would take a span three orders of magnitude past the
      * ceiling. A facet naming a value the type does not have admits nothing, which is this check's own
      * subject, and it is also what keeps {@link #isMultiple}'s {@code toNanos} from overflowing.
-     * {@code precision} beyond nine is refused for the same reason from the other end: the value space has
-     * no tenth digit for a schema to ask about.
      */
     @Override
     public List<String> coherenceCheck() {
         List<String> violations = new ArrayList<>();
         AtomCoherence.checkRange(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
                 AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
-        AtomCoherence.checkNonNegative(violations, "precision", precision);
-        precision.filter(digits -> digits > MAX_FRACTION_DIGITS)
-                .ifPresent(digits -> violations.add("precision " + digits + " is finer than the "
-                        + MAX_FRACTION_DIGITS + " fractional-second digits a duration carries"));
+        FractionDigits.checkCoherent(violations, fractionDigits, "duration");
         multipleOf.filter(step -> step.isZero() || step.isNegative()).ifPresent(step ->
                 violations.add("multiple_of " + step + " is not strictly positive"));
         checkInRange(violations, "min", min);
@@ -140,10 +135,8 @@ public record DurationType(TypeChain chain,
     /**
      * The value space's ends, as [TSON-SCHEMA] §5.5 fixes them: a signed 64-bit count of nanoseconds, stated
      * as a magnitude so that negating an admitted duration always yields an admitted one. {@code
-     * DurationParser} holds the same two numbers for the read side and carries the reasoning.
+     * DurationParser} holds the same number for the read side and carries the reasoning.
      */
-    private static final int MAX_FRACTION_DIGITS = 9;
-
     private static final Duration MAX_MAGNITUDE = Duration.ofSeconds(Long.MAX_VALUE / 1_000_000_000L,
             Long.MAX_VALUE % 1_000_000_000L);
 

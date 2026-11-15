@@ -78,13 +78,13 @@ class DateTimeParserTest {
     }
 
     /**
-     * <b>{@code precision} constrains the value, not the spelling</b> (§5.5) -- the same rule {@code
+     * <b>{@code fraction_digits} constrains the value, not the spelling</b> (§5.5) -- the same rule {@code
      * TimeParser} applies, inherited from the same {@code full-time} production: an instant that is a whole
      * number of 10⁻ᴺ seconds, however many digits an encoding spelled it with. Exact either way; an instant
      * off the grid is refused rather than rounded onto it.
      */
     @Test
-    void precisionConstrainsTheValueNotTheSpelling() {
+    void fractionDigitsConstrainsTheValueNotTheSpelling() {
         DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
                 Optional.of(3L)));
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), type.read(token("2025-03-13T10:15:30Z")));
@@ -108,9 +108,9 @@ class DateTimeParserTest {
         assertEquals("at most 9 fractional-second digits", refused.expected());
     }
 
-    /** {@code precision: 0} admits no fractional part at all (§5.5). */
+    /** {@code fraction_digits: 0} admits no fractional part at all (§5.5). */
     @Test
-    void precisionZeroAdmitsNoFraction() {
+    void fractionDigitsZeroAdmitsNoFraction() {
         DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
                 Optional.of(0L)));
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), type.read(token("2025-03-13T10:15:30Z")));

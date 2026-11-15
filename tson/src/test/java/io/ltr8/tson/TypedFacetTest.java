@@ -156,6 +156,23 @@ class TypedFacetTest {
     }
 
     @Test
+    void fractionDigitsAboveNineIsRefusedAtLoadOnEveryTemporalFamily() {
+        for (String declaration : List.of(
+                "t => !time ^ { fraction_digits: 10 }",
+                "t => !datetime ^ { fraction_digits: 10 }",
+                "t => !duration ^ { fraction_digits: 10 }",
+                "t => !temporal.time_type { fraction_digits: 10 }",
+                "t => !temporal.datetime_type { fraction_digits: 10 }")) {
+            List<Diagnostic> reported = loading(declaration);
+            assertEquals(1, reported.size(), declaration + ": " + reported);
+            assertEquals(Diagnostic.Code.SCHEMA_ERROR, reported.getFirst().code(), declaration);
+            assertTrue(reported.getFirst().message().contains("fraction_digits 10"), reported.getFirst().message());
+        }
+        assertEquals(List.of(), loading("t => !time ^ { fraction_digits: 9 }"));
+        assertEquals(List.of(), loading("t => !datetime ^ { fraction_digits: 9 }"));
+    }
+
+    @Test
     void anIncoherentRangeIsStillRefused() {
         List<Diagnostic> reported = loading("t => !duration ^ { min: PT2H  max: PT1H }");
         assertEquals(1, reported.size(), reported.toString());

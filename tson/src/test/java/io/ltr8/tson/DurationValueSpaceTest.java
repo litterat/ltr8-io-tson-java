@@ -79,12 +79,12 @@ class DurationValueSpaceTest {
         assertTrue(refused.message().contains("a period"), refused.message());
     }
 
-    // ── precision measures the value ─────────────────────────────────────
+    // ── fraction_digits measures the value ───────────────────────────────
 
     @Test
-    void precisionAdmitsAnAdmittedValueHoweverItIsSpelled() {
+    void fractionDigitsAdmitsAnAdmittedValueHoweverItIsSpelled() {
         Fixture fixture = governing("""
-                tenths => !duration ^ { precision: 1 }
+                tenths => !duration ^ { fraction_digits: 1 }
                   box => { d: tenths }""");
 
         assertEquals(List.of(), fixture.read("!box { d: PT0.5S }"));
@@ -95,12 +95,12 @@ class DurationValueSpaceTest {
     }
 
     @Test
-    void precisionFinerThanTheValueSpaceIsASchemaError() {
+    void fractionDigitsFinerThanTheValueSpaceIsASchemaError() {
         // There is no tenth fractional digit for a schema to ask about, so the facet names nothing.
-        List<Diagnostic> reported = loading("t => !duration ^ { precision: 12 }");
+        List<Diagnostic> reported = loading("t => !duration ^ { fraction_digits: 12 }");
         assertEquals(1, reported.size(), reported.toString());
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, reported.getFirst().code());
-        assertTrue(reported.getFirst().message().contains("precision 12"), reported.getFirst().message());
+        assertTrue(reported.getFirst().message().contains("fraction_digits 12"), reported.getFirst().message());
     }
 
     // ── a bound is a value of the space too ──────────────────────────────
@@ -122,7 +122,7 @@ class DurationValueSpaceTest {
 
         DurationType finer = new DurationType(Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.of(12L), Optional.empty());
-        assertTrue(finer.coherenceCheck().stream().anyMatch(v -> v.contains("precision 12")),
+        assertTrue(finer.coherenceCheck().stream().anyMatch(v -> v.contains("fraction_digits 12")),
                 finer.coherenceCheck().toString());
     }
 

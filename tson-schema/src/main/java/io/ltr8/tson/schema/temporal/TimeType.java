@@ -19,9 +19,9 @@ import java.util.Optional;
  * full-time}). Pure constraint values, no parsing/validation behavior -- {@code tson-atom}'s
  * {@code TimeParser} holds one of these and does the actual reading/writing.
  *
- * <p>{@code precision} is a constraint on the value, not on its spelling (§5.5): {@code precision: N} admits a
- * value that is a whole number of 10<sup>-N</sup> seconds, so {@code 12:00:00.500} passes at {@code precision: 1}
- * and {@code precision: 0} admits whole seconds only. It is an ordered bound like {@code min}/{@code max} and
+ * <p>{@code fraction_digits} is a constraint on the value, not on its spelling (§5.5): {@code fraction_digits: N} admits a
+ * value that is a whole number of 10<sup>-N</sup> seconds, so {@code 12:00:00.500} passes at {@code fraction_digits: 1}
+ * and {@code fraction_digits: 0} admits whole seconds only. It is an ordered bound like {@code min}/{@code max} and
  * refines the same way. The family carries no timezone facet -- RFC 3339 {@code full-time}, which {@code spec}
  * pins, already makes the offset mandatory.
  *
@@ -32,7 +32,7 @@ import java.util.Optional;
 public record TimeType(TypeChain chain,
         Optional<OffsetTime> min, @Field("exclusive_min") Optional<OffsetTime> exclusiveMin,
                      Optional<OffsetTime> max, @Field("exclusive_max") Optional<OffsetTime> exclusiveMax,
-                     Optional<Long> precision) implements Atom {
+                     @Field("fraction_digits") Optional<Long> fractionDigits) implements Atom {
 
     /**
      * Carries {@code @Record} because a second constructor exists below, and {@code ltr8-bind}'s own
@@ -51,23 +51,23 @@ public record TimeType(TypeChain chain,
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
     public TimeType(Optional<OffsetTime> min, Optional<OffsetTime> exclusiveMin, Optional<OffsetTime> max,
-            Optional<OffsetTime> exclusiveMax, Optional<Long> precision) {
-        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, precision);
+            Optional<OffsetTime> exclusiveMax, Optional<Long> fractionDigits) {
+        this(TypeChain.EMPTY, min, exclusiveMin, max, exclusiveMax, fractionDigits);
     }
 
     @Override
     public TimeType withChain(TypeChain chain) {
-        return new TimeType(chain, min, exclusiveMin, max, exclusiveMax, precision);
+        return new TimeType(chain, min, exclusiveMin, max, exclusiveMax, fractionDigits);
     }
 
-    /** The inclusive bounds alone, for the many callers that set neither an exclusive bound nor a precision. */
+    /** The inclusive bounds alone, for the many callers that set neither an exclusive bound nor {@code fraction_digits}. */
     public TimeType(Optional<OffsetTime> min, Optional<OffsetTime> max) {
         this(min, Optional.empty(), max, Optional.empty(), Optional.empty());
     }
 
-    /** The inclusive bounds and a precision. */
-    public TimeType(Optional<OffsetTime> min, Optional<OffsetTime> max, Optional<Long> precision) {
-        this(min, Optional.empty(), max, Optional.empty(), precision);
+    /** The inclusive bounds and {@code fraction_digits}. */
+    public TimeType(Optional<OffsetTime> min, Optional<OffsetTime> max, Optional<Long> fractionDigits) {
+        this(min, Optional.empty(), max, Optional.empty(), fractionDigits);
     }
 
     /** {@code time => !temporal.time_type {}} -- the unconstrained time, §5.4's {@code !time}. */
@@ -78,7 +78,7 @@ public record TimeType(TypeChain chain,
      *
      * <p>Bounds compare on {@link OffsetTime}'s own ordering, which normalises to the instant on a
      * shared day before comparing local time -- so a bound written in one offset is comparable with
-     * one written in another rather than being rejected as incomparable. {@code precision} is an
+     * one written in another rather than being rejected as incomparable. {@code fraction_digits} is an
      * upper bound and may only fall (§5.5).
      */
     @Override
@@ -91,7 +91,7 @@ public record TimeType(TypeChain chain,
                 AtomNarrowing.bound(other.min, other.exclusiveMin, "min", "exclusive_min"));
         AtomNarrowing.checkUpper(violations, AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"),
                 AtomNarrowing.bound(other.max, other.exclusiveMax, "max", "exclusive_max"));
-        AtomNarrowing.checkAtMost(violations, "precision", precision, other.precision);
+        AtomNarrowing.checkAtMost(violations, "fraction_digits", fractionDigits, other.fractionDigits);
         return List.copyOf(violations);
     }
 
@@ -108,6 +108,7 @@ public record TimeType(TypeChain chain,
         List<String> violations = new ArrayList<>();
         AtomCoherence.checkRange(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
                 AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
+        FractionDigits.checkCoherent(violations, fractionDigits, "time");
         return List.copyOf(violations);
     }
 }

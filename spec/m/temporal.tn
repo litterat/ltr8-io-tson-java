@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/temporal.tn?sha256=3f788a9e5927b72770d7cec1ce61ac172eb573f948459b84371a7e0c0de1689c"
+!!id:"https://tson.io/2026/40/m/temporal.tn?sha256=f5e1dbd8dc17ee0893d6fb3ab39e608d05de34fd078068a13de1778638962339"
 !!import:"https://tson.io/2026/40/m/meta.tn?sha256=83ac33fed8b62d3bd567ff2ee652e22b64227acd4bdb30c3efd0bc9f6ff9b04a"
 @doc:"""
   The TSON temporal library: `date`, `time`, `datetime`, `duration` and
@@ -27,29 +27,30 @@
       `10:00:00+01:00` and `09:00:00Z` are one value, and `23:30:00-02:00` is
       `01:30:00Z`. A leap second, `23:59:60`, is refused.
 
-      `precision: N` admits a value that is a whole number of 10^-N seconds, N
-      at most 9. It constrains the value and not a spelling: `12:00:00.500` is
-      admitted under `precision: 1`, and is written `12:00:00.5`.
+      `fraction_digits: N` admits a value that is a whole number of 10^-N
+      seconds, N at most 9. It constrains the value and not a spelling:
+      `12:00:00.500` is admitted under `fraction_digits: 1`, and is written
+      `12:00:00.5`.
       """
     time_type => meta.atom & atom.specification & {
-      spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
+      spec?:            = "https://www.rfc-editor.org/rfc/rfc3339"
       ( min: time | exclusive_min: time )?
       ( max: time | exclusive_max: time )?
-      precision?: numeric.count
+      fraction_digits?: numeric.count
     }
 
     @doc:"""
       The constructor of `datetime`: RFC 3339 `date-time`. The value is the
       instant on the UTC timeline: the offset is a spelling, so
       `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are one value, and
-      `-00:00` is the same instant as `Z`. A leap second is refused. `precision`
-      is `time_type`'s.
+      `-00:00` is the same instant as `Z`. A leap second is refused.
+      `fraction_digits` is `time_type`'s.
       """
     datetime_type => meta.atom & atom.specification & {
-      spec?:      = "https://www.rfc-editor.org/rfc/rfc3339"
+      spec?:            = "https://www.rfc-editor.org/rfc/rfc3339"
       ( min: datetime | exclusive_min: datetime )?
       ( max: datetime | exclusive_max: datetime )?
-      precision?: numeric.count
+      fraction_digits?: numeric.count
     }
 
     @doc:"""
@@ -68,15 +69,15 @@
       value in that range and MUST reject one outside it whether or not its own
       representation could hold it.
 
-      `precision` is `time_type`'s. `multiple_of` is a step over the seconds
-      count: `PT15M` admits only quarter-hour values.
+      `fraction_digits` is `time_type`'s. `multiple_of` is a step over the
+      seconds count: `PT15M` admits only quarter-hour values.
       """
     duration_type => meta.atom & atom.specification & {
-      spec?:       = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
+      spec?:            = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
       ( min: duration | exclusive_min: duration )?
       ( max: duration | exclusive_max: duration )?
-      precision?:  numeric.count
-      multiple_of?: duration
+      fraction_digits?: numeric.count
+      multiple_of?:     duration
     }
 
     @doc:"""
