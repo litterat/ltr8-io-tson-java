@@ -2,7 +2,7 @@
 
 Design notes for `!meta.extern` ([TSON-SCHEMA] §5.13): one entry of another schema under a local name, a dependency
 loaded with the imports whose names never enter the namespace, and a value read, bound and written through one
-(§7.9). The JSON stack is the gap (`BACKLOG.md`). Current form only; history lives in git.
+(§7.9), in both encodings. Current form only; history lives in git.
 
 **Invariants**
 
@@ -17,8 +17,7 @@ loaded with the imports whose names never enter the namespace, and a value read,
   marking each extern edge.
 - **One kernel is judged by identity, before a fetch.** A closure reached through an extern edge that names a kernel
   of another revision (`TsonBundledSchemas.isKernelOfAnyRevision`) is refused there, naming both kernels: this
-  library pre-loads its own kernel alone, and the other would fail to resolve as an ordinary document with a message
-  about its grammar.
+  library pre-loads its own kernel alone, and the other would fail as an ordinary document, about its grammar.
 - **What an extern lands on is a fact of the link, never of the value.** `Extern` holds what was written;
   `TsonLinkedSchema.externs` maps each extern to its `ExternTarget`, merged through imports as `entryOrigins` is. A
   refused extern stays unattached and lands nowhere, so a use of it reports nothing further.
@@ -34,30 +33,40 @@ loaded with the imports whose names never enter the namespace, and a value read,
 **Reading through an extern** (`ExternReader`, built in `TsonSchemaCompiler.Compilation.boundary`)
 
 - **The body is read by a foreign schema's own compiled reader**, so nothing re-resolves a name per scope. Each
-  foreign schema compiles once per identity and mode, through the read registry's cache or, for a checkpoint, the
-  core's cache for that mode (`TsonSchemaCompiler.ForeignSchemas`). A miss compiles outside any lock and `putIfAbsent`s: the
-  compile reaches the same cache again for each foreign schema, which `computeIfAbsent` cannot.
+  foreign schema compiles once per identity and mode, through the read registry's cache (in JSON,
+  `JsonCompiledSchemaRegistry`'s) or, for a checkpoint, the core's cache for that mode (`ForeignSchemas`). A miss
+  compiles outside any lock and `putIfAbsent`s: the compile reaches the cache again, which `computeIfAbsent` cannot.
 - **The boundary consumes the tag and the annotations in front of the value, in the enclosing scope, and hands a
   foreign reader the value untagged**, read as the entry the tag reached. Handing it a foreign name instead refuses
   what the boundary admitted wherever the target takes no tag of its own name: a choice, a member-dispatched base.
-- **What a tag may name is fixed at compile, by identity** (`ExternAdmission`, which the writer's tags read too, so
-  the two admit one set): any name of the enclosing scope, extern or not, that
-  reaches past its aliases and externs the target, an entry IS-A it, or a variant of it where it is a choice. A name
-  reaching an entry no extern reaches is read where the position's foreign schema reads it, if that namespace holds
-  the entry, else in the schema declaring it. An abstract target naming no selectors is refused at the boundary, so
-  the message names the subtypes this scope can write rather than the foreign schema's.
-- **The scope is the cursor's, for the one call that reads the value** (`ScopeCrossing`), not a field of every
-  context copy, which would be bytes on every read. The schema location restarts inside, and a schema document's
-  sink hears nothing there, the names being judged by the foreign readers rather than recorded for this link.
+- **What a tag may name is fixed at compile, by identity** (`tson-schema`'s `ExternAdmission`, a link fact both
+  encodings' boundaries and the writer's tags read): any name of the enclosing scope, extern or not, reaching past its
+  aliases and externs the target, an entry IS-A it, or a variant of it where it is a choice. A name reaching an entry
+  no extern reaches is read where the position's foreign schema reads it, if that namespace holds the entry, else in
+  the schema declaring it. An abstract target naming no selectors is refused at the boundary, so the message names
+  the subtypes this scope can write rather than the foreign schema's.
+- **The scope is the cursor's, for the one call that reads the value** (`ScopeCrossing`, in both encodings), not a
+  field of every context copy, which would be bytes on every read. The schema location restarts inside, and a schema
+  document's sink hears nothing there, the names being judged by the foreign readers rather than recorded for this
+  link.
 - **A tree value at the boundary carries the outer name** (the tag written, else the extern), so the writer writes
   back a tag the enclosing scope admits.
-- **Bind mode needs nothing of its own inside**: every class is asked of the binder by its entry's identity, the
-  declaring schema's canonical identity and the name (`ValueReaderContext.namespaceOf`), so two schemas' `card` bind
-  apart wherever the binder routes them (`DataNameBinder.byNamespace`). An annotation through an extern in a schema
-  document binds where the context binds the foreign classes and is a tree where it does not, as a value entry is.
-- **The annotations in front of the boundary reach a bound record through its carrier** (`ExternReader.carrying`):
-  the value crossed unannotated, so the bound record is rebuilt once with them, and only where some were written. A
-  class with no carrier drops them, as a record's reader does, the boundary having checked them.
+- **Bind mode needs nothing of its own inside**: every class is asked of the binder by its entry's identity
+  (`ValueReaderContext.namespaceOf`), so two schemas' `card` bind apart (`DataNameBinder.byNamespace`). An annotation
+  through an extern in a schema document binds where the foreign classes are bound and is a tree where not.
+- **The annotations in front of the boundary reach a bound record through its carrier** (`ExternReader.carrying`),
+  rebuilt once where some were written; a class with no carrier drops them, the boundary having checked them.
+
+**Reading through an extern in JSON** (`tson-json`'s `reader.ExternReader`, [TSON-JSON] §8.6)
+
+- **One object carries both scopes, so the boundary takes its `$type` off it.** The inline form crosses with its
+  leading `$type` consumed and its opening put back (`JsonReadContext.CROSSING`), the foreign reader reading the rest
+  untagged; the wrapper's `$value` crosses as it stands, so a `$type` inside it is the foreign schema's.
+- **A dispatcher that matched an extern's name hands it the whole annotation object** (`ExactReader.takesWrapper`):
+  handed the `$value`, the boundary would read its leading `$type` in the enclosing scope.
+- **An extern of a map is a map-typed position** (§3.3): a leading `$type` is a key there, so nothing is recognised.
+- **A question about a type's shape follows the extern** (`AliasChain.landed`): a choice's class table, a map key's
+  form, an identifier element. Asked of the `Extern` body, each answers as for no type.
 
 **Writing through an extern** (`writer.ExternTags`, from `TsonObjectWriter.describing(linked, root)`)
 
@@ -71,20 +80,20 @@ loaded with the imports whose names never enter the namespace, and a value read,
 
 **Decisions that lost**
 
+- **Admission stated in each encoding**: two copies of a judgement made of the link alone, which names no reader.
+- **Teaching the foreign record reader to skip an outer `$type`**: it would have to know which scope it is in.
 - **`@Typename.namespace` naming a class's entry when writing**: a second authority beside the binder, which the read
   cannot consult (no index runs from an annotation to its class). It stays unread.
 - **Handing the boundary's annotations to the foreign reader through the context**: bytes on every context copy.
 - **Tags derived from `describing(uri, root)`**: a fetch, or a failure, at derivation for a schema never loaded.
-
 - **Compiling the foreign schema inside the importer's compile**: once per importer and per checkpoint.
 - **A `scope` component on `Diagnostic`**: `schemaId` already names the schema whose names were read; the chain of
   externs is how the read got there, prose for a human.
-- **A target on the model record** (`@Unbound Optional<Target>` on `Extern`): it puts a link fact on a body, where
-  `schema.meta`'s equality and the binder's component analysis meet it; the binder then has to be taught to skip an
-  unbound component's type. The fact map on `TsonLinkedSchema` is where the other link facts live.
+- **A target on the model record** (`@Unbound Optional<Target>` on `Extern`): a link fact on a body, which
+  `schema.meta`'s equality and the binder's component analysis then meet. Link facts live on `TsonLinkedSchema`.
 - **Loading the foreign schema when the importer links**: too late for a value read at a checkpoint that reaches an
   extern, and it leaves the cycle guard blind to the extern edge.
 - **Comparing across the boundary by spelling**: exact only while both closures hold one kernel and share no other
   schema; identity costs one walk.
-- **Wrapping a nested failure once**: a cycle through several externs reports each extern it passed through, the
-  trail of how the importer reached it; nothing distinguishes an already-prefixed message without parsing it.
+- **Wrapping a nested failure once**: a cycle through several externs reports each extern it passed, the trail of
+  how the importer reached it; nothing tells an already-prefixed message apart without parsing it.

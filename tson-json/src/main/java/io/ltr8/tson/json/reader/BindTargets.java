@@ -37,7 +37,8 @@ import java.util.Optional;
  *       place has no name to bind by, and is read into the target's own record class ({@link
  *       RecordInPlaceReader}).</li>
  * </ul>
- * Anything else -- a dispatcher, a choice, a gap -- is read as it is.
+ * A boundary binds the target its extern lands on, in the foreign schema ({@link ExternReader#boundTo}). Anything
+ * else -- a dispatcher, a choice, a gap -- is read as it is.
  */
 final class BindTargets {
 
@@ -61,6 +62,9 @@ final class BindTargets {
                         + "what the named type reads to");
             }
             return reader;
+        }
+        if (reader instanceof ExternReader boundary) {
+            return boundary.boundTo(target, what, where, mismatches);
         }
         if (reader instanceof AtomReader<?> atom) {
             if (!(target instanceof DataClassAtom bound)) {

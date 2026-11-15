@@ -24,4 +24,14 @@ interface ExactReader {
      * @param wrapped the reader for a wrapper's {@code $value}, should the object turn out to be one
      */
     Object readExact(JsonReadContext ctx, JsonTypeReader<?> wrapped);
+
+    /**
+     * Whether this reader reads a wrapper whose {@code $type} a dispatcher matched, rather than being handed its
+     * {@code $value}: true of a boundary, whose wrapper's {@code $type} is the enclosing scope's and whose {@code
+     * $value} is the foreign schema's ([TSON-JSON] §8.6), so a wrapper read anywhere else would read the value in
+     * the wrong scope.
+     */
+    default boolean takesWrapper() {
+        return false;
+    }
 }

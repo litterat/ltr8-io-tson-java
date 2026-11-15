@@ -37,6 +37,11 @@ public final class DeferredTypeReader implements JsonTypeReader<Object>, ExactRe
                 : TagMembers.readWrapped(ctx, wrapped);
     }
 
+    @Override
+    public boolean takesWrapper() {
+        return target() instanceof ExactReader exact && exact.takesWrapper();
+    }
+
     private JsonTypeReader<?> target() {
         JsonTypeReader<?> target = finished.get(name);
         if (target == null) {

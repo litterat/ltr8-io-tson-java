@@ -986,13 +986,16 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
 12. **§6.3** — the one-position tuple was "the kernel's `meta.tuple1<T>` and
     `meta.voidable_tuple1<T>`", which §3.2 item 14 removed; it is a one-position tuple as
     declared, `!meta.tuple [{ element_type: text }]`. The encoding is unchanged.
-13. **§1.6, §3.3, §8.6 (new), §9.2** (§3.2 items 116–118) — a foreign value in JSON. Text
+13. **§1.6, §3.3, §6.4, §8.2, §8.6 (new), §9.2** (§3.2 items 116–118) — a foreign value in JSON. Text
     keeps the boundary's tag and the body apart; one JSON object carries both, so §8.6 says
     which is which: the `$type` leading the object at an extern position, or its wrapper,
     is the enclosing scope's and names the extern, and every other name in the value is the
     foreign schema's. An `$import` inside a foreign value is the resolver error it is at
-    every position but the document's top. §3.3's rule for where `$type` resolves, §9.2's
-    encoder obligation and §1.6's item 24 follow.
+    every position but the document's top. Where a choice or a declared position selects an
+    extern, the selecting `$type` is the boundary's and its wrapper's `$value` the foreign
+    value; a position whose extern's target is a map is a map-typed position. §6.4's key
+    form and §8.2's class follow an extern to its target. §3.3's rule for where `$type`
+    resolves, §9.2's encoder obligation and §1.6's item 24 follow.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 

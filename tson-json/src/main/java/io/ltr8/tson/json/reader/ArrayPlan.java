@@ -39,7 +39,7 @@ record ArrayPlan(String displayName, JsonSchemaLocation schemaLocation, boolean 
                 // A type written in place is a container, a tuple, a choice, a reference or a record, never an identifier
                 // family.
                 body.uniqueItems() && body.elementType() instanceof TypeRef element
-                        && AliasChain.terminal(context.schema(), element.name())
+                        && AliasChain.landed(context.linked(), element.name())
                         .map(terminal -> terminal.definition() instanceof IdentifierType)
                         .orElse(false));
     }

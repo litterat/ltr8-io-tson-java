@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.writer;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.compiler.reader.ExternAdmission;
+import io.ltr8.tson.schema.ExternAdmission;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.TsonLinkedSchema;

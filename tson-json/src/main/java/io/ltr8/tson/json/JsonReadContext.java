@@ -5,6 +5,8 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
+import io.ltr8.tson.json.reader.ForeignScope;
+import io.ltr8.tson.json.reader.ScopeCrossing;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 
@@ -64,12 +66,57 @@ public final class JsonReadContext {
         /** [TSON-DATA] §8.2's identifier policy, for the read positions that carry a name. */
         final IdentifierPolicy identifierPolicy;
 
+        /**
+         * The foreign value the cursor is inside, innermost first; {@code null} in the document's own scope. On the
+         * cursor rather than on each context, as one more field per context copy would be bytes on every read: a
+         * foreign value is read by one call that returns before anything outside it reads on ({@link #CROSSING}).
+         */
+        Scope scope;
+
         Cursor(JsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
             this.identifierPolicy = identifierPolicy;
         }
     }
+
+    /** One foreign value's scope ([TSON-SCHEMA] §7.9) and the scopes enclosing it. */
+    private record Scope(ForeignScope boundary, Scope parent) {
+
+        /** What a diagnostic raised inside the scope adds to its message: every boundary crossed, innermost first. */
+        String suffix() {
+            StringBuilder out = new StringBuilder(" (read in the scope of ").append(boundary.schema())
+                    .append(", through the extern ").append(boundary.through());
+            for (Scope outer = parent; outer != null; outer = outer.parent) {
+                out.append(", within ").append(outer.boundary.through());
+            }
+            return out.append("; [TSON-SCHEMA] §7.9)").toString();
+        }
+    }
+
+    /**
+     * Reading a foreign value ({@link ScopeCrossing}): the same cursor and data path, no schema location, so the
+     * foreign reader's own declaration seeds the pointer, and the scope on the cursor for the length of the call.
+     */
+    static final ScopeCrossing CROSSING = (ctx, boundary, reader, dropsTag) -> {
+        Cursor cursor = ctx.cursor;
+        Scope enclosing = cursor.scope;
+        cursor.scope = new Scope(boundary, enclosing);
+        try {
+            JsonReadContext inside = new JsonReadContext(cursor, ctx.tail, null, ctx.pinnedPosition);
+            if (dropsTag) {
+                // The object's own members follow its `$type`, so the reader is handed the object as it would be
+                // written untagged: its opening put back in front of them.
+                JsonEvent opening = inside.next();
+                inside.next();
+                inside.next();
+                cursor.rewound.addFirst(opening);
+            }
+            return reader.read(inside);
+        } finally {
+            cursor.scope = enclosing;
+        }
+    };
 
     /** One step of the RFC 6901 pointer. A member name, or an array index where {@code name} is null. */
     private record PathStep(PathStep parent, String name, int index) {
@@ -361,7 +408,8 @@ public final class JsonReadContext {
         cursor.reported++;
         cursor.receiver.report(new Diagnostic(Optional.of(path()),
                 Optional.ofNullable(schemaLocation).map(SchemaAt::pointer),
-                schemaLocation == null ? "" : schemaLocation.schemaId(), code, message, expected, actual,
+                schemaLocation == null ? "" : schemaLocation.schemaId(), code,
+                cursor.scope == null ? message : message + cursor.scope.suffix(), expected, actual,
                 position(), schemaLocation == null ? Optional.empty() : schemaLocation.position()));
     }
 

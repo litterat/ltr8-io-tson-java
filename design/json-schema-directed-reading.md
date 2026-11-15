@@ -42,6 +42,8 @@ JSON inputs are in `design/cli-config-hashing.md`.
   component, as the TSON reader does.
 - A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
   set serves every mode. The reader it selects validates in full.
+- A position an extern types is a boundary (`ExternReader`): its leading `$type` is the enclosing scope's, everything
+  inside the foreign schema's, read by that schema's own compiled readers (`design/externs.md`).
 - Every mode is all-or-nothing: no builder builds where anything was reported while its value was read.
 - Readers are named mode, then family, then form, and carry no `Json` prefix inside the unexported `reader` package; a
   dispatcher has no mode and carries none.

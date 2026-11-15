@@ -12,6 +12,7 @@ import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Extern;
+import io.ltr8.tson.schema.ExternAdmission;
 import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeInline;
@@ -391,7 +392,7 @@ public final class TsonSchemaCompiler {
             ExternTarget target = linked.externs().get(extern);
             return new ExternReader.Crossing(foreign.compiled(target.foreign()).get(target.type()),
                     new ForeignScope(extern, linked.originOf(extern), target.schema()),
-                    ExternReader.namesASubtype(landing.definition()));
+                    ExternAdmission.namesASubtype(landing.definition()));
         }
 
         /**
@@ -402,7 +403,7 @@ public final class TsonSchemaCompiler {
         private ExternReader.Crossing imported(String position, ExternTarget.Landing landing, String entry,
                                                String identity, Top definition) {
             String declaredBy = linked.originOf(entry);
-            boolean namesASubtype = ExternReader.namesASubtype(definition);
+            boolean namesASubtype = ExternAdmission.namesASubtype(definition);
             for (TsonLinkedSchema in : List.of(linked.externs().get(position).foreign(), landing.in())) {
                 if (in.schema().entries().containsKey(entry) && in.originOf(entry).equals(declaredBy)) {
                     return new ExternReader.Crossing(foreign.compiled(in).get(entry), new ForeignScope(position,

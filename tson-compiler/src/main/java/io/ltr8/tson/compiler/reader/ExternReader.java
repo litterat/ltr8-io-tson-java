@@ -11,17 +11,11 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.resolver.Externs;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.TypeRef;
-import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Extern;
-import io.ltr8.tson.schema.meta.FamilySelectors;
-import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonAtom;
@@ -217,25 +211,5 @@ public final class ExternReader implements TsonTypeReader<Object> {
             case TsonVoid n -> new TsonVoid(as, n.annotations());
             default -> value;
         };
-    }
-
-    /**
-     * The entry {@code written} reaches through an extern of {@code linked}'s namespace, past alias hops on both
-     * sides of every boundary; empty where it lands through no attached extern.
-     */
-    public static Optional<ExternTarget.Landing> landing(String written, TsonLinkedSchema linked) {
-        Namespace<Top> entries = linked.schema().entries();
-        String terminal = AliasChain.terminal(written, entries::get);
-        if (!(entries.get(terminal) instanceof Extern)) {
-            return Optional.empty();
-        }
-        ExternTarget target = linked.externs().get(terminal);
-        return target == null ? Optional.empty() : target.landing();
-    }
-
-    /** Whether a value at a position typed by {@code definition} must name a subtype: abstract, no selectors. */
-    public static boolean namesASubtype(Top definition) {
-        return FamilySelectors.extensionOf(definition).filter(RecordExtensionType.ABSTRACT::equals).isPresent()
-                && FamilySelectors.namesOf(definition).isEmpty();
     }
 }

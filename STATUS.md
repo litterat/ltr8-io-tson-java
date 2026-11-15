@@ -141,7 +141,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       in the enclosing scope, every name inside in the foreign schema's, at every position a type's name stands, the
       root and an annotation's value included, and scopes nest; bound in bind mode, each class by its entry's
       identity, and written back by `TsonObjectWriter.describing(linked, root)` under the enclosing scope's names.
-      Reading one in JSON reports `NOT_IMPLEMENTED`
+      In JSON ([TSON-JSON] §8.6) a foreign value is read in tree mode and bound at every position an extern types:
+      the `$type` leading its object or wrapper in the enclosing scope, every other name in the foreign schema's. No
+      JSON writer writes a tag, a boundary's included
 - [x] Binding by entry identity — a `DataNameBinder` is asked `resolve(namespace, name)`, the namespace the
       canonical identity of the schema declaring the entry, so two schemas' `order` bind two classes through one
       context (`DataNameBinder.byNamespace`); a binder answering by name alone answers every schema alike

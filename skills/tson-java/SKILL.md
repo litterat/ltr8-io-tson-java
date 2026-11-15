@@ -532,7 +532,8 @@ validates in full and builds the classes the binding resolves, all-or-nothing li
 "body": "hi"}`; a bare value there is refused, and the tree comes back without the tag. `$schema` binds the
 document on the root alone, and anywhere else is refused (`SCOPE_NOT_ADMITTED`). Built from the same
 `ProcessorConfig`, `Json.of(config)` and `Tson.of(config)` judge under the same policy and bind the same
-classes.
+classes. At a position an extern types, the `$type` leading the object (or its wrapper) is the reading schema's
+name for it, and every name inside is the foreign schema's: `{"$type": "order_v2", "payment": {"$type": "card", …}}`.
 
 ## Streaming and allocation
 

@@ -4,6 +4,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -120,6 +121,19 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     public List<String> dependencies() {
         return java.util.stream.Stream.concat(schema.imports().stream().map(CanonicalIdentity::canonicalize),
                 externSchemas().stream()).distinct().toList();
+    }
+
+    /**
+     * The foreign entry {@code name} lands on past its alias hops and its extern, alias hops on both sides of every
+     * boundary followed ([TSON-SCHEMA] §5.13); empty where it lands through no extern this link attached.
+     */
+    public Optional<ExternTarget.Landing> landing(String name) {
+        String terminal = ExternAdmission.terminal(name, schema.entries()::get);
+        if (!(schema.entries().get(terminal) instanceof Extern)) {
+            return Optional.empty();
+        }
+        ExternTarget target = externs.get(terminal);
+        return target == null ? Optional.empty() : target.landing();
     }
 
     /** The form enum {@code entryName} matches its members in -- {@code NONE} for one {@link #enumForms} omits. */
