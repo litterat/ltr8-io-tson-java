@@ -170,11 +170,10 @@ class ApplyConstructionTest {
 
     // ── Final kernel constructors ───────────────────────────────────────────────────────────────
 
-    /** {@code meta.apply} is final: nothing composes or refines it, and it still constructs. */
+    /** {@code meta.apply} is final: nothing composes it, and it still constructs. */
     @Test
     void metaApplyIsFinal() {
         refused("  x => meta.apply & { extra?: text }", "is final");
-        refused("  x => meta.apply ^ {}", "is final");
         assertEquals(List.of(), problems("  r => !meta.record { fields: { f => !meta.record_field { type: { of: "
                 + "!meta.apply { head: box  arguments: [text] } } } } }"));
     }
@@ -183,7 +182,6 @@ class ApplyConstructionTest {
     @Test
     void metaDependentIsFinal() {
         refused("  x => meta.dependent & { extra?: text }", "is final");
-        refused("  x => meta.dependent ^ {}", "is final");
         assertEquals(List.of(), problems("  a => { kind: meta.type_ref  v?: kind! }"));
         assertEquals(List.of(), problems("  a => !meta.record { fields: { kind => !meta.record_field { type: "
                 + "meta.type_ref }  v => !meta.record_field { type: { of: !meta.dependent { on: kind } }  "

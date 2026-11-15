@@ -71,7 +71,7 @@ import java.util.function.BiPredicate;
  *       KernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle fails
  *       there rather than here.</li>
  *   <li><b>A declaration no read produces is resolved from its grammar</b> by {@link DefinitionResolver}, as {@link
- *       SchemaResolver} resolves a record: a composition, a refinement of a record, an alias, a template. A record
+ *       SchemaResolver} resolves a record: a composition, an alias, a template. A record
  *       holding a type written in place reads it, through its constructor's reader, and waits on what that read
  *       reaches; {@code meta.type_inline}, the wrapper a type slot's choice recovers a brace to, is made ready with
  *       the pre-loaded set, so the first such read classifies both of the choice's variants.</li>

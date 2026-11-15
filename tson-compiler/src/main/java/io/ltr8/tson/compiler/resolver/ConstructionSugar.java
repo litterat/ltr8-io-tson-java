@@ -68,7 +68,7 @@ public final class ConstructionSugar {
     /**
      * Refuses {@code written}, an application at a type slot whose head as written is {@code head} and whose arguments
      * are spelled {@code arguments}, filling {@code slots}, where its constructor {@code name} builds a namespace type:
-     * the kernel's {@code namespace} or a constructor refining it ([TSON-SCHEMA] §4.2, §5.2). A namespace value carries
+     * the kernel's {@code namespace} or a constructor composed from it ([TSON-SCHEMA] §4.2, §5.2). A namespace value carries
      * its type's name as its tag, and a type written in place has none, so a namespace type is declared and named.
      *
      * @throws SchemaValidationException where it builds one

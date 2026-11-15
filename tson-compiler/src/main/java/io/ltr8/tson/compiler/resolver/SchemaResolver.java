@@ -159,7 +159,7 @@ public final class SchemaResolver {
      * then resolved via this resolver's own {@link TsonCompiledSchemaLoader} (fetched/bootstrapped on demand) and
      * its entries merged in, *before* any local declaration is resolved. That map ({@code namespace}, exposed to
      * {@link DefinitionResolver} through a {@link WaitOrder}) is where every name resolves: a construction head, a
-     * composition supertype, a refinement source, an annotation type. net.tn's own {@code net.ipv4_type =>
+     * composition supertype, an atom refinement source, an annotation type. net.tn's own {@code net.ipv4_type =>
      * meta.atom & atom.specification & {...}}, composing with two kernel entries it has only through its
      * import of meta.tn, would fail to resolve at all without this. Collision
      * handling mirrors {@code TsonSchemaLinker.mergeImports}'s own rule exactly: a name declared by
@@ -311,7 +311,7 @@ public final class SchemaResolver {
         }
 
         // Every declaration is made ready in wait order (§3.4.1), on demand: an entry waits on
-        // its head, its refinement source and operands, an annotation's type and every type a read of its value
+        // its head, its atom refinement source and operands, an annotation's type and every type a read of its value
         // reaches, each made ready first, whichever is written first. A name at a type position (a field's, a
         // variant's, an element's) is carried as a name, judged by the linker, and orders nothing. The imports are
         // ready before anything starts; every value the document reads is read at a checkpoint (Vocabulary).
@@ -402,11 +402,6 @@ public final class SchemaResolver {
                 // as opaque to the linker as a value entry's, so it is read under the policy too.
                 (type, value) -> vocabulary.annotation(type, value, names, heldByName),
                 heads, waitOrder, new ApplicationCloser() {
-
-                    @Override
-                    public String closeApplication(ApplyBody application) {
-                        return materialiser.closeApplication(application);
-                    }
 
                     /** An operand absorbed by value gets the same bound check an application closing does. */
                     @Override

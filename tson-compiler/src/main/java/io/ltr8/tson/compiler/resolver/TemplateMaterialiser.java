@@ -54,7 +54,7 @@ import java.util.function.Supplier;
  * declaration closing it ({@code f: node<text>}, §5.10.1).
  *
  * <p><b>Where a name is required</b> -- an argument of an application, a map's key, a reference's {@code of}, an alias's
- * target, a refinement source -- an application closes nowhere: a construction and an application of an open record
+ * target -- an application closes nowhere: a construction and an application of an open record
  * are each refused there, and declared under a name first ([TSON-SCHEMA] §4.2, §5.3).
  */
 final class TemplateMaterialiser {
@@ -62,7 +62,7 @@ final class TemplateMaterialiser {
     /**
      * Every entry visible to this schema -- local declarations and merged {@code !!import}s alike. A
      * <em>getter</em> rather than a fixed map, because an application closed on demand during resolution
-     * (at a refinement source) may name a head that has not been resolved yet; the getter is
+     * (a declaration naming one) may name a head that has not been resolved yet; the getter is
      * {@code SchemaResolver}'s own memo, so asking for it resolves it, with the circular-composition guard
      * still in front.
      */
@@ -242,25 +242,6 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * The name a fully-bound application at a refinement source leaves -- reached during resolution rather than from
-     * the batch pass afterwards. A construction there is refused, as at any slot that holds a name, and so is an
-     * application of a head that takes no parameters; one whose head names nothing is left whole for the linker. An
-     * application of an open record, through its alias hops or not, is absorbed by value and never reaches here
-     * ({@code DefinitionResolver.openOperand}).
-     */
-    String closeApplication(ApplyBody application) {
-        if (constructs(application)) {
-            throw nameRequired(application.text(), suggestedName(application));
-        }
-        return switch (closeApplicationOfRecord(application)) {
-            case TypeRef named -> named.name();
-            case TypeInline inline when inline.of() instanceof ApplyBody -> application.head().name();
-            case TypeInline inline -> throw new IllegalStateException("'" + application.text() + "' closed in place "
-                    + "at a refinement source, where an application of an open record is absorbed by value");
-        };
-    }
-
-    /**
      * The entry a declaration naming a fully-bound application <b>is</b> -- see {@link
      * ApplicationCloser#closeApplicationInto}. Closes the application into {@code declaredName} and hands the
      * definition back for the caller to own. An open record's closure is a record ({@link #closeOpenRecord}). An
@@ -319,7 +300,7 @@ final class TemplateMaterialiser {
 
     /**
      * The refusal of an application, spelled {@code written}, where only a name may stand -- a map's key, a
-     * reference's {@code of}, a parameter's bound, an alias's target, a refinement source ([TSON-SCHEMA] §4.2) --
+     * reference's {@code of}, a parameter's bound, an alias's target ([TSON-SCHEMA] §4.2) --
      * naming the declaration to write instead, {@code suggested => written}.
      */
     static SchemaValidationException nameRequired(String written, String suggested) {
@@ -360,12 +341,6 @@ final class TemplateMaterialiser {
         List<TypeRef> arguments = arguments(application);
         TypeExpr closed = instantiate(templateHead(application.head().name()), arguments, application);
         return closed == null ? application.withArguments(arguments).inPlace() : closed;
-    }
-
-    /** Whether {@code application}'s head, past its alias hops, is a constructor ({@link ConstructionSugar}). */
-    private boolean constructs(ApplyBody application) {
-        String constructor = AliasChain.terminal(application.head().name(), this::lookup);
-        return ConstructionSugar.constructs(constructor, lookup(constructor));
     }
 
     /** What {@link #materialise} applies to a closed body: each application written in place closed where it stands. */

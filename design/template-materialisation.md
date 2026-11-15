@@ -23,7 +23,7 @@ derived — and the static check that runs before any of it.
   { head: meta.array  arguments: [text] } }` is rewritten the same way where its arguments are names, so nothing
   constructs here.
 - **Where only a name may stand an application closes nowhere** (§4.2): a map's key, a reference's `of`, an alias's
-  target, a refinement source, a parameter's bound (`ParameterTypes.requireType`). A construction and an application
+  target, a parameter's bound (`ParameterTypes.requireType`). A construction and an application
   of an open record are both refused there (`nameRequired`), spelled as the author wrote them, at the declaration
   that wrote them, naming the declaration to write. A constructor's slot that holds only a name is judged where its
   application is rewritten (`ConstructionSugar.slotsInPlace`).
@@ -32,8 +32,8 @@ derived — and the static check that runs before any of it.
   a closed record, or left in another record's body by closing it: the substituted record, closed, its chain dropped,
   held as `TypeInline.closing(application, record)`, the application as written kept for messages and nowhere else.
   Nothing is minted, nothing records it, and it is never looked up to a declaration. A nested application equal to the
-  one a declaration is closing names that declaration (`closingInto`). One at a refinement source is absorbed, as a
-  composition operand is (below).
+  one a declaration is closing names that declaration (`closingInto`). One at a composition operand is absorbed
+  (below).
 - **Two refusals come before closing in place** (`instantiate`): one whose record in place would be IS-A a declared
   type (`refuseMembership`, §5.2), and a recursion with no declaration to tie to (§5.10.1). Held in an open record, a
   membership is reported at the declaration whose application closed it, and a recursion at the open record's own
@@ -143,8 +143,7 @@ checks), `design/schema-resolution.md` (chains, applied parents),
 
 ## Operands and on-demand closing
 
-A composition operand (§5.8) and a refinement source (§5.7) both need the source's *fields* while a declaration
-resolves, before the batch pass runs. They are handled differently.
+A composition operand (§5.8) needs its *fields* while a declaration resolves, before the batch pass runs.
 
 - **A composition operand never closes, open or closed** (`DefinitionResolver.openOperand`): it is absorbed by
   value (§5.8). The operand, an open record, is substituted on the model with
@@ -167,20 +166,13 @@ resolves, before the batch pass runs. They are handled differently.
     typed `pet` dispatches to it), and the application kept in the chain is folded like any other, to the entry
     `pet_of<dog_type>` denotes where one exists. No edge is stated to the template: a template is no type (§5.10).
     A removal empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
-- **A refinement source is absorbed like an operand** (`DefinitionResolver.resolveRefinement`, through
-  `openOperand`): an application of an open record at `^`, closed (`x => box<text> ^ { … }`) or over the declaration's
-  own parameters, contributes the substituted field set `^` re-emits and tightens, and its template's ancestors. The
-  application stays the written parent (`refineOnto`): an open record's, substituted when it closes, and a closed
-  declaration's, which the fold turns into the edge to the entry declared for it where one is, so `x` is IS-A `box`'s
-  written parents and `text_box` where `text_box => box<text>` is declared, and never `box`. Only a refinement of a
-  name records `refines`. `InlineTypeRulesTest` pins it.
 - **An operand's head is followed past its alias hops** (`Ancestry.templateHead`, §8.3): over `pet_of => pet_box`,
-  `pet_of<text>` at `&` or `^`, and `<T> pet_of<T> & { … }`, apply `pet_box` and are absorbed as `pet_box<text>` is.
-  The one rule serves every place an applied head is read: `openOperand` and `resolveRefinement`'s test for an open
-  source, `Ancestry.ofTemplate` when a chain is built, the materialiser's closing, and the fold, which keys a parent
-  written through the alias on the open record's application, so its edge still names the declaration of it. The
+  `pet_of<text>` at `&`, and `<T> pet_of<T> & { … }`, apply `pet_box` and are absorbed as `pet_box<text>` is.
+  The one rule serves every place an applied head is read: `openOperand`, `Ancestry.ofTemplate` when a chain is
+  built, the materialiser's closing, and the fold, which keys a parent written through the alias on the open record's
+  application, so its edge still names the declaration of it. The
   parent itself stays as written. `InlineTypeRulesTest.anApplicationThroughAnAliasIsAbsorbedAtAnOperand` pins it.
-- **The cycle guard still applies.** An operand's or source's head resolves through the resolution's `WaitOrder`,
+- **The cycle guard still applies.** An operand's head resolves through the resolution's `WaitOrder`,
   where an entry waiting on itself is refused, so a cycle reached through an application
   (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on
   'a'`) rather than recursing (`RecordTemplateTest.aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle`).

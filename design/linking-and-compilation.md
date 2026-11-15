@@ -131,7 +131,7 @@ from the import's own `originOf`, so an entry two hops away keeps its author rat
   and the local loop pass over a nested map met twice (`SchemaPaths.isNestedMap`), the map's entry being derived from
   its members, and `carryOver` takes no import's annotations onto it: the annotations written on a `geo => !schema
   { … }` entry are that document's contribution alone. This is how
-  any schema contributes a member (`meta => !schema { code_type => unicode.text_type ^ { max_length?: = 4 } }`, then
+  any schema contributes a member (`meta => !schema { code_type => unicode.text_type & { max_length?: = 4 } }`, then
   `code => !meta.code_type {}`); a contributed member is the contributor's, never a kernel entry
   (`TsonBundledSchemas.isKernel` judges by origin).
 
@@ -150,8 +150,8 @@ are worth their place here, each catching what would otherwise link, compile, an
   alias and its target are one type: `(text | my_text)` with `my_text => text` is caught, the only spelling an author
   cannot see. No variant may resolve to `void` (`checkVariantsAreNotVoid`).
 
-**A chain's names resolve in the same namespace.** A refinement of a kernel constructor reaches one (`list_type =>
-meta.array ^ {...}` carries `[meta.array, meta.product, meta.top, meta.type]`), and the defining schema's closure is inside
+**A chain's names resolve in the same namespace.** A composition of a kernel constructor reaches one (`list_type =>
+meta.array & {...}` carries `[meta.array, meta.product, meta.top, meta.type]`), and the defining schema's closure is inside
 the importer's, so every name on it is there. A `meta.ref` body's `of` names any type or constructor, an application
 there having closed to its entry during resolution, never a value entry or an open record (`KindMembers.ofRefusal`); what it
 names decides whether the slot holds a type's name or a value's. A namespace type's stated `key_type` must be a member of

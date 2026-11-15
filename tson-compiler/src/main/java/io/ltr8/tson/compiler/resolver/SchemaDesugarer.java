@@ -26,7 +26,6 @@ import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
-import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
@@ -97,11 +96,11 @@ import java.util.function.UnaryOperator;
  * tables ({@code TsonSchemaParser.declarationPositions()} is an {@code IdentityHashMap}), so a rebuilt node
  * silently loses its position; sharing confines that to the declarations that genuinely contain sugar.
  *
- * <p><b>What is deliberately left alone.</b> Three positions keep their heads intact, because a name there is
+ * <p><b>What is deliberately left alone.</b> Two positions keep their heads intact, because a name there is
  * being <em>declared</em> or <em>composed</em>, not applied: a declaration's own body reference
- * ({@code TypeExprDef}), a refinement source, and a composition supertype.
+ * ({@code TypeExprDef}) and a composition supertype.
  *
- * <p><b>A template's body is a record body</b> ([TSON-SCHEMA] §5.10): braces, a composition or a refinement, and the
+ * <p><b>A template's body is a record body</b> ([TSON-SCHEMA] §5.10): braces or a composition, and the
  * record passes through as it would without parameters, for {@code DefinitionResolver} to build as an open record. A
  * parameter list before a sugar form or a bare reference -- {@code <T> [T]}, {@code <T> ( T | error )}, {@code <B>
  * pair<uuid, B>} -- is refused here, naming what to write instead ({@link #refuseTemplateBody}). Inside an open record
@@ -347,14 +346,14 @@ final class SchemaDesugarer {
 
     /**
      * A parameter list before a body that is no record ([TSON-SCHEMA] §5.10: a template's body is a record body --
-     * braces, a composition or a refinement), refused with what to write instead. A sugar form is a construction,
+     * braces or a composition), refused with what to write instead. A sugar form is a construction,
      * applied where it is used or left open and completed there; a choice or a tuple is a discriminated record
      * family or a field group; a bare reference is an alias template, which names a partial application nothing
      * could close.
      */
     private SchemaValidationException refuseTemplateBody(TypeExpr body) {
-        String prefix = "'" + currentName + "': a template's body is a record body -- braces, a composition or a "
-                + "refinement (§5.10) -- and '" + spell(body) + "' is ";
+        String prefix = "'" + currentName + "': a template's body is a record body -- braces or a composition "
+                + "(§5.10) -- and '" + spell(body) + "' is ";
         return new SchemaValidationException(prefix + switch (body) {
             case ArrayExpr _ -> "an array. Write the application where it is used ('meta.array<T>', '[T]'), or "
                     + "leave its construction open ('nonempty => !meta.array ^ { min_items: 1 }') and complete it";
@@ -439,14 +438,6 @@ final class SchemaDesugarer {
     private StructuralDef structuralDef(StructuralDef def) {
         return switch (def) {
             case RecordDef record -> recordDef(record);
-            case RefinedDef refined -> {
-                // §5.7 refines a *named* source; only its arguments are expandable.
-                TypeRef target = refined.target() instanceof ApplicationRef generic
-                        ? applicationArguments(generic) : refined.target();
-                RecordDef body = recordDef(refined.body());
-                yield target == refined.target() && body == refined.body() ? refined
-                        : new RefinedDef(target, body);
-            }
             case ConstructionDef construction -> {
                 // §5.8 composes with named supertypes; only their arguments are expandable.
                 List<TypeExpr> supertypes = mapShared(construction.supertypes(), this::argumentsOnly);
@@ -584,8 +575,8 @@ final class SchemaDesugarer {
      * <p>A head this document neither declares nor imports is left alone -- the reference is simply
      * unresolved, which is {@code TsonSchemaLinker}'s verdict to deliver. A local head that declares no
      * parameters is an author error where its body says it is no constructor: a fresh record IS-A nothing, and
-     * a construction carries an empty chain (§4.1), so nothing there takes arguments. A composition, a refinement
-     * or an alias may be a constructor, which construction sugar applies (§5.3), and an atom refinement may be an
+     * a construction carries an empty chain (§4.1), so nothing there takes arguments. A composition or an alias may
+     * be a constructor, which construction sugar applies (§5.3), and an atom refinement may be an
      * incomplete entry, which an application completes (§5.5); only resolution can tell, so each passes through.
      */
     private void checkTemplateApplication(String head) {
@@ -812,7 +803,7 @@ final class SchemaDesugarer {
                     FieldDef.FieldType type = field.type().orElseThrow(() -> new SchemaValidationException("field '"
                             + field.name() + "' states only a modifier and no type, and a record written in place "
                             + "declares every field with its type -- a modifier-only entry is a tightening, written "
-                            + "in a refinement or composition body (§5.7)"));
+                            + "in a composition body (§5.8)"));
                     FieldModifiers.Resolved facts = FieldModifiers.of(field.name(), field.omittable(),
                             type.voidable(), field.modifier());
                     facts.value().filter(token -> token.form() == TokenForm.UNQUOTED

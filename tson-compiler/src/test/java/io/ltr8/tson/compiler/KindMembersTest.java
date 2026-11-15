@@ -272,7 +272,7 @@ class KindMembersTest {
     }
 
     /**
-     * A namespace type is built with {@code namespace}, a refinement of {@code map} and so IS-A {@code map} and {@code
+     * A namespace type is built with {@code namespace}, a composition of {@code map} and so IS-A {@code map} and {@code
      * product}: it is a member of {@code meta.type_ref}, {@code meta.ref<namespace>}, {@code meta.ref<map>} and
      * {@code meta.ref<product>}, and of no kind of {@code record}. A record's {@code field_map} is a map type, a
      * member of {@code meta.ref<map>} and of no {@code meta.ref<namespace>}.
@@ -307,7 +307,7 @@ class KindMembersTest {
 
     /**
      * A refinement of a reference narrows {@code of} to the source's or a type IS-A it ([TSON-SCHEMA] §5.7), and is
-     * IS-A its source: {@code meta.map} IS-A {@code meta.product}, and {@code meta.namespace}, a refinement of {@code
+     * IS-A its source: {@code meta.map} IS-A {@code meta.product}, and {@code meta.namespace}, a composition of {@code
      * meta.map}, IS-A {@code meta.map}. The kernel's own {@code meta.identifier_ref} is such a refinement of {@code
      * meta.type_ref}.
      */
@@ -322,7 +322,7 @@ class KindMembersTest {
                   records    => !meta.type_ref ^ { of: meta.record }
                   same       => !products ^ {}
                   order      => { id: text }
-                  big_order  => order ^ {}
+                  big_order  => order & {}
                   orders     => !meta.ref { of: order }
                   big_orders => !orders ^ { of: big_order }
                 }
@@ -539,13 +539,13 @@ class KindMembersTest {
         link(header + """
                 {
                   text_identifier => !unicode.identifier_type { continue_add: " " }
-                  text_enum       => meta.enum_type ^ { name_type?: = text_identifier }
+                  text_enum       => meta.enum_type & { name_type?: = text_identifier }
                 }
                 """, "");
         SchemaValidationException e = assertThrows(SchemaValidationException.class, () -> link(header + """
                 {
                   phrase      => !unicode.text_type { normalization: NFC }
-                  phrase_enum => meta.enum_type ^ { name_type?: = phrase }
+                  phrase_enum => meta.enum_type & { name_type?: = phrase }
                 }
                 """, ""));
 

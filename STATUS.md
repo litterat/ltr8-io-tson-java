@@ -110,9 +110,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `io.ltr8:<module>`, with sources and javadoc, usable on the class path or the module path (see
       the README's [Use it from another project](README.md#use-it-from-another-project))
 - [x] Part 2 schema grammar — full schema document parsing into a faithful AST (records, compositions,
-      refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against
+      atom refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against
       the spec's own real `meta.tn`/`numeric.tn`/`temporal.tn`/`net.tn`/`core.tn` fixtures
-- [x] Part 2 schema resolution — composition (`&`), refinement (`^`) including tightening, bare and
+- [x] Part 2 schema resolution — composition (`&`) including a restated field's tightening, bare and
       generic type references, field modifiers/defaults/fixed values, type parameters, array sugar,
       and generalized constructor-application/atom-refinement resolution (`!C value`), every declaration
       made ready in wait order whatever order it is written in, so a constructor, a type or an annotation

@@ -46,7 +46,7 @@ class DependentFieldTest {
     private static final String CELLS = schema("""
               point     => { x: int32  y: int32 }
               cell      => { kind: meta.type_ref  v?: kind! }
-              int_cell  => cell ^ { kind?: = int32 }
+              int_cell  => cell & { kind?: = int32 }
               defaulted => { kind?: meta.type_ref ~ int32  v?: kind! }
               box       => <T> { item: T }
               slot      => abstract { kind: meta.type_ref =?  v?: kind! }
@@ -80,8 +80,8 @@ class DependentFieldTest {
         for (String declarations : List.of(
                 "cell => { kind: meta.type_ref  v?: kind!  w: kind! }",
                 "cell => { kind?: meta.type_ref ~ int32  v?: kind! }",
-                "cell => { kind: meta.type_ref  v?: kind! }\n  pinned => cell ^ { kind?: = int32 }",
-                "cell => { kind: meta.type_ref  v?: kind! }\n  strict => cell ^ { v: kind! }",
+                "cell => { kind: meta.type_ref  v?: kind! }\n  pinned => cell & { kind?: = int32 }",
+                "cell => { kind: meta.type_ref  v?: kind! }\n  strict => cell & { v: kind! }",
                 "records => meta.ref<meta.record>\n  shape => { kind: records  v?: kind! }",
                 "base => { kind: meta.type_ref }\n  cell => base & { v?: kind! }",
                 "pair => <T> { kind: meta.type_ref  v?: kind!  w: T }\n  p => pair<text>",
@@ -142,7 +142,7 @@ class DependentFieldTest {
     void aFieldGroupMemberIsNoSiblingOfARequiredDependentField() {
         assertTrue(refusal("cell => { ( kind: meta.type_ref | name: text )  v: kind! }")
                 .contains("a member of a field group, and 'v' is required"));
-        assertTrue(refusal("cell => { ( kind: meta.type_ref | name: text )  v?: kind! }\n  must => cell ^ { v: kind! }")
+        assertTrue(refusal("cell => { ( kind: meta.type_ref | name: text )  v?: kind! }\n  must => cell & { v: kind! }")
                 .contains("a member of a field group, and 'v' is required"));
     }
 
@@ -174,7 +174,7 @@ class DependentFieldTest {
 
     @Test
     void aDependentFieldIsRestatedOnlyAsItself() {
-        assertTrue(refusal("cell => { kind: meta.type_ref  v?: kind! }\n  int_cell => cell ^ { kind?: = int32  "
+        assertTrue(refusal("cell => { kind: meta.type_ref  v?: kind! }\n  int_cell => cell & { kind?: = int32  "
                 + "v?: int32 }").contains("a dependent field is restated only as itself"));
     }
 

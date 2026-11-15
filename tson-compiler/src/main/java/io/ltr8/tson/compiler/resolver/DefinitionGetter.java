@@ -7,8 +7,8 @@ import io.ltr8.tson.schema.meta.Top;
  * A single-name entry lookup -- the value a name maps to -- {@code null} if {@code name} isn't resolved (yet or
  * at all), matching {@code Map.get}'s own contract -- {@link DefinitionResolver} holds two of these over the
  * schema's one namespace: {@code namespaceDefinitions}, the whole of it, which {@link
- * DefinitionResolver#resolveComposition}/{@link DefinitionResolver#resolveRefinement}/{@link
- * DefinitionResolver#resolveAtomRefinement} look a supertype/refinement-source/atom-refinement-source up in, and
+ * DefinitionResolver#resolveComposition}/{@link DefinitionResolver#resolveAtomRefinement} look a
+ * supertype/atom-refinement-source up in, and
  * {@code vocabularyDefinitions}, where {@link DefinitionResolver#resolveConstructorTarget} looks a constructor-application
  * target up and an annotation's type is found -- the whole namespace too, but for the kernel's own resolution, which
  * reads every head through its pre-loaded stand-in.

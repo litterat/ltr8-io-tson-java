@@ -7,7 +7,7 @@ Current form only; history lives in git. The sugar table and the naming rule the
 
 **Invariants**
 
-- **A template's body is a record body** ([TSON-SCHEMA] §5.10): braces, a composition or a refinement, which pass through
+- **A template's body is a record body** ([TSON-SCHEMA] §5.10): braces or a composition, which pass through
   as they would without parameters, for `DefinitionResolver` to build as an open record. A parameter list before a
   sugar form or a bare reference is refused here, naming what to write instead (`refuseTemplateBody`); before a
   construction (`<T> !C { … }`) it passes through, `DefinitionResolver.openInstance` admitting `!meta.record` alone,

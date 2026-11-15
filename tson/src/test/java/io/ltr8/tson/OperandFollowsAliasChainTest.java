@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * <b>An operand is judged at the end of its alias chain, not at the name the author wrote</b>
- * ([TSON-SCHEMA] §4.3): "the source of a refinement and every operand of a composition or subtraction MUST,
- * after following its alias chain (§8.3), be a definition whose body is a {@code !record}".
+ * ([TSON-SCHEMA] §4.3): every operand of a composition or subtraction MUST, after following its alias chain (§8.3),
+ * be a definition whose body is a {@code !meta.record}.
  *
  * <p>Both halves of that rule matter, and only the second was applied. A reference is the same type under
  * another name (§5.7's table), so an alias of a record has a field set to merge or tighten and MUST be
@@ -89,16 +89,16 @@ class OperandFollowsAliasChainTest {
     }
 
     @Test
-    void aRefinementThroughAnAliasToARecordIsAdmitted() {
+    void aRestatementThroughAnAliasToARecordIsAdmitted() {
         TsonLinkedSchema linked = resolve("ofc3", """
                   rec => { x: int32 }
                   ali => rec
-                  sub => ali ^ { x?: int32 = 1 }
+                  sub => ali & { x?: int32 = 1 }
                 """);
 
         assertEquals(1, TypeChain.supertypesOf(linked.schema().entries().get("sub")).stream()
                         .filter(name -> name.equals("rec")).count(),
-                () -> "refinement reaches the same terminal: "
+                () -> "a restatement reaches the same terminal: "
                         + TypeChain.supertypesOf(linked.schema().entries().get("sub")));
     }
 
@@ -137,16 +137,16 @@ class OperandFollowsAliasChainTest {
                 () -> "and IS-A the operand: " + TypeChain.supertypesOf(linked.schema().entries().get("sub")));
     }
 
-    /** The refinement half: a vocabulary to tighten is a vocabulary however the entry came by it. */
+    /** A body that only restates: a vocabulary to tighten is a vocabulary however the entry came by it. */
     @Test
-    void aRefinementThroughAnAliasToARecordInstantiationIsAdmitted() {
+    void aRestatementThroughAnAliasToARecordInstantiationIsAdmitted() {
         TsonLinkedSchema linked = resolve("ofc8", """
                   box => <V> { item: V }
                   bx  => box<text>
-                  sub => bx ^ { item?: text = "x" }
+                  sub => bx & { item?: text = "x" }
                 """);
 
-        assertEquals(List.of("item"), fieldNames(linked, "sub"), "refinement adds no field (§5.7)");
+        assertEquals(List.of("item"), fieldNames(linked, "sub"), "a restatement adds no field (§5.7)");
         assertTrue(TypeChain.supertypesOf(linked.schema().entries().get("sub")).contains("bx"),
                 () -> "and preserves IS-A: " + TypeChain.supertypesOf(linked.schema().entries().get("sub")));
     }

@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
-import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
@@ -133,7 +132,6 @@ final class FamilyJoiners {
             if (declaration.typeDef() instanceof StructuralTypeDef structural) {
                 return switch (structural.body()) {
                     case ConstructionDef construction -> construction.body();
-                    case RefinedDef refined -> Optional.of(refined.body());
                     case RecordDef record -> Optional.of(record);
                 };
             }
@@ -149,7 +147,6 @@ final class FamilyJoiners {
                 case StructuralTypeDef structural -> switch (structural.body()) {
                     case ConstructionDef construction -> construction.removal().isPresent() ? List.of()
                             : construction.supertypes().stream().flatMap(type -> named(type).stream()).toList();
-                    case RefinedDef refined -> named(refined.target()).map(List::of).orElse(List.of());
                     case RecordDef ignored -> List.of();
                 };
                 case TypeExprDef alias -> named(alias.ref()).map(List::of).orElse(List.of());

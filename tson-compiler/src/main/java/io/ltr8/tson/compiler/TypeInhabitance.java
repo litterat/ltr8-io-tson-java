@@ -54,7 +54,7 @@ import java.util.Set;
  * <p><b>Exact, total and two-valued</b> -- unlike {@link ChoiceDisjointness}, which had to give up exactness
  * to stay total, this needs no such trade. There is no third answer to report.
  *
- * <p><b>Scope is structural.</b> An atom whose own facets admit nothing ({@code int8 ^ { min: 300 }}) is
+ * <p><b>Scope is structural.</b> An atom whose own facets admit nothing ({@code !int8 ^ { min: 300 }}) is
  * uninhabited too, but that is a question for the family that owns those facets, and the resolver asks it
  * ({@code Atom.coherenceCheck}). Every atom body counts as inhabited here.
  */

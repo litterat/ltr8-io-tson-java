@@ -127,8 +127,8 @@ class TypeInhabitanceTest {
     /**
      * A template is judged when it closes, not where it is written: the element types this rule reads stand over
      * parameters until an application supplies the arguments. The closure is an ordinary entry by the time linking
-     * runs, so §8's {@code tree} fixture, its recursive position non-empty through a refined constructor, is caught
-     * the moment anything applies it -- and a template nobody applies is judged nowhere.
+     * runs, so §8's {@code tree} fixture, its recursive position non-empty through an incomplete entry's completion,
+     * is caught the moment anything applies it -- and a template nobody applies is judged nowhere.
      */
     @Test
     void anUninhabitedTemplateIsRejectedWhereItCloses() {

@@ -150,8 +150,8 @@ class OpenEntryResolvedFormTest {
 
     /**
      * <b>An entry declares parameters exactly when it is an open record</b>, asked of every entry of every bundled
-     * schema and of a schema exercising each template shape: a fresh record body, a composition and a refinement. The
-     * kernel declares none.
+     * schema and of a schema exercising each template shape: a fresh record body, a composition adding a field and
+     * one restating a field. The kernel declares none.
      */
     @Test
     void anEntryWithParametersIsAnOpenRecord() {
@@ -164,7 +164,7 @@ class OpenEntryResolvedFormTest {
                   base     => { id: text }
                   pair     => <A, B> { first: A  second: B }
                   composed => <T> base & { value: T }
-                  refined  => <T> pair<T, text> ^ { second: = hi }
+                  restated => <T> pair<T, text> & { second: = hi }
                   composed_int => composed<int32>
                   holder   => { p: pair<text, int32>  q: composed_int }
                 }
@@ -191,7 +191,7 @@ class OpenEntryResolvedFormTest {
         }
 
         assertEquals(List.of(), broken, "§5.10: a template is an open record");
-        assertEquals(List.of("pair", "composed", "refined"), open, "the kernel declares no open record");
+        assertEquals(List.of("pair", "composed", "restated"), open, "the kernel declares no open record");
     }
     // ── §8.1: a kind is derived, never recorded ─────────────────────────
 

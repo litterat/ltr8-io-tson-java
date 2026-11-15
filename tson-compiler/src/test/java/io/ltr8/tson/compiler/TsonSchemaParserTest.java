@@ -21,7 +21,6 @@ import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
-import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
@@ -288,13 +287,28 @@ class TsonSchemaParserTest {
         assertEquals(List.of("password", "ssn"), construction.removal().orElseThrow().fieldNames());
     }
 
+    /**
+     * {@code ^} follows {@code !name} and takes values (§5.5, §5.7): after a bare name, an application or a parameter
+     * list it is a parse error, whatever the name turns out to be, naming the composition that restates fields.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"production => config ^ { host: = \"prod.example.com\" }",
+            "minlist => meta.array ^ { min_items?: = 1 }", "fixed => box<text> ^ { v?: = a }",
+            "set => <T> array<T> ^ { ordered: = false }", "vip => person ^ {}"})
+    void aCaretAfterABareNameIsAParseError(String declaration) {
+        ParseException thrown = assertThrows(ParseException.class, () -> declOf(declaration));
+        assertTrue(thrown.getMessage().contains("'^' follows '!name' and takes values (§5.5, §5.7)"),
+                thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("a record's fields are restated in a composition"),
+                thrown.getMessage());
+    }
+
     @Test
-    void recordRefinement() {
-        TypeDef def = declOf("production => config ^ { host: = \"prod.example.com\" }").typeDef();
-        StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
-        RefinedDef refined = assertInstanceOf(RefinedDef.class, structural.body());
-        assertEquals(new NameRef("config"), refined.target());
-        assertEquals(1, refined.body().entries().size());
+    void theCompositionANameBeforeACaretNames() {
+        assertTrue(assertThrows(ParseException.class, () -> declOf("vip => person ^ {}")).getMessage()
+                .contains("'person & { ... }' (§5.8)"));
+        assertTrue(assertThrows(ParseException.class, () -> declOf("fixed => box<text> ^ { v?: = a }"))
+                .getMessage().contains("'box<...> & { ... }' (§5.8)"));
     }
 
     @Test
@@ -309,15 +323,6 @@ class TsonSchemaParserTest {
         TypeDef def = declOf("age => !integer ^ { min: 0  max: 150 }").typeDef();
         AtomRefinement refinement = assertInstanceOf(AtomRefinement.class, def);
         assertEquals("integer", refinement.target());
-    }
-
-    @Test
-    void parameterisedRefinementHead() {
-        TypeDef def = declOf("set => <T> array<T> ^ { ordered: = false }").typeDef();
-        StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
-        assertEquals(List.of("T"), structural.typeParams());
-        RefinedDef refined = assertInstanceOf(RefinedDef.class, structural.body());
-        assertEquals(new ApplicationRef("array", List.of(new NameRef("T"))), refined.target());
     }
 
     @Test
@@ -418,15 +423,15 @@ class TsonSchemaParserTest {
     }
 
     /**
-     * A record body stays a record body wherever the grammar already fixed one -- a refinement body, a
-     * composition tail, a constructor vocabulary -- so {@code =>} there is an error rather than a map, and
+     * A record body stays a record body wherever the grammar already fixed one -- a composition tail, a
+     * constructor vocabulary -- so {@code =>} there is an error rather than a map, and
      * the diagnostic says which of the two constructs {@code =>} belongs to.
      */
     @Test
     void aMapArrowInARecordBodyNamesTheConstructRatherThanTheToken() {
         ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!import:"https://tson.io/2026/40/m/meta.tn"
-                !schema { config => base ^ {text => text} }"""));
+                !schema { config => base & {text => text} }"""));
         assertTrue(thrown.getMessage().contains("'=>' begins a map type only where a type is expected"),
                 thrown.getMessage());
     }
@@ -495,15 +500,24 @@ class TsonSchemaParserTest {
         assertTrue(thrown.getMessage().contains("a map type's key is a type name"), thrown.getMessage());
     }
 
-    /** Composition, refinement and subtraction are declared, never written in place: each refusal says so. */
+    /** Composition and subtraction are declared, never written in place: each refusal says so. */
     @ParameterizedTest
-    @ValueSource(strings = {"r => { at: point & { z: int32 } }", "r => { at: point ^ { x?: = 0 } }",
-            "r => { at: point - { x } }", "r => { at: { x: int32 } & point }", "r => { at: [point & { z: int32 }] }",
-            "r => { at: ( text | point ^ { x?: = 0 } ) }", "r => { at: box<point & { z: int32 }> }"})
-    void compositionAndRefinementInPlaceAreRefused(String declaration) {
+    @ValueSource(strings = {"r => { at: point & { z: int32 } }", "r => { at: point - { x } }",
+            "r => { at: { x: int32 } & point }", "r => { at: [point & { z: int32 }] }",
+            "r => { at: box<point & { z: int32 }> }"})
+    void compositionAndSubtractionInPlaceAreRefused(String declaration) {
         ParseException thrown = assertThrows(ParseException.class, () -> declOf(declaration));
         assertTrue(thrown.getMessage().contains("is declared, never written in place"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("declare it under a name"), thrown.getMessage());
+    }
+
+    /** A {@code ^} after a name at a slot is refused as at a declaration, naming the composition to declare. */
+    @ParameterizedTest
+    @ValueSource(strings = {"r => { at: point ^ { x?: = 0 } }", "r => { at: ( text | point ^ { x?: = 0 } ) }"})
+    void aCaretAfterANameAtASlotIsRefused(String declaration) {
+        ParseException thrown = assertThrows(ParseException.class, () -> declOf(declaration));
+        assertTrue(thrown.getMessage().contains("'^' follows '!name' and takes values"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'my_type => base & { ... }'"), thrown.getMessage());
     }
 
     /** A name followed by a brace at a slot, a definition mark included, is refused naming the bare body. */
@@ -1283,14 +1297,14 @@ class TsonSchemaParserTest {
 
     /**
      * Anywhere else a reference stands, {@code kind!} is a parse error saying where the mark may stand: inside a field's
-     * type, as a declaration's body, a refinement's source, a composition operand, a map's key, a parameter's type, and
+     * type, as a declaration's body, a composition operand, a map's key, a parameter's type, and
      * as a field's value.
      */
     @Test
     void aDependentTypeOffAFieldsTypeDoesNotParse() {
         for (String declaration : List.of("cell => { v: [ kind! ] }", "cell => { v: [ kind!, text ] }",
                 "cell => { v: { text => kind! } }", "cell => { v: ( kind! | text ) }", "cell => { v: box< kind! > }",
-                "cell => { ( v: [ kind! ] | w: text )? }", "x => kind!", "x => kind! ^ { a: text }",
+                "cell => { ( v: [ kind! ] | w: text )? }", "x => kind!",
                 "x => base & kind! & { a: text }", "x => kind! & { a: text }", "x => { kind! => text }",
                 "x => <T: kind! > { a: T }", "cell => { kind: meta.type_ref ~ kind!  v: text }")) {
             ParseException e = assertThrows(ParseException.class, () -> declOf(declaration), declaration);

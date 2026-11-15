@@ -97,8 +97,8 @@ class FamilyJoinersTest {
     }
 
     @Test
-    void aRefinementSourceIsAnOperand() {
-        assertEquals(List.of("narrow"), joiners("  narrow => get ^ { path?: = \"/\" }\n", "get"));
+    void anOperandRestatingOnlyAPinIsAnOperand() {
+        assertEquals(List.of("narrow"), joiners("  narrow => get & { path?: = \"/\" }\n", "get"));
     }
 
     @Test

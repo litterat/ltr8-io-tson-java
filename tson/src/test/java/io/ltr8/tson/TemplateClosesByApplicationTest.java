@@ -118,14 +118,14 @@ class TemplateClosesByApplicationTest {
     }
 
     /**
-     * A refinement template pinning a slot to its parameter is refused at the declaration: a field's value is never a
+     * A template pinning a slot to its parameter is refused at the declaration: a field's value is never a
      * parameter, whatever the field's type -- {@code element_type} is typed {@code meta.type_ref}, and its pin is a
      * value all the same (§5.10).
      */
     @Test
     void aPinOfAParameterOnAReferenceTypedFieldIsRefused() {
         List<Diagnostic> problems = vocabularyProblems(
-                "my_set => <T> meta.array ^ { element_type?: = T  ordered?: = false  unique_items?: = true }");
+                "my_set => <T> meta.array & { element_type?: = T  ordered?: = false  unique_items?: = true }");
 
         assertEquals(1, problems.size(), problems::toString);
         assertTrue(problems.getFirst().message().contains("parameter 'T' stands at the value of field 'element_type'"),

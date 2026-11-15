@@ -64,7 +64,7 @@ the schema, at a line the data's author does not control. The diagnostic spells 
   halves.
 - **An unresolved reference is inhabited by fiat.** `validateEntry` has already reported it against this entry;
   calling it uninhabited too would report one defect twice, the second time naming a different problem.
-- **Scope is structural.** An atom whose facets admit nothing (`int8 ^ { min: 300 }`) is uninhabited too, but that is
+- **Scope is structural.** An atom whose facets admit nothing (`!int8 ^ { min: 300 }`) is uninhabited too, but that is
   its family's coherence rule (`Atom.coherenceCheck`, over `AtomCoherence`), asked by the resolver of each written
   body and by the linker's `checkCoherent` of every entry (`design/atom-refinement-and-coherence.md`). A value entry
   (`ValueEntry`) is inhabited because nothing may be typed by it, which is what makes that refusal load-bearing
@@ -82,7 +82,7 @@ usable and its members pin them distinctly, and every member is declared.
   local (two definition marks on one declaration, a mark carrying a value, a mark on a non-record) the resolver
   already refused while lowering. It runs on the merged map, not the annotated one: the marks are consumed into the
   body, so no annotation is left to consult.
-- **The FINAL check reads the entry's chain**, a template's as a closed type's: a template composing or refining a
+- **The FINAL check reads the entry's chain**, a template's as a closed type's: a template composing a
   final record is refused at its own declaration, whether or not anything applies it, since every application IS-A
   what the template's written parents reach. §5.9's subtraction leaves the chain empty, adding no IS-A edge, which is
   the only thing FINAL constrains, so subtracting from a final type is admitted. No *invalid* case would show a

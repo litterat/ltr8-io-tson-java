@@ -38,7 +38,7 @@ class SchemaResolverDiagnosticsTest {
     /**
      * Four independently broken declarations plus one good one, each failing a different rule so that no one
      * is a consequence of another: two refinements that widen rather than narrow (§5.7), a record body
-     * declaring the same field name twice (§5.8), and a refinement source that names nothing at all (§3.3.1)
+     * declaring the same field name twice (§5.8), and an atom refinement source that names nothing at all (§3.3.1)
      * -- the plain typo, and the most common of the four in practice.
      */
     private static final String FOUR_BROKEN = """

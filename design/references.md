@@ -13,7 +13,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   (`RefBody`). It admits a name exactly when the type of the named entry's value, its tag, past its alias hops,
   IS-A `of`: `order => { … }` holds a value of `meta.record`, `int32 => !integer ^ { … }` one of
   `numeric.integer_type`, `orders => !api { … }` one of `api`. `meta.ref<T>` is the construction `!meta.ref { of: T }`
-  (§5.3's construction sugar), whatever `of` names, and a refinement of `meta.ref` is a constructor IS-A it, so a
+  (§5.3's construction sugar), whatever `of` names, and a composition of `meta.ref` is a constructor IS-A it, so a
   question of whether a body is a reference goes by the constructor's chain, never its name;
   `meta.type_ref` is `!meta.ref { of: meta.type }`, and `meta.identifier_ref` a refinement of that to
   `unicode.identifier_type`, a refinement narrowing `of` to a type IS-A the source's (`RefBody.ofNarrowing`).
@@ -61,7 +61,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   inside an open record, over one of its parameters, applying an open record; the linker refuses one anywhere else
   (`TsonSchemaLinker.validateBody`'s apply arm, `requireOpen`), which is how a resolved form read as output is held to
   it. `meta.apply` composes `meta.type` alone and is final: it has no kind (`EntryKind.of` refuses one), and no
-  constructor refines it. Identity is the head and the arguments (`ApplyBody.equals`), so `CanonicalApplication` and
+  constructor composes it. Identity is the head and the arguments (`ApplyBody.equals`), so `CanonicalApplication` and
   the applied-parent fold compare structure, never text.
 - **A dependent field's type is no reference** (§5.2): `kind!` is schema-grammar sugar for `{ of: !meta.dependent { on:
   kind } }`, a type written in place at the field's type (`design/schema-resolution.md`). No reference production,
@@ -80,9 +80,9 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   `uuid_list => meta.array<uuid>` *is* `!meta.array { element_type: uuid }`, tag `meta.array`, no `@meta.application`.
   The arity is the slot count (`ConstructionSugar.requireArity`) and every argument a reference by the grammar; every
   other verdict is the construction's own, so `meta.namespace<int32 text>` is refused at link as `key_type: int32` is,
-  and `meta.enum_type<meta.identifier>` by the constructor's reader for the `members` it leaves unwritten. A refined
-  constructor is applied the same way and its instance is its own kind: `nonempty_type<uuid>` is `!nonempty_type {
-  element_type: uuid }`, a different entry from `[uuid; 1..]`. An application whose head is an open record
+  and `meta.enum_type<meta.identifier>` by the constructor's reader for the `members` it leaves unwritten. An
+  incomplete entry is completed the same way, and its completion is the plain construction: `nonempty<uuid>` over
+  `nonempty => !meta.array ^ { min_items: 1 }` is `[uuid; 1..]`. An application whose head is an open record
   substitutes (§5.10) -- an open record is never constructed, whatever its chain reaches -- and a head that is neither
   takes no arguments.
 - A slot that names the type of a value is typed `meta.type_ref` (`meta.tuple_element.element_type`,

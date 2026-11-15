@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The rules a type written in place is held to beside a name ([TSON-SCHEMA] §5.2, §5.4, §5.7, §8.2): a value modifier
  * on an inline reference, a name never one type with a construction, a choice that is not disjoint naming every
- * variant, an application of an open record absorbed at a refinement source, what a type in place may carry, and an
+ * variant, an application of an open record absorbed at a composition operand, what a type in place may carry, and an
  * abstract record in place empty.
  */
 class InlineTypeRulesTest {
@@ -149,12 +149,12 @@ class InlineTypeRulesTest {
 
     @Test
     void aRestatedFieldMayNotSwapANameForItsConstruction() {
-        refused("  base => { tags: text_list }\n  sub => base ^ { tags: [text] }",
+        refused("  base => { tags: text_list }\n  sub => base & { tags: [text] }",
                 "a name and a type written in place are never one type");
-        refused("  base => { tags: [text] }\n  sub => base ^ { tags: text_list }",
+        refused("  base => { tags: [text] }\n  sub => base & { tags: text_list }",
                 "a name and a type written in place are never one type");
-        assertEquals(List.of(), problems("  base => { tags: [text] }\n  sub => base ^ { tags: [text] }"));
-        assertEquals(List.of(), problems("  base => { tags: text_list }\n  sub => base ^ { tags: text_list }"));
+        assertEquals(List.of(), problems("  base => { tags: [text] }\n  sub => base & { tags: [text] }"));
+        assertEquals(List.of(), problems("  base => { tags: text_list }\n  sub => base & { tags: text_list }"));
     }
 
     /**
@@ -183,22 +183,22 @@ class InlineTypeRulesTest {
         refused("  c => @meta.disjoint ( [text] | [int32] )", "asserts @meta.disjoint");
     }
 
-    // ── An application at a refinement source is absorbed (§5.7, §5.8) ──────────────────────────
+    // ── An application at a composition operand is absorbed (§5.7, §5.8) ────────────────────────
 
     @Test
-    void anApplicationAtARefinementSourceIsAbsorbed() {
-        assertEquals(List.of(), problems("  x => box<text> ^ { w: text }"));
-        RecordBody x = assertInstanceOf(RecordBody.class, Tson.standard().resolve(schema("  x => box<text> ^ { w: text }"))
+    void anApplicationRestatedAtAnOperandIsAbsorbed() {
+        assertEquals(List.of(), problems("  x => box<text> & { w: text }"));
+        RecordBody x = assertInstanceOf(RecordBody.class, Tson.standard().resolve(schema("  x => box<text> & { w: text }"))
                 .schema().entries().get("x"));
         assertEquals(List.of("v", "w"), List.copyOf(x.fields().keySet()));
-        assertFalse(x.fields().get("w").optional(), "the refinement made 'w' required");
+        assertFalse(x.fields().get("w").optional(), "the restatement made 'w' required");
         assertFalse(TypeChain.supertypesOf(x).contains("box"), "nothing is IS-A a template");
     }
 
     /** It is IS-A its template's written parents, and the entry declared for the application where one is. */
     @Test
-    void anAbsorbedRefinementSourceReachesTheDeclaredApplication() {
-        String declarations = "  tb => pet_box<text>\n  x => pet_box<text> ^ { legs: int32 }";
+    void anAbsorbedOperandReachesTheDeclaredApplication() {
+        String declarations = "  tb => pet_box<text>\n  x => pet_box<text> & { legs: int32 }";
         assertEquals(List.of(), problems(declarations));
         Top x = Tson.standard().resolve(schema(declarations)).schema().entries().get("x");
         List<String> supertypes = TypeChain.supertypesOf(x);
@@ -209,7 +209,7 @@ class InlineTypeRulesTest {
 
     /**
      * An application whose head is an alias of an open record is the open record's application ([TSON-SCHEMA] §8.3),
-     * absorbed at a refinement source and at a composition operand alike, its edge naming the entry declared for the
+     * absorbed at a composition operand, whether its body restates or adds, its edge naming the entry declared for the
      * application, and so is one an open record composes over its own parameter.
      */
     @Test
@@ -217,7 +217,7 @@ class InlineTypeRulesTest {
         String declarations = """
                   pet_of => pet_box
                   tb     => pet_box<text>
-                  x      => pet_of<text> ^ { legs: int32 }
+                  x      => pet_of<text> & { legs: int32 }
                   y      => pet_of<text> & { name: text }
                   vip    => <T> pet_of<T> & { rank: int32 }
                   vt     => vip<text>
@@ -226,7 +226,7 @@ class InlineTypeRulesTest {
         var entries = Tson.standard().resolve(schema(declarations)).schema().entries();
         RecordBody x = assertInstanceOf(RecordBody.class, entries.get("x"));
         assertEquals(List.of("legs", "v"), List.copyOf(x.fields().keySet()));
-        assertFalse(x.fields().get("legs").optional(), "the refinement made 'legs' required");
+        assertFalse(x.fields().get("legs").optional(), "the restatement made 'legs' required");
         RecordBody y = assertInstanceOf(RecordBody.class, entries.get("y"));
         assertEquals(List.of("legs", "v", "name"), List.copyOf(y.fields().keySet()));
         for (String name : List.of("x", "y", "vt")) {

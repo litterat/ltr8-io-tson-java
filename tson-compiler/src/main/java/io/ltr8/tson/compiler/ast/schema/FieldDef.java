@@ -13,7 +13,7 @@ import java.util.Optional;
  * FieldType#voidable}) admits a written {@code _}. The modifier names the schema's value. Exactly one of
  * {@code type}/{@code modifier} may be absent, never both: a bare {@code field:} with neither a type-ref nor
  * a modifier is not a grammar production. Where {@code type} is absent, the type is elided and inherited
- * from a refinement/composition source (§5.7's "elided type-refs") -- legal only there; the compiler is
+ * from a composition's supertype (§5.7's "elided type-refs") -- legal only there; the compiler is
  * responsible for rejecting an elided type-ref in a fresh record definition (§5.2).
  */
 public record FieldDef(List<Annotation> annotations, String name, boolean omittable, Optional<FieldType> type,

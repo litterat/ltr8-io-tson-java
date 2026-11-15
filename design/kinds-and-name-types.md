@@ -64,8 +64,7 @@ schema's one namespace (§3.3), and the members are computed.
 
 ## The types built with a constructor (`KindMembers`, §4.2)
 
-A kind (`!meta.ref { of: net.uuid_type }`, or `meta.ref<net.uuid_type>`, the construction `!meta.ref { of:
-net.uuid_type }` of the kernel's refined constructor) is an atom
+A kind (`!meta.ref { of: net.uuid_type }`, or `meta.ref<net.uuid_type>`, the same construction) is an atom
 whose values are the names of the closure's types built with one constructor: a computed set of names, as an enum's is a
 listed one. The kernel declares `meta.type_ref` and its refinement `meta.identifier_ref`, and types
 `meta.enum_type.name_type` and `meta.record.name_type` by the second. `computeKinds` derives every reference's index
@@ -139,8 +138,7 @@ which equality, which profile) lives in a namespace the body cannot see.
 - **Membership, not body class.** `NameType.admits` reads the slot's kind off the `name_type` field of the constructor
   the entry applies, and asks `KindMembers.isMember` of the referent. Where the slot's kind is out of reach (a
   closure holding no kernel, as a hand-built schema's may), `meta.identifier_ref`'s `of`, `unicode.identifier_type`, is
-  used. A construction of `unicode.identifier_type` through a refined constructor of it is an instance of that
-  refinement, IS-A the constructor, and is admitted (`KindMembersTest`).
+  used.
 - **The profile is the type's.** `NameType.profile` reads the profile of an admitted type only; `checkNames` judges
   an enum's members and a record's field names by §8.2's per-name rules under it, so a `medial: " "` among its added
   characters is its own. An entry with no admitted profile and not refused falls back to the identifier grammar's.
@@ -170,12 +168,12 @@ field-name scope read it as they read a closed record. A parameter is never a fi
 
 - **Supertypes decide.** A record with supertypes takes their one type, refuses two that disagree, and refuses a
   stated type that is not theirs; two are one when their alias chains end at one entry (`sameNameType`), so an
-  alias is its target and `meta.field_name` is `meta.identifier`. A refinement keeps its source's. The rule is composition's
+  alias is its target and `meta.field_name` is `meta.identifier`. The rule is composition's
   (`resolveComposition`): a declaration never writes a chain (§8.1), so an explicit `!meta.record { … }` has none to take a
   type from, which is why `meta.record.name_type` has no `~` default. It is also how a brace form states one: a
   fieldless ABSTRACT base carries the type and the records composing it take it.
 - **A schema's own references to a field match its declared spelling exactly**, under a folding type too: a group
-  member, a refinement's or removal's restated field, a discriminator. Only a document's names are matched in the
+  member, a composition's restated or removed field, a discriminator. Only a document's names are matched in the
   type's form.
 - **Recorded for the readers.** Each record, open or closed, whose body states a name type is recorded in
   `TsonLinkedSchema.nameTypes` with the definition it resolves to (`FieldNames.readBy`), because its readers judge a

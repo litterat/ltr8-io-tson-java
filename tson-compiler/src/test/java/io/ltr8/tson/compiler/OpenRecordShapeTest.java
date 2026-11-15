@@ -96,7 +96,7 @@ class OpenRecordShapeTest {
     /**
      * A field's value is never a parameter, whatever the field's type (§5.10): a default or a pin naming one is
      * refused at the declaration, naming the slot -- in a fresh record body, in the explicit spelling, and in a
-     * refinement template pinning a slot typed {@code meta.type_ref}.
+     * composition pinning a slot typed {@code meta.type_ref}.
      */
     @Test
     void aParameterAtAFieldsValueIsRefused() {
@@ -106,7 +106,7 @@ class OpenRecordShapeTest {
                 "  retry => <T, N> !meta.record { fields: { t => T  attempts => { type: int32  optional: true  "
                         + "value: N } } }")).getMessage();
         String pinned = assertThrows(SchemaValidationException.class,
-                () -> compile("  my_set => <T> meta.array ^ { element_type?: = T }")).getMessage();
+                () -> compile("  my_set => <T> meta.array & { element_type?: = T }")).getMessage();
         String composed = assertThrows(SchemaValidationException.class, () -> compile("""
                   base => { status: int32  body: text }
                   bad  => <T> base & { status?: = T  extra: T }
@@ -365,14 +365,8 @@ class OpenRecordShapeTest {
                   box => <T> { v: T }
                   bad => box & { a: text }
                 """)).getMessage();
-        String refined = assertThrows(SchemaValidationException.class, () -> compile("""
-                  box => <T> { v: T }
-                  bad => box ^ { }
-                """)).getMessage();
 
         assertTrue(composed.contains("supertype 'box' is a template and is applied to no arguments"), composed);
-        assertTrue(refined.contains("refinement source 'box' is a template and is applied to no arguments"),
-                refined);
     }
 
     /**

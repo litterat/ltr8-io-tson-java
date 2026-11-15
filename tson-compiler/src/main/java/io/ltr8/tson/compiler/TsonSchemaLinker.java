@@ -132,7 +132,7 @@ import java.util.function.Predicate;
  * identity -- <b>transitive, not shallow</b>: {@code loader} hands back an already-registered, already-linked schema
  * whose {@code entries()} hold its own closure merged in, and all of them are taken; (2) this schema's own entries,
  * exactly as resolved. Every name a schema
- * writes -- a construction head, a refinement source, a type-ref, a kind's or a reference's {@code of}, an
+ * writes -- a construction head, a composition operand, a type-ref, a kind's or a reference's {@code of}, an
  * annotation -- resolves in that one flat namespace, with no hiding and no second store.
  *
  * <p><b>Anyone may declare a constructor</b> (an entry IS-A {@code top}, §4.1) or a reference, and import any
@@ -1084,7 +1084,7 @@ public final class TsonSchemaLinker {
 
     /**
      * Populates each type's {@code subtypes}, the reverse of {@code supertypes}. Since a closed chain is already
-     * the full *transitive* IS-A chain (by the induction the resolver's composition/refinement resolution
+     * the full *transitive* IS-A chain (by the induction the resolver's composition resolution
      * performs), the reverse index falls out just as transitively for free: if {@code success_response}'s own
      * chain includes both {@code response} and (transitively) {@code top}, then both gain {@code
      * success_response} as a subtype here, with no separate transitive-closure step needed.
@@ -1748,7 +1748,7 @@ public final class TsonSchemaLinker {
             case RecordBody record -> record.fields().values().forEach(field -> {
                 collectNames(field.type(), into);
                 // A routed parameter rides `value` like any other token, so it is named here too -- which is
-                // what keeps `<S> base ^ { status: = S }` from reading as a template that never uses S.
+                // what keeps `<S> base & { status: = S }` from reading as a template that never uses S.
                 field.value().map(Token::text).ifPresent(into::add);
             });
             case ArrayBody array -> collectNames(array.elementType(), into);
@@ -1846,7 +1846,7 @@ public final class TsonSchemaLinker {
 
     /**
      * [TSON-SCHEMA] §5.7's rule for a restated field's type, which §5.8 applies to a composition's tightening
-     * entries: refinement only restricts, so a field a record restates is typed by its source's type or a type IS-A
+     * entries: a restatement only restricts, so a field a record restates is typed by its source's type or a type IS-A
      * it, §7.2's IS-A asked as {@link #checkReferenceNarrows} asks it, past alias hops on both sides, and nothing
      * structural beside it (§5.7): {@code [int8]} restating {@code [int32]} is no narrowing. §5.7's
      * one other narrowing is {@code void} at a voidable position, whose value set {@code {_}} is inside every voidable
@@ -1891,8 +1891,8 @@ public final class TsonSchemaLinker {
                 }
             }
             if (!violations.isEmpty()) {
-                throw new SchemaValidationException("'" + entryName + "': not a valid refinement of '"
-                        + shown.apply(supertype) + "' (§5.7): " + String.join("; ", violations));
+                throw new SchemaValidationException("'" + entryName + "': not a valid restatement of '"
+                        + shown.apply(supertype) + "''s fields (§5.7): " + String.join("; ", violations));
             }
         }
     }
@@ -2017,7 +2017,7 @@ public final class TsonSchemaLinker {
 
     /**
      * A {@code ~}/{@code =} value at a field typed by a reference that names types: a type name, judged a member by
-     * the walk over the entry it resolves to ([TSON-SCHEMA] §4.2) -- {@code enum => enum_type ^ { name_type?: =
+     * the walk over the entry it resolves to ([TSON-SCHEMA] §4.2) -- {@code kebab => enum_type & { name_type?: =
      * identifier }} pins a name, and the pin is judged here, after resolution, in the schema's one namespace, which
      * holds the constructor pinning it and everything that constructor's schema reaches. A name resolving to
      * nothing, or to an entry whose value is not of the reference's {@code of}, is refused with the field's own two

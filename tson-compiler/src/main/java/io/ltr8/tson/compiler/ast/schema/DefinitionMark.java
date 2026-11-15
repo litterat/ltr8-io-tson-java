@@ -22,7 +22,7 @@ public enum DefinitionMark {
     /** {@code abstract} -- no instances of its own, so a value at a position typed by it is a subtype's. */
     ABSTRACT,
 
-    /** {@code final} -- instances of its own and no subtype: nothing may compose or refine onto it. */
+    /** {@code final} -- instances of its own and no subtype: nothing may compose onto it. */
     FINAL;
 
     /** The mark {@code word} spells, or empty where it is an ordinary name. */

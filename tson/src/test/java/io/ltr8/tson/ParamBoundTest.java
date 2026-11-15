@@ -196,8 +196,7 @@ class ParamBoundTest {
 
     /**
      * An application closed while the schema is still resolving -- a declaration naming it, a composition
-     * operand, a refinement source -- is checked against the same bound as
-     * one at a field, once every argument is ready.
+     * operand -- is checked against the same bound as one at a field, once every argument is ready.
      */
     @Test
     void aBoundIsEnforcedOnAnApplicationClosedDuringResolution() {

@@ -201,9 +201,9 @@ that is not a record, and no `meta.template` or `meta.record_template`.
   `parameters`. A template's body is a record body -- braces, a composition or a refinement, the explicit
   `<T> !meta.record { … }` among them -- and a parameter list before anything else is a resolver error at the
   declaration naming the remedy: before a container constructor or container sugar (`<T> !meta.array { … }`, `<T> [T]`),
-  the application at the use site or a refined constructor applied; before a choice or a tuple, a discriminated
-  record family or a field group; before a value (`<T> !api { … }`), one value per instantiation; before a bare
-  reference (`<B> pair<uuid, B>`, `<T> T`), no alias template. Inside an open record a form over a parameter is
+  the application at the use site or a construction left open and completed there; before a choice or a tuple, a
+  discriminated record family or a field group; before a value (`<T> !api { … }`), one value per instantiation;
+  before a bare reference (`<B> pair<uuid, B>`, `<T> T`), no alias template. Inside an open record a form over a parameter is
   written in place like any other, the parameter a name at its slot at any depth -- `[T; 1..]`, `[T?]`, `{K => V;
   ..10}`, a tuple, a choice and a record written in place over a parameter among them -- and a constructor's
   application over a parameter is its construction in place, `meta.array<T>` the form `[T]` is. Each is substituted
@@ -272,7 +272,7 @@ at ¶994-997, §8.2 ¶1535's "parsed held body" and its identity clause for open
 the lift rule, every mention of `meta.template` in §8.1, and narrow §12.1's `type-def` alternative `[type-params]
 type-expr` to a record body; and in §13.1 and the kernel's companion text replace `template`, `template_param`,
 `record_template`, `record_template_field`, `record_template_field_map`, `tuple1` and `voidable_tuple1` with
-`record.parameters` and `param`, `meta.ref` with the refined constructor and the root's `set` with an alias of
+`record.parameters` and `param`, `meta.ref` with the one reference constructor and the root's `set` with an alias of
 `meta.set_type`. The spec's own examples that need a record body move to one: `result => <T> ( T | error )` becomes a
 discriminated family (`result_of => <T> result & { value?: T }`), and §5.10.1's and §8.2's `nested => <T> ( T |
 [nested<T>] )` becomes a record, `nested => <T> { value?: T  more?: [nested<T>] }`.
@@ -340,14 +340,14 @@ types every type slot, a record field's included (#6). `tags: [text]` resolves t
 completion its constructor's (`set<text>` under `!meta.array`). The slots are a record field's `type`,
 `array.element_type`, `map.value_type`, `tuple_element.element_type` and each of `choice.variants`. What may be written
 in place is a container, a tuple, a
-choice or a reference, or a construction of a constructor refining one, or a record: a record body written at the
+choice or a reference, or a construction of a constructor composed from one, or a record: a record body written at the
 slot or the record an application of an open record closes to, one form. An enum and every other atom are declared
 and named, as §5.2 already requires. A map's key is a name. A type written in place is no entry: structural
 identity (same constructor, same fields, names as the leaves, annotations taking no part), no chain, a member of no
 kind, named by no tag.
 Nothing is lifted, minted or merged, and `@meta.application` stays on a declared application's key alone. An
 application of an open record is the substituted record under a declaration's name, absorbed by value at a
-composition operand or refinement source, where an applied parent's edge is the one lookup of a declaration by its
+composition operand, where an applied parent's edge is the one lookup of a declaration by its
 application, and closed in place at a type slot, never looked up; recursion ties to the declaration being closed,
 and a recursive application with none to tie to is refused. An argument of an open record's application is a name or
 a parameter; a slot typed `meta.type_ref` holds a name and refuses an application. Three rules widen: a dependent
@@ -375,7 +375,7 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   judged at link in a schema document. A choice that is not disjoint with a variant written in place
   (`( [text] | [int32] )`) is refused, a tag naming a variant by its name.
 - *Applications.* A declared application is its substituted record under its name, `@meta.application` on its key.
-  An application at a composition operand or a refinement source is absorbed by value, an applied parent's edge
+  An application at a composition operand is absorbed by value, an applied parent's edge
   naming the declared entry where there is one. At a type slot an application closes in place: `f: page<order>` holds
   `{ of: !meta.record { … } }`, the substituted record with no name, no chain and nothing recording it, never looked
   up to a declaration, and so does a nested application a closing leaves at a slot (`cursor: box<T>` once `page =>
@@ -423,8 +423,7 @@ and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-
   declaration to write.
 - *The three widened rules.* A dependent field's sibling typed by the type-slot choice, a constructor's argument
   slot typed by it (`meta.array<text>` constructs), and the positional `fields: { p => text }` all run.
-- *Kinds.* A construction in place is a member of no kind; a kind over a refined constructor whose only member was a
-  lifted construction now needs the member declared.
+- *Kinds.* A construction in place is a member of no kind: a kind's members are declared entries.
 
 **What is not yet running.** A tree read reports a dependent value whose sibling holds a type written in place as not
 implemented, holding the sibling as the record it is written as rather than as the type.
@@ -433,7 +432,7 @@ implemented, holding the sibling as the record it is written as rather than as t
 §3.3.3, §3.4.1, §4.1, §4.2 (the type-slot choice), §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12,
 §6, §7.2, §8.1, §8.2 (rewritten as *Instantiation and Identity*), §8.3, §9, §10.1, §11.5, §12.1 and §12.2, and Part 3
 §3.3; `spec/tson-rev40-changelog.md` records each section's rule before and after. Four points the
-design left open are settled there as ruled: a refinement source's application is absorbed as an operand's is; a
+design left open are settled there as ruled: an application at an operand is absorbed by value; a
 value modifier on a field typed by a reference written in place is admitted and read against it, and refused on a
 container, tuple or choice written in place; a choice that is not disjoint names every variant, a variant written in
 place there being a resolver error; and a name and a type written in place are never the same type, even where the
@@ -476,10 +475,10 @@ fixture (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`).
 - *The schema grammar* ([TSON-SCHEMA] §12.1, §5.3's sugar table). `kind!` parses only as a record field's type or a
   field group member's, a member being a field: `field-type = type-expr ["?"] / dependent-type`, `dependent-type =
   unquoted-token "!"`, `group-member = *annotation field-name ["?"] ws ":" ws field-type`, with `sibling-ref` gone
-  from `type-expr`, `refined-def`, `supertype-ref`, `map-key` and the imported productions. The token is one
+  from `type-expr`, `supertype-ref`, `map-key` and the imported productions. The token is one
   identifier and the `!` is followed by whitespace (§12.3), so `kind!?` is a parse error and a dependent field is
   never voidable by grammar. An adjacent `!` after a name at any other position — inside a field's type, a
-  declaration's body, a refinement source, a composition operand, a map key, a parameter's type, an argument, a
+  declaration's body, a composition operand, a map key, a parameter's type, an argument, a
   field's value — is a parse error: "'kind!' is a dependent field's type, and stands only as a record field's type, a
   field group member's included -- never inside a type, nor at any other position". The desugar step writes `kind!`
   as `{ of: !meta.dependent { on: kind } }` in place, and resolved output writes that.

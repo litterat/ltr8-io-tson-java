@@ -329,7 +329,6 @@ class IncompleteEntryTest {
                 Arguments.of("an argument", "box => <T> { v: T }\n  boxed => box<nonempty>"),
                 Arguments.of("a bound", "box => <T: nonempty> { v: T }"),
                 Arguments.of("an operand of &", "tagged => nonempty & { note?: text }"),
-                Arguments.of("a record ^ source", "tagged => nonempty ^ { }"),
                 Arguments.of("a reference's of", "arrays => !meta.ref { of: nonempty }"),
                 Arguments.of("an alias at a field", "filled => nonempty\n  holder => { names: filled }"));
     }
