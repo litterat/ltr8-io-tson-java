@@ -1,5 +1,7 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.schema.ExternTarget;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
@@ -75,6 +77,25 @@ final class AliasChain {
             admitted.addAll(namesMeaning.getOrDefault(name, Set.of()));
         }
         return admitted;
+    }
+
+    /**
+     * Where a chain ends past externs as well as aliases: the entry {@code name} lands on and the linked schema whose
+     * namespace holds it, the foreign one where the chain reaches an extern ([TSON-SCHEMA] §5.13). What a question
+     * asked of the type's shape -- its class, a map key's form -- asks, the shape being the target's.
+     */
+    record Landed(TsonLinkedSchema in, String name, Top definition) {
+    }
+
+    /** {@code name}'s landing in {@code linked}, past its aliases and its extern, or empty where it reaches nothing. */
+    static Optional<Landed> landed(TsonLinkedSchema linked, String name) {
+        Optional<ExternTarget.Landing> landing = linked.landing(name);
+        if (landing.isPresent()) {
+            ExternTarget.Landing end = landing.get();
+            return Optional.of(new Landed(end.in(), end.name(), end.definition()));
+        }
+        return terminal(linked.schema(), name).map(resolved -> new Landed(linked, resolved.name(),
+                resolved.definition()));
     }
 
     /**

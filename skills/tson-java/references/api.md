@@ -553,6 +553,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     public String originOf(String entryName);       // which document declared it, transitively
     public String declaringIdentity(String entryName); // originOf, canonical: what a binder is asked within
     public List<String> dependencies();             // every schema depended on directly: imports, then externs
+    public Optional<ExternTarget.Landing> landing(String name); // the foreign entry an extern lands on, past hops
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
     public Optional<Top> nameType(String entryName); // a record's name_type, where not meta.field_name
     public boolean isKernel(String entryName);      // declared by meta.tn, judged by origin

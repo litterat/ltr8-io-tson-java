@@ -986,13 +986,16 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
 12. **§6.3** — the one-position tuple was "the kernel's `meta.tuple1<T>` and
     `meta.voidable_tuple1<T>`", which §3.2 item 14 removed; it is a one-position tuple as
     declared, `!meta.tuple [{ element_type: text }]`. The encoding is unchanged.
-13. **§1.6, §3.3, §8.6 (new), §9.2** (§3.2 items 116–118) — a foreign value in JSON. Text
+13. **§1.6, §3.3, §6.4, §8.2, §8.6 (new), §9.2** (§3.2 items 116–118) — a foreign value in JSON. Text
     keeps the boundary's tag and the body apart; one JSON object carries both, so §8.6 says
     which is which: the `$type` leading the object at an extern position, or its wrapper,
     is the enclosing scope's and names the extern, and every other name in the value is the
     foreign schema's. An `$import` inside a foreign value is the resolver error it is at
-    every position but the document's top. §3.3's rule for where `$type` resolves, §9.2's
-    encoder obligation and §1.6's item 24 follow.
+    every position but the document's top. Where a choice or a declared position selects an
+    extern, the selecting `$type` is the boundary's and its wrapper's `$value` the foreign
+    value; a position whose extern's target is a map is a map-typed position. §6.4's key
+    form and §8.2's class follow an extern to its target. §3.3's rule for where `$type`
+    resolves, §9.2's encoder obligation and §1.6's item 24 follow.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -1139,7 +1142,7 @@ carries no open questions.
 | Item 109 (ruled) | `^` always follows `!name` and its body is values; `&` always follows a bare name and its body is field definitions, the only way to derive a record. | **[settled]** — the spec author's ruling. |
 | Items 108–109 (lost) | `a: enum`; a reference over sets alone; a set's `voidable: false` as a pin; a resolved form listing every name its source offers; `^`'s refusal of a new field. | Recorded — items 108 and 109 state each, and the replacement where there is one. |
 | Items 116–118 (ruled) | The extern is singular and a scope change; the tag at its boundary is the enclosing scope's; `type` is `text`; its schema loads with the imports and the declaring document is refused unless every foreign schema loads, holds the same kernel and closes no cycle; the head is written `meta.extern`; the boundary is absolute, no value entry brought in and no name selecting through it; a default or pin at a field typed by it is refused; an annotation through it is admitted; the import closure limit counts it. | **[settled]** — the spec author's rulings. |
-| Item 116 (reading) | An extern entry's kind. The text gives it a fifth kind, EXTERN, conferred by its form as ALIAS is, so a consumer of resolver output derives it from the entry alone; the alternative, its target's kind, needs the foreign schema loaded to derive. | **[editorial]** — the editor's reading. |
+| Item 116 (reading) | An extern entry's kind. The text gives it a fifth kind, EXTERN, conferred by its form as ALIAS is, so a consumer of resolver output derives it from the entry alone; the alternative, its target's kind, needs the foreign schema loaded to derive. | **[settled]** — the spec author's ruling, who expects the derived kind to go, nothing reading it; EXTERN goes with it. |
 | Item 116 (reading) | `meta.extern.schema` is `iri`, as the spec author wrote it, where an `!!import`'s value is an IRI-reference ([TSON-DATA] §3.3). The two name a schema on the same terms if the field is `iri_reference`. | **[editorial]** — the spec author's to confirm. |
 | Item 116 (reading) | A schema declares no value entry of an extern type: `!order_v1 { … }` at a declaration is refused with the other heads, beside the refused default and pin, so no foreign value is written in the declaring schema but an annotation's. | **[editorial]** — follows the ruling that an extern is no constructor head. |
 | Item 118 (reading) | Which tags the boundary admits. The text applies §7.2's subsumption with each name followed to the entry it reaches, by identity, so a name of the enclosing scope that is no extern is admitted where it reaches the target or a subtype of it (the scope importing the schema that declares it), and a variant's name is admitted where the target is a choice; the narrower reading admits externs alone. A tag naming the position's own extern is read as no tag, so an extern of a member-dispatched base may be written at a choice and its value placed by its selectors. | **[editorial]** — the editor's reading. |

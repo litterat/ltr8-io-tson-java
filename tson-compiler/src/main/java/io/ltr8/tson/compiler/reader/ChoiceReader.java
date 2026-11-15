@@ -73,7 +73,7 @@ final class ChoiceReader {
         for (TypeExpr variant : body.variants()) {
             // An extern variant is classified at the entry it lands on, in the namespace that holds it (§5.13).
             Optional<DiscriminationClass> variantClass = variant instanceof TypeRef reference
-                    ? ExternReader.landing(reference.name(), linked).map(end -> DiscriminationClass.of(end.name(),
+                    ? linked.landing(reference.name()).map(end -> DiscriminationClass.of(end.name(),
                             end.in().schema().entries()::get)).orElseGet(() -> DiscriminationClass.of(variant,
                             linked.schema().entries()::get))
                     : DiscriminationClass.of(variant, linked.schema().entries()::get);

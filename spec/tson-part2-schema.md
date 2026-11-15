@@ -1456,7 +1456,7 @@ A value at a position whose type resolves, past its alias chain, to an extern (�
 
 **Diagnostics.** A diagnostic raised inside a foreign value identifies the foreign schema, the scope its names were resolved in: its schema location is in the foreign schema, its document path is the whole document's, and it SHOULD name the extern the value was read through.
 
-**Every encoding reads a foreign value on these terms.** The scope is the model's fact, an extern's position and its target, and not this notation's: an encoding that writes a value's type states which of its spellings is the boundary's ([TSON-JSON] §8.5).
+**Every encoding reads a foreign value on these terms.** The scope is the model's fact, an extern's position and its target, and not this notation's: an encoding that writes a value's type states which of its spellings is the boundary's ([TSON-JSON] §8.6).
 
 
 ## 8. Resolver Output

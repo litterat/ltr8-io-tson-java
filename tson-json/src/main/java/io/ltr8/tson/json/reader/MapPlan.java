@@ -53,7 +53,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
                 body.voidable(), body.ordered(), body.minItems(), body.maxItems(), keyParser,
                 keyParser == null ? context.readers().resolve(body.keyType().name()) : null,
                 context.readers().resolve(body.valueType()), new MapDiagnostics(displayName),
-                keyProfile(context.schema(), body.keyType().name()));
+                keyProfile(context.linked(), body.keyType().name()));
     }
 
     /**
@@ -66,8 +66,8 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
     }
 
     /** {@code K}'s identifier profile when it is an identifier family, else {@code null}. */
-    private static IdentifierProfile keyProfile(TsonSchema schema, String keyTypeName) {
-        return AliasChain.terminal(schema, keyTypeName)
+    private static IdentifierProfile keyProfile(TsonLinkedSchema linked, String keyTypeName) {
+        return AliasChain.landed(linked, keyTypeName)
                 .map(terminal -> terminal.definition() instanceof IdentifierType identifier
                         ? identifier.profile() : null)
                 .orElse(null);
@@ -82,8 +82,8 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
      * Whether {@code body} takes the object form -- [TSON-SCHEMA] §5.4 asks the same question to give a map its
      * discrimination class, so a map in pairs form has none.
      */
-    static boolean isObjectForm(TsonSchema schema, MapBody body) {
-        return scalarKeyParser(new TsonLinkedSchema(schema), body.keyType().name()).isPresent();
+    static boolean isObjectForm(TsonLinkedSchema linked, MapBody body) {
+        return scalarKeyParser(linked, body.keyType().name()).isPresent();
     }
 
     /**
@@ -93,10 +93,11 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
      * than by being listed: neither has a content grammar for a key token to face.
      */
     private static Optional<AtomType<?>> scalarKeyParser(TsonLinkedSchema linked, String keyTypeName) {
-        AliasChain.Resolved terminal = AliasChain.terminal(linked.schema(), keyTypeName).orElseThrow(() ->
+        // A key type that is an extern is the target's, its parser and its enum's form the foreign schema's (§5.13).
+        AliasChain.Landed terminal = AliasChain.landed(linked, keyTypeName).orElseThrow(() ->
                 new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
         return terminal.definition() instanceof Atom atom
-                ? AtomParsers.forType(atom, linked.enumForm(terminal.name()))
+                ? AtomParsers.forType(atom, terminal.in().enumForm(terminal.name()))
                 : Optional.empty();
     }
 }

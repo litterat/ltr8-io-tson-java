@@ -2,6 +2,7 @@ package io.ltr8.tson.json;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.json.reader.ExternReader;
 import io.ltr8.tson.json.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.json.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -45,6 +46,20 @@ public final class JsonCompiledSchemaRegistry {
     private final Mode mode;
     private final Map<String, JsonCompiledSchema> compiled = new ConcurrentHashMap<>();
 
+    /** The schemas a value through an extern is read in, compiled and shared through this registry's cache. */
+    private final ExternReader.ForeignSchemas foreign = new ExternReader.ForeignSchemas() {
+        @Override
+        public JsonCompiledSchema compiled(TsonLinkedSchema linked) {
+            return JsonCompiledSchemaRegistry.this.compiled(linked);
+        }
+
+        @Override
+        public Optional<JsonCompiledSchema> compiled(String identity) {
+            JsonCompiledSchema hit = compiled.get(identity);
+            return hit != null ? Optional.of(hit) : loader.load(identity).map(JsonCompiledSchemaRegistry.this::compiled);
+        }
+    };
+
     private JsonCompiledSchemaRegistry(TsonSchemaLoader loader, ValueReaderFactoryResolver factories, Mode mode) {
         this.loader = loader;
         this.factories = factories;
@@ -84,10 +99,22 @@ public final class JsonCompiledSchemaRegistry {
         if (hit != null) {
             return Optional.of(hit);
         }
-        return loader.load(identity).map(linked -> {
-            JsonCompiledSchema built = JsonSchemaCompiler.compile(linked, factories);
-            JsonCompiledSchema raced = compiled.putIfAbsent(identity, built);
-            return raced != null ? raced : built;
-        });
+        return loader.load(identity).map(this::compiled);
+    }
+
+    /**
+     * {@code linked} compiled in this registry's mode, from the cache where it is there. A miss compiles outside any
+     * lock and keeps whichever copy lands first: a compile reaches this again for each schema an extern names
+     * ([TSON-SCHEMA] §7.9), which {@code computeIfAbsent} cannot.
+     */
+    private JsonCompiledSchema compiled(TsonLinkedSchema linked) {
+        String identity = linked.identity();
+        JsonCompiledSchema hit = compiled.get(identity);
+        if (hit != null) {
+            return hit;
+        }
+        JsonCompiledSchema built = JsonSchemaCompiler.compile(linked, factories, foreign);
+        JsonCompiledSchema raced = compiled.putIfAbsent(identity, built);
+        return raced != null ? raced : built;
     }
 }

@@ -253,13 +253,23 @@ thing outstanding under it is unrelated to the check itself.
 
 ## Externs
 
-A value through an extern ([TSON-SCHEMA] §7.9) is read, bound and written in TSON text; reading one in JSON is the
-gap left, listed under "JSON encoding".
+A value through an extern ([TSON-SCHEMA] §7.9) is read, bound and written in TSON text, and read and bound in JSON
+([TSON-JSON] §8.6). No JSON writer writes a `$type` at all, a boundary's included: listed under "JSON encoding".
 
-- [ ] **Write the boundary tag at every position an extern types.** `ExternTags` names a subtype or a variant at a
-  boundary where the extern types a record field, directly or through an array or a map written in place. A root
-  typed by an extern, and an extern reached through an alias of a container, write no boundary tag, so an instance
-  of a subtype there writes text that does not read back as that subtype ([TSON-SCHEMA] §7.9, "Writing").
+- [ ] **Write the boundary tag at every position an extern types, in TSON text.** `ExternTags` names a subtype or a
+  variant at a boundary where the extern types a record field, directly or through an array or a map written in
+  place. A root typed by an extern, and an extern reached through an alias of a container, write no boundary tag, so
+  an instance of a subtype there writes text that does not read back as that subtype ([TSON-SCHEMA] §7.9,
+  "Writing").
+- [ ] **A tag naming an extern at a position no extern types.** Where a schema imports another and also names one
+  of its entries by an extern, `!rush_x` at a position typed by the imported supertype `order` is refused in both
+  encodings (`'rush_x' is not admissible at a 'order' position`), though the extern reaches a subtype of `order` and
+  [TSON-SCHEMA] §8.3 follows an extern where it follows an alias, subsumption included. The readers that judge a tag
+  at an ordinary position (`VariantSchemaReader`, JSON's `DispatchTagReader`) follow the alias chain and stop at the
+  extern.
+- [ ] **A map key typed by an extern, in JSON, reports outside the foreign scope.** The key is parsed by the
+  target's parser, and a diagnostic on it carries neither the foreign schema nor the scope suffix
+  ([TSON-SCHEMA] §7.9, "Diagnostics").
 
 ## JSON encoding
 
@@ -268,9 +278,13 @@ it — and no schema declares one, so nothing in this stack reads a schema-side 
 written. A record is closed under its type and open-ended data is a declared map-typed field, identically in both
 encodings ([TSON-JSON] §6.1.1).
 
-- [ ] **Read a value through an extern in JSON** ([TSON-SCHEMA] §7.9, [TSON-JSON] §3.3): the object's leading `$type`
-  is the outer scope's and every nested one the foreign schema's. `JsonSchemaCompiler` compiles an extern to the
-  `NOT_IMPLEMENTED` gap meanwhile.
+- [ ] **No JSON writer writes a `$type`, so a value only its tag places has no JSON encoder** ([TSON-JSON] §9.2).
+  `JsonObjectWriter` is directed by the class, which states no tag, and refuses a union; a schema-directed tree read
+  drops every tag, so `JsonTreeWriter` writes the value back untagged. A value at an abstract position, a
+  non-disjoint choice, a declared position, or a boundary naming a subtype or a variant ([TSON-JSON] §8.6) therefore
+  writes JSON that does not read back. The work is a schema-directed JSON object writer, the peer of
+  `TsonObjectWriter.describing(linked, root)`, writing each `$type` in the scope it is read in, the boundary's by
+  the enclosing scope's name (`tson-schema`'s `ExternAdmission` says which).
 - [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 39.** §3.3 requires `$type` (after any `$import`)
   to lead its object and argues that code-point sorting preserves that; with `meta.record.name_type` admitting `$ref`,
   `$id` and `$defs` as field names, those sort first, so RFC 8785 canonical output of a tagged value —
@@ -475,6 +489,11 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **Delete `@Typename.namespace`, which nothing reads** (`ltr8-annotation`). The member defaults to `""` and no
+  binder, reader or writer consults it. A name binder is asked a name within a namespace
+  (`DataNameBinder.resolve(namespace, name)`), and a writer finds a class's entry by asking that binder, so a
+  namespace on the annotation would be a second authority beside it. Remove the member; a caller that wants to say
+  which schema a class binds in says it to `DataNameBinder.byNamespace`.
 - [ ] **A bind read does not judge an annotation on an atom, a container or an element** ([TSON-SCHEMA] §6). With
   `feed => { url: text  n: int32  tags: [text] }` bound to a host record, `url: @nosuch:"x" "/"`, `n: @nosuch:"x" 1`,
   `tags: @nosuch:"x" [a]`, `tags: [@nosuch:"x" a]` and `url: @title:{ a: 1 } "/"` all bind, in a data document and in
