@@ -592,6 +592,11 @@ final class SchemaDesugarer {
             case io.ltr8.tson.compiler.ast.schema.AtomRefinement ignored -> true;
             default -> false;
         };
+        Externs.Written extern = Externs.written(Map.of(head, declaration)).get(head);
+        if (extern != null) {
+            throw Externs.sealed("'" + currentName + "'", "'" + head + "<...>' applies", head, head,
+                    new io.ltr8.tson.schema.meta.Extern(extern.schema().orElse(""), extern.type().orElse("")));
+        }
         if (parameters.isEmpty() && !mayConstruct) {
             throw new SchemaValidationException("'" + head + "' declares no type parameters, so '"
                     + head + "<...>' applies arguments to something that takes none (§5.10); drop the "

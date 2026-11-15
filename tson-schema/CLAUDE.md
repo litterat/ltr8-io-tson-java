@@ -11,7 +11,7 @@ registry and identity, `design/namespace-types-and-value-entries.md` for `Namesp
   structurally, declare a stand-in (`schema.meta.Token`, `tson-base`'s `SourcePosition`).
 - A class lives in the package of the namespace its entry is declared in, so the binder reaches it by path
   (`numeric.integer_type` is `schema.numeric.IntegerType`); a class no entry declares stays in `schema.meta`.
-- `Top` is sealed all the way down: `Type`, `Alias`, `ValueEntry`, `IncompleteEntry`. An entry whose tag names an
+- `Top` is sealed all the way down: `Type`, `Alias`, `Extern`, `ValueEntry`, `IncompleteEntry`. An entry whose tag names an
   ordinary type is a `ValueEntry` wrapping the value (a `Namespace`, a bound object, or a tree); `Namespace` is the
   value of a namespace type and no `Top`. A template is a `RecordBody` with `parameters`, open and no type.
 - An atom body's components mirror its constructor's *resolved*, flattened shape — one component per schema field name.

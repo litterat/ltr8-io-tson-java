@@ -251,6 +251,25 @@ thing outstanding under it is unrelated to the check itself.
   resolver's own) and the comparison should drop it structurally, before rendering, the way it already drops
   `kind`. `CLAUDE.md`'s traps list carries the hazard meanwhile.
 
+## Externs
+
+A read that reaches a position an extern types ([TSON-SCHEMA] §5.13), in either encoding, reports `NOT_IMPLEMENTED`
+(`ExternReader`), as an annotation through one in a schema document does; each entry removes one of those gaps.
+
+- [ ] **Read a value through an extern in TSON text** ([TSON-SCHEMA] §7.9). The value's body is read by the foreign
+  entry's own compiled reader, every tag, annotation and reference name inside it resolving in the foreign schema's
+  namespace; the boundary tag and the annotations in front of it stay the outer scope's, a tag naming the extern, an
+  alias of it, or an extern of a foreign subtype admitted through the hop by identity. A tree value at the boundary
+  is named by the outer name, so the writer writes the boundary by the name the outer schema reads back. A diagnostic
+  inside the value names the foreign schema and its pointer. `ExternReader` is where it goes; `ExternHops` already
+  finds the landing.
+- [ ] **Read an annotation's value through an extern** (`@t:value` with `t` an extern, [TSON-SCHEMA] §6, §7.9): the
+  value read by the foreign type in its own scope, at the resolver's checkpoint (`DefinitionResolver
+  .bindAnnotationValue` refuses it as the gap). Needs the foreign reader above.
+- [ ] **Bind by entry identity.** One `DataNameBinder` serves the importer and every foreign schema, so two schemas'
+  `card` collide in bind mode: ask the binder by declaring schema and name, keeping the name-only form for a caller
+  with one schema. Lands with the TSON read through an extern.
+
 ## JSON encoding
 
 [TSON-SCHEMA] §6 defines a representation directive — a mark whose force is confined to the encodings that claim
@@ -258,6 +277,9 @@ it — and no schema declares one, so nothing in this stack reads a schema-side 
 written. A record is closed under its type and open-ended data is a declared map-typed field, identically in both
 encodings ([TSON-JSON] §6.1.1).
 
+- [ ] **Read a value through an extern in JSON** ([TSON-SCHEMA] §7.9, [TSON-JSON] §3.3): the object's leading `$type`
+  is the outer scope's and every nested one the foreign schema's. `JsonSchemaCompiler` compiles an extern to the
+  `NOT_IMPLEMENTED` gap meanwhile.
 - [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 39.** §3.3 requires `$type` (after any `$import`)
   to lead its object and argues that code-point sorting preserves that; with `meta.record.name_type` admitting `$ref`,
   `$id` and `$defs` as field names, those sort first, so RFC 8785 canonical output of a tagged value —
@@ -582,7 +604,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   and a `--max-…` flag beside `--max-depth` in `PolicyOptions`. Document side: **token length**, **decoded text
   length** after escape processing, **numeric literal length** (annotated tokens included), **decoded binary size**
   per `!bytes` value, **document size**, **elements** per array or set, **entries** per map, **fields** per record,
-  **annotations** on one value, and **total values**. Schema side: **import closure**, **entries** in one schema map,
+  **annotations** on one value, and **total values**. Schema side: **import closure** (every schema document reachable
+  from one header by `!!import` or by an extern, [TSON-SCHEMA] §5.13), **entries** in one schema map,
   **alias chain** and **supertype chain**. (Wait depth is counted, by `WaitOrder`, with its `--max-wait-depth` flag.) What
   still needs deciding per limit is *where it is counted*: the ones that bound shape are per-container state the
   stream does not keep, where depth was a counter it already had, and the aggregate (total values) needs its own

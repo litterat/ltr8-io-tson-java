@@ -299,6 +299,10 @@ public final class TsonSchemaCompiler {
                         EntryDisplayName.of(name, definition, linked.schema().factsOf(name),
                                 linked.schema().applicationOf(name)));
             }
+            if (body instanceof io.ltr8.tson.schema.meta.Extern extern) {
+                return new io.ltr8.tson.compiler.reader.ExternReader(name, extern,
+                        new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
+            }
             if (body instanceof ValueEntry value) {
                 // A value, which nothing is read against: a data tag naming it is the document's mistake.
                 return new ValueEntryReader(name, value.type(),

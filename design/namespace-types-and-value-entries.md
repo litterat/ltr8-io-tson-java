@@ -18,7 +18,7 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   those path entries (`SchemaPaths.synced`, `design/schema-resolution.md`). It is open: several documents of a closure
   declaring one map path contribute to one map, the union of their members (`design/linking-and-compilation.md`).
   Every other namespace type's value stays a value entry.
-- `Top` is sealed all the way down (`permits Type, Alias, ValueEntry, IncompleteEntry`). A switch over a body's kind
+- `Top` is sealed all the way down (`permits Type, Alias, Extern, ValueEntry, IncompleteEntry`). A switch over a body's kind
   is exhaustive with explicit `ValueEntry` and `IncompleteEntry` arms and no `default`: `EntryKind.of`, `TypeInhabitance`,
   `DiscriminationClass`, and the linker's `validateBody`, `collectNames` and coherence check.
 - **`meta.namespace` composes `meta.map`** (`meta.map & { key_type: meta.identifier_ref voidable?: = false

@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.reader.DiscriminationClass;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.EnumSet;
 import java.util.Map;
@@ -35,10 +36,14 @@ final class ChoiceDisjointness {
     private ChoiceDisjointness() {
     }
 
-    static boolean derive(ChoiceBody choice, Map<String, Top> namespace) {
+    /** An extern variant is classified at the entry it lands on, in the namespace holding it ({@code hops}). */
+    static boolean derive(ChoiceBody choice, Map<String, Top> namespace, ExternHops hops) {
         Set<DiscriminationClass> seen = EnumSet.noneOf(DiscriminationClass.class);
         for (TypeExpr variant : choice.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant, namespace::get);
+            Optional<DiscriminationClass> variantClass = variant instanceof TypeRef reference
+                    ? hops.discrimination(reference.name()).orElseGet(() -> DiscriminationClass.of(variant,
+                            namespace::get))
+                    : DiscriminationClass.of(variant, namespace::get);
             if (variantClass.isEmpty() || !seen.add(variantClass.get())) {
                 return false;
             }

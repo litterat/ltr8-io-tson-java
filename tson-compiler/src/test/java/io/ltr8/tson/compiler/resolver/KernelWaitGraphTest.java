@@ -87,10 +87,10 @@ class KernelWaitGraphTest {
         assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
         assertEquals(31, cycle.size(), "the cycle");
         assertEquals(66, closure.size(), "the cycle's closure");
-        assertEquals(74, graph.entries().size(), "the kernel's entries");
+        assertEquals(75, graph.entries().size(), "the kernel's entries");
         assertTrue(closure.containsAll(List.of("meta.param", "meta.param_name")), "reached through record.parameters");
         assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application", "meta.apply",
-                "binary.bytes_encoding", "binary.bytes_type",
+                "binary.bytes_encoding", "binary.bytes_type", "meta.extern",
                 "meta.field_name", "meta.tuple", "meta.tuple_element")),
                 new java.util.TreeSet<>(related), "the related concepts");
     }

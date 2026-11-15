@@ -46,6 +46,15 @@ public interface TsonCompiledSchemaLoader {
     TsonLinkedSchema resolveLinked(String uri);
 
     /**
+     * {@link #resolveLinked} for the schema the extern {@code entry} of the schema resolving names ([TSON-SCHEMA]
+     * §5.13): the same source, policy and pin verification as an import's, the edge an extern's, which a cycle and a
+     * second kernel are reported through.
+     */
+    default TsonLinkedSchema resolveLinkedForExtern(String uri, String entry) {
+        return resolveLinked(uri);
+    }
+
+    /**
      * Resolves {@code uri} to its compiled vocabulary: its entries compiled in object-binding mode, with the reader
      * for an instance of each constructor it holds.
      *

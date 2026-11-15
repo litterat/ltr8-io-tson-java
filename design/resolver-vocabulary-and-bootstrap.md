@@ -78,7 +78,8 @@ fact about the value model, stated once, where the model is walked:
 - A map's and a namespace type's `key_type`, a reference's `of`, an alias's target and an application's head and
   arguments hold a name: a construction has nowhere to stand there. A chain's parents are no slot: an open record
   substitutes them, and linking derives the rest.
-- Nothing in any other atom (its facets are values), a declared type, or a value entry.
+- Nothing in any other atom (its facets are values), a declared type, a value entry, or an extern, whose `type` is a
+  name of another schema's namespace.
 
 §5.10's regularity check does not use the walk: every entry with parameters is an open record, and reads its
 applications off its references (`OpenEntry.applications`).
@@ -207,7 +208,7 @@ joins whole, when it is ready. The value is read in the reading document's names
 The kernel, meta.tn (`TsonBundledSchemas.META_ID`), is special: its header is its `!!id` alone. It holds the kernel's
 one wait cycle, every name the cycle's declarations reference, closed to a fixed point, so it resolves and links on its
 own, and the concepts that belong with them: `meta.map`, `meta.tuple`, `meta.choice` and `meta.tuple_element`,
-`meta.application`, `meta.ref`, `meta.field_name`, `meta.disjoint`, `set`, the octet-sequence constructor
+`meta.application`, `meta.ref`, `meta.extern`, `meta.field_name`, `meta.disjoint`, `set`, the octet-sequence constructor
 `binary.bytes_type` with `binary.bytes_encoding` and
 `bytes`, and the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric` the
 data-format libraries state their types with. It is the one kernel document. Its root is the thirteen names an author
@@ -256,8 +257,8 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   `KernelBootstrapResolverTest` measures the cycle with `WaitGraph` from `spec/fixtures/meta-resolved.tn` (the six
   maps read as their members under their paths; a type written in place at a slot is no entry, and a read against it
   waits on what reading its construction reaches) and asserts the hand-built names equal it, so a kernel edit that
-  moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 74 entries (63 members of the six maps
-  and 11 at the root; the maps themselves make the kernel's 80 resolved entries), one cycle of 31, longest wait chain
+  moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 75 entries (64 members of the six maps
+  and 11 at the root; the maps themselves make the kernel's 81 resolved entries), one cycle of 31, longest wait chain
   3 — and asserts the kernel contains the cycle's closure (66 entries) and the related concepts. `enum` writing
   `name_type` puts `meta.identifier_ref` on the cycle, through every enum on it. The type slots put
   the choice constructor on it: a record field's type is read against `meta.type_expr`, a choice asserted disjoint,

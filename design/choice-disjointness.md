@@ -11,7 +11,8 @@ and why the same table is what untagged reading dispatches on. Current form only
 - Two kinds straddle classes and have none ([TSON-SCHEMA] §5.4): an approximate atom whose `allow_nan` or
   `allow_infinity` is true, and a map whose key type, at the end of its alias chain, is not an atom other than
   `value` and `void` (enums included). A classed type's every value lands in its class in every encoding.
-- A variant classifies through its §8.3 alias chain; no class at all makes the choice `false`.
+- A variant classifies through its §8.3 alias chain, and an extern at the entry it lands on, in the namespace holding
+  it (`ExternHops`); no class at all makes the choice `false`.
 - An enum's class is its members' shared class, read off each member's spelling; every enum is over an identifier
   family, so no fact beyond the body is needed. A closed set of text values is `unicode.text_type`'s `members` facet and is
   string-class as every text atom is, whatever its members spell.

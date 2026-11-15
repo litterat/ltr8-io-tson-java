@@ -19,7 +19,7 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
 
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -142,7 +142,10 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
      * strictly within one thread, so per-thread is both correct and exactly the scope of the
      * question being asked.
      */
-    private final ThreadLocal<Set<String>> resolving = ThreadLocal.withInitial(LinkedHashSet::new);
+    private final ThreadLocal<Map<String, String>> resolving = ThreadLocal.withInitial(LinkedHashMap::new);
+
+    /** The edge a link in {@link #resolving} was reached by: an extern's names its entry, an import's is null. */
+    private static final String IMPORT = null;
 
     /**
      * A fresh, empty {@link TsonSchemaRegistry} of its own and no fetch capability -- the common case for a
@@ -358,15 +361,37 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
      * resolution and the {@code ?sha256=} pin verification below run exactly as they did.
      */
     public TsonLinkedSchema resolveLinked(String uri, String identity, DiagnosticsReceiver receiver) {
+        return resolveLinked(uri, identity, receiver, IMPORT);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A closure reaching the kernel of another revision through the extern is refused before anything fetches it:
+     * this library pre-loads its own kernel alone, and an extern's schema holds the importer's.
+     */
+    @Override
+    public TsonLinkedSchema resolveLinkedForExtern(String uri, String entry) {
+        return resolveLinked(uri, CanonicalIdentity.canonicalize(uri), null, entry);
+    }
+
+    private TsonLinkedSchema resolveLinked(String uri, String identity, DiagnosticsReceiver receiver, String edge) {
         Optional<TsonLinkedSchema> cached = schemaRegistry.getByCanonicalIdentity(identity);
         if (cached.isPresent()) {
             verifyPin(uri, identity);
             return cached.get();
         }
-        Set<String> chain = resolving.get();
-        if (!chain.add(identity)) {
-            throw importCycle(chain, identity);
+        Map<String, String> chain = resolving.get();
+        if (chain.containsKey(identity)) {
+            throw referenceCycle(chain, identity, edge);
         }
+        if (!KERNEL_IDENTITY.equals(identity) && TsonBundledSchemas.isKernelOfAnyRevision(identity)
+                && (edge != IMPORT || chain.values().stream().anyMatch(Objects::nonNull))) {
+            throw new SchemaValidationException("its closure holds the kernel '" + identity + "', and the schema "
+                    + "naming it holds the kernel '" + KERNEL_IDENTITY + "' -- an extern's schema holds the "
+                    + "importer's kernel, one kernel by identity ([TSON-SCHEMA] §5.13)");
+        }
+        chain.put(identity, edge);
         try {
             return resolveUncached(uri, identity, receiver);
         } finally {
@@ -375,29 +400,47 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     }
 
     /**
-     * §2.2.3's import cycle, named by the path that closes it. A schema is registered only once it has
-     * linked, so the cycle cannot be found by a cache lookup -- being <em>in flight</em> is the whole
-     * signal, and the chain of identities in flight is what makes the message actionable: any one of its
-     * links is the edge to break.
+     * A cycle over the reference relation, named by the path that closes it: §2.2.3's import cycle, or one an
+     * extern takes part in ([TSON-SCHEMA] §5.13), each extern edge marked with the entry it is. A schema is
+     * registered only once it has linked, so the cycle cannot be found by a cache lookup -- being <em>in
+     * flight</em> is the whole signal, and the chain of identities in flight is what makes the message actionable:
+     * any one of its links is the edge to break.
      *
      * <p>An author error, not a library gap: the verdict does not change when this library improves. It
      * throws even where a {@link DiagnosticsReceiver} is in play, on the same footing as an
      * {@code !!import} that will not load -- what fails is the namespace
      * itself, and carrying on would report every reference into the unresolvable half as a second problem.
      */
-    private static SchemaValidationException importCycle(Set<String> chain, String identity) {
+    private static SchemaValidationException referenceCycle(Map<String, String> chain, String identity,
+                                                           String closing) {
         StringBuilder path = new StringBuilder();
         boolean fromCycleStart = false;
-        for (String link : chain) {
-            fromCycleStart |= link.equals(identity);
+        boolean throughExtern = closing != IMPORT;
+        for (Map.Entry<String, String> link : chain.entrySet()) {
             if (fromCycleStart) {
-                path.append(link).append(" -> ");
+                path.append(edge(link.getValue()));
+                throughExtern |= link.getValue() != IMPORT;
+            }
+            fromCycleStart |= link.getKey().equals(identity);
+            if (fromCycleStart) {
+                path.append(link.getKey());
             }
         }
-        return new SchemaValidationException("'" + identity + "' is part of an import cycle ("
-                + path + identity + ") -- a schema cannot depend, directly or transitively, on one that "
-                + "depends on it, since neither can be resolved before the other ([TSON-DATA] §2.2.3). "
-                + "Break the cycle by moving what both need into a third schema they each import");
+        path.append(edge(closing)).append(identity);
+        if (!throughExtern) {
+            return new SchemaValidationException("'" + identity + "' is part of an import cycle ("
+                    + path + ") -- a schema cannot depend, directly or transitively, on one that "
+                    + "depends on it, since neither can be resolved before the other ([TSON-DATA] §2.2.3). "
+                    + "Break the cycle by moving what both need into a third schema they each import");
+        }
+        return new SchemaValidationException("'" + identity + "' is part of a reference cycle through an extern ("
+                + path + ") -- the reference relation over imports and externs together is acyclic, so a schema "
+                + "reaches itself through neither, nor through a mix of the two ([TSON-SCHEMA] §3.4.1, §5.13). "
+                + "Break the cycle by moving what both need into a third schema they each reference");
+    }
+
+    private static String edge(String entry) {
+        return entry == IMPORT ? " -> " : " -[extern '" + entry + "']-> ";
     }
 
     /**

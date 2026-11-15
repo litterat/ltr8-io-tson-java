@@ -20,7 +20,9 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
 - One namespace per schema (§3.3): its own entries and the whole closure of its `!!import`s
   (`TsonSchema.namespaceSources`, header order, deduplicated by identity). Every name the schema writes resolves
   there; no rule ties what a schema may declare to what it imports, so any schema declares a constructor, a namespace
-  type or a reference, and imports any schema document.
+  type or a reference, and imports any schema document. The reference closure has a second kind of edge: an extern's
+  schema is resolved and registered with the imports, and none of its names merges; the extern is an entry like any
+  other, its landing carried beside it (`TsonLinkedSchema.externs`, `design/externs.md`).
 - A reference to a value entry (a `ValueEntry`, `myapi => !api { … }`) is refused at every position a type-ref
   occupies: it is a value, and nothing is typed by it.
 - An incomplete entry (`IncompleteEntry`, [TSON-SCHEMA] §5.5) is refused at every position a type-ref occupies,
@@ -86,18 +88,19 @@ load-bearing, each step reading what an earlier one wrote:
 1. **Merge the closure** (`mergeImports`): every `!!import`.
 2. **Add the local entries**: a collision with the closure is refused unless the two are equal. The merged map is
    the one namespace every later step reads.
-3. **`computeSubtypes`**, the reverse of `supertypes` over every closed `Type`, an open record left out.
-4. **`enumForms`** for each local enum (`EnumLabels.labelForm`).
-5. **`computeKinds`**, every reference's derived index, whether `of` names a constructor and, for a kind, its
+3. **`attachExterns`**, each local extern to the foreign entry it lands on, an imported one's carried from its link.
+4. **`computeSubtypes`**, the reverse of `supertypes` over every closed `Type`, an open record left out.
+5. **`enumForms`** for each local enum (`EnumLabels.labelForm`).
+6. **`computeKinds`**, every reference's derived index, whether `of` names a constructor and, for a kind, its
    members (`design/kinds-and-name-types.md`).
-6. **`computeDisjointness`**, every choice's `disjoint` (`design/choice-disjointness.md`).
-7. **`checkEnumTypes`**, **`checkFieldNameTypes`**, then **`nameTypes`** for each record not refused.
-8. **`checkNames`**, §8.2 over scopes (`design/name-hygiene.md`).
-9. **Validate** every entry (`validateEntry`).
-10. **`checkValuesByName`**, **`checkEveryEntryIsInhabited`**, **`checkRecordExtension`**.
-11. **`withNameAnnotations`**, then **`checkDisjointAssertions`**: an author's `@meta.disjoint` is read from both places §6
+7. **`computeDisjointness`**, every choice's `disjoint` (`design/choice-disjointness.md`).
+8. **`checkEnumTypes`**, **`checkFieldNameTypes`**, then **`nameTypes`** for each record not refused.
+9. **`checkNames`**, §8.2 over scopes (`design/name-hygiene.md`).
+10. **Validate** every entry (`validateEntry`).
+11. **`checkValuesByName`**, **`checkEveryEntryIsInhabited`**, **`checkRecordExtension`**.
+12. **`withNameAnnotations`**, then **`checkDisjointAssertions`**: an author's `@meta.disjoint` is read from both places §6
     puts it, the definition and the map key, so it runs last.
-12. **`checkHeldValues`**, only over a link otherwise clean and with nothing pending: each dependent field's value a
+13. **`checkHeldValues`**, only over a link otherwise clean and with nothing pending: each dependent field's value a
     local value entry holds as written, read through the schema compiled in tree mode (`HeldValues`, below).
 
 ## Import merge (`mergeImports`, §2.2.3)

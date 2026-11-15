@@ -40,6 +40,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Completion;
 import io.ltr8.tson.schema.meta.IncompleteEntry;
+import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -483,6 +484,13 @@ final class DefinitionResolver {
     private Object bindAnnotationValue(String declaration, String annotationName, DataValue value) {
         if (vocabularyDefinitions.definition(annotationName) == null) {
             return null;
+        }
+        Optional<Extern> extern = Externs.terminal(annotationName, vocabularyDefinitions::definition);
+        if (extern.isPresent()) {
+            // Admitted, the value read by the foreign type in its own schema's scope (§6, §7.9): not built yet.
+            throw new UnsupportedOperationException("'" + declaration + "': '@" + annotationName + "' is "
+                    + Externs.describe(extern.get()) + ", and reading an annotation's value through an extern, in "
+                    + "its own schema's scope, is not implemented yet ([TSON-SCHEMA] §7.9)");
         }
         try {
             return annotationValueReader.read(annotationName, value);
@@ -1206,6 +1214,9 @@ final class DefinitionResolver {
         // establishes atom-ness at once, where neither half does alone -- a plain record has no supertypes
         // either, and `integer_type` is ATOM-kinded exactly like its instances. It is also how the reader
         // stack decides everything of this shape (`Subsumption`), rather than trusting a stated kind.
+        if (source instanceof Extern extern) {
+            throw Externs.sealed("'" + name + "'", "'^' refines", refinement.target(), sourceName, extern);
+        }
         if (source instanceof IncompleteEntry incomplete) {
             return refineIncomplete(name, refinement.target(), sourceName, incomplete, refinement.bindings());
         }
@@ -1513,6 +1524,14 @@ final class DefinitionResolver {
             throw new SchemaValidationException("'" + name + "': '!" + target + "' is an alias whose chain "
                     + "ends at '" + terminal + "', which this schema's namespace does not declare (§8.3)");
         }
+        if (atEnd instanceof Extern extern) {
+            throw Externs.sealed("'" + name + "'", "'!" + target + " { ... }' constructs", target, terminal, extern);
+        }
+        if (!terminal.equals(target) && Externs.HEAD.equals(terminal) && vocabularyKernel.test(terminal)) {
+            throw new SchemaValidationException("'" + name + "': '!" + target + "' reaches '" + terminal
+                    + "' through its alias hops, and an extern is written '!" + Externs.HEAD + "': its head is how "
+                    + "a document's externs are found before any name resolves ([TSON-SCHEMA] §5.13)");
+        }
         return new ConstructorHead(terminal, atEnd);
     }
 
@@ -1707,6 +1726,11 @@ final class DefinitionResolver {
         if (definition == null) {
             return new SchemaValidationException("'" + name + "' has an unresolved reference '" + head + "'");
         }
+        Optional<Extern> extern = Externs.terminal(head, namespaceDefinitions::definition);
+        if (extern.isPresent()) {
+            return Externs.sealed("'" + name + "'", "'" + head + "<...>' applies", head,
+                    AliasChain.terminal(head, namespaceDefinitions::definition), extern.get());
+        }
         List<String> parameters = OpenEntry.parameterNames(definition);
         if (parameters.isEmpty()) {
             return new SchemaValidationException("'" + head + "' declares no type parameters, so '" + head
@@ -1831,6 +1855,10 @@ final class DefinitionResolver {
             // array, a map or a choice has no fields to contribute (§4.3).
             refuseUnappliedTemplate(name, supertypeName, terminalSupertype, "supertype");
             refuseIncomplete(name, supertypeName, terminalSupertype, "supertype");
+            if (terminalSupertype instanceof Extern extern) {
+                throw Externs.sealed("'" + name + "'", "'&' and '-' compose", supertypeName, supertypeTerminal,
+                        extern);
+            }
             if (!(terminalSupertype instanceof RecordBody supertypeBody)) {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
                         + (supertypeHops ? " resolves through its alias chain to '" + supertypeTerminal

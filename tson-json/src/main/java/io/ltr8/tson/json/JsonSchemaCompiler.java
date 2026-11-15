@@ -148,6 +148,12 @@ public final class JsonSchemaCompiler {
                 // than walked on every value.
                 return resolve(alias.target().name());
             }
+            if (body instanceof io.ltr8.tson.schema.meta.Extern extern) {
+                // Its reader is the gap the build's failure becomes ([TSON-SCHEMA] §5.13, §7.9).
+                throw new UnsupportedOperationException("'" + name + "' is an extern of '" + extern.type()
+                        + "' in '" + extern.schema() + "', and reading a value through an extern, in its own "
+                        + "schema's scope, is not implemented yet ([TSON-SCHEMA] §7.9)");
+            }
             // A namespace type's value is the map it describes (NamespaceBody#read), its keys read under its key
             // family.
             Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;
