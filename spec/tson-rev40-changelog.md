@@ -249,13 +249,14 @@ One sentence of the worked example follows the register's #1:
 
 Four sentences follow the extern (§3.2 items 116–118). No production and no token changes.
 
-27. **§2.1, §3.2, §3.3, §9.1** — a document's names came from "the one namespace its imports
+27. **§2.1, §2.2.1, §3.2, §3.3, §9.1** — a document's names came from "the one namespace its imports
     bind", without exception. §2.1 and §3.2 except the names inside a value at an extern
     position, which are that value's own schema's. §3.3 keeps its rule whole — a directive at
     a value position is a parse error, and a value cannot open a namespace — and says who
     does: where the names inside a value are another schema's, the schema that types the
-    value's position says so and the data does not. §9.1 counts a schema reached through an
-    extern among the schemas that are untrusted input.
+    value's position says so and the data does not. §2.2.1 names an extern's `schema` among
+    the references its rule covers. §9.1 counts a schema reached through an extern among the
+    schemas that are untrusted input.
 
 ### 3.2 Part 2 — Type System and Schema
 
@@ -872,7 +873,7 @@ it.
      form. `order_v1 => !meta.extern { schema: "https://example.com/order-1.tn"  type: order }`
      brings one entry of another schema into a document under a name the document chooses,
      and none of that schema's names enter the document's namespace. The kernel gains
-     `meta.extern => meta.top & { schema: iri  type: text }` beside `meta.alias` (§6).
+     `meta.extern => meta.top & { schema: iri_reference  type: text }` beside `meta.alias` (§6).
      - **A hop.** An extern is another name for its target, across a schema boundary: its
        identity is the target's, and a reference's membership, a choice's distinct variants
        and its disjointness are judged of the target, by identity. Its entry takes a fifth
@@ -1143,7 +1144,7 @@ carries no open questions.
 | Items 108–109 (lost) | `a: enum`; a reference over sets alone; a set's `voidable: false` as a pin; a resolved form listing every name its source offers; `^`'s refusal of a new field. | Recorded — items 108 and 109 state each, and the replacement where there is one. |
 | Items 116–118 (ruled) | The extern is singular and a scope change; the tag at its boundary is the enclosing scope's; `type` is `text`; its schema loads with the imports and the declaring document is refused unless every foreign schema loads, holds the same kernel and closes no cycle; the head is written `meta.extern`; the boundary is absolute, no value entry brought in and no name selecting through it; a default or pin at a field typed by it is refused; an annotation through it is admitted; the import closure limit counts it. | **[settled]** — the spec author's rulings. |
 | Item 116 (reading) | An extern entry's kind. The text gives it a fifth kind, EXTERN, conferred by its form as ALIAS is, so a consumer of resolver output derives it from the entry alone; the alternative, its target's kind, needs the foreign schema loaded to derive. | **[settled]** — the spec author's ruling, who expects the derived kind to go, nothing reading it; EXTERN goes with it. |
-| Item 116 (reading) | `meta.extern.schema` is `iri`, as the spec author wrote it, where an `!!import`'s value is an IRI-reference ([TSON-DATA] §3.3). The two name a schema on the same terms if the field is `iri_reference`. | **[editorial]** — the spec author's to confirm. |
+| Item 116 (ruled) | `meta.extern.schema` is `iri_reference`, what an `!!import`'s value is ([TSON-DATA] §3.3), so an extern names every schema an import may, a path-only reference to a library entry among them. `iri`, as first written, required a scheme and refused `/local/orders.tn` where `file:/local/orders.tn`, the same identity, passed. | **[settled]** — the spec author's ruling. |
 | Item 116 (reading) | A schema declares no value entry of an extern type: `!order_v1 { … }` at a declaration is refused with the other heads, beside the refused default and pin, so no foreign value is written in the declaring schema but an annotation's. | **[editorial]** — follows the ruling that an extern is no constructor head. |
 | Item 118 (reading) | Which tags the boundary admits. The text applies §7.2's subsumption with each name followed to the entry it reaches, by identity, so a name of the enclosing scope that is no extern is admitted where it reaches the target or a subtype of it (the scope importing the schema that declares it), and a variant's name is admitted where the target is a choice; the narrower reading admits externs alone. A tag naming the position's own extern is read as no tag, so an extern of a member-dispatched base may be written at a choice and its value placed by its selectors. | **[editorial]** — the editor's reading. |
 | Items 116–118 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
@@ -1157,9 +1158,9 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `14c4a27e…` (Revision 39 `c9b069b6…`), numeric `8257b5a2…` (`dfa66c5d…`), temporal
-   `44606ded…` (`fb4ada8f…`), net `ef6e3f68…` (`371fc20c…`), core `b6ae6c38…`
-   (`4e8d9c43…`), policy `b8a7be08…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   `73526b2c…` (Revision 39 `c9b069b6…`), numeric `082eca38…` (`dfa66c5d…`), temporal
+   `d8b3e252…` (`fb4ada8f…`), net `aae2edd9…` (`371fc20c…`), core `788afc79…`
+   (`4e8d9c43…`), policy `baf9ecee…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
    78–84's documentation of a parameter in a type written in place, for items 85–93's
@@ -1168,7 +1169,7 @@ carries no open questions.
    104–105's chain sets and rewritten documentation, for item 106's `meta.namespace`, and
    for item 108's incomplete entries and `meta.completion`, and temporal and core again
    for item 115's `fraction_digits`, and the kernel and every dependant again for item 116's
-   `meta.extern`. The chain is
+   `meta.extern`, twice, the second for its `schema` typed `iri_reference`. The chain is
    consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
    libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries

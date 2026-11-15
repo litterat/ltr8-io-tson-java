@@ -1190,7 +1190,7 @@ An **extern** brings one entry of another schema into a document under a name th
 }
 ```
 
-`meta.extern` is the kernel's `extern => meta.top & { schema: iri  type: text }` (§9). `schema` is the identity of a published schema document, resolved through the schema library as an `!!import`'s value is (§10), and may carry a `?sha256=` pin (§10.2); `type` is the name an entry has in that schema, written from its root as every name is (`order`, `geo.address`). The schema named is the extern's **foreign schema** and the entry named its **target**. Several externs under one prefix are a nested schema map of them (`v1 => !schema { order => !meta.extern { … } }`, §4.1); nothing else groups them.
+`meta.extern` is the kernel's `extern => meta.top & { schema: iri_reference  type: text }` (§9). `schema` is a reference to a published schema document on an `!!import` value's terms — any spelling of the document's identity, read to its canonical form ([TSON-DATA] §2.2.1), a path-only reference naming a library entry among them — resolved through the schema library as an `!!import`'s value is (§10), and it may carry a `?sha256=` pin (§10.2); `type` is the name an entry has in that schema, written from its root as every name is (`order`, `geo.address`). The schema named is the extern's **foreign schema** and the entry named its **target**. Several externs under one prefix are a nested schema map of them (`v1 => !schema { order => !meta.extern { … } }`, §4.1); nothing else groups them.
 
 **An extern is a hop.** The entry is another name for its target, as an alias is for its own (§8.3), across a schema boundary: its identity is the target's — the target's declaring schema and its path there (§2.2.3, §8.2) — and every judgement made through it is made of the target, compared by identity. A reference admits it where it admits the target: `meta.ref<meta.record>` admits `order_v1`, the target a record, and refuses an extern of an atom instance (§4.2). Two variants of a choice that reach one entry — two externs of it, an extern of it beside its imported name, an extern of an extern beside its target — are one type written twice and are refused (§5.4). A choice's disjointness is derived from the targets, so `(order_v1 | order_v2)`, two records, discriminates by tag. Two names for one type is what an alias gives; nothing here lets one name mean two types. An extern entry takes the EXTERN kind from its form and carries no chain (§4.1, §8.1).
 
@@ -2191,12 +2191,12 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/40/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/40/tson-part3-json |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/39/tson-guide |
-| meta.tn | TSON Kernel (companion artifact, pre-loaded) | https://tson.io/2026/40/m/meta.tn?sha256=14c4a27e639652d7d8d0ca83ba8df7d00ca619baa5a0a1674bbe8bde709f87d5 |
-| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/40/m/numeric.tn?sha256=8257b5a23aa85643f9448ec13bbac21a3d39b102a79783b54c087d549165647f |
-| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=44606ded5a6f367938ceb05a22b09983012c8b1cb5f9fb10fa52e24597f9baf7 |
-| net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=ef6e3f6864854f0a4bf6dbb3d23ea030a9ed59ed66b227746d5262da9ff84357 |
-| core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=b6ae6c38bace4a63ae53b5d16174384776e7d4afed3e7dda0f53f0ed89517560 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=b8a7be08ce6237a976e1c0367a95ef1885a6d8ca89a679b3f7d1df3cf02d7228 |
+| meta.tn | TSON Kernel (companion artifact, pre-loaded) | https://tson.io/2026/40/m/meta.tn?sha256=73526b2c5a7a3582535451520cb881d8e51d591edd05bb4c8835b801ed1f90f2 |
+| numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/40/m/numeric.tn?sha256=082eca38d6014e0b8539d6dcd380a2f58413365786910ff0b0ae4fa07d113ae5 |
+| temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=d8b3e252d7abc1a16da0969030e21f1ac5b5eeffe9c2ec87c4ca3605455e2fa1 |
+| net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=aae2edd937c9e3cc116213edf4eb18d971941b64a6c96a3e93162e539f1d3569 |
+| core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=788afc79d84340f77dbdc71bec54281a115ca51eb44eefd330ac503da2e2b8ca |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=baf9eceeeffdab6f7c58cab36b684a0eb1a1f4910cb852e288c72ce741cf329f |
 
 ### 13.3 Informative References
 

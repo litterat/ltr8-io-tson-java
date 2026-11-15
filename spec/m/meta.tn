@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=14c4a27e639652d7d8d0ca83ba8df7d00ca619baa5a0a1674bbe8bde709f87d5"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=73526b2c5a7a3582535451520cb881d8e51d591edd05bb4c8835b801ed1f90f2"
 @doc:"""
   The TSON kernel: the vocabulary every schema is written in. Its root holds the
   names an author writes: `text`, `integer`, `int64`, `boolean`, `bytes`, `iri`,
@@ -243,7 +243,7 @@
       inside it ([TSON-SCHEMA] §5.13, §7.9).
       """
     extern => meta.top & {
-      schema: iri
+      schema: iri_reference
       type:   text
     }
 
