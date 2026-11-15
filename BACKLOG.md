@@ -489,6 +489,11 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **Delete `@Typename.namespace`, which nothing reads** (`ltr8-annotation`). The member defaults to `""` and no
+  binder, reader or writer consults it. A name binder is asked a name within a namespace
+  (`DataNameBinder.resolve(namespace, name)`), and a writer finds a class's entry by asking that binder, so a
+  namespace on the annotation would be a second authority beside it. Remove the member; a caller that wants to say
+  which schema a class binds in says it to `DataNameBinder.byNamespace`.
 - [ ] **A bind read does not judge an annotation on an atom, a container or an element** ([TSON-SCHEMA] §6). With
   `feed => { url: text  n: int32  tags: [text] }` bound to a host record, `url: @nosuch:"x" "/"`, `n: @nosuch:"x" 1`,
   `tags: @nosuch:"x" [a]`, `tags: [@nosuch:"x" a]` and `url: @title:{ a: 1 } "/"` all bind, in a data document and in
