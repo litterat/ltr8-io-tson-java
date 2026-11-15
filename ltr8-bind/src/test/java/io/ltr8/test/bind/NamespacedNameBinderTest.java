@@ -5,11 +5,14 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.bind.UnboundNameException;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -79,5 +82,67 @@ public class NamespacedNameBinderTest {
         assertEquals(OrderOne.class, context.getDescriptor("one", "order").typeClass());
         assertEquals(OrderTwo.class, context.getDescriptor("two", "order").typeClass());
         assertThrows(UnboundNameException.class, () -> context.getDescriptor("two", "money"));
+    }
+
+    @Test
+    void aBinderAnsweringWithinANamespaceIsAskedThatFormByAContext() throws DataBindException {
+        DataNameBinder binder = new DataNameBinder() {
+            @Override
+            public Class<?> resolve(String name) {
+                return Money.class;
+            }
+
+            @Override
+            public Class<?> resolve(String namespace, String name) {
+                return namespace.equals("one") ? OrderOne.class : OrderTwo.class;
+            }
+        };
+        DataBindContext context = DataBindContext.builder().nameBinder(binder).build();
+        assertEquals(OrderOne.class, context.getDescriptor("one", "order").typeClass());
+        assertEquals(OrderTwo.class, context.getDescriptor("two", "order").typeClass());
+        assertEquals(Money.class, context.getDescriptor("order").typeClass());
+    }
+
+    @Test
+    void theConventionBinderAnswersEveryNamespaceByItsPackages() throws DataBindException {
+        DataNameBinder byConvention = new DataNameBinder.DefaultDataNameBinder(Set.of("java.lang"),
+                Map.of("whole_number", "integer"));
+        assertEquals(String.class, byConvention.resolve("string"));
+        assertEquals(String.class, byConvention.resolve("one", "string"));
+        assertEquals(Integer.class, byConvention.resolve("two", "whole_number"));
+        assertThrows(DataBindException.class, () -> byConvention.resolve("one", "nothing"));
+    }
+
+    @Test
+    void byNamespaceCopiesItsMap() throws DataBindException {
+        Map<String, DataNameBinder> binders = new HashMap<>(Map.of("one", ONE));
+        DataNameBinder binder = DataNameBinder.byNamespace(binders, SHARED);
+        binders.put("two", TWO);
+        binders.remove("one");
+        assertEquals(OrderOne.class, binder.resolve("one", "order"));
+        assertThrows(DataBindException.class, () -> binder.resolve("two", "order"));
+    }
+
+    @Test
+    void byNamespaceRequiresAFallback() {
+        assertThrows(NullPointerException.class, () -> DataNameBinder.byNamespace(Map.of("one", ONE), null));
+    }
+
+    @Test
+    void theFirstBinderAuthorsTheFailureOfANameAskedWithinANamespace() {
+        DataNameBinder binder = ONE.orElse(SHARED);
+        DataBindException missing = assertThrows(DataBindException.class, () -> binder.resolve("one", "nothing"));
+        assertTrue(missing.getMessage().contains("the binding map holds [order]"), missing.getMessage());
+        assertTrue(missing.getCause().getMessage().contains("the binding map holds [money]"),
+                missing.getCause().getMessage());
+    }
+
+    @Test
+    void aNamespaceTheMapDoesNotHoldIsTheFallbacksWithItsNamespace() throws DataBindException {
+        DataNameBinder routed = DataNameBinder.byNamespace(Map.of("two", TWO), SHARED);
+        DataNameBinder binder = DataNameBinder.byNamespace(Map.of("one", ONE), routed);
+        assertEquals(OrderOne.class, binder.resolve("one", "order"));
+        assertEquals(OrderTwo.class, binder.resolve("two", "order"));
+        assertSame(Money.class, binder.resolve("three", "money"));
     }
 }
