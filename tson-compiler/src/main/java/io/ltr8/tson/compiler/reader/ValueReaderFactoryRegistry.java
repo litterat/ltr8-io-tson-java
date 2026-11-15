@@ -42,9 +42,19 @@ import java.util.function.UnaryOperator;
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
     private final Map<String, ValueReaderFactory> factories;
+    private final boolean readsTrees;
 
-    private ValueReaderFactoryRegistry(Map<String, ValueReaderFactory> factories) {
+    private ValueReaderFactoryRegistry(Map<String, ValueReaderFactory> factories, boolean readsTrees) {
         this.factories = factories;
+        this.readsTrees = readsTrees;
+    }
+
+    /**
+     * Whether this is tree mode's table, the mode a value is read through an extern in ([TSON-SCHEMA] §7.9): bind
+     * mode's one name binder cannot tell two schemas' names apart.
+     */
+    public boolean readsTrees() {
+        return readsTrees;
     }
 
     @Override
@@ -66,7 +76,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
                 AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.VOID, UnaryOperator.identity(),
-                ChoiceReader.FACTORY));
+                ChoiceReader.FACTORY), false);
     }
 
     /**
@@ -80,7 +90,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
                 new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_VOID, AtomTreeFactory::new,
-                ChoiceReader.FACTORY));
+                ChoiceReader.FACTORY), true);
     }
 
     /** Tree mode's {@code void_type} factory: {@link VoidTreeReader} over {@link AtomTypeReader#VOID}'s reader. */

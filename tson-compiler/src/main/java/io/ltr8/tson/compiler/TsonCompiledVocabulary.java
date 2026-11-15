@@ -55,7 +55,7 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
             } catch (RuntimeException noFactory) {
                 return unbuildable(linked.originOf(name), name, noFactory);
             }
-        }, pending, checkpoint));
+        }, pending, checkpoint, null));
     }
 
     /**

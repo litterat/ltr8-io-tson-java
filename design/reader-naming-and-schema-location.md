@@ -14,7 +14,9 @@ in git.
   there would allocate per read.
 - Both pointers are rendered from the `PathStep` chain only when a diagnostic is built; concatenating per step is
   quadratic in depth.
-- The pointer is the path taken (`/point/y`), not the leaf reached (`/int32` in numeric.tn).
+- The pointer is the path taken (`/point/y`), not the leaf reached (`/int32` in numeric.tn). Inside a value read
+  through an extern it restarts at the foreign reader's own declaration, the steps before the boundary being the
+  enclosing schema's (`design/externs.md`).
 - `schemaField` steps data and schema together; `field`/`index` step the data alone. It takes two names — the
   field as the document wrote it for the data path, as declared for the schema pointer — which differ under a
   case-folding name type, where only the written one is an RFC 6901 pointer into the document.

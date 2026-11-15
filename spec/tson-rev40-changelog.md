@@ -910,8 +910,12 @@ it.
      named at a declared position — resolves in the foreign schema's namespace and no
      other. The tag and annotations in front of it are the enclosing scope's: at a choice
      the tag selects the variant before any scope is known, and `(order_v1 | order_v2)` is
-     `order` against `order` in the variants' own schemas. A subtype of the target is
-     written at the boundary through an extern of its own. Scopes nest as values do, and a
+     `order` against `order` in the variants' own schemas. A tag there is admitted as §7.2
+     admits one at a position of the target, the names followed to the entries they reach
+     and compared by identity: the extern, a name of the enclosing scope reaching the target
+     or a subtype of it, or a variant where the target is a choice; a tag naming the
+     position's extern says no more than the position does. A foreign value is part of its
+     document, so limits, policies and name hygiene run across the boundary. Scopes nest as values do, and a
      name means one type throughout a scope; a document's scopes are where its schema says
      and never where its data does, so [TSON-DATA] §3.3's parse error stands. §7.8's
      closing paragraph, which gave the absence of a form as the design, states what a
@@ -1138,6 +1142,7 @@ carries no open questions.
 | Item 116 (reading) | An extern entry's kind. The text gives it a fifth kind, EXTERN, conferred by its form as ALIAS is, so a consumer of resolver output derives it from the entry alone; the alternative, its target's kind, needs the foreign schema loaded to derive. | **[editorial]** — the editor's reading. |
 | Item 116 (reading) | `meta.extern.schema` is `iri`, as the spec author wrote it, where an `!!import`'s value is an IRI-reference ([TSON-DATA] §3.3). The two name a schema on the same terms if the field is `iri_reference`. | **[editorial]** — the spec author's to confirm. |
 | Item 116 (reading) | A schema declares no value entry of an extern type: `!order_v1 { … }` at a declaration is refused with the other heads, beside the refused default and pin, so no foreign value is written in the declaring schema but an annotation's. | **[editorial]** — follows the ruling that an extern is no constructor head. |
+| Item 118 (reading) | Which tags the boundary admits. The text applies §7.2's subsumption with each name followed to the entry it reaches, by identity, so a name of the enclosing scope that is no extern is admitted where it reaches the target or a subtype of it (the scope importing the schema that declares it), and a variant's name is admitted where the target is a choice; the narrower reading admits externs alone. A tag naming the position's own extern is read as no tag, so an extern of a member-dispatched base may be written at a choice and its value placed by its selectors. | **[editorial]** — the editor's reading. |
 | Items 116–118 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
@@ -1257,9 +1262,14 @@ carries no open questions.
    schema map or a name the foreign closure lacks; an alias of `meta.extern` at the head;
    two externs of one entry as variants of one choice; an extern of a record at a
    reference over `meta.enum_type`; a cycle through an extern; a foreign schema over
-   another revision's kernel; and a pin that does not match. §7.9's data document reaches
-   the extern position and stops there: the first implementation loads and links a schema
-   declaring externs and does not yet read a value through one, in either encoding, which
-   it reports as not implemented and not as a verdict.
+   another revision's kernel; and a pin that does not match. §7.9's data document validates,
+   its `!card` read as `order-2.tn`'s; `!order_v1` and a root tagged with an extern of a subtype are admitted; an
+   untagged value at `(order_v1 | order_v2)`, the foreign name `!order` at the boundary and a
+   name of the reading document inside the value are refused; and a diagnostic inside the
+   value names the foreign schema and the extern it was read through. A name the enclosing
+   scope imports is admitted at the boundary where it reaches the target or a subtype of it.
+   The first implementation reads a foreign value as a tree and in validation; binding one
+   to host classes, and the JSON encoding of one, it reports as not implemented and not as a
+   verdict.
 9. **The build** — the implementation's full build, with the conformance corpus's Revision
    40 branch required, passes over the revised text.

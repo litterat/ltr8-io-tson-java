@@ -168,22 +168,46 @@ public final class TsonCompiledSchemaRegistry {
     }
 
     /**
-     * The cached compilation for {@code identity}, compiling on a miss. <b>A plain {@code get} first, and
-     * {@code computeIfAbsent} only when it misses</b>: every read reaches this and all but the first hit,
-     * and {@code computeIfAbsent} takes the bin's lock where a colliding key sits behind the first node,
-     * where {@code get} never locks at all. On the miss the race is harmless either way -- two threads
-     * compiling one schema, one entry kept -- so the atomicity is worth having and worth not paying for on
-     * the path that does not need it.
+     * The cached compilation for {@code identity}, compiling on a miss. <b>A plain {@code get}, then the compile
+     * outside any lock, then {@code putIfAbsent}</b>: every read reaches this and all but the first hit, so the
+     * hit takes no lock; and a compile reaches this again for each schema an extern names ([TSON-SCHEMA] §7.9),
+     * which a compile inside {@code computeIfAbsent} could not do on one map. On the miss the race is harmless --
+     * two threads compiling one schema, the first entry kept and handed to both.
      */
     private TsonCompiledSchema compiledFor(String identity, TsonLinkedSchema linked) {
         TsonCompiledSchema cached = compiled.get(identity);
-        return cached != null ? cached : compiled.computeIfAbsent(identity, id -> compile(linked));
+        if (cached != null) {
+            return cached;
+        }
+        TsonCompiledSchema fresh = compile(linked);
+        TsonCompiledSchema raced = compiled.putIfAbsent(identity, fresh);
+        return raced != null ? raced : fresh;
     }
 
-    /** Compiles an already-resolved, already-linked schema in this registry's mode, uncached. */
+    /**
+     * Compiles an already-resolved, already-linked schema in this registry's mode, uncached; a schema one of its
+     * externs names is compiled once, through this registry's cache, and shared.
+     */
     public TsonCompiledSchema compile(TsonLinkedSchema linked) {
         refuseUnbound(linked, null);
-        return TsonSchemaCompiler.compile(linked, factories);
+        return TsonSchemaCompiler.compile(linked, factories, mode == Mode.TREE ? foreignSchemas : null);
+    }
+
+    /** This registry's cache, as a compile obtains the schema a foreign value is read in. */
+    private final TsonSchemaCompiler.ForeignSchemas foreignSchemas = new TsonSchemaCompiler.ForeignSchemas() {
+        @Override
+        public TsonCompiledSchema compiled(TsonLinkedSchema linked) {
+            return foreign(linked);
+        }
+
+        @Override
+        public java.util.Optional<TsonCompiledSchema> compiled(String identity) {
+            return core.schemaRegistry().getByCanonicalIdentity(identity).map(TsonCompiledSchemaRegistry.this::foreign);
+        }
+    };
+
+    private TsonCompiledSchema foreign(TsonLinkedSchema linked) {
+        return compiledFor(CanonicalIdentity.canonicalize(linked.schema().id()), linked);
     }
 
     /**

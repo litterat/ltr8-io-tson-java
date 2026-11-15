@@ -253,22 +253,14 @@ thing outstanding under it is unrelated to the check itself.
 
 ## Externs
 
-A read that reaches a position an extern types ([TSON-SCHEMA] §5.13), in either encoding, reports `NOT_IMPLEMENTED`
-(`ExternReader`), as an annotation through one in a schema document does; each entry removes one of those gaps.
+A value is read through an extern ([TSON-SCHEMA] §7.9) in TSON text, in tree mode; binding one reports
+`NOT_IMPLEMENTED` (`ExternReader.unbound`), as reading one in JSON does.
 
-- [ ] **Read a value through an extern in TSON text** ([TSON-SCHEMA] §7.9). The value's body is read by the foreign
-  entry's own compiled reader, every tag, annotation and reference name inside it resolving in the foreign schema's
-  namespace; the boundary tag and the annotations in front of it stay the outer scope's, a tag naming the extern, an
-  alias of it, or an extern of a foreign subtype admitted through the hop by identity. A tree value at the boundary
-  is named by the outer name, so the writer writes the boundary by the name the outer schema reads back. A diagnostic
-  inside the value names the foreign schema and its pointer. `ExternReader` is where it goes; `ExternHops` already
-  finds the landing.
-- [ ] **Read an annotation's value through an extern** (`@t:value` with `t` an extern, [TSON-SCHEMA] §6, §7.9): the
-  value read by the foreign type in its own scope, at the resolver's checkpoint (`DefinitionResolver
-  .bindAnnotationValue` refuses it as the gap). Needs the foreign reader above.
 - [ ] **Bind by entry identity.** One `DataNameBinder` serves the importer and every foreign schema, so two schemas'
-  `card` collide in bind mode: ask the binder by declaring schema and name, keeping the name-only form for a caller
-  with one schema. Lands with the TSON read through an extern.
+  `card` would bind to one class: ask the binder by declaring schema and name, keeping the name-only form for a
+  caller with one schema, then compile an extern in bind mode as tree mode does (`TsonSchemaCompiler.Compilation
+  .boundary`) through the bind registry's cache. The annotations in front of the boundary go to the bound value as
+  a record's do.
 
 ## JSON encoding
 

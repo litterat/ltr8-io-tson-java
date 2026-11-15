@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
@@ -70,8 +71,12 @@ final class ChoiceReader {
         }
         Map<DiscriminationClass, TypeExpr> byClass = new EnumMap<>(DiscriminationClass.class);
         for (TypeExpr variant : body.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant,
-                    linked.schema().entries()::get);
+            // An extern variant is classified at the entry it lands on, in the namespace that holds it (§5.13).
+            Optional<DiscriminationClass> variantClass = variant instanceof TypeRef reference
+                    ? ExternReader.landing(reference.name(), linked).map(end -> DiscriminationClass.of(end.name(),
+                            end.in().schema().entries()::get)).orElseGet(() -> DiscriminationClass.of(variant,
+                            linked.schema().entries()::get))
+                    : DiscriminationClass.of(variant, linked.schema().entries()::get);
             if (variantClass.isEmpty() || byClass.putIfAbsent(variantClass.get(), variant) != null) {
                 return Map.of(); // a classless variant, or two variants sharing a class -> keep the tag
             }

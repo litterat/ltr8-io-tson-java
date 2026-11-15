@@ -7,8 +7,6 @@ import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 
-import java.util.List;
-
 import org.junit.jupiter.api.Test;
 
 import static io.ltr8.tson.ExternWorld.ORDER_1;
@@ -20,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * An extern in resolved output ([TSON-SCHEMA] §8.1) is the entry as written, and a use of it the local name; and a
- * value read through one is a gap of this library, never a verdict ([TSON-SCHEMA] §7.9).
+ * value bound through one is a gap of this library, never a verdict ([TSON-SCHEMA] §7.9).
  */
 class ExternResolvedFormTest {
 
@@ -50,18 +48,6 @@ class ExternResolvedFormTest {
         assertEquals("order_v1", assertInstanceOf(TypeRef.class, envelope.fields().get("body").type()).name());
     }
 
-    @Test
-    void aValueReadThroughAnExternIsReportedAsNotImplemented() {
-        Tson tson = world.tson();
-        envelope(tson);
-        List<Diagnostic> reported = tson.validate("!!import:\"https://example.test/envelope.tn\"\n"
-                + "!envelope { id: a  body: { id: x  payment: { number: n } } }");
-        assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED), reported.stream().map(Diagnostic::code).toList(),
-                reported.toString());
-        assertTrue(reported.getFirst().message().startsWith("'order_v1' is an extern of 'order' in '" + ORDER_1
-                + "', and reading a value through an extern"), reported.getFirst().message());
-    }
-
     public record Card(String number) {
     }
 
@@ -79,15 +65,7 @@ class ExternResolvedFormTest {
                 () -> tson.objectReader().read("!!import:\"https://example.test/envelope.tn\"\n"
                         + "!envelope { id: a  body: { id: x  payment: { number: n } } }", Envelope.class));
         assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, gap.diagnostic().code(), gap.getMessage());
-    }
-
-    @Test
-    void anAnnotationThroughAnExternIsReportedAsNotImplemented() {
-        world.schema("https://example.test/titles.tn", "title_text => @meta.annotation text");
-        List<String> reported = world.validate(extern("t", "https://example.test/titles.tn", "title_text")
-                + "@t:\"hello\" y => { a: text }");
-        assertEquals(List.of("NOT_IMPLEMENTED /y: 'y': '@t' is an extern of 'title_text' in "
-                + "'https://example.test/titles.tn', and reading an annotation's value through an extern, in its "
-                + "own schema's scope, is not implemented yet ([TSON-SCHEMA] §7.9)"), reported);
+        assertTrue(gap.diagnostic().message().startsWith("'order_v1' is an extern of 'order' in '" + ORDER_1
+                + "', and binding a value read through an extern is not implemented yet"), gap.getMessage());
     }
 }
