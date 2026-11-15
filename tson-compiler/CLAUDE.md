@@ -1,8 +1,8 @@
 # tson-compiler — the TSON text engine
 
 Lexer, both grammars, resolver, linker, compiler, compiled readers, writers and the read facades. Exports the packages
-with cross-module callers; `reader`, `atom`, `base` and `lexer` stay internal. Read the note for the package you are in
-before editing — each opens with its invariants.
+with cross-module callers; `resolver`, `reader`, `writer`, `atom`, `base` and `lexer` stay internal. Read the note
+for the package you are in before editing — each opens with its invariants.
 
 | Working in | Read (`design/…`) |
 |---|---|

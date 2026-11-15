@@ -14,7 +14,7 @@ applies to all work in the repo.
 
 ## Design notes (`design/`)
 
-Forty-odd notes, each under ~8 KB and opening with its invariants. Pick by the class you are about to touch.
+Forty-odd notes, each opening with its invariants. Pick by the class you are about to touch.
 
 | Area | Notes (`design/…`) |
 |---|---|

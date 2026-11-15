@@ -8,12 +8,12 @@ registry and identity, `design/namespace-types-and-value-entries.md` for `Namesp
 `design/open-records.md` for an open record (`RecordBody` with `parameters`, `Param`, `ParamRef`, `OpenEntry`).
 
 - Names no `tson-compiler` type — the engine depends on this module, not the reverse. Where a compiler type is needed
-  structurally, declare a local stand-in (`schema.meta.Token`, `SourcePosition`).
+  structurally, declare a stand-in (`schema.meta.Token`, `tson-base`'s `SourcePosition`).
 - A class lives in the package of the namespace its entry is declared in, so the binder reaches it by path
   (`numeric.integer_type` is `schema.numeric.IntegerType`); a class no entry declares stays in `schema.meta`.
-- `Top` is sealed all the way down: `Type`, `Alias`, `ValueEntry`. An entry whose tag names an ordinary type is a
-  `ValueEntry` wrapping the value (a `Namespace`, a bound object, or a tree); `Namespace` is the value of a namespace
-  type and no `Top`. A template is a `RecordBody` with `parameters`, open and no type.
+- `Top` is sealed all the way down: `Type`, `Alias`, `ValueEntry`, `IncompleteEntry`. An entry whose tag names an
+  ordinary type is a `ValueEntry` wrapping the value (a `Namespace`, a bound object, or a tree); `Namespace` is the
+  value of a namespace type and no `Top`. A template is a `RecordBody` with `parameters`, open and no type.
 - An atom body's components mirror its constructor's *resolved*, flattened shape — one component per schema field name.
   A nested or missing component binds `null` silently.
 - A bind target with more than one public constructor needs `@Record` on the canonical one.
