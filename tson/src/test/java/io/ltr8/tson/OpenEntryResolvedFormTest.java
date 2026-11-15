@@ -333,6 +333,7 @@ class OpenEntryResolvedFormTest {
             case io.ltr8.tson.schema.meta.ApplyBody apply -> "meta.apply";
             case Alias alias -> "alias";
             case io.ltr8.tson.schema.meta.ValueEntry value -> value.type();
+            case io.ltr8.tson.schema.meta.IncompleteEntry incomplete -> incomplete.constructor();
         };
     }
 }

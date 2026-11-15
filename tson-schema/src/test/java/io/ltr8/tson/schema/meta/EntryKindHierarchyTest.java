@@ -26,10 +26,24 @@ class EntryKindHierarchyTest {
 
     @Test
     void whatComposesWithTopDirectlyIsNoType() {
-        assertEquals(Set.of(Type.class, Alias.class, ValueEntry.class),
+        assertEquals(Set.of(Type.class, Alias.class, ValueEntry.class, IncompleteEntry.class),
                 Set.of(Top.class.getPermittedSubclasses()));
         assertFalse(Type.class.isAssignableFrom(Alias.class));
         assertFalse(Type.class.isAssignableFrom(ValueEntry.class));
+        assertFalse(Type.class.isAssignableFrom(IncompleteEntry.class));
+    }
+
+    @Test
+    void anIncompleteEntryTakesTheIncompleteKindAndNamesItsConstructor() {
+        IncompleteEntry nonempty = new IncompleteEntry("meta.array", java.util.List.of("element_type"), "written", Map.of());
+        assertEquals(EntryKind.INCOMPLETE, EntryKind.of(nonempty, name -> true));
+        assertEquals("meta.array", io.ltr8.tson.schema.TsonSchema.constructorOf(nonempty));
+    }
+
+    @Test
+    void anIncompleteEntryWithNothingAbsentIsABrokenInvariant() {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> new IncompleteEntry("meta.array", java.util.List.of(), "written", Map.of()));
     }
 
     @Test

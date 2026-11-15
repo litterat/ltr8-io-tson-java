@@ -304,6 +304,10 @@ public final class TsonSchemaCompiler {
                 return new ValueEntryReader(name, value.type(),
                         new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
             }
+            if (body instanceof io.ltr8.tson.schema.meta.IncompleteEntry incomplete) {
+                return new IncompleteEntryReader(name, incomplete,
+                        new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
+            }
             // A namespace type's value is the map it describes (NamespaceBody#read), its keys read under its key
             // family.
             Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;

@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -86,18 +87,25 @@ final class ResolvedForm {
 
     /**
      * The entries a registered schema declares <em>itself</em> -- what a resolver
-     * produced for that document, before an import merged anything else into its namespace.
+     * produced for that document, before an import merged anything else into its namespace -- as its resolved form
+     * holds them: complete entries only, an incomplete entry and an alias of one left out.
      */
     static Map<String, Top> ownEntries(Tson tson, String id) {
         var linked = tson.bindRegistry().core().resolveLinked(id);
         String canonical = CanonicalIdentity.canonicalize(id);
         Map<String, Top> own = new LinkedHashMap<>();
         linked.schema().entries().forEach((name, definition) -> {
-            if (linked.originOf(name).equals(canonical)) {
+            if (linked.originOf(name).equals(canonical) && !incomplete(name, linked)) {
                 own.put(name, contribution(name, definition, linked, canonical));
             }
         });
         return own;
+    }
+
+    /** Whether the entry {@code path} names is an incomplete entry, or an alias whose chain ends at one. */
+    private static boolean incomplete(String path, io.ltr8.tson.schema.TsonLinkedSchema linked) {
+        return io.ltr8.tson.compiler.resolver.AliasChain.terminalDefinition(path, linked.schema().entries()::get)
+                .orElse(null) instanceof IncompleteEntry;
     }
 
     /**
@@ -113,7 +121,7 @@ final class ResolvedForm {
         io.ltr8.annotation.AnnotatedMap<String, Top> own = new io.ltr8.annotation.AnnotatedMap<>();
         members.annotatedEntrySet().forEach(member -> {
             String path = name + "." + member.getKey().value();
-            if (linked.originOf(path).equals(canonical)) {
+            if (linked.originOf(path).equals(canonical) && !incomplete(path, linked)) {
                 own.put(member.getKey().value(), contribution(path, (Top) member.getValue(), linked, canonical),
                         member.getKey().annotations());
             }

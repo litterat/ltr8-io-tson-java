@@ -23,7 +23,11 @@ import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
+import io.ltr8.tson.compiler.resolver.AliasChain;
+import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
@@ -417,6 +421,16 @@ public final class DataClassObjectWriter {
     }
 
     /**
+     * Whether {@code held} is an incomplete entry, or an alias whose chain ends at one. The chain is walked in {@code
+     * root}, the outermost schema map, whose keys are the paths every name is written by.
+     */
+    private static boolean incomplete(Object held, Namespace<?> root) {
+        return held instanceof IncompleteEntry || held instanceof Alias alias && AliasChain.terminalDefinition(
+                alias.target().name(), name -> root.entries().get(name) instanceof Top top ? top : null)
+                .orElse(null) instanceof IncompleteEntry;
+    }
+
+    /**
      * A namespace value's entries, in the order held: each key with its annotations, as its bare name where it is an
      * identifier and quoted otherwise, and each value as its own class writes it, under the tag its {@link Typename}
      * names where it carries one -- a value of a subtype of the namespace's value type is selected by it on the way
@@ -424,12 +438,20 @@ public final class DataClassObjectWriter {
      * them inside the nested map alone.
      */
     private void writeNamespace(Namespace<?> namespace, TsonDataEmitter writer) throws Throwable {
+        writeNamespace(namespace, writer, namespace);
+    }
+
+    /** {@link #writeNamespace(Namespace, TsonDataEmitter)}, a schema map nested in {@code root}. */
+    private void writeNamespace(Namespace<?> namespace, TsonDataEmitter writer, Namespace<?> root) throws Throwable {
         boolean schemaMap = TsonSchema.SCHEMA.equals(namespace.type());
         writer.beginMap();
         for (Map.Entry<? extends io.ltr8.annotation.Annotated<String>, ?> entry
                 : namespace.entries().annotatedEntrySet()) {
             if (schemaMap && SchemaPaths.isPath(entry.getKey().value())) {
                 continue; // a nested map's member, written inside its map
+            }
+            if (schemaMap && incomplete(entry.getValue(), root)) {
+                continue; // a resolved form holds complete entries only ([TSON-SCHEMA] §5.5)
             }
             writer.beforeMapEntry();
             writeAnnotations(entry.getKey().annotations(), writer);
@@ -441,6 +463,12 @@ public final class DataClassObjectWriter {
             }
             writer.mapArrow();
             Object held = entry.getValue();
+            if (schemaMap && held instanceof ValueEntry nested && nested.value() instanceof Namespace<?> members
+                    && TsonSchema.SCHEMA.equals(members.type())) {
+                writer.typeRef(nested.type());
+                writeNamespace(members, writer, root);
+                continue;
+            }
             Typename tag = held == null ? null : held.getClass().getAnnotation(Typename.class);
             write(held, held == null ? null : descriptorOf(held), writer,
                     tag == null ? null : tag.name());

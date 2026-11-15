@@ -363,11 +363,14 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * The constructor {@code value}'s class is named for, by its {@link Typename} -- exact where one constructor
      * has that shape, and only one of them where several share it ({@code enum_type}, {@code enum} and a meta
      * layer's own tightening of either are one class), which is why an entry's own facts are asked first. A
-     * value entry names its own: the type it is a value of.
+     * value entry names its own: the type it is a value of; an incomplete entry the constructor it builds.
      */
     public static String constructorOf(Top value) {
         if (value instanceof io.ltr8.tson.schema.meta.ValueEntry entry) {
             return entry.type();
+        }
+        if (value instanceof io.ltr8.tson.schema.meta.IncompleteEntry incomplete) {
+            return incomplete.constructor();
         }
         Typename typename = value.getClass().getAnnotation(Typename.class);
         if (typename == null) {

@@ -39,6 +39,7 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -742,6 +743,9 @@ final class DefinitionResolver {
     private Top resolveInstance(String name, Instance instance, boolean desugared) {
         String target = instance.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
+        if (head.definition() instanceof IncompleteEntry incomplete) {
+            return complete(name, target, incomplete, instance.value(), desugared);
+        }
         refuseDeclaredApplication(name, head, instance.value());
         refuseWrittenParameters(name, head, instance.value());
         Top constructor = head.definition();
@@ -1170,6 +1174,10 @@ final class DefinitionResolver {
      * constructor is {@code I}'s own (e.g. {@code numeric.integer_type} for {@code I = integer}), and its chain is
      * the literal single-element {@code [I]} -- not transitively chained with {@code I}'s own supertypes (empty for
      * every fresh {@code Instance}). {@code I} written as an alias names the instance at the end of its chain.
+     *
+     * <p>Three sources are no atom instance and take the same spelling: a constructor of types, whose construction is
+     * left open ({@link #constructOpen}); an incomplete entry ({@link #refineIncomplete}); and an array or a map type,
+     * refined by its facets' kinds ({@link #refineCollection}).
      */
     private Top resolveAtomRefinement(String name, AtomRefinement refinement) {
         // An alias is a hop, not a supertype (§8.3): `!integer ^ { ... }` through core's `integer => integer`
@@ -1186,6 +1194,15 @@ final class DefinitionResolver {
         // establishes atom-ness at once, where neither half does alone -- a plain record has no supertypes
         // either, and `integer_type` is ATOM-kinded exactly like its instances. It is also how the reader
         // stack decides everything of this shape (`Subsumption`), rather than trusting a stated kind.
+        if (source instanceof IncompleteEntry incomplete) {
+            return refineIncomplete(name, refinement.target(), incomplete, refinement.bindings());
+        }
+        if (ConstructionSugar.constructs(sourceName, source)) {
+            return constructOpen(name, refinement.target(), sourceName, (RecordBody) source, refinement.bindings());
+        }
+        if (source instanceof io.ltr8.tson.schema.meta.ArrayBody || source instanceof io.ltr8.tson.schema.meta.MapBody) {
+            return refineCollection(name, sourceName, (Type) source, refinement.bindings());
+        }
         if (!(source instanceof io.ltr8.tson.schema.meta.Atom)) {
             // The construction hint is offered only where construction would actually work, which is the
             // same applicability question (§4.1) -- so `top`, not applicable, gets the plain answer rather
@@ -1208,6 +1225,151 @@ final class DefinitionResolver {
         checkNarrows(name, sourceName, source, body);
         constructedBy(name, constructor);
         return ((Type) body).withSupertypes(List.of(sourceName));
+    }
+
+    // ── Incomplete entries (§5.5) ───────────────────────────────────────────
+
+    /**
+     * {@code !C ^ { … }}, {@code C} a constructor of types: its construction left open, an incomplete entry, where a
+     * required field of {@code C} is absent. Each field is read where it is written; required fields, defaults and
+     * coherence across fields wait for the completion, which reads the whole.
+     */
+    private Top constructOpen(String name, String target, String constructorName, RecordBody constructor,
+                              DataValue bindings) {
+        refuseAbstractHead(name, target, constructor);
+        refuseWrittenChain(name, target + " ^", bindings);
+        DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
+        refuseWrittenParameters(name, new ConstructorHead(constructorName, constructor), payload);
+        SequencedMap<String, DataValue> written = braced(name, target, payload);
+        IncompleteEntries.requireWritable(name, constructorName, constructor, written);
+        List<String> absent = IncompleteEntries.required(constructor).stream()
+                .filter(field -> !written.containsKey(field)).toList();
+        if (absent.isEmpty()) {
+            throw new SchemaValidationException("'" + name + "': '!" + target + " ^ { ... }' writes every required "
+                    + "field of '" + constructorName + "', so nothing is left open -- write the construction '!"
+                    + target + " { ... }' (§5.5)");
+        }
+        Map<String, Object> read = readEachField(name, constructorName, constructor, written);
+        constructedBy(name, constructorName);
+        return new IncompleteEntry(constructorName, absent,
+                IncompleteEntries.record(payload, constructorName, written), read);
+    }
+
+    /**
+     * {@code !X ^ { … }}, {@code X} incomplete: the fields {@code X} has not written, a required one left absent. The
+     * result is another incomplete entry, with no IS-A to {@code X}.
+     */
+    private Top refineIncomplete(String name, String target, IncompleteEntry base, DataValue bindings) {
+        RecordBody constructor = constructorOf(name, base);
+        refuseWrittenChain(name, target + " ^", bindings);
+        DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
+        refuseWrittenParameters(name, new ConstructorHead(base.constructor(), constructor), payload);
+        SequencedMap<String, DataValue> written = braced(name, target, payload);
+        IncompleteEntries.requireWritable(name, base.constructor(), constructor, written);
+        IncompleteEntries.requireWrittenOnce(name, target, base, written);
+        Map<String, Object> read = readEachField(name, base.constructor(), constructor, written);
+        constructedBy(name, base.constructor());
+        return IncompleteEntries.refined(name, target, base, payload, written, read);
+    }
+
+    /**
+     * {@code !X { … }}, {@code !X [ … ]} or a declaration's {@code X<A …>}, {@code X} incomplete: the plain
+     * construction of {@code X}'s constructor over what {@code X} writes and what the completion adds, read whole by
+     * that constructor's reader. It carries no chain: a completion is equal to the same construction written
+     * directly.
+     */
+    private Top complete(String name, String target, IncompleteEntry base, DataValue payload, boolean desugared) {
+        RecordBody constructor = constructorOf(name, base);
+        refuseWrittenChain(name, target, payload);
+        DataValue body = IncompleteEntries.completed(name, target, base, constructor,
+                rewrite.inPlace(payload, desugared));
+        ConstructorHead head = new ConstructorHead(base.constructor(), constructor);
+        refuseDeclaredApplication(name, head, body);
+        refuseWrittenParameters(name, head, body);
+        Top built = asWritten(bindAtomInstance(name, body, target), body);
+        constructedBy(name, base.constructor());
+        return built;
+    }
+
+    /**
+     * {@code !T ^ { … }}, {@code T} an array or a map type: a refinement, IS-A {@code T} and its chain, each written
+     * facet judged by its kind over effective values ({@link io.ltr8.tson.schema.meta.CollectionFacets}).
+     */
+    private Top refineCollection(String name, String sourceName, Type source, DataValue bindings) {
+        String tag = factsOf(sourceName).constructor().orElseGet(() -> TsonSchema.constructorOf(source));
+        String constructorName = AliasChain.terminal(tag, vocabularyDefinitions::definition);
+        if (!(vocabularyDefinitions.definition(constructorName) instanceof RecordBody constructor)) {
+            throw new IllegalStateException("'" + name + "': '" + sourceName + "' was built by '" + constructorName
+                    + "', which is no constructor");
+        }
+        refuseWrittenChain(name, sourceName + " ^", bindings);
+        DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
+        IncompleteEntries.requireWritable(name, constructorName, constructor, braced(name, sourceName, payload));
+        Top body = bindAtomInstance(name, mergeWithSource(name, source, payload, constructorName));
+        List<String> violations = switch (source) {
+            case io.ltr8.tson.schema.meta.ArrayBody array -> io.ltr8.tson.schema.meta.CollectionFacets.narrowing(array,
+                    (io.ltr8.tson.schema.meta.ArrayBody) body);
+            case io.ltr8.tson.schema.meta.MapBody map -> io.ltr8.tson.schema.meta.CollectionFacets.narrowing(map,
+                    (io.ltr8.tson.schema.meta.MapBody) body);
+            default -> throw new IllegalStateException("'" + name + "': '" + sourceName + "' is no array or map");
+        };
+        if (!violations.isEmpty()) {
+            throw new SchemaValidationException("'" + name + "': not a valid refinement of '!" + sourceName
+                    + "' (§5.7): " + String.join("; ", violations));
+        }
+        constructedBy(name, tag);
+        List<String> supertypes = new ArrayList<>(List.of(sourceName));
+        source.supertypes().stream().filter(supertype -> !supertypes.contains(supertype)).forEach(supertypes::add);
+        return ((Type) body).withSupertypes(supertypes);
+    }
+
+    /** The constructor {@code incomplete} builds, ready since {@code incomplete} was. */
+    private RecordBody constructorOf(String name, IncompleteEntry incomplete) {
+        if (!(vocabularyDefinitions.definition(incomplete.constructor()) instanceof RecordBody constructor)) {
+            throw new IllegalStateException("'" + name + "': an incomplete entry builds '" + incomplete.constructor()
+                    + "', which is no constructor");
+        }
+        return constructor;
+    }
+
+    /** A {@code ^} payload's fields; the grammar writes a braced record there, and nothing else is one. */
+    private static SequencedMap<String, DataValue> braced(String name, String target, DataValue payload) {
+        return IncompleteEntries.braced(payload).orElseThrow(() -> new SchemaValidationException("'" + name
+                + "': '!" + target + " ^' takes a braced record of the constructor's fields (§5.5)"));
+    }
+
+    /**
+     * Each field of {@code written} read against the type {@code constructor} declares it with, where it is written,
+     * and what each read. A field typed by a type written in place names no type to read against, and is read where
+     * the entry is completed.
+     */
+    private Map<String, Object> readEachField(String name, String constructorName, RecordBody constructor,
+                                              SequencedMap<String, DataValue> written) {
+        Map<String, Object> read = new LinkedHashMap<>();
+        written.forEach((field, value) -> {
+            if (!(constructor.fields().get(field).type() instanceof io.ltr8.tson.schema.meta.TypeRef type)) {
+                return;
+            }
+            try {
+                Object bound = constructionReader.readValue(type.name(), value);
+                if (bound != null) {
+                    read.put(field, bound);
+                }
+            } catch (ReadException e) {
+                if (e.diagnostic().code() == Diagnostic.Code.NOT_IMPLEMENTED) {
+                    throw new UnsupportedOperationException("'" + name + "': '" + field + "' cannot yet be read "
+                            + "against '" + type.name() + "' -- " + e.getMessage(), e);
+                }
+                throw payloadFailure("'" + name + "': '" + field + "'", "'" + name + "': '" + field + "' is no "
+                        + "value of '" + type.name() + "', its type in '" + constructorName + "' -- "
+                        + e.getMessage(), e);
+            } catch (BindMismatchException e) {
+                String where = "'" + name + "': " + e.getMessage();
+                throw e instanceof MissingBindingException ? new MissingBindingException(where)
+                        : new BindMismatchException(where);
+            }
+        });
+        return read;
     }
 
     /**
@@ -1647,6 +1809,7 @@ final class DefinitionResolver {
             // canonicalised is identity, not provenance). Any other body fails this same test on its own: an
             // array, a map or a choice has no fields to contribute (§4.3).
             refuseUnappliedTemplate(name, supertypeName, terminalSupertype, "supertype", "&");
+            refuseIncomplete(name, supertypeName, terminalSupertype, "supertype");
             if (!(terminalSupertype instanceof RecordBody supertypeBody)) {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
                         + (supertypeHops ? " resolves through its alias chain to '" + supertypeTerminal
@@ -1920,6 +2083,7 @@ final class DefinitionResolver {
         // is §5.7's own per-field rule, which refuses re-fixing a FIXED field to a different value
         // whoever wrote it. Any other body fails on its own (§4.3).
         refuseUnappliedTemplate(name, sourceName, terminalSource, "refinement source", "^");
+        refuseIncomplete(name, sourceName, terminalSource, "refinement source");
         if (!(terminalSource instanceof RecordBody sourceBody)) {
             throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName + "'"
                     + (sourceHops ? " resolves through its alias chain to '" + sourceTerminal
@@ -2054,6 +2218,14 @@ final class DefinitionResolver {
         }
     }
 
+    /** Refuses an operand that names an incomplete entry, which is no type and has no fields to contribute. */
+    private static void refuseIncomplete(String name, String operand, Top definition, String position) {
+        if (definition instanceof IncompleteEntry incomplete) {
+            throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' names "
+                    + IncompleteEntries.noType(operand, incomplete));
+        }
+    }
+
     /**
      * A parameter is never an operand of {@code &} or {@code ^} ([TSON-SCHEMA] §5.10): both read the operand's
      * field set to flatten, and a parameter has none until the template is applied, so {@code <T> T & { … }} and
@@ -2121,8 +2293,9 @@ final class DefinitionResolver {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' names no type this schema declares or imports");
         }
-        if (ConstructionSugar.constructs(AliasChain.terminal(head, namespaceDefinitions::definition),
-                namespaceDefinitions.definition(AliasChain.terminal(head, namespaceDefinitions::definition)))) {
+        String terminal = AliasChain.terminal(head, namespaceDefinitions::definition);
+        if (ConstructionSugar.constructs(terminal, namespaceDefinitions.definition(terminal))
+                || namespaceDefinitions.definition(terminal) instanceof IncompleteEntry) {
             // A constructor applied is a construction (§5.3), a binding record with elements or slots, not fields:
             // the same verdict its closed spelling gets once it closes.
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head
@@ -2183,9 +2356,11 @@ final class DefinitionResolver {
                     + application.name() + "<...>' needs a whole-schema materialiser, and this resolver was "
                     + "built without one");
         }
+        if (rewrite.constructor(application.name()).isPresent()) {
+            throw ConstructionRewrite.nameRequired(application);
+        }
         if (!ConstructionRewrite.namesOnly(application)) {
-            throw rewrite.constructor(application.name()).isPresent() ? ConstructionRewrite.nameRequired(application)
-                    : ConstructionRewrite.argumentNotAName(application);
+            throw ConstructionRewrite.argumentNotAName(application);
         }
         return applicationCloser.closeApplication(ConstructionRewrite.names(application));
     }

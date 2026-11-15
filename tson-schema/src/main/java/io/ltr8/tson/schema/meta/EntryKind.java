@@ -14,7 +14,10 @@ public enum EntryKind {
      * A value entry ({@link ValueEntry}): an instance of an ordinary type, {@code orders => !api { ... }}. It is
      * no type, and no kind holds it.
      */
-    VALUE;
+    VALUE,
+
+    /** An incomplete entry ({@link IncompleteEntry}): a construction left open, which is no type. */
+    INCOMPLETE;
 
     /**
      * {@code value}'s kind. A body is the branch of {@link Top} it occupies -- an instance takes its constructor's
@@ -39,6 +42,7 @@ public enum EntryKind {
             case Alias ignored -> ALIAS;
 
             case ValueEntry ignored -> VALUE;
+            case IncompleteEntry ignored -> INCOMPLETE;
         };
     }
 

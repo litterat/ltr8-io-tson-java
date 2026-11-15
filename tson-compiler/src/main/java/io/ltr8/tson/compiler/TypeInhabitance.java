@@ -124,6 +124,7 @@ final class TypeInhabitance {
             // Only inside an open record, which is not walked; one anywhere else is the linker's refusal.
             case io.ltr8.tson.schema.meta.ApplyBody ignored -> true;
             case ValueEntry ignored -> true; // a value, which nothing is typed by
+            case io.ltr8.tson.schema.meta.IncompleteEntry ignored -> true; // no type, which nothing is typed by
         };
     }
 
@@ -349,6 +350,7 @@ final class TypeInhabitance {
             case Atom ignored -> null;
 
             case ValueEntry ignored -> null;
+            case io.ltr8.tson.schema.meta.IncompleteEntry ignored -> null;
         };
     }
 }

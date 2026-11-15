@@ -1127,22 +1127,20 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void atomRefinementRejectsRefiningAConstructorInsteadOfAnInstance() {
-        // integer_type is the integer family's *constructor*, so its body is the family's constraint
-        // vocabulary where an instance's body is an atom value ("integer" carries an IntegerType). Refining
-        // it directly ("!integer_type ^ {...}") is a resolver error -- there is no atom value to narrow --
-        // and the diagnostic points at constructor application instead (§5.5). The test is whether the body
-        // IS-A `Atom`, which neither the kind nor the `~` marker answers: `integer_type => atom & { ... }`
-        // is ATOM-kinded too.
+    void aConstructionLeftOpenWritingEveryRequiredFieldIsRefused() {
+        // integer_type is a constructor of types, so `!integer_type ^ { ... }` is its construction left open (§5.5);
+        // it has no required field, so nothing is left open, and the construction is written without the `^`.
         Namespace<Top> metaKernelEntries = KernelBootstrapResolver.kernelSchema().entries();
-        DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
+        DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, metaKernelEntries::get,
+                metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema { bad => !numeric.integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("is a constraint vocabulary"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("nothing is left open"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'!numeric.integer_type { ... }'"), thrown.getMessage());
     }
 
     @Test

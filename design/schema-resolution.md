@@ -413,8 +413,9 @@ path (`design/front-door-and-config.md`); a class no entry declares stays in `sc
 `Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as Java subtyping, and an entry's kind is
 `EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record carries `TypeChain chain` as its first
 component, mirroring the constructor's flattened shape (`type`'s field first);
-`Alias` and `ValueEntry` carry none. `TypeRef` is the parsed form of a reference value, a name: sealed over `NameRef`
-and `ParamRef`, which only an open record makes of a name its parameters declare. An application is no reference but
+`Alias`, `ValueEntry` and `IncompleteEntry` carry none. `TypeRef` is the parsed form of a reference value, a name:
+sealed over `NameRef` and `ParamRef`, which only an open record makes of a name its parameters declare. An application
+is no reference but
 the construction `meta.apply` (`ApplyBody`), written in place, whose arguments are names (§5.10). Every slot holding a
 reference is typed `TypeRef`, and every type slot `TypeExpr`, a `TypeRef` or a `TypeInline`. A dependent field's type
 is a `TypeInline` over a `DependentBody`: a consumer that needs a field's own type asks `RecordField.ownType()` (empty

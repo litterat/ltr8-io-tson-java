@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.OpenEntry;
 
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.ValueEntry;
 
 import java.util.ArrayList;
@@ -103,7 +104,8 @@ public final class KindMembers {
     public static boolean isMember(Top type, String head, String of, Function<String, Top> local,
                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
-        if (type == null || OpenEntry.isOpen(type) || type instanceof Alias || type instanceof ValueEntry) {
+        if (type == null || OpenEntry.isOpen(type) || type instanceof Alias || type instanceof ValueEntry
+                || type instanceof IncompleteEntry) {
             return false;
         }
         String constructorOf = AliasChain.terminal(of, constructors);
@@ -133,7 +135,7 @@ public final class KindMembers {
      * Why {@code reference}'s {@code of} cannot be one, or empty where it can: any type or constructor of the writer's
      * namespace may be. Refused are a name {@code structure} does not declare (an empty answer from this method's
      * caller's resolution, reported as an unresolved reference), an open entry, which denotes no type until it is
-     * applied (§5.10), and a value entry, which is a value and no type.
+     * applied (§5.10), a value entry, which is a value and no type, and an incomplete entry, which is no type.
      */
     public static Optional<String> ofRefusal(RefBody reference, Function<String, Top> structure) {
         String of = reference.of().name();
@@ -149,6 +151,9 @@ public final class KindMembers {
         if (OpenEntry.isOpen(definition)) {
             return Optional.of("its 'of' names '" + of + "', an open record: a template denotes no type until it is "
                     + "applied (§5.10)");
+        }
+        if (definition instanceof IncompleteEntry incomplete) {
+            return Optional.of("its 'of' names '" + of + "', " + IncompleteEntries.noType(of, incomplete));
         }
         return Optional.empty();
     }

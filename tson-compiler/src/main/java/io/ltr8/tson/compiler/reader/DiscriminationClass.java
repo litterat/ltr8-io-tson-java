@@ -150,6 +150,7 @@ public enum DiscriminationClass {
             case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
             case Alias ignored -> Optional.empty();
             case ValueEntry ignored -> Optional.empty();
+            case io.ltr8.tson.schema.meta.IncompleteEntry ignored -> Optional.empty(); // no type, refused at link
         };
     }
 

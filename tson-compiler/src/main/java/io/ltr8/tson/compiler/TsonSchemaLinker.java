@@ -12,6 +12,7 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.ConstructionSugar;
+import io.ltr8.tson.compiler.resolver.IncompleteEntries;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.schema.*;
@@ -55,6 +56,7 @@ import io.ltr8.tson.schema.net.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.numeric.RationalType;
 import io.ltr8.tson.schema.meta.Product;
@@ -738,6 +740,9 @@ public final class TsonSchemaLinker {
         Function<String, Optional<String>> constructors = name -> constructorOf(name, namespace.get(name), facts);
         ValuesByName byName = new ValuesByName(schema, merged, facts, origins, values);
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
+            if (entry.getValue() instanceof IncompleteEntry && !localNames.contains(entry.getKey())) {
+                continue; // its names were judged when its own schema linked, in a closure inside this one
+            }
             try {
                 // Named by what the author wrote: its declared name, or the form or application an entry with no
                 // source position records.
@@ -1585,7 +1590,47 @@ public final class TsonSchemaLinker {
             // nothing is asked of the host class a value binds to.
             case ValueEntry ignored -> {
             }
+            case IncompleteEntry incomplete -> validateHeld(entryName, incomplete, namespace, constructors, shown,
+                    byName);
         }
+    }
+
+    /**
+     * The names an incomplete entry's fields hold, judged as a construction's are where it writes them
+     * ([TSON-SCHEMA] §4.2, §5.5): a name at a type slot, or at a reference naming types, resolves, names no value and
+     * no incomplete entry, and is a member of the reference's kind; a type written in place is judged as its body.
+     * Required fields, defaults and coherence across fields are the completion's.
+     */
+    private static void validateHeld(String entryName, IncompleteEntry incomplete, Map<String, Top> namespace,
+                                     Function<String, Optional<String>> constructors, Function<String, String> shown,
+                                     ValuesByName byName) {
+        if (!(namespace.get(incomplete.constructor()) instanceof RecordBody constructor)) {
+            throw new IllegalStateException("'" + entryName + "' is an incomplete entry of '"
+                    + incomplete.constructor() + "', which this schema's namespace holds no constructor for");
+        }
+        incomplete.read().forEach((field, read) -> {
+            if (!(constructor.fields().get(field).type() instanceof TypeRef declared)
+                    || !ConstructionSugar.holdsAType(declared.name(), namespace::get)) {
+                return;
+            }
+            String trail = " " + field;
+            switch (read) {
+                case TypeInline inline -> validateSlot(inline, namespace, constructors, entryName, trail, shown,
+                        byName);
+                case TypeRef name -> {
+                    validateTypeRef(name, namespace, constructors, entryName, trail);
+                    Optional<String> kind = ConstructionSugar.kindOf(declared.name(), namespace::get);
+                    if (constructors != null && kind.isPresent() && !TYPE.equals(kind.get())
+                            && !KindMembers.isMember(name.name(), kind.get(), namespace::get, constructors,
+                                    namespace::get)) {
+                        throw new SchemaValidationException("'" + entryName + "'" + trail + " names '" + name.name()
+                                + "', which '" + declared.name() + "' does not admit");
+                    }
+                }
+                default -> {
+                }
+            }
+        });
     }
 
     /**
@@ -1727,6 +1772,7 @@ public final class TsonSchemaLinker {
                 apply.arguments().forEach(argument -> collectNames(argument, into));
             }
             case ValueEntry ignored -> { } // a value names no type of its own
+            case IncompleteEntry ignored -> { } // never open
         }
     }
 
@@ -1768,6 +1814,7 @@ public final class TsonSchemaLinker {
             case ApplyBody ignored -> List.of();
             case Alias ignored -> List.of();
             case ValueEntry ignored -> List.of();
+            case IncompleteEntry ignored -> List.of(); // judged where it is completed
         };
         if (!violations.isEmpty()) {
             // No name leads this one, deliberately. Only a form an application closed to can reach here -- a
@@ -2092,6 +2139,12 @@ public final class TsonSchemaLinker {
         }
         if (!namespace.containsKey(ref.name())) {
             throw new UnresolvedReference(subject, trail, ref.name());
+        }
+        // An alias of one is another name for it, admitted where an alias's target is judged (`constructors` null).
+        if (constructors != null && AliasChain.terminalDefinition(ref.name(), namespace).orElse(null)
+                instanceof IncompleteEntry incomplete) {
+            throw new SchemaValidationException(context + " names '" + ref.name() + "', "
+                    + IncompleteEntries.noType(ref.name(), incomplete));
         }
         checkArity(ref.name(), 0, namespace, List.of(), context);
         // Membership walks construction to `type`, so it is judged only where `type` is in reach: a namespace built
