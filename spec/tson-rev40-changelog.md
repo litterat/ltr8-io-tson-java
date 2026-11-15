@@ -3,7 +3,7 @@ title: "TSON 2026 Revision 40 — Change Log"
 against: "TSON 2026 Revision 39 (Working Draft)"
 status: "Proposed, not adjudicated. The six normative artifacts and five resolved fixtures are at `/2026/40/` identities, each pin verified over the shipped bytes and listed in Part 2 §13.2 (§6). Parts 1, 2 and 3 are revised against them (§3.1, §3.2, §3.4); the Developer Guide is not revised and keeps its `/2026/39/` reference. A verification pass over the examples and the build is recorded in §7."
 inputs:
-  - "SPEC-FEEDBACK.md (entries open against Revision 39; #3, #5 and #6 are the proposals this revision carries)"
+  - "SPEC-FEEDBACK.md (entries open against Revision 39; #3, #5 and #6 are the proposals this revision carries; #1, #7, #8 and #9 are accepted as written)"
   - "Revised companion artifacts at /2026/40/ identities: meta.tn (the kernel), numeric.tn, temporal.tn, net.tn, core.tn, policy.tn and five resolved fixtures (implementing #3)"
   - "tson-part3-json.md, edited directly as the proposal's steps landed (carrying the Part 3 half of #3)"
   - "The open-construction design, which no register entry carries (§3.2 items 106–110)"
@@ -21,7 +21,8 @@ leaves the reference, and `kind!` leaves the data grammar. Its fourth, which no 
 entry carries, is *open construction*: a construction may be left open as an incomplete
 entry, which the kernel's `enum` and `set` become, and record refinement goes, `^` following
 `!name` and `&` being the one way to derive a record (§3.2 items 106–110). The register's
-entries #1 and #2 are carried unchanged (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
+entries #1, #7, #8 and #9 are accepted as they propose, each a sentence or a paragraph
+stating what the series already holds; #2 and #4 are carried (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
 modified by this revision; each of its entries receives a disposition here.
 
 Provenance markers used in the disposition table:
@@ -132,13 +133,17 @@ footing:
 
 | # | Entry (abridged) | Disposition |
 |---|---|---|
-| 1 | [TSON-DATA] §2.1's worked example says untagged tokens resolve by §4's base rules under an imported schema | **Carried.** Not among this revision's changes; the entry stays open against Revision 40 as written. [open] |
+| 1 | [TSON-DATA] §2.1's worked example says untagged tokens resolve by §4's base rules under an imported schema | **Accept** — the sentence is rewritten for a document under a schema: its tags name types of the imported namespace and each untagged token is read by its position's declared type, with what the same tags and tokens mean in a document with no `!!import` (§3.1 item 26). No rule changes. **[settled]** |
 | 2 | Whether a quoted token at a reference-typed position is a reference | **Carried**, narrowed by #3: an argument is a reference in both grammars, so a quoted argument is refused in a schema document and in data alike; the field-position half (`t: "int32"` at a `meta.type_ref` field in data) stays open as written. [open] |
 | 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–58, 71 and 72–77), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented] |
 | 3 | Templates as open records | **Accept — the baseline above**, every step as the register states what runs. Part 2 §5.10 is rewritten around the three rules; §1.3, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow (§3.2). §1.6's example drops its value parameter. **[editorial]** at five points where the sources disagree or the text needed a reading (§5). [settled — implemented] |
 | 6 | A dependent field's type is a sum in place | **Accept** — the kernel's `meta.dependent`, the retyped `meta.record_field.type`, `meta.type_ref` and `meta.ref`, and the hand-written resolved fixture are the baseline (§1); Part 1 §1.3, §1.5, §2.3, §2.5, §2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4, §7.5, §7.7 and §8.1 follow (§3.1, items 11–19), Part 2 §1.4, §4.2, §5.2, §5.3, §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9 and §12 (§3.2, items 59–70), and Part 3 §1.6 and §5.6 (§3.4). Four readings the spec author ruled on; one point stays open (§5). [settled — implemented] |
+| 4 | A tag at a choice names a variant; a choice with an abstract variant has no values | **Carried.** Part 2 §5.4's tag still names a variant exactly, so a tag naming a subtype of a variant is refused and an abstract variant holds no tagged value. The entry's two resolutions stand as written; its "why it matters now" no longer holds, the kernel's type-slot choice being a reference beside a closed record, `meta.type_inline`. [open] |
+| 7 | A free sibling hands the choice of a dependent field's type to the document's author | **Accept** — one paragraph in Part 2 §11.1, and no change to §5.2's rules (§3.2 item 111). **[settled]** |
+| 8 | A name inside an annotation's value: that it is judged, where, and when | **Accept** — Part 2 §5.12's "Where the rule stands" names an annotation's value among the slots the rule reaches, with its namespace and its time, and §6 points at it (§3.2 item 112). No rule changes; the first implementation judges a data document's annotation value and not yet a schema document's (§5). **[settled]** |
+| 9 | `net.uuid_type.version` has no stated meaning | **Accept** — Part 2 §5.5 states it, a UUID whose RFC 9562 version field equals `version`, and §5.7 lists it among the settable-once facets (§3.2 item 113), which is what runs. **[settled]** |
 
-Counts: **3 accepted** (#3, in six steps, #5 and #6), **0 declined**, **2 carried** (#1, #2). Revision
+Counts: **7 accepted** (#3, in six steps, #5 and #6; and #1, #7, #8 and #9, which change no rule), **0 declined**, **2 carried** (#2, #4). Revision
 39's open remainders on templates close with #3: #13's (whether a value argument narrows
 below `token`) by the removal of value arguments, #19's (a shared parent for `record` and
 `record_template`) by the removal of `record_template`, and #21's (a sibling in a template
@@ -228,6 +233,15 @@ carrying an argument list. Each names the rule before and after.
     and so does the adjacency row for `<`; the identifier grammar's positions lose "the head
     of a reference"; the parse-error list loses the argument-list cases and gains a special
     token the data grammar gives no role, `<` and `>` among them.
+
+One sentence of the worked example follows the register's #1:
+
+26. **§2.1** — the paragraph after the example said its type annotations "invoke the built-in
+    vocabulary" and its unannotated tokens "resolve by the base rules of §4", under an
+    `!!import`, where §4 and §5.1 confine both to a document with none. It says the tags name
+    types of the imported namespace, `order.tn`'s closure supplying `uuid`, `date` and
+    `number`, and each unannotated token is read by the type its position declares
+    ([TSON-SCHEMA] §7.3); the base rules' reading is given for a document with no `!!import`.
 
 ### 3.2 Part 2 — Type System and Schema
 
@@ -790,6 +804,35 @@ after.
      is unrecorded, which a record's edge being `&`'s and every other `^`'s makes untrue, a
      declared completion's `@meta.completion` being the one provenance output carries.
 
+Three register entries are accepted as they propose, and three sentences corrected. None
+changes a rule: each states what the series already holds and the first implementation
+runs, a schema document's annotation value aside (§5).
+
+111. **§11.1** (#7) — new paragraph **A free sibling gives the document's author the choice
+     of a type**: a dependent field's free sibling typed `meta.type_ref` or `meta.type_expr`
+     lets a document's author choose the type a value is read against, the kernel's
+     vocabulary included and, for `meta.type_expr`, a type written in place; a reference
+     narrows by constructor and never to one record's subtypes; a schema for untrusted input
+     SHOULD pin the sibling, make it a selector or narrow the reference. §5.2 is unchanged.
+112. **§5.12, §6** (#8) — "Where the rule stands" listed a value entry's field, a field's
+     default or pin and a data document's field, and never an annotation's value, which §6
+     validates against its type. It gains **The rule reaches an annotation's value**: a name
+     at a reference-typed slot there resolves in the annotating document's namespace
+     (§3.3.3) and is judged by the same walk, when a data document is read and when a schema
+     document links. §6's `@T:value` bullet points at it.
+113. **§5.5, §5.7** (#9) — `net.uuid_type.version` had no stated meaning. §5.5's list gains:
+     it admits a UUID whose RFC 9562 version field equals it, any other version a validation
+     error. §5.7 lists it among the settable-once facets, two versions admitting disjoint
+     values, so `!v4 ^ { version: 7 }` over `v4 => !uuid ^ { version: 4 }` is refused.
+114. **§5.2, §5.7, §5.10.1** — three sentences the text carried against its own rules. §5.2
+     quoted `dependent => meta.sum & { on: text }`, without the `final` item 91 gave it.
+     §5.10.1 said `tree`'s `children` "holds `meta.array<tree<T>>` as written", where items
+     79 and 87 make it the array's construction in place, its element type the `meta.apply`
+     of `tree` to `T`. §5.7 said a type built "by a constructor composed from either"
+     `meta.array` or `meta.map` is refined by `^`, against the same section's rule that the
+     source of `^` is a type `meta.array` or `meta.map` built: the clause goes, so a
+     namespace type, built by `meta.namespace`, takes no `^` (§5).
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Four entries are edited by this revision of
@@ -848,6 +891,9 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
 11. **§1.6** (§3.2 item 108) — item 13's set is described by its facets, `ordered: false` and
     `unique_items: true`, `set<T>` writing no bound of its own, where it named
     `meta.set_type`; item 23's construction example is `meta.array<text>`.
+12. **§6.3** — the one-position tuple was "the kernel's `meta.tuple1<T>` and
+    `meta.voidable_tuple1<T>`", which §3.2 item 14 removed; it is a one-position tuple as
+    declared, `!meta.tuple [{ element_type: text }]`. The encoding is unchanged.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -954,8 +1000,9 @@ carries no open questions.
 
 | Ref | Question | Status |
 |---|---|---|
-| #1 | [TSON-DATA] §2.1's example under an `!!import`. | Open — carried as written. |
+| #1 | [TSON-DATA] §2.1's example under an `!!import`. | **[settled]** — §3.1 item 26. |
 | #2 | A quoted token at a field typed by a reference in data. | Open — carried; the argument half closed by #3. |
+| #4 | A tag at a choice naming a subtype of a variant, and a choice with an abstract variant: whether the tag selects the one variant its type IS-A, or an abstract variant is refused at the declaration. | Open — carried as written. |
 | #3 (reading) | A number or a quoted token in a *schema* document's argument list: a grammar error, as the register and the proposal have it: Part 2 §12.1 is `type-arg = type-expr`, and [TSON-DATA] §7.4's data argument is narrowed the same way. The corpus records the schema-document case under the `resolver` category, which every schema-document error carries, so it does not tell a grammar error from a resolver one. | **[settled]** — the running behaviour. |
 | #3 (reading) | The proposal narrows §12.1's `type-def` alternative `[type-params] type-expr` to a record body. A parameter list before a sugar form or a bare reference is a resolver error naming the remedy, so the production keeps the alternative and a comment says the resolver admits a record body alone. | **[editorial]** — the running behaviour. |
 | #3 (reading) | §4.1 makes an open record a type by its constructor, `meta.record`, while §5.10's rule is that no template is a type a position names. The text keeps §4.1's predicate and states the refusal on references, as the proposal's §1.3 does; §5.10's heading says "no template is a type a position names". | **[editorial]** — for confirmation. |
@@ -973,6 +1020,8 @@ carries no open questions.
 | #6 (ruled) | A declared sum written in place was refused only by its absence from Part 2 §4.2's list of what `of` holds. §4.2 states it, beside a namespace type. | **[settled]** — the spec author's ruling. |
 | #6 (open) | A data document typed by the kernel can write a type in place that §4.2's list refuses (`!meta.array { element_type: { of: !meta.dependent { on: kind } } }` reads with no diagnostic): `meta.type_inline.of` is typed `meta.type`, and the list is a resolver rule. It predates `meta.dependent`, which adds one entry to the list. | Open — carried. |
 | Items 78–84 (ruled) | A choice over a parameter, `( T \| int32 )`, is disjoint for some arguments and not others. Refusing it at the declaration, or requiring disjointness for every argument, were the alternatives; it loads at the open record, and each application is judged where it closes. | **[settled]** — the spec author's ruling. |
+| #8 (remainder) | A name in a schema document's annotation value is judged at link (Part 2 §5.12). The first implementation checks the value's shape and delivers the name unjudged; a data document's is judged at the read. | Open — outstanding work in the implementation; the text states the rule. |
+| Item 114 (reading) | A type built by a constructor composed from `meta.array` or `meta.map`, a namespace type, takes no `^`: Part 2 §5.7 names the source of `^` as a type `meta.array` or `meta.map` built, and `!api ^ { max_items: 3 }` over a `!meta.namespace` type is refused. The open-construction design moved a written value by its facet's kind for every constructor, which asks for more. | **[editorial]** — the running behaviour, for confirmation. |
 | Items 107–108 (ruled) | Over an incomplete entry nothing is replaced: a field written again is refused, whatever the value, and to narrow, the entry is completed and the type refined. One rule covers required fields: `^` writes any unwritten field and leaves one required field absent. An alias of an incomplete entry is allowed and not written. An incomplete entry is imported like any entry. | **[settled]** — the spec author's ruling. |
 | Item 109 (ruled) | `^` always follows `!name` and its body is values; `&` always follows a bare name and its body is field definitions, the only way to derive a record. | **[settled]** — the spec author's ruling. |
 | Items 108–109 (lost) | `a: enum`; a reference over sets alone; a set's `voidable: false` as a pin; a resolved form listing every name its source offers; `^`'s refusal of a new field. | Recorded — items 108 and 109 state each, and the replacement where there is one. |
@@ -1052,14 +1101,14 @@ carries no open questions.
    `wrap` refused at its declaration applied or not, and the parameter remedy;
    §8.2's `pair<text, text>` at a field; sugar in place, a sugar form refused as an argument and
    the widened positional form.
-5. **Items 78–84's examples** — `[T; 1..]`, `[T?]`, `[T, text]`, `( T | int32 )`, `{T =>
+4. **Items 78–84's examples** — `[T; 1..]`, `[T?]`, `[T, text]`, `( T | int32 )`, `{T =>
    int32}`, `{ cursor: T }` and `[{ at: T  tags: {text => T} }]` load and read through a
    declared application and one at a slot, each equal to the type written by hand;
    `meta.array<T>`, `meta.map<text meta.array<T>>`, `set<T>` and `meta.ref<T>` resolve to the
    same form as their sugar; `pick<int32>` is refused at its declaration; `{box<T> => text}`,
    `m: { w?: T ~ 5 }`, `meta.array<[T]>`, an irregular recursion inside a type in place and
    `f: [node<text>]` are refused.
-6. **Items 106–110's examples** — §5.5's `nonempty`, `array_min`, `max_things` and `by_name`
+5. **Items 106–110's examples** — §5.5's `nonempty`, `array_min`, `max_things` and `by_name`
    load; `tags => nonempty<text>`, `by_name<int32>`, `!nonempty { element_type: uuid }` and
    `!nonempty text` resolve, and `max_things<text>` is refused, `min_items` 10 above
    `max_items` 5. An incomplete entry is refused at a field's type, a variant, a bound, an
@@ -1071,5 +1120,9 @@ carries no open questions.
    `!tags ^ { min_items: 1 }` over `tags => [text]` resolve; `person ^ {}` and
    `box<text> ^ { … }` are parse errors naming the composition, `!person ^ {}` a resolver
    error naming it, and `!tags ^ { element_type: uuid }` is refused.
-4. **The build** — the implementation's full build, with the conformance corpus's Revision
+6. **Items 111–114's examples** — `!v4 ^ { version: 7 }` over `v4 => !uuid ^ { version: 4 }`
+   is refused and `!v4 ^ { version: 4 }` loads; `!api ^ { max_items: 3 }` over a
+   `!meta.namespace` type is refused, and `!tags ^ { max_items: 3 }` and
+   `!lookup ^ { max_items: 3 }` over a declared array and map load.
+7. **The build** — the implementation's full build, with the conformance corpus's Revision
    40 branch required, passes over the revised text.

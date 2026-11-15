@@ -493,7 +493,7 @@ A set-typed position uses the same JSON array form. Duplicates under the element
 
 ### 6.3 Tuples
 
-A tuple encodes as a JSON array of exactly its declared length — short or long arrays are validation errors regardless of trailing voidable positions, matching [TSON-SCHEMA] §5.3. Each slot decodes at its position's element type; a voidable position's void value is JSON null in its slot (the `_` of the text form); at any other position null is a validation error (§7). The kernel's `meta.tuple1<T>` and `meta.voidable_tuple1<T>` are the one-position case and encode as a JSON array of exactly one element — `["a"]`, and `[null]` where the position is voidable.
+A tuple encodes as a JSON array of exactly its declared length — short or long arrays are validation errors regardless of trailing voidable positions, matching [TSON-SCHEMA] §5.3. Each slot decodes at its position's element type; a voidable position's void value is JSON null in its slot (the `_` of the text form); at any other position null is a validation error (§7). A one-position tuple, declared `!meta.tuple [{ element_type: text }]` ([TSON-SCHEMA] §5.3), encodes as a JSON array of exactly one element — `["a"]`, and `[null]` where the position is voidable.
 
 
 ### 6.4 Maps
