@@ -35,6 +35,23 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   element_type: { of: !meta.apply { head: box  arguments: [T] } } } } }`, every argument then kernel data, read once. No
   verdict is the sugar's own but the argument count, an argument written in place at a slot that holds only a name,
   and a namespace type in place.
+- `!C ^ { … }` over a constructor of types (`ConstructionSugar.constructs`) is an **incomplete entry**
+  (`IncompleteEntry`) where a required field -- neither optional nor pinned -- is absent, and refused where none is.
+  `!X ^ { … }`, `!X { … }`, `!X value` (§5.6's positional form, one required field absent) and `X<…>` over one
+  write only fields `X` has not written
+  (`IncompleteEntries`): **write-once, never a narrowing judgement**, since narrowing is a relation between types and
+  an incomplete entry only accumulates. A refinement keeps one required field absent; a completion is the plain
+  construction of the constructor and **carries no chain**, so `nonempty<text>` equals `!meta.array { … }` written
+  anywhere. A chain naming `X` lost for that reason: the same type would be two entries by spelling.
+- Each field of an incomplete entry is read against its declared type where it is written (`readEachField`);
+  required fields, defaults and coherence wait for the completion, which reads the whole. What each field read is
+  kept on the entry (`IncompleteEntry.read`), and the names it holds are judged when its own schema links
+  (`TsonSchemaLinker.validateHeld`), never again by an importer's. Reading only at the completion lost: an entry no
+  completion can use would load. A field typed by a type written in place names no type to read against and is read
+  at the completion: every resolver read goes through a compiled reader looked up by a type's name at a checkpoint.
+- An incomplete entry is a `Top` held in the schema's one namespace, so imports, collisions, key annotations and alias
+  hops carry it unchanged; it holds the parsed node, never a tree, which loses a token's form. A second map beside the
+  entries lost: both import merges and the collision rule would be written twice.
 
 Related: `design/schema-resolution.md` (the resolution phase around this), `design/atom-refinement-and-coherence.md`
 (`!I ^ { ... }`), `design/template-materialisation.md` and `design/open-records.md` (how `C<...>` closes),
@@ -158,5 +175,5 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   instance is its own kind and is not normalised to its source's: `nonempty_type<uuid>` and `[uuid; 1..]` are two
   entries. `ConstructionSugarTest` pins all of it.
 - **The desugarer cannot tell a constructor from a record**, so `checkTemplateApplication` refuses an argument list
-  only on a local head whose body says it is none: a fresh record, a construction or an atom refinement. A
-  composition, a refinement or an alias passes through for resolution to judge.
+  only on a local head whose body says it is none: a fresh record or a construction. A composition, a refinement, an
+  alias or an atom refinement (an incomplete entry, completed by application) passes through for resolution to judge.

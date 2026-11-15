@@ -160,11 +160,14 @@ public final class JsonSchemaCompiler {
      * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, so an open
      * record takes {@code record}'s factory, which answers it with the refusal of a template named where a type is
      * read ([TSON-SCHEMA] §5.10). A value entry names the ordinary type it is a value of, which has no factory:
-     * nothing is typed by such an entry, and its reader is the refusal.
+     * nothing is typed by such an entry, and its reader is the refusal; an incomplete entry, no type either, the same.
      */
     private static String constructorOf(Top body) {
         if (body instanceof ValueEntry value) {
             return value.type();
+        }
+        if (body instanceof io.ltr8.tson.schema.meta.IncompleteEntry) {
+            throw new IllegalStateException("an incomplete entry is no type, and has no reader");
         }
         Class<?> leaf = body.getClass();
         Typename typename = leaf.getAnnotation(Typename.class);

@@ -138,6 +138,14 @@ spec-required case:
   is a constructor with the same field names binds as that parent. Then check a refined constructor read back from a
   resolved form, which carries no recorded fact. Add `schema/valid` vectors for the `&` spelling, applied and
   constructed.
+- [ ] **A field of an incomplete entry typed by a type written in place is read only where the entry is completed**
+  ([TSON-SCHEMA] §5.5). §5.5 reads each written field by its own type where it is written and judges the names it
+  holds at link. A constructor's field whose type is written in place (`meta.choice.variants`, a `[meta.type_expr]`;
+  `meta.tuple.elements`) has no name to find a compiled reader by: the resolver's reads look one up by a type's name
+  at a checkpoint keyed by that name, and a reader for a type written in place exists only inside the reader of the
+  record declaring it. So a wrong value there is reported at the completion, and a name it holds is not judged when
+  an entry never completed links. It needs a compiled reader for a `TypeExpr` the resolver can ask for, with a
+  checkpoint not keyed by a name. Add `schema/invalid` and `link/invalid` vectors for a field so typed.
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
   so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest re-runs the
   family checks (no record written in place a member of anything) over the ingested map and its closure, the §5.11 group

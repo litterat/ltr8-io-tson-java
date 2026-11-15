@@ -23,6 +23,12 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   type or a reference, and imports any schema document.
 - A reference to a value entry (a `ValueEntry`, `myapi => !api { … }`) is refused at every position a type-ref
   occupies: it is a value, and nothing is typed by it.
+- An incomplete entry (`IncompleteEntry`, [TSON-SCHEMA] §5.5) is refused at every position a type-ref occupies,
+  judged past alias hops, and is no kind's member; an alias's own target may name one (`constructors == null`). The
+  names its own fields hold are judged in its own schema's link, an imported one skipped (`validateHeld`). Where
+  a schema map is written (`DataClassObjectWriter`) an incomplete entry and an alias whose chain ends at one are left
+  out, at any depth of nested maps, the chain walked from the root's paths: a resolved form holds complete entries
+  only, and every use of one closes to a plain construction.
 - A kernel slot typed `meta.type_ref` (`meta.record_field.type`, the element and container type slots,
   `meta.choice.variants`) is judged by `KindMembers` in `validateTypeRef`, after resolution: a constructor whose declaration
   is a record is a member, its value being of `meta.record`, and a value entry is refused there. An alias's target (`Alias`),

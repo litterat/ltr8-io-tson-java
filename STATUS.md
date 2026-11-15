@@ -129,6 +129,10 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       is a value of it, no type and in no kind, named by a reference over its type and walked by key and field;
       bound through the one bind context, or held as a tree where no class binds its type, so the schema loads and
       validates
+- [x] Incomplete entries (Part 2 §5.5, proposed for Revision 40) — `!C ^ { … }` over a constructor of types with a
+      required field absent, refined by fields it has not written and completed by `!X { … }`, `!X value` or `X<…>`
+      into the plain construction; refused wherever a type is named, imported like any entry, and left out of the
+      resolved form. An array or a map type refines by its facets' kinds, `!tags ^ { min_items: 2 }` (§5.7)
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
       reads against real TSON data documents (see the README's [Schema pipeline](README.md#schema-pipeline))

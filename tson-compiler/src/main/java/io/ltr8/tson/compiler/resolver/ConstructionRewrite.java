@@ -11,6 +11,7 @@ import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -72,7 +73,8 @@ final class ConstructionRewrite {
                 List<RecordValue.Field> fields = new ArrayList<>(record.fields().size());
                 boolean changed = false;
                 for (RecordValue.Field field : record.fields()) {
-                    DataValue value = inPlace(field.value(), desugared);
+                    DataValue value = WireForm.OF.equals(field.name()) ? ofInPlace(field.value(), desugared)
+                            : inPlace(field.value(), desugared);
                     changed |= value != field.value();
                     fields.add(value == field.value() ? field : new RecordValue.Field(field.name(), value));
                 }
@@ -123,14 +125,18 @@ final class ConstructionRewrite {
         return constructed == written ? Optional.empty() : Optional.of(constructed);
     }
 
-    /** The constructor {@code head} applies past its alias hops, or empty where it applies none (§5.3). */
+    /**
+     * The constructor or incomplete entry {@code head} applies past its alias hops, or empty where it applies none
+     * (§5.3, §5.5).
+     */
     Optional<String> constructor(String head) {
         if (opens.test(head)) {
             return Optional.empty();
         }
         String constructor = AliasChain.terminal(head, types);
-        return ConstructionSugar.constructs(constructor, types.apply(constructor)) ? Optional.of(constructor)
-                : Optional.empty();
+        Top definition = types.apply(constructor);
+        return ConstructionSugar.constructs(constructor, definition) || definition instanceof IncompleteEntry
+                ? Optional.of(constructor) : Optional.empty();
     }
 
     /**
@@ -169,10 +175,14 @@ final class ConstructionRewrite {
             }
             return written;
         }
+        if (types.apply(constructor.get()) instanceof IncompleteEntry incomplete) {
+            return completed(written, head.get(), incomplete, arguments, constructed, inPlace);
+        }
         RecordBody definition = (RecordBody) types.apply(constructor.get());
         if (inPlace) {
             ConstructionSugar.refuseNamespaceInPlace(text(written), head.get(),
-                    arguments.stream().map(ConstructionRewrite::text).toList(), constructor.get(), definition, types);
+                    arguments.stream().map(ConstructionRewrite::text).toList(), ConstructionSugar.slots(definition,
+                            types), constructor.get(), definition);
         }
         List<String> slots = ConstructionSugar.slots(definition, types);
         ConstructionSugar.requireArity(head.get(), slots, constructed.size());
@@ -186,6 +196,68 @@ final class ConstructionRewrite {
         }
         return new DataValue(written.annotations(), Optional.of(inPlace ? constructor.get() : head.get()),
                 new RecordValue(fields));
+    }
+
+    /**
+     * An application of an incomplete entry, its arguments filling the type slots the entry leaves absent, in its
+     * constructor's declared order. A declaration's body is tagged by the head as written, for the declaration to
+     * complete; in place it is the completion itself, its constructor's construction over the merged body.
+     */
+    private DataValue completed(DataValue written, String head, IncompleteEntry incomplete, List<DataValue> arguments,
+                                List<DataValue> constructed, boolean inPlace) {
+        RecordBody constructor = (RecordBody) types.apply(incomplete.constructor());
+        List<String> allSlots = ConstructionSugar.slots(constructor, types);
+        List<Boolean> allInPlace = ConstructionSugar.slotsInPlace(constructor, types);
+        List<String> slots = new ArrayList<>();
+        List<Boolean> slotsInPlace = new ArrayList<>();
+        for (int i = 0; i < allSlots.size(); i++) {
+            if (incomplete.absent().contains(allSlots.get(i))) {
+                slots.add(allSlots.get(i));
+                slotsInPlace.add(allInPlace.get(i));
+            }
+        }
+        if (slots.size() != constructed.size()) {
+            throw new SchemaValidationException(slots.isEmpty()
+                    ? "'" + head + "' is an incomplete '" + incomplete.constructor() + "' leaving " + incomplete.absent()
+                            + " absent, none of them a type slot, so '" + head + "<...>' has nothing to fill; complete "
+                            + "it in braces, '!" + head + " { ... }', as a declaration (§5.5)"
+                    : "'" + head + "' is an incomplete '" + incomplete.constructor() + "' whose absent type slots are "
+                            + slots + ", so '" + head + "<...>' takes " + slots.size() + " argument"
+                            + (slots.size() == 1 ? "" : "s") + ", one for each in that order, but " + constructed.size()
+                            + " " + (constructed.size() == 1 ? "was" : "were") + " applied (§5.5)");
+        }
+        List<RecordValue.Field> fields = new ArrayList<>(slots.size());
+        for (int i = 0; i < slots.size(); i++) {
+            if (!isName(arguments.get(i)) && !slotsInPlace.get(i)) {
+                throw TemplateMaterialiser.nameRequired(text(arguments.get(i)), suggestedName(arguments.get(i)));
+            }
+            fields.add(new RecordValue.Field(slots.get(i), constructed.get(i)));
+        }
+        DataValue applied = new DataValue(written.annotations(), Optional.of(head), new RecordValue(fields));
+        if (!inPlace) {
+            return applied;
+        }
+        ConstructionSugar.refuseNamespaceInPlace(text(written), head,
+                arguments.stream().map(ConstructionRewrite::text).toList(), slots, incomplete.constructor(),
+                constructor);
+        return IncompleteEntries.completed(text(written), head, incomplete, constructor, applied);
+    }
+
+    /**
+     * The {@code of} of a type written in place: where it is tagged by an incomplete entry, {@code { of: !X { … } }},
+     * the completion in place, its constructor's construction. Only a type in place is asked, its tag being read
+     * against anyway: a tag in a held value orders nothing ([TSON-SCHEMA] §3.4.1), and asking would make it ready.
+     */
+    private DataValue ofInPlace(DataValue written, boolean desugared) {
+        Optional<String> head = written.typeRef().filter(tag -> !opens.test(tag) && types.apply(tag) != null);
+        if (head.isEmpty() || !(types.apply(AliasChain.terminal(head.get(), types))
+                instanceof IncompleteEntry incomplete)) {
+            return inPlace(written, desugared);
+        }
+        DataValue payload = inPlace(new DataValue(written.annotations(), Optional.empty(), written.coreValue()),
+                desugared);
+        return IncompleteEntries.completed("!" + head.get(), head.get(), incomplete,
+                (RecordBody) types.apply(incomplete.constructor()), payload);
     }
 
     /** {@code generic} as its head applied to its arguments, each a name or a parameter. */

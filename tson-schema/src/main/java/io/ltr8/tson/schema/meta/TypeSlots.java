@@ -117,6 +117,8 @@ public final class TypeSlots {
                     apply.arguments().stream().map(rewrite::atName).toList());
             // A value is data: a name it holds is judged at link against the closure.
             case ValueEntry value -> value;
+            // Its names are judged where it is completed, the completion being an ordinary construction.
+            case IncompleteEntry incomplete -> incomplete;
         };
     }
 }

@@ -23,6 +23,9 @@ package io.ltr8.tson.schema.meta;
  * an ordinary type, {@code orders => !api { ... }} or {@code create_order => !operation { ... }}. It is a value,
  * never a type, and is how a schema puts vocabulary of its own in a schema map. Every branch is sealed, so an
  * entry's kind is decidable by inspection and every switch over them is exhaustive.
+ *
+ * <p>{@link IncompleteEntry} is the branch that is no value at all: a construction left open, a base to refine and a
+ * head to complete, held in a namespace and never written.
  */
-public sealed interface Top permits Type, Alias, ValueEntry {
+public sealed interface Top permits Type, Alias, ValueEntry, IncompleteEntry {
 }

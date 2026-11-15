@@ -713,6 +713,14 @@ after.
      narrower type and pins another, which declares a constructor and narrows no value, so it
      is the composition `meta.map & { … }`, restating by §5.8. The entry's resolved form, its
      chain and every namespace type are unchanged; `meta.tn`'s pin changes (§13.2).
+107. **§3.3.1, §5.3, §5.5, §5.7, §8.1, §12.1** — `!C ^ { … }` over a constructor was no form, and
+     a type a container constructor built was finished. `!C ^ { values }` now constructs `C`
+     with a required field left absent, declaring an **incomplete entry**: no type and no
+     value, written once field by field through `!X ^ { values }`, and completed by
+     `!X { … }`, `!X [ … ]` or `X<A …>` into the plain construction `!C { … }`, which carries no
+     chain. It is refused wherever a type is named, is checked whole where it is completed,
+     and is not written in resolver output. A type `meta.array` or `meta.map` built is refined
+     by `!T ^ { values }`, its facets taking §5.7's kinds, and the result IS-A `T`.
 
 ### 3.3 Companion artifacts
 

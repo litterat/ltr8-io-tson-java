@@ -584,9 +584,9 @@ final class SchemaDesugarer {
      * <p>A head this document neither declares nor imports is left alone -- the reference is simply
      * unresolved, which is {@code TsonSchemaLinker}'s verdict to deliver. A local head that declares no
      * parameters is an author error where its body says it is no constructor: a fresh record IS-A nothing, and
-     * a construction or atom refinement carries an empty chain (§4.1), so nothing there takes arguments. A
-     * composition, a refinement or an alias may be a constructor, which construction sugar applies (§5.3), and
-     * only resolution can tell, so each passes through.
+     * a construction carries an empty chain (§4.1), so nothing there takes arguments. A composition, a refinement
+     * or an alias may be a constructor, which construction sugar applies (§5.3), and an atom refinement may be an
+     * incomplete entry, which an application completes (§5.5); only resolution can tell, so each passes through.
      */
     private void checkTemplateApplication(String head) {
         SchemaMap.Declaration declaration = local.get(head);
@@ -597,6 +597,8 @@ final class SchemaDesugarer {
         boolean mayConstruct = switch (declaration.typeDef()) {
             case StructuralTypeDef structural -> !(structural.body() instanceof RecordDef);
             case TypeExprDef ignored -> true;
+            // `!C ^ { … }` over a constructor is an incomplete entry, which an application completes.
+            case io.ltr8.tson.compiler.ast.schema.AtomRefinement ignored -> true;
             default -> false;
         };
         if (parameters.isEmpty() && !mayConstruct) {

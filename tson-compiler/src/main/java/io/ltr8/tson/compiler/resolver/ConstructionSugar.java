@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -66,19 +67,17 @@ public final class ConstructionSugar {
 
     /**
      * Refuses {@code written}, an application at a type slot whose head as written is {@code head} and whose arguments
-     * are spelled {@code arguments}, where its constructor {@code name} builds a namespace type: the kernel's {@code
-     * namespace} or a constructor refining it ([TSON-SCHEMA] §4.2, §5.2). A namespace value carries its type's name as
-     * its tag, and a type written in place has none, so a namespace type is declared and named.
+     * are spelled {@code arguments}, filling {@code slots}, where its constructor {@code name} builds a namespace type:
+     * the kernel's {@code namespace} or a constructor refining it ([TSON-SCHEMA] §4.2, §5.2). A namespace value carries
+     * its type's name as its tag, and a type written in place has none, so a namespace type is declared and named.
      *
-     * @param types where the constructor's slots are looked up, for the declaration the message suggests
      * @throws SchemaValidationException where it builds one
      */
-    static void refuseNamespaceInPlace(String written, String head, List<String> arguments, String name,
-                                       Top definition, Function<String, Top> types) {
+    static void refuseNamespaceInPlace(String written, String head, List<String> arguments, List<String> slots,
+                                       String name, Top definition) {
         if (!NAMESPACE.equals(name) && !TypeChain.supertypesOf(definition).contains(NAMESPACE)) {
             return;
         }
-        List<String> slots = slots((RecordBody) definition, types);
         List<String> bindings = new ArrayList<>();
         for (int i = 0; i < slots.size() && i < arguments.size(); i++) {
             bindings.add(slots.get(i) + ": " + arguments.get(i));
@@ -121,8 +120,14 @@ public final class ConstructionSugar {
      * Whether a field typed {@code name} holds a type: typed {@code meta.type_expr}, a type's name or a type written in
      * place, or by a reference naming types ([TSON-SCHEMA] §5.3).
      */
-    private static boolean holdsAType(String name, Function<String, Top> types) {
+    public static boolean holdsAType(String name, Function<String, Top> types) {
         return TYPE_EXPR.equals(AliasChain.terminal(name, types)) || namesTypes(name, types);
+    }
+
+    /** The {@code of} of the reference the type {@code name} is, past its alias hops; empty where it is none. */
+    public static Optional<String> kindOf(String name, Function<String, Top> types) {
+        return types.apply(AliasChain.terminal(name, types)) instanceof RefBody reference
+                ? Optional.of(reference.of().name()) : Optional.empty();
     }
 
     /**

@@ -18,6 +18,7 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Param;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeExpr;
@@ -225,6 +226,11 @@ final class ParameterTypes {
             throw new SchemaValidationException("the bound '" + spell(bound) + "' names '" + name + "', and '"
                     + name + "' is a constructor, not a type (§4.1); a bound names a type, which every argument "
                     + "must IS-A (§5.10)");
+        }
+        if (local.apply(AliasChain.terminal(name, local)) instanceof IncompleteEntry incomplete) {
+            throw new SchemaValidationException("the bound '" + spell(bound) + "' names '" + name + "', "
+                    + IncompleteEntries.noType(name, incomplete) + "; a bound names a type, which every argument "
+                    + "must IS-A, and no type IS-A an incomplete entry (§5.10)");
         }
     }
 
