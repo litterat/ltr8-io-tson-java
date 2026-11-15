@@ -6,6 +6,7 @@ inputs:
   - "SPEC-FEEDBACK.md (entries open against Revision 39; #3, #5 and #6 are the proposals this revision carries)"
   - "Revised companion artifacts at /2026/40/ identities: meta.tn (the kernel), numeric.tn, temporal.tn, net.tn, core.tn, policy.tn and five resolved fixtures (implementing #3)"
   - "tson-part3-json.md, edited directly as the proposal's steps landed (carrying the Part 3 half of #3)"
+  - "The open-construction design, which no register entry carries (§3.2 items 106–110)"
 ---
 
 # TSON 2026 Revision 40 — Change Log
@@ -16,8 +17,11 @@ series. Its one input of substance is the implementation's spec-feedback registe
 branch of the first implementation and of the conformance corpus. Its second is entry #5,
 *inline types*: a type slot holds a name or a type written in place, and no entry is lifted
 or minted. Its third is entry #6, *a dependent field's type is a sum in place*: the sibling
-leaves the reference, and `kind!` leaves the data grammar. The register's entries #1 and #2
-are carried unchanged (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
+leaves the reference, and `kind!` leaves the data grammar. Its fourth, which no register
+entry carries, is *open construction*: a construction may be left open as an incomplete
+entry, which the kernel's `enum` and `set` become, and record refinement goes, `^` following
+`!name` and `&` being the one way to derive a record (§3.2 items 106–110). The register's
+entries #1 and #2 are carried unchanged (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
 modified by this revision; each of its entries receives a disposition here.
 
 Provenance markers used in the disposition table:
@@ -29,9 +33,10 @@ Provenance markers used in the disposition table:
   dictates, or a reading the editor took where the sources disagree or admit more than one.
   Each is the spec author's to confirm; collected in §5 beside the open questions.
 
-**This revision does not change the lexer.** The schema grammar's productions change at one
-point: a record field's or a group member's type may be a `dependent-type`, `kind!`, which
-no other production admits (#6, [TSON-SCHEMA] §12.1); `type-params` still parses before any
+**This revision does not change the lexer.** The schema grammar's productions change at two
+points: a record field's or a group member's type may be a `dependent-type`, `kind!`, which
+no other production admits (#6, [TSON-SCHEMA] §12.1), and `refined-def` goes, so `^` follows
+`! name` alone and a bare name before it is a parse error (§3.2 item 109); `type-params` still parses before any
 body, and the resolver admits it before a record body alone. It takes **both of Revision
 39's value forms out of the data grammar**: the argument list, so `<` and `>` in a data value
 are parse errors as they were in Revision 38; and `sibling-ref`, so `kind!` in a data value
@@ -708,20 +713,21 @@ after.
      listing also typed `parents` `[meta.type_ref]` where the kernel has `[meta.type_expr]`.
 105. **§13.2** — every pin changes (§6), for item 104 and for the artifacts' documentation
      (§3.3).
-106. **§4.1, §5.7** — `meta.namespace` was written `meta.map ^ { key_type:
+106. **§4.1, §5.7, §13.2** — `meta.namespace` was written `meta.map ^ { key_type:
      meta.identifier_ref  voidable?: = false }`, a refinement. It restates a field under a
      narrower type and pins another, which declares a constructor and narrows no value, so it
      is the composition `meta.map & { … }`, restating by §5.8. The entry's resolved form, its
      chain and every namespace type are unchanged; `meta.tn`'s pin changes (§13.2).
-107. **§3.3.1, §5.3, §5.5, §5.7, §8.1, §12.1** — `!C ^ { … }` over a constructor was no form, and
+107. **§3.3.1, §5.3, §5.5, §5.7, §8.1, §12.1, §12.2** — `!C ^ { … }` over a constructor was no form, and
      a type a container constructor built was finished. `!C ^ { values }` now constructs `C`
      with a required field left absent, declaring an **incomplete entry**: no type and no
      value, written once field by field through `!X ^ { values }`, and completed by
-     `!X { … }`, `!X [ … ]` or `X<A …>` into the plain construction `!C { … }`, which carries no
+     `!X { … }`, `!X value` or `X<A …>` into the plain construction `!C { … }`, which carries no
      chain. It is refused wherever a type is named, is checked whole where it is completed,
      and is not written in resolver output. A type `meta.array` or `meta.map` built is refined
      by `!T ^ { values }`, its facets taking §5.7's kinds, and the result IS-A `T`.
-108. **§3.4, §4.1, §5.3, §5.6, §6, §7.4, §7.5, §8.1, §8.3, §9, §13.2** — the kernel's
+108. **Header, §1.6, §3.3.1, §3.3.3, §3.4, §4.1, §4.2, §5.1, §5.2, §5.3, §5.4, §5.6, §5.7, §6,
+     §7.4, §7.5, §8.1, §8.3, §9, §13.2** — the kernel's
      `meta.set_type` and root `enum` were constructors refining `meta.array` and
      `meta.enum_type`, and a processor bound their instances as the constructor each refined.
      Each is now an incomplete entry (item 107): `meta.set_type => !meta.array ^ { voidable:
@@ -736,9 +742,14 @@ after.
      alias hops; an author writing it is a resolver error, and it is read as stated. The
      kernel's wait cycle loses `meta.set_type` and gains `meta.identifier_ref`, which `enum`'s
      `name_type` is read by where it is written, and is 31 entries as before. `meta.tn`'s pin
-     and every pin above it change (§13.2).
-109. **Header, §1, §4.1, §4.2, §4.3, §5.1, §5.2, §5.5, §5.7, §5.8, §5.9, §5.10, §5.11, §8.1,
-     §12.1, §12.2** — record refinement goes. `T ^ { … }` refined a record, a constructor among
+     and every pin above it change (§13.2). **Lost:** a field admitting only enums over
+     identifiers, `a: meta.enum_type` admitting any name type; a reference admitting only
+     sets, `of: meta.array` being wider and nothing narrower existing; a set's
+     `voidable: false` as a pin, which held only through `meta.set_type`; and a resolved form
+     listing every name its source offers, what a schema offers to be completed being its
+     source's (§8.1, §10.1).
+109. **Header, §1, §4.1, §4.2, §4.3, §5.1, §5.2, §5.5, §5.7, §5.8, §5.9, §5.10, §5.10.1, §5.11,
+     §8.1, §8.2, §12.1, §12.2, §12.3** — record refinement goes. `T ^ { … }` refined a record, a constructor among
      them, and declared a refined record or a refined constructor beside `&`'s composition. The
      operator now decides the body: `^` follows `!name` and its body is values, and it never
      declares a record or a constructor; `&` follows a bare name and its body is field
@@ -759,11 +770,32 @@ after.
      rows. **Lost:** `^` refused a new field and `&` does not, so `person & { agee: adult }` adds a
      field where `person ^ { agee: adult }` was refused. A modifier-only entry naming no inherited
      field is still refused. There is no replacement.
+110. **Header, §1, §1.3, §3.3.1, §3.4.1, §4.1, §4.2, §4.3, §5, §5.1, §5.3, §5.4, §5.5, §5.6,
+     §5.7, §5.10, §5.12, §6, §7.2, §7.4, §7.5, §8, §8.1, §8.2, §10.1, §11.4, §12.1, §12.3** —
+     the text read end to end against items 107–109; no rule changes, each sentence being
+     what those items imply and the first implementation runs. Where a sentence listed what
+     the name after `!` or the head of an application resolves to, what an entry is, or what
+     resolver output holds, it names the incomplete entry or sets it aside: §3.3.1's roles,
+     §3.4.1's read of a declaration against its head, §4.1's entries and nested maps, §4.2's
+     `of`, §4.3's two families and its table, which gains rows for open construction and
+     completion, §5.1's forms, §5.3's arguments, §8's and §8.2's statement of what output
+     holds, §10.1's reasons a resolved form is no source, and §12.1's and §12.3's comments
+     and rows. The refusals §5.5 states once are stated where each position is defined: a
+     bound and a parameter shadowing one (§5.10), a referent (§5.12), an annotation (§6) and
+     a tag in data (§7.2). An incomplete entry is imported like any entry (§5.5), and a
+     completion over a parameter is its construction in place (§5.10). `enum` and
+     `meta.set_type` *write* the facets the text said they pinned (§7.4, §7.5); an enum's
+     `name_type` alone stands among the facets fixed at construction, a record's being
+     composition's (§5.2, §5.7); and §4.1 and §8.1 said the operator that minted an IS-A edge
+     is unrecorded, which a record's edge being `&`'s and every other `^`'s makes untrue, a
+     declared completion's `@meta.completion` being the one provenance output carries.
 
 ### 3.3 Companion artifacts
 
-The revised artifacts carry the baseline of §1. One entry is edited by this revision of the
-text, `meta.type_chain` (item 104), and every artifact's documentation is rewritten for a
+The revised artifacts carry the baseline of §1. Four entries are edited by this revision of
+the text and one is added — `meta.type_chain` (item 104), `meta.namespace` (item 106),
+`meta.set_type` and `enum`, and the new `meta.completion` (item 108) — and every artifact's
+documentation is rewritten for a
 reader looking at one entry who has not read this text: what the entry is, how it is written
 in the basic case, the facts about its values that its declaration does not show, and the
 section to read further. A rule this text states in full is cited and no longer restated,
@@ -813,6 +845,9 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
 10. **§1.6, §5.6** — item 16 and §5.6 named "the kernel's `meta.reference_type`, or its
     refinement `meta.ref`"; they name `meta.ref`, the one reference constructor (§3.2 items
     98–101).
+11. **§1.6** (§3.2 item 108) — item 13's set is described by its facets, `ordered: false` and
+    `unique_items: true`, `set<T>` writing no bound of its own, where it named
+    `meta.set_type`; item 23's construction example is `meta.array<text>`.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -831,10 +866,9 @@ Changes a Revision 39 implementer must act on:
    is a reference.
 3. **A bound is written.** A parameter passed to a bounded parameter is written with a
    bound that IS-A it; nothing is inferred.
-4. **`C<args>` over a constructor constructs it**: `meta.array<text>` is `[text]`,
-   `set<text>` is `!meta.set_type { element_type: text }`, `meta.ref<method>` is
-   `!meta.ref { of: method }`. The root's `set` is an alias of `meta.set_type`, and
-   `meta.ref` a refined constructor.
+4. **`C<args>` over a constructor constructs it**: `meta.array<text>` is `[text]` and
+   `meta.ref<method>` is `!meta.ref { of: method }`; `set<text>` completes an incomplete
+   entry (entry 18).
 5. **No template is a type a position names**, and no application is IS-A its template. A
    family is an abstract base, a template composing it, and members composing an
    application and pinning the selectors.
@@ -881,6 +915,34 @@ Changes a Revision 39 implementer must act on:
     not yet ready whose written operands reach the base and whose nearest written pin does not
     differ, so a value selecting a member declared after it loads, and one whose member waits
     on the reading entry is a wait cycle.
+17. **A construction may be left open** (§3.2 item 107): `!C ^ { values }` over a constructor
+    of types writes some of `C`'s fields and leaves a required one absent, declaring an
+    incomplete entry — no type and no value, refused wherever a type is named and not written
+    in resolver output. `!X ^ { values }` writes fields `X` has not written, each once;
+    `!X { … }`, `!X value` or `X<A …>` completes it into the plain construction `!C { … }`,
+    with no chain, checked whole there, and a declared completion carries the derived
+    `@meta.completion:{ of: [X …] }` on its key. A type `meta.array` or `meta.map` built is
+    refined by `!T ^ { values }` and IS-A `T`.
+18. **The kernel's `enum` and `set` are incomplete entries** (§3.2 item 108):
+    `meta.set_type => !meta.array ^ { voidable: false  ordered: false  unique_items: true }`,
+    `enum => !meta.enum_type ^ { name_type: meta.identifier }`, and the root's `set` another
+    name for `meta.set_type`. A resolved form writes `set<text>` as `!meta.array {
+    element_type: text  ordered: false  unique_items: true }` and `!enum [A B]` as
+    `!meta.enum_type { name_type: meta.identifier  members: [A B] }`, each with
+    `@meta.completion` on a declared entry's key, and writes none of the three names. A field
+    holding an enum type is `meta.enum_type`, a constructor narrowing a set is
+    `meta.array & { … }`, and a reference over sets is `meta.ref<meta.array>`, which is wider.
+19. **`^` follows `!name`, and record refinement is gone** (§3.2 items 106, 109): `^`'s body
+    is values and it never declares a record or a constructor; `&` is the one way to derive a
+    record, and so to declare a constructor. `employee => person ^ { age: adult }` is
+    `person & { age: adult }`, `vip => person ^ {}` is `person & {}`, and
+    `minlist => meta.array ^ { min_items?: = 1 }` is `!meta.array ^ { min_items: 1 }` (entry
+    17) or `meta.array & { min_items?: = 1 }`; the kernel's `meta.namespace` is
+    `meta.map & { … }`, its resolved form unchanged. A bare `name ^ {` is a parse error and
+    `!person ^ { … }` a resolver error, each naming `person & { … }`. A restated field follows
+    the rules it did. One check is lost: `^` refused a new field and `&` adds it, so
+    `person & { agee: adult }` loads where `person ^ { agee: adult }` was refused; a
+    modifier-only entry naming no inherited field is still refused.
 
 ---
 
@@ -900,17 +962,20 @@ carries no open questions.
 | #3 (reading) | A self-reaching expansion kept its closed record under a name derived from the canonical application. | **Superseded by #5**: a recursive application ties to the declaration closing it, and one with none is refused. |
 | #3 (reading) | A tag naming an open record in data is a validation error (Revision 39: a resolver error as a data annotation). | **[editorial]** — the running behaviour. |
 | #3 (remainder) | An open record is read at its declaration against `record`'s vocabulary, but a name in it that resolves to nothing is reported per application, and not at all while nothing applies the record. The proposal's reading at the declaration asks for more. | Open — outstanding work in the implementation; the text states the declaration-time checks it runs. |
-| #5 (ruled) | An application at a refinement source (`x => box<text> ^ { … }`) is absorbed as one at a composition operand is, IS-A the template's written parents and a declaration of the application where one exists. | **[settled]** — the spec author's ruling; the first implementation closes a declared one to its declaration and reports one nothing declares as not implemented. |
+| #5 (ruled) | An application at a refinement source (`x => box<text> ^ { … }`) is absorbed as one at a composition operand is, IS-A the template's written parents and a declaration of the application where one exists. | **Superseded by item 109**: `box<text> ^ { … }` is a parse error, written `box<text> & { … }`, whose operand rule (Part 2 §5.8) it followed. |
 | #5 (ruled) | A value modifier on a field typed by a reference written in place (`handler?: meta.ref<method> ~ …`) is admitted, read against the reference as against a declared one; on a container, tuple or choice written in place it is refused, as on a declared one. | **[settled]** — the spec author's ruling. |
 | #5 (ruled) | A choice that is not disjoint names every variant: one holding a variant written in place is a resolver error, a tag naming a variant by its name. | **[settled]** — the spec author's ruling. |
 | #5 (ruled) | A name and a type written in place are never the same type, even where the name's construction is identical; a name is a name's type past alias hops, and a type written in place an equal one's. | **[settled]** — the spec author's ruling. |
 | #5 (ruled) | An author's explicit `!C { … }` at a field stays refused: §5.6's constructor application is valid only as a declaration's body, and §5.3 admits an applied constructor at a field where a `!` construction is not. | **[settled]** — the existing rule. |
 | #6 (ruled) | `kind!` in a data document is refused by the separator rule's parse error, the token before it read as the position reads any token. A targeted rule naming the mark would put the form back in the data grammar. | **[settled]** — the spec author's ruling. |
-| #6 (ruled) | `meta.ref` withdraws nothing once `allow_sibling` is gone. It stays, as the empty refinement `meta.reference_type ^ {}`, so `meta.ref<T>` keeps its spelling. | **[settled]** — the spec author's ruling. |
+| #6 (ruled) | `meta.ref` withdraws nothing once `allow_sibling` is gone. It stays, as the empty refinement `meta.reference_type ^ {}`, so `meta.ref<T>` keeps its spelling. | **Superseded by items 98–101**: `meta.ref` is the one reference constructor, and `meta.reference_type` is gone. |
 | #6 (ruled) | `meta.dependent.on` is `text`, naming a field of the record by its declared spelling, declared before the dependent field, as a `discriminators` entry names one. | **[settled]** — the spec author's ruling. |
 | #6 (ruled) | A declared sum written in place was refused only by its absence from Part 2 §4.2's list of what `of` holds. §4.2 states it, beside a namespace type. | **[settled]** — the spec author's ruling. |
 | #6 (open) | A data document typed by the kernel can write a type in place that §4.2's list refuses (`!meta.array { element_type: { of: !meta.dependent { on: kind } } }` reads with no diagnostic): `meta.type_inline.of` is typed `meta.type`, and the list is a resolver rule. It predates `meta.dependent`, which adds one entry to the list. | Open — carried. |
 | Items 78–84 (ruled) | A choice over a parameter, `( T \| int32 )`, is disjoint for some arguments and not others. Refusing it at the declaration, or requiring disjointness for every argument, were the alternatives; it loads at the open record, and each application is judged where it closes. | **[settled]** — the spec author's ruling. |
+| Items 107–108 (ruled) | Over an incomplete entry nothing is replaced: a field written again is refused, whatever the value, and to narrow, the entry is completed and the type refined. One rule covers required fields: `^` writes any unwritten field and leaves one required field absent. An alias of an incomplete entry is allowed and not written. An incomplete entry is imported like any entry. | **[settled]** — the spec author's ruling. |
+| Item 109 (ruled) | `^` always follows `!name` and its body is values; `&` always follows a bare name and its body is field definitions, the only way to derive a record. | **[settled]** — the spec author's ruling. |
+| Items 108–109 (lost) | `a: enum`; a reference over sets alone; a set's `voidable: false` as a pin; a resolved form listing every name its source offers; `^`'s refusal of a new field. | Recorded — items 108 and 109 state each, and the replacement where there is one. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
 
@@ -921,15 +986,16 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `fba10509…` (Revision 39 `c9b069b6…`), numeric `44b6423f…` (`dfa66c5d…`), temporal
-   `e839a87b…` (`fb4ada8f…`), net `a7ecf6cc…` (`371fc20c…`), core `1d57dbba…`
-   (`4e8d9c43…`), policy `a236c4fd…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   `83ac33fe…` (Revision 39 `c9b069b6…`), numeric `232d69ba…` (`dfa66c5d…`), temporal
+   `3f788a9e…` (`fb4ada8f…`), net `cb8a29d3…` (`371fc20c…`), core `8cd8be3d…`
+   (`4e8d9c43…`), policy `5aeeaa04…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
    78–84's documentation of a parameter in a type written in place, for items 85–93's
    `meta.apply` and final constructors, and for items 94–97's documentation of a reference
-   with no argument list, for items 98–101's one reference constructor, and for items
-   104–105's chain sets and rewritten documentation. The chain is
+   with no argument list, for items 98–101's one reference constructor, for items
+   104–105's chain sets and rewritten documentation, for item 106's `meta.namespace`, and
+   for item 108's incomplete entries and `meta.completion`. The chain is
    consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
    libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
@@ -945,8 +1011,13 @@ carries no open questions.
    `meta.type_expr` and `meta.type_chain`: the kernel measures 83 entries. Items 94–97
    rewrite `meta.reference_type`'s again. Items 98–101 merge `meta.reference_type` into
    `meta.ref`: the kernel measures 82 entries. Item 104 retypes `type_chain.supertypes` and
-   `type_chain.subtypes`, and every artifact's documentation is rewritten (§3.3).
-   `meta-resolved.tn` follows; the four library fixtures change only their identities.
+   `type_chain.subtypes`, and every artifact's documentation is rewritten (§3.3). Item 106
+   respells `meta.namespace` as `meta.map & { … }`. Item 108 makes `meta.set_type` and `enum`
+   incomplete entries and adds `meta.completion`: the kernel measures 83 entries, three of
+   which — `enum`, `set` and `meta.set_type` — its resolved form does not write.
+   `meta-resolved.tn` follows; `numeric-resolved.tn` writes its two enums and its set as the
+   constructor's construction with `@meta.completion`, and the other three library fixtures
+   change only their identities.
 
 ---
 
@@ -958,7 +1029,7 @@ carries no open questions.
    `outcome<text>`, `rebox`, `<K> { m: {K => text} }`, `page<[uuid; 1..]>`,
    `created`, `text_pair`, `nested`, the one-position tuples (`[a]` admitted, `[_]` refused,
    and admitted with `voidable: true`), `nonempty<uuid>`, `meta.array<user_id>`,
-   `x => box<text> ^ { … }`, `<T> !meta.record { … }` and a parameterised subtraction
+   `x => box<text> & { … }`, `<T> !meta.record { … }` and a parameterised subtraction
    resolve; and each refusal the text names — a bare template at a field or an operand, an
    argument outside its bound, an unbounded or mis-bounded parameter passed on, a bound
    naming a constructor, a literal on a parameter-typed field, a parameter at a value or a
@@ -988,5 +1059,17 @@ carries no open questions.
    same form as their sugar; `pick<int32>` is refused at its declaration; `{box<T> => text}`,
    `m: { w?: T ~ 5 }`, `meta.array<[T]>`, an irregular recursion inside a type in place and
    `f: [node<text>]` are refused.
+6. **Items 106–110's examples** — §5.5's `nonempty`, `array_min`, `max_things` and `by_name`
+   load; `tags => nonempty<text>`, `by_name<int32>`, `!nonempty { element_type: uuid }` and
+   `!nonempty text` resolve, and `max_things<text>` is refused, `min_items` 10 above
+   `max_items` 5. An incomplete entry is refused at a field's type, a variant, a bound, an
+   operand of `&`, a reference's `of`, a reference-typed slot, an annotation and a
+   parameter's name, and its name as a tag in a data document is refused; a field written
+   twice and `!meta.array ^ { element_type: text }`, which leaves nothing open, are refused.
+   `<T> { s: set<T> }` applied and `set<meta.array<text>>` resolve, and `page<set<text>>` is
+   refused. `person & { age: adult }`, `person & {}`, `box<text> & { … }` and
+   `!tags ^ { min_items: 1 }` over `tags => [text]` resolve; `person ^ {}` and
+   `box<text> ^ { … }` are parse errors naming the composition, `!person ^ {}` a resolver
+   error naming it, and `!tags ^ { element_type: uuid }` is refused.
 4. **The build** — the implementation's full build, with the conformance corpus's Revision
    40 branch required, passes over the revised text.
