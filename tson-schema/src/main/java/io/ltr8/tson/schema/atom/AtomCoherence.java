@@ -5,6 +5,7 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Product;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
@@ -49,13 +50,19 @@ public final class AtomCoherence {
      */
     public static <T extends Comparable<? super T>> void checkRange(List<String> out, AtomNarrowing.Bound<T> lower,
             AtomNarrowing.Bound<T> upper) {
+        checkRange(out, lower, upper, Comparator.naturalOrder());
+    }
+
+    /** {@link #checkRange(List, AtomNarrowing.Bound, AtomNarrowing.Bound)} over the family's own order. */
+    public static <T extends Comparable<? super T>> void checkRange(List<String> out, AtomNarrowing.Bound<T> lower,
+            AtomNarrowing.Bound<T> upper, Comparator<? super T> order) {
         if (lower == null || upper == null) {
             return;
         }
-        int order = lower.value().compareTo(upper.value());
-        if (order > 0) {
+        int sign = order.compare(lower.value(), upper.value());
+        if (sign > 0) {
             out.add(lower + " is above " + upper);
-        } else if (order == 0 && !(lower.inclusive() && upper.inclusive())) {
+        } else if (sign == 0 && !(lower.inclusive() && upper.inclusive())) {
             out.add(lower + " and " + upper + " meet at " + lower.value() + ", which one of them excludes");
         }
     }

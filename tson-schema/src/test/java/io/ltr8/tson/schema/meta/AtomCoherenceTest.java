@@ -324,10 +324,9 @@ class AtomCoherenceTest {
     }
 
     /**
-     * Bounds written in two different offsets are comparable rather than incomparable -- {@code
-     * OffsetTime} normalises to the instant first -- so the check judges them instead of waving them
-     * through. Both pairs read backwards on their local times alone, and the offsets are what decide
-     * them: 09:00+02:00 is 07:00 UTC, genuinely before the 08:00 UTC ceiling, while 08:00+02:00 is
+     * Bounds written in two different offsets are comparable rather than incomparable, so the check judges
+     * them instead of waving them through. Both pairs read backwards on their local times alone, and the
+     * offsets are what decide them: 09:00+02:00 is 07:00 UTC, genuinely before the 08:00 UTC ceiling, while 08:00+02:00 is
      * 06:00 UTC, genuinely after the 09:00 UTC floor.
      */
     @Test
@@ -336,6 +335,32 @@ class AtomCoherenceTest {
                 Optional.of(OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC))));
         assertViolation(new TimeType(Optional.of(OffsetTime.of(9, 0, 0, 0, ZoneOffset.UTC)),
                 Optional.of(OffsetTime.of(8, 0, 0, 0, ZoneOffset.ofHours(2)))), "is above max");
+    }
+
+    /** The offset is a spelling (§5.5), so a floor and a ceiling at one instant pin it whatever each is written in. */
+    @Test
+    void aRangePinningOneInstantInTwoOffsetsIsCoherent() {
+        assertCoherent(new TimeType(Optional.of(OffsetTime.parse("11:00:00+01:00")),
+                Optional.of(OffsetTime.parse("10:00:00Z"))));
+        assertCoherent(new TimeType(Optional.of(OffsetTime.parse("23:30:00-02:00")),
+                Optional.of(OffsetTime.parse("01:30:00Z"))));
+        assertCoherent(new DateTimeType(Optional.of(OffsetDateTime.parse("2026-01-01T11:00:00+01:00")),
+                Optional.of(OffsetDateTime.parse("2026-01-01T10:00:00Z"))));
+    }
+
+    @Test
+    void anInversionAcrossOffsetsIsRefusedWhereTheLocalTimesReadInOrder() {
+        // 10:00+02:00 is 08:00 UTC, before the 09:00 UTC floor.
+        assertViolation(new TimeType(Optional.of(OffsetTime.parse("09:00:00Z")),
+                Optional.of(OffsetTime.parse("10:00:00+02:00"))), "is above max");
+        assertViolation(new DateTimeType(Optional.of(OffsetDateTime.parse("2026-01-01T09:00:00Z")),
+                Optional.of(OffsetDateTime.parse("2026-01-01T10:00:00+02:00"))), "is above max");
+        assertViolation(new TimeType(Optional.empty(), Optional.of(OffsetTime.parse("11:00:00+01:00")),
+                Optional.of(OffsetTime.parse("10:00:00Z")), Optional.empty(), Optional.empty()),
+                "which one of them excludes");
+        assertViolation(new DateTimeType(Optional.of(OffsetDateTime.parse("2026-01-01T11:00:00+01:00")), Optional.empty(),
+                Optional.empty(), Optional.of(OffsetDateTime.parse("2026-01-01T10:00:00Z")), Optional.empty()),
+                "which one of them excludes");
     }
 
     /**

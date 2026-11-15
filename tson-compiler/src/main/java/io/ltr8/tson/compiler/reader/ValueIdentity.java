@@ -38,9 +38,8 @@ import java.util.Optional;
  * in UTC, so {@code 2026-01-01T10:00:00+01:00} and {@code 2026-01-01T09:00:00Z} are one value, {@code -00:00}
  * is the same instant as {@code Z}, and {@code 23:30:00-02:00} is {@code 01:30:00Z}. {@link
  * OffsetDateTime#equals}/{@link OffsetTime#equals} compare the offset instead, which is a narrower relation
- * than the value space, and would answer every rule above wrongly at once. Ordering needs nothing: both host
- * types' {@code compareTo} already compares the instant. §5.5 has TSON text preserve the offset as written,
- * so this is an identity and never what a reader hands back.
+ * than the value space, and would answer every rule above wrongly at once. §5.5 has TSON text preserve the
+ * offset as written, so this is an identity and never what a reader hands back.
  *
  * <p><b>The exact tier compares by value, because §5.5 makes scale a spelling too.</b> {@code 1} and
  * {@code 1.0} are one {@code number}, and so are {@code 199.90} and {@code 199.9} -- "every comparison, bound

@@ -10,7 +10,9 @@ import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 
 import java.time.OffsetTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,12 +76,18 @@ public record TimeType(TypeChain chain,
     public static final TimeType UNCONSTRAINED = new TimeType(Optional.empty(), Optional.empty(), Optional.empty());
 
     /**
+     * The value space's order, a time being its time of day in UTC (§5.5): {@code 11:00:00+01:00} ties with
+     * {@code 10:00:00Z}, and {@code 23:30:00-02:00} sorts as {@code 01:30:00Z}. Never {@code compareTo}, whose
+     * tie-break on the local time makes the offset part of the value, nor {@code isBefore}, which compares on one
+     * shared day and so does not wrap at midnight.
+     */
+    public static final Comparator<OffsetTime> INSTANT_ORDER =
+            Comparator.comparing(time -> time.withOffsetSameInstant(ZoneOffset.UTC).toLocalTime());
+
+    /**
      * {@inheritDoc}
      *
-     * <p>Bounds compare on {@link OffsetTime}'s own ordering, which normalises to the instant on a
-     * shared day before comparing local time -- so a bound written in one offset is comparable with
-     * one written in another rather than being rejected as incomparable. {@code fraction_digits} is an
-     * upper bound and may only fall (§5.5).
+     * <p>{@code fraction_digits} is an upper bound and may only fall (§5.5).
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
@@ -88,9 +96,9 @@ public record TimeType(TypeChain chain,
         }
         List<String> violations = new ArrayList<>();
         AtomNarrowing.checkLower(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
-                AtomNarrowing.bound(other.min, other.exclusiveMin, "min", "exclusive_min"));
+                AtomNarrowing.bound(other.min, other.exclusiveMin, "min", "exclusive_min"), INSTANT_ORDER);
         AtomNarrowing.checkUpper(violations, AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"),
-                AtomNarrowing.bound(other.max, other.exclusiveMax, "max", "exclusive_max"));
+                AtomNarrowing.bound(other.max, other.exclusiveMax, "max", "exclusive_max"), INSTANT_ORDER);
         AtomNarrowing.checkAtMost(violations, "fraction_digits", fractionDigits, other.fractionDigits);
         return List.copyOf(violations);
     }
@@ -99,15 +107,13 @@ public record TimeType(TypeChain chain,
      * {@inheritDoc}
      *
      * <p>Each side is a field group ([TSON-SCHEMA] §5.11), so a range is empty either by a ceiling below
-     * its floor or by the two meeting at one value an exclusive end removes. Compared on {@link java.time.OffsetTime}'s own
-     * ordering, which normalises to the instant on a shared day first, so a pair written in two
-     * different offsets is still judged rather than waved through as incomparable.
+     * its floor or by the two meeting at one value an exclusive end removes.
      */
     @Override
     public List<String> coherenceCheck() {
         List<String> violations = new ArrayList<>();
         AtomCoherence.checkRange(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
-                AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
+                AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"), INSTANT_ORDER);
         FractionDigits.checkCoherent(violations, fractionDigits, "time");
         return List.copyOf(violations);
     }

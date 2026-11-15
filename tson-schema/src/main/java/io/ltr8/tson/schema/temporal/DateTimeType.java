@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.numeric.IntegerSize;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,11 +75,16 @@ public record DateTimeType(TypeChain chain,
             new DateTimeType(Optional.empty(), Optional.empty(), Optional.empty());
 
     /**
+     * The value space's order, a datetime being the instant on the UTC timeline (§5.5):
+     * {@code 2026-01-01T11:00:00+01:00} ties with {@code 2026-01-01T10:00:00Z}. Never {@code compareTo}, whose
+     * tie-break on the local date-time makes the offset part of the value.
+     */
+    public static final Comparator<OffsetDateTime> INSTANT_ORDER = OffsetDateTime.timeLineOrder();
+
+    /**
      * {@inheritDoc}
      *
-     * <p>Bounds compare on {@link OffsetDateTime}'s own ordering, which compares the instant first,
-     * so two bounds written in different offsets are still comparable. {@code fraction_digits} is an upper
-     * bound and may only fall (§5.5).
+     * <p>{@code fraction_digits} is an upper bound and may only fall (§5.5).
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
@@ -87,9 +93,9 @@ public record DateTimeType(TypeChain chain,
         }
         List<String> violations = new ArrayList<>();
         AtomNarrowing.checkLower(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
-                AtomNarrowing.bound(other.min, other.exclusiveMin, "min", "exclusive_min"));
+                AtomNarrowing.bound(other.min, other.exclusiveMin, "min", "exclusive_min"), INSTANT_ORDER);
         AtomNarrowing.checkUpper(violations, AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"),
-                AtomNarrowing.bound(other.max, other.exclusiveMax, "max", "exclusive_max"));
+                AtomNarrowing.bound(other.max, other.exclusiveMax, "max", "exclusive_max"), INSTANT_ORDER);
         AtomNarrowing.checkAtMost(violations, "fraction_digits", fractionDigits, other.fractionDigits);
         return List.copyOf(violations);
     }
@@ -98,15 +104,13 @@ public record DateTimeType(TypeChain chain,
      * {@inheritDoc}
      *
      * <p>Each side is a field group ([TSON-SCHEMA] §5.11), so a range is empty either by a ceiling below
-     * its floor or by the two meeting at one value an exclusive end removes. Compared on {@link java.time.OffsetDateTime}'s own
-     * ordering, which compares the instant first, so a pair written in two different offsets is
-     * still judged rather than waved through as incomparable.
+     * its floor or by the two meeting at one value an exclusive end removes.
      */
     @Override
     public List<String> coherenceCheck() {
         List<String> violations = new ArrayList<>();
         AtomCoherence.checkRange(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
-                AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
+                AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"), INSTANT_ORDER);
         FractionDigits.checkCoherent(violations, fractionDigits, "datetime");
         return List.copyOf(violations);
     }
