@@ -71,6 +71,20 @@ class TsonSealedFamilyReadTest {
         assertEquals(List.of(), problems("!holder { p: { pet_type: cat  name: Tom  indoor: true } }"));
     }
 
+    /** The tree writer states every atom's tag, so a family member written back carries one on its selector. */
+    @Test
+    void aSelectorWrittenWithItsOwnTagStillSelects() {
+        assertEquals(List.of(), problems("!holder { p: { pet_type: !text dog  name: Rex  breed: corgi } }"));
+    }
+
+    @Test
+    void aTreeReadOfAFamilyMemberWritesBackToTextThatReadsBack() {
+        Tson tson = tson();
+        String text = "!!import:\"%s\"\n!holder { p: { pet_type: dog  name: Rex  breed: corgi } }".formatted(ID);
+        String written = tson.treeWriter().toTson(tson.treeReader().readDocument(text));
+        assertEquals(List.of(), tson.validate(written), written);
+    }
+
     /**
      * A record's fields have no significant order, so the selector may arrive after the fields it selects.
      * A reader that decided on the opening brace cannot read this, which is why the scan is a lookahead.

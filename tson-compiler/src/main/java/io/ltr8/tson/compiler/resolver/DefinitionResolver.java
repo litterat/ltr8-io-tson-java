@@ -300,7 +300,8 @@ final class DefinitionResolver {
         this.facts = Objects.requireNonNull(facts, "facts");
         this.constructionReader = Objects.requireNonNull(constructionReader, "constructionReader");
         this.annotationsResolve = annotationValueReader != null;
-        this.annotationValueReader = annotationValueReader == null ? (type, value) -> null : annotationValueReader;
+        this.annotationValueReader = annotationValueReader == null ? (type, value, foreign) -> null
+                : annotationValueReader;
         this.vocabularyDefinitions = Objects.requireNonNull(vocabularyDefinitions, "vocabularyDefinitions");
         this.namespaceDefinitions = Objects.requireNonNull(namespaceDefinitions, "namespaceDefinitions");
         this.applicationCloser = applicationCloser;
@@ -485,15 +486,9 @@ final class DefinitionResolver {
         if (vocabularyDefinitions.definition(annotationName) == null) {
             return null;
         }
-        Optional<Extern> extern = Externs.terminal(annotationName, vocabularyDefinitions::definition);
-        if (extern.isPresent()) {
-            // Admitted, the value read by the foreign type in its own schema's scope (§6, §7.9): not built yet.
-            throw new UnsupportedOperationException("'" + declaration + "': '@" + annotationName + "' is "
-                    + Externs.describe(extern.get()) + ", and reading an annotation's value through an extern, in "
-                    + "its own schema's scope, is not implemented yet ([TSON-SCHEMA] §7.9)");
-        }
+        boolean foreign = Externs.terminal(annotationName, vocabularyDefinitions::definition).isPresent();
         try {
-            return annotationValueReader.read(annotationName, value);
+            return annotationValueReader.read(annotationName, value, foreign);
         } catch (ReadException e) {
             // Same split as bindAtomInstance, for the same reason: an annotation value that does not conform
             // to the type its name refers to (§6) is the author's error, and relabelling it a coverage gap

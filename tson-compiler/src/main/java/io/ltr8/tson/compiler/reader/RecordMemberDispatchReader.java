@@ -229,10 +229,13 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
                 return found;
             }
             String selector = selectorNames.get(nameForm.apply(field.name()));
+            // Past the selector's own annotations and tag, which a tree writer states: the member's field reads
+            // and judges them.
+            EventSkip.annotationsAndTypeRef(ctx);
             if (selector != null && ctx.peek() instanceof TokenEvent token) {
                 found.putIfAbsent(selector, token);
             }
-            EventSkip.dataValue(ctx);
+            EventSkip.coreValue(ctx);
         }
         return found;
     }

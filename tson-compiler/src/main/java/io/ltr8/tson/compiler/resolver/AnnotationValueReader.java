@@ -17,9 +17,12 @@ import io.ltr8.tson.compiler.ast.DataValue;
  *
  * <p>A resolver with no compiled reader to offer supplies one that returns {@code null}, which the caller
  * treats as "value out of reach" and keeps the annotation's name alone.
+ *
+ * <p>{@code foreign} is true where {@code type} is an extern: the value is a foreign value ([TSON-SCHEMA] §5.13,
+ * §7.9), read as a tree, since one bind context cannot tell the foreign schema's names from this one's.
  */
 @FunctionalInterface
 interface AnnotationValueReader {
 
-    Object read(String type, DataValue value);
+    Object read(String type, DataValue value, boolean foreign);
 }

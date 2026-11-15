@@ -408,7 +408,7 @@ public final class SchemaResolver {
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary. Its value is
                 // as opaque to the linker as a value entry's, so it is read under the policy too.
-                (type, value) -> vocabulary.annotation(type, value, names, heldByName),
+                (type, value, foreign) -> vocabulary.annotation(type, value, names, heldByName, foreign),
                 heads, waitOrder, new ApplicationCloser() {
 
                     /** An operand absorbed by value gets the same bound check an application closing does. */
@@ -1073,13 +1073,16 @@ public final class SchemaResolver {
                     heldByName, false, waits));
         }
 
-        /** An annotation's value, read against the type {@code name} under {@code names}. */
+        /**
+         * An annotation's value, read against the type {@code name} under {@code names}: bound, or as a tree where
+         * {@code foreign}, {@code name} being an extern.
+         */
         Object annotation(String name, io.ltr8.tson.compiler.ast.DataValue value, IdentifierPolicy names,
-                          Map<Object, HeldInBody> heldByName) {
+                          Map<Object, HeldInBody> heldByName, boolean foreign) {
             if (self != null) {
                 return read(self.get(name), value, names, heldByName, false);
             }
-            return atCheckpoint(name, false,
+            return atCheckpoint(name, foreign,
                     (readers, waits) -> read(readers.get(name), value, names, heldByName, false, waits));
         }
 

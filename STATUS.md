@@ -134,10 +134,13 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       required field absent, refined by fields it has not written and completed by `!X { … }`, `!X value` or `X<…>`
       into the plain construction; refused wherever a type is named, imported like any entry, and left out of the
       resolved form. An array or a map type refines by its facets' kinds, `!tags ^ { min_items: 2 }` (§5.7)
-- [x] Externs, the schema side (Part 2 §5.13, proposed for Revision 40) — `order_v1 => !meta.extern { schema: …
-      type: order }` names one entry of another schema, whose schema loads with the imports and none of whose names
-      enter the namespace; judged through the hop by the foreign entry's identity, and sealed. Reading a value
-      through one is not built yet: it reports `NOT_IMPLEMENTED`
+- [x] Externs (Part 2 §5.13, §7.9, proposed for Revision 40) — `order_v1 => !meta.extern { schema: … type: order }`
+      names one entry of another schema, whose schema loads with the imports and none of whose names enter the
+      namespace; judged through the hop by the foreign entry's identity, and sealed. A value through one is read in
+      TSON text, in tree mode, by the foreign schema's own compiled reader: the tag and the annotations in front of it
+      in the enclosing scope, every name inside in the foreign schema's, at every position a type's name stands, the
+      root and an annotation's value included, and scopes nest. Binding one, and reading one in JSON, report
+      `NOT_IMPLEMENTED`
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
       reads against real TSON data documents (see the README's [Schema pipeline](README.md#schema-pipeline))

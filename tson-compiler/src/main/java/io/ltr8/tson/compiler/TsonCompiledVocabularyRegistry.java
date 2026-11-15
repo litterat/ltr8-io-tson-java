@@ -97,6 +97,21 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     // no hash for the identity and silently verifies nothing, which is §10.2's MUST quietly skipped.
     private final Map<String, String> contentHashes = new ConcurrentHashMap<>();
 
+    /** Each schema a foreign value is read in, compiled in tree mode once for every checkpoint ({@link #foreign}). */
+    private final Map<String, TsonCompiledSchema> foreignTrees = new ConcurrentHashMap<>();
+
+    private final TsonSchemaCompiler.ForeignSchemas foreignTreeSchemas = new TsonSchemaCompiler.ForeignSchemas() {
+        @Override
+        public TsonCompiledSchema compiled(TsonLinkedSchema linked) {
+            return foreign(linked);
+        }
+
+        @Override
+        public Optional<TsonCompiledSchema> compiled(String identity) {
+            return schemaRegistry.getByCanonicalIdentity(identity).map(TsonCompiledVocabularyRegistry.this::foreign);
+        }
+    };
+
     /**
      * Recorded for an identity whose document cannot be content-addressed at all -- no line terminator
      * after its id line, so §2.2.1's hash input has no boundary. Never a hash (which is 64 hex digits), so
@@ -244,8 +259,24 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     @Override
     public TsonCompiledSchema compileReady(TsonSchema ready, Set<String> pending, boolean tree) {
         TsonLinkedSchema linked = TsonSchemaLinker.linkReady(ready, schemaRegistry, pending);
-        return tree ? TsonSchemaCompiler.compileReady(linked, ValueReaderFactoryRegistry.tree(), pending)
+        return tree ? TsonSchemaCompiler.compileReady(linked, ValueReaderFactoryRegistry.tree(), pending, foreignTreeSchemas)
                 : TsonCompiledVocabulary.compileReady(linked, resolver, pending);
+    }
+
+    /**
+     * A schema an extern names, compiled in tree mode for a checkpoint's read through the extern ([TSON-SCHEMA]
+     * §7.9), once per identity: every checkpoint of every resolution shares it.
+     */
+    private TsonCompiledSchema foreign(TsonLinkedSchema linked) {
+        String identity = CanonicalIdentity.canonicalize(linked.schema().id());
+        TsonCompiledSchema cached = foreignTrees.get(identity);
+        if (cached != null) {
+            return cached;
+        }
+        TsonCompiledSchema fresh = TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.tree(),
+                foreignTreeSchemas);
+        TsonCompiledSchema raced = foreignTrees.putIfAbsent(identity, fresh);
+        return raced != null ? raced : fresh;
     }
 
     /**

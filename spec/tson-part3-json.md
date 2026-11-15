@@ -606,7 +606,7 @@ An `$import` at a declared position is a resolver error, as at every position bu
 
 A value at a position typed by an extern ([TSON-SCHEMA] §5.13) is a foreign value, read on [TSON-SCHEMA] §7.9's terms: its body under the foreign schema, and the type written in front of it in the scope that holds it. In text the two are apart, the tag before the value and the body inside it; in JSON one object carries both, so this section says which is which:
 
-- **The boundary's `$type` is the annotation object's own.** The `$type` that leads the object at the extern position, or its wrapper, resolves in the enclosing scope: it names the extern, or an extern whose target IS-A the position's target. A name of the foreign schema is unresolvable there, as it is in text.
+- **The boundary's `$type` is the annotation object's own.** The `$type` that leads the object at the extern position, or its wrapper, resolves in the enclosing scope: it names the extern, or a name of the enclosing scope admitted there as [TSON-SCHEMA] §7.9 admits a tag. A name of the foreign schema is unresolvable there, as it is in text.
 - **Every other name in the value is the foreign schema's.** The `$type` of every annotation object nested in the value — inside `$value`, in wrapper form — resolves in the foreign schema's namespace, and so does a name at a reference-typed position and the type a value names at a declared position inside it (§8.5). Member names are matched against the target's fields as at any record position (§6.1), and the selectors of a member-dispatched target are the foreign schema's, read as §6.1.5 reads them.
 
 ```json
