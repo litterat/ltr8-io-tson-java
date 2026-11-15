@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.unicode.Normalization;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -56,16 +57,27 @@ import java.util.Optional;
  * name_type} is not the kernel's {@code meta.field_name} ([TSON-SCHEMA] §5.2), with the value that type
  * resolves to, by which its readers judge the field names a document writes. A record not listed has
  * identifiers for field names.
-
+ *
+ * <p><b>{@code externs} is the fourth</b>: each extern of the namespace ([TSON-SCHEMA] §5.13) with the entry it lands
+ * on in its foreign schema, which only a link holding that schema can find. Carried through {@code !!import}, an
+ * imported extern attached where its own schema linked.
  */
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
-                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
+                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes,
+                               Map<String, ExternTarget> externs) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
         entryOrigins = Map.copyOf(entryOrigins);
         enumForms = Map.copyOf(enumForms);
         nameTypes = Map.copyOf(nameTypes);
+        externs = Map.copyOf(externs);
+    }
+
+    /** A schema whose namespace holds no extern. */
+    public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
+                            Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
+        this(schema, entryOrigins, enumForms, nameTypes, Map.of());
     }
 
     /** A schema whose records all have the kernel's identifiers for field names. */
@@ -85,6 +97,18 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      */
     public TsonLinkedSchema(TsonSchema schema) {
         this(schema, Map.of());
+    }
+
+    /**
+     * The canonical identities of the schemas this schema's own externs name, in declaration order, each once: its
+     * dependencies beside its {@code !!import}s, none of whose names enters its namespace ([TSON-SCHEMA] §3.4.1).
+     */
+    public List<String> externSchemas() {
+        String own = CanonicalIdentity.canonicalize(schema.id());
+        return schema.entries().keySet().stream()
+                .filter(name -> externs.containsKey(name) && originOf(name).equals(own))
+                .map(name -> externs.get(name).schema())
+                .distinct().toList();
     }
 
     /** The form enum {@code entryName} matches its members in -- {@code NONE} for one {@link #enumForms} omits. */

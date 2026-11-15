@@ -149,6 +149,8 @@ public enum DiscriminationClass {
             case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
             case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
             case Alias ignored -> Optional.empty();
+            // Classified at its landing, in the foreign namespace, by a caller holding the link (ExternHops).
+            case io.ltr8.tson.schema.meta.Extern ignored -> Optional.empty();
             case ValueEntry ignored -> Optional.empty();
             case io.ltr8.tson.schema.meta.IncompleteEntry ignored -> Optional.empty(); // no type, refused at link
         };

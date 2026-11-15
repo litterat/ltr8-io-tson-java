@@ -117,6 +117,8 @@ final class TypeInhabitance {
             // referent only the linker judges.
             case RefBody reference -> !reference.namesTypes() || !reference.memberNames().isEmpty();
             case Alias alias -> refInhabited(alias.target(), namespace, inhabited);
+            // What it lands on was judged inhabited where the schema declaring it linked.
+            case io.ltr8.tson.schema.meta.Extern ignored -> true;
 
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
@@ -345,6 +347,7 @@ final class TypeInhabitance {
                     .filter(java.util.Objects::nonNull).findFirst().orElse(null);
             case Alias alias -> refInhabited(alias.target(), namespace, inhabited)
                     ? null : alias.target().name();
+            case io.ltr8.tson.schema.meta.Extern ignored -> null;
             // A choice fails on every variant at once, so no single link continues the chain; the rest name none.
             case Sum ignored -> null;
             case Atom ignored -> null;

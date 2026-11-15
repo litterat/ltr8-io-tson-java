@@ -19,6 +19,8 @@ import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Extern;
+import io.ltr8.tson.compiler.resolver.Externs;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.ValueRef;
@@ -106,16 +108,16 @@ final class ValuesByName {
      *               record value through; {@code null} where the link was given none
      */
     ValuesByName(TsonSchema schema, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                 Map<String, String> origins, DataBindContext values) {
+                 Map<String, String> origins, DataBindContext values, ExternHops hops) {
         this.merged = merged;
         this.facts = facts;
         String ownIdentity = CanonicalIdentity.canonicalize(schema.id());
-        this.space = new Space(merged, name -> origins.getOrDefault(name, ownIdentity));
+        this.space = new Space(merged, name -> origins.getOrDefault(name, ownIdentity), hops);
         this.values = values;
     }
 
-    /** The schema's one namespace: its entries, and where each was declared. */
-    private record Space(Map<String, Top> entries, Function<String, String> originOf) {
+    /** The schema's one namespace: its entries, where each was declared, and where its externs land. */
+    private record Space(Map<String, Top> entries, Function<String, String> originOf, ExternHops hops) {
 
         /** Whether {@code name} is a constructor, IS-A the kernel's {@code top} ({@link EntryKind#isConstructor}). */
         boolean isConstructor(String name, Top value) {
@@ -159,8 +161,7 @@ final class ValuesByName {
             if (inline.isPresent()) {
                 return "#" + name;
             }
-            String terminal = terminal();
-            return space.originOf().apply(terminal) + "#" + terminal;
+            return space.hops().identity(name);
         }
 
         Top body() {
@@ -265,6 +266,16 @@ final class ValuesByName {
                     + "' reaches no entry");
         }
         String entry = terminal.equals(head) ? "'" + head + "'" : "'" + head + "' (an alias of '" + terminal + "')";
+        if (referent instanceof Extern extern && segments.size() > 1) {
+            throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is "
+                    + Externs.describe(extern) + ": no name walks through an extern into another schema's namespace, "
+                    + "so '" + segments.get(1) + "' selects nothing ([TSON-SCHEMA] §5.12, §5.13)");
+        }
+        if (referent instanceof Extern extern && !namesTypes) {
+            throw new SchemaValidationException(where + " wants " + a(slot.of()) + ", and " + entry + " is "
+                    + Externs.describe(extern) + ", a type and no value -- a slot over '" + slot.of() + "' holds the "
+                    + "name of a value ([TSON-SCHEMA] §5.12)");
+        }
         if (OpenEntry.isOpen(referent)) {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is an open "
                     + "entry: a template denotes no value until it is applied (§5.10), so nothing is there to name");
@@ -372,9 +383,9 @@ final class ValuesByName {
             throw new SchemaValidationException(wants + "'" + name + "' goes on past " + entry + ", a type, which "
                     + "admits no further segment");
         }
-        if (KindMembers.isMember(name, slot.of(), merged::get,
-                named -> TsonSchemaLinker.constructorOf(named, merged.get(named), facts),
-                merged::get)) {
+        if (space.hops().membership(name, slot.of()).orElseGet(() -> KindMembers.isMember(name, slot.of(),
+                merged::get, named -> TsonSchemaLinker.constructorOf(named, merged.get(named), facts),
+                merged::get))) {
             return;
         }
         if (referent instanceof ValueEntry value) {

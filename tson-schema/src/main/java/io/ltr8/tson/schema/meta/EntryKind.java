@@ -11,6 +11,12 @@ public enum EntryKind {
     ATOM, PRODUCT, SUM, ALIAS,
 
     /**
+     * An extern ({@link Extern}): a hop into another schema's namespace, whose far end's kind is that schema's to
+     * state, so no kind of this one holds it.
+     */
+    EXTERN,
+
+    /**
      * A value entry ({@link ValueEntry}): an instance of an ordinary type, {@code orders => !api { ... }}. It is
      * no type, and no kind holds it.
      */
@@ -40,6 +46,7 @@ public enum EntryKind {
             case ApplyBody application -> throw new IllegalStateException("the application '" + application.text()
                     + "' has no kind: it stands only inside an open record, written in place, and is no entry's value");
             case Alias ignored -> ALIAS;
+            case Extern ignored -> EXTERN;
 
             case ValueEntry ignored -> VALUE;
             case IncompleteEntry ignored -> INCOMPLETE;

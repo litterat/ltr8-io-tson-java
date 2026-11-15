@@ -105,6 +105,8 @@ public final class TypeSlots {
             case ChoiceBody choice -> new ChoiceBody(choice.chain(),
                     choice.variants().stream().map(variant -> map(variant, rewrite)).toList(), choice.disjoint());
             case Alias alias -> new Alias(rewrite.atName(alias.target()));
+            // `type` is a name of the foreign namespace, which no rewrite of this one's names touches.
+            case Extern extern -> extern;
             // `of` holds a name ([TSON-SCHEMA] §4.2); the index is carried, derived at link.
             case RefBody reference -> new RefBody(reference.chain(), rewrite.atName(reference.of()),
                     reference.index());

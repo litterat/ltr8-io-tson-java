@@ -4,6 +4,7 @@ import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.OpenEntry;
 
 import io.ltr8.tson.schema.meta.Top;
@@ -104,8 +105,9 @@ public final class KindMembers {
     public static boolean isMember(Top type, String head, String of, Function<String, Top> local,
                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
-        if (type == null || OpenEntry.isOpen(type) || type instanceof Alias || type instanceof ValueEntry
-                || type instanceof IncompleteEntry) {
+        // An extern is a member where the entry it lands on is, which only a caller holding the link can judge.
+        if (type == null || OpenEntry.isOpen(type) || type instanceof Alias || type instanceof Extern
+                || type instanceof ValueEntry || type instanceof IncompleteEntry) {
             return false;
         }
         String constructorOf = AliasChain.terminal(of, constructors);

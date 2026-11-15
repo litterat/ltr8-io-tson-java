@@ -63,7 +63,9 @@ import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.compiler.resolver.AliasChain;
+import io.ltr8.tson.compiler.resolver.Externs;
 import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.unicode.RegexType;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.temporal.TimeType;
@@ -665,8 +667,10 @@ public final class TsonSchemaLinker {
         // it, a local one's as this schema's resolution wrote it. What a message shows for an entry with no
         // source position.
         Map<String, ApplyBody> applications = new LinkedHashMap<>();
+        // Each extern of the namespace with the foreign entry it lands on: an import's as its own link attached it.
+        Map<String, ExternTarget> externs = new LinkedHashMap<>();
         Map<String, Top> merged = mergeImports(schema, loader, origins, enumForms, nameTypes, facts,
-                applications);
+                applications, externs);
         schema.entries().keySet().forEach(name -> schema.applicationOf(name)
                 .ifPresent(application -> applications.put(name, application)));
 
@@ -694,6 +698,9 @@ public final class TsonSchemaLinker {
             localNames.add(entry.getKey());
         }
 
+        attachExterns(schema, merged, localNames, loader, facts, externs, receiver);
+        ExternHops hops = new ExternHops(merged::get, name -> origins.getOrDefault(name, localIdentity(schema)),
+                externs);
         merged = computeSubtypes(merged, localNames);
         // Only here, with the closure whole, can an enum's name type be followed to the entry its constructor pinned.
         for (String name : localNames) {
@@ -708,7 +715,7 @@ public final class TsonSchemaLinker {
         AtomicReference<Map<String, Top>> closure = new AtomicReference<>(Map.of());
         // And a name read under a reference that names values reaches a value of that final namespace.
         AtomicReference<ValuesByName> reached = new AtomicReference<>();
-        merged = computeKinds(merged, facts, merged::get, pending, reached, new java.util.AbstractMap<>() {
+        merged = computeKinds(merged, facts, merged::get, pending, reached, hops, new java.util.AbstractMap<>() {
             @Override
             public Top get(Object name) {
                 return closure.get().get(name);
@@ -719,7 +726,7 @@ public final class TsonSchemaLinker {
                 return closure.get().entrySet();
             }
         });
-        merged = computeDisjointness(merged, pending);
+        merged = computeDisjointness(merged, pending, hops);
         // Before the name checks: a member that is not a value of its enum's name type is the more basic verdict,
         // and the per-name rules would otherwise report it as a restricted character.
         Set<String> refusedEnums = checkEnumTypes(schema, merged, facts, localNames, merged::get,
@@ -738,7 +745,7 @@ public final class TsonSchemaLinker {
         Set<String> blamedOnce = new LinkedHashSet<>();
         Map<String, Top> namespace = merged;
         Function<String, Optional<String>> constructors = name -> constructorOf(name, namespace.get(name), facts);
-        ValuesByName byName = new ValuesByName(schema, merged, facts, origins, values);
+        ValuesByName byName = new ValuesByName(schema, merged, facts, origins, values, hops);
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             if (entry.getValue() instanceof IncompleteEntry && !localNames.contains(entry.getKey())) {
                 continue; // its names were judged when its own schema linked, in a closure inside this one
@@ -747,7 +754,8 @@ public final class TsonSchemaLinker {
                 // Named by what the author wrote: its declared name, or the form or application an entry with no
                 // source position records.
                 validateEntry(displayName(entry.getKey(), merged, facts, applications), entry.getValue(),
-                        merged, constructors, other -> displayName(other, namespace, facts, applications), byName);
+                        merged, constructors, other -> displayName(other, namespace, facts, applications), byName,
+                        hops);
             } catch (UnsupportedOperationException gap) {
                 // A field's value naming a value through a step this library does not yet follow: the gap it is.
                 if (receiver == null) {
@@ -776,7 +784,7 @@ public final class TsonSchemaLinker {
             }
         }
 
-        checkValuesByName(schema, merged, facts, origins, localNames, values, receiver);
+        checkValuesByName(schema, merged, facts, origins, localNames, values, hops, receiver);
         checkEveryEntryIsInhabited(schema, merged, facts, applications, localNames, receiver);
         checkRecordExtension(schema, merged, facts, applications, localNames, origins, enumForms, receiver);
 
@@ -784,14 +792,103 @@ public final class TsonSchemaLinker {
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
         checkTaggedVariantsAreNamed(schema, annotated, facts, localNames, receiver);
         closure.set(annotated);
-        reached.set(new ValuesByName(schema, annotated, facts, origins, values));
+        reached.set(new ValuesByName(schema, annotated, facts, origins, values, hops));
 
         TsonLinkedSchema linked = new TsonLinkedSchema(new TsonSchema(schema.id(), schema.imports(), annotated,
-                schema.bootstrap(), schema.valuesByName(), schema.heldValues(), facts), origins, enumForms, nameTypes);
+                schema.bootstrap(), schema.valuesByName(), schema.heldValues(), facts), origins, enumForms, nameTypes,
+                externs);
         if (pending.isEmpty() && (counted == null || !counted.reported()) && HeldValues.anyHeld(schema, localNames)) {
-            checkHeldValues(linked, merged, facts, origins, localNames, identifiers, values, receiver);
+            checkHeldValues(linked, merged, facts, origins, localNames, identifiers, values, hops, receiver);
         }
         return linked;
+    }
+
+    /**
+     * Each local extern attached to the entry it lands on in its schema's namespace ([TSON-SCHEMA] §5.13), that
+     * schema registered by the resolution that read this one. An extern names a type a value can have, anywhere in
+     * its schema's closure; anything else is refused against the extern, naming the foreign entry, and stays
+     * unattached, a use of it then landing nowhere.
+     */
+    private static void attachExterns(TsonSchema schema, Map<String, Top> merged, Set<String> localNames,
+                                      TsonSchemaLoader loader, Map<String, TsonSchema.EntryFacts> facts,
+                                      Map<String, ExternTarget> externs, DiagnosticsReceiver receiver) {
+        for (String name : localNames) {
+            if (!(merged.get(name) instanceof Extern extern)) {
+                continue;
+            }
+            String identity;
+            try {
+                identity = CanonicalIdentity.canonicalize(extern.schema());
+            } catch (SchemaValidationException notAnIdentity) {
+                report(receiver, schema, name, at(facts, name), "'" + name + "' is " + Externs.describe(extern)
+                        + ", whose schema is no identity -- " + notAnIdentity.getMessage());
+                continue;
+            }
+            Optional<TsonLinkedSchema> foreign = loader == null ? Optional.empty() : loader.load(identity);
+            if (foreign.isEmpty()) {
+                report(receiver, schema, name, at(facts, name), "'" + name + "' is " + Externs.describe(extern)
+                        + ", whose schema is not loaded -- an extern's schema loads with the imports of the "
+                        + "schema declaring it ([TSON-SCHEMA] §3.4.1, §5.13)");
+                continue;
+            }
+            ExternTarget target = new ExternTarget(foreign.get(), extern.type());
+            Optional<String> refusal = externRefusal(target);
+            if (refusal.isPresent()) {
+                report(receiver, schema, name, at(facts, name), "'" + name + "' is " + Externs.describe(extern)
+                        + ", which " + refusal.get() + " -- an extern names a type a value can have, declared "
+                        + "anywhere in its schema's closure ([TSON-SCHEMA] §5.13)");
+                continue;
+            }
+            externs.put(name, target);
+        }
+    }
+
+    /** Why the foreign entry {@code target} names is no type an extern may name, or empty where it is one. */
+    private static Optional<String> externRefusal(ExternTarget target) {
+        TsonLinkedSchema foreign = target.foreign();
+        Function<String, Top> there = foreign.schema().entries()::get;
+        String name = target.type();
+        Top definition = there.apply(name);
+        if (definition == null) {
+            return Optional.of("that schema's closure does not hold");
+        }
+        if (definition instanceof Extern) {
+            return foreign.externs().containsKey(name) ? Optional.empty()
+                    : Optional.of("is an extern that schema's link refused");
+        }
+        Optional<String> what = noType(name, definition, foreign);
+        if (what.isPresent() || !(definition instanceof Alias)) {
+            return what.map(reason -> reason);
+        }
+        String terminal = AliasChain.terminal(name, there);
+        Top end = there.apply(terminal);
+        if (end instanceof Extern) {
+            return foreign.externs().containsKey(terminal) ? Optional.empty()
+                    : Optional.of("is an alias of '" + terminal + "', an extern that schema's link refused");
+        }
+        return (end == null ? Optional.of("names nothing") : noType(terminal, end, foreign))
+                .map(reason -> "is an alias of '" + terminal + "', which " + reason);
+    }
+
+    /** What makes the foreign entry {@code name} no type a value can have, or empty where it is one. */
+    private static Optional<String> noType(String name, Top definition, TsonLinkedSchema foreign) {
+        if (SchemaPaths.isNestedMap(definition)) {
+            return Optional.of("is a schema map, and an extern names one type");
+        }
+        if (definition instanceof ValueEntry) {
+            return Optional.of("is a value entry, which is a value and no type");
+        }
+        if (definition instanceof IncompleteEntry) {
+            return Optional.of("is an incomplete entry, which is no type until it is completed");
+        }
+        if (OpenEntry.isOpen(definition)) {
+            return Optional.of("is an open record, which denotes no type until it is applied (§5.10)");
+        }
+        if (foreign.isConstructor(name, definition)) {
+            return Optional.of("is a constructor, whose values are types and which an extern can neither apply "
+                    + "nor extend");
+        }
+        return Optional.empty();
     }
 
     /**
@@ -804,9 +901,9 @@ public final class TsonSchemaLinker {
     private static void checkHeldValues(TsonLinkedSchema linked, Map<String, Top> merged,
                                         Map<String, TsonSchema.EntryFacts> facts, Map<String, String> origins,
                                         Set<String> localNames, IdentifierPolicy identifiers,
-                                        DataBindContext values, DiagnosticsReceiver receiver) {
+                                        DataBindContext values, ExternHops hops, DiagnosticsReceiver receiver) {
         TsonSchema schema = linked.schema();
-        ValuesByName names = new ValuesByName(schema, merged, facts, origins, values);
+        ValuesByName names = new ValuesByName(schema, merged, facts, origins, values, hops);
         HeldValues held = new HeldValues(linked, merged, identifiers);
         for (String name : localNames) {
             held.check(name, names,
@@ -834,9 +931,9 @@ public final class TsonSchemaLinker {
     private static void checkValuesByName(TsonSchema schema, Map<String, Top> merged,
                                           Map<String, TsonSchema.EntryFacts> facts,
                                           Map<String, String> origins, Set<String> localNames,
-                                          DataBindContext values,
+                                          DataBindContext values, ExternHops hops,
                                           DiagnosticsReceiver receiver) {
-        ValuesByName judged = new ValuesByName(schema, merged, facts, origins, values);
+        ValuesByName judged = new ValuesByName(schema, merged, facts, origins, values, hops);
         for (String name : localNames) {
             Top definition = merged.get(name);
             List<TsonSchema.ValueByName> held = schema.valuesByName().get(name);
@@ -1157,17 +1254,18 @@ public final class TsonSchemaLinker {
      * kernel's hand-built {@code meta.type_expr} is read against before {@code meta.type_inline} is ready, and states
      * the fact its {@code @meta.disjoint} asserts.
      */
-    private static Map<String, Top> computeDisjointness(Map<String, Top> merged, Set<String> pending) {
+    private static Map<String, Top> computeDisjointness(Map<String, Top> merged, Set<String> pending,
+                                                        ExternHops hops) {
         Map<String, Top> result = new LinkedHashMap<>(merged);
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             Top value = mapInline(entry.getValue(), body -> body instanceof ChoiceBody inline
                     ? new ChoiceBody(inline.chain(), inline.variants(),
-                            Optional.of(ChoiceDisjointness.derive(inline, merged)))
+                            Optional.of(ChoiceDisjointness.derive(inline, merged, hops)))
                     : body);
             if (value instanceof ChoiceBody choice && choice.variants().stream()
                     .noneMatch(variant -> variant instanceof TypeRef reference && pending.contains(reference.name()))) {
                 value = new ChoiceBody(choice.chain(), choice.variants(),
-                        Optional.of(ChoiceDisjointness.derive(choice, merged)));
+                        Optional.of(ChoiceDisjointness.derive(choice, merged, hops)));
             }
             if (value != entry.getValue()) {
                 result.put(entry.getKey(), value);
@@ -1243,15 +1341,16 @@ public final class TsonSchemaLinker {
      */
     private static Map<String, Top> computeKinds(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
                                                  Function<String, Top> structure, Set<String> pending,
-                                                 AtomicReference<ValuesByName> reached, Map<String, Top> entries) {
+                                                 AtomicReference<ValuesByName> reached, ExternHops hops,
+                                                 Map<String, Top> entries) {
         Map<String, Top> result = null;
         // A reference written in place is linked as an entry's is, at the slot that holds it.
         UnaryOperator<io.ltr8.tson.schema.meta.Type> link = body -> body instanceof RefBody reference
-                ? linkReference(reference, merged, facts, structure, pending, reached, entries) : body;
+                ? linkReference(reference, merged, facts, structure, pending, reached, hops, entries) : body;
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             Top value = mapInline(entry.getValue(), link);
             if (value instanceof RefBody reference) {
-                value = linkReference(reference, merged, facts, structure, pending, reached, entries);
+                value = linkReference(reference, merged, facts, structure, pending, reached, hops, entries);
             }
             if (value != entry.getValue()) {
                 if (result == null) {
@@ -1267,10 +1366,15 @@ public final class TsonSchemaLinker {
     private static RefBody linkReference(RefBody reference, Map<String, Top> merged,
                                          Map<String, TsonSchema.EntryFacts> facts, Function<String, Top> structure,
                                          Set<String> pending, AtomicReference<ValuesByName> reached,
-                                         Map<String, Top> entries) {
+                                         ExternHops hops, Map<String, Top> entries) {
         boolean namesTypes = KindMembers.namesTypes(reference.of().name(), structure);
         List<String> members = namesTypes ? KindMembers.of(reference, merged,
                 name -> constructorOf(name, merged.get(name), facts), structure) : List.of();
+        if (namesTypes && hops.any()) {
+            // An extern is a member where the entry it lands on is, judged in the namespace holding that entry.
+            members = java.util.stream.Stream.concat(members.stream(), merged.keySet().stream()
+                    .filter(name -> hops.membership(name, reference.of().name()).orElse(false))).distinct().toList();
+        }
         // A message lists the members by name, before the pending ones a partial link adds.
         List<String> shown = members;
         if (namesTypes && !pending.isEmpty()) {
@@ -1320,7 +1424,8 @@ public final class TsonSchemaLinker {
                                                  Map<String, Normalization> enumForms,
                                                  Map<String, Top> nameTypes,
                                                  Map<String, TsonSchema.EntryFacts> facts,
-                                                 Map<String, ApplyBody> applications) {
+                                                 Map<String, ApplyBody> applications,
+                                                 Map<String, ExternTarget> externs) {
         Map<String, Top> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : importer.namespaceSources()) {
@@ -1365,6 +1470,7 @@ public final class TsonSchemaLinker {
                     enumForms.put(name, form);
                 }
                 imported.nameType(name).ifPresent(type -> nameTypes.put(name, type));
+                Optional.ofNullable(imported.externs().get(name)).ifPresent(target -> externs.put(name, target));
             }
         }
         return merged;
@@ -1389,7 +1495,7 @@ public final class TsonSchemaLinker {
 
     private static void validateEntry(String name, Top def, Map<String, Top> namespace,
                                        Function<String, Optional<String>> constructors,
-                                       Function<String, String> shown, ValuesByName byName) {
+                                       Function<String, String> shown, ValuesByName byName, ExternHops hops) {
         checkOpenEntryUsesEveryParameter(name, def);
         // Every name on a chain is in the one namespace, the defining schema's closure being inside the
         // importer's (§2.2.3).
@@ -1403,12 +1509,12 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def, namespace, constructors, shown, byName);
+        validateBody(name, def, namespace, constructors, shown, byName, hops);
     }
 
     private static void validateBody(String entryName, Top body, Map<String, Top> namespace,
                                       Function<String, Optional<String>> constructors, Function<String, String> shown,
-                                      ValuesByName byName) {
+                                      ValuesByName byName, ExternHops hops) {
         if (OpenEntry.isOpen(body)) {
             // An open record's references are judged by what they resolve to once substitution supplies the
             // arguments, so type-kind validation and inhabitance apply to its applications instead, where the whole
@@ -1430,9 +1536,9 @@ public final class TsonSchemaLinker {
                 for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
                     if (field.getValue().ownType().isPresent()) {
                         validateSlot(field.getValue().ownType().get(), namespace, constructors, entryName,
-                                " field '" + field.getKey() + "'", shown, byName);
+                                " field '" + field.getKey() + "'", shown, byName, hops);
                         checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors,
-                                byName);
+                                byName, hops);
                     }
                 }
                 for (FieldGroup group : r.groups()) {
@@ -1443,7 +1549,7 @@ public final class TsonSchemaLinker {
                         }
                     }
                 }
-                checkRestatedFieldTypes(entryName, r, namespace, shown);
+                checkRestatedFieldTypes(entryName, r, namespace, shown, hops);
             }
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
             // An alias naming a template bare names the template under another name (`ref_of => ref`),
@@ -1454,33 +1560,37 @@ public final class TsonSchemaLinker {
                 }
             }
             case Alias ref -> validateTypeRef(ref.target(), namespace, null,
-                    entryName, "");
+                    entryName, "", hops);
+            // What it names was judged where it was attached, in the namespace holding it (attachExterns).
+            case Extern ignored -> {
+            }
             case MapBody m -> {
                 validateTypeRef(m.keyType(), namespace, constructors, entryName,
-                        " key_type");
-                validateSlot(m.valueType(), namespace, constructors, entryName, " value_type", shown, byName);
+                        " key_type", hops);
+                validateSlot(m.valueType(), namespace, constructors, entryName, " value_type", shown, byName,
+                        hops);
             }
             case NamespaceBody n -> {
                 TypeRef key = n.keyType();
-                validateTypeRef(key, namespace, constructors, entryName, " key_type");
+                validateTypeRef(key, namespace, constructors, entryName, " key_type", hops);
                 // A namespace's keys are names: `key_type` is typed meta.identifier_ref (§4.1, §7.4).
                 if (constructors != null && namespace.containsKey(IDENTIFIER_TYPE)
-                        && !KindMembers.isMember(key.name(), IDENTIFIER_TYPE, namespace::get, constructors,
-                                namespace::get)) {
+                        && !isMember(key.name(), IDENTIFIER_TYPE, namespace, constructors, hops)) {
                     throw new SchemaValidationException("'" + entryName + "' key_type names '" + key.name()
                             + "', which is no identifier family -- a namespace's keys are names, so its key type "
                             + "is a member of meta.identifier_ref, a type built with identifier_type; a closed set "
                             + "of names is an identifier family with members");
                 }
-                validateSlot(n.valueType(), namespace, constructors, entryName, " value_type", shown, byName);
+                validateSlot(n.valueType(), namespace, constructors, entryName, " value_type", shown, byName,
+                        hops);
             }
             case ArrayBody a -> validateSlot(a.elementType(), namespace, constructors, entryName, " element_type",
-                    shown, byName);
+                    shown, byName, hops);
             case TupleBody t -> {
                 int index = 0;
                 for (TupleElement element : t.elements()) {
                     validateSlot(element.elementType(), namespace, constructors, entryName,
-                            " element[" + index + "]", shown, byName);
+                            " element[" + index + "]", shown, byName, hops);
                     index++;
                 }
             }
@@ -1488,10 +1598,10 @@ public final class TsonSchemaLinker {
                 int index = 0;
                 for (TypeExpr variant : c.variants()) {
                     validateSlot(variant, namespace, constructors, entryName, " variant[" + index + "]", shown,
-                            byName);
+                            byName, hops);
                     index++;
                 }
-                checkVariantsAreDistinct(entryName, c, namespace);
+                checkVariantsAreDistinct(entryName, c, namespace, hops);
                 checkVariantsAreNotVoid(entryName, c, namespace);
             }
             // `of` resolves in the schema's one namespace and names any type or constructor ([TSON-SCHEMA] §4.2,
@@ -1505,7 +1615,7 @@ public final class TsonSchemaLinker {
                 KindMembers.ofRefusal(reference, namespace::get).ifPresent(refusal -> {
                     throw new SchemaValidationException("'" + entryName + "' is a reference, but " + refusal);
                 });
-                checkReferenceNarrows(entryName, reference, namespace);
+                checkReferenceNarrows(entryName, reference, namespace, hops);
             }
             case VoidType ignored -> {
             }
@@ -1590,7 +1700,7 @@ public final class TsonSchemaLinker {
             case ValueEntry ignored -> {
             }
             case IncompleteEntry incomplete -> validateHeld(entryName, incomplete, namespace, constructors, shown,
-                    byName);
+                    byName, hops);
         }
     }
 
@@ -1602,7 +1712,7 @@ public final class TsonSchemaLinker {
      */
     private static void validateHeld(String entryName, IncompleteEntry incomplete, Map<String, Top> namespace,
                                      Function<String, Optional<String>> constructors, Function<String, String> shown,
-                                     ValuesByName byName) {
+                                     ValuesByName byName, ExternHops hops) {
         if (!(namespace.get(incomplete.constructor()) instanceof RecordBody constructor)) {
             throw new IllegalStateException("'" + entryName + "' is an incomplete entry of '"
                     + incomplete.constructor() + "', which this schema's namespace holds no constructor for");
@@ -1615,13 +1725,12 @@ public final class TsonSchemaLinker {
             String trail = " " + field;
             switch (read) {
                 case TypeInline inline -> validateSlot(inline, namespace, constructors, entryName, trail, shown,
-                        byName);
+                        byName, hops);
                 case TypeRef name -> {
-                    validateTypeRef(name, namespace, constructors, entryName, trail);
+                    validateTypeRef(name, namespace, constructors, entryName, trail, hops);
                     Optional<String> kind = ConstructionSugar.kindOf(declared.name(), namespace::get);
                     if (constructors != null && kind.isPresent() && !TYPE.equals(kind.get())
-                            && !KindMembers.isMember(name.name(), kind.get(), namespace::get, constructors,
-                                    namespace::get)) {
+                            && !isMember(name.name(), kind.get(), namespace, constructors, hops)) {
                         throw new SchemaValidationException("'" + entryName + "'" + trail + " names '" + name.name()
                                 + "', which '" + declared.name() + "' does not admit");
                     }
@@ -1652,24 +1761,42 @@ public final class TsonSchemaLinker {
      * construction are two types, even a name for the construction written beside it ([TSON-SCHEMA] §8.2).
      */
     private static void checkVariantsAreDistinct(String entryName, ChoiceBody choice,
-                                                  Map<String, Top> namespace) {
-        // A type written in place is its own construction, compared by its body; a name by where its chain ends.
-        Map<TypeExpr, String> seen = new LinkedHashMap<>();
+                                                  Map<String, Top> namespace, ExternHops hops) {
+        // A type written in place is its own construction, compared by its body; a name by the identity of where its
+        // hops end, alias and extern alike, so an extern and an import of the entry it names are one variant.
+        Map<Object, String> seen = new LinkedHashMap<>();
         for (TypeExpr variant : choice.variants()) {
-            TypeExpr flattened = switch (variant) {
-                case TypeRef reference -> TypeRef.of(AliasChain.terminal(reference.name(), namespace));
+            Object identity = switch (variant) {
+                case TypeRef reference -> hops.identity(reference.name());
                 case TypeInline inline -> inline;
             };
-            String first = seen.putIfAbsent(flattened, variant.text());
+            String first = seen.putIfAbsent(identity, variant.text());
             if (first == null) {
                 continue;
             }
             throw new SchemaValidationException("'" + entryName + "' " + (first.equals(variant.text())
                     ? "lists the variant '" + variant.text() + "' twice"
-                    : "variants '" + first + "' and '" + variant.text() + "' both resolve to '"
-                            + flattened.text() + "'")
+                    : "variants '" + first + "' and '" + variant.text() + "' both resolve to "
+                            + resolvedTo((TypeRef) variant, namespace, hops))
                     + " -- §5.4 requires each variant to resolve to a distinct type");
         }
+    }
+
+    /** What a message says a name resolves to: its alias chain's end, or the foreign entry an extern lands on. */
+    private static String resolvedTo(TypeRef reference, Map<String, Top> namespace, ExternHops hops) {
+        return hops.landing(reference.name())
+                .map(end -> "'" + end.name() + "' of '" + end.declaringSchema() + "'")
+                .orElseGet(() -> "'" + AliasChain.terminal(reference.name(), namespace) + "'");
+    }
+
+    /**
+     * {@link KindMembers#isMember} over this namespace, an extern judged at the entry it lands on ({@link
+     * ExternHops#membership}).
+     */
+    private static boolean isMember(String name, String of, Map<String, Top> namespace,
+                                    Function<String, Optional<String>> constructors, ExternHops hops) {
+        return hops.membership(name, of)
+                .orElseGet(() -> KindMembers.isMember(name, of, namespace::get, constructors, namespace::get));
     }
 
     /**
@@ -1763,6 +1890,7 @@ public final class TsonSchemaLinker {
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Alias alias -> collectNames(alias.target(), into);
+            case Extern ignored -> { } // never open
             case Atom ignored -> { } // an atom body names no type
             case DeclaredType ignored -> { } // its variants are the closure's, named by no field
             case DependentBody ignored -> { } // it names a field of the enclosing record, never an entry
@@ -1812,6 +1940,7 @@ public final class TsonSchemaLinker {
             case Sum sum -> sum.coherenceCheck();
             case ApplyBody ignored -> List.of();
             case Alias ignored -> List.of();
+            case Extern ignored -> List.of(); // judged in the schema declaring what it lands on
             case ValueEntry ignored -> List.of();
             case IncompleteEntry ignored -> List.of(); // judged where it is completed
         };
@@ -1832,10 +1961,11 @@ public final class TsonSchemaLinker {
      * names {@code of} holds need be resolved, so the IS-A is asked here, over the one namespace both resolve in; the
      * source is the reference the refinement's chain names, past its alias hops.
      */
-    private static void checkReferenceNarrows(String entryName, RefBody reference, Map<String, Top> namespace) {
+    private static void checkReferenceNarrows(String entryName, RefBody reference, Map<String, Top> namespace,
+                                              ExternHops hops) {
         for (String supertype : TypeChain.supertypesOf(reference)) {
             if (namespace.get(AliasChain.terminal(supertype, namespace)) instanceof RefBody source) {
-                List<String> violations = source.ofNarrowing(reference, (sub, sup) -> isA(sub, sup, namespace));
+                List<String> violations = source.ofNarrowing(reference, (sub, sup) -> isA(sub, sup, namespace, hops));
                 if (!violations.isEmpty()) {
                     throw new SchemaValidationException("'" + entryName + "': not a valid refinement of '!"
                             + supertype + "' (§5.7): " + String.join("; ", violations));
@@ -1860,7 +1990,7 @@ public final class TsonSchemaLinker {
      * by an application not yet closed, or by a name no entry holds, is the reference checks' to report.
      */
     private static void checkRestatedFieldTypes(String entryName, RecordBody record, Map<String, Top> namespace,
-                                                Function<String, String> shown) {
+                                                Function<String, String> shown, ExternHops hops) {
         List<String> supertypes = TypeChain.supertypesOf(record);
         for (String supertype : supertypes) {
             boolean nearest = supertypes.stream().noneMatch(other -> !other.equals(supertype)
@@ -1879,7 +2009,7 @@ public final class TsonSchemaLinker {
                 if (dependent.isPresent()) {
                     violations.add(dependent.get());
                 } else if (restated.sibling().isEmpty() && !narrows(inherited.getValue(), restated,
-                        namespace)) {
+                        namespace, hops)) {
                     boolean oneIsANameOneInPlace = restated.typeExpr() instanceof TypeInline
                             != inherited.getValue().typeExpr() instanceof TypeInline;
                     violations.add("field '" + inherited.getKey() + "' is typed '"
@@ -1911,7 +2041,8 @@ public final class TsonSchemaLinker {
      * §8.2), even a name for the very construction written: two types written in place narrow exactly when they are
      * one, the same constructor and fields, and a name never narrows to a construction nor a construction to a name.
      */
-    private static boolean narrows(RecordField inherited, RecordField restated, Map<String, Top> namespace) {
+    private static boolean narrows(RecordField inherited, RecordField restated, Map<String, Top> namespace,
+                                   ExternHops hops) {
         if (inherited.typeExpr() instanceof TypeInline || restated.typeExpr() instanceof TypeInline) {
             return inherited.typeExpr().equals(restated.typeExpr());
         }
@@ -1920,15 +2051,18 @@ public final class TsonSchemaLinker {
         if (!namespace.containsKey(from.name()) || !namespace.containsKey(to.name())) {
             return true;
         }
-        return isA(to.name(), from.name(), namespace) || restated.voidable()
+        return isA(to.name(), from.name(), namespace, hops) || restated.voidable()
                 && namespace.get(AliasChain.terminal(to.name(), namespace)) instanceof VoidType;
     }
 
     /**
-     * §7.2's IS-A between two names of {@code namespace}: past their alias hops they are one entry, or the first's
-     * chain lists the second.
+     * §7.2's IS-A between two names of {@code namespace}: past their hops, alias and extern alike, they are one entry
+     * by identity, or the first's chain lists the second.
      */
-    private static boolean isA(String sub, String sup, Map<String, Top> namespace) {
+    private static boolean isA(String sub, String sup, Map<String, Top> namespace, ExternHops hops) {
+        if (hops.identity(sub).equals(hops.identity(sup))) {
+            return true;
+        }
         String wanted = AliasChain.terminal(sup, namespace);
         String terminal = AliasChain.terminal(sub, namespace);
         if (terminal.equals(wanted)) {
@@ -1963,9 +2097,19 @@ public final class TsonSchemaLinker {
      */
     private static void checkFieldValue(String entryName, String fieldName, RecordField field,
                                         Map<String, Top> namespace,
-                                        Function<String, Optional<String>> constructors, ValuesByName byName) {
+                                        Function<String, Optional<String>> constructors, ValuesByName byName,
+                                        ExternHops hops) {
         if (field.value().isEmpty()) {
             return;
+        }
+        if (field.typeExpr() instanceof TypeRef typed) {
+            Optional<Extern> extern = Externs.terminal(typed.name(), namespace::get);
+            if (extern.isPresent()) {
+                throw Externs.sealed("'" + entryName + "': field '" + fieldName + "'", "its "
+                        + (field.role() == FieldRole.DEFAULT ? "default" : "fixed value") + " "
+                        + asWritten(field.value().get()) + " is a value of", typed.name(),
+                        AliasChain.terminal(typed.name(), namespace), extern.get());
+            }
         }
         // The chain end is what has to be checked, not the hop: a field typed by an alias
         // (`a => text`, `f: a = hello`) states a value of whatever the alias names. Resolved output states
@@ -1985,7 +2129,7 @@ public final class TsonSchemaLinker {
         }
         Token value = field.value().get();
         if (target instanceof RefBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get)) {
-            checkKindValue(entryName, fieldName, field, value, reference, namespace, constructors);
+            checkKindValue(entryName, fieldName, field, value, reference, namespace, constructors, hops);
             return;
         }
         if (target instanceof RefBody reference) {
@@ -2025,8 +2169,8 @@ public final class TsonSchemaLinker {
      */
     private static void checkKindValue(String entryName, String fieldName, RecordField field, Token value,
                                        RefBody kind, Map<String, Top> namespace,
-                                       Function<String, Optional<String>> constructors) {
-        if (KindMembers.isMember(value.text(), kind.of().name(), namespace::get, constructors, namespace::get)) {
+                                       Function<String, Optional<String>> constructors, ExternHops hops) {
+        if (isMember(value.text(), kind.of().name(), namespace, constructors, hops)) {
             return;
         }
         throw new SchemaValidationException("'" + entryName + "': field '" + fieldName + "' is "
@@ -2094,12 +2238,12 @@ public final class TsonSchemaLinker {
      */
     private static void validateSlot(TypeExpr type, Map<String, Top> namespace,
                                      Function<String, Optional<String>> constructors, String subject, String trail,
-                                     Function<String, String> shown, ValuesByName byName) {
+                                     Function<String, String> shown, ValuesByName byName, ExternHops hops) {
         switch (type) {
-            case TypeRef reference -> validateTypeRef(reference, namespace, constructors, subject, trail);
+            case TypeRef reference -> validateTypeRef(reference, namespace, constructors, subject, trail, hops);
             case TypeInline inline -> {
                 try {
-                    validateBody(inline.text(), inline.of(), namespace, constructors, shown, byName);
+                    validateBody(inline.text(), inline.of(), namespace, constructors, shown, byName, hops);
                 } catch (UnresolvedReference e) {
                     throw inline.of() instanceof RecordBody ? e.heldInPlace() : e.namedByForm();
                 }
@@ -2122,7 +2266,7 @@ public final class TsonSchemaLinker {
      */
     private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace,
                                          Function<String, Optional<String>> constructors,
-                                         String subject, String trail) {
+                                         String subject, String trail, ExternHops hops) {
         String context = "'" + subject + "'" + trail;
         if (ref instanceof ParamRef) {
             // A closed body holds no parameter, so one here would resolve only as a parameter (§8.1), and is judged
@@ -2146,11 +2290,14 @@ public final class TsonSchemaLinker {
                     + IncompleteEntries.noType(ref.name(), incomplete));
         }
         checkArity(ref.name(), 0, namespace, List.of(), context);
+        // An extern its link refused lands nowhere, and has had its verdict where it was attached.
+        if (Externs.terminal(ref.name(), namespace::get).isPresent() && hops.landing(ref.name()).isEmpty()) {
+            return;
+        }
         // Membership walks construction to `type`, so it is judged only where `type` is in reach: a namespace built
         // without the kernel (a test's, a fragment's) gets resolution alone, as a kind with no meta gets no verdict.
-        if (constructors != null
-                && (namespace.containsKey(TYPE) || namespace.containsKey(TYPE))
-                && !KindMembers.isMember(ref.name(), TYPE, namespace::get, constructors, namespace::get)) {
+        if (constructors != null && namespace.containsKey(TYPE)
+                && !isMember(ref.name(), TYPE, namespace, constructors, hops)) {
             throw new SchemaValidationException(context + " names '" + ref.name() + "', which is no type a value "
                     + "can have -- a slot typed 'meta.type_ref' holds the name of an entry whose value is of 'type'");
         }
@@ -2257,6 +2404,9 @@ public final class TsonSchemaLinker {
             return;
         }
         String head = AliasChain.terminal(name, namespace);
+        if (namespace.get(head) instanceof Extern extern) {
+            throw Externs.sealed(context, "'" + name + "<...>' applies", name, head, extern);
+        }
         if (supplied > 0 && ConstructionSugar.constructs(head, referenced)) {
             // Construction sugar (§5.3): one argument per argument slot of the constructor.
             try {

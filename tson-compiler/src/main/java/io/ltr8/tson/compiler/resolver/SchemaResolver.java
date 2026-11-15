@@ -28,6 +28,8 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaRefusalException;
+import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.ContentHashMismatchException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.OpenEntry;
@@ -270,6 +272,12 @@ public final class SchemaResolver {
         // every head through its pre-loaded stand-in (§3.4).
         boolean isKernel = TsonBundledSchemas.isKernel(id);
         Predicate<String> kernel = name -> isKernel || kernelNames.contains(name);
+        // An extern's schema joins the reference closure with the imports, before any name of this document resolves
+        // (§3.4.1); none of its names enters this namespace. A head names the kernel's constructor only where the
+        // closure holds the kernel: an import-free schema's own `meta.extern` is an ordinary entry.
+        if (!isKernel && kernelNames.contains(Externs.HEAD)) {
+            loadExterns(document.body().declarations());
+        }
 
         // Expand the sugar forms before anything reads a declaration, so resolution below only ever sees a
         // bare reference or `!C value` (§5.3/§5.6 define these as desugarings; §3.3.1 names their targets).
@@ -1195,6 +1203,33 @@ public final class SchemaResolver {
             }
         }
         return merged;
+    }
+
+    /**
+     * Resolves the schema each extern of the document names, as an {@code !!import} target is resolved: through the
+     * same loader, under the same source and policy, its pin verified per identity. A failure refuses this schema
+     * whole, as an import that will not load does, and says it came through the extern ([TSON-SCHEMA] §5.13).
+     */
+    private void loadExterns(Map<String, SchemaMap.Declaration> declarations) {
+        Externs.written(declarations).forEach((name, written) -> written.schema().ifPresent(uri -> {
+            String through = "'" + name + "' is an extern of '" + written.type().orElse("") + "' in '" + uri + "'";
+            try {
+                CanonicalIdentity.canonicalize(uri);
+                loader.resolveLinkedForExtern(uri, name);
+            } catch (SchemaFetchException unavailable) {
+                throw new SchemaFetchException(unavailable.uri(), unavailable.reason(), through
+                        + ", whose schema is not available: " + unavailable.getMessage(), unavailable);
+            } catch (ContentHashMismatchException mismatch) {
+                throw new ContentHashMismatchException(through + ", whose schema does not verify: "
+                        + mismatch.getMessage());
+            } catch (SchemaRefusalException refused) {
+                throw new SchemaRefusalException(refused.code(), through + ", whose schema is refused: "
+                        + refused.getMessage(), refused);
+            } catch (SchemaValidationException invalid) {
+                throw new SchemaValidationException(through + ", whose schema does not load: "
+                        + invalid.getMessage(), invalid);
+            }
+        }));
     }
 
     /** {@link TsonSchema#namespaceSources} for the document before it is resolved: the same list, from its header. */

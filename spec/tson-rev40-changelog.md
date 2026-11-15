@@ -7,6 +7,7 @@ inputs:
   - "Revised companion artifacts at /2026/40/ identities: meta.tn (the kernel), numeric.tn, temporal.tn, net.tn, core.tn, policy.tn and five resolved fixtures (implementing #3)"
   - "tson-part3-json.md, edited directly as the proposal's steps landed (carrying the Part 3 half of #3)"
   - "The open-construction design, which no register entry carries (§3.2 items 106–110)"
+  - "The extern design, which no register entry carries (§3.2 items 116–118)"
 ---
 
 # TSON 2026 Revision 40 — Change Log
@@ -20,7 +21,10 @@ or minted. Its third is entry #6, *a dependent field's type is a sum in place*: 
 leaves the reference, and `kind!` leaves the data grammar. Its fourth, which no register
 entry carries, is *open construction*: a construction may be left open as an incomplete
 entry, which the kernel's `enum` and `set` become, and record refinement goes, `^` following
-`!name` and `&` being the one way to derive a record (§3.2 items 106–110). The register's
+`!name` and `&` being the one way to derive a record (§3.2 items 106–110). Its fifth, which
+no register entry carries either, is the *extern*: a schema names one entry of another schema
+under a name of its own, and a value so typed is read under its own schema (§3.2 items
+116–118). The register's
 entries #1, #7, #8 and #9 are accepted as they propose, each a sentence or a paragraph
 stating what the series already holds; #2 and #4 are carried (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
 modified by this revision; each of its entries receives a disposition here.
@@ -242,6 +246,16 @@ One sentence of the worked example follows the register's #1:
     types of the imported namespace, `order.tn`'s closure supplying `uuid`, `date` and
     `number`, and each unannotated token is read by the type its position declares
     ([TSON-SCHEMA] §7.3); the base rules' reading is given for a document with no `!!import`.
+
+Four sentences follow the extern (§3.2 items 116–118). No production and no token changes.
+
+27. **§2.1, §3.2, §3.3, §9.1** — a document's names came from "the one namespace its imports
+    bind", without exception. §2.1 and §3.2 except the names inside a value at an extern
+    position, which are that value's own schema's. §3.3 keeps its rule whole — a directive at
+    a value position is a parse error, and a value cannot open a namespace — and says who
+    does: where the names inside a value are another schema's, the schema that types the
+    value's position says so and the data does not. §9.1 counts a schema reached through an
+    extern among the schemas that are untrusted input.
 
 ### 3.2 Part 2 — Type System and Schema
 
@@ -845,12 +859,73 @@ One facet takes one name, on the spec author's ruling. The rule is unchanged.
      larger value a schema-load coherence error, are unchanged. `temporal.tn`'s and
      `core.tn`'s pins change (§6).
 
+A schema could address only the namespace it had. Revision 39 removed Revision 38's external
+forms and its scope push and put nothing in their place, §7.8 saying that a schema meaning
+to admit a type from a document it does not import "has no way to say so, by design". Two
+schemas that both declare `order` could therefore be named by no one document: a
+description of a service serving two versions of one schema named one of them. The spec
+author's ruling is that the schema layer needs an external reference, in a form under which
+the data still names no schema. It is the extern, in three items; no register entry carries
+it.
+
+116. **§5.13 (new), §1.4, §2.2.3, §3, §3.3, §3.5, §4.1, §5.12, §6, §8.1, §8.3, §9** — the
+     form. `order_v1 => !meta.extern { schema: "https://example.com/order-1.tn"  type: order }`
+     brings one entry of another schema into a document under a name the document chooses,
+     and none of that schema's names enter the document's namespace. The kernel gains
+     `meta.extern => meta.top & { schema: iri  type: text }` beside `meta.alias` (§6).
+     - **A hop.** An extern is another name for its target, across a schema boundary: its
+       identity is the target's, and a reference's membership, a choice's distinct variants
+       and its disjointness are judged of the target, by identity. Its entry takes a fifth
+       kind, EXTERN, from its form, as an alias takes ALIAS, and carries no chain (§4.1,
+       §8.1); resolver output writes it as written and each use by the extern's name.
+     - **What it names.** A type a value can have, anywhere in the foreign schema's
+       namespace. An open record, an incomplete entry, a constructor, a value entry, a
+       schema map and an unknown name are each refused. An extern names a type and nothing
+       else: a schema that wants another's value or constructor imports it.
+     - **Where it stands, and sealed.** It stands where a type's name stands and at a
+       reference over a constructor. Nothing is derived from it: `&`, `-`, `^`, an
+       application head and a constructor head are refused, and so are a default or a pin
+       at a field typed by it. No qualified name selects through it (§5.12): the boundary
+       is absolute.
+     - **`type` is `text`.** The name is judged in the foreign schema's namespace, so
+       `meta.type_ref`, judged in the declaring document's, would state what is not so.
+     §3.5 gains the consequence it left unsaid: two versions that declare a name in common
+     cannot share an import closure, and a schema names types of both through externs, or
+     the versions declare their names under maps that differ.
+117. **§5.13, §3.3.1, §3.4.1, §10.1, §10.2, §11.2, §11.5** — an extern is a dependency,
+     read with the imports. It is recognised by its written head, `!meta.extern`, an alias
+     of the constructor at the head refused, so a document's externs are found before any
+     name resolves, and each foreign schema joins the reference closure on an import's
+     terms: the same library and policy, one digest per identity across imports and
+     externs, resolved first. Three requirements refuse the declaring document: every
+     foreign schema loads and holds an admitted target; a kernel the foreign closure holds
+     is the declaring document's, so a schema of another revision is not externed; and the
+     reference relation over imports and externs together is acyclic. §11.5's import
+     closure counts a schema reached by either, and Revision 38's foreign-schemas limit
+     stays retired: the schema fixes which foreign schemas a document reaches, and the data
+     adds none.
+118. **§7.9 (new), §7, §7.2, §7.8, §11.4** — the scope of a foreign value. A value at a
+     position typed by an extern is read against the target under the foreign schema, and
+     every name inside it — a tag, an annotation, a name at a reference-typed slot, a type
+     named at a declared position — resolves in the foreign schema's namespace and no
+     other. The tag and annotations in front of it are the enclosing scope's: at a choice
+     the tag selects the variant before any scope is known, and `(order_v1 | order_v2)` is
+     `order` against `order` in the variants' own schemas. A subtype of the target is
+     written at the boundary through an extern of its own. Scopes nest as values do, and a
+     name means one type throughout a scope; a document's scopes are where its schema says
+     and never where its data does, so [TSON-DATA] §3.3's parse error stands. §7.8's
+     closing paragraph, which gave the absence of a form as the design, states what a
+     declared position admits and points here. §11.4 judges a foreign schema's names in
+     that schema's namespace: a look-alike pair with one name in each scope is a pair in
+     none.
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Seven entries are edited by this revision of
-the text and one is added — `meta.type_chain` (item 104), `meta.namespace` (item 106),
-`meta.set_type` and `enum`, and the new `meta.completion` (item 108), and
-`temporal.time_type`, `temporal.datetime_type` and `temporal.duration_type` (item 115) — and
+the text and two are added — `meta.type_chain` (item 104), `meta.namespace` (item 106),
+`meta.set_type` and `enum`, and the new `meta.completion` (item 108),
+`temporal.time_type`, `temporal.datetime_type` and `temporal.duration_type` (item 115), and
+the new `meta.extern` (item 116) — and
 every artifact's documentation is rewritten for a reader looking at one entry who has not
 read this text: what the entry is, how it is written in the basic case, the facts about its
 values that its declaration does not show, and the section to read further. A rule this text
@@ -907,6 +982,13 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
 12. **§6.3** — the one-position tuple was "the kernel's `meta.tuple1<T>` and
     `meta.voidable_tuple1<T>`", which §3.2 item 14 removed; it is a one-position tuple as
     declared, `!meta.tuple [{ element_type: text }]`. The encoding is unchanged.
+13. **§1.6, §3.3, §8.6 (new), §9.2** (§3.2 items 116–118) — a foreign value in JSON. Text
+    keeps the boundary's tag and the body apart; one JSON object carries both, so §8.6 says
+    which is which: the `$type` leading the object at an extern position, or its wrapper,
+    is the enclosing scope's and names the extern, and every other name in the value is the
+    foreign schema's. An `$import` inside a foreign value is the resolver error it is at
+    every position but the document's top. §3.3's rule for where `$type` resolves, §9.2's
+    encoder obligation and §1.6's item 24 follow.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -1006,6 +1088,16 @@ Changes a Revision 39 implementer must act on:
     `numeric.decimal_type` gives the same facet: `!time ^ { precision: 3 }` is re-spelled
     `!time ^ { fraction_digits: 3 }`, `precision` being a field no temporal constructor
     declares. Its meaning and its cap of 9 are unchanged.
+21. **A schema names one entry of another schema: the extern** (§3.2 items 116–118).
+    `order_v1 => !meta.extern { schema: "…/order-1.tn"  type: order }` is a new form and
+    breaks no Revision 39 document but one that contributed a member `extern` to the
+    kernel's `meta` map, which now collides. A value at a position typed by an extern is
+    written as it is in a document of its own schema, its inner tags that schema's names,
+    and the tag in front of it the extern's: `body: !order_v2 { … payment: !card { … } }`.
+    This is the series' one place where a name's meaning depends on where it stands, and
+    the schema, never the data, says where: no `!!schema` returns, and an extern takes no
+    `&`, `^`, default or qualified name through it. A foreign schema is a dependency like
+    an import — pinned, verified and counted with them — and must hold the same kernel.
 
 ---
 
@@ -1042,6 +1134,11 @@ carries no open questions.
 | Items 107–108 (ruled) | Over an incomplete entry nothing is replaced: a field written again is refused, whatever the value, and to narrow, the entry is completed and the type refined. One rule covers required fields: `^` writes any unwritten field and leaves one required field absent. An alias of an incomplete entry is allowed and not written. An incomplete entry is imported like any entry. | **[settled]** — the spec author's ruling. |
 | Item 109 (ruled) | `^` always follows `!name` and its body is values; `&` always follows a bare name and its body is field definitions, the only way to derive a record. | **[settled]** — the spec author's ruling. |
 | Items 108–109 (lost) | `a: enum`; a reference over sets alone; a set's `voidable: false` as a pin; a resolved form listing every name its source offers; `^`'s refusal of a new field. | Recorded — items 108 and 109 state each, and the replacement where there is one. |
+| Items 116–118 (ruled) | The extern is singular and a scope change; the tag at its boundary is the enclosing scope's; `type` is `text`; its schema loads with the imports and the declaring document is refused unless every foreign schema loads, holds the same kernel and closes no cycle; the head is written `meta.extern`; the boundary is absolute, no value entry brought in and no name selecting through it; a default or pin at a field typed by it is refused; an annotation through it is admitted; the import closure limit counts it. | **[settled]** — the spec author's rulings. |
+| Item 116 (reading) | An extern entry's kind. The text gives it a fifth kind, EXTERN, conferred by its form as ALIAS is, so a consumer of resolver output derives it from the entry alone; the alternative, its target's kind, needs the foreign schema loaded to derive. | **[editorial]** — the editor's reading. |
+| Item 116 (reading) | `meta.extern.schema` is `iri`, as the spec author wrote it, where an `!!import`'s value is an IRI-reference ([TSON-DATA] §3.3). The two name a schema on the same terms if the field is `iri_reference`. | **[editorial]** — the spec author's to confirm. |
+| Item 116 (reading) | A schema declares no value entry of an extern type: `!order_v1 { … }` at a declaration is refused with the other heads, beside the refused default and pin, so no foreign value is written in the declaring schema but an annotation's. | **[editorial]** — follows the ruling that an extern is no constructor head. |
+| Items 116–118 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
 
@@ -1052,9 +1149,9 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `83ac33fe…` (Revision 39 `c9b069b6…`), numeric `232d69ba…` (`dfa66c5d…`), temporal
-   `f5e1dbd8…` (`fb4ada8f…`), net `cb8a29d3…` (`371fc20c…`), core `815fabda…`
-   (`4e8d9c43…`), policy `5aeeaa04…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   `14c4a27e…` (Revision 39 `c9b069b6…`), numeric `8257b5a2…` (`dfa66c5d…`), temporal
+   `44606ded…` (`fb4ada8f…`), net `ef6e3f68…` (`371fc20c…`), core `b6ae6c38…`
+   (`4e8d9c43…`), policy `b8a7be08…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
    78–84's documentation of a parameter in a type written in place, for items 85–93's
@@ -1062,7 +1159,8 @@ carries no open questions.
    with no argument list, for items 98–101's one reference constructor, for items
    104–105's chain sets and rewritten documentation, for item 106's `meta.namespace`, and
    for item 108's incomplete entries and `meta.completion`, and temporal and core again
-   for item 115's `fraction_digits`. The chain is
+   for item 115's `fraction_digits`, and the kernel and every dependant again for item 116's
+   `meta.extern`. The chain is
    consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
    libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
@@ -1085,7 +1183,8 @@ carries no open questions.
    `meta-resolved.tn` follows; `numeric-resolved.tn` writes its two enums and its set as the
    constructor's construction with `@meta.completion`, `temporal-resolved.tn` names item
    115's `fraction_digits` on its three constructors, and the other two library fixtures
-   change only their identities.
+   change only their identities. Item 116 adds `meta.extern`: the kernel measures 84 entries,
+   and `meta-resolved.tn` writes the entry and lists it among `meta.top`'s subtypes.
 
 ---
 
@@ -1148,5 +1247,19 @@ carries no open questions.
    `fraction_digits: 10` is refused at load on `time`, `datetime` and `duration`, and on
    `!temporal.datetime_type { … }`; `!time ^ { precision: 3 }` is refused, `precision` being
    no field of `temporal.time_type`.
-8. **The build** — the implementation's full build, with the conformance corpus's Revision
+8. **Items 116–118's examples** — §5.13's `shipping.tn` loads beside `order-1.tn` and
+   `order-2.tn`, each declaring `order`, where importing both is refused; so do an extern of
+   a subtype, of a nested map's member (`geo.address`), a nested map of externs as a prefix,
+   and an extern at a `meta.ref<meta.record>` slot. Each refusal the text names is refused
+   with the diagnostic it describes: `&`, `-`, `^`, a construction head and an application
+   head on an extern; a default at a field typed by one; a qualified name through one; a
+   target that is an open record, an incomplete entry, a constructor, a value entry, a
+   schema map or a name the foreign closure lacks; an alias of `meta.extern` at the head;
+   two externs of one entry as variants of one choice; an extern of a record at a
+   reference over `meta.enum_type`; a cycle through an extern; a foreign schema over
+   another revision's kernel; and a pin that does not match. §7.9's data document reaches
+   the extern position and stops there: the first implementation loads and links a schema
+   declaring externs and does not yet read a value through one, in either encoding, which
+   it reports as not implemented and not as a verdict.
+9. **The build** — the implementation's full build, with the conformance corpus's Revision
    40 branch required, passes over the revised text.

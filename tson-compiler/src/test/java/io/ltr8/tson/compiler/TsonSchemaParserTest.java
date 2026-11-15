@@ -1024,7 +1024,7 @@ class TsonSchemaParserTest {
     void theKernelParses() throws IOException {
         SchemaDocument doc = parse(readFixture("meta.tn"));
         // The six maps, their 64 members, and the 13 entries at the root.
-        assertEquals(83, doc.body().declarations().size());
+        assertEquals(84, doc.body().declarations().size());
         assertTrue(doc.body().declarations().containsKey("meta.record"));
         assertTrue(doc.body().declarations().containsKey("text"));
     }

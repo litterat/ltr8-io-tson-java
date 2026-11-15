@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=83ac33fed8b62d3bd567ff2ee652e22b64227acd4bdb30c3efd0bc9f6ff9b04a"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=14c4a27e639652d7d8d0ca83ba8df7d00ca619baa5a0a1674bbe8bde709f87d5"
 @doc:"""
   The TSON kernel: the vocabulary every schema is written in. Its root holds the
   names an author writes: `text`, `integer`, `int64`, `boolean`, `bytes`, `iri`,
@@ -232,6 +232,19 @@
       """
     alias => meta.top & {
       target: meta.type_ref
+    }
+
+    @doc:"""
+      One entry of another schema under a name of this one: `order_v1 =>
+      !meta.extern { schema: "https://example.com/order-1.tn"  type: order }`
+      makes `order_v1` the same type as that schema's `order`. `type` is a name
+      in that schema's namespace; none of that schema's names enter this one. A
+      value at a position typed `order_v1` uses the names of its own schema
+      inside it ([TSON-SCHEMA] §5.13, §7.9).
+      """
+    extern => meta.top & {
+      schema: iri
+      type:   text
     }
 
     @doc:"""

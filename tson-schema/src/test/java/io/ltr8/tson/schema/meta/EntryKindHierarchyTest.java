@@ -26,11 +26,19 @@ class EntryKindHierarchyTest {
 
     @Test
     void whatComposesWithTopDirectlyIsNoType() {
-        assertEquals(Set.of(Type.class, Alias.class, ValueEntry.class, IncompleteEntry.class),
+        assertEquals(Set.of(Type.class, Alias.class, Extern.class, ValueEntry.class, IncompleteEntry.class),
                 Set.of(Top.class.getPermittedSubclasses()));
         assertFalse(Type.class.isAssignableFrom(Alias.class));
+        assertFalse(Type.class.isAssignableFrom(Extern.class));
         assertFalse(Type.class.isAssignableFrom(ValueEntry.class));
         assertFalse(Type.class.isAssignableFrom(IncompleteEntry.class));
+    }
+
+    @Test
+    void anExternTakesTheExternKindAndNamesItsConstructor() {
+        Extern extern = new Extern("https://example.test/order-1.tn", "order");
+        assertEquals(EntryKind.EXTERN, EntryKind.of(extern, name -> true));
+        assertEquals("meta.extern", io.ltr8.tson.schema.TsonSchema.constructorOf(extern));
     }
 
     @Test

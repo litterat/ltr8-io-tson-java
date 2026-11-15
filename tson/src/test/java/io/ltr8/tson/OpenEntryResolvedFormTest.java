@@ -335,6 +335,7 @@ class OpenEntryResolvedFormTest {
             case Sum sum -> sum.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
             case io.ltr8.tson.schema.meta.ApplyBody apply -> "meta.apply";
             case Alias alias -> "alias";
+            case io.ltr8.tson.schema.meta.Extern extern -> "meta.extern";
             case io.ltr8.tson.schema.meta.ValueEntry value -> value.type();
             case io.ltr8.tson.schema.meta.IncompleteEntry incomplete -> incomplete.constructor();
         };

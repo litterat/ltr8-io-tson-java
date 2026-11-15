@@ -385,6 +385,11 @@ final class TemplateMaterialiser {
             return null; // unresolved head -- the linker's verdict, not this pass's
         }
         List<String> parameters = OpenEntry.parameterNames(template);
+        Optional<io.ltr8.tson.schema.meta.Extern> extern = Externs.terminal(head, namespace::definition);
+        if (parameters.isEmpty() && extern.isPresent()) {
+            throw Externs.sealed("'" + written.text() + "'", "'" + head + "<...>' applies", head,
+                    AliasChain.terminal(head, namespace::definition), extern.get());
+        }
         if (parameters.isEmpty()) {
             throw new SchemaValidationException("'" + head + "' declares no type parameters, so '"
                     + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
