@@ -1,6 +1,7 @@
 package io.ltr8.bind;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.StringJoiner;
 
@@ -10,9 +11,15 @@ import java.util.StringJoiner;
  * "type-to-Class binding" problem every serialization library eventually needs: there is no
  * reflection API to enumerate "every class in a package," so this is necessarily a name lookup
  * (with whatever naming convention/namespace a caller's own classes follow), not an enumeration
- * of candidates. {@link DataBindContext#getDescriptor(String)} is the one place this gets
- * consulted, composing {@link #resolve} with {@link DataBindContext#getDescriptor(Class)} so a
- * caller gets a {@link DataClass} directly from a bare name.
+ * of candidates. {@link DataBindContext#getDescriptor(String, String)} is where this gets consulted,
+ * composing {@link #resolve} with {@link DataBindContext#getDescriptor(Class)} so a caller gets a
+ * {@link DataClass} directly from a name.
+ *
+ * <p><b>A name is asked within its namespace</b> ({@link #resolve(String, String)}): two namespaces may each
+ * declare a type of one name, and each binds to its own class. The namespace is opaque here, matched by
+ * equality: an encoding with schemas passes the identity of the schema that declares the type. A binder that
+ * answers by the name alone implements {@link #resolve(String)} only, which is what a caller with one namespace
+ * writes; {@link #byNamespace} routes each namespace to a binder of its own.
  *
  * <p>{@link DefaultDataNameBinder} is the default implementation, a fixed namespace (or several)
  * plus an alias table. A caller with a different naming convention, or one that needs to resolve
@@ -23,6 +30,17 @@ public interface DataNameBinder {
 
     /** @throws DataBindException if {@code schemaTypeName} has no matching Java class under this binder's own convention */
     Class<?> resolve(String schemaTypeName) throws DataBindException;
+
+    /**
+     * The class the type {@code name}, declared in {@code namespace}, binds to. By default the answer for the name
+     * alone ({@link #resolve(String)}), so a binder that does not tell namespaces apart answers every one alike.
+     *
+     * @param namespace the namespace declaring {@code name}, opaque and matched by equality
+     * @throws DataBindException if this binder binds no class for that type
+     */
+    default Class<?> resolve(String namespace, String name) throws DataBindException {
+        return resolve(name);
+    }
 
     /**
      * The names in {@code bindings} and no others -- for a caller that already knows which class each type
@@ -53,18 +71,67 @@ public interface DataNameBinder {
      *
      * <p><b>The first binder authors the failure.</b> When neither resolves the name, what a caller needs to
      * see is the line missing from <em>their</em> configuration, not that the backstop did not recognise it
-     * either; the backstop's own message rides along as the cause.
+     * either; the backstop's own message rides along as the cause. Both forms of the question compose, so a
+     * namespace asked of the composition reaches both binders.
      */
     default DataNameBinder orElse(DataNameBinder next) {
-        return name -> {
-            try {
-                return resolve(name);
-            } catch (DataBindException notMine) {
+        DataNameBinder first = this;
+        return new DataNameBinder() {
+            @Override
+            public Class<?> resolve(String name) throws DataBindException {
                 try {
-                    return next.resolve(name);
-                } catch (DataBindException notTheirs) {
-                    throw new DataBindException(notMine.getMessage(), notTheirs);
+                    return first.resolve(name);
+                } catch (DataBindException notMine) {
+                    try {
+                        return next.resolve(name);
+                    } catch (DataBindException notTheirs) {
+                        throw new DataBindException(notMine.getMessage(), notTheirs);
+                    }
                 }
+            }
+
+            @Override
+            public Class<?> resolve(String namespace, String name) throws DataBindException {
+                try {
+                    return first.resolve(namespace, name);
+                } catch (DataBindException notMine) {
+                    try {
+                        return next.resolve(namespace, name);
+                    } catch (DataBindException notTheirs) {
+                        throw new DataBindException(notMine.getMessage(), notTheirs);
+                    }
+                }
+            }
+        };
+    }
+
+    /**
+     * One binder per namespace: a type declared in a namespace {@code binders} holds is answered by that
+     * namespace's binder alone, and every other by {@code fallback}, which also answers a name asked with no
+     * namespace. What a caller holding one name binder per schema composes them into, so two schemas' types of one
+     * name bind to two classes through one context.
+     *
+     * <p><b>A namespace's binder is the last word for it</b>, not a first try: a type it does not bind is reported
+     * as that binder's missing line, never answered by {@code fallback} with a class meant for another namespace.
+     * A caller wanting a backstop for one namespace composes it there ({@link #orElse}).
+     *
+     * <p>The map is copied, so a caller may keep and change theirs.
+     *
+     * @param binders  each namespace, as {@link #resolve(String, String)} is asked it, to the binder for its types
+     * @param fallback the binder for a namespace {@code binders} does not hold, and for a name asked alone
+     */
+    static DataNameBinder byNamespace(Map<String, DataNameBinder> binders, DataNameBinder fallback) {
+        Map<String, DataNameBinder> copy = Map.copyOf(binders);
+        Objects.requireNonNull(fallback, "fallback");
+        return new DataNameBinder() {
+            @Override
+            public Class<?> resolve(String name) throws DataBindException {
+                return fallback.resolve(name);
+            }
+
+            @Override
+            public Class<?> resolve(String namespace, String name) throws DataBindException {
+                return copy.getOrDefault(namespace, fallback).resolve(namespace, name);
             }
         };
     }
