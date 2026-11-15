@@ -62,6 +62,10 @@ class CrossEncodingParityTest {
               unique => set<text>
               label  => text
               stamps => set<datetime>
+              after_y2k   => !date ^ { exclusive_min: 2000-01-01 }
+              before_noon => !time ^ { exclusive_max: "12:00:00Z" }
+              before_2026 => !datetime ^ { exclusive_max: "2026-01-01T00:00:00Z" }
+              window      => { d?: after_y2k  t?: before_noon  dt?: before_2026 }
               pair   => [text, int32]
               capped => {
                 value: int32
@@ -394,6 +398,19 @@ class CrossEncodingParityTest {
     void twoSpellingsOfOneInstantAreOneSetElementInBoth() {
         sameRule("stamps", "[ \"2026-01-01T00:00:30Z\" \"2026-01-01T01:00:30+01:00\" ]", """
                 ["2026-01-01T00:00:30Z", "2026-01-01T01:00:30+01:00"]""");
+    }
+
+    /** An exclusive bound refuses its own value ([TSON-SCHEMA] §5.7), through the one parser both encodings ask. */
+    @Test
+    void anExclusiveTemporalBoundRefusesItsOwnValueInBoth() {
+        sameRule("window", "{ d: 2000-01-01 }", """
+                {"d": "2000-01-01"}""");
+        sameRule("window", "{ t: \"12:00:00Z\" }", """
+                {"t": "12:00:00Z"}""");
+        sameRule("window", "{ dt: \"2026-01-01T00:00:00Z\" }", """
+                {"dt": "2026-01-01T00:00:00Z"}""");
+        bothAccept("window", "{ d: 2000-01-02  t: \"11:59:59Z\"  dt: \"2025-12-31T23:59:59Z\" }", """
+                {"d": "2000-01-02", "t": "11:59:59Z", "dt": "2025-12-31T23:59:59Z"}""");
     }
 
     /**

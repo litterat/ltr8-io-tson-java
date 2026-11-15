@@ -74,6 +74,35 @@ class TimeParserTest {
     }
 
     @Test
+    void exclusiveMinRefusesItsOwnInstantAndEveryEarlierOne() {
+        TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.of(OffsetTime.parse("09:00:00Z")),
+                Optional.empty(), Optional.empty(), Optional.empty()));
+        AtomValidationException at = assertThrows(AtomValidationException.class, () -> type.read("09:00:00Z"));
+        assertEquals("> 09:00Z", at.expected());
+        assertEquals(OffsetTime.parse("09:00:00.001Z"), type.read("09:00:00.001Z"));
+        assertThrows(AtomValidationException.class, () -> type.read("08:59:59Z"));
+    }
+
+    @Test
+    void exclusiveMaxRefusesItsOwnInstantAndEveryLaterOne() {
+        TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(OffsetTime.parse("17:00:00Z")), Optional.empty()));
+        AtomValidationException at = assertThrows(AtomValidationException.class, () -> type.read("17:00:00Z"));
+        assertEquals("< 17:00Z", at.expected());
+        assertEquals(OffsetTime.parse("16:59:59Z"), type.read("16:59:59Z"));
+        assertThrows(AtomValidationException.class, () -> type.read("17:00:01Z"));
+    }
+
+    /** The offset is a spelling (§5.5): the bound's own instant written in another offset is still the bound. */
+    @Test
+    void anExclusiveBoundExcludesItsInstantInAnyOffset() {
+        TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.of(OffsetTime.parse("09:00:00Z")),
+                Optional.empty(), Optional.empty(), Optional.empty()));
+        assertThrows(AtomValidationException.class, () -> type.read("10:00:00+01:00"));
+        assertEquals(OffsetTime.parse("10:00:01+01:00"), type.read("10:00:01+01:00"));
+    }
+
+    @Test
     void writeRoundTripsThroughRead() {
         assertEquals("10:15:30+01:00",
                 TimeParser.UNCONSTRAINED.write(TimeParser.UNCONSTRAINED.read(token("10:15:30+01:00"))));

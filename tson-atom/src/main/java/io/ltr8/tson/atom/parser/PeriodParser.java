@@ -6,6 +6,7 @@ import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.schema.temporal.PeriodType;
 import java.math.BigInteger;
 import java.time.Period;
+import java.util.Comparator;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -65,24 +66,17 @@ public record PeriodParser(PeriodType constraints) implements AtomTypeParser<Per
     }
 
     private void validate(Period value, String text) {
-        BigInteger months = PeriodType.months(value);
-        constraints.min().ifPresent(min ->
-                require(months.compareTo(PeriodType.months(min)) >= 0, text, ">= " + min));
-        constraints.exclusiveMin().ifPresent(min ->
-                require(months.compareTo(PeriodType.months(min)) > 0, text, "> " + min));
-        constraints.max().ifPresent(max ->
-                require(months.compareTo(PeriodType.months(max)) <= 0, text, "<= " + max));
-        constraints.exclusiveMax().ifPresent(max ->
-                require(months.compareTo(PeriodType.months(max)) < 0, text, "< " + max));
-        constraints.multipleOf().ifPresent(step ->
-                require(PeriodType.isMultiple(value, step), text, "a multiple of " + step));
+        Bounds.check(value, text, MONTH_ORDER, Bounds.NOT_EXPECTED, constraints.min(),
+                constraints.exclusiveMin(), constraints.max(), constraints.exclusiveMax());
+        constraints.multipleOf().ifPresent(step -> {
+            if (!PeriodType.isMultiple(value, step)) {
+                throw new AtomValidationException("'" + text + "' is not a multiple of " + step,
+                        "a multiple of " + step);
+            }
+        });
     }
 
-    private static void require(boolean holds, String text, String expected) {
-        if (!holds) {
-            throw new AtomValidationException("'" + text + "' is not " + expected, expected);
-        }
-    }
+    private static final Comparator<Period> MONTH_ORDER = Comparator.comparing(PeriodType::months);
 
     /** Written as years and months, years carrying every whole twelve -- the value's own normal form. */
     @Override
