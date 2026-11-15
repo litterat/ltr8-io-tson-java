@@ -72,6 +72,38 @@ class DateTimeParserTest {
     }
 
     @Test
+    void exclusiveMinRefusesItsOwnInstantAndEveryEarlierOne() {
+        DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(),
+                Optional.of(OffsetDateTime.parse("2025-01-01T00:00:00Z")), Optional.empty(), Optional.empty(),
+                Optional.empty()));
+        AtomValidationException at = assertThrows(AtomValidationException.class,
+                () -> type.read("2025-01-01T00:00:00Z"));
+        assertEquals("> 2025-01-01T00:00Z", at.expected());
+        assertEquals(OffsetDateTime.parse("2025-01-01T00:00:01Z"), type.read("2025-01-01T00:00:01Z"));
+        assertThrows(AtomValidationException.class, () -> type.read("2024-12-31T23:59:59Z"));
+    }
+
+    @Test
+    void exclusiveMaxRefusesItsOwnInstantAndEveryLaterOne() {
+        DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.of(OffsetDateTime.parse("2025-01-01T00:00:00Z")), Optional.empty()));
+        AtomValidationException at = assertThrows(AtomValidationException.class,
+                () -> type.read("2025-01-01T00:00:00Z"));
+        assertEquals("< 2025-01-01T00:00Z", at.expected());
+        assertEquals(OffsetDateTime.parse("2024-12-31T23:59:59Z"), type.read("2024-12-31T23:59:59Z"));
+        assertThrows(AtomValidationException.class, () -> type.read("2025-01-01T00:00:01Z"));
+    }
+
+    /** The offset is a spelling (§5.5): the bound's own instant written in another offset is still the bound. */
+    @Test
+    void anExclusiveBoundExcludesItsInstantInAnyOffset() {
+        DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.of(OffsetDateTime.parse("2025-01-01T00:00:00Z")), Optional.empty()));
+        assertThrows(AtomValidationException.class, () -> type.read("2025-01-01T01:00:00+01:00"));
+        assertEquals(OffsetDateTime.parse("2025-01-01T00:59:59+01:00"), type.read("2025-01-01T00:59:59+01:00"));
+    }
+
+    @Test
     void writeRoundTripsThroughRead() {
         assertEquals("2025-03-13T10:15:30Z",
                 DateTimeParser.UNCONSTRAINED.write(DateTimeParser.UNCONSTRAINED.read(token("2025-03-13T10:15:30Z"))));

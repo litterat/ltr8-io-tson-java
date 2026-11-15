@@ -162,18 +162,14 @@ public record DurationParser(DurationType constraints) implements AtomTypeParser
                         "a whole number of 10^-" + digits + " seconds");
             }
         });
-        constraints.min().ifPresent(min -> require(value.compareTo(min) >= 0, text, ">= " + min));
-        constraints.exclusiveMin().ifPresent(min -> require(value.compareTo(min) > 0, text, "> " + min));
-        constraints.max().ifPresent(max -> require(value.compareTo(max) <= 0, text, "<= " + max));
-        constraints.exclusiveMax().ifPresent(max -> require(value.compareTo(max) < 0, text, "< " + max));
-        constraints.multipleOf().ifPresent(step -> require(DurationType.isMultiple(value, step), text,
-                "a multiple of " + step));
-    }
-
-    private static void require(boolean holds, String text, String expected) {
-        if (!holds) {
-            throw new AtomValidationException("'" + text + "' is not " + expected, expected);
-        }
+        Bounds.check(value, text, Duration::compareTo, Bounds.NOT_EXPECTED, constraints.min(),
+                constraints.exclusiveMin(), constraints.max(), constraints.exclusiveMax());
+        constraints.multipleOf().ifPresent(step -> {
+            if (!DurationType.isMultiple(value, step)) {
+                throw new AtomValidationException("'" + text + "' is not a multiple of " + step,
+                        "a multiple of " + step);
+            }
+        });
     }
 
     /**

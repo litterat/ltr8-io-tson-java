@@ -2,7 +2,6 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
-import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.schema.temporal.DateType;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -59,16 +58,8 @@ public record DateParser(DateType constraints) implements AtomTypeParser<LocalDa
     }
 
     private void validate(LocalDate value, String text) {
-        constraints.min().ifPresent(m -> {
-            if (value.isBefore(m)) {
-                throw new AtomValidationException("'" + text + "' is before the minimum " + m, ">= " + m);
-            }
-        });
-        constraints.max().ifPresent(m -> {
-            if (value.isAfter(m)) {
-                throw new AtomValidationException("'" + text + "' is after the maximum " + m, "<= " + m);
-            }
-        });
+        Bounds.check(value, text, LocalDate::compareTo, Bounds.CHRONOLOGICAL, constraints.min(),
+                constraints.exclusiveMin(), constraints.max(), constraints.exclusiveMax());
     }
 
     /**
