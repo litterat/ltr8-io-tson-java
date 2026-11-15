@@ -276,7 +276,7 @@
     } }
 
     extern => !meta.record { chain: { supertypes: [meta.top] }  fields: {
-      schema => !meta.record_field { type: iri }
+      schema => !meta.record_field { type: iri_reference }
       type   => !meta.record_field { type: text }
     } }
 

@@ -91,6 +91,26 @@ class ExternLoadingTest {
     }
 
     @Test
+    void anExternsSchemaIsAnyReferenceAnImportMayBe() {
+        world.documents.put("/local/orders.tn", "!!id:\"/local/orders.tn\"\n!schema { order => { id: order_id }"
+                + "  order_id => {} }\n");
+        for (String spelling : List.of("/local/orders.tn", "file:/local/orders.tn", "file:///local/orders.tn")) {
+            assertEquals(List.of(), world.validate(extern("local_order", spelling, "order")
+                    + "use => { f: local_order }"), spelling);
+        }
+        assertEquals(List.of(), world.validate("use => { f: order }", "/local/orders.tn"),
+                "the import an extern of the same reference stands beside");
+    }
+
+    @Test
+    void anExternsSchemaThatIsNoIdentityIsRefusedAsAnImportsIs() {
+        String relative = only(world.validate(extern("x", "local/orders.tn", "order")));
+        assertTrue(relative.contains("'x' is an extern of 'order' in 'local/orders.tn'"), relative);
+        String fragment = only(world.validate(extern("x", ORDER_1 + "#order", "order")));
+        assertTrue(fragment.contains("'x' is an extern of 'order' in '" + ORDER_1 + "#order'"), fragment);
+    }
+
+    @Test
     void oneDigestPerIdentityHoldsAcrossAnImportAndAnExtern() {
         String digest = TsonContentHash.sha256(world.documents.get(ORDER_1).getBytes(StandardCharsets.UTF_8));
         String right = ORDER_1 + "?sha256=" + digest;
