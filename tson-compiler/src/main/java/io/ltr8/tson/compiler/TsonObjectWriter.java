@@ -6,6 +6,8 @@ import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataClass;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
+import io.ltr8.tson.compiler.writer.ExternTags;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -44,8 +46,13 @@ public final class TsonObjectWriter {
     }
 
     private TsonObjectWriter(DataBindContext context, TsonDocumentHeader header, Optional<String> rootTypeName) {
+        this(context, new DataClassObjectWriter(context), header, rootTypeName);
+    }
+
+    private TsonObjectWriter(DataBindContext context, DataClassObjectWriter engine, TsonDocumentHeader header,
+                             Optional<String> rootTypeName) {
         this.context = context;
-        this.engine = new DataClassObjectWriter(context);
+        this.engine = engine;
         this.header = header;
         this.rootTypeName = rootTypeName;
     }
@@ -66,9 +73,9 @@ public final class TsonObjectWriter {
      * every document this library has ever produced ({@code tson validate --output tson} included), so the
      * plain writer keeps writing a bare value and a caller opts in per writer, exactly as the readers derive.
      *
-     * <p>Both strings are the caller's to supply. Deriving them from a compiled schema the bind registry
-     * already holds is the shape that would spare a caller naming what it already knows, and it needs the
-     * schema-aware writer this library does not have yet ({@code BACKLOG.md}); nothing here forecloses it.
+     * <p>Both strings are the caller's to supply, and nothing is checked against the schema. A caller holding the
+     * schema linked uses {@link #describing(TsonLinkedSchema, String)}, which a schema typing a position by an
+     * extern needs.
      *
      * @param schemaUri    the governing schema's identity, written as the {@code !!import} argument
      * @param rootTypeName the schema's own name for the root value's type, written as its type-ref. A value
@@ -76,7 +83,26 @@ public final class TsonObjectWriter {
      *                     refused rather than written twice; see {@link TsonDataEmitter#typeRef}
      */
     public TsonObjectWriter describing(String schemaUri, String rootTypeName) {
-        return new TsonObjectWriter(context, header.describing(schemaUri), Optional.of(rootTypeName));
+        return new TsonObjectWriter(context, engine, header.describing(schemaUri), Optional.of(rootTypeName));
+    }
+
+    /**
+     * {@link #describing(String, String)} for a schema this writer is given linked -- {@code !!import} naming its
+     * identity -- and writing a value at a position the schema types by an extern ([TSON-SCHEMA] §7.9) as that
+     * position reads it: the names inside are the foreign schema's, and a tag at the boundary, which is read in the
+     * enclosing scope, is that scope's name for the entry the value's class is bound to (the extern for its target,
+     * an admitted name for a subtype or a variant). A value whose class is bound to an entry the enclosing scope has
+     * no name for is refused with a {@link WriteException}.
+     *
+     * <p>Which entry a class is bound to is asked of this writer's bind context, by each admitted entry's declaring
+     * schema and name, once, here: derive one writer per schema and keep it.
+     *
+     * @param schema       the governing schema, as {@code Tson.loader().resolveLinked} or {@code Tson.resolve} gives it
+     * @param rootTypeName the schema's own name for the root value's type, as for {@link #describing(String, String)}
+     */
+    public TsonObjectWriter describing(TsonLinkedSchema schema, String rootTypeName) {
+        return new TsonObjectWriter(context, new DataClassObjectWriter(context, ExternTags.of(schema, context)),
+                header.describing(schema.schema().id()), Optional.of(rootTypeName));
     }
 
     /**
@@ -84,7 +110,7 @@ public final class TsonObjectWriter {
      * emitted first when {@link #describing} is also in force (§2.2 fixes the order).
      */
     public TsonObjectWriter identifiedBy(String documentId) {
-        return new TsonObjectWriter(context, header.identifiedBy(documentId), rootTypeName);
+        return new TsonObjectWriter(context, engine, header.identifiedBy(documentId), rootTypeName);
     }
 
     // ── Entry point ──────────────────────────────────────────────────────
@@ -129,7 +155,8 @@ public final class TsonObjectWriter {
                     + "nothing to write as the root's type-ref and a reader would have no way to pick a type from "
                     + "those schemas -- a document read against a schema carries both, so this one was assembled "
                     + "by hand; supply the type, or drop the imports and write a bare value", null));
-            writer = new TsonObjectWriter(context, writer.header.importing(document.imports()), Optional.of(type));
+            writer = new TsonObjectWriter(context, engine, writer.header.importing(document.imports()),
+                    Optional.of(type));
         }
         if (document.id().isPresent()) {
             writer = writer.identifiedBy(document.id().get());

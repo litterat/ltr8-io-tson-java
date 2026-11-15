@@ -267,7 +267,7 @@ final class BindRecordBuilder implements RecordBuilder {
         List<String> candidates = bindingNames(name, context);
         for (String candidate : candidates) {
             try {
-                return binding.getDescriptor(candidate);
+                return binding.getDescriptor(namespaceOf(candidate, context), candidate);
             } catch (UnboundNameException e) {
                 first = first == null ? e : first;
             } catch (DataBindException e) {
@@ -284,12 +284,17 @@ final class BindRecordBuilder implements RecordBuilder {
     private static DataClass boundClassOrNull(String name, ValueReaderContext context, DataBindContext binding) {
         for (String candidate : bindingNames(name, context)) {
             try {
-                return binding.getDescriptor(candidate);
+                return binding.getDescriptor(namespaceOf(candidate, context), candidate);
             } catch (DataBindException ignored) {
                 // not bound under this name; the next is tried
             }
         }
         return null;
+    }
+
+    /** The namespace a bind lookup asks entry {@code name} within: the canonical identity of its declaring schema. */
+    private static String namespaceOf(String name, ValueReaderContext context) {
+        return context.linked().declaringIdentity(name);
     }
 
     /** The names a bind lookup for entry {@code name} tries, in order: the aliases an author wrote, then its own. */

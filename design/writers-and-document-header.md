@@ -36,6 +36,9 @@ keeps the rest of the document. Current form only; history lives in git.
 - A peek is total: a malformed header yields nothing rather than throwing, never a schema the document does
   not name, and the failure it kept is reported by the read that continues.
 - The resolver reaches for the `writer`-package engine (`DataClassObjectWriter`), never the facade.
+- The object writer reads a schema in one place only: `describing(TsonLinkedSchema, root)` tags a union member at a
+  position typed by an extern with the enclosing scope's name (`writer.ExternTags`, `design/externs.md`); every other
+  tag is the class's own, and a writer derived from strings writes none of the schema's.
 
 Related: `design/facades-and-tree.md` (the read facades, annotation capture), `design/tree-model.md`
 (`TsonValue`, `TsonDocument`, `TsonObjectDocument`), `design/front-door-and-config.md` (`Tson`),

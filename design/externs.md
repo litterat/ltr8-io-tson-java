@@ -1,8 +1,8 @@
 # Externs
 
 Design notes for `!meta.extern` ([TSON-SCHEMA] §5.13): one entry of another schema under a local name, a dependency
-loaded with the imports whose names never enter the namespace, and a value read through one (§7.9). Binding through
-one and the JSON stack are gaps (`BACKLOG.md`, "Externs"). Current form only; history lives in git.
+loaded with the imports whose names never enter the namespace, and a value read, bound and written through one
+(§7.9). The JSON stack is the gap (`BACKLOG.md`). Current form only; history lives in git.
 
 **Invariants**
 
@@ -35,12 +35,13 @@ one and the JSON stack are gaps (`BACKLOG.md`, "Externs"). Current form only; hi
 
 - **The body is read by a foreign schema's own compiled reader**, so nothing re-resolves a name per scope. Each
   foreign schema compiles once per identity and mode, through the read registry's cache or, for a checkpoint, the
-  core's tree cache (`TsonSchemaCompiler.ForeignSchemas`). A miss compiles outside any lock and `putIfAbsent`s: the
+  core's cache for that mode (`TsonSchemaCompiler.ForeignSchemas`). A miss compiles outside any lock and `putIfAbsent`s: the
   compile reaches the same cache again for each foreign schema, which `computeIfAbsent` cannot.
 - **The boundary consumes the tag and the annotations in front of the value, in the enclosing scope, and hands a
   foreign reader the value untagged**, read as the entry the tag reached. Handing it a foreign name instead refuses
   what the boundary admitted wherever the target takes no tag of its own name: a choice, a member-dispatched base.
-- **What a tag may name is fixed at compile, by identity**: any name of the enclosing scope, extern or not, that
+- **What a tag may name is fixed at compile, by identity** (`ExternAdmission`, which the writer's tags read too, so
+  the two admit one set): any name of the enclosing scope, extern or not, that
   reaches past its aliases and externs the target, an entry IS-A it, or a variant of it where it is a choice. A name
   reaching an entry no extern reaches is read where the position's foreign schema reads it, if that namespace holds
   the entry, else in the schema declaring it. An abstract target naming no selectors is refused at the boundary, so
@@ -50,11 +51,30 @@ one and the JSON stack are gaps (`BACKLOG.md`, "Externs"). Current form only; hi
   sink hears nothing there, the names being judged by the foreign readers rather than recorded for this link.
 - **A tree value at the boundary carries the outer name** (the tag written, else the extern), so the writer writes
   back a tag the enclosing scope admits.
-- **Bind mode reports `NOT_IMPLEMENTED`** (`ExternReader.unbound`): one `DataNameBinder` names both schemas' classes,
-  so two `card`s would bind to one class. For the same reason an annotation through an extern in a schema document
-  is read at a tree checkpoint and holds a `TsonValue`.
+- **Bind mode needs nothing of its own inside**: every class is asked of the binder by its entry's identity, the
+  declaring schema's canonical identity and the name (`ValueReaderContext.namespaceOf`), so two schemas' `card` bind
+  apart wherever the binder routes them (`DataNameBinder.byNamespace`). An annotation through an extern in a schema
+  document binds where the context binds the foreign classes and is a tree where it does not, as a value entry is.
+- **The annotations in front of the boundary reach a bound record through its carrier** (`ExternReader.carrying`):
+  the value crossed unannotated, so the bound record is rebuilt once with them, and only where some were written. A
+  class with no carrier drops them, as a record's reader does, the boundary having checked them.
+
+**Writing through an extern** (`writer.ExternTags`, from `TsonObjectWriter.describing(linked, root)`)
+
+- **Only a tag is the enclosing scope's**; the body is written as the class writes it, the foreign schema's names. A
+  union member at a boundary is tagged with the enclosing scope's name for the entry its class is bound to: the
+  extern for the target, an admitted name for a subtype or a variant. A class bound to no admitted entry is a
+  `WriteException`, never the foreign name, which the boundary would refuse.
+- **A class maps to its entry by asking the binder forward**, for each admitted entry, by declaring schema and name:
+  the write inverts what a read binds. Built once per derived writer over every schema the externs reach; a write
+  looks up its record class and component and allocates nothing.
 
 **Decisions that lost**
+
+- **`@Typename.namespace` naming a class's entry when writing**: a second authority beside the binder, which the read
+  cannot consult (no index runs from an annotation to its class). It stays unread.
+- **Handing the boundary's annotations to the foreign reader through the context**: bytes on every context copy.
+- **Tags derived from `describing(uri, root)`**: a fetch, or a failure, at derivation for a schema never loaded.
 
 - **Compiling the foreign schema inside the importer's compile**: once per importer and per checkpoint.
 - **A `scope` component on `Diagnostic`**: `schemaId` already names the schema whose names were read; the chain of

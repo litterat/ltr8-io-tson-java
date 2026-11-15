@@ -104,11 +104,22 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      * dependencies beside its {@code !!import}s, none of whose names enters its namespace ([TSON-SCHEMA] §3.4.1).
      */
     public List<String> externSchemas() {
-        String own = CanonicalIdentity.canonicalize(schema.id());
+        String own = identity();
         return schema.entries().keySet().stream()
                 .filter(name -> externs.containsKey(name) && originOf(name).equals(own))
                 .map(name -> externs.get(name).schema())
                 .distinct().toList();
+    }
+
+    /**
+     * Every schema this schema depends on directly, as canonical identities, each once: its {@code !!import}s in
+     * header order, then the schemas its own externs name ({@link #externSchemas}). What a caller walks to collect
+     * the closure a schema needs -- to publish it, to warm a cache, to fetch it ahead of a read -- since a schema an
+     * extern names loads with the imports ([TSON-SCHEMA] §3.4.1) though none of its names enters this namespace.
+     */
+    public List<String> dependencies() {
+        return java.util.stream.Stream.concat(schema.imports().stream().map(CanonicalIdentity::canonicalize),
+                externSchemas().stream()).distinct().toList();
     }
 
     /** The form enum {@code entryName} matches its members in -- {@code NONE} for one {@link #enumForms} omits. */
@@ -180,6 +191,28 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      */
     public String originOf(String entryName) {
         return entryOrigins.getOrDefault(entryName, schema.id());
+    }
+
+    /**
+     * {@link #originOf}, as a canonical identity ([TSON-DATA] §2.2.1): the namespace a host binds the entry's class
+     * within, so one entry reached through several schemas is one, and two schemas' entries of one name are two. An
+     * imported entry's origin is recorded canonical, and this schema's own entries are its {@link #identity()}.
+     */
+    public String declaringIdentity(String entryName) {
+        String recorded = entryOrigins.get(entryName);
+        return recorded != null ? recorded : identity();
+    }
+
+    /**
+     * This schema's canonical identity ([TSON-DATA] §2.2.1): its {@code !!id} canonicalized, or as it stands where it
+     * is already an identity rather than a reference (a stand-in named by identity).
+     */
+    public String identity() {
+        try {
+            return CanonicalIdentity.canonicalize(schema.id());
+        } catch (SchemaValidationException alreadyAnIdentity) {
+            return schema.id();
+        }
     }
 
     /**

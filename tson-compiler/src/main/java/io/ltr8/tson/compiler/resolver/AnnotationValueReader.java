@@ -19,7 +19,7 @@ import io.ltr8.tson.compiler.ast.DataValue;
  * treats as "value out of reach" and keeps the annotation's name alone.
  *
  * <p>{@code foreign} is true where {@code type} is an extern: the value is a foreign value ([TSON-SCHEMA] §5.13,
- * §7.9), read as a tree, since one bind context cannot tell the foreign schema's names from this one's.
+ * §7.9), bound where the bind context binds the foreign schema's classes and held as a tree where it does not.
  */
 @FunctionalInterface
 interface AnnotationValueReader {

@@ -35,27 +35,28 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
      * schema compiles and only reading a value against that entry fails.
      */
     static TsonCompiledVocabulary compile(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver) {
-        return compileWith(linked, resolver, Set.of(), false);
+        return compileWith(linked, resolver, Set.of(), false, null);
     }
 
     /**
      * {@link #compile} of a schema whose resolution is in progress, {@code pending} naming its declarations not yet
-     * ready ({@link TsonSchemaCompiler#compileReady}).
+     * ready ({@link TsonSchemaCompiler#compileReady}), a schema an extern names compiled by {@code foreign}.
      */
     static TsonCompiledVocabulary compileReady(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver,
-                                               Set<String> pending) {
-        return compileWith(linked, resolver, pending, true);
+                                               Set<String> pending, TsonSchemaCompiler.ForeignSchemas foreign) {
+        return compileWith(linked, resolver, pending, true, foreign);
     }
 
     private static TsonCompiledVocabulary compileWith(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver,
-                                                      Set<String> pending, boolean checkpoint) {
+                                                      Set<String> pending, boolean checkpoint,
+                                                      TsonSchemaCompiler.ForeignSchemas foreign) {
         return new TsonCompiledVocabulary(TsonSchemaCompiler.compileWith(linked, name -> {
             try {
                 return resolver.resolve(name);
             } catch (RuntimeException noFactory) {
                 return unbuildable(linked.originOf(name), name, noFactory);
             }
-        }, pending, checkpoint, null));
+        }, pending, checkpoint, foreign, TsonSchemaCompiler.bindingOf(resolver)));
     }
 
     /**

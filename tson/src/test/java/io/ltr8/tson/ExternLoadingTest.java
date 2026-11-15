@@ -49,6 +49,17 @@ class ExternLoadingTest {
     }
 
     @Test
+    void theDependencyListIsEveryImportThenEveryExternsSchemaEachOnce() {
+        world.schema("https://example.test/shared.tn", "money => { cents: int64 }\n");
+        TsonLinkedSchema linked = world.tson().resolve(ExternWorld.text("https://example.test/subject.tn",
+                extern("a", ORDER_1, "order") + extern("b", ORDER_2, "order") + extern("c", ORDER_1, "card"),
+                "https://example.test/shared.tn"));
+        assertEquals(List.of(CanonicalIdentity.canonicalize(ExternWorld.CORE),
+                CanonicalIdentity.canonicalize("https://example.test/shared.tn"), CanonicalIdentity.canonicalize(ORDER_1),
+                CanonicalIdentity.canonicalize(ORDER_2)), linked.dependencies());
+    }
+
+    @Test
     void noneOfTheForeignSchemasNamesEntersTheNamespace() {
         assertEquals(List.of("SCHEMA_ERROR /batch: 'batch' field 'c' has an unresolved reference 'card'"),
                 world.validate(extern("o1", ORDER_1, "order") + "batch => { o: o1  c: card }"));

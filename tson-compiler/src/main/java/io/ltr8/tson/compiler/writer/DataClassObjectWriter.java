@@ -73,8 +73,17 @@ public final class DataClassObjectWriter {
      */
     private final TreeValueWriter treeWriter = new TreeValueWriter();
 
+    /** The tags a value written at a position typed by an extern carries; {@link ExternTags#NONE} for none. */
+    private final ExternTags externs;
+
     public DataClassObjectWriter(DataBindContext context) {
+        this(context, ExternTags.NONE);
+    }
+
+    /** A writer whose values at a position typed by an extern are tagged in the enclosing scope ({@code externs}). */
+    public DataClassObjectWriter(DataBindContext context, ExternTags externs) {
         this.context = context;
+        this.externs = externs;
     }
 
     /** Over the {@code schema.meta} resolution vocabulary -- what the schema resolver writes through. */
@@ -145,6 +154,15 @@ public final class DataClassObjectWriter {
      */
     private void write(Object value, DataClass dataClass, TsonDataEmitter writer, String typeRef)
             throws DataBindException {
+        write(value, dataClass, writer, typeRef, null);
+    }
+
+    /**
+     * {@link #write(Object, DataClass, TsonDataEmitter, String)} at a position typed by an extern, {@code boundary}
+     * naming the tags the enclosing scope writes there; {@code null} elsewhere.
+     */
+    private void write(Object value, DataClass dataClass, TsonDataEmitter writer, String typeRef,
+                       ExternTags.Boundary boundary) throws DataBindException {
         try {
             if (value == null) {
                 writer.voidValue();
@@ -155,7 +173,7 @@ public final class DataClassObjectWriter {
                 // as a record carrier's precede the record (§7.4). Taken apart through its own handles, so
                 // nothing here names the carrier class.
                 writeAnnotations((Annotations) boxed.annotations().invoke(value), writer);
-                write(boxed.value().invoke(value), boxed.valueClass(), writer, typeRef);
+                write(boxed.value().invoke(value), boxed.valueClass(), writer, typeRef, boundary);
                 return;
             }
             if (value instanceof ValueRef<?> reference) {
@@ -234,7 +252,7 @@ public final class DataClassObjectWriter {
             if (typeRef != null) {
                 writer.typeRef(typeRef);
             }
-            writeCore(value, dataClass, writer);
+            writeCore(value, dataClass, writer, boundary);
         } catch (DataBindException | UncheckedIOException | WriteException e) {
             // Both of the non-binding failures pass through rather than being wrapped as "cannot write
             // <class> as TSON", which would blame the object for neither being its fault: an
@@ -252,15 +270,16 @@ public final class DataClassObjectWriter {
      * from {@link #write}, which owns that prologue; a caller wanting a type-ref of its own hands it to the
      * seam there rather than emitting it and coming here directly.
      */
-    private void writeCore(Object value, DataClass dataClass, TsonDataEmitter writer) throws DataBindException {
+    private void writeCore(Object value, DataClass dataClass, TsonDataEmitter writer, ExternTags.Boundary boundary)
+            throws DataBindException {
         try {
             switch (dataClass) {
                 case DataClassAtom atom -> writeAtom(value, writer);
                 case DataClassRecord record -> writeRecord(value, record, writer);
-                case DataClassArray array -> writeArray(value, array, writer);
-                case DataClassMap map -> writeMap(value, map, writer);
+                case DataClassArray array -> writeArray(value, array, writer, boundary);
+                case DataClassMap map -> writeMap(value, map, writer, boundary);
                 case DataClassTuple tuple -> writeTuple(value, tuple, writer);
-                case DataClassUnion union -> writeUnion(value, union, writer);
+                case DataClassUnion union -> writeUnion(value, union, writer, boundary);
                 default -> throw new DataBindException("unsupported DataClass for writing: " + dataClass);
             }
         } catch (DataBindException | UncheckedIOException | WriteException e) {
@@ -365,14 +384,15 @@ public final class DataClassObjectWriter {
                 continue;
             }
             writer.field(field.name());
-            write(field.get(value), field.dataClass(), writer);
+            write(field.get(value), field.dataClass(), writer, null, externs.at(dataClass.typeClass(), field.name()));
         }
         writer.endRecord();
     }
 
     // ── Arrays ───────────────────────────────────────────────────────────
 
-    private void writeArray(Object value, DataClassArray dataClass, TsonDataEmitter writer) throws Throwable {
+    private void writeArray(Object value, DataClassArray dataClass, TsonDataEmitter writer,
+                            ExternTags.Boundary boundary) throws Throwable {
         writer.beginArray();
         int size = (int) dataClass.size().invoke(value);
         Object iterator = dataClass.iterator().invoke(value);
@@ -380,14 +400,15 @@ public final class DataClassObjectWriter {
         for (int i = 0; i < size; i++) {
             Object element = dataClass.get().invoke(value, iterator);
             writer.beforeArrayElement();
-            write(element, elementClass, writer);
+            write(element, elementClass, writer, null, boundary);
         }
         writer.endArray();
     }
 
     // ── Maps ─────────────────────────────────────────────────────────────
 
-    private void writeMap(Object value, DataClassMap dataClass, TsonDataEmitter writer) throws Throwable {
+    private void writeMap(Object value, DataClassMap dataClass, TsonDataEmitter writer,
+                          ExternTags.Boundary boundary) throws Throwable {
         writer.beginMap();
         Object iterator = dataClass.iterator().invoke(value);
         DataClass keyClass = dataClass.keyDataClass();
@@ -399,7 +420,7 @@ public final class DataClassObjectWriter {
             writer.beforeMapEntry();
             write(key, keyClass, writer);
             writer.mapArrow();
-            write(entryValue, valueClass, writer);
+            write(entryValue, valueClass, writer, null, boundary);
         }
         writer.endMap();
     }
@@ -499,7 +520,8 @@ public final class DataClassObjectWriter {
      * the forms the read side accepts -- read/write asymmetry is fine here; a reader benefiting from
      * flexibility doesn't obligate a writer to be equally flexible about its own single output.
      */
-    private void writeUnion(Object value, DataClassUnion dataClass, TsonDataEmitter writer) throws Throwable {
+    private void writeUnion(Object value, DataClassUnion dataClass, TsonDataEmitter writer,
+                            ExternTags.Boundary boundary) throws Throwable {
         if (value instanceof Namespace<?> || value instanceof ValueEntry || value instanceof TypeInline) {
             // A namespace and a value entry name their own type, which no class does; a type written in place is
             // untagged, recovered by its brace.
@@ -514,7 +536,23 @@ public final class DataClassObjectWriter {
         // Naming the member is the whole of this method's own business; the tag goes to write()'s seam so
         // that the prologue around it -- bridge, annotated box, parsed value -- is the one every other
         // position gets, rather than a copy of part of it maintained here.
-        write(value, context.getDescriptor(memberClass), writer, memberTypeRef(memberClass));
+        write(value, context.getDescriptor(memberClass), writer,
+                boundary == null ? memberTypeRef(memberClass) : tagAt(boundary, memberClass));
+    }
+
+    /**
+     * The tag a member writes at a boundary: the enclosing scope's name for the entry its class is bound to, since the
+     * tag is read there and the foreign schema's own name is not.
+     */
+    private static String tagAt(ExternTags.Boundary boundary, Class<?> memberClass) {
+        String tag = boundary.tagFor(memberClass);
+        if (tag == null) {
+            throw new WriteException(memberClass.getName() + " is written at a '" + boundary.extern() + "' position, "
+                    + "and the enclosing scope has no name reaching the entry it is bound to: a subtype is written at "
+                    + "the boundary through a name of the enclosing scope (" + boundary.admissible() + ") "
+                    + "([TSON-SCHEMA] §7.9)");
+        }
+        return tag;
     }
 
     /**

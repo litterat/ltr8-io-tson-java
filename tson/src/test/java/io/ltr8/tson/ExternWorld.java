@@ -66,9 +66,13 @@ final class ExternWorld {
 
     /** A processor binding the schema type names {@code classes} maps, beside the schema model's own. */
     Tson tson(Map<String, Class<?>> classes) {
+        return tson(DataNameBinder.ofMap(classes).orElse(SchemaModelNameBinder.INSTANCE));
+    }
+
+    /** A processor binding classes through {@code binder}, beside the schema model's own. */
+    Tson tson(DataNameBinder binder) {
         return Tson.of(config().withDataBindContext(DataBindContext.builder()
-                .nameBinder(DataNameBinder.ofMap(classes).orElse(SchemaModelNameBinder.INSTANCE))
-                .registerAtoms(AtomContext.hostTypes()).build()));
+                .nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build()));
     }
 
     private ProcessorConfig config() {

@@ -466,7 +466,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         private Class<?> boundClassOrNull(String schemaTypeName, ValueReaderContext vctx) {
             for (String candidate : vctx.bindingNamesFor(schemaTypeName)) {
                 try {
-                    return context.getDescriptor(candidate).typeClass();
+                    return context.getDescriptor(vctx.namespaceOf(candidate), candidate).typeClass();
                 } catch (DataBindException | RuntimeException e) {
                     // Not a member under this name; the next candidate is the entry's own.
                 }
@@ -489,7 +489,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             StringBuilder tried = new StringBuilder();
             for (String candidate : vctx.bindingNamesFor(name)) {
                 try {
-                    return context.getDescriptor(candidate);
+                    return context.getDescriptor(vctx.namespaceOf(candidate), candidate);
                 } catch (UnboundNameException e) {
                     // Not bound under this name; the next candidate is tried, and the first is the one reported,
                     // being the name the author wrote.

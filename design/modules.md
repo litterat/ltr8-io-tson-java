@@ -37,7 +37,9 @@ module has a real `module-info.java`; module names mirror each module's root exp
   (`DataBindContext.Builder.profile`), selecting among a class's `@Profile` constructors so one class binds
   several shapes — one context per schema version, descriptors still cached per context. The name is opaque
   here: matched by equality, with nothing in the module knowing what it stands for, which is what keeps
-  selection out of the schema layer. **A cyclic type graph resolves** — a record reaching itself, directly or
+  selection out of the schema layer. A `DataNameBinder` is asked a name within a **namespace**, opaque on the same
+  terms: the engine passes the declaring schema's identity, and `ltr8-bind` only routes by equality
+  (`byNamespace`). **A cyclic type graph resolves** — a record reaching itself, directly or
   through others: `getDescriptor` hands a re-entrant call a deferred supplier and each holder keeps it in a
   final `Memoized`, so laziness is confined to the cyclic edge and every other component still resolves
   eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` →

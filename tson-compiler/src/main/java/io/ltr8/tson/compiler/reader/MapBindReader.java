@@ -145,9 +145,9 @@ final class MapBindReader extends MapAbstractReader<Object> {
             if (!(typeDefinition instanceof MapBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition);
             }
-            Type keyType = resolveType(body.keyType().name());
+            Type keyType = resolveType(body.keyType().name(), context);
             // A value written in place has no bound class of its own: its host type is its constructor's shape.
-            Type valueType = BindTargets.hostType(body.valueType(), this::resolveType);
+            Type valueType = BindTargets.hostType(body.valueType(), value -> resolveType(value, context));
             // A value of a namespace type is a map of names, whose keys' annotations and order are part of what
             // an instance of the constructor holds (NamespaceInstanceReader).
             String terminal = AliasChain.terminal(name, context.schema().entries()::get);
@@ -165,9 +165,9 @@ final class MapBindReader extends MapAbstractReader<Object> {
         }
 
         /** {@code schemaTypeName} has no real bound Java class only where none is bound by that name. */
-        private Class<?> resolveType(String schemaTypeName) {
+        private Class<?> resolveType(String schemaTypeName, ValueReaderContext vctx) {
             try {
-                return context.getDescriptor(schemaTypeName).typeClass();
+                return context.getDescriptor(vctx.namespaceOf(schemaTypeName), schemaTypeName).typeClass();
             } catch (DataBindException e) {
                 return String.class;
             }

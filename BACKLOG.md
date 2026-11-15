@@ -253,14 +253,13 @@ thing outstanding under it is unrelated to the check itself.
 
 ## Externs
 
-A value is read through an extern ([TSON-SCHEMA] §7.9) in TSON text, in tree mode; binding one reports
-`NOT_IMPLEMENTED` (`ExternReader.unbound`), as reading one in JSON does.
+A value through an extern ([TSON-SCHEMA] §7.9) is read, bound and written in TSON text; reading one in JSON is the
+gap left, listed under "JSON encoding".
 
-- [ ] **Bind by entry identity.** One `DataNameBinder` serves the importer and every foreign schema, so two schemas'
-  `card` would bind to one class: ask the binder by declaring schema and name, keeping the name-only form for a
-  caller with one schema, then compile an extern in bind mode as tree mode does (`TsonSchemaCompiler.Compilation
-  .boundary`) through the bind registry's cache. The annotations in front of the boundary go to the bound value as
-  a record's do.
+- [ ] **Write the boundary tag at every position an extern types.** `ExternTags` names a subtype or a variant at a
+  boundary where the extern types a record field, directly or through an array or a map written in place. A root
+  typed by an extern, and an extern reached through an alias of a container, write no boundary tag, so an instance
+  of a subtype there writes text that does not read back as that subtype ([TSON-SCHEMA] §7.9, "Writing").
 
 ## JSON encoding
 
