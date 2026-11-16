@@ -1,21 +1,32 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeRef;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 /**
  * The {@link ValueReaderFactory} for the kernel's {@code choice} constructor. Dispatches by the value's own
- * {@code !typeName} annotation against {@link ChoiceBody#variants}' fixed, declared list, via {@link
- * NamedDispatchReader}. Same for both {@link ValueReaderFactoryRegistry#tree} and {@link
- * ValueReaderFactoryRegistry#bind} (a single shared entry, not per mode).
+ * {@code !typeName} annotation to one of {@link ChoiceBody#variants}, via {@link NamedDispatchReader}. Same for both
+ * {@link ValueReaderFactoryRegistry#tree} and {@link ValueReaderFactoryRegistry#bind} (a single shared entry, not
+ * per mode).
+ *
+ * <p><b>Which variant a tag selects ([TSON-SCHEMA] §5.4)</b> is decided here, once per choice, as a table from every
+ * name a tag may carry to its variant: a variant's own name and every alias meaning the same type, then each type
+ * IS-A exactly one variant. The value goes to that variant's reader, which weighs the tag as a position typed by the
+ * variant does (§7.2) -- so the abstract variant itself is refused there, not here, and a subtype validates as
+ * itself. A type IS-A two variants and naming neither is no entry of the table.
  *
  * <p><b>Untagged structural recovery (§5.4).</b> Where the choice is disjoint and every variant has a {@link
  * DiscriminationClass}, each distinct, the tag is omissible: an untagged value is recovered to the variant of its own
@@ -51,13 +62,57 @@ final class ChoiceReader {
         for (TypeExpr variant : body.variants()) {
             variantNames.add(variant.text());
         }
+        Map<String, List<String>> selectsNone = new LinkedHashMap<>();
+        Map<String, TypeExpr> selects = selection(body, context, selectsNone);
         // NamedDispatchReader's positionName is message-only, so the display name goes straight in.
         return new NamedDispatchReader(context.displayName(name, typeDefinition),
                 "is a choice -- a value at this position requires an explicit type annotation (!typeName) "
                         + "naming one of its declared variants to disambiguate",
-                "declared variant", variantNames, context.readers(),
+                variantNames, Map.copyOf(selects), Map.copyOf(selectsNone), context.readers(),
                 untaggedRecovery(body, context.linked()));
     };
+
+    /**
+     * The table the class Javadoc describes. A name meaning a variant is entered before any subtype, so at {@code (
+     * base | sub )} the tag {@code !sub} selects {@code sub}; {@code ambiguous} receives each name IS-A more than one
+     * variant and meaning none, with those variants' names. A variant written in place adds nothing.
+     */
+    private static Map<String, TypeExpr> selection(ChoiceBody body, ValueReaderContext context,
+                                                   Map<String, List<String>> ambiguous) {
+        var entries = context.schema().entries();
+        Map<String, TypeExpr> selects = new LinkedHashMap<>();
+        List<TypeRef> named = body.variants().stream().flatMap(variant -> TypeExpr.named(variant).stream()).toList();
+        for (TypeRef variant : named) {
+            selects.put(variant.name(), variant);
+        }
+        for (TypeRef variant : named) {
+            String terminal = AliasChain.terminal(variant.name(), entries::get);
+            Subsumption.admitting(List.of(terminal), context.namesMeaning())
+                    .forEach(written -> selects.putIfAbsent(written, variant));
+        }
+        Map<String, List<TypeRef>> below = new LinkedHashMap<>();
+        for (TypeRef variant : named) {
+            String terminal = AliasChain.terminal(variant.name(), entries::get);
+            Top definition = entries.get(terminal);
+            if (definition == null) {
+                continue;
+            }
+            for (String written : Subsumption.admitting(context.subtypesOf(terminal, definition),
+                    context.namesMeaning())) {
+                if (!selects.containsKey(written)) {
+                    below.computeIfAbsent(written, ignored -> new ArrayList<>()).add(variant);
+                }
+            }
+        }
+        below.forEach((written, variants) -> {
+            if (variants.size() == 1) {
+                selects.put(written, variants.getFirst());
+            } else {
+                ambiguous.put(written, variants.stream().map(TypeRef::name).toList());
+            }
+        });
+        return selects;
+    }
 
     /**
      * {@code discrimination class -> variant} for untagged recovery, or empty (tag stays required) unless the

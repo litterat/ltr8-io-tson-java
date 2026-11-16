@@ -114,6 +114,7 @@ class CrossEncodingParityTest {
               dog_of    => dog
               pet_of    => pet
               gallery   => { f: figure }
+              drawn     => { o: ( text | figure ) }
               garage    => { r: robot }
               outcome    => abstract <T> { code: T }
               won        => <T> outcome<T> & { prize: text }
@@ -1009,6 +1010,20 @@ class CrossEncodingParityTest {
         bothAccept("shaped", """
                 { outline: !circle { radius: 1.0 } }""", """
                 {"outline": {"$type": "circle", "radius": 1.0}}""");
+    }
+
+    /**
+     * A tag at a choice selects the one variant its type IS-A, and the value is read there as at a position typed by
+     * it ([TSON-SCHEMA] §5.4): the abstract variant's member reads, and the abstract variant itself is refused.
+     */
+    @Test
+    void aTagNamingASubtypeOfOneVariantSelectsItInBoth() {
+        bothAccept("drawn", """
+                { o: !disc { area: 4  side: 2 } }""", """
+                {"o": {"$type": "disc", "area": 4, "side": 2}}""");
+        sameVerdict("drawn", """
+                { o: !figure { area: 4 } }""", """
+                {"o": {"$type": "figure", "area": 4}}""");
     }
 
     // ── Types written in place: each read by a reader built from its construction ────────

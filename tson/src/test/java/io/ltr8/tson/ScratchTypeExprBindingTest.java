@@ -38,17 +38,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * construction is read through too, and written back through {@code DataClassObjectWriter}.
  *
  * <p>Tier 1 is the marker shape (§3.3), which the design did not take: the kernel's {@code type_inline} is a wrapper
- * record, a concrete variant, so a tag naming a subtype of a variant is not needed and is not read. Its tests that
- * depend on that, or on G3, are disabled, each saying which; {@link RealModel} is the shape taken.
+ * record, a concrete variant, so a tag naming a subtype of a variant is not needed there. Its tests that depend on
+ * G3 are disabled; {@link RealModel} is the shape taken.
  *
  * <p><b>The gaps found here.</b>
  * <ul>
  *   <li><b>G1, untagged recovery</b>: {@code ChoiceReader} recovered an untagged value only where every variant is
  *       scalar, so the bare name at {@code ( t_name | t_inline )} needed a tag. Closed: a disjoint choice recovers a
  *       brace- or bracket-class variant by its delimiter ({@code ChoiceReader.untaggedRecovery}).</li>
- *   <li><b>G2, a tag naming a subtype of a variant</b>: {@code NamedDispatchReader} admits only a tag naming a
- *       declared variant, so {@code !t_array} at {@code ( t_name | t_inline )} is refused. Not patched: the
- *       wrapper does not need it, and the spec does not say it ({@code SPEC-FEEDBACK.md} #4).</li>
+ *   <li><b>G2, a tag naming a subtype of a variant</b>: closed. {@code !t_array} at {@code ( t_name | t_inline )}
+ *       selects {@code t_inline}, the one variant it IS-A ([TSON-SCHEMA] §5.4).</li>
  *   <li><b>G3, a bridged variant through a choice</b>: still open. {@code BindTargets} reads a choice "as it is", so a
  *       variant whose Java member is a bridged or {@code @Transparent} class (here {@code TName} over {@code text})
  *       delivers the wire value, a {@code String}, into the {@code TExpr} component: {@code ClassCastException}. The
@@ -188,8 +187,8 @@ class ScratchTypeExprBindingTest {
         assertEquals(new Holder(new TName("text")), read);
     }
 
-    /** Fails on G3 at the nested element_type; the !t_array dispatch itself (G2 patched) succeeds. */
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
+    /** Fails on G3 at the nested element_type; the !t_array dispatch itself succeeds. */
+    @Disabled("G3 open: a choice reads a bridged variant as it is, so the wire value reaches the sealed slot")
     @Test
     void q2_aTaggedInlineTypeReadsIntoTheSealedSlot() {
         Holder read = bound().objectReader().read(doc("!holder { slot: !t_array { element_type: text } }"),
@@ -222,7 +221,6 @@ class ScratchTypeExprBindingTest {
      * The narrow slot reaches TTuple through t_inline's dispatcher (union TInline), the wide one through t_type's
      * (union TWide, whose flattening lists TArray, TMap and TTuple twice, once under TProduct and once under TInline).
      */
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
     @Test
     void q3_aDoublyParentedRecordReadsAtTheNarrowAndTheWideSlot_noNames() {
         Tson tson = bound();
@@ -232,7 +230,6 @@ class ScratchTypeExprBindingTest {
                 tson.objectReader().read(doc("!wide { slot: !t_tuple { arity: 2 } }"), Wide.class));
     }
 
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
     @Test
     void q3_aDoublyParentedRecordWritesAndRoundTripsInBothHierarchies_noNames() {
         Tson tson = bound();
@@ -245,7 +242,7 @@ class ScratchTypeExprBindingTest {
     }
 
     /** Fails on G3 at key_type; the same record with names inside. */
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
+    @Disabled("G3 open: a choice reads a bridged variant as it is, so the wire value reaches the sealed slot")
     @Test
     void q3_aDoublyParentedRecordReadsAtTheNarrowAndTheWideSlot() {
         Tson tson = bound();
@@ -287,7 +284,7 @@ class ScratchTypeExprBindingTest {
     }
 
     /** Fails on G3: a name inside arrives as a String. */
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
+    @Disabled("G3 open: a choice reads a bridged variant as it is, so the wire value reaches the sealed slot")
     @Test
     void q4_aNestedInlineTypeRoundTrips() {
         Tson tson = bound();
@@ -298,7 +295,7 @@ class ScratchTypeExprBindingTest {
     }
 
     /** Fails on G3: a name inside arrives as a String. */
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
+    @Disabled("G3 open: a choice reads a bridged variant as it is, so the wire value reaches the sealed slot")
     @Test
     void q4_aNestedInlineTypeReadsFromTheResolvedFormSpelling() {
         Holder read = bound().objectReader().read(doc(
@@ -320,7 +317,6 @@ class ScratchTypeExprBindingTest {
                 tson.objectReader().read(doc("!wide { slot: !t_array { element_type: money } }"), Wide.class));
     }
 
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
     @Test
     void q5_theWideSlotReadsAMemberOutsideTheNarrowLine() {
         assertEquals(new Wide(new TRec(3)),
@@ -335,7 +331,7 @@ class ScratchTypeExprBindingTest {
     // ── Q6: a list of slots ──
 
     /** Fails on G3: a name inside arrives as a String. */
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
+    @Disabled("G3 open: a choice reads a bridged variant as it is, so the wire value reaches the sealed slot")
     @Test
     void q6_aListOfSlotsReadsNamesAndInlineTypesMixed() {
         Holders read = bound().objectReader().read(doc(
@@ -344,7 +340,7 @@ class ScratchTypeExprBindingTest {
     }
 
     /** Fails on G3: a name inside arrives as a String. */
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
+    @Disabled("G3 open: a choice reads a bridged variant as it is, so the wire value reaches the sealed slot")
     @Test
     void q6_aChoiceBodyHoldsAListOfSlots() {
         Holder read = bound().objectReader().read(doc(
@@ -353,7 +349,7 @@ class ScratchTypeExprBindingTest {
     }
 
     /** Fails on G3: a name inside arrives as a String. */
-    @Disabled("The marker shape, not taken: a tag naming a subtype of a variant is not read (SPEC-FEEDBACK.md #4)")
+    @Disabled("G3 open: a choice reads a bridged variant as it is, so the wire value reaches the sealed slot")
     @Test
     void q6_aListOfSlotsRoundTrips() {
         Tson tson = bound();

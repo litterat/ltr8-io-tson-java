@@ -26,7 +26,7 @@ no register entry carries either, is the *extern*: a schema names one entry of a
 under a name of its own, and a value so typed is read under its own schema (§3.2 items
 116–118). The register's
 entries #1, #7, #8 and #9 are accepted as they propose, each a sentence or a paragraph
-stating what the series already holds; #4 is carried (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
+stating what the series already holds; #2 and #4 are accepted by the spec author's rulings (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
 modified by this revision; each of its entries receives a disposition here.
 
 Provenance markers used in the disposition table:
@@ -142,12 +142,12 @@ footing:
 | 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–58, 71 and 72–77), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented] |
 | 3 | Templates as open records | **Accept — the baseline above**, every step as the register states what runs. Part 2 §5.10 is rewritten around the three rules; §1.3, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow (§3.2). §1.6's example drops its value parameter. **[editorial]** at five points where the sources disagree or the text needed a reading (§5). [settled — implemented] |
 | 6 | A dependent field's type is a sum in place | **Accept** — the kernel's `meta.dependent`, the retyped `meta.record_field.type`, `meta.type_ref` and `meta.ref`, and the hand-written resolved fixture are the baseline (§1); Part 1 §1.3, §1.5, §2.3, §2.5, §2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4, §7.5, §7.7 and §8.1 follow (§3.1, items 11–19), Part 2 §1.4, §4.2, §5.2, §5.3, §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9 and §12 (§3.2, items 59–70), and Part 3 §1.6 and §5.6 (§3.4). Four readings the spec author ruled on; one point stays open (§5). [settled — implemented] |
-| 4 | A tag at a choice names a variant; a choice with an abstract variant has no values | **Carried.** Part 2 §5.4's tag still names a variant exactly, so a tag naming a subtype of a variant is refused and an abstract variant holds no tagged value. The entry's two resolutions stand as written; its "why it matters now" no longer holds, the kernel's type-slot choice being a reference beside a closed record, `meta.type_inline`. [open] |
+| 4 | A tag at a choice names a variant; a choice with an abstract variant has no values | **Accept**, the entry's first resolution: a tag at a choice names a variant, or a type that IS-A exactly one variant, and the value is read at that variant as at a position typed by it, so an abstract variant admits its family; a tag that IS-A two variants and names neither is refused at the data (§3.2 item 121). **[settled]** |
 | 7 | A free sibling hands the choice of a dependent field's type to the document's author | **Accept** — one paragraph in Part 2 §11.1, and no change to §5.2's rules (§3.2 item 111). **[settled]** |
 | 8 | A name inside an annotation's value: that it is judged, where, and when | **Accept** — Part 2 §5.12's "Where the rule stands" names an annotation's value among the slots the rule reaches, with its namespace and its time, and §6 points at it (§3.2 item 112). No rule changes; the first implementation judges a data document's annotation value and not yet a schema document's (§5). **[settled]** |
 | 9 | `net.uuid_type.version` has no stated meaning | **Accept** — Part 2 §5.5 states it, a UUID whose RFC 9562 version field equals `version`, and §5.7 lists it among the settable-once facets (§3.2 item 113), which is what runs. **[settled]** |
 
-Counts: **8 accepted** (#3, in six steps, #5, #6 and #2; and #1, #7, #8 and #9, which change no rule), **0 declined**, **1 carried** (#4). Revision
+Counts: **9 accepted** (#3, in six steps, #5, #6, #2 and #4; and #1, #7, #8 and #9, which change no rule), **0 declined**, **0 carried**. Revision
 39's open remainders on templates close with #3: #13's (whether a value argument narrows
 below `token`) by the removal of value arguments, #19's (a shared parent for `record` and
 `record_template`) by the removal of `record_template`, and #21's (a sibling in a template
@@ -962,6 +962,17 @@ it.
      a schema's own references to its fields match exactly stands and says what it does not
      cover: a segment selects a field of a record value, and is matched as a document's
      name is.
+121. **§5.4, §7.2** — a tag at a choice reaches a variant's subtypes (#4). The tag "selecting
+     the variant" was read as naming one exactly, so at `( text | shape )`, `shape` abstract,
+     `!circle` was refused as no variant and `!shape` as abstract, and the choice held no
+     record; a concrete variant refused the subtypes a field typed by it admits. The tag
+     names a variant, or a type that IS-A exactly one variant, and the value is read at that
+     variant as at a position typed by it, §7.2's subsumption with the variant as the
+     position's type. A named variant is selected before one the type only IS-A, and a tag
+     whose type IS-A two variants and names neither selects none, a validation error and
+     not a refusal of the choice, a schema importing the choice's being free to declare
+     such a type. `disjoint` is derived over the variants' classes as before, a subtype
+     having its variant's class.
 
 ### 3.3 Companion artifacts
 
@@ -1039,6 +1050,8 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
 14. **§5.6** (§3.2 item 119) — a reference naming values read its string as "segments between
     dots, each an identifier"; each is a name of the family of what it enters. JSON has one
     string form, so nothing else moves.
+15. **§3.3, §8.1** (§3.2 item 121) — the `$type` at a choice position names a variant, or a
+    type that IS-A exactly one variant.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -1154,6 +1167,10 @@ Changes a Revision 39 implementer must act on:
     named with a space. One thing breaks: a namespace's `key_type` or a record's
     `name_type` that admits `.` is refused, and a vocabulary with dotted member names is
     translated with the names changed, or held as a map keyed by text.
+23. **A tag at a choice reaches a variant's subtypes** (§3.2 item 121; #4). `!circle` at
+    `( text | shape )` selects `shape` and validates as a `circle`, so an abstract variant
+    admits its family and a concrete one its subtypes. Nothing valid under Revision 39 changes
+    meaning: the values this admits were refused.
 
 ---
 
@@ -1171,7 +1188,9 @@ carries no open questions.
 | #2 (ruled) | Under a case-folding family a segment is matched in the family's form, as a document's key is, so `get` selects `GET`. Exact spelling, as a schema's references to a field declaration are matched, was the alternative. | **[settled]** — the spec author's ruling. |
 | #2 (lost) | A record field or a namespace key holding `.`. | Recorded — item 120: the name is changed in translation, or the vocabulary is a map keyed by text, which no reference enters. |
 | #2 (considered) | A reference as an unquoted token everywhere, names outside §7.7 unreachable; a namespace keyed by `meta.identifier` alone; a quoted segment, `main."public api".ping`; `.` refused in every identifier family; a dotted name admitted and unreachable. | Recorded — the first gives up the reach, the second leaves a record's wide field name on the path, the third gives adjacency a meaning where separators are optional, the fourth costs `net.scheme_name`, and the fifth leaves names no reference can write. |
-| #4 | A tag at a choice naming a subtype of a variant, and a choice with an abstract variant: whether the tag selects the one variant its type IS-A, or an abstract variant is refused at the declaration. | Open — carried as written. |
+| #4 | A tag at a choice naming a subtype of a variant, and a choice with an abstract variant. | **[settled]** — the spec author's ruling, §3.2 item 121: the tag selects the one variant its type IS-A. |
+| #4 (ruled) | A tag whose type IS-A two variants is refused at the data. Refusing the choice at its declaration was the alternative, and a schema importing the choice's could then make it invalid. | **[settled]** — the spec author's ruling. |
+| #4 (considered) | The tag kept exact, and an abstract variant refused at the declaration. | Recorded — it gives up "text or any shape" as an open family, the members listed and the choice edited for each new one. |
 | #3 (reading) | A number or a quoted token in a *schema* document's argument list: a grammar error, as the register and the proposal have it: Part 2 §12.1 is `type-arg = type-expr`, and [TSON-DATA] §7.4's data argument is narrowed the same way. The corpus records the schema-document case under the `resolver` category, which every schema-document error carries, so it does not tell a grammar error from a resolver one. | **[settled]** — the running behaviour. |
 | #3 (reading) | The proposal narrows §12.1's `type-def` alternative `[type-params] type-expr` to a record body. A parameter list before a sugar form or a bare reference is a resolver error naming the remedy, so the production keeps the alternative and a comment says the resolver admits a record body alone. | **[editorial]** — the running behaviour. |
 | #3 (reading) | §4.1 makes an open record a type by its constructor, `meta.record`, while §5.10's rule is that no template is a type a position names. The text keeps §4.1's predicate and states the refusal on references, as the proposal's §1.3 does; §5.10's heading says "no template is a type a position names". | **[editorial]** — for confirmation. |

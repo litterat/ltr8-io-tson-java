@@ -239,7 +239,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         if (tag.type() != null && selfNames.contains(tag.type())) {
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances, and a sealed base has none: naming it selects nothing.
-            ctx.report(extension.tagNamesTheBase(TagMembers.TYPE));
+            ctx.report(extension.tagNamesTheBase(TagMembers.TYPE, true));
             EventSkip.nextValue(ctx);
             return null;
         }

@@ -24,7 +24,8 @@ and why the same table is what untagged reading dispatches on. Current form only
   (`TsonSchemaLinker.mapInline`), as an entry's choice is. A partial link derives nothing over a variant still
   pending: the choice keeps the fact as it stands until the whole schema links.
 - **A choice that is not disjoint has every variant a name** (`TsonSchemaLinker.checkTaggedVariantsAreNamed`): its
-  values are selected by a tag, a tag names a variant by its name, and a variant written in place has none. So `(
+  values are selected by a tag, a tag reaches a variant by a name, its own or a subtype's, and a variant written in
+  place has neither. So `(
   [text] | [int32] )`, both bracket-class, is refused at the declaration, a choice written in place at any depth
   included; `( [text] | text )` is disjoint and unaffected, and so is a non-disjoint choice of names. A choice whose
   `@meta.disjoint` fails keeps that diagnostic alone, and a repeated variant is distinctness's to refuse.
@@ -33,6 +34,11 @@ and why the same table is what untagged reading dispatches on. Current form only
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
   §8.3 alias chain.
 - `ChoiceReader.untaggedRecovery` and the derivation both go through `DiscriminationClass.of`: one fact, not two.
+- **A tag selects its variant from one table per choice, built at compile** (`ChoiceReader.selection`,
+  `DispatchChoiceReader`, §5.4): a name meaning a variant first, then each type IS-A exactly one. The variant's own
+  reader weighs the tag (§7.2), so no choice tests subsumption itself and an abstract variant's tag is refused there.
+  A type IS-A two variants and naming neither is a data error. Lost: refusing such a choice at its declaration (an
+  importer may declare the type), and an exact tag with abstract variants refused at the declaration.
 - Any change to the class table is a compatibility decision: it decides which schemas load and which documents read
   untagged.
 
