@@ -9,10 +9,13 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,12 +63,14 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
     private final Map<DiscriminationClass, JsonTypeReader<?>> readerByClass;
 
     /**
-     * Every name a written {@code $type} may spell here, to where the value goes: each variant, every alias
-     * whose chain ends at one, and every subtype of one -- §8.4's "subtypes of variants" note, which holds for
-     * a tagged value at any choice: "a record whose {@code $type} names a proper subtype S of a variant
-     * validates as S". {@link #variants} stays the declared list, which is what a diagnostic names.
+     * Every name a written {@code $type} may spell here, to where the value goes ([TSON-SCHEMA] §5.4, [TSON-JSON]
+     * §8.1): each variant and every alias meaning the same type, then every type IS-A exactly one variant, which
+     * validates as itself. {@link #variants} stays the declared list, which is what a diagnostic names.
      */
     private final Map<String, Route> routes;
+
+    /** Every name IS-A more than one variant and meaning none, to those variants: it selects none. */
+    private final Map<String, List<String>> selectsNone;
 
     private DispatchChoiceReader(String name, ChoiceBody body, ValueReaderContext context,
                                  JsonSchemaLocation schemaLocation) {
@@ -78,29 +83,51 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         this.readerByClass = Map.copyOf(kinds);
         Map<String, Route> table = new LinkedHashMap<>();
         // A variant written in place has no name a $type can spell: it is reached by its class alone.
-        List<String> named = body.variants().stream().flatMap(variant -> TypeExpr.named(variant).stream())
-                .map(TypeRef::name).toList();
-        for (String written : context.admitting(named)) {
-            table.put(written, Route.to(context.readers().resolve(written)));
+        List<TypeRef> named = body.variants().stream().flatMap(variant -> TypeExpr.named(variant).stream()).toList();
+        for (TypeRef variant : named) {
+            table.put(variant.name(), Route.to(context.readers().resolve(variant.name())));
         }
-        for (TypeRef variant : body.variants().stream().flatMap(v -> TypeExpr.named(v).stream()).toList()) {
-            JsonTypeReader<?> reader = context.readers().resolve(variant.name());
-            AliasChain.terminal(context.schema(), variant.name())
-                    .ifPresent(resolved -> context.admitting(TypeChain.subtypesOf(resolved.definition()))
-                            .forEach(subtype -> table.putIfAbsent(subtype, routeBelow(reader, subtype))));
+        Map<TypeRef, AliasChain.Resolved> terminals = new LinkedHashMap<>();
+        for (TypeRef variant : named) {
+            AliasChain.terminal(context.schema(), variant.name()).ifPresent(resolved -> {
+                terminals.put(variant, resolved);
+                Route route = table.get(variant.name());
+                context.admitting(List.of(resolved.name())).forEach(written -> table.putIfAbsent(written, route));
+            });
         }
+        // A name the table already holds means a variant, which is selected before any variant it only IS-A.
+        Map<String, List<TypeRef>> below = new LinkedHashMap<>();
+        terminals.forEach((variant, resolved) -> context.admitting(TypeChain.subtypesOf(resolved.definition()))
+                .stream().filter(subtype -> !table.containsKey(subtype))
+                .forEach(subtype -> below.computeIfAbsent(subtype, ignored -> new ArrayList<>()).add(variant)));
+        Map<String, List<String>> none = new LinkedHashMap<>();
+        below.forEach((subtype, isA) -> {
+            if (isA.size() == 1) {
+                TypeRef variant = isA.getFirst();
+                table.put(subtype, routeBelow(context, terminals.get(variant).definition(),
+                        context.readers().resolve(variant.name()), subtype));
+            } else {
+                none.put(subtype, isA.stream().map(TypeRef::name).toList());
+            }
+        });
         this.routes = Map.copyOf(table);
+        this.selectsNone = Map.copyOf(none);
     }
 
     /**
-     * The route to {@code subtype} through the variant whose compiled reader is {@code variant}. A variant
-     * placed by {@code $type} already holds that route, flattened; any other -- a sealed family, whose
-     * selectors this position cannot bypass, or a reader still closing a cycle -- receives the value and
-     * places it itself.
+     * The route to {@code subtype} through the variant whose definition is {@code variant} and whose compiled reader
+     * is {@code reader}. A record variant placed by {@code $type} already holds that route, flattened; any other
+     * record variant -- a sealed family, whose selectors this position cannot bypass, or a reader still closing a
+     * cycle -- receives the value and places it itself. Below a variant that is no record the subtype's own reader
+     * reads the value, whose facets the variant's reader would not check.
      */
-    private static Route routeBelow(JsonTypeReader<?> variant, String subtype) {
-        Route route = variant instanceof DispatchTagReader dispatch ? dispatch.route(subtype) : null;
-        return route != null ? route : new Route(variant, variant);
+    private static Route routeBelow(ValueReaderContext context, Top variant, JsonTypeReader<?> reader,
+                                    String subtype) {
+        if (!(variant instanceof RecordBody)) {
+            return Route.to(context.readers().resolve(subtype));
+        }
+        Route route = reader instanceof DispatchTagReader dispatch ? dispatch.route(subtype) : null;
+        return route != null ? route : new Route(reader, reader);
     }
 
     /**
@@ -173,16 +200,23 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
             return null;
         }
         Route route = routes.get(tag.type());
-        if (route == null) {
-            if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.field(TagMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'$type' names '%s', which is not a variant of '%s'".formatted(tag.type(), name),
-                        String.join(" | ", variants), tag.type());
-            }
-            EventSkip.nextValue(ctx);
-            return null;
+        if (route != null) {
+            return route.read(ctx, tag);
         }
-        return route.read(ctx, tag);
+        List<String> among = selectsNone.get(tag.type());
+        if (among != null) {
+            ctx.field(TagMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+                    "'$type' names '%s', a subtype of more than one variant of '%s' -- (%s) -- and of none by name, "
+                            .formatted(tag.type(), name, String.join(" | ", among)) + "so it selects none (§8.1)",
+                    String.join(" | ", among), tag.type());
+        } else if (!NameHygiene.refuses(ctx, tag.type())) {
+            ctx.field(TagMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+                    "'$type' names '%s', which is neither a variant of '%s' nor a subtype of exactly one"
+                            .formatted(tag.type(), name),
+                    String.join(" | ", variants), tag.type());
+        }
+        EventSkip.nextValue(ctx);
+        return null;
     }
 
     /**

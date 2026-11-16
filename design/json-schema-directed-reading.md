@@ -188,8 +188,9 @@ record factory, because the concrete reading is the only one that differs by mod
 tag reaches a type any levels down, or an alias of one, in one step. A route holds two readers because §3.3's forms want
 two: the inline form goes to the reader for exactly that type (an OPEN record's concrete reader, not its dispatcher),
 the wrapper's `$value` to the type's entry reader, which dispatches again on a tag of its own. A choice routes through a
-variant placed by `$type` the same way, and through a sealed variant only by handing it the value, whose selectors a
-choice position cannot bypass.
+variant placed by `$type` the same way, through a sealed variant only by handing it the value, whose selectors a
+choice position cannot bypass, and below an atom variant to the refinement's own reader, whose facets the variant's
+would not check.
 
 **A sealed position** decodes its pins once, at the fields' declared types in the base, keyed by `ValueIdentity` (so
 `255` selects the member pinned `= 0xFF`). A discriminator that does not lead is missing, with JSON's own wording,

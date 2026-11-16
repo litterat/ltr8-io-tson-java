@@ -83,8 +83,11 @@ public record RecordExtensionDiagnostics(String typeName, String members) {
      * that rule assumes a type with direct instances: an abstract base has none, so a tag naming it asserts
      * something no value satisfies and selects nothing. Its own rule because the remedy differs -- the tag is
      * not <em>wrong</em> about the position, it is just not an answer.
+     *
+     * @param membersPlaceIt whether the base names discriminators, which place an untagged value: only then is
+     *                       omitting the tag a remedy, an untagged value being refused at every other abstract position
      */
-    public Refusal tagNamesTheBase(String tagSpelling) {
+    public Refusal tagNamesTheBase(String tagSpelling, boolean membersPlaceIt) {
         if (members.isEmpty()) {
             return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                     "a tag naming '%s' selects nothing -- it is abstract and has no direct instances, and no schema "
@@ -93,8 +96,8 @@ public record RecordExtensionDiagnostics(String typeName, String members) {
         }
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 "a tag naming '%s' selects nothing -- it is abstract and has no direct instances. Name the "
-                        .formatted(typeName) + "member this value is, one of (%s), or omit the tag"
-                        .formatted(members),
+                        .formatted(typeName) + "member this value is, one of (%s)".formatted(members)
+                        + (membersPlaceIt ? ", or omit the tag" : ""),
                 members, tagSpelling + " " + typeName);
     }
 

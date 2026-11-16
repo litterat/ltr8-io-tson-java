@@ -167,7 +167,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances. A sealed base has none, so naming it selects nothing -- and letting it through
             // would hand the member's reader a tag its own §7.2 guard must refuse, one position too late.
-            ctx.report(extension.tagNamesTheBase(TAG));
+            ctx.report(extension.tagNamesTheBase(TAG, true));
             EventSkip.dataValue(ctx);
             return null;
         }

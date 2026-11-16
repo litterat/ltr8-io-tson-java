@@ -189,7 +189,7 @@ class JsonChoiceReadTest {
         Diagnostic refusal = read("any_json", """
                 {"$type": "x", "a": 1}""").refusal();
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
-        assertTrue(refusal.message().contains("not a variant"), refusal.message());
+        assertTrue(refusal.message().contains("neither a variant"), refusal.message());
     }
 
     /** §8.4's note: a `$type` naming a proper subtype of a variant validates as that subtype. */

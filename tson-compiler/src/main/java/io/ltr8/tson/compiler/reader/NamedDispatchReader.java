@@ -15,41 +15,46 @@ import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.TypeExpr;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * Dispatch-by-{@code !typeName} over a fixed candidate-name set. Reads the value's own type-ref (via {@link
- * EventSkip#annotationsAndTypeRef}), requires it names one of {@code candidateNames}, and delegates to that
- * candidate's own reader, resolved lazily at dispatch time. A variant written in place has no name a tag could
- * give, so it is reached by untagged recovery alone.
+ * Dispatch-by-{@code !typeName} over a table, built by {@link ChoiceReader}, from every name a tag may carry to the
+ * variant it selects. Reads the value's own type-ref (via {@link EventSkip#annotationsAndTypeRef}) and delegates to
+ * that variant's own reader, resolved lazily at dispatch time, which is handed the whole data-value, tag included. A
+ * variant written in place has no name a tag could give, so it is reached by untagged recovery alone.
  *
  * <p><b>Untagged recovery.</b> When {@code untaggedRecovery} is non-empty and the value carries no type-ref,
  * the value is instead recovered structurally: its own §4 base-type class selects the variant (§5.4) -- a scalar
  * token's resolved class, a reference token's string class, and an opening brace or bracket its delimiter's class.
  * The map is built (by {@link ChoiceReader}) only where that's sound -- a disjoint choice whose variants each have a
  * distinct class. When it's empty, an untagged value is the usual error (the tag is required).
- *
- * <p>{@code positionName}/{@code candidateNoun} keep the error messages accurate to whichever dispatch this
- * is (currently only {@link ChoiceReader}'s declared-variant list) without the dispatch logic knowing.
  */
 final class NamedDispatchReader implements TsonTypeReader<Object> {
 
     private final String positionName;
     private final String missingTypeRefMessage;
-    private final String candidateNoun;
     private final Set<String> candidateNames;
+    private final Map<String, TypeExpr> selects;
+    private final Map<String, List<String>> selectsNone;
     private final TsonTypeReaderResolver resolver;
     private final Map<DiscriminationClass, TypeExpr> untaggedRecovery;
 
-    NamedDispatchReader(String positionName, String missingTypeRefMessage, String candidateNoun,
-                         Set<String> candidateNames, TsonTypeReaderResolver resolver,
-                         Map<DiscriminationClass, TypeExpr> untaggedRecovery) {
+    /**
+     * @param candidateNames the variants as declared, for a message to list
+     * @param selects        every name a tag may carry, to the variant it selects
+     * @param selectsNone    every name IS-A more than one variant and meaning none, to those variants
+     */
+    NamedDispatchReader(String positionName, String missingTypeRefMessage, Set<String> candidateNames,
+                        Map<String, TypeExpr> selects, Map<String, List<String>> selectsNone,
+                        TsonTypeReaderResolver resolver, Map<DiscriminationClass, TypeExpr> untaggedRecovery) {
         this.positionName = positionName;
         this.missingTypeRefMessage = missingTypeRefMessage;
-        this.candidateNoun = candidateNoun;
         this.candidateNames = candidateNames;
+        this.selects = selects;
+        this.selectsNone = selectsNone;
         this.resolver = resolver;
         this.untaggedRecovery = untaggedRecovery;
     }
@@ -93,14 +98,23 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
         Optional<String> typeRef = EventSkip.typeRefAhead(ctx);
         if (typeRef.isPresent()) {
             String ref = typeRef.get();
-            if (!candidateNames.contains(ref)) {
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'" + ref + "' is not a " + candidateNoun + " of '"
-                                + positionName + "' -- expected one of " + candidateNames,
-                        "one of " + candidateNames, ref);
-                EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
-                return null;
+            TypeExpr variant = selects.get(ref);
+            if (variant != null) {
+                return resolver.resolve(variant).read(ctx);
             }
-            return resolver.resolve(ref).read(ctx);
+            List<String> among = selectsNone.get(ref);
+            if (among != null) {
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'" + ref + "' is a subtype of more than one variant of '"
+                                + positionName + "' -- " + among + " -- and names none of them, so it selects none "
+                                + "(§5.4)", "one of " + among, ref);
+            } else {
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'" + ref + "' is not a declared variant of '"
+                                + positionName + "' -- expected one of " + candidateNames
+                                + ", or a type that IS-A exactly one",
+                        "one of " + candidateNames + ", or a type that IS-A exactly one", ref);
+            }
+            EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
+            return null;
         }
         if (!untaggedRecovery.isEmpty()) {
             return recoverUntagged(ctx);

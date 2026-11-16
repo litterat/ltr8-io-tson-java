@@ -146,7 +146,7 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
                 ctx.report(untagged != null ? subsumption.notAdmissible(lead.type(), admissible())
                         // The base itself is not admissible here, which is the whole of what ABSTRACT means --
                         // where a concrete position would take a tag naming it as a redundant restatement.
-                        : selfNames.contains(lead.type()) ? extension.tagNamesTheBase(TagMembers.TYPE)
+                        : selfNames.contains(lead.type()) ? extension.tagNamesTheBase(TagMembers.TYPE, false)
                         : extension.notASubtype(TagMembers.TYPE, lead.type()));
             }
             EventSkip.nextValue(ctx);
