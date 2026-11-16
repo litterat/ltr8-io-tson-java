@@ -167,6 +167,12 @@ class CrossEncodingParityTest {
               c1          => !customer { name: Ada }
               order_ref   => meta.ref<order>
               order_pick  => { which: order_ref  also?: meta.ref<order> ~ o1 }
+              reach_word  => !unicode.identifier_type { medial: " " }
+              reach_api   => !meta.namespace { key_type: meta.identifier  value_type: text }
+              reach_base  => !meta.record { name_type: reach_word  fields: {}  extension: ABSTRACT }
+              reach_site  => reach_base & { "public api": reach_api }
+              reach_main  => !reach_site { "public api": !reach_api { ping => "x" } }
+              text_pick   => { which: meta.ref<text> }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -673,6 +679,23 @@ class CrossEncodingParityTest {
         }
         sameVerdict("order_pick", "{ which: o1  also: c1 }", """
                 {"which": "o1", "also": "c1"}""");
+    }
+
+    /**
+     * A reference is a token's text in TSON, whatever its form, and a string's in JSON, split at {@code .} before any
+     * family is consulted and each segment judged by the family of what it enters ([TSON-SCHEMA] §5.12): a field
+     * named with a space is reached by both, and a name splitting into nothing or a segment its family refuses is
+     * refused by both alike.
+     */
+    @Test
+    void aReferencesSegmentsAreJudgedByWhatTheyEnterInBoth() {
+        bothAccept("text_pick", "{ which: \"reach_main.public api.ping\" }", """
+                {"which": "reach_main.public api.ping"}""");
+        for (String refused : List.of("reach_main..ping", "reach_main.public  api.ping", "reach_main.public api.pong",
+                "reach_main.public api.p ng")) {
+            sameVerdict("text_pick", "{ which: \"" + refused + "\" }", """
+                    {"which": "%s"}""".formatted(refused));
+        }
     }
 
     /**

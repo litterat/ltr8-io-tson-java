@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A name at a kind- or reference-typed slot of a value body is judged whatever the host component's Java type: the
  * slot declares the spelling and the linker judges the name by the slot's declared type, so a {@code String}
  * component receives the name as text and the name is judged exactly as under a {@code ValueRef} one at a value's
- * reference, or a {@code TypeRef} one at a kind. What is no name -- a quoted token -- is refused at the read under
- * either host.
+ * reference, or a {@code TypeRef} one at a kind. A quoted token is the name its text spells under either host
+ * ([TSON-SCHEMA] §5.12).
  */
 class ValueRefHostShapeTest {
 
@@ -142,9 +142,9 @@ class ValueRefHostShapeTest {
     }
 
     @Test
-    void aQuotedReferenceWithATextHostIsRefused() {
-        refused(schema("ref-text-quoted", "b => !rh_ref_texts { one => { method: \"orders.place\" } }"),
-                "expected the name of a 'rh_method' value", "which is text rather than a name");
+    void aQuotedReferenceWithATextHostResolves() {
+        assertEquals(List.of(), problems(schema("ref-text-quoted",
+                "b => !rh_ref_texts { one => { method: \"orders.place\" } }")));
     }
 
     @Test
@@ -167,8 +167,8 @@ class ValueRefHostShapeTest {
     }
 
     @Test
-    void aQuotedKindWithATextHostIsRefused() {
-        refused(schema("kind-text-quoted", "k => !rh_type_name_texts { one => { request: \"order\" } }"),
-                "a position typed by a kind holds the name of a type");
+    void aQuotedKindWithATextHostResolves() {
+        assertEquals(List.of(), problems(schema("kind-text-quoted",
+                "k => !rh_type_name_texts { one => { request: \"order\" } }")));
     }
 }

@@ -103,7 +103,7 @@ import java.util.stream.Collectors;
  *
  * <p><b>In a schema document, a bare token is a positional fill only where the positional field is atom-typed</b>
  * ([TSON-SCHEMA] §5.6). When the read is of a value inside a schema document ({@link
- * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
+ * TsonReadContext#readsSchemaDocument()}), a token at a record position ({@link
  * ValueRefSlotReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
  * positional field is <b>atom</b>-typed -- {@code meta.record_field}'s {@code type}, a {@code meta.type_ref}, so {@code
  * !meta.record { fields: { p => text } }} fills {@code type} -- and loses it where that field is a product or a sum,

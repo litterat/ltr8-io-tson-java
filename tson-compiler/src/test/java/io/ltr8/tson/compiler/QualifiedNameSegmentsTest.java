@@ -12,7 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The linker's parse of a reference written by name into its segments ({@link ValuesByName#segments}): the name split
- * at each {@code .}, each segment a [TSON-DATA] §7.7 identifier.
+ * at each {@code .} before any family is consulted, none empty, the first a [TSON-DATA] §7.7 identifier
+ * ([TSON-SCHEMA] §5.12).
  */
 class QualifiedNameSegmentsTest {
 
@@ -31,15 +32,22 @@ class QualifiedNameSegmentsTest {
     void anEmptySegmentIsNoName() {
         for (String name : List.of(".orders", "orders.", "a..b")) {
             SchemaValidationException refused = assertThrows(SchemaValidationException.class, () -> segments(name));
-            assertTrue(refused.getMessage().contains("one is empty"), refused.getMessage());
+            assertTrue(refused.getMessage().contains("has an empty segment"), refused.getMessage());
         }
     }
 
     @Test
-    void aSegmentThatIsNoIdentifierIsNoName() {
+    void aFirstSegmentThatIsNoIdentifierIsNoName() {
         SchemaValidationException refused = assertThrows(SchemaValidationException.class,
-                () -> segments("orders.1x"));
-        assertTrue(refused.getMessage().contains("'1x' is not"), refused.getMessage());
+                () -> segments("1x.orders"));
+        assertTrue(refused.getMessage().contains("'1x' is no name"), refused.getMessage());
+    }
+
+    /** A further segment is the family's to judge where the walk enters it, so it splits whatever it holds. */
+    @Test
+    void aFurtherSegmentSplitsWhateverItHolds() {
+        assertEquals(List.of("main", "public api", "ping"), segments("main.public api.ping"));
+        assertEquals(List.of("orders", "1x"), segments("orders.1x"));
     }
 
 }

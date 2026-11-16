@@ -17,7 +17,6 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.base.WriteException;
@@ -177,10 +176,10 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (value instanceof ValueRef<?> reference) {
-                // A value held by name writes as the name, a bare token, as a type's name does: resolved output
-                // states the reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not wanted.
+                // A value held by name writes as the name, as a type's name does: resolved output states the
+                // reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not wanted.
                 writeAnnotations(value, dataClass, writer);
-                writer.unquotedToken(reference.name());
+                writer.reference(reference.name());
                 return;
             }
             if (value instanceof ValueEntry entry) {
@@ -202,17 +201,11 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (value instanceof TypeRef reference) {
-                // A reference is a name, written unquoted with the annotations written on it ahead, one token.
-                // A name that is no qualified name reads back only quoted.
                 writeAnnotations(reference.annotations(), writer);
                 if (typeRef != null) {
                     writer.typeRef(typeRef);
                 }
-                if (ReferenceGrammar.isQualifiedName(reference.name())) {
-                    writer.reference(reference);
-                } else {
-                    writer.quotedString(reference.text());
-                }
+                writer.reference(reference.name());
                 return;
             }
             if (value instanceof TypeInline inline) {

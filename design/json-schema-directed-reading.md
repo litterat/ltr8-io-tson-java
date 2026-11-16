@@ -22,8 +22,8 @@ JSON inputs are in `design/cli-config-hashing.md`.
   order. A missing required tag is `TYPE_MISMATCH`.
 - A kind (a `meta.ref` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and
   never a discrimination case ([TSON-JSON] §5.6). A JSON document is always data, so the name is judged a member over the
-  reading document's closure, whatever it imports (`AtomParsers.forType`). JSON has no unquoted form, so a string
-  is read by `atom.ReferenceGrammar`, the production TSON reads unquoted, and judged as TSON judges it by the shared
+  reading document's closure, whatever it imports (`AtomParsers.forType`). A string is read by
+  `atom.ReferenceGrammar`, as a TSON token of either form is, and judged as TSON judges it by the shared
   `TypeRefParser`: a data document's reference is a name, so a string holding an application, `"set<text>"`, is
   refused (`ATOM_CONSTRAINT_VIOLATION`) whether or not the closure closes it ([TSON-JSON] §5.6). A string holding
   `kind!` spells no reference, schema-grammar sugar having no data form, and is refused as malformed

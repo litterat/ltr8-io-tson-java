@@ -41,6 +41,12 @@ is why they are the linker's. Current form only; history lives in git.
   shared with materialisation.
 - An enum's and a record's name type is an identifier family whose `normalization` implies NFC (`NONE` never;
   `ASCII_CASEFOLD` only over ASCII, `NameType.formRefusal`); their names are judged under its profile.
+- A record's name type, and a namespace's `key_type`, admits no U+002E in Start, Continue or Medial
+  (`NameType.dotRefusal`; [TSON-SCHEMA] §4.2, §5.2): a reference's segments are split at `.` before they are matched
+  against those names (§5.12). Refused where the type is named, a record taking it from a supertype included; an
+  enum's `name_type` and a plain map's key are no segment's container, so a dotted family (`net.scheme_name`) types
+  them still. The profile is judged rather than the names a schema declares, since a namespace value's keys also
+  arrive as data, after every link.
 - The enum and record checks run before `checkNames`; an entry they refuse is not judged by name again.
 - `FieldNames` never sees two fields of one spelling (`meta.record.fields` is a map, and its reader refuses the repeat), so
   its duplicate check is two spellings that are one value of the record's name type, and nothing else.

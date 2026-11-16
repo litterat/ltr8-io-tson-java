@@ -26,7 +26,7 @@ no register entry carries either, is the *extern*: a schema names one entry of a
 under a name of its own, and a value so typed is read under its own schema (§3.2 items
 116–118). The register's
 entries #1, #7, #8 and #9 are accepted as they propose, each a sentence or a paragraph
-stating what the series already holds; #2 and #4 are carried (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
+stating what the series already holds; #4 is carried (§2). SPEC-FEEDBACK.md remains a record against Revision 39 and is not
 modified by this revision; each of its entries receives a disposition here.
 
 Provenance markers used in the disposition table:
@@ -138,7 +138,7 @@ footing:
 | # | Entry (abridged) | Disposition |
 |---|---|---|
 | 1 | [TSON-DATA] §2.1's worked example says untagged tokens resolve by §4's base rules under an imported schema | **Accept** — the sentence is rewritten for a document under a schema: its tags name types of the imported namespace and each untagged token is read by its position's declared type, with what the same tags and tokens mean in a document with no `!!import` (§3.1 item 26). No rule changes. **[settled]** |
-| 2 | Whether a quoted token at a reference-typed position is a reference | **Carried**, narrowed by #3: an argument is a reference in both grammars, so a quoted argument is refused in a schema document and in data alike; the field-position half (`t: "int32"` at a `meta.type_ref` field in data) stays open as written. [open] |
+| 2 | Whether a quoted token at a reference-typed position is a reference | **Accept**, the other way from the entry's proposal: a quoted token at a position typed by a reference is the reference its text spells, each segment a name of the family of what it enters, and no family a segment is matched against admits `.` (§3.1 item 28, §3.2 items 119–120). The argument half closed with #3: an argument is schema grammar and stays unquoted. **[settled]** |
 | 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–58, 71 and 72–77), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented] |
 | 3 | Templates as open records | **Accept — the baseline above**, every step as the register states what runs. Part 2 §5.10 is rewritten around the three rules; §1.3, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow (§3.2). §1.6's example drops its value parameter. **[editorial]** at five points where the sources disagree or the text needed a reading (§5). [settled — implemented] |
 | 6 | A dependent field's type is a sum in place | **Accept** — the kernel's `meta.dependent`, the retyped `meta.record_field.type`, `meta.type_ref` and `meta.ref`, and the hand-written resolved fixture are the baseline (§1); Part 1 §1.3, §1.5, §2.3, §2.5, §2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4, §7.5, §7.7 and §8.1 follow (§3.1, items 11–19), Part 2 §1.4, §4.2, §5.2, §5.3, §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9 and §12 (§3.2, items 59–70), and Part 3 §1.6 and §5.6 (§3.4). Four readings the spec author ruled on; one point stays open (§5). [settled — implemented] |
@@ -147,7 +147,7 @@ footing:
 | 8 | A name inside an annotation's value: that it is judged, where, and when | **Accept** — Part 2 §5.12's "Where the rule stands" names an annotation's value among the slots the rule reaches, with its namespace and its time, and §6 points at it (§3.2 item 112). No rule changes; the first implementation judges a data document's annotation value and not yet a schema document's (§5). **[settled]** |
 | 9 | `net.uuid_type.version` has no stated meaning | **Accept** — Part 2 §5.5 states it, a UUID whose RFC 9562 version field equals `version`, and §5.7 lists it among the settable-once facets (§3.2 item 113), which is what runs. **[settled]** |
 
-Counts: **7 accepted** (#3, in six steps, #5 and #6; and #1, #7, #8 and #9, which change no rule), **0 declined**, **2 carried** (#2, #4). Revision
+Counts: **8 accepted** (#3, in six steps, #5, #6 and #2; and #1, #7, #8 and #9, which change no rule), **0 declined**, **1 carried** (#4). Revision
 39's open remainders on templates close with #3: #13's (whether a value argument narrows
 below `token`) by the removal of value arguments, #19's (a shared parent for `record` and
 `record_template`) by the removal of `record_template`, and #21's (a sibling in a template
@@ -257,6 +257,19 @@ Four sentences follow the extern (§3.2 items 116–118). No production and no t
     value's position says so and the data does not. §2.2.1 names an extern's `schema` among
     the references its rule covers. §9.1 counts a schema reached through an extern among the
     schemas that are untrusted input.
+
+One rule follows the ruling on #2 (§3.2 items 119–120). No production and no token changes.
+
+28. **§2.4, §7.1, §7.4, §7.7** — a quoted token at a position typed by a reference. §7.1
+    said "a quoted token is never a reference" where §2.4 says form is consulted once and
+    identity is text, and the two answered a reference-typed field oppositely. §2.4's rule
+    stands whole: `orders.place` and `"orders.place"` are the same reference at a position
+    typed by one, and §7.1 says when a reference is quoted, exactly when one of its segments
+    holds a character outside the token profile. §7.4's `qualified-name-token` stays the
+    spelling of a tag and an annotation name, and says a reference in a value is no
+    production of the grammar: a token of either form, read by its position. §7.7's
+    identifier profile governs the segments of a tag, an annotation name and a type's name;
+    a segment of a reference in a value is a name of the family of what it enters.
 
 ### 3.2 Part 2 — Type System and Schema
 
@@ -923,6 +936,32 @@ it.
      declared position admits and points here. §11.4 judges a foreign schema's names in
      that schema's namespace: a look-alike pair with one name in each scope is a pair in
      none.
+119. **§1.3, §5.12, §12.1** — a reference reaches every name (#2). A qualified name was "one
+     unquoted token", each segment a [TSON-DATA] §7.7 identifier, so a key of a namespace
+     under a wider `key_type`, and a field of a record value under a wider `name_type`,
+     could be written by no name: the text conceded the first in a sentence and was silent
+     on the second. A qualified name is the text of one token of either form, split at each
+     `.`, and each segment is a name of the family of what it enters — `meta.type_name` at
+     the root and at a schema map, the namespace's `key_type`, the record's `name_type` —
+     matched there as a document's own key or field name is, in the family's form. A name
+     holding a segment outside the token profile is quoted whole, `"main.public api.ping"`,
+     and `main."public api".ping` stays three tokens. "A quoted token is text, never a
+     name" leaves §5.12 with the sentence on keys no segment could write. A body a schema
+     document reads as data follows the one rule, so `!meta.array { element_type: "text" }`
+     constructs `[text]`; a tag, an annotation name and every type position §12.1 reads name
+     types through schema maps alone and stay unquoted. §1.3's bullet separates the two
+     judgements.
+120. **§4.2, §5.2** — no family a segment is matched against admits `.`. A namespace's
+     `key_type`, and a record's `name_type`, whose profile holds U+002E in its Start,
+     Continue or Medial set is a resolver error where it is named, a record taking the type
+     from a supertype included, so item 119's split is the same whatever is entered and
+     every key of a namespace value and every field of a record value can be written as a
+     segment.
+     `unicode.identifier_type` is unchanged: a dotted family types a map's key, an enum's
+     `name_type` and any other value, and `net.scheme_name` keeps its `.`. §5.2's rule that
+     a schema's own references to its fields match exactly stands and says what it does not
+     cover: a segment selects a field of a record value, and is matched as a document's
+     name is.
 
 ### 3.3 Companion artifacts
 
@@ -997,6 +1036,9 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
     value; a position whose extern's target is a map is a map-typed position. §6.4's key
     form and §8.2's class follow an extern to its target. §3.3's rule for where `$type`
     resolves, §9.2's encoder obligation and §1.6's item 24 follow.
+14. **§5.6** (§3.2 item 119) — a reference naming values read its string as "segments between
+    dots, each an identifier"; each is a name of the family of what it enters. JSON has one
+    string form, so nothing else moves.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -1106,6 +1148,12 @@ Changes a Revision 39 implementer must act on:
     the schema, never the data, says where: no `!!schema` returns, and an extern takes no
     `&`, `^`, default or qualified name through it. A foreign schema is a dependency like
     an import — pinned, verified and counted with them — and must hold the same kernel.
+22. **A reference reaches every name** (§3.2 items 119–120; #2). At a position typed by a
+    reference a quoted token is the reference its text spells, each segment judged by what
+    it enters, so `"main.public api.ping"` names a key of a namespace held under a field
+    named with a space. One thing breaks: a namespace's `key_type` or a record's
+    `name_type` that admits `.` is refused, and a vocabulary with dotted member names is
+    translated with the names changed, or held as a map keyed by text.
 
 ---
 
@@ -1118,7 +1166,11 @@ carries no open questions.
 | Ref | Question | Status |
 |---|---|---|
 | #1 | [TSON-DATA] §2.1's example under an `!!import`. | **[settled]** — §3.1 item 26. |
-| #2 | A quoted token at a field typed by a reference in data. | Open — carried; the argument half closed by #3. |
+| #2 | A quoted token at a field typed by a reference in data. | **[settled]** — the spec author's ruling, §3.1 item 28 and §3.2 items 119–120. |
+| #2 (ruled) | One rule for data: a constructor body's reference slot takes the quoted form, `!meta.array { element_type: "text" }`. A second rule refusing quotes at slots naming types, where none is needed, was the alternative. | **[settled]** — the spec author's ruling. |
+| #2 (ruled) | Under a case-folding family a segment is matched in the family's form, as a document's key is, so `get` selects `GET`. Exact spelling, as a schema's references to a field declaration are matched, was the alternative. | **[settled]** — the spec author's ruling. |
+| #2 (lost) | A record field or a namespace key holding `.`. | Recorded — item 120: the name is changed in translation, or the vocabulary is a map keyed by text, which no reference enters. |
+| #2 (considered) | A reference as an unquoted token everywhere, names outside §7.7 unreachable; a namespace keyed by `meta.identifier` alone; a quoted segment, `main."public api".ping`; `.` refused in every identifier family; a dotted name admitted and unreachable. | Recorded — the first gives up the reach, the second leaves a record's wide field name on the path, the third gives adjacency a meaning where separators are optional, the fourth costs `net.scheme_name`, and the fifth leaves names no reference can write. |
 | #4 | A tag at a choice naming a subtype of a variant, and a choice with an abstract variant: whether the tag selects the one variant its type IS-A, or an abstract variant is refused at the declaration. | Open — carried as written. |
 | #3 (reading) | A number or a quoted token in a *schema* document's argument list: a grammar error, as the register and the proposal have it: Part 2 §12.1 is `type-arg = type-expr`, and [TSON-DATA] §7.4's data argument is narrowed the same way. The corpus records the schema-document case under the `resolver` category, which every schema-document error carries, so it does not tell a grammar error from a resolver one. | **[settled]** — the running behaviour. |
 | #3 (reading) | The proposal narrows §12.1's `type-def` alternative `[type-params] type-expr` to a record body. A parameter list before a sugar form or a bare reference is a resolver error naming the remedy, so the production keeps the alternative and a comment says the resolver admits a record body alone. | **[editorial]** — the running behaviour. |

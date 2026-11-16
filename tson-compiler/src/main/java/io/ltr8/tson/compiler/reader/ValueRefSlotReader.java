@@ -4,7 +4,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.TokenEvent;
@@ -19,18 +18,19 @@ import java.util.Optional;
  * is a value's qualified name ([TSON-SCHEMA] §5.12), such as {@code orders.place_order}.
  *
  * <p><b>In a schema document the name is kept as written</b>, in a {@code ValueRef} the linker delivers the value into.
- * Nothing here parses segments: the linker splits the name and applies the identifier grammar to each segment, where
- * it also resolves them. Every name read there is recorded ({@link TsonReadContext#heldByName}) with its slot and the
+ * Nothing here parses segments: the linker splits the name and judges each segment by the family of what it enters,
+ * where it also resolves them. Every name read there is recorded ({@link TsonReadContext#heldByName}) with its slot and the
  * slot's declared type, and the linker judges that collection.
  *
  * <p><b>In a data document the name is judged at the read</b>, by the reference's atom bound to the component
  * ({@code inData}): the {@code ValueRef} receives what it reaches in the governing schema's closure.
  *
- * <p><b>What a name is, stated once for every reader that asks</b> ({@link #nameIn}): an <b>unquoted</b> token. A
- * quoted token is text, never a name. {@link RecordAbstractReader} asks the same question to decide when §5.6's
- * positional form loses the token in a schema document, so the readers cannot disagree about which tokens are names.
+ * <p><b>What a name is, stated once for every reader that asks</b> ({@link #nameIn}): a token's text, whatever its
+ * form ([TSON-DATA] §2.4, [TSON-SCHEMA] §5.12), so {@code "main.public api.ping"} is the name a segment outside the
+ * token profile is written as. {@link RecordAbstractReader} asks the same question to decide when §5.6's positional
+ * form loses the token in a schema document, so the readers cannot disagree about which tokens are names.
  *
- * <p><b>Names only.</b> The slot holds a reference and nothing else, so a braced value, a quoted token and a framed
+ * <p><b>Names only.</b> The slot holds a reference and nothing else, so a braced value and a framed
  * name ({@code @doc:"x" orders}, {@code !meta.record x}) are refused: a name's type is its referent's, and an annotation
  * would have nowhere to go.
  */
@@ -51,10 +51,9 @@ final class ValueRefSlotReader implements TsonTypeReader<Object> {
         this.inData = inData;
     }
 
-    /** The name {@code event} spells, or empty where it is no unquoted token. */
+    /** The name {@code event} spells, or empty where it is no token. */
     static Optional<String> nameIn(TsonEvent event) {
-        return event instanceof TokenEvent token && token.form() == TokenForm.UNQUOTED
-                ? Optional.of(token.text()) : Optional.empty();
+        return event instanceof TokenEvent token ? Optional.of(token.text()) : Optional.empty();
     }
 
     @Override
@@ -72,7 +71,7 @@ final class ValueRefSlotReader implements TsonTypeReader<Object> {
         }
         String found = found(event);
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the name of " + expected + ", found " + found
-                + " -- this position holds a value by name, written as dotted identifiers", "a qualified name", found);
+                + " -- this position holds a value by name, its segments joined by dots", "a qualified name", found);
         EventSkip.annotationsAndTypeRef(ctx);
         EventSkip.coreValue(ctx);
         return null;
@@ -81,7 +80,6 @@ final class ValueRefSlotReader implements TsonTypeReader<Object> {
     /** What stood where a name was wanted, as a message says it. */
     private static String found(TsonEvent event) {
         return switch (event) {
-            case TokenEvent token -> "the quoted token \"" + token.text() + "\", which is text rather than a name";
             case AnnotationStart annotation -> "the annotation '@" + annotation.name() + "', and a name carries none";
             case TypeRef typeRef -> "the type-ref '!" + typeRef.name() + "', and a name carries none: its type is "
                     + "its referent's";

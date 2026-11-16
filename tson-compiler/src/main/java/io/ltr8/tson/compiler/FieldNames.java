@@ -152,6 +152,13 @@ final class FieldNames {
                 return Optional.of(new EnumLabels.Violation(name, who + ": its name_type '"
                         + body.nameTypeName() + "' cannot judge names -- " + form.get()));
             }
+            Optional<String> dot = NameType.dotRefusal(identifiers);
+            if (dot.isPresent()) {
+                return Optional.of(new EnumLabels.Violation(name, who + ": its name_type '"
+                        + body.nameTypeName() + "' cannot name a record's fields -- " + dot.get() + "; a "
+                        + "vocabulary with dotted names is translated with the names changed, or held as a map "
+                        + "keyed by text ([TSON-SCHEMA] §5.2)"));
+            }
         }
         Optional<AtomType<?>> parser = AtomParsers.forType(type.definition());
         if (parser.isEmpty()) {
