@@ -80,7 +80,7 @@ left is in `BACKLOG.md`.
 ## Pipeline and modules
 
 Schema documents: **parse → desugar → resolve → link → register → compile → read** (`TsonSchemaParser`,
-`SchemaDesugarer`, `TsonSchemaResolver`, `TsonSchemaLinker`, `TsonSchemaRegistry`, `TsonSchemaCompiler`,
+`SchemaDesugarer`, `SchemaResolver`, `TsonSchemaLinker`, `TsonSchemaRegistry`, `TsonSchemaCompiler`,
 `TsonTypeReader`). Data documents with no schema run lex → parse → base-type-resolve.
 
 | Module | Holds |

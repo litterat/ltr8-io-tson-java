@@ -48,9 +48,7 @@ import java.util.Optional;
  * <p><b>{@code id} is required, not {@code Optional}</b> -- the grammar itself marks {@code !!id} optional (a raw
  * parsed {@code SchemaDocument} can genuinely lack one), but a {@code TsonSchema} value -- the *resolved*,
  * actually-usable thing this module represents -- always needs a real identity. A document with no {@code !!id}
- * simply never becomes a {@code TsonSchema} at all -- {@code TsonSchemaResolver}'s own document-level resolution
- * enforces this before ever constructing one (see its own Javadoc on {@code resolveSchema}'s {@code !!id}
- * validation).
+ * simply never becomes a {@code TsonSchema} at all: resolution refuses it before constructing one.
  *
  * <p><b>A record</b>, genuinely immutable: the compact constructor defensively copies every collection, and
  * convenience constructors cover the common case (fresh, non-bootstrap, nothing held by name) without every caller

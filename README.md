@@ -548,7 +548,7 @@ vocabulary — parse → resolve → link → register → compile → read:
    `[T, U]`, `{K => V}`, `(A | B)`) into the constructor application it denotes, off a fixed table. At a
    declaration's own position the form simply *is* that application; at any other type slot it is that construction
    written in place, `{ of: !meta.array { … } }`, with no entry of its own, and equal forms are one type.
-3. **Resolve** (`TsonSchemaResolver`) — one declaration at a time, the AST becomes a concrete
+3. **Resolve** (`SchemaResolver`) — one declaration at a time, the AST becomes a concrete
    value (`Top`): composition induces supertypes, flattens fields and tightens a restated
    inherited field against a state-transition table, a constructor application (`!C value`) transfers
    its constructor's own kind, and so on. A reference to another declaration is still a bare, unverified
