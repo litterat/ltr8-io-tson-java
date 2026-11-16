@@ -24,10 +24,15 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
 - A network family's `within`/`excluding` pair is judged for emptiness by the family's own `coherenceCheck`
   (`AtomCoherence.checkAdmitsAValue`), never by the linker or the resolver; its prefix bounds fold in.
 - Unchecked by design: `pattern` against `pattern` (and `pattern` emptiness), selector facets.
-- `!T ^ { … }` over an array or a map type is judged by `CollectionFacets` over the two **bound** bodies, so a facet
-  neither wrote compares at its default: bounds move inward, a type slot and `ordered` are restated only,
-  `unique_items` only rises, `voidable` only falls. Its chain is `T` and `T`'s, where an atom refinement's is `[I]`. A
-  namespace type keeps the refusal: its values carry its name as their tag, and no rule for refining one is stated.
+- `!T ^ { … }` over a type built by a constructor that is or IS-A `meta.array` or `meta.map` is judged by
+  `CollectionFacets` over the two **bound** bodies, a namespace type's as the map `NamespaceBody.read()` states, so a
+  facet neither wrote compares at its default: bounds move inward, a type slot and `ordered` are restated only,
+  `unique_items` only rises, `voidable` only falls. A field the constructor pins (`meta.namespace`'s `voidable`) may
+  be written, and its reader compares it against the pin. Its chain is `T` and `T`'s, where an atom refinement's is
+  `[I]`, and its body is the source constructor's, so a refined namespace type is a `NamespaceBody` that everything
+  recognising a namespace type takes. The gate asks the source's constructor and its chain, never the body's class:
+  keeping the source to the two constructors, a namespace type bounded only where it is constructed, lost to §5.7's
+  rule that the facets' rules are the fields', kept through composition. A namespace *value* stays finished.
 - A reference's `of` narrows to the source's or a type IS-A it, and that one rule is judged at **link**, not in
   `checkNarrows`: `RefBody.constraintsCheck` asks that a reference refines a reference, and
   `RefBody.ofNarrowing` takes the IS-A as a predicate the linker supplies

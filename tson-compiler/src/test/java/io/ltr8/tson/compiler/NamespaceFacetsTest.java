@@ -74,4 +74,19 @@ class NamespaceFacetsTest {
                 hosted => !meta.namespace { value_type: method }
                 """), "'hosted'", "key_type");
     }
+
+    /**
+     * {@code meta.namespace} composes {@code meta.map}, so a namespace type is refined as a map type is, each facet by
+     * its kind ([TSON-SCHEMA] §5.7), and a value of one stays finished to {@code ^}.
+     */
+    @Test
+    void aNamespaceTypeIsRefinedByItsFacetsKinds() {
+        String api = "api => !meta.namespace { key_type: meta.identifier  value_type: method  max_items: 4 }\n";
+        assertEquals(List.of(), link(api + "small => !api ^ { max_items: 3 }\ntiny => !small ^ { min_items: 1 }"));
+        refused(link(api + "wide => !api ^ { max_items: 5 }"), "'wide'", "max_items 5 is above");
+        refused(link(api + "keyed => !api ^ { key_type: meta.type_name }"), "'keyed'", "only restates key_type");
+        refused(link("words => !meta.namespace { key_type: meta.identifier  value_type: text }\n"
+                + "v => !words { a => \"x\" }\nr => !v ^ { max_items: 1 }"), "'r'",
+                "finished and takes no refinement");
+    }
 }

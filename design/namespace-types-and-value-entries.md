@@ -27,7 +27,8 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   `meta.schema => !meta.namespace { key_type: meta.type_name value_type: meta.declared }`, and a schema's own `api =>
   !meta.namespace { key_type: meta.identifier value_type: method }`. A value of one is the map its facets describe
   (`NamespaceBody.read()`), its size bounds judged as a map's are, and nothing else: a field beside the facets is
-  refused by `meta.namespace`'s own record reader.
+  refused by `meta.namespace`'s own record reader. A namespace type is refined by `^` as a map type is, and the result
+  is a namespace type IS-A its source (`design/atom-refinement-and-coherence.md`).
 - **IS-A `meta.map` is a fact about kinds, not about bodies.** `NamespaceBody` and `MapBody` are distinct classes, so
   every reader, compiler and walk that dispatches on the body (`TsonSchemaCompiler`, `JsonSchemaCompiler`,
   `DeclaredReader`, `MapBindReader` through `TsonLinkedSchema.namespace`, `ValuesByName`, `TypeInhabitance`,
@@ -298,6 +299,4 @@ reservation: every root name in the closure is taken, so a schema importing core
 `set`, `uuid` or `title` of its own, nor `meta`, `atom`, `numeric`, `unicode`, `net`, `binary` or `temporal`
 (`ImportedVocabularyTest`). The machinery is under those seven prefixes, so `record`, `identifier`, `map`, `namespace`,
 `template`, `type_ref`, `field_name`, `bounded`, `value` and `kind` are free; a schema importing only the libraries it wants
-leaves the rest's root names free too (one importing temporal.tn alone may declare `title` or `int32`). The one thing a
-schema cannot do is hold a value of a type it declares itself: `!api { … }` beside `api => !meta.namespace { … }` waits on
-`api` being resolved first, which outside the kernel's bootstrap is a gap.
+leaves the rest's root names free too (one importing temporal.tn alone may declare `title` or `int32`).

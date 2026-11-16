@@ -84,6 +84,30 @@ class JsonNamespaceTypeTest {
         assertEquals(1, read(governed, "defaults", "{\"accept\": \"text/plain\"}").size());
     }
 
+    /** A namespace type refined by {@code ^} bounds an object read at it as its source's values are bounded (§5.7). */
+    @Test
+    void anObjectAtARefinedNamespaceTypeMeetsItsBounds() {
+        JsonCompiledSchema refined = JsonSchemaCompiler.compile(Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_TEXT))))).resolve("""
+                !!id:"https://example.test/one-header.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://example.test/meta-headers.tn"
+                !schema {
+                  one     => !headers ^ { max_items: 1 }
+                  request => { headers: one }
+                }
+                """));
+
+        assertEquals(List.of(), read(refined, "request", """
+                {"headers": {"accept": "text/plain"}}"""));
+        List<Diagnostic> over = read(refined, "request", """
+                {"headers": {"accept": "text/plain", "user-agent": "probe"}}""");
+        assertEquals(1, over.size(), over::toString);
+        assertEquals("/headers", over.getFirst().path().orElseThrow());
+        assertEquals(1, read(refined, "request", """
+                {"headers": {"1st": "text/plain"}}""").size());
+    }
+
     private static List<Diagnostic> read(JsonCompiledSchema compiled, String type, String json) {
         List<Diagnostic> problems = new ArrayList<>();
         DiagnosticsReceiver receiver = problems::add;

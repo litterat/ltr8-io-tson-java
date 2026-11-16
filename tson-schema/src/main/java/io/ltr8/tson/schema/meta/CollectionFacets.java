@@ -7,11 +7,11 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * [TSON-SCHEMA] §5.7's facet kinds for a refinement of an array or a map type, {@code !tags ^ { min_items: 2 }},
- * judged over effective values: both bodies are bound, so a facet neither wrote compares at the constructor's
- * default. The bounds move inward; a type slot and {@code ordered} are restated only, the one saying what an element
- * is and the other what two values being equal means; {@code unique_items} only rises and {@code voidable} only falls,
- * each a permission withdrawn.
+ * [TSON-SCHEMA] §5.7's facet kinds for a refinement of an array, a map or a namespace type,
+ * {@code !tags ^ { min_items: 2 }}, judged over effective values: both bodies are bound, so a facet neither wrote
+ * compares at the constructor's default. The bounds move inward; a type slot and {@code ordered} are restated only,
+ * the one saying what an element is and the other what two values being equal means; {@code unique_items} only rises
+ * and {@code voidable} only falls, each a permission withdrawn.
  */
 public final class CollectionFacets {
 
@@ -41,6 +41,14 @@ public final class CollectionFacets {
         AtomNarrowing.checkAtLeast(out, "min_items", source.minItems(), refined.minItems());
         AtomNarrowing.checkAtMost(out, "max_items", source.maxItems(), refined.maxItems());
         return out;
+    }
+
+    /**
+     * Each way {@code refined} moves a facet of {@code source} outward, judged as the maps their values are read by:
+     * {@code meta.namespace} composes {@code meta.map} and adds no field beside the ones it takes ([TSON-SCHEMA] §5.7).
+     */
+    public static List<String> narrowing(NamespaceBody source, NamespaceBody refined) {
+        return narrowing(source.read(), refined.read());
     }
 
     private static void restated(List<String> out, String facet, Object source, Object refined) {

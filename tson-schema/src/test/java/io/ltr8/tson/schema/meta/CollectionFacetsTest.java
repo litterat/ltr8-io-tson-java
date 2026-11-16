@@ -48,4 +48,16 @@ class CollectionFacetsTest {
         assertEquals(List.of("key_type uuid replaces the source's own text, and a refinement only restates key_type"),
                 CollectionFacets.narrowing(index, MapBody.of(TypeRef.of("uuid"), TypeRef.of("int32"))));
     }
+
+    @Test
+    void aNamespaceTypeNarrowsAsTheMapItsValuesAreReadBy() {
+        NamespaceBody api = new NamespaceBody(TypeRef.of("meta.identifier"), TypeRef.of("method"), false,
+                Optional.of(1L), Optional.of(5L));
+        assertEquals(List.of(), CollectionFacets.narrowing(api, new NamespaceBody(TypeRef.of("meta.identifier"),
+                TypeRef.of("method"), false, Optional.of(2L), Optional.of(3L))));
+        List<String> violations = CollectionFacets.narrowing(api, new NamespaceBody(TypeRef.of("meta.type_name"),
+                TypeRef.of("text"), true, Optional.of(0L), Optional.of(6L)));
+        assertEquals(5, violations.size(), violations.toString());
+        assertTrue(violations.getFirst().startsWith("key_type"), violations.toString());
+    }
 }
