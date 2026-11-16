@@ -1,8 +1,7 @@
 # Externs
 
-Design notes for `!meta.extern` ([TSON-SCHEMA] §5.13): one entry of another schema under a local name, a dependency
-loaded with the imports whose names never enter the namespace, and a value read, bound and written through one
-(§7.9), in both encodings. Current form only; history lives in git.
+`!meta.extern` ([TSON-SCHEMA] §5.13, §7.9): one entry of another schema under a local name, loaded with the imports,
+and a value read, bound and written through it in both encodings.
 
 **Invariants**
 
@@ -14,8 +13,8 @@ loaded with the imports whose names never enter the namespace, and a value read,
   and cycle guard. A failure refuses the importer whole, prefixed with the extern, and keeps its classification.
 - **The cycle guard knows its edges.** `TsonCompiledVocabularyRegistry.resolving` maps each identity in flight to the
   extern that reached it (null for an import), so a cycle over imports and externs together is one check, its path
-  marking each extern edge. A document held as text is in flight under its own `!!id` while it resolves and links
-  (`resolveAndLink`), so a reference reaching that identity is the cycle, never a fetch of it as another document.
+  marking each extern edge. A document held as text is in flight under its own `!!id` (`resolveAndLink`): a
+  reference reaching it is the cycle, never a fetch.
 - **One kernel is judged by identity, before a fetch.** A closure reached through an extern edge that names a kernel
   of another revision (`TsonBundledSchemas.isKernelOfAnyRevision`) is refused there, naming both kernels: this
   library pre-loads its own kernel alone, and the other would fail as an ordinary document, about its grammar.
@@ -23,13 +22,12 @@ loaded with the imports whose names never enter the namespace, and a value read,
   `TsonLinkedSchema.externs` maps each extern to its `ExternTarget`, merged through imports as `entryOrigins` is. A
   refused extern stays unattached and lands nowhere, so a use of it reports nothing further.
 - **Every judgement through the hop compares the landing by identity** (`ExternHops`): the declaring schema and path
-  at the end of alias hops and further externs. A choice's distinct variants, IS-A, a reference's membership (the
-  foreign entry's constructor or one on its chain is `of`, by identity), the disjointness class (classified in the
-  namespace holding the entry) and a value name's type all go through it. `KindMembers` alone treats an extern as no
-  member, since its own construction is `meta.extern`, IS-A `meta.top`: only a caller holding the link can judge it.
+  at the end of alias hops and further externs. A choice's distinct variants, IS-A, a reference's membership, the
+  disjointness class (classified in the namespace holding the entry) and a value name's type all go through it.
+  `KindMembers` alone treats an extern as no member, since its own construction is `meta.extern`, IS-A `meta.top`:
+  only a caller holding the link can judge it.
 - **A foreign schema importing nothing writes the processor's kernel's forms** (§3.3.1), so a constructor its closure
   lacks is looked up, by identity, in the importer's namespace, which holds that kernel.
-- **Sealed is one wording** (`Externs.sealed`), raised wherever the operation is first seen.
 
 **Reading through an extern** (`ExternReader`, built in `TsonSchemaCompiler.Compilation.boundary`)
 
@@ -65,7 +63,6 @@ loaded with the imports whose names never enter the namespace, and a value read,
   untagged; the wrapper's `$value` crosses as it stands, so a `$type` inside it is the foreign schema's.
 - **A dispatcher that matched an extern's name hands it the whole annotation object** (`ExactReader.takesWrapper`):
   handed the `$value`, the boundary would read its leading `$type` in the enclosing scope.
-- **An extern of a map is a map-typed position** (§3.3): a leading `$type` is a key there, so nothing is recognised.
 - **A question about a type's shape follows the extern** (`AliasChain.landed`): a choice's class table, a map key's
   form, an identifier element. Asked of the `Extern` body, each answers as for no type.
 
@@ -76,25 +73,21 @@ loaded with the imports whose names never enter the namespace, and a value read,
   extern for the target, an admitted name for a subtype or a variant. A class bound to no admitted entry is a
   `WriteException`, never the foreign name, which the boundary would refuse.
 - **A class maps to its entry by asking the binder forward**, for each admitted entry, by declaring schema and name:
-  the write inverts what a read binds. Built once per derived writer over every schema the externs reach; a write
-  looks up its record class and component and allocates nothing.
+  the write inverts what a read binds.
 
 **Decisions that lost**
 
 - **Admission stated in each encoding**: two copies of a judgement made of the link alone, which names no reader.
 - **Teaching the foreign record reader to skip an outer `$type`**: it would have to know which scope it is in.
 - **`@Typename.namespace` naming a class's entry when writing**: a second authority beside the binder, which the read
-  cannot consult (no index runs from an annotation to its class). It stays unread.
+  cannot consult (no index runs from an annotation to its class).
 - **Handing the boundary's annotations to the foreign reader through the context**: bytes on every context copy.
 - **Tags derived from `describing(uri, root)`**: a fetch, or a failure, at derivation for a schema never loaded.
 - **Compiling the foreign schema inside the importer's compile**: once per importer and per checkpoint.
-- **A `scope` component on `Diagnostic`**: `schemaId` already names the schema whose names were read; the chain of
-  externs is how the read got there, prose for a human.
+- **A `scope` component on `Diagnostic`**: `schemaId` already names the schema whose names were read.
 - **A target on the model record** (`@Unbound Optional<Target>` on `Extern`): a link fact on a body, which
   `schema.meta`'s equality and the binder's component analysis then meet. Link facts live on `TsonLinkedSchema`.
 - **Loading the foreign schema when the importer links**: too late for a value read at a checkpoint that reaches an
   extern, and it leaves the cycle guard blind to the extern edge.
 - **Comparing across the boundary by spelling**: exact only while both closures hold one kernel and share no other
   schema; identity costs one walk.
-- **Wrapping a nested failure once**: a cycle through several externs reports each extern it passed, the trail of
-  how the importer reached it; nothing tells an already-prefixed message apart without parsing it.

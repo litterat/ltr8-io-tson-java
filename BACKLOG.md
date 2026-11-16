@@ -358,12 +358,12 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   so the comparison needs the wire value there.
 
 - [ ] **`tson-compiler`'s readers adopt the JSON dispatch design once it settles.** `RecordTagDispatchReader`,
-  `RecordMemberDispatchReader`, `Subsumption.dispatching`, `AbstractTemplateReader` and the choice's
-  `NamedDispatchReader` still select by name at read time, and a concrete record reader still accepts a tag
-  naming a subtype. The port: dispatchers wrapping object references resolved at compile, chains flattened
-  through the family, concrete readers that only accept a tag restating themselves, and the JSON side's
-  `Dispatch*Reader` names. Its diagnostics are the drift to close: every divergence the JSON restructure pins in
-  `CrossEncodingParityTest` comes out of that test as the TSON side matches.
+  `RecordMemberDispatchReader`, `Subsumption.dispatching` and the choice's `NamedDispatchReader` still select by
+  name at read time, and a concrete record reader still accepts a tag naming a subtype. The port: dispatchers
+  wrapping object references resolved at compile, chains flattened through the family, concrete readers that only
+  accept a tag restating themselves, and the JSON side's `Dispatch*Reader` names. Its diagnostics are the drift to
+  close: every divergence the JSON restructure pins in `CrossEncodingParityTest` comes out of that test as the TSON
+  side matches.
 
 - [ ] **A JSON diagnostic names the type at the end of an alias chain, not the alias the author wrote.**
   `JsonSchemaCompiler` collapses an `ALIAS` entry onto its target's reader ([TSON-SCHEMA] §8.3 permits

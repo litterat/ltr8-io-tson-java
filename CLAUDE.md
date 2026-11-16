@@ -72,8 +72,8 @@ deprecated, a wrongly-shaped public method deleted rather than wrapped. The one 
 of a *published* schema `!!id`.
 
 **Status.** Parts 1 and 2 work end to end — the bundled schemas resolve, link and compile; user schemas validate and
-read in tree and bind mode; the `tson` CLI drives it. The JSON encoding has its own full stack in tree mode. What is
-left is in `BACKLOG.md`.
+read in tree and bind mode; the `tson` CLI drives it. The JSON encoding has its own full stack, in tree and bind
+mode. What is left is in `BACKLOG.md`.
 
 **Hard constraints:** Java 25 only. No external runtime dependencies in main code; JUnit (Jupiter) for tests only.
 

@@ -53,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * TsonCompiledVocabulary#reader}, which is deliberately scoped to constructor-declared entries only
  * (see that method's own Javadoc).
  */
-class TsonSchemaResolverCompiledVocabularyTest {
+class SchemaResolverCompiledVocabularyTest {
 
     /**
      * The kernel, meta.tn, and numeric.tn registered: their own instance declarations ({@code ieee_format =>
