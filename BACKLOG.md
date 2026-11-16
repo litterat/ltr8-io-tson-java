@@ -90,10 +90,15 @@ spec-required case:
   (`TsonSchemaLinker.checkOpenArity`), so `box => <T> { v: T  w: no_such_type }` gets its verdict at each application,
   retargeted to `box` (`heldDeclarationNaming`), and none while nothing applies it. Judge the references that are no
   `ParamRef` with `validateTypeRef` at the declaration, and add a `schema/invalid` vector for the unapplied case.
-- [ ] **An application through an alias is untested** ([TSON-SCHEMA] §8.3). An application through an alias of an
-  open record applies the open record (`TemplateMaterialiser.templateHead`: `bx<text>` over `bx => box` closes to the
-  record `box<text>` closes to), and one through an alias of a constructor constructs (`ref_of<order>` over `ref_of =>
-  meta.ref`); no test or vector pins either. Add a `schema/valid` vector for each, with the expected resolved form.
+- [ ] **An application through an alias of an open record is pinned at a composition operand alone** ([TSON-SCHEMA]
+  §8.3). It applies the open record (`TemplateMaterialiser.templateHead`: `bx<text>` over `bx => box` closes to the
+  record `box<text>` closes to), and the corpus holds that at an operand, `box_of<text> & { … }`. Add a
+  `schema/valid` vector for one at a declaration and one at a field's type, with the expected resolved form.
+- [ ] **No vector pins a parameter at a facet** ([TSON-SCHEMA] §5.10). §5.10 refuses a parameter at a facet as at a
+  size bound, a default or a field's own slots, and the corpus has a `schema/invalid` vector for each of those
+  (`a-parameter-at-a-size-bound` among them) but none for a facet. `t => <T> !meta.record { fields: { a => { type: {
+  of: !meta.array { element_type: text  unique_items: T } } } } }` is refused ("parameter 'T' stands at
+  meta.array.unique_items"); add it as a vector.
 - [ ] **An aliased application across imports is untested at the IS-A edge fold.** An imported schema's
   `@meta.application` is the application as written (`{ head: box  arguments: [user_id] }`), and reaches the importer's
   edge fold in that form, where the fold compares canonical applications ([TSON-SCHEMA] §8.2), arguments past their
@@ -165,6 +170,13 @@ spec-required case:
   `JsonSchemaCompiler` dispatches a `ValueEntry` to the factory of its type's name, finds none, and compiles an
   `ErrorReader`, so the same document in JSON reports `NOT_IMPLEMENTED`. Give the JSON stack the same refusal and a
   `CrossEncodingParityTest` case.
+- [ ] **A JSON `$type` naming an incomplete entry reports a gap, not the document's mistake** ([TSON-SCHEMA] §5.5).
+  Under `nonempty => !meta.array ^ { min_items: 1 }` and `envelope => { local: meta.declared }`, TSON's `!envelope {
+  local: !nonempty [a] }` is a `TYPE_MISMATCH` ("'nonempty' is an incomplete 'meta.array' with [element_type] absent,
+  not a type", `IncompleteEntryReader`); `{"local": {"$type": "nonempty", "$value": ["a"]}}` reports `NOT_IMPLEMENTED`
+  ("has no usable compiled reader"), and so does a JSON root read at `nonempty`: `JsonSchemaCompiler.constructorOf`
+  throws `IllegalStateException` for an `IncompleteEntry`, which the compile loop turns into an `ErrorReader`. Give the
+  JSON stack `IncompleteEntryReader`'s refusal and a `CrossEncodingParityTest` case.
 - [ ] **§5.7: a field restated where no closed record is on the chain is not judged for its type.** The link
   judges a restated type against the nearest closed records on the chain (`TsonSchemaLinker.checkRestatedFieldTypes`).
   `dog => pet<dog_type> & { pet: cat_type }`, where no entry names `pet<dog_type>`, has an edge only to
@@ -228,12 +240,15 @@ spec-required case:
   can be left out"); §3.4.1 says a loop of aliases is not a wait cycle and §8.3 refuses it as an alias chain with no
   terminal. The verdict is right; report the chain (`'a' is an alias of 'b', an alias of 'a', which names no type`)
   once, at the first entry, before the productivity check sees it.
-- [ ] **A tag naming a nested member by its bare name is a mismatch, not an unresolved name** ([TSON-SCHEMA] §3.3,
-  §7.2). Under `geo => !schema { address => { … } }` and `order => { shipping: geo.address }`, `!order { shipping:
-  !address { … } }` reports `TYPE_MISMATCH` ("'address' is not admissible at a 'geo.address' position"), though
-  `address` resolves to nothing at the root — a bare name "names the root's `address` or fails to resolve" (§3.3).
-  That is `UNKNOWN_TYPE_REF`, the resolver category, as the same tag already gets at a `meta.declared` position.
-  Resolve the tag before judging admissibility at every typed position, and add a `class2/validate` vector.
+- [ ] **A tag that names nothing is a mismatch below the root, not an unresolved name** ([TSON-DATA] §8.1;
+  [TSON-SCHEMA] §3.3, §7.2). Under `outer => { inner: inner }` and `inner => { a: text }`, `!outer { inner: !nosuch {
+  a: "x" } }` reports `TYPE_MISMATCH` ("'nosuch' is not admissible at a 'inner' position"), as does the tag at an atom
+  position and as `"$type": "nosuch"` in JSON, where the same tag at the root is `UNKNOWN_TYPE` ("'nosuch' is not in
+  this compiled schema"). So is a nested member's bare name: under `geo => !schema { address => { … } }` and `order =>
+  { shipping: geo.address }`, `!order { shipping: !address { … } }` is a mismatch, though a bare name "names the
+  root's `address` or fails to resolve" (§3.3). §8.1 makes an unresolved type name a resolver error: `UNKNOWN_TYPE_REF`,
+  as the same tag already gets at a `meta.declared` position. Resolve the tag before judging admissibility at every
+  typed position, in both encodings, and add `class2/validate` vectors for both names.
 
 ## Checked annotations
 
@@ -285,7 +300,7 @@ encodings ([TSON-JSON] §6.1.1).
   writes JSON that does not read back. The work is a schema-directed JSON object writer, the peer of
   `TsonObjectWriter.describing(linked, root)`, writing each `$type` in the scope it is read in, the boundary's by
   the enclosing scope's name (`tson-schema`'s `ExternAdmission` says which).
-- [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 39.** §3.3 requires `$type` (after any `$import`)
+- [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 40.** §3.3 requires `$type` (after any `$import`)
   to lead its object and argues that code-point sorting preserves that; with `meta.record.name_type` admitting `$ref`,
   `$id` and `$defs` as field names, those sort first, so RFC 8785 canonical output of a tagged value —
   `{"$ref": "#/a", "$type": "sub", …}` — is refused as a misplaced `$type`. Decided: the reader admits the annotation
@@ -502,6 +517,15 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   and type-reference bind readers resolve an annotation (`AnnotationCapture.bound`); every other bind reader skips
   it unread. Judge the name and the value at each of them as the tree readers do, discarding what no component
   receives, add a `CrossEncodingParityTest`-style case per position, and check `tson-json`'s bind path for the same.
+- [ ] **A choice's variant bound through a bridge delivers its wire value** ([TSON-SCHEMA] §7.4). With `color =>
+  !enum [RED GREEN]` bound to a Java enum `Color implements Shade`, `size => { n: int32 }` to a record `Size implements
+  Shade`, `shade => ( color | size )` and `holder => { s: shade }` to `Holder(Shade s)`, `!holder { s: RED }`, tagged or
+  not, fails each read as `BIND_MISMATCH` ("Holder rejected the value the schema admits: java.lang.ClassCastException:
+  Cannot cast java.lang.String to …Shade"), and JSON's `{"s": "RED"}` the same; a field typed `color` binds
+  `Color.RED`, and the `size` variant binds. Both stacks' `BindTargets` wrap a field's reader in the target's bridge
+  and read a choice as it is, so the enum variant arrives as its label. Bind each variant to its class through its
+  bridge when the reader is built, refusing at compile a variant whose class the component cannot hold, with a
+  bind-mode test per encoding.
 - [ ] **A map keyed by a record type admits a token key** ([TSON-SCHEMA] §4.2, §5.3; [TSON-DATA] §2.5). §4.2 says
   "a map's keys may be records, tuples or arrays, each declared and named", and a key is a data value read at the
   key type. Under `order => { id: text }` and `r => { keyed: {order => int32} }`, `!r { keyed: { o => 1 } }` reads
@@ -620,3 +644,17 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   still needs deciding per limit is *where it is counted*: the ones that bound shape are per-container state the
   stream does not keep, where depth was a counter it already had, and the aggregate (total values) needs its own
   counter since §9.1 is explicit that the total is not bounded by the parts.
+
+- [ ] **A schema nested too deep fails as a host fault, not a limit refusal** ([TSON-DATA] §9.1; [TSON-SCHEMA] §11.5,
+  §5.2). §9.1 wants a refusal naming the limit and its threshold "rather than … a stack overflow", and §11.5 applies
+  its counters to a schema document as written. A schema nesting brackets, braces or a choice's parentheses past 64
+  (`deep => [[…[text]…]]`, `{ a: { a: … } }`, `( int32 | ( int32 | … ) )`) throws `LimitExceededException` out of
+  `Tson.validateSchema` rather than returning `LIMIT_EXCEEDED`; `tson compile` prints "internal error … nested deeper
+  than this processor reads (64)" and exits 70. The schema parser reads at the default limits whatever is configured
+  (`new TsonSchemaParser(schemaText)` in `Tson`), so `compile --max-depth 100000` refuses at 64 too. An argument
+  list opens no container, so nothing counts it: `meta.array<…<text>…>` 1,000 deep compiles, `set<…>` 1,000 deep
+  overflows the stack where the resolver reads the construction (`TypeInlineReader` through `RecordBindReader`), and
+  either at 5,000 overflows in `TsonSchemaParser.parseTypeArgs`; the `StackOverflowError` escapes the CLI, which
+  exits 1, the code for a rejected document. Report the stream's refusal through the receiver, hand the parser the
+  configured `LimitsPolicy`, and bound an argument list's depth (§5.2's nesting limit on inline forms) so that no
+  schema reaches a host fault.
