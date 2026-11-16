@@ -459,9 +459,11 @@ import-cycle guard.
 
 ### Pipeline stages, if you need one directly
 
-`TsonSchemaParser`, `TsonSchemaResolver`, `TsonSchemaLinker`, `TsonSchemaCompiler`, `TsonDataParser`,
-`TsonDataStream`, `TsonDiagnostics` (the classifiers over this engine's exceptions).
-`TsonSchemaParser` / `TsonSchemaResolver` / `TsonSchemaLinker` each have a reporting overload that collects
+`TsonSchemaParser`, `TsonSchemaLinker`, `TsonSchemaCompiler`, `TsonDataParser`,
+`TsonDataStream`, `TsonDiagnostics` (the classifiers over this engine's exceptions). Resolution is reached through
+`TsonCompiledVocabularyRegistry.resolveAndLink(document, positions)`, which resolves and links a parsed document
+and registers nothing.
+`TsonSchemaParser`, `resolveAndLink` and `TsonSchemaLinker` each have a reporting overload that collects
 every independent problem in one pass; namespace-level failures (an unloadable `!!import`, an import cycle, the
 `!!id` cross-check) still throw even with a receiver. Compilation, and the lexer under
 everything, are fail-fast by design.

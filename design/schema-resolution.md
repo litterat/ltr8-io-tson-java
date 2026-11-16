@@ -71,7 +71,7 @@ Related: `design/constructor-application.md` (what `!C { … }` may apply and ho
 
 ## The two resolvers
 
-`SchemaResolver` resolves a whole `SchemaDocument` (`TsonSchemaResolver` is its public wrapper): header directives,
+`SchemaResolver` resolves a whole `SchemaDocument`: header directives,
 and the merge of every `!!import`'s namespace (`TsonSchema.namespaceSources`) *before* any
 local declaration resolves, recording each imported entry's origin. That merge mirrors `TsonSchemaLinker.mergeImports`
 — transitive, collisions decided by entry identity (§2.2.3) — because it is the same concept met one phase earlier,

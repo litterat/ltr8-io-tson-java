@@ -613,12 +613,12 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
      * through a record value's field is read by ({@link TsonSchemaLinker#link(TsonSchema,
      * io.ltr8.tson.schema.TsonSchemaLoader, IdentifierPolicy, DataBindContext)}). Throws at the first failing entry.
      */
-    public TsonLinkedSchema link(TsonSchema resolved) {
+    private TsonLinkedSchema link(TsonSchema resolved) {
         return TsonSchemaLinker.link(resolved, schemaRegistry, identifierPolicy, context);
     }
 
     /** {@link #link(TsonSchema)} reporting each failing entry through {@code receiver} instead of throwing. */
-    public TsonLinkedSchema link(TsonSchema resolved, DiagnosticsReceiver receiver) {
+    private TsonLinkedSchema link(TsonSchema resolved, DiagnosticsReceiver receiver) {
         return TsonSchemaLinker.link(resolved, schemaRegistry, receiver, identifierPolicy, context);
     }
 

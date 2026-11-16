@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.suite.SuiteBindings;
@@ -81,7 +82,7 @@ class SidecarSchemasTest {
         TsonCompiledSchemaLoader loader = TsonCompiledVocabularyRegistry.withStandardLibrary(SuiteBindings.context(),
                 id -> fetch(schemasRoot, id));
 
-        TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);
+        TsonSchema resolved = new SchemaResolver(loader).resolveSchema(document);
         assertFalse(resolved.entries().isEmpty(), fileName + " resolved with no entries");
     }
 

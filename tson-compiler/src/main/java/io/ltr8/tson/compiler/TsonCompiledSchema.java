@@ -16,8 +16,7 @@ import java.util.Optional;
  * build logic of its own; all the actual compile-time work (the eager walk, cycle detection,
  * per-entry build-failure deferral) lives in {@link TsonSchemaCompiler} itself, matching the
  * verb/noun split this project's own pipeline vocabulary uses everywhere else ({@code
- * TsonSchemaLinker}/{@code TsonLinkedSchema}, {@code TsonSchemaResolver}/its own resolved {@code
- * TsonSchema}).
+ * TsonSchemaLinker}/{@code TsonLinkedSchema}).
  *
  * <p>The compile output for *any* resolved schema. A schema compiled as vocabulary -- the readers another
  * schema's resolution reads its construction heads and annotation values through -- is the {@link
