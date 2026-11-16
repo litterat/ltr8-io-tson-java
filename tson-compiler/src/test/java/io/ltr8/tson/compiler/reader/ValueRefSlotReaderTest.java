@@ -45,9 +45,11 @@ class ValueRefSlotReaderTest {
         assertEquals(Optional.of("orders.1x"), in("orders.1x", TokenForm.UNQUOTED));
     }
 
+    /** A reference is a token's text whatever its form ([TSON-DATA] §2.4, [TSON-SCHEMA] §5.12). */
     @Test
-    void aQuotedTokenIsText() {
-        assertEquals(Optional.empty(), in("orders", TokenForm.SINGLE_LINE_QUOTED));
+    void aQuotedTokenIsAName() {
+        assertEquals(Optional.of("orders"), in("orders", TokenForm.SINGLE_LINE_QUOTED));
+        assertEquals(Optional.of("main.public api.ping"), in("main.public api.ping", TokenForm.SINGLE_LINE_QUOTED));
     }
 
     /** In a schema document the name is kept as written, and handed on with its cell for the link to deliver into. */

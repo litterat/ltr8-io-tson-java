@@ -120,11 +120,11 @@ constructor's binding record, a value entry's payload — reaches the readers of
 `SchemaResolver.read`, whose context answers `readsSchemaDocument()` true (`TsonReadContext.schemaDocument`), and only
 a schema has a namespace a name could resolve in. There a record whose one non-optional field is atom-typed takes a
 bare value as that field — `meta.record_field`'s `type` is `meta.type_expr`, whose name variant is an atom
-whose value is a type's name (`TypeRefSlotReader`) — and where the field is a product or a sum, an unquoted token
+whose value is a type's name (`TypeRefSlotReader`) — and where the field is a product or a sum, a token of either form
 (`ValueRefSlotReader.nameIn`) is a **value by name** the record reader does not read as the field (`meta.record_field`'s
 own positional field being an atom, `fields: { p => x }` fills its `type`, as the sugar `p: x` does). Whether the token is
-a well-formed qualified name — each `.`-separated segment a [TSON-DATA] §7.7 identifier — is the linker's to judge,
-where the name is resolved (`ValuesByName.segments`).
+a well-formed qualified name — each segment a name of the family of what it enters — is the linker's to judge,
+where the name is resolved (`ValuesByName`).
 **Every data document reads as it did before the rule**, tree mode and bind mode alike: `p: x` at a `meta.record_field`
 position fills `type`. Whether the positional field is atom-typed is read off the field's own compiled reader,
 captured before a bind reader rebinds it (`RecordAbstractReader.bareTokenFillsPositionally`), looking through a
@@ -141,5 +141,4 @@ as anything else (a `String`) receives what the atom reads, and the name is reco
 (`RecordedNameReader`). In a schema document the reader resolves nothing — the linker does
 (`design/linking-and-compilation.md`); in a data document it hands the name to the reference's atom bound to the
 component, which judges it in the governing schema and delivers the value reached. At a reference-typed slot a
-quoted token is text, and a framed (`@a x`, `!t x`) or braced value is refused as `expected the name of a 'method'
-value`, whatever the host.
+framed (`@a x`, `!t x`) or braced value is refused as `expected the name of a 'method' value`, whatever the host.

@@ -49,8 +49,21 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
 - **A reference is a name, and an argument list is no data form** ([TSON-DATA] §7.2.5): in data and in a schema
   value alike, `set<text>` is a parse error at its `<`, the grammar's ordinary one for a reserved character. A
   reference's text is a qualified name (`ReferenceGrammar`), so a JSON string or a quoted token holding an argument
-  list fails that grammar, a resolver error, the message saying the same (SPEC-FEEDBACK.md #2 holds whether a quoted
-  token is a reference at all).
+  list fails that grammar, a resolver error, the message saying the same.
+- **A reference is a token's text, whatever its form** ([TSON-DATA] §2.4, [TSON-SCHEMA] §5.12): at a position typed by
+  a reference, in data and in a body a schema document reads as data (a value entry's, a construction's, a field's
+  default), `"main.public api.ping"` and `main.internal.pong` are each the name their text spells, and `"int32"` is
+  `int32` (`ValueRefSlotReader.nameIn`, the one predicate). The text splits at `.` before any family is consulted
+  (`ReferenceGrammar.malformed`: none empty, the first segment a §7.7 identifier), and each further segment is a name
+  of the family of what it enters, matched in that family's form as a document's own key or field name there is
+  (`ValuesByName`'s `Family`): `meta.type_name` at a schema map, the namespace's `key_type`, the record's `name_type`.
+  So no `key_type` or `name_type` admits U+002E (`NameType.dotRefusal`, at link where the type is named; §4.2, §5.2),
+  and every key and field is reachable. A type's name enters schema maps alone, so every segment of one is an
+  identifier (`ReferenceGrammar.parse`), and the positions the schema grammar reads (a field's type, a parent, an
+  alias target, a bound, an argument) refuse a quoted token, as a tag and an annotation name are unquoted. Lost:
+  the rule that a quoted token is text at a reference, which kept a second spelling rule for type-naming slots where
+  quoting is never needed, and left a spaced field or key unreachable; and exact-spelling matching under a folding
+  family, which would make `get` and `GET` one key to the document and two to a reference.
 - **An application is `meta.apply` written in place** (`ApplyBody`): `head` a name, `arguments` names or parameters,
   exactly as the kernel types them (`[meta.type_ref; 1..]`). The schema grammar's `head<args>` at a type slot is its
   sugar, and the explicit `{ of: !meta.apply { … } }` means the same. A constructor's application is its construction

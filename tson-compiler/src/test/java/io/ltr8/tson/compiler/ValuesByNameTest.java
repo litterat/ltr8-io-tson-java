@@ -318,14 +318,11 @@ class ValuesByNameTest {
                 problems.getFirst().message());
     }
 
-    /** The read refuses what is no name at a slot that holds one, before the linker is reached. */
+    /** A reference is a token's text whatever its form ([TSON-DATA] §2.4, [TSON-SCHEMA] §5.12). */
     @Test
-    void aQuotedNameIsText() {
-        List<Diagnostic> problems = problems(api("quoted", """
-                routes => !bindings { b => { method: "orders.place_order"  verb: POST  route: "/" } }"""));
-        assertEquals(1, problems.size(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("expected the name of a 'method' value"),
-                problems.getFirst().message());
+    void aQuotedNameIsTheNameItsTextSpells() {
+        assertEquals(List.of(), problems(api("quoted", """
+                routes => !bindings { b => { method: "orders.place_order"  verb: POST  route: "/" } }""")));
     }
 
     // ── The binding's side ─────────────────────────────────────────────────────────────────────────
@@ -336,15 +333,19 @@ class ValuesByNameTest {
         assertMisbound("name_at_text", "text", "is not a reference");
     }
 
-    /** The grammar is the linker's: each segment between the dots is an identifier, none empty. */
+    /**
+     * The grammar is the linker's: the name splits at each dot, none empty, and each further segment is a name of the
+     * family of what it enters ([TSON-SCHEMA] §5.12), refused by that family.
+     */
     @Test
     void aMalformedNameIsRefusedWhereItIsResolved() {
         refused(api("bad-segment", """
                 routes => !bindings { b => { method: orders.1x  verb: POST  route: "/" } }"""),
-                "'routes' at /b/method holds 'orders.1x', which is no qualified name", "'1x' is not");
+                "'routes' at /b/method names 'orders.1x', and '1x' is no name of 'method_name', which names the keys "
+                        + "of 'orders'", "cannot start an identifier");
         refused(api("leading-dot", """
                 routes => !bindings { b => { method: .orders  verb: POST  route: "/" } }"""),
-                "holds '.orders', which is no qualified name", "one is empty");
+                "holds '.orders', which is no qualified name", "has an empty segment");
     }
 
     private static void assertMisbound(String constructor, String fieldType, String expected) {

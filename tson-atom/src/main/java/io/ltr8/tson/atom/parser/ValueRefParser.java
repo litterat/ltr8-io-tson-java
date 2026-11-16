@@ -12,8 +12,8 @@ import java.util.Optional;
 
 /**
  * Parses a reference that names values -- an instance of the kernel's {@code ref} whose {@code of} is no constructor,
- * {@code meta.ref<method>}. A value is a qualified name, segments between dots, each a [TSON-DATA] §7.7 identifier,
- * read into the {@link ValueRef} a host receives.
+ * {@code meta.ref<method>}. A value is a qualified name ({@link ReferenceGrammar#valueName}), read into the {@link
+ * ValueRef} a host receives.
  *
  * <p><b>The value finds what it names</b> where the reference was linked over a whole closure ({@link
  * RefBody#values}): the name is judged by what it reaches there, as the linker judges a value body's names
@@ -40,7 +40,7 @@ public record ValueRefParser(RefBody reference, boolean judgesValues) implements
 
     @Override
     public ValueRef<Object> read(String text) {
-        TypeRef read = ReferenceGrammar.parse(text);
+        TypeRef read = ReferenceGrammar.valueName(text);
         ValueRef<Object> cell = ValueRef.to(read.name());
         Optional<RefBody.Values> values = judgesValues ? reference.values() : Optional.empty();
         if (values.isEmpty()) {

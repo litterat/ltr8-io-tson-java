@@ -18,11 +18,10 @@ keeps the rest of the document. Current form only; history lives in git.
   will not read back.
 - `TsonDataEmitter.field` writes a name that is no identifier as a quoted string: a relaxed `name_type`
   ([TSON-SCHEMA] §5.2) admits `"@id"`, which written bare would not lex back.
-- A reference is a name, written unquoted as its one token (`TsonDataEmitter.reference(TypeRef)`), as a value written
-  by name has only that spelling ([TSON-SCHEMA] §5.12); `TreeValueWriter` and `DataClassObjectWriter` write a
-  `schema.meta.TypeRef` through it. An application is a record, `meta.apply`, written as any record is, since an
-  argument list is no data form ([TSON-DATA] §7.2.5). A name that is no qualified name is written as a quoted string,
-  never as bare text that would not read back.
+- A reference is written by `TsonDataEmitter.reference`, unquoted where every segment is an identifier and quoted
+  otherwise, so a segment outside the token profile reads back ([TSON-SCHEMA] §5.12, the form carrying nothing);
+  `TreeValueWriter` and `DataClassObjectWriter` write a `TypeRef` and a `ValueRef` through it. An application is a
+  record, `meta.apply`, written as any record is, since an argument list is no data form ([TSON-DATA] §7.2.5).
 - `DataClassObjectWriter` writes a `Namespace` as the map it holds: each key keeps its annotations and is bare where
   it is an identifier, quoted otherwise; a value is tagged only where its class carries `@Typename`, which is what
   selects a subtype of the value type on the way back in. A value entry (`ValueEntry`) is written as its `type` for

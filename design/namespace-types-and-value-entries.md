@@ -63,7 +63,8 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   the host component is.
 - A value by name is entered through a value entry only. Its first segment resolves in the schema's one namespace,
   each segment naming a member of a nested `!schema` map collapsing onto that member's path entry (`geo.home`); a
-  further segment selects a key of a namespace value or a field of a record value (bound or tree-held); a map that is
+  further segment selects a key of a namespace value or a field of a record value (bound or tree-held), matched in the
+  `key_type`'s or `name_type`'s form (`get` selects `GET` under a case fold); a map that is
   no namespace, `{text => method}` or a record value's `meta.field_map`, is not entered whatever its key type, though
   `meta.ref<meta.map>` holds namespace types and plain map types alike: the walk asks the body, a `NamespaceBody`.
 - A field step through a bound record value reads the host object through the descriptor of the bind context it was

@@ -194,13 +194,14 @@ returns that same node, so the first failure stays the informative one.
 node because there is one no-value spelling: `TsonVoid` carries `_` and a collecting-mode read failure.
 The token `null` is not absence — §4 resolves it to the string `null`, so it arrives as a `TsonAtom`.
 
-**A reference in data is a name, one unquoted token** (`order`, `geo.address`). An argument list is schema grammar
+**A reference in data is a name, one token's text** (`order`, `geo.address`; `"order"` is the same reference, and
+`"main.public api.ping"` reaches a field named `public api`). An argument list is schema grammar
 and no data form ([TSON-DATA] §7.2.5): `t: set<text>` in a data document, or in a schema value's payload, is a parse
 error whether or not the schema closes the application, and the document names the entry the schema declares for it
 (`names => set<text>`, then `t: names`). A schemaless read keeps a name as a `TsonAtom` holding its text. Under a
 schema, a value at a kind-typed position (`meta.ref<T>`, `meta.type_ref`) arrives in tree mode as an atom holding a
 `schema.meta.TypeRef` (`as(TypeRef.class)`), never a `String`: `name()`, `segments()`, `text()`, and `referent()`, the
-value of the entry it names in the schema it was read under. A quoted `"set<text>"` there is text that is no
+value of the entry it names in the schema it was read under. A quoted `"set<text>"` there is no
 qualified name, refused as outside the reference's grammar (`ATOM_FORM_INVALID`), as the JSON string is. `kind!` is schema
 sugar for a dependent field's type and no data form: written in data it is a syntax error. A position typed by a
 reference over a type that is no constructor (`meta.ref<order>`) holds a value's qualified name (`o1`, `book.first`),

@@ -172,6 +172,17 @@ public final class NameType {
         };
     }
 
+    /**
+     * Why {@code type} cannot type the names a qualified name's segments are matched against -- a record's field
+     * names, a namespace's keys -- or empty when it can: the segments are split at {@code .} before any family is
+     * consulted ([TSON-SCHEMA] §5.12), so a family admitting U+002E holds names no segment can spell.
+     */
+    public static Optional<String> dotRefusal(IdentifierType type) {
+        return type.profile().admits('.') ? Optional.of("its profile admits '.' (U+002E), which joins the segments "
+                + "of a qualified name, so a name holding one could not be reached by a reference ([TSON-SCHEMA] "
+                + "§5.12)") : Optional.empty();
+    }
+
     private static boolean asciiOnly(IdentifierType type) {
         return asciiBase(type.start()) && asciiBase(type.continueBase())
                 && Stream.of(type.startAdd(), type.continueAdd(), type.medial())

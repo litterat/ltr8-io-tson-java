@@ -1581,6 +1581,12 @@ public final class TsonSchemaLinker {
                             + "is a member of meta.identifier_ref, a type built with identifier_type; a closed set "
                             + "of names is an identifier family with members");
                 }
+                if (namespace.get(AliasChain.terminal(key.name(), namespace)) instanceof IdentifierType family) {
+                    NameType.dotRefusal(family).ifPresent(why -> {
+                        throw new SchemaValidationException("'" + entryName + "' key_type names '" + key.name()
+                                + "', which cannot name a namespace's keys -- " + why + " ([TSON-SCHEMA] §4.2)");
+                    });
+                }
                 validateSlot(n.valueType(), namespace, constructors, entryName, " value_type", shown, byName,
                         hops);
             }

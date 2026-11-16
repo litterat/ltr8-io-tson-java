@@ -42,7 +42,10 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       a schema value's payload is a parse error, the grammar's ordinary one, whether or not the schema closes the
       application. A type's name reads to a `TypeRef` whose `referent()` is the entry's value, and a value's name to a
       `ValueRef` delivered with the value it reaches. In JSON a reference is the string
-      of a qualified name, and `"set<text>"` is refused as a string outside its grammar
+      of a qualified name, and `"set<text>"` is refused as a string outside its grammar. A quoted token is the
+      reference its text spells, each segment a name of the family of what it enters (Part 2 §5.12), so
+      `"main.public api.ping"` reaches a field named `public api`; no record's `name_type` or namespace's `key_type`
+      admits `.`
 - [x] A dependent field's type is a sum written in place (Part 2 §5.2, `SPEC-FEEDBACK.md` #6) —
       `{ of: !meta.dependent { on: kind } }` at a record field's type, `kind!` in schema-grammar sugar, which parses at
       a field's or group member's type and nowhere else; a `meta.dependent` declared or at any other slot is refused at

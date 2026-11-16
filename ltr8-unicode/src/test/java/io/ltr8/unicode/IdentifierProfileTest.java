@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -44,6 +45,17 @@ class IdentifierProfileTest {
     }
 
     /** JavaScript's IdentifierName: {@code ID_Start ∪ {$ _}}, {@code ID_Continue ∪ {$}}. */
+    /** A character stands somewhere in a name when it is Start, Continue or medial, an exclusion removing it. */
+    @Test
+    void aCharacterIsAdmittedAnywhereItMayStand() {
+        assertTrue(profile(Base.XID, Base.XID, ".", "", "", "", Normalization.NFC).admits('.'));
+        assertTrue(profile(Base.XID, Base.XID, "", ".", "", "", Normalization.NFC).admits('.'));
+        assertTrue(profile(Base.XID, Base.XID, "", "", ".", "", Normalization.NFC).admits('.'));
+        assertFalse(profile(Base.XID, Base.XID, "", ".-", "", ".", Normalization.NFC).admits('.'));
+        assertFalse(DASH_CONTINUES.admits('.'));
+        assertTrue(DASH_CONTINUES.admits('-'));
+    }
+
     @Test
     void additionsExtendTheBase() {
         IdentifierProfile js = profile(Base.ID, Base.ID, "$_", "$", "", "", Normalization.NFC);

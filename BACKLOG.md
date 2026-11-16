@@ -602,8 +602,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   element_type: text }]` given `a` reports `expected a tuple (array-shaped) for 'one_text', found TokenEvent[text=a,
   form=UNQUOTED, position=…]`: `TypeTagCheck.describe`
   names a record, map, array, `{}` and `_` and falls back to `String.valueOf` for anything else, so a scalar token
-  arrives as its `toString`. It has 18 callers, all exposed the same way, and a constructor body's reference-typed slot
-  given a quoted token (`!meta.array { element_type: "text" }`) prints it the same way through another path; a scalar
+  arrives as its `toString`. It has 18 callers, all exposed the same way; a scalar
   wants its token text (and form, where quoting is the difference). `JsonAtoms.describe` is the JSON side's counterpart
   and `CrossEncodingParityTest` the check that the two describe one value alike.
 

@@ -121,14 +121,13 @@ public final class TreeValueWriter {
     private void writeAtom(TsonAtom node, TsonDataEmitter out) throws DataBindException {
         Object value = node.value();
         if (value instanceof io.ltr8.tson.schema.meta.TypeRef reference) {
-            // A reference a schema-directed read delivered: written as the reference it is, unquoted.
             node.typeRef().ifPresent(out::typeRef);
-            out.reference(reference);
+            out.reference(reference.name());
             return;
         }
         if (value instanceof io.ltr8.tson.schema.meta.ValueRef<?> reference) {
             node.typeRef().ifPresent(out::typeRef);
-            out.unquotedToken(reference.name());
+            out.reference(reference.name());
             return;
         }
         VocabularyAtoms.Entry vocab = vocabularyAtoms.get(value.getClass());

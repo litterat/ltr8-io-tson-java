@@ -14,7 +14,7 @@ import java.util.Optional;
  * judges the same name under a {@code TypeRef} or {@code ValueRef} host. Whether a name is judged is the slot's to
  * say, never the host's.
  *
- * <p><b>The spelling is the slot's too.</b> What is no name -- a quoted token, a braced value, a framed name -- is
+ * <p><b>The spelling is the slot's too.</b> What is no name -- a braced value, a framed name -- is
  * refused as the slot's own host's reader refuses it ({@code refusing}): at a reference-typed slot in any schema
  * document, and at a kind-typed slot in a value body, where nothing is closed. A data document's read is the
  * bound reader's alone.

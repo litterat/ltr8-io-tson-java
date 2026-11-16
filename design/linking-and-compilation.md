@@ -264,9 +264,10 @@ The same walk judges two more names, so one rule decides what a value's name rea
   (`design/references.md`). A link of a resolution in progress (`linkReady`) gives none: its pending entries hold no
   value, and a reference there reads its grammar alone, a held value at one being judged when the whole schema links.
 
-- **The grammar is judged here.** `ValuesByName.segments` splits the name at each `.` and requires each segment to be
-  a [TSON-DATA] §7.7 identifier, none empty and no arguments, so `orders.1x`, `.orders` and `orders.` are refused
-  before anything is looked up. An application in a value body is refused where it is read, the alias spelling
+- **The grammar is judged here.** `ValuesByName.segments` splits the name at each `.`, none empty, the first segment an
+  identifier and no arguments, so `.orders` and `orders.` are refused before anything is looked up; each further
+  segment is judged by the family of what it enters as the walk enters it, so `orders.1x` is refused by `orders`'
+  `key_type` (§5.12). An application in a value body is refused where it is read, the alias spelling
   named (`design/references.md`).
 - **One namespace for the slot's type and the name.** The first segment resolves in `merged`, a segment naming a
   member of a nested `!schema` map collapses onto that member's path entry, alias hops are followed (§8.3), and only

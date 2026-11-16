@@ -58,9 +58,9 @@ phase happens to need it first, such a fact ends up stated more than once.
 every producer goes through, and `refValue`, which writes a reference as a bare token; an application at a slot is
 written by `SchemaDesugarer` as the `{ of: !meta.apply { … } }` construction it is. Its producers are `SchemaDesugarer`,
 writing a sugar form's binding record (a nested construction in its `{ of: … }` wrapper, `SchemaDesugarer.slotValue`),
-and `ConstructionRewrite`, writing an applied constructor's arguments at its slots. A quoted token is never a reference,
-so a text slot holding `"box<T>"` is text whatever it spells. `TsonObjectWriter` cannot build a binding record: its
-output is canonical-explicit and fully quoted, a different language from the one a binding is written in.
+and `ConstructionRewrite`, writing an applied constructor's arguments at its slots. A text slot holding `"box<T>"` is
+text whatever it spells, the slot's type and not the token's form deciding. `TsonObjectWriter` cannot build a binding
+record: its output is canonical-explicit and fully quoted, a different language from the one a binding is written in.
 
 **`TypeSlots`** (`tson-schema`, beside the model it walks) — every reference a value holds, at any depth of types
 written in place, its chain left as written. It lives in the model because `RecordBody` itself needs it: an open

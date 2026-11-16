@@ -7,6 +7,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.atom.ReferenceGrammar;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -301,10 +302,17 @@ public final class TsonDataEmitter {
         return this;
     }
 
-    /** Writes the name {@code reference} unquoted, a qualified name ([TSON-DATA] §7.7). */
-    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.TypeRef reference) {
+    /**
+     * Writes a reference's name: unquoted where every segment is an identifier, so the name is one unquoted token,
+     * and quoted otherwise ([TSON-DATA] §7.1), the form carrying nothing at a reference ([TSON-SCHEMA] §5.12).
+     */
+    public TsonDataEmitter reference(String name) {
         startCoreValue();
-        emit(reference.name());
+        if (ReferenceGrammar.isQualifiedName(name)) {
+            emit(name);
+        } else {
+            emitQuoted(name);
+        }
         return this;
     }
 
