@@ -2250,7 +2250,7 @@ class DefinitionResolverTest {
      * <p>That they lower <em>without</em> any import declaring them is a different property and is
      * not shown here -- this harness builds a resolver with no {@code AnnotationValueReader}, so it never
      * checks an annotation name against the namespace at all. {@code
-     * TsonSchemaResolverCompiledVocabularyTest.theMarksLowerUnderAnImportThatDeclaresNoneOfThem} is where that
+     * SchemaResolverCompiledVocabularyTest.theMarksLowerUnderAnImportThatDeclaresNoneOfThem} is where that
      * one is pinned, against a resolver that does check.
      */
     @Test

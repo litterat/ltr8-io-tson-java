@@ -302,13 +302,6 @@ class AtomCoherenceTest {
 
     // ── Temporal families ────────────────────────────────────────────────────
 
-    /**
-     * Reached by direct construction rather than through a resolved schema, and that is not merely a
-     * unit-test convenience: no temporal bound can be written in schema text today. {@code
-     * date_type.min}/{@code max} are declared {@code value?} in temporal.tn, so a bound binds as a {@code
-     * String} into an {@code Optional<LocalDate>} and throws before any coherence check runs -- a
-     * separate, pre-existing defect. These rules go live at the resolver when that is fixed.
-     */
     @Test
     void temporalFamiliesRejectACeilingBelowTheirFloor() {
         assertViolation(new DateType(Optional.of(LocalDate.of(2030, 1, 1)), Optional.of(LocalDate.of(2020, 1, 1))),

@@ -11,7 +11,7 @@
 #   scripts/restamp-bundled-schemas.sh --check    report what is stale, write nothing (exit 1 if any)
 #
 # The library verifies the packaged bytes against the held digest on every load, so a stale pin is
-# not a test-only failure -- it fails Tson.builder().build(). Restamping is what keeps the checks on
+# not a test-only failure -- it fails Tson.standard(). Restamping is what keeps the checks on
 # while a schema is edited across several commits.
 #
 # [TSON-DATA] §2.2.1's content hash is sha256 over every byte past the !!id line, so the id line can
