@@ -136,7 +136,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Incomplete entries (Part 2 §5.5, proposed for Revision 40) — `!C ^ { … }` over a constructor of types with a
       required field absent, refined by fields it has not written and completed by `!X { … }`, `!X value` or `X<…>`
       into the plain construction; refused wherever a type is named, imported like any entry, and left out of the
-      resolved form. An array or a map type refines by its facets' kinds, `!tags ^ { min_items: 2 }` (§5.7)
+      resolved form. An array, a map or a namespace type refines by its facets' kinds, `!tags ^ { min_items: 2 }` (§5.7)
 - [x] Externs (Part 2 §5.13, §7.9, proposed for Revision 40) — `order_v1 => !meta.extern { schema: … type: order }`
       names one entry of another schema, whose schema loads with the imports and none of whose names enter the
       namespace; judged through the hop by the foreign entry's identity, and sealed. A value through one is read in

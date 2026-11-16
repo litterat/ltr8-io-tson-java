@@ -173,6 +173,9 @@ class CrossEncodingParityTest {
               reach_base  => !meta.record { name_type: reach_word  fields: {}  extension: ABSTRACT }
               reach_site  => reach_base & { "public api": reach_api }
               reach_main  => !reach_site { "public api": !reach_api { ping => "x" } }
+              reach_few   => !reach_api ^ { max_items: 1 }
+              few_main    => !reach_few { pong => "y" }
+              few_holder  => { calls: reach_few }
               text_pick   => { which: meta.ref<text> }
               marks      => {
                 nickname?: text
@@ -697,6 +700,22 @@ class CrossEncodingParityTest {
             sameVerdict("text_pick", "{ which: \"" + refused + "\" }", """
                     {"which": "%s"}""".formatted(refused));
         }
+    }
+
+    /**
+     * A namespace type refined by {@code ^} is a namespace type ([TSON-SCHEMA] §5.7): both encodings read a value at
+     * it under the narrowed bounds, and a qualified name enters a value of it in both (§5.12).
+     */
+    @Test
+    void aRefinedNamespaceTypeIsReadAndEnteredAlikeInBoth() {
+        bothAccept("few_holder", "{ calls: { ping => \"x\" } }", """
+                {"calls": {"ping": "x"}}""");
+        sameVerdict("few_holder", "{ calls: { ping => \"x\"  pong => \"y\" } }", """
+                {"calls": {"ping": "x", "pong": "y"}}""");
+        bothAccept("text_pick", "{ which: few_main.pong }", """
+                {"which": "few_main.pong"}""");
+        sameVerdict("text_pick", "{ which: few_main.ping }", """
+                {"which": "few_main.ping"}""");
     }
 
     /**

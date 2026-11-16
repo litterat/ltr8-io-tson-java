@@ -858,8 +858,8 @@ runs, a schema document's annotation value aside (§5).
      79 and 87 make it the array's construction in place, its element type the `meta.apply`
      of `tree` to `T`. §5.7 said a type built "by a constructor composed from either"
      `meta.array` or `meta.map` is refined by `^`, against the same section's rule that the
-     source of `^` is a type `meta.array` or `meta.map` built: the clause goes, so a
-     namespace type, built by `meta.namespace`, takes no `^` (§5).
+     source of `^` is a type `meta.array` or `meta.map` built: the clause stands and the
+     source rule is the one that widens (item 122).
 
 One facet takes one name, on the spec author's ruling. The rule is unchanged.
 
@@ -973,6 +973,15 @@ it.
      not a refusal of the choice, a schema importing the choice's being free to declare
      such a type. `disjoint` is derived over the variants' classes as before, a subtype
      having its variant's class.
+122. **§4.2, §4.3, §5.7** — a namespace type is refined (item 114's reading, reversed on the
+     spec author's ruling). §5.7 named the source of `^` as a type `meta.array` or `meta.map`
+     built, which left out the one kernel collection built by a constructor composed from
+     either: `meta.namespace => meta.map & { … }`. The source is a type built by
+     `meta.array`, by `meta.map` or by a constructor that IS-A either. The rules are the
+     fields', kept through composition, and a field the composing constructor adds is fixed
+     at construction: `small => !api ^ { max_items: 3 }` is a namespace type IS-A `api`,
+     and another `value_type` is refused as it is over a map. A record, a tuple, a choice and
+     a namespace value stay finished to `^`.
 
 ### 3.3 Companion artifacts
 
@@ -1171,6 +1180,9 @@ Changes a Revision 39 implementer must act on:
     `( text | shape )` selects `shape` and validates as a `circle`, so an abstract variant
     admits its family and a concrete one its subtypes. Nothing valid under Revision 39 changes
     meaning: the values this admits were refused.
+24. **A namespace type is refined as a map type is** (§3.2 item 122):
+    `small => !api ^ { max_items: 3 }` is IS-A `api`. The source of `^` is stated once, for
+    every constructor that IS-A `meta.array` or `meta.map`.
 
 ---
 
@@ -1209,7 +1221,7 @@ carries no open questions.
 | #6 (open) | A data document typed by the kernel can write a type in place that §4.2's list refuses (`!meta.array { element_type: { of: !meta.dependent { on: kind } } }` reads with no diagnostic): `meta.type_inline.of` is typed `meta.type`, and the list is a resolver rule. It predates `meta.dependent`, which adds one entry to the list. | Open — carried. |
 | Items 78–84 (ruled) | A choice over a parameter, `( T \| int32 )`, is disjoint for some arguments and not others. Refusing it at the declaration, or requiring disjointness for every argument, were the alternatives; it loads at the open record, and each application is judged where it closes. | **[settled]** — the spec author's ruling. |
 | #8 (remainder) | A name in a schema document's annotation value is judged at link (Part 2 §5.12). The first implementation checks the value's shape and delivers the name unjudged; a data document's is judged at the read. | Open — outstanding work in the implementation; the text states the rule. |
-| Item 114 (reading) | A type built by a constructor composed from `meta.array` or `meta.map`, a namespace type, takes no `^`: Part 2 §5.7 names the source of `^` as a type `meta.array` or `meta.map` built, and `!api ^ { max_items: 3 }` over a `!meta.namespace` type is refused. The open-construction design moved a written value by its facet's kind for every constructor, which asks for more. | **[editorial]** — the running behaviour, for confirmation. |
+| Item 114 (ruled) | A type built by a constructor composed from `meta.array` or `meta.map`, a namespace type, takes `^` under the collection's rules: §5.7's source of `^` is a type built by `meta.array`, by `meta.map` or by a constructor that IS-A either. Keeping the source to the two constructors, so that a namespace type is bounded only where it is constructed, was the reading first taken. | **[settled]** — the spec author's ruling, §3.2 item 122: the general rule, with no case for a namespace. |
 | Items 107–108 (ruled) | Over an incomplete entry nothing is replaced: a field written again is refused, whatever the value, and to narrow, the entry is completed and the type refined. One rule covers required fields: `^` writes any unwritten field and leaves one required field absent. An alias of an incomplete entry is allowed and not written. An incomplete entry is imported like any entry. | **[settled]** — the spec author's ruling. |
 | Item 109 (ruled) | `^` always follows `!name` and its body is values; `&` always follows a bare name and its body is field definitions, the only way to derive a record. | **[settled]** — the spec author's ruling. |
 | Items 108–109 (lost) | `a: enum`; a reference over sets alone; a set's `voidable: false` as a pin; a resolved form listing every name its source offers; `^`'s refusal of a new field. | Recorded — items 108 and 109 state each, and the replacement where there is one. |

@@ -82,15 +82,22 @@ public final class IncompleteEntries {
      */
     static void requireWritable(String name, String constructorName, RecordBody constructor,
                                 SequencedMap<String, DataValue> written) {
+        requireDeclared(name, constructorName, constructor, written);
         for (String field : written.keySet()) {
-            RecordField declared = constructor.fields().get(field);
-            if (declared == null) {
-                throw new SchemaValidationException("'" + name + "': '" + field + "' is no field of the constructor '"
-                        + constructorName + "' (§5.5)");
-            }
-            if (declared.role() == FieldRole.FIXED) {
+            if (constructor.fields().get(field).role() == FieldRole.FIXED) {
                 throw new SchemaValidationException("'" + name + "': '" + field + "' is fixed by '" + constructorName
                         + "', and no construction writes it (§5.5)");
+            }
+        }
+    }
+
+    /** Refuses a field of {@code written} that {@code constructor} does not declare. */
+    static void requireDeclared(String name, String constructorName, RecordBody constructor,
+                                SequencedMap<String, DataValue> written) {
+        for (String field : written.keySet()) {
+            if (!constructor.fields().containsKey(field)) {
+                throw new SchemaValidationException("'" + name + "': '" + field + "' is no field of the constructor '"
+                        + constructorName + "' (§5.5)");
             }
         }
     }

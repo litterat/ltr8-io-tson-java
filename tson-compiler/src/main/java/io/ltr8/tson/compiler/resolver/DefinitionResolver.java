@@ -34,7 +34,11 @@ import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.CollectionFacets;
+import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
@@ -73,6 +77,7 @@ import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Resolves one declaration from a {@link SchemaMap} (the grammar-layer AST) into the value its entry maps to
@@ -205,6 +210,7 @@ final class DefinitionResolver {
 
     /** {@code type}'s one field ([TSON-SCHEMA] §4.1): a type's IS-A chain, which no declaration writes. */
     private static final String CHAIN = "chain";
+    private static final Set<String> COLLECTION_CONSTRUCTORS = Set.of(KernelNames.of("array"), KernelNames.of("map"));
 
     /** The kernel's {@code meta.apply}, which no declaration's body constructs. */
     private static final String APPLY = KernelNames.of("apply");
@@ -1191,8 +1197,8 @@ final class DefinitionResolver {
      * every fresh {@code Instance}). {@code I} written as an alias names the instance at the end of its chain.
      *
      * <p>Three sources are no atom instance and take the same spelling: a constructor of types, whose construction is
-     * left open ({@link #constructOpen}); an incomplete entry ({@link #refineIncomplete}); and an array or a map type,
-     * refined by its facets' kinds ({@link #refineCollection}).
+     * left open ({@link #constructOpen}); an incomplete entry ({@link #refineIncomplete}); and a type a collection
+     * constructor built, refined by its facets' kinds ({@link #refineCollection}).
      */
     private Top resolveAtomRefinement(String name, AtomRefinement refinement) {
         // An alias is a hop, not a supertype (§8.3): `!integer ^ { ... }` through core's `integer => integer`
@@ -1218,8 +1224,8 @@ final class DefinitionResolver {
         if (ConstructionSugar.constructs(sourceName, source)) {
             return constructOpen(name, refinement.target(), sourceName, (RecordBody) source, refinement.bindings());
         }
-        if (source instanceof io.ltr8.tson.schema.meta.ArrayBody || source instanceof io.ltr8.tson.schema.meta.MapBody) {
-            return refineCollection(name, sourceName, (Type) source, refinement.bindings());
+        if (source instanceof Type type && collectionConstructor(sourceName, type).isPresent()) {
+            return refineCollection(name, sourceName, type, refinement.bindings());
         }
         if (!(source instanceof io.ltr8.tson.schema.meta.Atom)) {
             // The construction hint is offered only where construction would actually work, which is the
@@ -1237,10 +1243,8 @@ final class DefinitionResolver {
                                     : "kind=" + EntryKind.of(source, kernel) + ", which is finished and takes no "
                                             + "refinement"));
         }
-        // The tag the source's value carries, and failing a recorded one the constructor its class is the body
-        // of -- every resolved instance records its tag, and a hand-assembled one is the class's own.
-        String constructor = factsOf(sourceName).constructor()
-                .orElseGet(() -> TsonSchema.constructorOf(source));
+        // Every resolved instance records its tag, and a hand-assembled one is the class's own.
+        String constructor = tagOf(sourceName, source);
         refuseWrittenChain(name, sourceName + " ^", refinement.bindings());
 
         DataValue merged = mergeWithSource(name, source, refinement.bindings(), constructor);
@@ -1319,35 +1323,56 @@ final class DefinitionResolver {
     }
 
     /**
-     * {@code !T ^ { … }}, {@code T} an array or a map type: a refinement, IS-A {@code T} and its chain, each written
-     * facet judged by its kind over effective values ({@link io.ltr8.tson.schema.meta.CollectionFacets}).
+     * The constructor that built {@code source}, where it is {@code meta.array}, {@code meta.map} or a constructor IS-A
+     * either, {@code meta.namespace} among them: [TSON-SCHEMA] §5.7 states the collection facets' kinds as the fields'
+     * rules, which composition keeps.
+     */
+    private Optional<String> collectionConstructor(String sourceName, Type source) {
+        String constructorName = AliasChain.terminal(tagOf(sourceName, source), vocabularyDefinitions::definition);
+        if (!(vocabularyDefinitions.definition(constructorName) instanceof RecordBody constructor)) {
+            return Optional.empty();
+        }
+        boolean collection = Stream.concat(Stream.of(constructorName), constructor.supertypes().stream())
+                .anyMatch(COLLECTION_CONSTRUCTORS::contains);
+        return collection ? Optional.of(constructorName) : Optional.empty();
+    }
+
+    /**
+     * {@code !T ^ { … }}, {@code T} a type a collection constructor built ({@link #collectionConstructor}): a
+     * refinement by the same constructor, IS-A {@code T} and its chain, each written facet judged by its kind over
+     * effective values ({@link CollectionFacets}).
      */
     private Top refineCollection(String name, String sourceName, Type source, DataValue bindings) {
-        String tag = factsOf(sourceName).constructor().orElseGet(() -> TsonSchema.constructorOf(source));
-        String constructorName = AliasChain.terminal(tag, vocabularyDefinitions::definition);
-        if (!(vocabularyDefinitions.definition(constructorName) instanceof RecordBody constructor)) {
-            throw new IllegalStateException("'" + name + "': '" + sourceName + "' was built by '" + constructorName
-                    + "', which is no constructor");
-        }
+        String constructorName = collectionConstructor(sourceName, source).orElseThrow();
+        RecordBody constructor = (RecordBody) vocabularyDefinitions.definition(constructorName);
         refuseWrittenChain(name, sourceName + " ^", bindings);
         DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
-        IncompleteEntries.requireWritable(name, constructorName, constructor, braced(name, sourceName, payload));
+        // A pinned field is a facet fixed at construction, which a refinement restates verbatim or leaves alone
+        // ([TSON-SCHEMA] §5.7): the constructor's reader compares a written value against the pin.
+        IncompleteEntries.requireDeclared(name, constructorName, constructor, braced(name, sourceName, payload));
         Top body = bindAtomInstance(name, mergeWithSource(name, source, payload, constructorName));
         List<String> violations = switch (source) {
-            case io.ltr8.tson.schema.meta.ArrayBody array -> io.ltr8.tson.schema.meta.CollectionFacets.narrowing(array,
-                    (io.ltr8.tson.schema.meta.ArrayBody) body);
-            case io.ltr8.tson.schema.meta.MapBody map -> io.ltr8.tson.schema.meta.CollectionFacets.narrowing(map,
-                    (io.ltr8.tson.schema.meta.MapBody) body);
-            default -> throw new IllegalStateException("'" + name + "': '" + sourceName + "' is no array or map");
+            case ArrayBody array -> CollectionFacets.narrowing(array, (ArrayBody) body);
+            case MapBody map -> CollectionFacets.narrowing(map, (MapBody) body);
+            case NamespaceBody namespace -> CollectionFacets.narrowing(namespace, (NamespaceBody) body);
+            // A schema's own composition of a collection constructor builds no type in this library (BACKLOG.md),
+            // so nothing it built reaches this.
+            default -> throw new UnsupportedOperationException("'" + name + "': refining '" + sourceName
+                    + "', built by '" + constructorName + "', is not implemented");
         };
         if (!violations.isEmpty()) {
             throw new SchemaValidationException("'" + name + "': not a valid refinement of '!" + sourceName
                     + "' (§5.7): " + String.join("; ", violations));
         }
-        constructedBy(name, tag);
+        constructedBy(name, tagOf(sourceName, source));
         List<String> supertypes = new ArrayList<>(List.of(sourceName));
         source.supertypes().stream().filter(supertype -> !supertypes.contains(supertype)).forEach(supertypes::add);
         return ((Type) body).withSupertypes(supertypes);
+    }
+
+    /** The tag {@code source}'s value carries, and failing a recorded one the constructor its class is the body of. */
+    private String tagOf(String sourceName, Top source) {
+        return factsOf(sourceName).constructor().orElseGet(() -> TsonSchema.constructorOf(source));
     }
 
     /** The constructor {@code incomplete} builds, ready since {@code incomplete} was. */
