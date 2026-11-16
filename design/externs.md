@@ -14,7 +14,8 @@ loaded with the imports whose names never enter the namespace, and a value read,
   and cycle guard. A failure refuses the importer whole, prefixed with the extern, and keeps its classification.
 - **The cycle guard knows its edges.** `TsonCompiledVocabularyRegistry.resolving` maps each identity in flight to the
   extern that reached it (null for an import), so a cycle over imports and externs together is one check, its path
-  marking each extern edge.
+  marking each extern edge. A document held as text is in flight under its own `!!id` while it resolves and links
+  (`resolveAndLink`), so a reference reaching that identity is the cycle, never a fetch of it as another document.
 - **One kernel is judged by identity, before a fetch.** A closure reached through an extern edge that names a kernel
   of another revision (`TsonBundledSchemas.isKernelOfAnyRevision`) is refused there, naming both kernels: this
   library pre-loads its own kernel alone, and the other would fail as an ordinary document, about its grammar.

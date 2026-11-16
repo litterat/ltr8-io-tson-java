@@ -99,7 +99,7 @@ spec-required case:
   edge fold in that form, where the fold compares canonical applications ([TSON-SCHEMA] §8.2), arguments past their
   aliases. Add a link vector with an aliased application declared in an import and composed as a parent in the
   importer, and reduce on ingest if it misses.
-- [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
+- [ ] **Automatic reference-closure resolution** ([TSON-SCHEMA] §2.2.3, §3.4.1) — no code
   collects a schema's transitive `!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (`TinySchemaImportsCoreTn1Test` included) has to
   already know and hand-sequence the correct registration order itself. Distinct from what
