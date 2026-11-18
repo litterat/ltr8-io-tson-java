@@ -149,7 +149,7 @@ public final class JsonSchemaCompiler {
                 return done;
             }
             if (!building.add(name)) {
-                return new DeferredTypeReader(name, finished);
+                return new DeferredTypeReader(linked, name, finished);
             }
             try {
                 Top definition = schema.entries().get(name);

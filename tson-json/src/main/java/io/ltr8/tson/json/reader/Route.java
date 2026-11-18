@@ -10,17 +10,20 @@ import io.ltr8.tson.json.JsonTypeReader;
  * <p><b>Two because §3.3's two forms want two different things.</b> In the <b>inline</b> form the object is
  * the selected type's own value, so it goes to the reader that reads exactly that type -- through no further
  * dispatch, which is the dispatch having been flattened at compile ({@link #exact}). In the <b>wrapper</b>
- * form the tag names the type of {@code $value}, and that value may carry a tag of its own: it is read at
- * the type's entry reader, which dispatches again if the type has subtypes.
+ * form the tag names the type of {@code $value}, which carries no tag of its own (§3.3): it is read at the type's
+ * entry reader, which places it as a position of that type would, a sealed family by its discriminators.
  *
  * @param entry  the selected type's compiled reader, whatever it is -- what reads a wrapper's {@code $value}
  * @param inline the reader for exactly the selected type -- what reads the object itself
+ * @param keyed  whether the selected type is map-typed, so a wrapper's {@code $value} holds keys
+ *               ({@link TagMembers#keyed(io.ltr8.tson.schema.meta.Top)})
  */
-record Route(JsonTypeReader<?> entry, JsonTypeReader<?> inline) {
+record Route(JsonTypeReader<?> entry, JsonTypeReader<?> inline, boolean keyed) {
 
-    /** The route to a type whose compiled reader is {@code entry}. */
-    static Route to(JsonTypeReader<?> entry) {
-        return new Route(entry, exact(entry));
+    /** The route to the type {@code name} names in {@code context}'s schema. */
+    static Route to(ValueReaderContext context, String name) {
+        JsonTypeReader<?> entry = context.readers().resolve(name);
+        return new Route(entry, exact(entry), TagMembers.keyed(context.linked(), name));
     }
 
     /**
@@ -45,6 +48,6 @@ record Route(JsonTypeReader<?> entry, JsonTypeReader<?> inline) {
         if (inline instanceof ExactReader exact && (!lead.wrapper() || exact.takesWrapper())) {
             return exact.readExact(ctx, entry);
         }
-        return TagMembers.readWrapped(ctx, entry);
+        return TagMembers.readWrapped(ctx, entry, keyed);
     }
 }

@@ -2,6 +2,7 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 
 import java.util.Map;
 
@@ -18,10 +19,13 @@ public final class DeferredTypeReader implements JsonTypeReader<Object>, ExactRe
 
     private final String name;
     private final Map<String, JsonTypeReader<?>> finished;
+    private final boolean keyed;
 
-    public DeferredTypeReader(String name, Map<String, JsonTypeReader<?>> finished) {
+    /** The edge closing a cycle at {@code name}, an entry of {@code linked}, read from {@code finished}. */
+    public DeferredTypeReader(TsonLinkedSchema linked, String name, Map<String, JsonTypeReader<?>> finished) {
         this.name = name;
         this.finished = finished;
+        this.keyed = TagMembers.keyed(linked, name);
     }
 
     @Override
@@ -34,7 +38,7 @@ public final class DeferredTypeReader implements JsonTypeReader<Object>, ExactRe
     public Object readExact(JsonReadContext ctx, JsonTypeReader<?> wrapped) {
         return target() instanceof ExactReader exact
                 ? exact.readExact(ctx, wrapped)
-                : TagMembers.readWrapped(ctx, wrapped);
+                : TagMembers.readWrapped(ctx, wrapped, keyed);
     }
 
     @Override

@@ -8,10 +8,9 @@ import io.ltr8.tson.json.JsonTypeReader;
  * which reads the object itself, its leading {@code $type} included, with no lookahead.
  *
  * <p><b>Why a dispatcher hands it a second reader.</b> §3.3's wrapper form puts the value in {@code $value}
- * and names its type in the leading {@code $type}; the value inside may carry a tag of its own, so it is read
- * at the type's <em>entry</em> reader, which dispatches again where the type has subtypes. The exact reader
- * cannot know its entry -- an OPEN record with subtypes has a dispatcher in front of it -- so whoever reached
- * it says ({@link Route}).
+ * and names its type in the leading {@code $type}, and a wrapper's {@code $value} is read at the type's
+ * <em>entry</em> reader wherever the wrapper is met ({@link Route}). The exact reader cannot know its entry -- an
+ * OPEN record with subtypes has a dispatcher in front of it -- so whoever reached it says.
  *
  * <p>A dispatcher implements it too, for the case where a tag names a base that dispatches its own family:
  * it reads the object again from its leading members, which is a bounded peek and never a scan.

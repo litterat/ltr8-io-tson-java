@@ -63,9 +63,11 @@ and a value read, bound and written through it in both encodings.
 
 - **One object carries both scopes, so the boundary takes its `$type` off it.** The inline form crosses with its
   leading `$type` consumed and its opening put back (`JsonReadContext.CROSSING`), the foreign reader reading the rest
-  untagged; the wrapper's `$value` crosses as it stands, so a `$type` inside it is the foreign schema's.
+  untagged; the wrapper's `$value` crosses as it stands. The value has one type name, the boundary's ([TSON-JSON]
+  §3.3): a `$type` leading `$value` is refused in the enclosing document before anything crosses, whichever scope
+  its name belongs to, so a foreign subtype is named only by an admitted name of the enclosing scope, as in text.
 - **A dispatcher that matched an extern's name hands it the whole annotation object** (`ExactReader.takesWrapper`):
-  handed the `$value`, the boundary would read its leading `$type` in the enclosing scope.
+  handed the `$value`, the boundary would never see the tag, which is what names a subtype or a variant there.
 - **A question about a type's shape follows the extern** (`AliasChain.landed`): a choice's class table, a map key's
   form, an identifier element. Asked of the `Extern` body, each answers as for no type.
 

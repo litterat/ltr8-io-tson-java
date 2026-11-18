@@ -55,7 +55,7 @@ final class DispatchDeclaredReader implements JsonTypeReader<Object> {
         this.schemaLocation = schemaLocation;
         Map<String, Route> routes = new LinkedHashMap<>();
         for (String entry : context.schema().entries().keySet()) {
-            routes.put(entry, Route.to(context.readers().resolve(entry)));
+            routes.put(entry, Route.to(context, entry));
         }
         this.closure = Map.copyOf(routes);
     }

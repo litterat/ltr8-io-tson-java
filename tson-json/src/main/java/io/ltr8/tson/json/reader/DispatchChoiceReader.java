@@ -97,7 +97,7 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
                 variant -> terminals.containsKey(variant)
                         ? context.admitting(TypeChain.subtypesOf(terminals.get(variant).definition())) : List.of());
         Map<TypeRef, Route> byVariant = new LinkedHashMap<>();
-        named.forEach(variant -> byVariant.put(variant, Route.to(context.readers().resolve(variant.name()))));
+        named.forEach(variant -> byVariant.put(variant, Route.to(context, variant.name())));
         Map<String, Route> table = new LinkedHashMap<>();
         selection.selects().forEach((written, variant) -> {
             Route route = byVariant.get(variant);
@@ -122,10 +122,10 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
     private static Route routeBelow(ValueReaderContext context, Top variant, JsonTypeReader<?> reader,
                                     String subtype) {
         if (!(variant instanceof RecordBody)) {
-            return Route.to(context.readers().resolve(subtype));
+            return Route.to(context, subtype);
         }
         Route route = reader instanceof DispatchTagReader dispatch ? dispatch.route(subtype) : null;
-        return route != null ? route : new Route(reader, reader);
+        return route != null ? route : new Route(reader, reader, false);
     }
 
     /**

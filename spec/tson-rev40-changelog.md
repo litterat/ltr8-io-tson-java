@@ -1101,6 +1101,15 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
     string form, so nothing else moves.
 15. **§3.3, §8.1** (§3.2 item 121) — the `$type` at a choice position names a variant, or a
     type that IS-A exactly one variant.
+16. **§3.3, §8.6** — one value, one type name. §3.3 read a wrapper's `$value` "at the type
+    `$type` selects", so an object there could lead with a `$type` of its own: one value
+    with two type names, which text's one tag cannot write. Item 15 left the nested form
+    without its use, a single `$type` naming a subtype selecting the variant, and at an
+    extern's boundary it named a foreign subtype by the foreign schema's name, a document
+    text has no spelling for. `$value` is the annotated value itself and no annotation
+    object; a subtype across a boundary is named as it is in text, by a name of the
+    enclosing scope ([TSON-SCHEMA] §5.13). A second tag in text, `!order_v1 !rush { … }`,
+    was the alternative, and gives one value two spellings in both encodings.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -1229,6 +1238,9 @@ Changes a Revision 39 implementer must act on:
     a declaration's, and a data document typed by the kernel declares nothing.
 27. **`meta.field_name` is removed** (§3.2 item 125): a record's default name type is
     `meta.identifier`, as an enum's is. A schema naming the role writes `meta.identifier`.
+28. **One value, one type name, in JSON as in text** (§3.4 item 16): a wrapper's `$value`
+    carries no `$type` of its own. `{ "$type": "shape", "$value": { "$type": "circle", … } }`
+    is written `{ "$type": "circle", … }`.
 
 ---
 
@@ -1276,6 +1288,7 @@ carries no open questions.
 | Item 116 (ruled) | `meta.extern.schema` is `iri_reference`, what an `!!import`'s value is ([TSON-DATA] §3.3), so an extern names every schema an import may, a path-only reference to a library entry among them. `iri`, as first written, required a scheme and refused `/local/orders.tn` where `file:/local/orders.tn`, the same identity, passed. | **[settled]** — the spec author's ruling. |
 | Item 116 (reading) | A schema declares no value entry of an extern type: `!order_v1 { … }` at a declaration is refused with the other heads, beside the refused default and pin, so no foreign value is written in the declaring schema but an annotation's. | **[settled]** — the spec author's ruling: confirmed as written. |
 | Item 118 (reading) | Which tags the boundary admits. The text applies §7.2's subsumption with each name followed to the entry it reaches, by identity, so a name of the enclosing scope that is no extern is admitted where it reaches the target or a subtype of it (the scope importing the schema that declares it), and a variant's name is admitted where the target is a choice; the narrower reading admits externs alone. A tag naming the position's own extern is read as no tag, so an extern of a member-dispatched base may be written at a choice and its value placed by its selectors. | **[settled]** — the spec author's ruling, §3.2 item 126: by identity, as written. |
+| Items 116–118 (ruled) | A wrapper's inner `$type` at an extern's boundary named a foreign subtype by the foreign schema's name, which text cannot write. The encodings align on one type name for a value, the boundary's. A second tag in text was the alternative. | **[settled]** — the spec author's ruling, §3.4 item 16. |
 | Items 116–118 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
