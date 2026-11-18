@@ -5,7 +5,7 @@ import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.unicode.RestrictionLevel;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 
 import java.lang.Character.UnicodeScript;
 import java.util.List;
@@ -33,7 +33,7 @@ import java.util.Set;
  * configuration and the report it produces are one vocabulary.
  */
 public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifierPolicy,
-                        @Field("token_policy") CliScriptPolicy tokenPolicy,
+                        @Field("token_policy") CliTokenPolicy tokenPolicy,
                         @Field("unicode_data_version") String unicodeDataVersion,
                         CliLimits limits) {
 
@@ -63,7 +63,7 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
      */
     static CliPolicy from(ProcessorPolicy policy) {
         return new CliPolicy(CliIdentifierPolicy.from(policy.identifierPolicy()),
-                CliScriptPolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion(),
+                CliTokenPolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion(),
                 CliLimits.from(policy.limits()));
     }
 
@@ -120,7 +120,7 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
 
         static CliIdentifierPolicy from(IdentifierPolicy policy) {
             return new CliIdentifierPolicy(policy.scripts().level(), policy.isPerSegment(),
-                    policy.appliesSkeletonDistinctness(), CliScriptPolicy.from(policy.scripts()).permitting());
+                    policy.appliesSkeletonDistinctness(), CliTokenPolicy.from(policy.scripts()).permitting());
         }
     }
 
@@ -128,16 +128,16 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
      * §8.2's token policy: the UTS #39 §5.2 restriction level over each whole token, and the script combinations
      * admitted over and above it.
      */
-    public record CliScriptPolicy(RestrictionLevel level, List<List<String>> permitting) {
+    public record CliTokenPolicy(RestrictionLevel level, List<List<String>> permitting) {
 
-        static CliScriptPolicy from(ScriptPolicy policy) {
-            return new CliScriptPolicy(policy.level(),
-                    policy.permittedScripts().stream().map(CliScriptPolicy::names).toList());
+        static CliTokenPolicy from(TokenPolicy policy) {
+            return new CliTokenPolicy(policy.level(),
+                    policy.permittedScripts().stream().map(CliTokenPolicy::names).toList());
         }
 
         /** One admitted combination, script names sorted so two deployments' reports compare as text. */
         private static List<String> names(Set<UnicodeScript> scripts) {
-            return scripts.stream().map(CliScriptPolicy::alias).sorted().toList();
+            return scripts.stream().map(CliTokenPolicy::alias).sorted().toList();
         }
 
         /**

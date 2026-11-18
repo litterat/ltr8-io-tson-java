@@ -7,7 +7,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.json.tree.JsonValue;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -35,7 +35,7 @@ class JsonFrontDoorTest {
     void both_readers_carry_the_configuration_the_front_door_holds() {
         DiagnosticsCollector problems = new DiagnosticsCollector();
         Json json = Json.of(ProcessorConfig.defaults()
-                .withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(ScriptPolicy.asciiOnly())));
+                .withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(TokenPolicy.asciiOnly())));
 
         json.treeReader().withDiagnostics(problems).read("{\"note\": \"" + CYRILLIC_A + "\"}");
         json.objectReader().withDiagnostics(problems)
@@ -55,9 +55,9 @@ class JsonFrontDoorTest {
         ProcessorConfig config = ProcessorConfig.defaults();
         Json json = Json.of(config);
 
-        config.withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(ScriptPolicy.asciiOnly()));
+        config.withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(TokenPolicy.asciiOnly()));
 
-        assertEquals(ScriptPolicy.unrestricted().level(), json.processorPolicy().tokenPolicy().level());
+        assertEquals(TokenPolicy.unrestricted().level(), json.processorPolicy().tokenPolicy().level());
     }
 
     @Test

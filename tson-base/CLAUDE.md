@@ -15,4 +15,4 @@ for the `Diagnostic` record and the rule classes, `design/diagnostic-model.md` a
 - `base.diagnostics` prose is the schema's vernacular (fields, *absent*); the encoding's spelling rides in `actual`.
 - `ByteSource`/`ByteSink`: bytes never characters; close releases only what was acquired; closing is not flushing.
 - `IdentifierPolicy.judge` is the one place the per-name
-  rules are applied; the token policy is a bare `ScriptPolicy`, which has no unit.
+  rules are applied; the token policy is a bare `TokenPolicy`, which has no unit.

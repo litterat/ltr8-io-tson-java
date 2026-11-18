@@ -23,7 +23,7 @@ import java.util.Locale;
  * <p><b>Every flag is consumed here and nowhere else</b> ({@link #consume}), which is what lets the three
  * subcommands' own argument loops go on seeing only {@code --output} and their positionals.
  */
-record PolicyOptions(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy,
+record PolicyOptions(IdentifierPolicy identifierPolicy, TokenPolicy tokenPolicy,
                      LimitsPolicy limits) {
 
     /**
@@ -32,7 +32,7 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy
      * {@code PolicyOptionsTest} pins the restatement against a real {@code Tson}.
      */
     static final PolicyOptions DEFAULTS = new PolicyOptions(IdentifierPolicy.defaults(),
-            ScriptPolicy.unrestricted(), LimitsPolicy.defaults());
+            TokenPolicy.unrestricted(), LimitsPolicy.defaults());
 
     /**
      * The level a script list brings with it on a surface whose default scans nothing.
@@ -135,16 +135,16 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy
      * says is never quietly accepted. {@code --identifier-allow-look-alikes} is not such a relaxation -- skeleton
      * distinctness is no part of the level, and means the same under every one.
      */
-    private static ScriptPolicy assemble(String surface, RestrictionLevel stated,
+    private static TokenPolicy assemble(String surface, RestrictionLevel stated,
                                          RestrictionLevel fallback, boolean perSegment,
                                          List<UnicodeScript[]> scripts) {
         boolean relaxed = perSegment || !scripts.isEmpty();
         RestrictionLevel level = stated;
         if (level == null) {
-            level = relaxed && !ScriptPolicy.of(fallback).checksScripts() ? IMPLIED_BY_SCRIPTS : fallback;
+            level = relaxed && !TokenPolicy.of(fallback).checksScripts() ? IMPLIED_BY_SCRIPTS : fallback;
         }
 
-        ScriptPolicy policy = ScriptPolicy.of(level);
+        TokenPolicy policy = TokenPolicy.of(level);
         if (relaxed && !policy.checksScripts()) {
             String given = scripts.isEmpty() ? "--" + surface + "-per-segment"
                     : "--" + surface + "-scripts" + (perSegment ? " and --" + surface + "-per-segment" : "");

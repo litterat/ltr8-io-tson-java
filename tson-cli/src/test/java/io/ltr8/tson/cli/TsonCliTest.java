@@ -5,7 +5,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

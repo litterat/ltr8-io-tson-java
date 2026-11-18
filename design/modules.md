@@ -129,7 +129,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `BidiRule` (RFC 5893). A true leaf that knows nothing of TSON, named for the publisher rather than the format. The
   boundary is **mechanism versus choice**: what the Unicode standards define lives here, and what a format chooses —
   its own profile, the policy it applies and the words of a refusal — stays with the format (`tson-atom`'s
-  `IdentifierGrammar`, `tson-base`'s `ScriptPolicy` and `IdentifierPolicy`). One version for every table is the reason
+  `IdentifierGrammar`, `tson-base`'s `TokenPolicy` and `IdentifierPolicy`). One version for every table is the reason
   it is one module: a JDK whose Unicode version moves re-derives them together. `tson-base` requires it transitively,
   so the engines above read `Nfc`, `Normalization` and `IdentifierProfile` without naming a second module, and a
   consumer naming a level names `RestrictionLevel`, since the levels are Unicode's.

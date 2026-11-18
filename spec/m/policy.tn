@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/policy.tn?sha256=5236954648e8e049aedcf4c144f2cc79dbc42b58e6d6923e43de945f05b5b58a"
+!!id:"https://tson.io/2026/40/m/policy.tn?sha256=131dda3357feb51dcd32562051b0fff352eada690318c87b0a4df1ceabe6a3e8"
 !!import:"https://tson.io/2026/40/m/meta.tn?sha256=05ae93747be29bffeeaf7ebc36ef9a6ba9143b0e7533cbb470dcd1ed5193aec5"
 @doc:"""
   The TSON processor policy: what a processor admits as a name and what it
@@ -20,7 +20,7 @@
       `permitting` is a script combination admitted over the level (UTS #39
       §5.2).
       """
-    script_policy => { level: policy.restriction_level  permitting: [[text]] }
+    token_policy => { level: policy.restriction_level  permitting: [[text]] }
 
     @doc:"""
       The identifier policy. `per_segment` applies the level to each segment of
@@ -72,7 +72,7 @@
       """
     processor => {
       identifier_policy: policy.identifier_policy
-      token_policy: policy.script_policy
+      token_policy: policy.token_policy
       unicode_data_version?: text
       limits: policy.limits
     }

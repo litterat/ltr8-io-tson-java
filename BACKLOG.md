@@ -536,13 +536,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   read against the value type, in both stacks, and add a `class2/validate` invalid vector beside a valid one keyed
   by `{ id: a }`.
 
-- [ ] **`policy.script_policy` is the token policy under another name** ([TSON-DATA] §8.2). Part 1 names the two
-  policies "so that two implementations reporting them agree on what they are called", and `policy.processor` writes
-  `token_policy: policy.script_policy` beside `identifier_policy: policy.identifier_policy`. Rename the record
-  `policy.token_policy`, with `identifier_policy`'s doc reference and the Java `ScriptPolicy` following it. Then
-  restamp `policy.tn` and the schemas that pin it. The Revision 39 change log keeps the received name, with the
-  policy keeping its name in prose, so this waits for a revision to carry it.
-
 - [ ] **Schemaless `!integer` and `!regex` are refused** ([TSON-DATA] §5.5, §5.6). `{ a: !integer 5 }` and
   `{ a: !regex "^a+$" }` with no `!!import` report `UNKNOWN_TYPE_REF` ("not a built-in type"); both are rows of the
   built-in vocabulary (the kernel's `integer` and `regex`), and `!int64`, the other kernel row, is accepted. Add the

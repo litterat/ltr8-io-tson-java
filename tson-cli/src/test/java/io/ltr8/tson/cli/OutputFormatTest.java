@@ -3,7 +3,7 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.base.Diagnostic;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ class OutputFormatTest {
      * configuration, so a report that did not state them could not be interpreted anywhere but here.
      */
     private static final CliPolicy POLICY = CliPolicy.from(ProcessorPolicy.of(
-            IdentifierPolicy.defaults(), ScriptPolicy.unrestricted(),
+            IdentifierPolicy.defaults(), TokenPolicy.unrestricted(),
             LimitsPolicy.defaults()));
 
     /** {@link #POLICY} as {@code --output json} writes it -- built from the accessor, not pinned to a version. */
@@ -240,10 +240,10 @@ class OutputFormatTest {
     @Test
     void tsonOutputRoundTripsARelaxedPolicy() {
         CliPolicy relaxed = CliPolicy.from(ProcessorPolicy.of(
-                IdentifierPolicy.of(ScriptPolicy.moderatelyRestrictive()
+                IdentifierPolicy.of(TokenPolicy.moderatelyRestrictive()
                         .permitting(UnicodeScript.LATIN, UnicodeScript.CYRILLIC)).perSegment()
                         .withSkeletonDistinctness(false),
-                ScriptPolicy.unrestricted(), LimitsPolicy.defaults()));
+                TokenPolicy.unrestricted(), LimitsPolicy.defaults()));
         ValidationReport original = ValidationReport.ok(relaxed);
 
         String rendered = OutputFormat.TSON.render(original);
@@ -262,11 +262,11 @@ class OutputFormatTest {
      */
     @Test
     void aScriptIsWrittenAsItsUnicodeAlias() {
-        assertEquals("Latin", CliPolicy.CliScriptPolicy.alias(UnicodeScript.LATIN));
-        assertEquals("Old_Italic", CliPolicy.CliScriptPolicy.alias(UnicodeScript.OLD_ITALIC));
-        assertEquals("SignWriting", CliPolicy.CliScriptPolicy.alias(UnicodeScript.SIGNWRITING));
+        assertEquals("Latin", CliPolicy.CliTokenPolicy.alias(UnicodeScript.LATIN));
+        assertEquals("Old_Italic", CliPolicy.CliTokenPolicy.alias(UnicodeScript.OLD_ITALIC));
+        assertEquals("SignWriting", CliPolicy.CliTokenPolicy.alias(UnicodeScript.SIGNWRITING));
         for (UnicodeScript script : UnicodeScript.values()) {
-            assertEquals(script, UnicodeScript.forName(CliPolicy.CliScriptPolicy.alias(script)), script::name);
+            assertEquals(script, UnicodeScript.forName(CliPolicy.CliTokenPolicy.alias(script)), script::name);
         }
     }
 
@@ -326,7 +326,7 @@ class OutputFormatTest {
     @Test
     void textPrintsANonDefaultPolicyEvenWhenNothingWasRefused() {
         CliPolicy relaxed = CliPolicy.from(ProcessorPolicy.of(
-                IdentifierPolicy.of(ScriptPolicy.scriptsUnchecked()), ScriptPolicy.unrestricted(),
+                IdentifierPolicy.of(TokenPolicy.scriptsUnchecked()), TokenPolicy.unrestricted(),
                 LimitsPolicy.defaults()));
 
         String rendered = OutputFormat.TEXT.render(ValidationReport.ok(relaxed));

@@ -26,43 +26,43 @@ import java.util.Set;
  *
  * <p>Instances are immutable; {@link #permitting} returns a modified copy.
  */
-public final class ScriptPolicy {
+public final class TokenPolicy {
 
     private final RestrictionLevel level;
     private final List<Set<UnicodeScript>> permitted;
 
-    private ScriptPolicy(RestrictionLevel level, List<Set<UnicodeScript>> permitted) {
+    private TokenPolicy(RestrictionLevel level, List<Set<UnicodeScript>> permitted) {
         this.level = level;
         this.permitted = List.copyOf(permitted);
     }
 
-    public static ScriptPolicy of(RestrictionLevel level) {
-        return new ScriptPolicy(level, List.of());
+    public static TokenPolicy of(RestrictionLevel level) {
+        return new TokenPolicy(level, List.of());
     }
 
-    public static ScriptPolicy asciiOnly() {
+    public static TokenPolicy asciiOnly() {
         return of(RestrictionLevel.ASCII_ONLY);
     }
 
-    public static ScriptPolicy singleScript() {
+    public static TokenPolicy singleScript() {
         return of(RestrictionLevel.SINGLE_SCRIPT);
     }
 
-    public static ScriptPolicy highlyRestrictive() {
+    public static TokenPolicy highlyRestrictive() {
         return of(RestrictionLevel.HIGHLY_RESTRICTIVE);
     }
 
-    public static ScriptPolicy moderatelyRestrictive() {
+    public static TokenPolicy moderatelyRestrictive() {
         return of(RestrictionLevel.MODERATELY_RESTRICTIVE);
     }
 
     /** §5.2 level 5: no script restriction, the identifier profile kept. */
-    public static ScriptPolicy scriptsUnchecked() {
+    public static TokenPolicy scriptsUnchecked() {
         return of(RestrictionLevel.MINIMALLY_RESTRICTIVE);
     }
 
     /** §5.2 level 6: no script restriction and no identifier profile. See {@link RestrictionLevel#UNRESTRICTED}. */
-    public static ScriptPolicy unrestricted() {
+    public static TokenPolicy unrestricted() {
         return of(RestrictionLevel.UNRESTRICTED);
     }
 
@@ -71,10 +71,10 @@ public final class ScriptPolicy {
      * and its siblings. The narrowest relaxation available: a deployment that knows it is Russian says
      * {@code permitting(LATIN, CYRILLIC)} rather than dropping a level and losing the rule everywhere else.
      */
-    public ScriptPolicy permitting(UnicodeScript... scripts) {
+    public TokenPolicy permitting(UnicodeScript... scripts) {
         List<Set<UnicodeScript>> extended = new java.util.ArrayList<>(permitted);
         extended.add(Set.of(scripts));
-        return new ScriptPolicy(level, extended);
+        return new TokenPolicy(level, extended);
     }
 
     /**
@@ -150,7 +150,7 @@ public final class ScriptPolicy {
      */
     @Override
     public boolean equals(Object o) {
-        return o instanceof ScriptPolicy other && level == other.level && permitted.equals(other.permitted);
+        return o instanceof TokenPolicy other && level == other.level && permitted.equals(other.permitted);
     }
 
     @Override

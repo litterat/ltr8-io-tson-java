@@ -6,7 +6,7 @@ identifier status, confusable skeletons over a set, joining-control contexts and
 derived property (RFC 5892) and Bidi rule (RFC 5893). Depends on
 nothing and knows nothing of TSON, so it carries no `Tson` prefix and is usable on its own. What a format chooses
 — its own profile, the policy it applies, the words of a refusal — belongs to the module that defines the format
-(`tson-atom`'s `IdentifierGrammar`, `tson-base`'s `ScriptPolicy` and `IdentifierPolicy`, for TSON's).
+(`tson-atom`'s `IdentifierGrammar`, `tson-base`'s `TokenPolicy` and `IdentifierPolicy`, for TSON's).
 
 - One Unicode version for every table, checked against that version's UCD files. A JDK whose Unicode version
   moves needs every table re-derived here, together.

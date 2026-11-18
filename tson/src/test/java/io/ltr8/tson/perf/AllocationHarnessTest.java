@@ -6,7 +6,7 @@ import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.Tson;
@@ -230,7 +230,7 @@ class AllocationHarnessTest {
         double unrestricted = AllocationProbe.allocatedPerOperation(20_000, () ->
                 AllocationProbe.sink = reader.read(DOCUMENT, Order.class));
         double restricted = AllocationProbe.allocatedPerOperation(20_000, () -> AllocationProbe.sink =
-                reader.withTokenPolicy(ScriptPolicy.highlyRestrictive()).read(DOCUMENT, Order.class));
+                reader.withTokenPolicy(TokenPolicy.highlyRestrictive()).read(DOCUMENT, Order.class));
         double overhead = restricted - unrestricted;
 
         report("allocated per read, tokenPolicy raised to highlyRestrictive", restricted, "bytes");
