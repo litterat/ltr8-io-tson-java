@@ -1018,6 +1018,11 @@ it.
      have, an abstract record and a choice among them: refusing those would refuse the
      selector-dispatched family, and a record that is not abstract has subtypes too.
 
+127. **§5.4** — a tag names a variant by the entry it reaches. "A variant the tag names is
+     selected before one its type only IS-A" did not say what naming is where a variant is
+     an alias or an extern: it is the entry the tag reaches, past its alias chain and an
+     extern, being the variant's, as every judgement through a hop is made (§5.13, §8.3).
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Seven entries are edited by this revision of

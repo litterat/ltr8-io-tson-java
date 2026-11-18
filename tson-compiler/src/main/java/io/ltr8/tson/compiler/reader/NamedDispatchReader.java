@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Dispatch-by-{@code !typeName} over a table, built by {@link ChoiceReader}, from every name a tag may carry to the
@@ -41,15 +42,18 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
     private final Map<String, List<String>> selectsNone;
     private final TsonTypeReaderResolver resolver;
     private final Map<DiscriminationClass, TypeExpr> untaggedRecovery;
+    private final Predicate<String> inScope;
 
     /**
      * @param candidateNames the variants as declared, for a message to list
      * @param selects        every name a tag may carry, to the variant it selects
      * @param selectsNone    every name IS-A more than one variant and meaning none, to those variants
+     * @param inScope        whether a name is one of the enclosing scope, where a tag at a choice is read (§7.9)
      */
     NamedDispatchReader(String positionName, String missingTypeRefMessage, Set<String> candidateNames,
                         Map<String, TypeExpr> selects, Map<String, List<String>> selectsNone,
-                        TsonTypeReaderResolver resolver, Map<DiscriminationClass, TypeExpr> untaggedRecovery) {
+                        TsonTypeReaderResolver resolver, Map<DiscriminationClass, TypeExpr> untaggedRecovery,
+                        Predicate<String> inScope) {
         this.positionName = positionName;
         this.missingTypeRefMessage = missingTypeRefMessage;
         this.candidateNames = candidateNames;
@@ -57,6 +61,7 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
         this.selectsNone = selectsNone;
         this.resolver = resolver;
         this.untaggedRecovery = untaggedRecovery;
+        this.inScope = inScope;
     }
 
     /** Whether an untagged value of {@code valueClass} is recovered to a variant rather than refused. */
@@ -107,10 +112,15 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'" + ref + "' is a subtype of more than one variant of '"
                                 + positionName + "' -- " + among + " -- and names none of them, so it selects none "
                                 + "(§5.4)", "one of " + among, ref);
-            } else {
+            } else if (inScope.test(ref)) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'" + ref + "' is not a declared variant of '"
                                 + positionName + "' -- expected one of " + candidateNames
                                 + ", or a type that IS-A exactly one",
+                        "one of " + candidateNames + ", or a type that IS-A exactly one", ref);
+            } else {
+                ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + ref + "' names no type of the scope holding '"
+                                + positionName + "', where its tag is read -- expected one of " + candidateNames
+                                + ", or a type that IS-A exactly one ([TSON-SCHEMA] §5.4, §7.9)",
                         "one of " + candidateNames + ", or a type that IS-A exactly one", ref);
             }
             EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable

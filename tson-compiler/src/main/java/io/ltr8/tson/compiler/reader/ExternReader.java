@@ -59,6 +59,7 @@ public final class ExternReader implements TsonTypeReader<Object> {
     private final AnnotationTypes annotations;
     private final Crossing own;
     private final Map<String, Crossing> admitted;
+    private final Map<String, List<String>> selectsNone;
     private final String narrower;
     private final String admissible;
     private final ScopeCrossing crossing;
@@ -66,17 +67,22 @@ public final class ExternReader implements TsonTypeReader<Object> {
     private final DataBindContext binding;
 
     /**
-     * @param admitted every name this scope may tag the value with, mapped to how the value crosses
-     * @param narrower the admitted names landing on a subtype or a variant of this one's landing, joined for a message
-     * @param binding  the context the foreign readers bind with, {@code null} where they read trees
+     * @param admitted    every name this scope may tag the value with, mapped to how the value crosses
+     * @param selectsNone every name IS-A more than one variant of a choice the target is and meaning none, to those
+     *                    variants
+     * @param narrower    the admitted names a value may carry that land on a subtype or a variant of this one's
+     *                    landing, joined for a message
+     * @param binding     the context the foreign readers bind with, {@code null} where they read trees
      */
     public ExternReader(String name, ValueReaderContext context, Crossing own, Map<String, Crossing> admitted,
-                        String narrower, ScopeCrossing crossing, DataBindContext binding) {
+                        Map<String, List<String>> selectsNone, String narrower, ScopeCrossing crossing,
+                        DataBindContext binding) {
         this.name = name;
         this.location = context.locationOf(name);
         this.annotations = AnnotationTypes.of(context);
         this.own = own;
         this.admitted = Map.copyOf(admitted);
+        this.selectsNone = Map.copyOf(selectsNone);
         this.admissible = String.join(" | ", admitted.keySet());
         this.narrower = narrower;
         this.crossing = crossing;
@@ -95,7 +101,11 @@ public final class ExternReader implements TsonTypeReader<Object> {
             ctx.next();
             through = admitted.get(tag.name());
             if (through == null) {
-                report(ctx, refusal(tag.name()), admissible, tag.name());
+                List<String> among = selectsNone.get(tag.name());
+                report(ctx, among == null ? refusal(tag.name()) : "'" + tag.name() + "' is a subtype of more than one "
+                        + "variant of the choice a '" + name + "' position is, which is " + describe() + " -- " + among
+                        + " -- and names none of them, so it selects none ([TSON-SCHEMA] §5.4, §7.9)", admissible,
+                        tag.name());
                 EventSkip.coreValue(ctx);
                 return null;
             }

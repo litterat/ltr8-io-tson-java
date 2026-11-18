@@ -40,10 +40,13 @@ and a value read, bound and written through it in both encodings.
   what the boundary admitted wherever the target takes no tag of its own name: a choice, a member-dispatched base.
 - **What a tag may name is fixed at compile, by identity** (`tson-schema`'s `ExternAdmission`, a link fact both
   encodings' boundaries and the writer's tags read): any name of the enclosing scope, extern or not, reaching past its
-  aliases and externs the target, an entry IS-A it, or a variant of it where it is a choice. A name reaching an entry
-  no extern reaches is read where the position's foreign schema reads it, if that namespace holds the entry, else in
-  the schema declaring it. An abstract target naming no selectors is refused at the boundary, so the message names
-  the subtypes this scope can write rather than the foreign schema's.
+  aliases and externs the target, an entry IS-A it, or, where it is a choice, a variant or an entry IS-A exactly one.
+  A choice with an extern variant tallies that variant's names from the same admission, in one place for both
+  encodings (`ChoiceSelection`): reaching the target names the variant, IS-A it is a subtype, and selecting a variant
+  of a choice target is neither, IS-A being no relation to a choice (§5.4). A name reaching an entry no extern
+  reaches is read where the position's foreign schema reads it, if that namespace holds the entry, else in the schema
+  declaring it. An abstract target naming no selectors is refused at the boundary, so the message names the subtypes
+  this scope can write rather than the foreign schema's.
 - **The scope is the cursor's, for the one call that reads the value** (`ScopeCrossing`, in both encodings), not a
   field of every context copy, which would be bytes on every read. The schema location restarts inside, and a schema
   document's sink hears nothing there, the names being judged by the foreign readers rather than recorded for this
