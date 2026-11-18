@@ -54,8 +54,8 @@ class KernelWaitGraphTest {
      * reads, the annotations on its header and on its keys, {@code @atom.ordering}, {@code @atom.bounded} and {@code
      * @meta.completion} among them), and every entry a declaration of that set names, closed to a fixed point -- and
      * the concepts that belong with them, which nothing in the closure names: the tuple and choice constructors and the
-     * tuple's element, the {@code application} annotation, the {@code ref} reference with {@code field_name}, the
-     * {@code disjoint} assertion, and the octet-sequence constructor with its encodings and instance. An open record's
+     * tuple's element, the {@code application} annotation, the {@code ref} reference, the {@code disjoint}
+     * assertion, and the octet-sequence constructor with its encodings and instance. An open record's
      * {@code param} and {@code param_name} are in the closure, reached through {@code record.parameters}. The choice
      * constructor and the disjoint assertion are on the cycle: a record field's type is read against {@code
      * meta.type_expr}, a choice asserted disjoint, and a type written in place reaches every constructor's record
@@ -87,11 +87,10 @@ class KernelWaitGraphTest {
         assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
         assertEquals(31, cycle.size(), "the cycle");
         assertEquals(66, closure.size(), "the cycle's closure");
-        assertEquals(75, graph.entries().size(), "the kernel's entries");
+        assertEquals(74, graph.entries().size(), "the kernel's entries");
         assertTrue(closure.containsAll(List.of("meta.param", "meta.param_name")), "reached through record.parameters");
         assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application", "meta.apply",
-                "binary.bytes_encoding", "binary.bytes_type", "meta.extern",
-                "meta.field_name", "meta.tuple", "meta.tuple_element")),
+                "binary.bytes_encoding", "binary.bytes_type", "meta.extern", "meta.tuple", "meta.tuple_element")),
                 new java.util.TreeSet<>(related), "the related concepts");
     }
 

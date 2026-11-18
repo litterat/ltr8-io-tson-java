@@ -79,9 +79,9 @@ final class RecordPlan {
     private final Normalization nameForm;
 
     /**
-     * The record's name type, by name for messages, and its reader -- {@code null} for the kernel's
-     * {@code meta.field_name}, which §7.7's grammar answers without allocating -- and the profile a member name it
-     * admits is judged under ({@link #unmatched}).
+     * The record's name type, by name for messages, and its reader -- {@code null} where the record states none,
+     * the kernel's {@code meta.identifier} being one §7.7's grammar answers without allocating -- and the profile a
+     * member name it admits is judged under ({@link #unmatched}).
      */
     private final String nameType;
     private final AtomType<?> nameReader;

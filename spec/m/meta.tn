@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=73526b2c5a7a3582535451520cb881d8e51d591edd05bb4c8835b801ed1f90f2"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=05ae93747be29bffeeaf7ebc36ef9a6ba9143b0e7533cbb470dcd1ed5193aec5"
 @doc:"""
   The TSON kernel: the vocabulary every schema is written in. Its root holds the
   names an author writes: `text`, `integer`, `int64`, `boolean`, `bytes`, `iri`,
@@ -267,9 +267,6 @@
 
     @doc:"A type's name: a schema-map key, and a segment of a reference."
     type_name  => meta.identifier
-
-    @doc:"A field's name, in a record or a field group."
-    field_name => meta.identifier
 
     @doc:"A parameter's name."
     param_name => meta.identifier

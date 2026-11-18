@@ -164,7 +164,7 @@ final class FieldNames {
         if (parser.isEmpty()) {
             return Optional.empty();
         }
-        // Under the default, meta.field_name, a refusal speaks of identifiers as any name's would; only an author's own name
+        // Under the default, meta.identifier, a refusal speaks of identifiers as any name's would; only an author's own name
         // type is named, since its rules are the ones the author has to look up.
         boolean identifier = NameType.isIdentifier(type, structure);
         String ofType = identifier ? "an identifier" : "a value of its name_type '" + body.nameTypeName() + "'";

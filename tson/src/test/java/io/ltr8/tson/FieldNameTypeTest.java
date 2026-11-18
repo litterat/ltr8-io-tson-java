@@ -362,8 +362,8 @@ class FieldNameTypeTest {
 
     /**
      * Two name types are one when their alias chains end at one entry, not when they are spelled alike: an
-     * alias of {@code json_name} composes with it, and so does the kernel's {@code meta.identifier} with the default
-     * {@code meta.field_name}, an alias of it.
+     * alias of {@code json_name} composes with it, and a record stating the kernel's {@code meta.identifier} with one
+     * stating none, that being the type a record has where none is stated.
      */
     @Test
     void nameTypesAreOneByTheEntryTheyResolveTo() {
@@ -377,6 +377,23 @@ class FieldNameTypeTest {
               plain => { x: text }
               ip => i & plain
             """));
+    }
+
+    /**
+     * A record's default name type is the kernel's {@code meta.identifier} itself, and the kernel declares no other
+     * name for it ([TSON-SCHEMA] §5.2): {@code meta.field_name}, as a name type or as a field's type, names nothing.
+     */
+    @Test
+    void theKernelDeclaresNoFieldNameRole() {
+        assertEquals(List.of("'r': its name_type 'meta.field_name' names nothing in scope"),
+                messages("r => !meta.record { name_type: meta.field_name  fields: { x => { type: text } } }"));
+        assertEquals(List.of("'r' field 'label' has an unresolved reference 'meta.field_name'"),
+                messages("r => { label: meta.field_name }"));
+    }
+
+    private static List<String> messages(String body) {
+        return Tson.standard().validateSchema(schema("no-field-name", body)).stream().map(Diagnostic::message)
+                .toList();
     }
 
     /**
@@ -413,7 +430,7 @@ class FieldNameTypeTest {
 
     /**
      * A name type a record states is the one it gets, a schema's own family ({@code at_name}) as readily as the
-     * kernel's; a record stating none has the kernel's {@code meta.field_name}.
+     * kernel's; a record stating none has the kernel's {@code meta.identifier}.
      */
     @Test
     void aStatedNameTypeIsTheOneTheRecordGets() {
@@ -444,8 +461,8 @@ class FieldNameTypeTest {
     }
 
     /**
-     * The default is a name type like any other: a plain record's names are {@code meta.field_name}'s, set where it is
-     * declared, so a translation's record cannot compose it -- its names were never declared as the other type's.
+     * The default is a name type like any other: a plain record's names are {@code meta.identifier}'s, set where it
+     * is declared, so a translation's record cannot compose it -- its names were never declared as the other type's.
      * The record to compose is one declared over the translation's type.
      */
     @Test
@@ -457,7 +474,7 @@ class FieldNameTypeTest {
                       address => { city: text }
                       node => json_record & address & { "@id": text }
                     """)));
-        assertTrue(thrown.getMessage().contains("'json_name' and 'meta.field_name'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'json_name' and 'meta.identifier'"), thrown.getMessage());
 
         String declared = schema("declared", """
                   json_name => !unicode.identifier_type { start_add: "@$" }

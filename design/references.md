@@ -110,7 +110,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   `meta.namespace.key_type` is typed `meta.identifier_ref`: a namespace's keys are names, which is what a qualified
   name's segment selects, so an enum-keyed map is no namespace. `key_type` is required, the family every key is read and
   judged under. A record's fields are no namespace: `meta.field_map` is an ordered map keyed by `text`, each key judged
-  by the record's `name_type`, its supertypes' where it states none, and `meta.field_name` where neither does.
+  by the record's `name_type`, its supertypes' where it states none, and `meta.identifier` where neither does.
 - **A constructor is an ordinary record type** (§4.1). A constructor whose declaration is a record
   (`net.uuid_type => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
   `meta.ref<meta.product>` hold it, and `meta.record`, `meta.top`, `meta.alias`, `meta.namespace`,

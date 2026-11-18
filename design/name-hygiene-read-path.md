@@ -8,7 +8,7 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 - The token policy is the stream's, not the context's: a context rewinds, a stream produces each token exactly once.
 - The per-name rules run in `DefaultTsonReadContext`, only on a freshly pulled event — never on a replayed one. A
   field name a lookahead pulls is the one deferral: it is judged when a reader reads it, under that reader's rule.
-- A record reader pulls its own names through `nextFieldName(rule)`, its name type (`FieldNameRule.FIELD_NAME` where
+- A record reader pulls its own names through `nextFieldName(rule)`, its name type (`FieldNameRule.DEFAULT_NAME_TYPE` where
   it states none, never `null`); every other pull of a field name — schemaless readers, `EventSkip` — judges it as a
   schemaless record's, an identifier or `ATOM_FORM_INVALID`, except a root value a read abandons, which
   `discardUnjudged` skips with no name rule at all, the value of a field its record does not declare, which

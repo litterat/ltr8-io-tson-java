@@ -299,7 +299,7 @@ class InlineTypeRulesTest {
     @Test
     void whatARecordInPlaceMayStateLoads() {
         for (String body : List.of("!meta.record { " + X + "  extension: FINAL }",
-                "!meta.record { " + X + "  chain: {} }", "!meta.record { " + X + "  name_type: meta.field_name }",
+                "!meta.record { " + X + "  chain: {} }", "!meta.record { " + X + "  name_type: meta.identifier }",
                 "!meta.record { fields: { x => !meta.record_field { type: int32  optional: true }  "
                         + "y => !meta.record_field { type: int32  optional: true } }  "
                         + "groups: [ !meta.field_group { members: [[x] [y]] } ] }")) {

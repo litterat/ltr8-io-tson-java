@@ -293,8 +293,6 @@
 
     type_name => !meta.alias { target: meta.identifier }
 
-    field_name => !meta.alias { target: meta.identifier }
-
     param_name => !meta.alias { target: meta.identifier }
 
     @meta.completion:{ of: [enum] }

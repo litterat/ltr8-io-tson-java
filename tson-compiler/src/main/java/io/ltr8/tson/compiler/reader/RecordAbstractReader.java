@@ -195,7 +195,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * What this record's field names are judged by as they are read ({@link TsonReadContext#nextFieldName}):
-     * its name type, the kernel's {@code meta.field_name} where it states none.
+     * its name type, the kernel's {@code meta.identifier} where it states none.
      */
     private final TsonReadContext.FieldNameRule fieldNames;
     /**
@@ -461,7 +461,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * The rule entry {@code name}'s field names are judged by, from what linking recorded of its name type, or
-     * {@link TsonReadContext.FieldNameRule#FIELD_NAME} where it has the kernel's default.
+     * {@link TsonReadContext.FieldNameRule#DEFAULT_NAME_TYPE} where it has the kernel's default.
      */
     static TsonReadContext.FieldNameRule fieldNameRule(String name, RecordBody body, ValueReaderContext context) {
         return context.linked().nameType(name, body).map(type -> {
@@ -473,7 +473,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     .orElseThrow(() -> new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName()
                             + "' has no reader of its own")), identifiers.profile(),
                     context.linked().nameForm(name, body));
-        }).orElse(TsonReadContext.FieldNameRule.FIELD_NAME);
+        }).orElse(TsonReadContext.FieldNameRule.DEFAULT_NAME_TYPE);
     }
 
     /**
@@ -515,7 +515,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     // Under the default the message is the plain one, as for any undeclared identifier; only an
                     // author's own name type is named, with its reason, since its rules are the ones to look up.
                     String stated = fieldName.name();
-                    Optional<String> notAName = fieldNames == TsonReadContext.FieldNameRule.FIELD_NAME
+                    Optional<String> notAName = fieldNames == TsonReadContext.FieldNameRule.DEFAULT_NAME_TYPE
                             ? Optional.empty() : fieldNames.refusal(stated);
                     ctx.field(stated).report(notAName.isEmpty() ? rules.unrecognizedField(stated)
                             : rules.unrecognizedField(stated, fieldNames.typeName(), notAName.get()));

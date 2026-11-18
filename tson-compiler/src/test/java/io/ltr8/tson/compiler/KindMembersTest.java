@@ -501,8 +501,8 @@ class KindMembersTest {
                 uri -> { throw new IllegalStateException("unexpected fetch: " + uri); })
                 .resolveLinked("https://tson.io/2026/40/m/meta.tn");
 
-        assertEquals(List.of("meta.field_name", "meta.identifier", "meta.param_name", "meta.type_name",
-                "net.scheme_name"), kind(meta, "meta.identifier_ref").memberNames());
+        assertEquals(List.of("meta.identifier", "meta.param_name", "meta.type_name", "net.scheme_name"),
+                kind(meta, "meta.identifier_ref").memberNames());
     }
 
     /**

@@ -130,7 +130,7 @@ class EnumTypeTest {
         TsonLinkedSchema linked = Tson.standard().resolve(schema("restated", """
                 { live   => !status ^ { name_type: label  members: [OPEN ACTIVE] }
                   status => !enum [OPEN ACTIVE DONE]
-                  label  => meta.field_name }"""));
+                  label  => meta.type_name }"""));
 
         EnumBody live = assertInstanceOf(EnumBody.class, linked.schema().entries().get("live"));
         assertEquals(EnumBody.IDENTIFIER, live.nameType());

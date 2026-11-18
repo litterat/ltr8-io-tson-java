@@ -118,7 +118,7 @@ goes through, so an entry is made ready the first time anything asks for it, and
 - **Wait depth is counted here**, order-independently, and a chain past `LimitsPolicy.maxWaitDepth` refuses its head
   with `LIMIT_EXCEEDED` (`design/processor-policy.md`).
 - **Rule 6: a judgement that walks a name waits for everything.** §5.8's one name type over a composition's
-  supertypes (`requireOneNameType`) walks a name type to its terminal (`meta.field_name` → `meta.identifier`); run during
+  supertypes (`requireOneNameType`) walks a name type to its terminal (an alias to its target); run during
   resolution it would make the composition wait on what it only names. `DefinitionResolver` defers it, and
   `judgeDeferred` runs it once every entry is ready, a failure reported against its declaration
   (`DefinitionResolverTest.aCompositionsNameTypesAreJudgedOnceEveryEntryIsReady`).

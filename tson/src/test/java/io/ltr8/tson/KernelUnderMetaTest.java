@@ -158,7 +158,6 @@ class KernelUnderMetaTest {
                 namespace  => [text]
                 template   => !enum [a b]
                 type_ref  => { k: text }
-                field_name => !text ^ { max_length: 8 }
                 bounded    => !integer ^ { min: 0  max: 9 }
                 value      => { v: int32 }
                 uuid_type  => { u: uuid }

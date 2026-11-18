@@ -60,7 +60,7 @@ Related: `design/linking-and-compilation.md` (the link order), `design/reference
 worth re-proposing: a refined `schema` type carrying the checks (§5.7 gives entry-membership only and tightens no
 field to a choice of subtypes); per-slot checked annotations (`@fields_of`, `@typed_by`), which put the referent
 predicate on every slot; naming roles (`meta.type_name`, `method_name` as instances of one constructor, "a role-keyed map
-declares, any other slot references"), which fused token family, store and referent and broke at `meta.field_name`, whose
+declares, any other slot references"), which fused token family, store and referent and broke at field names, whose
 family is the record's; a namespace kind with a role lattice, the same fusion plus an alias rule letting a family
 widen a role against §5.7; `name_type` with `target` and `relation` facets, where `relation` was two stores wearing
 one enum; the predicate as facets on the name atom; `meta.ref<T>` with `of` resolving in the writer's namespace, which
@@ -139,8 +139,7 @@ which equality, which profile) lives in a namespace the body cannot see.
   or imports (`!meta.enum_type { name_type: kebab … }`); one the constructor pinned (`!enum [A B]` names the kernel's
   `meta.identifier`) resolves in the same namespace, and since the closure holds the kernel's `meta.identifier`, no schema
   declares one of its own to displace it. Pinned is found through the constructor the entry's value applies
-  (`TsonSchemaLinker.constructorOf`). A record stating no name type takes `meta.field_name`, the kernel's alias
-  of its `meta.identifier`.
+  (`TsonSchemaLinker.constructorOf`). A record stating no name type takes the kernel's `meta.identifier`.
 - **Membership, not body class.** `NameType.admits` reads the slot's kind off the `name_type` field of the constructor
   the entry applies, and asks `KindMembers.isMember` of the referent. Where the slot's kind is out of reach (a
   closure holding no kernel, as a hand-built schema's may), `meta.identifier_ref`'s `of`, `unicode.identifier_type`, is
@@ -174,7 +173,7 @@ field-name scope read it as they read a closed record. A parameter is never a fi
 
 - **Supertypes decide.** A record with supertypes takes their one type, refuses two that disagree, and refuses a
   stated type that is not theirs; two are one when their alias chains end at one entry (`sameNameType`), so an
-  alias is its target and `meta.field_name` is `meta.identifier`. The rule is composition's
+  alias is its target and a record stating `meta.identifier` is one with a record stating none. The rule is composition's
   (`resolveComposition`): a declaration never writes a chain (§8.1), so an explicit `!meta.record { … }` has none to take a
   type from, which is why `meta.record.name_type` has no `~` default. It is also how a brace form states one: a
   fieldless ABSTRACT base carries the type and the records composing it take it.
