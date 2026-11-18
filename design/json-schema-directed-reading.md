@@ -42,6 +42,10 @@ JSON inputs are in `design/cli-config-hashing.md`.
   component, as the TSON reader does.
 - A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
   set serves every mode. The reader it selects validates in full.
+- A wrapper's `$value` is no annotation object ([TSON-JSON] §3.3): every wrapper's value is read through
+  `TagMembers`, which refuses an object there leading with an annotation member before the selected reader sees it,
+  unless the selected type is map-typed (`TagMembers.keyed`, fixed at compile on the `Route`, the boundary's
+  `Crossing` and a cycle's `DeferredTypeReader`).
 - A position an extern types is a boundary (`ExternReader`): its leading `$type` is the enclosing scope's, everything
   inside the foreign schema's, read by that schema's own compiled readers (`design/externs.md`).
 - Every mode is all-or-nothing: no builder builds where anything was reported while its value was read.
@@ -126,14 +130,14 @@ extra member of an invalid object, refused by whoever reads it.
 loop judges annotation members as they arrive: a `$type` in first place must restate the record (`RecordPlan.admitsTag`)
 -- a record written in place has no name, and `ValueReaderContext.admitting` admits nothing for a name no entry holds,
 so its `$type` is refused whatever it holds, its application's text included (§7.2); `$value` straight after it makes
-the object a wrapper, read at the reader the enclosing position chose (`ExactReader`, `Route`), since the value inside
-may carry a tag of its own; a misplaced `$type` or `$value`, or any `$import`, refuses the object and the rest of it is
-skipped (`RecordPlan.refuseTagMember`). A member name is matched in NFC and then in the record's name type's form
-(`TsonLinkedSchema.nameForm`, held by `RecordPlan`, the name type a record in place's body states included; §6.1.1), so
-under a case-folding name type `NAME` is the field `name`; `TagMembers.lead` puts a sealed base's selectors in the same
-form. A member matching nothing is judged by that name type (`RecordPlan.unmatched`), as TSON's record reader judges it:
-one that is no value of the type is `UNRECOGNIZED_FIELD` with the type's reason and meets no hygiene rule, being no
-name; one that is meets [TSON-DATA] §8.2 under the type's profile, and only then is unknown (§9.4).
+the object a wrapper, read at the reader the enclosing position chose (`ExactReader`, `Route`); a misplaced `$type` or
+`$value`, or any `$import`, refuses the object and the rest of it is skipped (`RecordPlan.refuseTagMember`). A member
+name is matched in NFC and then in the record's name type's form (`TsonLinkedSchema.nameForm`, held by `RecordPlan`,
+the name type a record in place's body states included; §6.1.1), so under a case-folding name type `NAME` is the field
+`name`; `TagMembers.lead` puts a sealed base's selectors in the same form. A member matching nothing is judged by that
+name type (`RecordPlan.unmatched`), as TSON's record reader judges it: one that is no value of the type is
+`UNRECOGNIZED_FIELD` with the type's reason and meets no hygiene rule, being no name; one that is meets [TSON-DATA]
+§8.2 under the type's profile, and only then is unknown (§9.4).
 
 
 Members read before a refusal have already reported, so an invalid document's diagnostics follow its member order —
@@ -187,10 +191,10 @@ record factory, because the concrete reading is the only one that differs by mod
 **Every reader a dispatcher can select is wired at compile** (`Route`). A base's `subtypes` is its whole family, so a
 tag reaches a type any levels down, or an alias of one, in one step. A route holds two readers because §3.3's forms want
 two: the inline form goes to the reader for exactly that type (an OPEN record's concrete reader, not its dispatcher),
-the wrapper's `$value` to the type's entry reader, which dispatches again on a tag of its own. A choice routes through a
-variant placed by `$type` the same way, through a sealed variant only by handing it the value, whose selectors a
-choice position cannot bypass, and below an atom variant to the refinement's own reader, whose facets the variant's
-would not check.
+the wrapper's `$value`, which carries no tag of its own, to the type's entry reader, which places it as a position of
+that type would (a sealed family by its discriminators). A choice routes through a variant placed by `$type` the same
+way, through a sealed variant only by handing it the value, whose selectors a choice position cannot bypass, and below
+an atom variant to the refinement's own reader, whose facets the variant's would not check.
 
 **A sealed position** decodes its pins once, at the fields' declared types in the base, keyed by `ValueIdentity` (so
 `255` selects the member pinned `= 0xFF`). A discriminator that does not lead is missing, with JSON's own wording,

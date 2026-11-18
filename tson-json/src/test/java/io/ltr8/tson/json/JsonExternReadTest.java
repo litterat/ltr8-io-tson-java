@@ -197,7 +197,6 @@ class JsonExternReadTest {
             "all|{\"col\": \"green\"}",
             "all|{\"e\": 4}",
             "all|{\"e\": {\"$type\": \"either_x\", \"$value\": 4}}",
-            "all|{\"e\": {\"$type\": \"either_x\", \"$value\": {\"$type\": \"int32\", \"$value\": 4}}}",
             "all|{\"e\": {\"$type\": \"int32\", \"$value\": 4}}",
             "all|{\"n\": [\"a\", \"b\"]}",
             "all|{\"l\": {\"x\": 1}}",
@@ -239,8 +238,6 @@ class JsonExternReadTest {
     @ValueSource(strings = {
             "envelope|{\"id\": \"a\", \"body\": {\"$type\": \"order_v1\", \"$value\": {\"id\": \"x\", "
                     + "\"payment\": {\"number\": \"n\"}}}}",
-            "envelope|{\"id\": \"a\", \"body\": {\"$type\": \"order_v1\", \"$value\": {\"$type\": \"order\", "
-                    + "\"id\": \"x\", \"payment\": {\"$type\": \"card\", \"number\": \"n\"}}}}",
             "single|{\"o\": {\"$type\": \"rush_v2\", \"ref\": \"r\", \"lines\": [], \"payment\": {\"pan\": \"p\"}, "
                     + "\"by\": \"today\"}}",
             "all|{\"p\": {\"$type\": \"dog_x\", \"name\": \"rex\", \"barks\": true}}",
@@ -394,14 +391,26 @@ class JsonExternReadTest {
     }
 
     /**
-     * A wrapper's {@code $value} is the foreign value, so a {@code $type} leading it is the foreign schema's and may
-     * name a subtype of the target there, as a wrapper's value may at any record position (§3.3, §8.6).
+     * A foreign value carries one type name, the boundary's (§3.3, §8.6): a {@code $type} leading a wrapper's
+     * {@code $value} is refused in the enclosing document, whichever scope its name belongs to, before the value
+     * crosses. The subtype is named by the boundary's {@code $type}, {@code rush_v2}.
      */
-    @Test
-    void aWrappersValueMayNameASubtypeOfTheTargetByTheForeignSchemasName() {
-        assertEquals(List.of(), shown(read(SHIPPING, "single", """
-                {"o": {"$type": "order_v2", "$value": {"$type": "rush", "ref": "r", "lines": [],
-                 "payment": {"pan": "p"}, "by": "b"}}}""").problems()));
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "single|/o|{\"o\": {\"$type\": \"order_v2\", \"$value\": {\"$type\": \"rush\", \"ref\": \"r\", "
+                    + "\"lines\": [], \"payment\": {\"pan\": \"p\"}, \"by\": \"b\"}}}",
+            "single|/o|{\"o\": {\"$type\": \"order_v2\", \"$value\": {\"$type\": \"rush_v2\", \"ref\": \"r\", "
+                    + "\"lines\": [], \"payment\": {\"pan\": \"p\"}, \"by\": \"b\"}}}",
+            "envelope|/body|{\"id\": \"a\", \"body\": {\"$type\": \"order_v1\", \"$value\": {\"$type\": "
+                    + "\"order\", \"id\": \"x\", \"payment\": {\"number\": \"n\"}}}}",
+            "all|/e|{\"e\": {\"$type\": \"either_x\", \"$value\": {\"$type\": \"int32\", \"$value\": 4}}}"})
+    void aTypeInsideAWrappersValueIsRefusedAtTheBoundary(String rootPathAndDocument) {
+        String[] parts = rootPathAndDocument.split("\\|", 3);
+        List<Diagnostic> got = read(SHIPPING, parts[0], parts[2]).problems();
+        assertEquals(List.of("UNRECOGNIZED_FIELD " + parts[1] + "/$value/$type"), refusals(got), parts[2]);
+        assertEquals("example.test/shipping.tn", got.getFirst().schemaId());
+        assertTrue(got.getFirst().message().startsWith("'$value' is the annotated value itself, and no annotation "
+                + "object"), got.getFirst().message());
     }
 
     /**

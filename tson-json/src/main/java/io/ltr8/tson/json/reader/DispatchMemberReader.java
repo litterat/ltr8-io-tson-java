@@ -130,7 +130,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
             under.addAll(record.subtypes());
             deeper.put(subtype, context.admitting(under));
             for (String written : deeper.get(subtype)) {
-                table.computeIfAbsent(written, ignored -> Route.to(context.readers().resolve(written)));
+                table.computeIfAbsent(written, ignored -> Route.to(context, written));
             }
         }
         this.routes = Map.copyOf(table);

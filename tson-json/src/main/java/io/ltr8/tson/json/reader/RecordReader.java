@@ -98,8 +98,7 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
             String name = member.name();
             if (TagMembers.isTagMember(name)) {
                 if (tagged && position == 1 && TagMembers.VALUE.equals(name)) {
-                    // §3.3's wrapper: the value is `$value`, at the reader the enclosing position chose for it,
-                    // since the value inside may carry a tag of its own.
+                    // §3.3's wrapper: the value is `$value`, at the reader the enclosing position chose for it.
                     Object value = TagMembers.readWrappedValue(ctx, wrapped);
                     return value == null ? builder.refused() : value;
                 }

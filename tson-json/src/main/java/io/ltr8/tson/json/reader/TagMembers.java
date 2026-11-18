@@ -4,6 +4,10 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
+import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.Top;
 
 import io.ltr8.unicode.Nfc;
 import io.ltr8.unicode.Normalization;
@@ -160,19 +164,21 @@ final class TagMembers {
      * variant (§8.1) -- because the wrapper is one form and a second reading of it is a second chance to
      * disagree about what it admits. Returns what {@code target} produced, or null where there was no
      * {@code $value} to read: the wrapper builds nothing of its own, so it serves every mode.
+     *
+     * @param keyed whether the selected type is map-typed ({@link #keyed(Top)}), so {@code $value}'s members are keys
      */
-    static Object readWrapped(JsonReadContext ctx, JsonTypeReader<?> target) {
+    static Object readWrapped(JsonReadContext ctx, JsonTypeReader<?> target, boolean keyed) {
         ctx.next();   // ObjectStart
-        return walkWrapper(ctx, target, IMPORT, false, null);
+        return walkWrapper(ctx, target, keyed, IMPORT, false, null);
     }
 
     /**
      * The rest of a wrapper whose leading members have been read and whose {@code $value} name was just
      * consumed: the value, read at {@code target}, and then whatever follows it, which a wrapper admits none of.
-     * For a record reader that met {@code $value} straight after its leading {@code $type}.
+     * For a record reader that met {@code $value} straight after its leading {@code $type}, a record being no map.
      */
     static Object readWrappedValue(JsonReadContext ctx, JsonTypeReader<?> target) {
-        return walkWrapper(ctx, target, null, true, target.read(ctx.field(VALUE)));
+        return walkWrapper(ctx, target, false, null, true, readValue(ctx, target, false));
     }
 
     /**
@@ -182,8 +188,8 @@ final class TagMembers {
      *              or null once another member has come
      * @param found whether {@code $value} has already been read, {@code value} being what it read
      */
-    private static Object walkWrapper(JsonReadContext ctx, JsonTypeReader<?> target, String next, boolean found,
-                                      Object value) {
+    private static Object walkWrapper(JsonReadContext ctx, JsonTypeReader<?> target, boolean keyed, String next,
+                                      boolean found, Object value) {
         while (true) {
             JsonEvent event = ctx.next();
             if (event instanceof JsonEvent.ObjectEnd) {
@@ -199,7 +205,7 @@ final class TagMembers {
             }
             String name = member.name();
             if (VALUE.equals(name)) {
-                value = target.read(ctx.field(VALUE));
+                value = readValue(ctx, target, keyed);
                 found = true;
                 continue;
             }
@@ -218,6 +224,46 @@ final class TagMembers {
             }
             EventSkip.nextValue(ctx.field(member.name()));
         }
+    }
+
+    /**
+     * A wrapper's {@code $value}, read at {@code target}. It is the annotated value itself and no annotation object
+     * (§3.3), so where the selected type is not map-typed an object there leading with an annotation member is
+     * refused before {@code target} sees it: the value's type is the wrapper's one {@code $type}, and a second would
+     * be a second tag in text, which has none. At a map-typed selection its members are keys (§3.2, §8.3.1).
+     */
+    private static Object readValue(JsonReadContext ctx, JsonTypeReader<?> target, boolean keyed) {
+        JsonReadContext at = ctx.field(VALUE);
+        if (!keyed && at.peek() instanceof JsonEvent.ObjectStart) {
+            Lead lead = lead(at);
+            if (lead.present()) {
+                if (lead.imports()) {
+                    Tags.refuseScope(at, VALUE, "is the annotated value itself, and no annotation object");
+                } else {
+                    String member = lead.typed() ? TYPE : VALUE;
+                    at.field(member).report(Diagnostic.Code.UNRECOGNIZED_FIELD, "'$value' is the annotated value "
+                                    + "itself, and no annotation object: a value's type is written once, in the "
+                                    + "wrapper's '$type', which names a subtype directly (§3.3)",
+                            "the value, with no annotation member of its own", member);
+                }
+                EventSkip.nextValue(at);
+                return null;
+            }
+        }
+        return target.read(at);
+    }
+
+    /**
+     * Whether a value of {@code definition} is a map, whose object's members are keys and never annotation members
+     * (§3.3): a map, or a namespace type, whose value is the map it describes.
+     */
+    static boolean keyed(Top definition) {
+        return definition instanceof MapBody || definition instanceof NamespaceBody;
+    }
+
+    /** {@link #keyed(Top)} of what {@code name} lands on, past its aliases and its extern. */
+    static boolean keyed(TsonLinkedSchema linked, String name) {
+        return AliasChain.landed(linked, name).map(landed -> keyed(landed.definition())).orElse(false);
     }
 
     /**

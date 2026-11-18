@@ -11,8 +11,6 @@ import io.ltr8.tson.schema.ExternAdmission;
 import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Extern;
-import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -31,8 +29,9 @@ import java.util.Optional;
  * <p>The {@code $type} leading the object, or its wrapper, is the enclosing scope's: it is judged here, against this
  * namespace, before the value crosses -- a name of this scope reaching the target, a subtype or a variant of it, by
  * identity ({@link io.ltr8.tson.schema.ExternAdmission}). A foreign reader reads the rest as that entry: the inline
- * form's object without its {@code $type}, the wrapper's {@code $value} as it stands, so a {@code $type} inside it is
- * the foreign schema's. The wrapper's own members are apparatus of the enclosing scope and are judged here.
+ * form's object without its {@code $type}, the wrapper's {@code $value} as it stands. The wrapper's own members are
+ * apparatus of the enclosing scope and are judged here, and so is a {@code $type} leading its {@code $value}, refused
+ * before the value crosses ([TSON-JSON] §3.3): the value's one type name is the boundary's.
  *
  * <p><b>An extern of a map is a map-typed position</b> ([TSON-JSON] §3.3): its object's members are keys, a leading
  * {@code $type} among them, so no annotation object is recognised and the value always crosses as written. A
@@ -43,9 +42,11 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
     /**
      * How a value crosses through one extern: the foreign entry's reader, which reads the value untagged as that
      * entry; the scope it is read in; whether the entry is abstract with no selectors, where a value must name a
-     * subtype of it; and whether it reads an object as a record, where the annotation members may stand inline.
+     * subtype of it; whether it reads an object as a record, where the annotation members may stand inline; and
+     * whether it is map-typed, where a wrapper's {@code $value} holds keys (§3.3).
      */
-    record Crossing(JsonTypeReader<?> reader, ForeignScope scope, boolean namesASubtype, boolean record) {
+    record Crossing(JsonTypeReader<?> reader, ForeignScope scope, boolean namesASubtype, boolean record,
+                    boolean keyed) {
     }
 
     /**
@@ -101,8 +102,7 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
             }
         });
         Top target = landing.definition();
-        return new ExternReader(name, context, own, admitted, narrower,
-                target instanceof MapBody || target instanceof NamespaceBody, crossing);
+        return new ExternReader(name, context, own, admitted, narrower, TagMembers.keyed(target), crossing);
     }
 
     private static Crossing crossing(TsonLinkedSchema linked, String extern, ExternTarget.Landing landing,
@@ -110,7 +110,8 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
         ExternTarget target = linked.externs().get(extern);
         return new Crossing(foreign.compiled(target.foreign()).get(target.type()),
                 new ForeignScope(extern, linked.declaringIdentity(extern), target.schema()),
-                ExternAdmission.namesASubtype(landing.definition()), readsARecord(landing.definition()));
+                ExternAdmission.namesASubtype(landing.definition()), readsARecord(landing.definition()),
+                TagMembers.keyed(landing.definition()));
     }
 
     /**
@@ -125,10 +126,11 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
         String through = linked.declaringIdentity(position);
         boolean namesASubtype = ExternAdmission.namesASubtype(reach.reached());
         boolean record = readsARecord(reach.reached());
+        boolean keyed = TagMembers.keyed(reach.reached());
         for (TsonLinkedSchema in : List.of(linked.externs().get(position).foreign(), landing.in())) {
             if (in.schema().entries().containsKey(entry) && in.declaringIdentity(entry).equals(declaredBy)) {
                 return new Crossing(foreign.compiled(in).get(entry), new ForeignScope(position, through,
-                        in.identity()), namesASubtype, record);
+                        in.identity()), namesASubtype, record, keyed);
             }
         }
         JsonTypeReader<?> reader = foreign.compiled(declaredBy).<JsonTypeReader<?>>map(compiled -> compiled.get(entry))
@@ -139,7 +141,7 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
                     EventSkip.nextValue(ctx);
                     return null;
                 });
-        return new Crossing(reader, new ForeignScope(position, through, declaredBy), namesASubtype, record);
+        return new Crossing(reader, new ForeignScope(position, through, declaredBy), namesASubtype, record, keyed);
     }
 
     /** Whether a value of {@code definition} is a record, whose annotation members may stand inline (§3.3). */
@@ -174,7 +176,7 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
      */
     JsonTypeReader<?> boundTo(DataClass target, String what, String where, List<String> mismatches) {
         Crossing bound = new Crossing(BindTargets.to(own.reader(), target, what, where, mismatches), own.scope(),
-                own.namesASubtype(), own.record());
+                own.namesASubtype(), own.record(), own.keyed());
         Map<String, Crossing> rebound = new LinkedHashMap<>();
         admitted.forEach((written, through) -> rebound.put(written, through == own ? bound : through));
         return new ExternReader(name, location, bound, Map.copyOf(rebound), admissible, narrower, mapTyped, crossing,
@@ -203,7 +205,7 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
     /** Reached by a dispatcher that matched this extern's name: the whole annotation object, its tag judged again. */
     @Override
     public Object readExact(JsonReadContext ctx, JsonTypeReader<?> wrapped) {
-        return mapTyped ? TagMembers.readWrapped(ctx, this) : read(ctx);
+        return mapTyped ? TagMembers.readWrapped(ctx, this, true) : read(ctx);
     }
 
     @Override
@@ -249,7 +251,7 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
         }
         if (lead.wrapper() || !through.record()) {
             return TagMembers.readWrapped(ctx, inner -> crossing.read(inner, through.scope(), through.reader(),
-                    false));
+                    false), through.keyed());
         }
         return crossing.read(ctx, through.scope(), through.reader(), true);
     }
