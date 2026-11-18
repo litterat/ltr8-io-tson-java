@@ -380,12 +380,13 @@ public final class TsonSchemaCompiler {
                     admitted.put(written, reach.same() ? own : byEntry.computeIfAbsent(terminal,
                             entry -> imported(name, landing, entry, reach.identity(), reach.reached())));
                 }
-                if (!reach.same()) {
+                // What a message offers is a tag that is read: an abstract record naming no selectors would refuse in turn.
+                if (!reach.same() && !ExternAdmission.namesASubtype(reach.reached())) {
                     narrower.add(written);
                 }
             });
-            return new ExternReader(name, context, own, admitted, String.join(" | ", narrower),
-                    DefaultTsonReadContext.CROSSING, binding);
+            return new ExternReader(name, context, own, admitted, admission.selectsNone(),
+                    String.join(" | ", narrower), DefaultTsonReadContext.CROSSING, binding);
         }
 
         private ExternReader.Crossing crossing(String extern, ExternTarget.Landing landing) {

@@ -95,7 +95,8 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
                 admitted.put(written, reach.same() ? own : byEntry.computeIfAbsent(terminal,
                         entry -> imported(linked, name, landing, reach, foreign)));
             }
-            if (!reach.same()) {
+            // What a message offers is a tag that is read: an abstract record naming no selectors would refuse in turn.
+            if (!reach.same() && !ExternAdmission.namesASubtype(reach.reached())) {
                 narrower.add(written);
             }
         });

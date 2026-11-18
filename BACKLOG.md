@@ -285,13 +285,6 @@ A value through an extern ([TSON-SCHEMA] §7.9) is read, bound and written in TS
   [TSON-SCHEMA] §8.3 follows an extern where it follows an alias, subsumption included. The readers that judge a tag
   at an ordinary position (`VariantSchemaReader`, JSON's `DispatchTagReader`) follow the alias chain and stop at the
   extern.
-- [ ] **A tag at a choice does not reach a subtype through an extern.** [TSON-SCHEMA] §5.4 selects the one variant
-  a tag's type IS-A, and §7.9 gives an extern whose target is a choice the same rule. Both are refused in both
-  encodings: `!circle_x` at `( text | shape_x )`, two externs of a schema's `circle` and its abstract `shape`
-  (`'circle_x' is not a declared variant`), where a field typed `shape_x` admits it; and `!circle_x` at a position
-  typed by an extern of `( text | shape )` (`not admissible at a 'item_x' position`). `ChoiceReader`'s table reads
-  the declaring namespace's subtypes, which an extern has none of, and `tson-schema`'s `ExternAdmission` admits a
-  variant's identity and no subtype of one.
 - [ ] **A map key typed by an extern, in JSON, reports outside the foreign scope.** The key is parsed by the
   target's parser, and a diagnostic on it carries neither the foreign schema nor the scope suffix
   ([TSON-SCHEMA] §7.9, "Diagnostics").
