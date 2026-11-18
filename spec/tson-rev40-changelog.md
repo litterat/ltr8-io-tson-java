@@ -983,6 +983,14 @@ it.
      and another `value_type` is refused as it is over a map. A record, a tuple, a choice and
      a namespace value stay finished to `^`.
 
+123. **§5.7** — a facet fixed at construction that holds a type's name is restated as the
+     type it names. Such a facet was "restated verbatim or left alone", which read an alias
+     as another type at this one position: over `label => text`, `!tags ^ { element_type:
+     label }` was refused. A collection's `element_type`, `key_type` and `value_type` and
+     an enum's `name_type` are one by the entry a name resolves to and not by spelling, as
+     §5.2 already states for a record's `name_type`, and the resolved value states the
+     facet as the source wrote it.
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Seven entries are edited by this revision of
@@ -1183,6 +1191,8 @@ Changes a Revision 39 implementer must act on:
 24. **A namespace type is refined as a map type is** (§3.2 item 122):
     `small => !api ^ { max_items: 3 }` is IS-A `api`. The source of `^` is stated once, for
     every constructor that IS-A `meta.array` or `meta.map`.
+25. **A type slot is restated through an alias** (§3.2 item 123): over `label => text`,
+    `!tags ^ { element_type: label }` restates `text`. One type by the entry, not by spelling.
 
 ---
 

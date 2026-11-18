@@ -11,7 +11,8 @@ import java.util.Objects;
  * {@code !tags ^ { min_items: 2 }}, judged over effective values: both bodies are bound, so a facet neither wrote
  * compares at the constructor's default. The bounds move inward; a type slot and {@code ordered} are restated only,
  * the one saying what an element is and the other what two values being equal means; {@code unique_items} only rises
- * and {@code voidable} only falls, each a permission withdrawn.
+ * and {@code voidable} only falls, each a permission withdrawn. A type slot compares as held: two names reaching one
+ * entry are one type ([TSON-SCHEMA] §5.7), and a refined body reaching here holds the source's spelling for them.
  */
 public final class CollectionFacets {
 
@@ -53,9 +54,14 @@ public final class CollectionFacets {
 
     private static void restated(List<String> out, String facet, Object source, Object refined) {
         if (!Objects.equals(source, refined)) {
-            out.add(facet + " " + shown(refined) + " replaces the source's own " + shown(source) + ", and a "
-                    + "refinement only restates " + facet);
+            out.add(replaced(facet, source, refined));
         }
+    }
+
+    /** The violation of a refinement writing {@code refined} at {@code facet}, fixed at {@code source}. */
+    public static String replaced(String facet, Object source, Object refined) {
+        return facet + " " + shown(refined) + " replaces the source's own " + shown(source) + ", and a refinement "
+                + "only restates " + facet;
     }
 
     private static String shown(Object facet) {

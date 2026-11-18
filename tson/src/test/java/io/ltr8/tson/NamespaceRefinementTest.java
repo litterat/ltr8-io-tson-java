@@ -131,11 +131,79 @@ class NamespaceRefinementTest {
                 """));
     }
 
+    /** A key or value type is one by the entry its name reaches, and the refined type keeps the source's spelling. */
+    @Test
+    void aSlotRestatedThroughAnAliasKeepsTheSourcesSpelling() {
+        Tson tson = tson();
+        Namespace<Top> entries = tson.resolve("""
+                !!id:"https://example.test/alias.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  k2          => !api ^ { key_type: method_name }
+                  kernel      => !api ^ { key_type: meta.type_name }
+                  v2          => !api ^ { value_type: opal  max_items: 3 }
+                  back        => !aliased ^ { key_type: meta.identifier  value_type: method }
+                  method      => { verb: text }
+                  method_name => meta.identifier
+                  opal        => method
+                  api         => !meta.namespace { key_type: meta.identifier  value_type: method }
+                  aliased     => !meta.namespace { key_type: method_name  value_type: opal }
+                }""").schema().entries();
+
+        NamespaceBody k2 = assertInstanceOf(NamespaceBody.class, entries.get("k2"));
+        assertEquals(TypeRef.of("meta.identifier"), k2.keyType());
+        assertEquals(List.of("api"), k2.supertypes());
+        assertEquals(TypeRef.of("meta.identifier"), assertInstanceOf(NamespaceBody.class, entries.get("kernel")).keyType());
+        NamespaceBody v2 = assertInstanceOf(NamespaceBody.class, entries.get("v2"));
+        assertEquals(TypeRef.of("method"), v2.valueType());
+        assertEquals(Optional.of(3L), v2.maxItems());
+        NamespaceBody back = assertInstanceOf(NamespaceBody.class, entries.get("back"));
+        assertEquals(TypeRef.of("method_name"), back.keyType());
+        assertEquals(TypeRef.of("opal"), back.valueType());
+    }
+
+    @Test
+    void anAliasOfAnotherTypeStillReplacesASlot() {
+        refused("""
+                  scheme => net.scheme_name
+                  r      => !api ^ { key_type: scheme }""", "key_type scheme replaces the source's own meta.identifier");
+        refused("""
+                  words => text
+                  r     => !api ^ { value_type: words }""", "value_type words replaces the source's own method");
+    }
+
+    // ── A composition of the constructor ─────────────────────────────────────
+
+    /**
+     * {@code meta.namespace} composes {@code meta.map} and no base kind of its own ([TSON-SCHEMA] §5.5), so a composition
+     * of it loads as one of {@code meta.map} does, and an application of either reports the same gap.
+     */
+    @Test
+    void aCompositionOfTheNamespaceConstructorIsOneOfTheMapConstructor() {
+        assertEquals(List.of(), schemaProblems("  my_ns => meta.namespace & { label?: text }"));
+        assertEquals(List.of(), schemaProblems("  my_map => meta.map & { label?: text }"));
+
+        List<Diagnostic> namespace = schemaProblems("""
+                  my_ns => meta.namespace & { label?: text }
+                  x     => !my_ns { key_type: meta.identifier  value_type: method }""");
+        List<Diagnostic> map = schemaProblems("""
+                  my_map => meta.map & { label?: text }
+                  x      => !my_map { key_type: meta.identifier  value_type: method }""");
+        for (List<Diagnostic> problems : List.of(namespace, map)) {
+            assertEquals(1, problems.size(), problems.toString());
+            assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, problems.getFirst().code(), problems.toString());
+            assertTrue(problems.getFirst().message().contains(
+                    "this library models the body of a type built only by the bundled schemas' constructors"),
+                    problems.toString());
+        }
+    }
+
     static Stream<Arguments> facetsMovedOutward() {
         return Stream.of(
                 Arguments.of("a ceiling raised", "!bounded ^ { max_items: 4 }", "max_items 4 is above"),
                 Arguments.of("a floor lowered", "!bounded ^ { min_items: 0 }", "min_items 0 is below"),
-                Arguments.of("a key family replaced", "!api ^ { key_type: meta.type_name }",
+                Arguments.of("a key family replaced", "!api ^ { key_type: net.scheme_name }",
                         "only restates key_type"),
                 Arguments.of("a value type replaced", "!api ^ { value_type: text }", "only restates value_type"),
                 Arguments.of("order changed", "!api ^ { ordered: true }", "only restates ordered"),

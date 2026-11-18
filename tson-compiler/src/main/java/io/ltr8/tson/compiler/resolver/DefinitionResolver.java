@@ -171,7 +171,7 @@ import java.util.stream.Stream;
  * Either getter can be an always-{@code null} lookup for a resolver that never needs it.
  *
  * <p><b>Kind determination</b> (§4.1, {@link #determineKind}) checks the transitive supertype chain for the
- * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum}/{@code namespace} -- not a general
+ * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum} -- not a general
  * "inherit the nearest ancestor's own kind" rule, which would be wrong: {@code atom} the entry is itself
  * {@code kind: PRODUCT}, its own chain being {@code [top type]}. None found is {@code PRODUCT} (the
  * structural default), exactly one is that kind, and two or more is a schema error. A fresh (non-composed)
@@ -950,7 +950,11 @@ final class DefinitionResolver {
 
     /** {@code nameType}'s terminal entry, or {@code null} where the namespace holds no such name. */
     private String nameTypeIdentity(Optional<String> nameType) {
-        String written = nameType.orElse(RecordBody.FIELD_NAME);
+        return entryReached(nameType.orElse(RecordBody.FIELD_NAME));
+    }
+
+    /** The entry at the end of {@code written}'s alias chain, or {@code null} where the namespace holds no such name. */
+    private String entryReached(String written) {
         DefinitionGetter in = vocabularyDefinitions.definition(written) != null ? vocabularyDefinitions
                 : namespaceDefinitions;
         return in.definition(written) == null ? null : AliasChain.terminal(written, in::definition);
@@ -1246,8 +1250,12 @@ final class DefinitionResolver {
         // Every resolved instance records its tag, and a hand-assembled one is the class's own.
         String constructor = tagOf(sourceName, source);
         refuseWrittenChain(name, sourceName + " ^", refinement.bindings());
+        DataValue bindings = source instanceof io.ltr8.tson.schema.meta.EnumBody enumBody
+                ? restatedByEntry(name, sourceName, Map.of(WireForm.NAME_TYPE, enumBody.nameType()), refinement.bindings(),
+                        (facet, held, written) -> io.ltr8.tson.schema.meta.EnumBody.nameTypeReplaced(held, written))
+                : refinement.bindings();
 
-        DataValue merged = mergeWithSource(name, source, refinement.bindings(), constructor);
+        DataValue merged = mergeWithSource(name, source, bindings, constructor);
         Top body = bindAtomInstance(name, merged);
         checkNarrows(name, sourceName, source, body);
         constructedBy(name, constructor);
@@ -1347,9 +1355,10 @@ final class DefinitionResolver {
         RecordBody constructor = (RecordBody) vocabularyDefinitions.definition(constructorName);
         refuseWrittenChain(name, sourceName + " ^", bindings);
         DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
-        // A pinned field is a facet fixed at construction, which a refinement restates verbatim or leaves alone
+        // A pinned field is a facet fixed at construction, which a refinement restates as a value or leaves alone
         // ([TSON-SCHEMA] §5.7): the constructor's reader compares a written value against the pin.
         IncompleteEntries.requireDeclared(name, constructorName, constructor, braced(name, sourceName, payload));
+        payload = restatedByEntry(name, sourceName, namedSlots(source), payload, CollectionFacets::replaced);
         Top body = bindAtomInstance(name, mergeWithSource(name, source, payload, constructorName));
         List<String> violations = switch (source) {
             case ArrayBody array -> CollectionFacets.narrowing(array, (ArrayBody) body);
@@ -1368,6 +1377,68 @@ final class DefinitionResolver {
         List<String> supertypes = new ArrayList<>(List.of(sourceName));
         source.supertypes().stream().filter(supertype -> !supertypes.contains(supertype)).forEach(supertypes::add);
         return ((Type) body).withSupertypes(supertypes);
+    }
+
+    /**
+     * The type slots of a type a collection constructor built that hold a name, by field name, to that name. A slot
+     * holding a type written in place is no name's, so no name restates it.
+     */
+    private static Map<String, String> namedSlots(Type source) {
+        Map<String, io.ltr8.tson.schema.meta.TypeExpr> slots = switch (source) {
+            case ArrayBody array -> Map.of("element_type", array.elementType());
+            case MapBody map -> Map.of("key_type", map.keyType(), "value_type", map.valueType());
+            case NamespaceBody namespace -> Map.of("key_type", namespace.keyType(), "value_type", namespace.valueType());
+            default -> Map.of();
+        };
+        Map<String, String> named = new HashMap<>();
+        slots.forEach((slot, held) -> {
+            if (held instanceof io.ltr8.tson.schema.meta.TypeRef reference) {
+                named.put(slot, reference.name());
+            }
+        });
+        return named;
+    }
+
+    /**
+     * {@code payload} without each field of {@code held} it restates by another name, which is judged once every entry
+     * is ready ({@link #judgeDeferred}) to reach the entry the source's name reaches, and refused with {@code
+     * replaced}'s violation where it does not. A fixed slot is one by the entry its name resolves to and not by
+     * spelling, and the resolved value states it as the source wrote it ([TSON-SCHEMA] §5.2, §5.7): leaving the field
+     * out lets the merge carry the source's spelling. A name at such a slot orders nothing, so waiting on it here
+     * would make the refinement wait on what it only names.
+     *
+     * @param held each fixed slot whose source value is a name, by field name, to that name
+     */
+    private DataValue restatedByEntry(String name, String sourceName, Map<String, String> held, DataValue payload,
+                                      Replaced replaced) {
+        if (!(payload.coreValue() instanceof RecordValue record)) {
+            return payload;
+        }
+        List<RecordValue.Field> kept = new ArrayList<>();
+        for (RecordValue.Field field : record.fields()) {
+            String source = held.get(field.name());
+            if (source != null && field.value().typeRef().isEmpty()
+                    && field.value().coreValue() instanceof TokenValue token && !token.text().equals(source)) {
+                String written = token.text();
+                deferred.add(new Deferred(name, () -> {
+                    String reached = entryReached(written);
+                    if (reached == null || !reached.equals(entryReached(source))) {
+                        throw new SchemaValidationException("'" + name + "': not a valid refinement of '!"
+                                + sourceName + "' (§5.7): " + replaced.violation(field.name(), source, written));
+                    }
+                }));
+            } else {
+                kept.add(field);
+            }
+        }
+        return kept.size() == record.fields().size() ? payload
+                : new DataValue(payload.annotations(), payload.typeRef(), new RecordValue(List.copyOf(kept)));
+    }
+
+    /** A family's violation for a fixed facet written as {@code written} where its source holds {@code source}. */
+    @FunctionalInterface
+    private interface Replaced {
+        String violation(String facet, String source, String written);
     }
 
     /** The tag {@code source}'s value carries, and failing a recorded one the constructor its class is the body of. */
@@ -2062,13 +2133,12 @@ final class DefinitionResolver {
     }
 
     /**
-     * §4.1: a type's kind is settled by which of the kernel's base kinds -- {@code atom}/{@code product}/
-     * {@code sum}/{@code namespace}, {@code top} never counts -- its transitive supertype chain reaches, each
-     * judged by where it is defined ({@link #kernel}), never by its spelling: a schema's own {@code namespace} is
-     * an ordinary record. The base kinds themselves and not each ancestor's own kind: the {@code atom}
-     * entry is itself a PRODUCT (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's
-     * kind" would give the wrong answer even for {@code atom}'s own subtypes. A chain reaching two of them is
-     * refused, {@code namespace} beside a base kind included.
+     * [TSON-SCHEMA] §4.1, §5.5: a type's kind is settled by which of the kernel's base kinds -- {@code atom}/
+     * {@code product}/{@code sum}, {@code top} never counts -- its transitive supertype chain reaches, each judged by
+     * where it is defined ({@link #kernel}), never by its spelling: a schema's own {@code atom} is an ordinary
+     * record. The base kinds themselves and not each ancestor's own kind: the {@code atom} entry is itself a PRODUCT
+     * (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's kind" would give the wrong
+     * answer even for {@code atom}'s own subtypes. A chain reaching two of them is refused.
      */
     EntryKind determineKind(String name, List<String> transitiveSupertypes) {
         List<String> baseKindsFound = new ArrayList<>();
@@ -2090,7 +2160,7 @@ final class DefinitionResolver {
     }
 
     private static final Set<String> BASE_KINDS = Set.of(KernelNames.of("atom"), KernelNames.of("product"),
-            KernelNames.of("sum"), KernelNames.of("namespace"));
+            KernelNames.of("sum"));
 
     /**
      * One source's fields and groups copied into the record being built. Shared by the two composition paths

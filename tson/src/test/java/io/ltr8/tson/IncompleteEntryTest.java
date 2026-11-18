@@ -10,9 +10,11 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -421,6 +423,79 @@ class IncompleteEntryTest {
         assertEquals(Optional.of(3L), small.maxItems());
     }
 
+    /** A type slot is one by the entry its name reaches, and the refined body holds the source's spelling (§5.7). */
+    @Test
+    void aTypeSlotRestatedThroughAnAliasKeepsTheSourcesSpelling() {
+        Namespace<Top> entries = resolved("""
+                label  => text
+                names  => [text]
+                viaal  => !names ^ { element_type: label  max_items: 3 }
+                labels => [label]
+                back   => !labels ^ { element_type: text  max_items: 3 }
+                index  => {text => int32}
+                count  => int32
+                keyed  => !index ^ { key_type: label  value_type: count }
+                """).schema().entries();
+
+        ArrayBody viaal = assertInstanceOf(ArrayBody.class, entries.get("viaal"));
+        assertEquals(TypeRef.of("text"), viaal.elementType());
+        assertEquals(Optional.of(3L), viaal.maxItems());
+        assertEquals(TypeRef.of("label"), assertInstanceOf(ArrayBody.class, entries.get("back")).elementType());
+        MapBody keyed = assertInstanceOf(MapBody.class, entries.get("keyed"));
+        assertEquals(TypeRef.of("text"), keyed.keyType());
+        assertEquals(TypeRef.of("int32"), keyed.valueType());
+    }
+
+    @Test
+    void aTwoHopAliasDeclaredAfterTheRefinementRestatesTheSlot() {
+        ArrayBody refined = assertInstanceOf(ArrayBody.class, resolved("""
+                refined => !names ^ { element_type: heading  unique_items: true }
+                names   => [text]
+                heading => label
+                label   => text
+                """).schema().entries().get("refined"));
+
+        assertEquals(TypeRef.of("text"), refined.elementType());
+        assertTrue(refined.uniqueItems());
+    }
+
+    @Test
+    void anImportedAliasRestatesTheSlot() {
+        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(
+                "https://example.test/labels.tn", """
+                        !!id:"https://example.test/labels.tn"
+                        !!import:"https://tson.io/2026/40/m/core.tn"
+                        !schema {
+                          label => text
+                        }
+                        """)))));
+
+        Top refined = tson.resolve("""
+                !!id:"https://example.test/s.tn"
+                !!import:"https://example.test/labels.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  names => [text]
+                  r     => !names ^ { element_type: label  max_items: 3 }
+                }
+                """).schema().entries().get("r");
+        assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, refined).elementType());
+    }
+
+    @Test
+    void anAliasOfAnotherTypeStillReplacesTheSlot() {
+        refused("""
+                  id    => uuid
+                  names => [text]
+                  r     => !names ^ { element_type: id }""", "element_type id replaces the source's own text");
+        refused("""
+                  r     => !names ^ { element_type: r }
+                  names => [text]""", "element_type r replaces the source's own text");
+        refused("""
+                  index => {text => int32}
+                  r     => !index ^ { value_type: no_such }""", "value_type no_such replaces the source's own int32");
+    }
+
     static Stream<Arguments> collectionFacetsMovedOutward() {
         return Stream.of(
                 Arguments.of("a floor lowered", "t => [text; 2..]", "!t ^ { min_items: 1 }", "min_items 1 is below"),
@@ -432,7 +507,9 @@ class IncompleteEntryTest {
                 Arguments.of("duplicates allowed", "u => [text]\n  t => !u ^ { unique_items: true }",
                         "!t ^ { unique_items: false }", "duplicate items"),
                 Arguments.of("a key replaced", "t => {text => int32}", "!t ^ { key_type: uuid }",
-                        "only restates key_type"));
+                        "only restates key_type"),
+                Arguments.of("an element in place restated by a name", "inner => [text]\n  t => [[text]]",
+                        "!t ^ { element_type: inner }", "only restates element_type"));
     }
 
     @ParameterizedTest(name = "{0}")

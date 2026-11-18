@@ -33,6 +33,10 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   recognising a namespace type takes. The gate asks the source's constructor and its chain, never the body's class:
   keeping the source to the two constructors, a namespace type bounded only where it is constructed, lost to §5.7's
   rule that the facets' rules are the fields', kept through composition. A namespace *value* stays finished.
+- A type slot, and an enum's `name_type`, is one by the entry its name reaches, not by spelling: a restatement by
+  another name is left out of the merge, so the source's spelling carries and `CollectionFacets` compares equal
+  values, and whether the two names reach one entry is judged in `judgeDeferred`, since a name at a type position
+  orders nothing and walking it during resolution would make the refinement wait on what it only names.
 - A reference's `of` narrows to the source's or a type IS-A it, and that one rule is judged at **link**, not in
   `checkNarrows`: `RefBody.constraintsCheck` asks that a reference refines a reference, and
   `RefBody.ofNarrowing` takes the IS-A as a predicate the linker supplies
