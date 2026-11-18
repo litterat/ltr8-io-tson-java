@@ -423,7 +423,7 @@ class DefinitionResolverTest {
                 write(integerType));
     }
 
-    // ── Bare type references (§8.3): meta.type_name, meta.field_name, meta.param_name, and
+    // ── Bare type references (§8.3): meta.type_name, meta.param_name, and
     //    the annotation markers -- all resolve to an ALIAS-kind entry
     //    regardless of what the referenced name itself resolves to.
 
@@ -432,21 +432,18 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = kernelDeclarations();
 
         Top typeName = resolver.resolve(schemaMap.declarations().get("meta.type_name"));
-        Top fieldName = resolver.resolve(schemaMap.declarations().get("meta.field_name"));
         Top paramName = resolver.resolve(schemaMap.declarations().get("meta.param_name"));
         Top annotation = resolver.resolve(schemaMap.declarations().get("meta.annotation"));
         Top doc = resolver.resolve(schemaMap.declarations().get("doc"));
 
-        // meta.type_name/field_name/param_name => meta.identifier; each is its own fresh ALIAS entry, not
-        // three views of the same one -- source/target both name "meta.identifier" for all three.
+        // meta.type_name/param_name => meta.identifier; each is its own fresh ALIAS entry, not
+        // two views of the same one -- source/target both name "meta.identifier" for both.
         assertEquals(EntryKind.ALIAS, EntryKind.of(typeName, n -> true));
-        assertEquals(EntryKind.ALIAS, EntryKind.of(fieldName, n -> true));
         assertEquals(EntryKind.ALIAS, EntryKind.of(paramName, n -> true));
         assertEquals(EntryKind.ALIAS, EntryKind.of(annotation, n -> true));
         assertEquals(EntryKind.ALIAS, EntryKind.of(doc, n -> true));
 
         assertEquals("{ target: meta.identifier }", write(typeName));
-        assertEquals(write(typeName), write(fieldName));
         assertEquals(write(typeName), write(paramName));
 
         // annotation => void is a plain alias. doc => @meta.annotation text writes its marker after "=>", so §6
@@ -675,7 +672,7 @@ class DefinitionResolverTest {
     @Disabled("A field written in place is read through the compiled vocabulary, which this unit resolver does not have")
     @Test
     void resolvesFieldGroupFromTheRealMetaKernelFixture() throws IOException, DataBindException {
-        // field_group => { members: [[meta.field_name; 1..]; 1..]  optional_members?: [meta.field_name; 1..]
+        // field_group => { members: [[text; 1..]; 1..]  optional_members?: [text; 1..]
         //                  optional?: boolean ~ false }
         // -- a fresh record combining sugar forms with an ordinary literal default modifier. Desugared first,
         // as SchemaResolver does: each bracket form is the construction written in place at its field.

@@ -22,7 +22,7 @@ import java.util.Optional;
  *
  * <p><b>{@code annotations} carries the annotations written on the reference itself</b>: [TSON-SCHEMA] §8.3 attaches
  * {@code @alias:name} to the type value when a use site is flattened past an alias entry, so
- * {@code type: @alias:meta.field_name token} records both where the reference points and what the author wrote.
+ * {@code type: @alias:meta.type_name meta.identifier} records both where the reference points and what the author wrote.
  * <b>Identity</b> is the variant and the name: {@code annotations} and {@code closure} are excluded from {@code
  * equals}, as both are about where a reference came from, and §8.2 keys identity on where it points.
  */

@@ -74,12 +74,12 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
                           @Field("name_type") Optional<String> nameType) implements Product {
 
     /**
-     * The kernel's {@code meta.field_name}, an identifier: a record's name type where neither it nor a supertype states
-     * one ([TSON-SCHEMA] §5.2). {@link #nameType} keeps the difference between stating {@code meta.field_name} and
-     * stating nothing, because the two resolve in different namespaces: a name an author wrote resolves in the
-     * author's own schema first, as an enum's does, and the absent default is the kernel's.
+     * The name type of a record where neither it nor a supertype states one, the kernel's identifier ([TSON-SCHEMA]
+     * §5.2). {@link #nameType} keeps the difference between stating {@code meta.identifier} and stating nothing,
+     * because the two resolve in different namespaces: a name an author wrote resolves in the author's own schema
+     * first, as an enum's does, and the absent default is the kernel's.
      */
-    public static final String FIELD_NAME = "meta.field_name";
+    public static final String DEFAULT_NAME_TYPE = "meta.identifier";
 
     /** The kernel's {@code field_map}, the ordered map type a record's {@link #fields} are a value of. */
     public static final String FIELD_MAP = "meta.field_map";
@@ -242,9 +242,9 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
         }
     }
 
-    /** The name type's name, for a message: the one stated, or {@link #FIELD_NAME}. */
+    /** The name type's name, for a message: the one stated, or {@link #DEFAULT_NAME_TYPE}. */
     public String nameTypeName() {
-        return nameType.orElse(FIELD_NAME);
+        return nameType.orElse(DEFAULT_NAME_TYPE);
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */

@@ -26,9 +26,9 @@ import java.util.stream.Stream;
  * Where an entry's {@code name_type} resolves, and whether what it resolves to may stand there: an enum's, which its
  * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of ([TSON-SCHEMA] §5.2).
  * A value the entry's constructor wrote resolves where that constructor is declared, whose closure is in the schema's
- * -- so {@code !enum [A B]} names the kernel's {@code meta.identifier}, and a record that says nothing the kernel's {@code
- * meta.field_name}, names no schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own
- * namespace first. Shared by the linker's enum and field name checks.
+ * -- so {@code !enum [A B]} names the kernel's {@code meta.identifier}, as does a record that says nothing, a name no
+ * schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own namespace first. Shared
+ * by the linker's enum and field name checks.
  *
  * <p><b>What may stand there is the slot's kind's to say</b> ([TSON-SCHEMA] §4.2). The kernel types both slots
  * {@code meta.identifier_ref}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
@@ -143,9 +143,8 @@ public final class NameType {
     }
 
     /**
-     * Whether {@code type} is the kernel's {@code meta.identifier} -- an enum's default, and through
-     * {@code meta.field_name} a record's -- whose names a refusal calls identifiers, where it names any other type, the
-     * author's own.
+     * Whether {@code type} is the kernel's {@code meta.identifier} -- an enum's default and a record's -- whose names
+     * a refusal calls identifiers, where it names any other type, the author's own.
      */
     public static boolean isIdentifier(Resolved type, Function<String, Top> structure) {
         return type.definition() != null
@@ -209,11 +208,11 @@ public final class NameType {
 
     /**
      * A name type the record states was written by its author, so it resolves in the schema's own namespace first,
-     * as an enum's does; the absent default is the kernel's {@code meta.field_name}, resolved in the structure first.
+     * as an enum's does; the absent default is the kernel's {@code meta.identifier}, resolved in the structure first.
      */
     private static Optional<Resolved> ofRecord(Optional<String> nameType, Function<String, Top> local,
                                                Function<String, Top> structure) {
-        String name = nameType.orElse(RecordBody.FIELD_NAME);
+        String name = nameType.orElse(RecordBody.DEFAULT_NAME_TYPE);
         Function<String, Top> first = nameType.isEmpty() ? structure : local;
         Function<String, Top> second = first == structure ? local : structure;
         for (Function<String, Top> namespace : List.of(first, second)) {

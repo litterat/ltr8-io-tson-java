@@ -208,7 +208,7 @@ joins whole, when it is ready. The value is read in the reading document's names
 The kernel, meta.tn (`TsonBundledSchemas.META_ID`), is special: its header is its `!!id` alone. It holds the kernel's
 one wait cycle, every name the cycle's declarations reference, closed to a fixed point, so it resolves and links on its
 own, and the concepts that belong with them: `meta.map`, `meta.tuple`, `meta.choice` and `meta.tuple_element`,
-`meta.application`, `meta.ref`, `meta.extern`, `meta.field_name`, `meta.disjoint`, `set`, the octet-sequence constructor
+`meta.application`, `meta.ref`, `meta.extern`, `meta.disjoint`, `set`, the octet-sequence constructor
 `binary.bytes_type` with `binary.bytes_encoding` and
 `bytes`, and the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric` the
 data-format libraries state their types with. It is the one kernel document. Its root is the thirteen names an author

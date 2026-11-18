@@ -54,10 +54,9 @@ import java.util.Optional;
  * closure, which the resolved {@link TsonSchema#entries()} do not hold and which linking is the last phase to see.
  * Like {@code entryOrigins} it is carried through {@code !!import}, each enum judged in the schema that declared it.
  *
- * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record whose {@code
- * name_type} is not the kernel's {@code meta.field_name} ([TSON-SCHEMA] §5.2), with the value that type
- * resolves to, by which its readers judge the field names a document writes. A record not listed has
- * identifiers for field names.
+ * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record that states a {@code name_type}
+ * ([TSON-SCHEMA] §5.2), with the value that type resolves to, by which its readers judge the field names a document
+ * writes. A record not listed has identifiers for field names.
  *
  * <p><b>{@code externs} is the fourth</b>: each extern of the namespace ([TSON-SCHEMA] §5.13) with the entry it lands
  * on in its foreign schema, which only a link holding that schema can find. Carried through {@code !!import}, an
@@ -184,7 +183,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      * The form record {@code entryName}'s field names are matched in: its name type's {@code normalization}
      * ([TSON-SCHEMA] §5.5), so a document's name and a declared one that are one value of the type are one field --
      * the equality the linker judged the declared names distinct under. {@code NFC} for one {@link #nameTypes}
-     * omits, the kernel's {@code meta.field_name} being NFC; no form compares lower than NFC.
+     * omits, the kernel's {@code meta.identifier} being NFC; no form compares lower than NFC.
      */
     public Normalization nameForm(String entryName) {
         return nameForm(nameType(entryName));

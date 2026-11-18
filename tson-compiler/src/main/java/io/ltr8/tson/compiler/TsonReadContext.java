@@ -8,6 +8,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.unicode.IdentifierProfile;
@@ -206,8 +207,8 @@ public interface TsonReadContext {
      */
     record FieldNameRule(String typeName, AtomType<?> type, IdentifierProfile profile, Normalization form) {
 
-        /** The kernel's {@code meta.field_name}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
-        public static final FieldNameRule FIELD_NAME = new FieldNameRule("meta.field_name",
+        /** The kernel's {@code meta.identifier}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
+        public static final FieldNameRule DEFAULT_NAME_TYPE = new FieldNameRule(RecordBody.DEFAULT_NAME_TYPE,
                 AtomParsers.forType(IdentifierType.IDENTIFIER).orElseThrow(), IdentifierGrammar.PROFILE,
                 Normalization.NFC);
 
@@ -223,7 +224,7 @@ public interface TsonReadContext {
          * answers without allocating, since it is asked of every field name of an ordinary document.
          */
         public Optional<String> refusal(String name) {
-            if (this == FIELD_NAME) {
+            if (this == DEFAULT_NAME_TYPE) {
                 return IdentifierGrammar.validate(name);
             }
             try {

@@ -557,7 +557,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     public List<String> dependencies();             // every schema depended on directly: imports, then externs
     public Optional<ExternTarget.Landing> landing(String name); // the foreign entry an extern lands on, past hops
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
-    public Optional<Top> nameType(String entryName); // a record's name_type, where not meta.field_name
+    public Optional<Top> nameType(String entryName); // a record's name_type, where it states one
     public boolean isKernel(String entryName);      // declared by meta.tn, judged by origin
     public EntryKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
     public boolean isConstructor(String name, Top value); // IS-A the kernel's meta.top

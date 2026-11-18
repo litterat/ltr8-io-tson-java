@@ -991,6 +991,33 @@ it.
      §5.2 already states for a record's `name_type`, and the resolved value states the
      facet as the source wrote it.
 
+124. **§4.2** — a type value written as data is held to the kernel's types alone (#6's open
+     row). `meta.type_inline.of` is typed `meta.type`, and §4.2's list of what is written in
+     place is the resolver's rule, so a data document typed by the kernel reads
+     `!meta.array { element_type: { of: !meta.dependent { on: kind } } }`, as it reads
+     crossed bounds or a chain no resolver writes. The text says so once: such a value
+     declares nothing, nothing is read against it, and a document whose type values are to
+     be types is loaded as a schema document. Typing `of` by a narrower kernel type would
+     state one resolver rule of many, and bring back the slot types #6 removed.
+
+125. **§4.2, §5.2, §5.8, §7.4, §8.1, §9** — `meta.field_name` is removed. It aliased `meta.identifier`
+     and typed no slot of the kernel: `meta.field_map`'s key is `text`, judged by the
+     record's name type, and `meta.record.name_type` carries no default. It named the name
+     type of a record that states none, which an enum's default already writes as
+     `meta.identifier`, and it did not cover its role, a record over a wider name type
+     having field names outside it. A record that states no name type has
+     `meta.identifier`'s, and a schema that typed a field by the role writes
+     `meta.identifier` or an alias of its own. `meta.type_name` and `meta.param_name` stay,
+     each typing a slot.
+
+126. **§5.13** — a family across an extern's boundary (item 118's reading, confirmed). The
+     boundary's tag is the enclosing scope's, so a subtype or a variant is tagged there only
+     by a name that scope holds. §5.13 says what follows: a family read through an extern
+     names selectors, a value then placed by its members under the foreign schema; without
+     them each tagged type is an extern of its own. The target stays any type a value can
+     have, an abstract record and a choice among them: refusing those would refuse the
+     selector-dispatched family, and a record that is not abstract has subtypes too.
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Seven entries are edited by this revision of
@@ -1193,6 +1220,10 @@ Changes a Revision 39 implementer must act on:
     every constructor that IS-A `meta.array` or `meta.map`.
 25. **A type slot is restated through an alias** (§3.2 item 123): over `label => text`,
     `!tags ^ { element_type: label }` restates `text`. One type by the entry, not by spelling.
+26. **A type value in data is held to its shape** (§3.2 item 124): the resolver's rules are
+    a declaration's, and a data document typed by the kernel declares nothing.
+27. **`meta.field_name` is removed** (§3.2 item 125): a record's default name type is
+    `meta.identifier`, as an enum's is. A schema naming the role writes `meta.identifier`.
 
 ---
 
@@ -1228,7 +1259,7 @@ carries no open questions.
 | #6 (ruled) | `meta.ref` withdraws nothing once `allow_sibling` is gone. It stays, as the empty refinement `meta.reference_type ^ {}`, so `meta.ref<T>` keeps its spelling. | **Superseded by items 98–101**: `meta.ref` is the one reference constructor, and `meta.reference_type` is gone. |
 | #6 (ruled) | `meta.dependent.on` is `text`, naming a field of the record by its declared spelling, declared before the dependent field, as a `discriminators` entry names one. | **[settled]** — the spec author's ruling. |
 | #6 (ruled) | A declared sum written in place was refused only by its absence from Part 2 §4.2's list of what `of` holds. §4.2 states it, beside a namespace type. | **[settled]** — the spec author's ruling. |
-| #6 (open) | A data document typed by the kernel can write a type in place that §4.2's list refuses (`!meta.array { element_type: { of: !meta.dependent { on: kind } } }` reads with no diagnostic): `meta.type_inline.of` is typed `meta.type`, and the list is a resolver rule. It predates `meta.dependent`, which adds one entry to the list. | Open — carried. |
+| #6 (ruled) | A data document typed by the kernel can write a type in place that §4.2's list refuses (`!meta.array { element_type: { of: !meta.dependent { on: kind } } }` reads with no diagnostic): `meta.type_inline.of` is typed `meta.type`, and the list is a resolver rule. It predates `meta.dependent`, which adds one entry to the list. | **[settled]** — the spec author's ruling, §3.2 item 124: the shape alone, the resolver's rules being a declaration's. |
 | Items 78–84 (ruled) | A choice over a parameter, `( T \| int32 )`, is disjoint for some arguments and not others. Refusing it at the declaration, or requiring disjointness for every argument, were the alternatives; it loads at the open record, and each application is judged where it closes. | **[settled]** — the spec author's ruling. |
 | #8 (remainder) | A name in a schema document's annotation value is judged at link (Part 2 §5.12). The first implementation checks the value's shape and delivers the name unjudged; a data document's is judged at the read. | Open — outstanding work in the implementation; the text states the rule. |
 | Item 114 (ruled) | A type built by a constructor composed from `meta.array` or `meta.map`, a namespace type, takes `^` under the collection's rules: §5.7's source of `^` is a type built by `meta.array`, by `meta.map` or by a constructor that IS-A either. Keeping the source to the two constructors, so that a namespace type is bounded only where it is constructed, was the reading first taken. | **[settled]** — the spec author's ruling, §3.2 item 122: the general rule, with no case for a namespace. |
@@ -1238,8 +1269,8 @@ carries no open questions.
 | Items 116–118 (ruled) | The extern is singular and a scope change; the tag at its boundary is the enclosing scope's; `type` is `text`; its schema loads with the imports and the declaring document is refused unless every foreign schema loads, holds the same kernel and closes no cycle; the head is written `meta.extern`; the boundary is absolute, no value entry brought in and no name selecting through it; a default or pin at a field typed by it is refused; an annotation through it is admitted; the import closure limit counts it. | **[settled]** — the spec author's rulings. |
 | Item 116 (reading) | An extern entry's kind. The text gives it a fifth kind, EXTERN, conferred by its form as ALIAS is, so a consumer of resolver output derives it from the entry alone; the alternative, its target's kind, needs the foreign schema loaded to derive. | **[settled]** — the spec author's ruling, who expects the derived kind to go, nothing reading it; EXTERN goes with it. |
 | Item 116 (ruled) | `meta.extern.schema` is `iri_reference`, what an `!!import`'s value is ([TSON-DATA] §3.3), so an extern names every schema an import may, a path-only reference to a library entry among them. `iri`, as first written, required a scheme and refused `/local/orders.tn` where `file:/local/orders.tn`, the same identity, passed. | **[settled]** — the spec author's ruling. |
-| Item 116 (reading) | A schema declares no value entry of an extern type: `!order_v1 { … }` at a declaration is refused with the other heads, beside the refused default and pin, so no foreign value is written in the declaring schema but an annotation's. | **[editorial]** — follows the ruling that an extern is no constructor head. |
-| Item 118 (reading) | Which tags the boundary admits. The text applies §7.2's subsumption with each name followed to the entry it reaches, by identity, so a name of the enclosing scope that is no extern is admitted where it reaches the target or a subtype of it (the scope importing the schema that declares it), and a variant's name is admitted where the target is a choice; the narrower reading admits externs alone. A tag naming the position's own extern is read as no tag, so an extern of a member-dispatched base may be written at a choice and its value placed by its selectors. | **[editorial]** — the editor's reading. |
+| Item 116 (reading) | A schema declares no value entry of an extern type: `!order_v1 { … }` at a declaration is refused with the other heads, beside the refused default and pin, so no foreign value is written in the declaring schema but an annotation's. | **[settled]** — the spec author's ruling: confirmed as written. |
+| Item 118 (reading) | Which tags the boundary admits. The text applies §7.2's subsumption with each name followed to the entry it reaches, by identity, so a name of the enclosing scope that is no extern is admitted where it reaches the target or a subtype of it (the scope importing the schema that declares it), and a variant's name is admitted where the target is a choice; the narrower reading admits externs alone. A tag naming the position's own extern is read as no tag, so an extern of a member-dispatched base may be written at a choice and its value placed by its selectors. | **[settled]** — the spec author's ruling, §3.2 item 126: by identity, as written. |
 | Items 116–118 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
@@ -1251,9 +1282,9 @@ carries no open questions.
 1. **Received at Revision 40** — all eleven artifacts carry "2026 Revision 40 draft" and
    `/2026/40/` identities, and each normative pin was checked against sha256 over the bytes
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
-   `73526b2c…` (Revision 39 `c9b069b6…`), numeric `082eca38…` (`dfa66c5d…`), temporal
-   `d8b3e252…` (`fb4ada8f…`), net `aae2edd9…` (`371fc20c…`), core `788afc79…`
-   (`4e8d9c43…`), policy `baf9ecee…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   `05ae9374…` (Revision 39 `c9b069b6…`), numeric `ab51ca61…` (`dfa66c5d…`), temporal
+   `906282ed…` (`fb4ada8f…`), net `897f3964…` (`371fc20c…`), core `c1be02df…`
+   (`4e8d9c43…`), policy `52369546…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
    78–84's documentation of a parameter in a type written in place, for items 85–93's
@@ -1262,9 +1293,9 @@ carries no open questions.
    104–105's chain sets and rewritten documentation, for item 106's `meta.namespace`, and
    for item 108's incomplete entries and `meta.completion`, and temporal and core again
    for item 115's `fraction_digits`, and the kernel and every dependant again for item 116's
-   `meta.extern`, twice, the second for its `schema` typed `iri_reference`. The chain is
-   consistent — numeric, temporal, net and policy each pin the kernel; core pins the three
-   libraries.
+   `meta.extern`, twice, the second for its `schema` typed `iri_reference`, and for item
+   125's removal of `meta.field_name`. The chain is consistent — numeric, temporal, net and
+   policy each pin the kernel; core pins the three libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of
    `meta.record`, `meta.record_field`, `meta.reference_type`, `meta.alias`, `meta.array`
@@ -1287,6 +1318,7 @@ carries no open questions.
    115's `fraction_digits` on its three constructors, and the other two library fixtures
    change only their identities. Item 116 adds `meta.extern`: the kernel measures 84 entries,
    and `meta-resolved.tn` writes the entry and lists it among `meta.top`'s subtypes.
+   Item 125 removes `meta.field_name`: the kernel measures 83 entries.
 
 ---
 

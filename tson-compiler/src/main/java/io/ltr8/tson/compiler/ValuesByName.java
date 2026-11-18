@@ -227,7 +227,7 @@ final class ValuesByName {
 
         static final Family TYPE_NAME = new Family("meta.type_name", IDENTIFIER, Normalization.NFC);
 
-        static final Family FIELD_NAME = new Family("meta.field_name", IDENTIFIER, Normalization.NFC);
+        static final Family DEFAULT_NAME_TYPE = new Family(RecordBody.DEFAULT_NAME_TYPE, IDENTIFIER, Normalization.NFC);
 
         /**
          * {@code segment} as a name of this family, in its form; refused, opening with {@code naming}, where it is
@@ -350,8 +350,8 @@ final class ValuesByName {
             Top body = at.body();
             switch (body) {
                 case RecordBody record -> {
-                    Family names = record.nameType().map(type -> family(type, Family.FIELD_NAME))
-                            .orElse(Family.FIELD_NAME);
+                    Family names = record.nameType().map(type -> family(type, Family.DEFAULT_NAME_TYPE))
+                            .orElse(Family.DEFAULT_NAME_TYPE);
                     String declared = declaredField(record, names, names.read(naming,
                             "which names the fields of '" + reached + "'", segment));
                     if (declared == null) {

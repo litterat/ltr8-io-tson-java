@@ -930,17 +930,17 @@ final class DefinitionResolver {
     private void requireOneNameType(String name, String aFrom, Optional<String> a, String bFrom, Optional<String> b) {
         if (!sameNameType(a, b)) {
             throw new SchemaValidationException("'" + name + "': supertypes '" + aFrom + "' and '" + bFrom
-                    + "' have different name types, '" + a.orElse(RecordBody.FIELD_NAME) + "' and '"
-                    + b.orElse(RecordBody.FIELD_NAME) + "' -- a record's name type is set where it is declared, "
+                    + "' have different name types, '" + a.orElse(RecordBody.DEFAULT_NAME_TYPE) + "' and '"
+                    + b.orElse(RecordBody.DEFAULT_NAME_TYPE) + "' -- a record's name type is set where it is declared, "
                     + "the default included, and a subtype cannot change it; declare both over one name type");
         }
     }
 
     /**
      * Whether two records' name types are one type: the same entry at the end of each one's alias chain, not
-     * the same spelling, so {@code jn => json_name} is {@code json_name} and the kernel's {@code meta.field_name} is
-     * {@code meta.identifier}. Both resolve in the schema's one namespace, the absent default being the kernel's {@code
-     * meta.field_name}, and two that resolve to nothing are compared as written, the linker refusing each on its own.
+     * the same spelling, so {@code jn => json_name} is {@code json_name}. Both resolve in the schema's one namespace,
+     * the absent default being the kernel's {@code meta.identifier}, so a record stating it is one with a record
+     * stating none; two that resolve to nothing are compared as written, the linker refusing each on its own.
      */
     private boolean sameNameType(Optional<String> a, Optional<String> b) {
         String ka = nameTypeIdentity(a);
@@ -950,7 +950,7 @@ final class DefinitionResolver {
 
     /** {@code nameType}'s terminal entry, or {@code null} where the namespace holds no such name. */
     private String nameTypeIdentity(Optional<String> nameType) {
-        return entryReached(nameType.orElse(RecordBody.FIELD_NAME));
+        return entryReached(nameType.orElse(RecordBody.DEFAULT_NAME_TYPE));
     }
 
     /** The entry at the end of {@code written}'s alias chain, or {@code null} where the namespace holds no such name. */
