@@ -6,7 +6,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 import io.ltr8.tson.json.lexer.JsonLexer;
@@ -62,7 +62,7 @@ public final class JsonStream implements JsonEventSource {
     private final int maxDepth;
 
     /** §8.2's token surface, or {@code null} where a read named none -- see {@link #checkTokenPolicy}. */
-    private ScriptPolicy tokenPolicy;
+    private TokenPolicy tokenPolicy;
     private DiagnosticsReceiver tokenPolicyReceiver;
 
     /**
@@ -113,7 +113,7 @@ public final class JsonStream implements JsonEventSource {
      * policy is applied to every token it hands out.
      *
      * <p><b>One policy rather than a depth and a surface</b>, because a deployment states one -- and because
-     * a bare {@code int} beside a {@code ScriptPolicy} is how a caller comes to pass a bound from one
+     * a bare {@code int} beside a {@code TokenPolicy} is how a caller comes to pass a bound from one
      * policy and a token surface from another.
      *
      * <p>[TSON-JSON] §9.4 puts the token policy on "map keys and string values"; this checks every token

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Mixed-script names are built from code points, never typed: the whole subject is spellings that look
  * alike, so a literal would be unreviewable.
  */
-class ScriptPolicyTest {
+class TokenPolicyTest {
 
     private static final String CYR_A = new String(Character.toChars(0x0430));   // а
     private static final String CYR_P = new String(Character.toChars(0x043F));   // п
@@ -22,19 +22,19 @@ class ScriptPolicyTest {
     private static final String HAN = new String(Character.toChars(0x65E5));     // 日
     private static final String DEVANAGARI = new String(Character.toChars(0x0905));
 
-    private static void accepts(ScriptPolicy policy, String text) {
+    private static void accepts(TokenPolicy policy, String text) {
         assertTrue(policy.violation(text).isEmpty(),
                 () -> policy + " should accept " + text + " but said " + policy.violation(text).orElse(""));
     }
 
-    private static void refuses(ScriptPolicy policy, String text) {
+    private static void refuses(TokenPolicy policy, String text) {
         assertFalse(policy.violation(text).isEmpty(), () -> policy + " should refuse " + text);
     }
 
     /** The default: strictest of the practically deployable levels, and a level UTS #39 names. */
     @Test
     void highlyRestrictiveOverAWholeNameIsTheDefaultPosition() {
-        ScriptPolicy policy = ScriptPolicy.highlyRestrictive();
+        TokenPolicy policy = TokenPolicy.highlyRestrictive();
 
         accepts(policy, "admin");
         accepts(policy, "пользователь");
@@ -47,7 +47,7 @@ class ScriptPolicyTest {
     /** The narrowest relaxation: name the combination instead of dropping a level. */
     @Test
     void anAdditionalPermittedSetAdmitsOnlyThatCombination() {
-        ScriptPolicy policy = ScriptPolicy.highlyRestrictive().permitting(LATIN, CYRILLIC);
+        TokenPolicy policy = TokenPolicy.highlyRestrictive().permitting(LATIN, CYRILLIC);
 
         accepts(policy, "id_" + CYR_P);
         accepts(policy, CYR_A + "dmin");                      // deliberately: the deployment said so
@@ -57,7 +57,7 @@ class ScriptPolicyTest {
     /** Moderately Restrictive: Latin plus one other, except the two §5.2 names. */
     @Test
     void moderatelyRestrictiveAdmitsLatinPlusOneExceptCyrillicAndGreek() {
-        ScriptPolicy policy = ScriptPolicy.moderatelyRestrictive();
+        TokenPolicy policy = TokenPolicy.moderatelyRestrictive();
 
         accepts(policy, "id_" + DEVANAGARI);
         refuses(policy, "id_" + CYR_P);
@@ -66,14 +66,14 @@ class ScriptPolicyTest {
 
     @Test
     void singleScriptRefusesEvenTheAugmentedSets() {
-        accepts(ScriptPolicy.singleScript(), "admin");
-        refuses(ScriptPolicy.singleScript(), HAN + HAN + "id");
+        accepts(TokenPolicy.singleScript(), "admin");
+        refuses(TokenPolicy.singleScript(), HAN + HAN + "id");
     }
 
     @Test
     void asciiOnlyIsWhatItSays() {
-        accepts(ScriptPolicy.asciiOnly(), "order_id");
-        refuses(ScriptPolicy.asciiOnly(), "café");
+        accepts(TokenPolicy.asciiOnly(), "order_id");
+        refuses(TokenPolicy.asciiOnly(), "café");
     }
 
     /**
@@ -82,8 +82,8 @@ class ScriptPolicyTest {
      */
     @Test
     void theTwoOffPositionsDifferOnlyInTheIdentifierProfile() {
-        ScriptPolicy five = ScriptPolicy.scriptsUnchecked();
-        ScriptPolicy six = ScriptPolicy.unrestricted();
+        TokenPolicy five = TokenPolicy.scriptsUnchecked();
+        TokenPolicy six = TokenPolicy.unrestricted();
 
         assertFalse(five.checksScripts());
         assertFalse(six.checksScripts());

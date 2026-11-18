@@ -1592,7 +1592,7 @@ Six bundled documents carry the series' vocabulary, and one of them is pre-loade
 | `temporal.tn` | the kernel | `date`, `time`, `datetime`, `duration`, `period` | `temporal`: `temporal.date_type`, `temporal.time_type`, `temporal.datetime_type`, `temporal.duration_type`, `temporal.period_type` |
 | `net.tn` | the kernel | `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `hostname`, `host`, `media_type`, `uri_reference`, `uri`, `uuid` | `net`, beside the kernel's members: `net.email_type`, `net.ipv4_type`, `net.ipv6_type`, `net.cidr4_type`, `net.cidr6_type`, `net.mac_type`, `net.hostname_type`, `net.host_type`, `net.media_type_type`, `net.uri_type`, `net.uuid_type` |
 | `core.tn` | `numeric.tn`, `temporal.tn`, `net.tn` | the author annotations `deprecated`, `title`, `comment`, `examples`, `read_only`, `write_only` | nothing: it declares no map of its own |
-| `policy.tn` | the kernel | nothing | `policy`: `policy.processor` and its parts `policy.identifier_policy`, `policy.script_policy` and `policy.limits`, `policy.restriction_level` and `policy.limit` |
+| `policy.tn` | the kernel | nothing | `policy`: `policy.processor` and its parts `policy.identifier_policy`, `policy.token_policy` and `policy.limits`, `policy.restriction_level` and `policy.limit` |
 
 **A library imports the kernel alone; `core.tn` is the bundle.** A schema imports the libraries it uses: one importing `temporal.tn` alone has `date` and the kernel's vocabulary, does not see `int32`, and may declare `int32` as an entry of its own, though not `numeric`, which the kernel declares; one importing `numeric.tn` and `net.tn` has both, their closures meeting at the kernel by identity. Every schema whose closure holds the kernel reserves the kernel's thirteen root names and the map names `meta`, `atom`, `numeric`, `unicode`, `net` and `binary` (§2.2.3). `core.tn` imports the three, so a schema wanting every bundled type imports `core.tn` and reserves those, `temporal` and every root above; `record`, `identifier`, `type_ref`, `bounded`, `value`, `kind` and `core` stay free. No two of the bundled documents declare one root name or one member path, and the maps two of them declare, `numeric` and `net`, are open and the union of their members, so no closure of them collides with itself. `policy.tn` imports the kernel alone; a closure holding it reserves `policy`.
 
@@ -2200,7 +2200,7 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=906282ed88fc997c2bf86bd8d8286654f57294e38d1a31eb512ae9c0808934b9 |
 | net.tn | TSON Network and Identifier Library (companion artifact) | https://tson.io/2026/40/m/net.tn?sha256=897f396411a7aadf1ff0a4b98d25a419f7c08718912b82c2631b30392094c8e8 |
 | core.tn | TSON Core Bundle (companion artifact) | https://tson.io/2026/40/m/core.tn?sha256=c1be02dff40bd37ab11d40478b2c2b10e2d26848a0a48cb3f8d610a1613e3f05 |
-| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=5236954648e8e049aedcf4c144f2cc79dbc42b58e6d6923e43de945f05b5b58a |
+| policy.tn | TSON Processor Policy (companion artifact) | https://tson.io/2026/40/m/policy.tn?sha256=131dda3357feb51dcd32562051b0fff352eada690318c87b0a4df1ceabe6a3e8 |
 
 ### 13.3 Informative References
 

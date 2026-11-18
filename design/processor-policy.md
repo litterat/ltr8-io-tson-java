@@ -9,7 +9,7 @@ the wait depth are counted. Current form only; history lives in git.
 - The policy is threaded as one value; `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` each change exactly one
   component, deriving from what is already stated.
 - The two surfaces have two types: an `IdentifierPolicy` (all three §8.2 mechanisms, a unit, a skeleton switch) and a
-  token `ScriptPolicy` (a level over whole text). A per-segment token policy is unwritable, not refused.
+  `TokenPolicy` (a level over whole text). A per-segment token policy is unwritable, not refused.
 - It is not a diagnostic component: constant for a run, needed before a document is written, and a level says more
   than a version.
 - It is read off the reader that judged, not rebuilt from a configuration object.
@@ -38,10 +38,10 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 ## `ProcessorPolicy` — the configuration, stated once
 
 **And threaded as one value.** Every constructor and derivation that needs an `IdentifierPolicy`, a
-`ScriptPolicy` and a `LimitsPolicy` takes the policy
+`TokenPolicy` and a `LimitsPolicy` takes the policy
 instead: both streams, both TSON facades, and `JsonObjectReader`. Three parameters that always travel
 together is how a caller comes to pass a bound from one policy beside a token surface from another, and a
-bare `int` beside a `ScriptPolicy` is the same hazard with less to grep for.
+bare `int` beside a `TokenPolicy` is the same hazard with less to grep for.
 
 A reader's `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` each change exactly one component, and
 `ProcessorPolicy` has the matching three so a reader's derivation is one call rather than a rebuild.
@@ -60,9 +60,9 @@ off the `ProcessorConfig` that `Tson.of(config)` takes, and a deployment stating
 places to get them wrong.
 
 **The two surfaces have two types, because they have two shapes.** `IdentifierPolicy` is §8.2's identifier
-policy: a `ScriptPolicy` level, a unit (whole name or `perSegment()`), and `withSkeletonDistinctness`, the switch
+policy: a `TokenPolicy` level, a unit (whole name or `perSegment()`), and `withSkeletonDistinctness`, the switch
 for mechanism 1 that no level reaches — UTS #39 ties `Identifier_Status` to Unrestricted, and nothing ties a relation
-over a set to a level that judges one name. `ScriptPolicy` alone is the token policy: a level and any `permitting`
+over a set to a level that judges one name. `TokenPolicy` alone is the token policy: a level and any `permitting`
 combinations over whole text. `_` and `-` are word separators by convention in a name and ordinary characters in a
 value, so segmenting a value would admit UTS #39's own `Toys-Я-Us`; with no unit on the type, no route can state one.
 

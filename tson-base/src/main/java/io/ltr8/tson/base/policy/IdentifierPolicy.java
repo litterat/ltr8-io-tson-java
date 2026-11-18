@@ -46,26 +46,26 @@ public final class IdentifierPolicy {
     public record Violation(Diagnostic.Code code, String reason) {
     }
 
-    private static final IdentifierPolicy NONE = new IdentifierPolicy(ScriptPolicy.unrestricted(), false, false);
+    private static final IdentifierPolicy NONE = new IdentifierPolicy(TokenPolicy.unrestricted(), false, false);
 
-    private final ScriptPolicy scripts;
+    private final TokenPolicy scripts;
     private final boolean perSegment;
     private final boolean skeletonDistinctness;
 
-    private IdentifierPolicy(ScriptPolicy scripts, boolean perSegment, boolean skeletonDistinctness) {
+    private IdentifierPolicy(TokenPolicy scripts, boolean perSegment, boolean skeletonDistinctness) {
         this.scripts = Objects.requireNonNull(scripts, "scripts");
         this.perSegment = perSegment;
         this.skeletonDistinctness = skeletonDistinctness;
     }
 
     /** {@code scripts} over each whole name, with skeleton distinctness -- §8.2's defaults bar the level. */
-    public static IdentifierPolicy of(ScriptPolicy scripts) {
+    public static IdentifierPolicy of(TokenPolicy scripts) {
         return new IdentifierPolicy(scripts, false, true);
     }
 
     /** §8.2's recommended policy: Highly Restrictive over the whole name, all three mechanisms on. */
     public static IdentifierPolicy defaults() {
-        return of(ScriptPolicy.highlyRestrictive());
+        return of(TokenPolicy.highlyRestrictive());
     }
 
     /**
@@ -93,7 +93,7 @@ public final class IdentifierPolicy {
     }
 
     /** The restriction level and any combinations admitted over it. */
-    public ScriptPolicy scripts() {
+    public TokenPolicy scripts() {
         return scripts;
     }
 

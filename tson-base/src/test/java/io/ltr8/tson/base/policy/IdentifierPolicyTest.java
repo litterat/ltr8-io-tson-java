@@ -35,7 +35,7 @@ class IdentifierPolicyTest {
     private static final String RESTRICTED = new String(Character.toChars(0x0132));
 
     private static final IdentifierPolicy PER_SEGMENT =
-            IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment();
+            IdentifierPolicy.of(TokenPolicy.highlyRestrictive()).perSegment();
 
     /** A JavaScript-like profile: {@code $} and {@code _} start a name, {@code $} continues one. */
     private static final IdentifierProfile JS =
@@ -104,8 +104,8 @@ class IdentifierPolicyTest {
     void onlyUnrestrictedDropsTheRestrictedCharacterRule() {
         String name = "a" + RESTRICTED + "b";
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_CHARACTER),
-                codes(IdentifierPolicy.of(ScriptPolicy.scriptsUnchecked()), name, NAME));
-        assertEquals(List.of(), codes(IdentifierPolicy.of(ScriptPolicy.unrestricted()), name,
+                codes(IdentifierPolicy.of(TokenPolicy.scriptsUnchecked()), name, NAME));
+        assertEquals(List.of(), codes(IdentifierPolicy.of(TokenPolicy.unrestricted()), name,
                 NAME));
     }
 
@@ -113,7 +113,7 @@ class IdentifierPolicyTest {
     @Test
     void skeletonDistinctnessIsItsOwnSwitch() {
         assertTrue(IdentifierPolicy.defaults().appliesSkeletonDistinctness());
-        assertTrue(IdentifierPolicy.of(ScriptPolicy.unrestricted()).appliesSkeletonDistinctness());
+        assertTrue(IdentifierPolicy.of(TokenPolicy.unrestricted()).appliesSkeletonDistinctness());
         assertFalse(IdentifierPolicy.defaults().withSkeletonDistinctness(false).appliesSkeletonDistinctness());
         assertFalse(IdentifierPolicy.none().appliesSkeletonDistinctness());
         assertEquals(List.of(), codes(IdentifierPolicy.none(), "a" + RESTRICTED + CYR_A, NAME));
@@ -121,7 +121,7 @@ class IdentifierPolicyTest {
 
     @Test
     void aPolicyIsAValue() {
-        assertEquals(PER_SEGMENT, IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment());
+        assertEquals(PER_SEGMENT, IdentifierPolicy.of(TokenPolicy.highlyRestrictive()).perSegment());
         assertNotEquals(PER_SEGMENT, IdentifierPolicy.defaults());
         assertNotEquals(IdentifierPolicy.defaults(), IdentifierPolicy.defaults().withSkeletonDistinctness(false));
         assertEquals("HIGHLY_RESTRICTIVE per segment without skeleton distinctness",

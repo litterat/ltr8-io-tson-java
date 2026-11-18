@@ -77,7 +77,7 @@ public final class TsonBundledSchemas {
     public static final String CORE_SHA256 = "c1be02dff40bd37ab11d40478b2c2b10e2d26848a0a48cb3f8d610a1613e3f05";
 
     /** policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s !!id. */
-    public static final String POLICY_SHA256 = "5236954648e8e049aedcf4c144f2cc79dbc42b58e6d6923e43de945f05b5b58a";
+    public static final String POLICY_SHA256 = "131dda3357feb51dcd32562051b0fff352eada690318c87b0a4df1ceabe6a3e8";
 
     /**
      * The six identities in dependency order: the kernel, the three libraries importing it alone, core importing the

@@ -224,7 +224,7 @@ document and leave them unable to change it.
 the one `tson policy` prints (`HIGHLY_RESTRICTIVE`); `--identifier-per-segment` the unit;
 `--identifier-allow-look-alikes` drops skeleton distinctness; and `--identifier-scripts`/`--token-scripts` a
 `Latin+Cyrillic` combination, repeatable. Allow-look-alikes is no relaxation of the level, so it is valid under every
-level. There is no `--token-per-segment`: a token policy is a `ScriptPolicy`, which has no unit.
+level. There is no `--token-per-segment`: a token policy is a `TokenPolicy`, which has no unit.
 
 **Three rules keep a flag from meaning nothing.** `--token-scripts` alone raises the token level from its
 `UNRESTRICTED` default to `SINGLE_SCRIPT`, because `permitting(…)` is consulted only by a level that scans, and Single

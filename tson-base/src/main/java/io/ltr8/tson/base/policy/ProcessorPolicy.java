@@ -50,7 +50,7 @@ import java.util.Objects;
  * nothing about the other, which is exactly why both are stated.
  *
  * <p><b>The two have different types, because they have different shapes.</b> An {@link IdentifierPolicy}
- * has a unit, a restricted-character rule and a scope relation; a token policy is a {@link ScriptPolicy}, a
+ * has a unit, a restricted-character rule and a scope relation; a token policy is a {@link TokenPolicy}, a
  * level alone. A per-segment token policy -- which would admit UTS #39's own {@code Toys-Я-Us}, {@code -} being
  * an ordinary character in a value -- is not refused here but unwritable.
  *
@@ -70,7 +70,7 @@ import java.util.Objects;
  *                            rules were computed against ([TSON-DATA] §8.2 on why that is the
  *                            version §8.2's "UTS #39 data version" means)
  */
-public record ProcessorPolicy(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy,
+public record ProcessorPolicy(IdentifierPolicy identifierPolicy, TokenPolicy tokenPolicy,
                               LimitsPolicy limits, String unicodeDataVersion) {
 
     public ProcessorPolicy {
@@ -87,7 +87,7 @@ public record ProcessorPolicy(IdentifierPolicy identifierPolicy, ScriptPolicy to
      * into this library, and a caller stating a different one would be describing a processor that does not
      * exist.
      */
-    public static ProcessorPolicy of(IdentifierPolicy identifierPolicy, ScriptPolicy tokenPolicy,
+    public static ProcessorPolicy of(IdentifierPolicy identifierPolicy, TokenPolicy tokenPolicy,
                                      LimitsPolicy limits) {
         return new ProcessorPolicy(identifierPolicy, tokenPolicy, limits, dataVersion());
     }
@@ -123,7 +123,7 @@ public record ProcessorPolicy(IdentifierPolicy identifierPolicy, ScriptPolicy to
 
     /** {@link #defaults()} is what a processor applies before a deployment says anything. */
     public static ProcessorPolicy defaults() {
-        return of(IdentifierPolicy.defaults(), ScriptPolicy.unrestricted(), LimitsPolicy.defaults());
+        return of(IdentifierPolicy.defaults(), TokenPolicy.unrestricted(), LimitsPolicy.defaults());
     }
 
     /**
@@ -137,7 +137,7 @@ public record ProcessorPolicy(IdentifierPolicy identifierPolicy, ScriptPolicy to
         return of(policy, tokenPolicy, limits);
     }
 
-    public ProcessorPolicy withTokenPolicy(ScriptPolicy policy) {
+    public ProcessorPolicy withTokenPolicy(TokenPolicy policy) {
         return of(identifierPolicy, policy, limits);
     }
 

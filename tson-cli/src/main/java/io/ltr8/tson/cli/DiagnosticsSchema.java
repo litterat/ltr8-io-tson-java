@@ -40,7 +40,7 @@ final class DiagnosticsSchema {
         case "diagnostic" -> CliDiagnostic.class;
         case "policy.processor" -> CliPolicy.class;
         case "policy.identifier_policy" -> CliPolicy.CliIdentifierPolicy.class;
-        case "policy.script_policy" -> CliPolicy.CliScriptPolicy.class;
+        case "policy.token_policy" -> CliPolicy.CliTokenPolicy.class;
         case "policy.limits" -> CliPolicy.CliLimits.class;
         case "diagnostic_code" -> Diagnostic.Code.class;
         case "outcome" -> Outcome.class;

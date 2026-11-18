@@ -271,6 +271,15 @@ One rule follows the ruling on #2 (§3.2 items 119–120). No production and no 
     identifier profile governs the segments of a tag, an annotation name and a type's name;
     a segment of a reference in a value is a name of the family of what it enters.
 
+One name follows the section's own. No rule changes.
+
+29. **§8.2** — the token policy's type carries the policy's name. §8.2 names the two
+    policies, the identifier policy and the token policy, "so that two implementations
+    reporting them agree on what they are called", and said `policy.tn` states the second as
+    `policy.script_policy`, the `token_policy` field of a `policy.processor`: one policy
+    under two names. The type is `policy.token_policy`, beside `policy.identifier_policy`,
+    and its shape is unchanged (§3.3).
+
 ### 3.2 Part 2 — Type System and Schema
 
 1. **Header** — Revision 40, with a one-paragraph summary of this revision.
@@ -1029,7 +1038,8 @@ The revised artifacts carry the baseline of §1. Seven entries are edited by thi
 the text and two are added — `meta.type_chain` (item 104), `meta.namespace` (item 106),
 `meta.set_type` and `enum`, and the new `meta.completion` (item 108),
 `temporal.time_type`, `temporal.datetime_type` and `temporal.duration_type` (item 115), and
-the new `meta.extern` (item 116) — and
+the new `meta.extern` (item 116) — one is removed, `meta.field_name` (item 125), one is
+renamed, `policy.script_policy` to `policy.token_policy` (§3.1 item 29), and
 every artifact's documentation is rewritten for a reader looking at one entry who has not
 read this text: what the entry is, how it is written in the basic case, the facts about its
 values that its declaration does not show, and the section to read further. A rule this text
@@ -1241,6 +1251,9 @@ Changes a Revision 39 implementer must act on:
 28. **One value, one type name, in JSON as in text** (§3.4 item 16): a wrapper's `$value`
     carries no `$type` of its own. `{ "$type": "shape", "$value": { "$type": "circle", … } }`
     is written `{ "$type": "circle", … }`.
+29. **`policy.script_policy` is `policy.token_policy`** (§3.1 item 29): the type is named
+    for the policy [TSON-DATA] §8.2 names. A schema or a document naming the type writes
+    the new name; the `token_policy` field of a `policy.processor` is unchanged.
 
 ---
 
@@ -1302,7 +1315,7 @@ carries no open questions.
    past the `!!id` line and **matched** the row in Part 2 §13.2: kernel (`meta.tn`)
    `05ae9374…` (Revision 39 `c9b069b6…`), numeric `ab51ca61…` (`dfa66c5d…`), temporal
    `906282ed…` (`fb4ada8f…`), net `897f3964…` (`371fc20c…`), core `c1be02df…`
-   (`4e8d9c43…`), policy `52369546…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
+   (`4e8d9c43…`), policy `131dda33…` (`e9cb5b93…`), each re-stamped for #5's kernel, its
    declared namespace type and its record written at a slot and for #6's, policy again for
    the materialisation depth's removal, and the kernel and its dependants again for items
    78–84's documentation of a parameter in a type written in place, for items 85–93's
@@ -1312,7 +1325,8 @@ carries no open questions.
    for item 108's incomplete entries and `meta.completion`, and temporal and core again
    for item 115's `fraction_digits`, and the kernel and every dependant again for item 116's
    `meta.extern`, twice, the second for its `schema` typed `iri_reference`, and for item
-   125's removal of `meta.field_name`. The chain is consistent — numeric, temporal, net and
+   125's removal of `meta.field_name`, and policy again for §3.1 item 29's
+   `policy.token_policy`. The chain is consistent — numeric, temporal, net and
    policy each pin the kernel; core pins the three libraries.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of
