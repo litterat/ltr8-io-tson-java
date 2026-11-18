@@ -84,7 +84,7 @@ class NamespaceFacetsTest {
         String api = "api => !meta.namespace { key_type: meta.identifier  value_type: method  max_items: 4 }\n";
         assertEquals(List.of(), link(api + "small => !api ^ { max_items: 3 }\ntiny => !small ^ { min_items: 1 }"));
         refused(link(api + "wide => !api ^ { max_items: 5 }"), "'wide'", "max_items 5 is above");
-        refused(link(api + "keyed => !api ^ { key_type: meta.type_name }"), "'keyed'", "only restates key_type");
+        refused(link(api + "keyed => !api ^ { key_type: net.scheme_name }"), "'keyed'", "only restates key_type");
         refused(link("words => !meta.namespace { key_type: meta.identifier  value_type: text }\n"
                 + "v => !words { a => \"x\" }\nr => !v ^ { max_items: 1 }"), "'r'",
                 "finished and takes no refinement");

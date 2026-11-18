@@ -176,6 +176,8 @@ class CrossEncodingParityTest {
               reach_few   => !reach_api ^ { max_items: 1 }
               few_main    => !reach_few { pong => "y" }
               few_holder  => { calls: reach_few }
+              reach_named => !reach_api ^ { key_type: meta.type_name  max_items: 1 }
+              named_hold  => { calls: reach_named }
               text_pick   => { which: meta.ref<text> }
               marks      => {
                 nickname?: text
@@ -716,6 +718,15 @@ class CrossEncodingParityTest {
                 {"which": "few_main.pong"}""");
         sameVerdict("text_pick", "{ which: few_main.ping }", """
                 {"which": "few_main.ping"}""");
+    }
+
+    /** A key type restated through an alias is the source's ([TSON-SCHEMA] §5.7), and both encodings read it so. */
+    @Test
+    void aSlotRestatedThroughAnAliasIsReadAlikeInBoth() {
+        bothAccept("named_hold", "{ calls: { ping => \"x\" } }", """
+                {"calls": {"ping": "x"}}""");
+        sameVerdict("named_hold", "{ calls: { ping => \"x\"  pong => \"y\" } }", """
+                {"calls": {"ping": "x", "pong": "y"}}""");
     }
 
     /**

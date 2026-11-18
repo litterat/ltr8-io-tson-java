@@ -5,12 +5,15 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.EnumBody;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -119,6 +122,19 @@ class EnumTypeTest {
                   names  => !meta.enum_type { name_type: meta.identifier  members: [OPEN DONE] }
                   strict => !names ^ { name_type: upper } }"""));
         assertTrue(messages(free).contains("an enum's name_type is fixed where it is constructed"), messages(free));
+    }
+
+    /** A name type is one by the entry it reaches, not by spelling (§5.2), and the refinement states the source's. */
+    @Test
+    void aRefinementRestatesTheNameTypeThroughAnAlias() {
+        TsonLinkedSchema linked = Tson.standard().resolve(schema("restated", """
+                { live   => !status ^ { name_type: label  members: [OPEN ACTIVE] }
+                  status => !enum [OPEN ACTIVE DONE]
+                  label  => meta.field_name }"""));
+
+        EnumBody live = assertInstanceOf(EnumBody.class, linked.schema().entries().get("live"));
+        assertEquals(EnumBody.IDENTIFIER, live.nameType());
+        assertEquals(List.of("OPEN", "ACTIVE"), live.members());
     }
 
     /**

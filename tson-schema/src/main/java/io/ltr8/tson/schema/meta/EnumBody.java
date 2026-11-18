@@ -68,10 +68,15 @@ public record EnumBody(TypeChain chain,
         }
         List<String> violations = new ArrayList<>();
         if (!nameType.equals(other.nameType)) {
-            violations.add("name_type '" + other.nameType + "' replaces the source's own '" + nameType
-                    + "'; an enum's name_type is fixed where it is constructed, and a refinement narrows its members");
+            violations.add(nameTypeReplaced(nameType, other.nameType));
         }
         AtomNarrowing.checkSubset(violations, "members", members, other.members);
         return List.copyOf(violations);
+    }
+
+    /** The violation of a refinement whose {@code name_type} is {@code refined}, another type than {@code source}. */
+    public static String nameTypeReplaced(String source, String refined) {
+        return "name_type '" + refined + "' replaces the source's own '" + source + "'; an enum's name_type is fixed "
+                + "where it is constructed, and a refinement narrows its members";
     }
 }

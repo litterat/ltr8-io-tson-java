@@ -129,7 +129,10 @@ spec-required case:
   `NOT_IMPLEMENTED` at `/x`, in either declaration order and with `extra?: text` left unwritten: no class binds `c`, so
   `vocabulary.instance` throws `MissingBindingException` and `SchemaResolver.constructed` sends it to `unmodelledType`.
   Decide where an added facet lives in the schema model and in the resolved form,
-  then read the instance as its source's body with the facet held. An instance of a constructor composing `atom`,
+  then read the instance as its source's body with the facet held. A constructor adding a field to a collection
+  constructor is the same gap: `my_map => meta.map & { label?: text }` and `my_ns => meta.namespace & { label?: text }`
+  load, and `!my_ns { key_type: meta.identifier  value_type: op }` reports it as `!my_map { … }` does, the instance
+  then refinable by `^` as its source constructor's are (§5.7). An instance of a constructor composing `atom`,
   `product` or `sum` directly stays refused: it is a type of a new form, which a processor backs with readers and
   writers of its own.
 - [ ] **An instance of a constructor composed with `&` that adds no field is refused** ([TSON-SCHEMA] §5.8).
