@@ -550,9 +550,9 @@ vocabulary — parse → resolve → link → register → compile → read:
    written in place, `{ of: !meta.array { … } }`, with no entry of its own, and equal forms are one type.
 3. **Resolve** (`SchemaResolver`) — one declaration at a time, the AST becomes a concrete
    value (`Top`): composition induces supertypes, flattens fields and tightens a restated
-   inherited field against a state-transition table, a constructor application (`!C value`) transfers
-   its constructor's own kind, and so on. A reference to another declaration is still a bare, unverified
-   name at this point.
+   inherited field against a state-transition table, a constructor application (`!C value`) builds an
+   instance tagged with its constructor and IS-A nothing, and so on. A reference to another declaration is
+   still a bare, unverified name at this point.
 4. **Link** (`TsonSchemaLinker`) — the whole-schema pass: merges `!!import`s, populates `subtypes`, derives
    choice disjointness, and validates that every reference in the schema actually resolves to something.
    Produces a `TsonLinkedSchema` — proof, in the type system, that this pass has run, not a runtime flag to

@@ -18,7 +18,6 @@ import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -128,9 +127,9 @@ final class ValuesByName {
     /** The schema's one namespace: its entries, where each was declared, and where its externs land. */
     private record Space(Map<String, Top> entries, Function<String, String> originOf, ExternHops hops) {
 
-        /** Whether {@code name} is a constructor, IS-A the kernel's {@code top} ({@link EntryKind#isConstructor}). */
+        /** Whether {@code name} is a constructor, IS-A the kernel's {@code top} ({@link TypeChain#isConstructor}). */
         boolean isConstructor(String name, Top value) {
-            return EntryKind.isConstructor(name, value, entry -> TsonBundledSchemas.isKernel(originOf.apply(entry)));
+            return TypeChain.isConstructor(name, value, entry -> TsonBundledSchemas.isKernel(originOf.apply(entry)));
         }
     }
 

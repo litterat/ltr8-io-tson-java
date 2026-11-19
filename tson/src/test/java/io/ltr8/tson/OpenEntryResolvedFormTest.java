@@ -1,25 +1,17 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.Product;
-import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +22,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * What [TSON-SCHEMA] §8.1 says about an <b>open</b> entry's resolved form, asked of real documents.
@@ -38,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>An open entry is an open record: a {@code !meta.record} carrying {@code parameters}, each a type written where it
  * stands as its name, a reference value, so the record is read against {@code record}'s own vocabulary as any record
  * is. The tests below hold that against real documents: the published fixtures validate, an open record validates
- * and reads back with its parameters, every entry with parameters is one, and an entry's kind is derived.
+ * and reads back with its parameters, and every entry with parameters is one.
  */
 class OpenEntryResolvedFormTest {
 
@@ -192,152 +183,5 @@ class OpenEntryResolvedFormTest {
 
         assertEquals(List.of(), broken, "§5.10: a template is an open record");
         assertEquals(List.of("pair", "composed", "restated"), open, "the kernel declares no open record");
-    }
-    // ── §8.1: a kind is derived, never recorded ─────────────────────────
-
-    /**
-     * <b>{@code EntryKind.of} agrees with what the entry's own value determines</b>, over every entry of the
-     * three bundled schemas plus a schema exercising each declaration form. An entry's kind is its value's
-     * type's kind ([TSON-SCHEMA] §4.1), derived and never written, so nothing but this test stands between
-     * the derivation and a model that quietly stops agreeing with the rule it states.
-     *
-     * <p><b>The rule has four branches and two of them are special cases</b>: branch 4 is a namespace lookup,
-     * and it reaches an <em>imported</em> schema rather than the entry's own for most of core.tn --
-     * {@code integer} is {@code !integer_type {}} and {@code integer_type} is meta.tn's -- which the value's
-     * Java shape answers on its own, a body's class being the branch of {@code Top} its constructor builds.
-     *
-     * <p><b>The rule is total.</b> An open record takes the kind its chain reaches, as a closed record does, answered
-     * from the entry alone. {@link #derive} is therefore the whole rule, and the one §8.1 states under "Kind is
-     * derived".
-     */
-    @Test
-    void kindAgreesWithWhatTheEntryAlreadyStates() {
-        Tson tson = tson();
-        tson.resolve("""
-                !!id:"https://example.com/kinds.tn"
-                !!import:"https://tson.io/2026/40/m/meta.tn"
-                !!import:"https://tson.io/2026/40/m/core.tn"
-                !schema {
-                  port   => !numeric.integer_type { min: 0  max: 65535 }
-                  age    => !int32 ^ { min: 0  max: 150 }
-                  renamed => port
-                  colour => !enum [RED GREEN BLUE]
-                  point  => { x: int32  y: int32 }
-                  named  => point & { label: text }
-                  boxes  => [point]
-                  lookup => { text => point }
-                  either => ( point | colour )
-                  trip   => [int32, text]
-                  pair   => <A, B> { first: A  second: B }
-                  holder => { p: pair<text, int32> }
-                }
-                """);
-        // A schema whose templates compose onto a base kind: each application closes to a constructor,
-        // whose kind is its chain's base kind and not its !record body's PRODUCT.
-        tson.resolve("""
-                !!id:"https://example.com/kind-constructors.tn"
-                !!import:"https://tson.io/2026/40/m/meta.tn"
-                !schema {
-                  listed      => <T> meta.atom & { members: [T] }
-                  listed_text => listed<text>
-                }
-                """);
-        List<String> ids = List.of(TsonBundledSchemas.META_ID, TsonBundledSchemas.NUMERIC_ID,
-                TsonBundledSchemas.TEMPORAL_ID, TsonBundledSchemas.NET_ID, TsonBundledSchemas.CORE_ID,
-                "https://example.com/kinds.tn", "https://example.com/kind-constructors.tn");
-
-        Map<String, Top> universe = new LinkedHashMap<>();
-        Map<String, Map<String, Top>> perSchema = new LinkedHashMap<>();
-        for (String id : ids) {
-            TsonLinkedSchema linked = tson.bindRegistry().core().resolveLinked(id);
-            String own = CanonicalIdentity.canonicalize(id);
-            // The entries the schema declares itself: its linked namespace holds its whole closure too.
-            Map<String, Top> entries = new LinkedHashMap<>();
-            linked.schema().entries().entries().forEach((name, definition) -> {
-                if (linked.originOf(name).equals(own)) {
-                    entries.put(name, definition);
-                }
-            });
-            perSchema.put(id, entries);
-            entries.forEach(universe::putIfAbsent);
-        }
-
-        List<String> mismatches = new ArrayList<>();
-        int closed = 0;
-        int open = 0;
-        int neededTheGoverningMeta = 0;
-        for (String id : ids) {
-            for (Map.Entry<String, Top> entry : perSchema.get(id).entrySet()) {
-                Top definition = entry.getValue();
-                if (io.ltr8.tson.schema.SchemaPaths.isNestedMap(definition)) {
-                    continue; // the kernel's `meta`: a value of meta.schema, whose members are checked on their own
-                }
-                if (definition instanceof io.ltr8.tson.schema.meta.IncompleteEntry) {
-                    continue; // no type and in no resolved form (§5.5), so it has no kind to derive
-                }
-                if (OpenEntry.isOpen(definition)) {
-                    open++;
-                }
-                closed++;
-                if (!TypeChain.supertypesOf(definition).contains("meta.top") && !(definition instanceof Alias)
-                        && !OpenEntry.isOpen(definition)
-                        && !perSchema.get(id).containsKey(headOf(definition))) {
-                    neededTheGoverningMeta++;
-                }
-                EntryKind derived = derive(definition, universe);
-                if (derived != EntryKind.of(definition, n -> true)) {
-                    mismatches.add(id + "#" + entry.getKey() + ": states " + EntryKind.of(definition, n -> true)
-                            + " but derives " + derived);
-                }
-            }
-        }
-
-        int closedEntries = closed;
-        int openEntries = open;
-        int outsideOwnSchema = neededTheGoverningMeta;
-        assertEquals(List.of(), mismatches, "kind restates what supertypes and body already determine");
-        assertTrue(closedEntries > 140, () -> "not enough entries for this to mean anything: " + closedEntries);
-        assertTrue(openEntries > 0, () -> "no open record exercised the rule: " + openEntries);
-        assertTrue(outsideOwnSchema >= 25, () -> "the lookup should reach outside the entry's own schema for "
-                + "most of core.tn's instances -- that is why the field stays: " + outsideOwnSchema + " of "
-                + closedEntries);
-    }
-
-    /** §4.1's rule, read off what the entry already states. Four branches; see the test's own note. */
-    private static EntryKind derive(Top definition, Map<String, Top> universe) {
-        if (definition instanceof Alias) {
-            // §4.1 gives an alias the kind ALIAS, a meta.type_ref and not a base kind -- and the kernel's `alias`
-            // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.
-            return EntryKind.ALIAS;
-        }
-        if (TypeChain.supertypesOf(definition).contains("meta.top")) {
-            // A constructor: its kind states what its *instances* will be, not what its own body is --
-            // `integer_type => atom & { ... }` has a !record body and kind ATOM.
-            for (String supertype : TypeChain.supertypesOf(definition)) {
-                switch (supertype) {
-                    case "meta.atom" -> { return EntryKind.ATOM; }
-                    case "meta.sum" -> { return EntryKind.SUM; }
-                    default -> { }
-                }
-            }
-            return EntryKind.PRODUCT;
-        }
-        Top constructor = universe.get(headOf(definition));
-        assertNotNull(constructor, "no entry for the body's constructor head " + headOf(definition));
-        return EntryKind.of(constructor, n -> true);
-    }
-
-    /** The constructor name a body identifies as -- the {@code !head} a resolved document writes on it. */
-    private static String headOf(Top body) {
-        return switch (body) {
-            case Atom atom -> atom.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
-            case Product product -> product.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
-            case Sum sum -> sum.getClass().getAnnotation(io.ltr8.annotation.Typename.class).name();
-            case io.ltr8.tson.schema.meta.ApplyBody apply -> "meta.apply";
-            case Alias alias -> "alias";
-            case io.ltr8.tson.schema.meta.Extern extern -> "meta.extern";
-            case io.ltr8.tson.schema.meta.ValueEntry value -> value.type();
-            case io.ltr8.tson.schema.meta.IncompleteEntry incomplete -> incomplete.constructor();
-        };
     }
 }

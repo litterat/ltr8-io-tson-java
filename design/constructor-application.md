@@ -23,11 +23,12 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
 - A construction never writes `parameters` (`refuseWrittenParameters`): an open record's parameters are the list before
   its body, `<T> { … }` or `<T> !meta.record { … }`, and a parameter list before any other head is refused
   (`openInstance`, `design/open-records.md`).
-- An atom instance is **ATOM-kinded and not itself applicable**; both halves are needed, and IS-A `meta.atom` alone runs
-  backwards (true of the constructor, false of every instance).
-- `!meta.alias { target: X }` resolves to the alias's own entry — `kind: ALIAS`, `X` as source and body — the same
+- An atom instance is **a body that is an `Atom`**, which no constructor's is: a constructor's body is the
+  `!meta.record` describing its instances. IS-A `meta.atom` runs backwards (true of the constructor, false of every
+  instance).
+- `!meta.alias { target: X }` resolves to the alias's own entry — an `Alias`, `X` as source and body — the same
   entry `name => X` denotes.
-- Construction transfers kind and no supertypes (§5.5), so an instance carries an empty chain and is not itself a
+- Construction grants no supertypes (§5.5), so an instance carries an empty chain and is not itself a
   constructor. Any schema may declare a constructor; nothing ties it to what the document imports.
 - `C<args>` over a constructor (a closed record IS-A `meta.type`) is the construction `!C { … }` over its argument
   slots (§5.3, `ConstructionSugar`), **rewritten on the written form before anything reads it** (`ConstructionRewrite`),
@@ -78,12 +79,12 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `TemplateClosesByApplicationTest` pins all of it.
 - **A construction head resolves through its alias chain first** (§8.3, `resolveConstructorTarget`).
   An alias is a hop, not a rewrite, so `alias_array => meta.array` makes `!alias_array { … }` an application of
-  `meta.array`, and every question the head is then asked — is it a template, is it applicable, what kind does
-  construction transfer, whose vocabulary reads the payload — is a question about the entry at the end.
-  Asking the alias would answer all four from an empty supertype chain and an `ALIAS` kind, which is what
+  `meta.array`, and every question the head is then asked — is it a template, is it applicable, whose vocabulary
+  reads the payload — is a question about the entry at the end.
+  Asking the alias would answer all three from an empty supertype chain and an `Alias` body, which is what
   a hop looks like rather than what it points at. The author's spelling survives where it is visible: the tag resolved output
   writes (`EntryFacts.constructor`) is the name they wrote, so the chain stays walkable from resolved output.
-- **`!C { … }` applies a constructor exactly when `C` IS-A `meta.top` (§4.1)** (`EntryKind.isConstructor`), asked of that
+- **`!C { … }` applies a constructor exactly when `C` IS-A `meta.top` (§4.1)** (`TypeChain.isConstructor`), asked of that
   entry. §4.1 makes every base kind IS-A `meta.top` and every constructor transitively so, while IS-A stops at
   construction — an instance or a fresh record carries an empty chain — so the predicate admits every constructor and
   nothing else. Over the bundled schemas that is every vocabulary constructor plus `meta.top`, `meta.type`, the three base
@@ -98,25 +99,24 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   refused as abstract (§4.1, `refuseAbstractHead`): each is `extension: ABSTRACT`, so its reader is the abstract dispatch
   every abstract record has, and a tag naming the base itself is refused naming the subtypes that would satisfy the position,
   which is the better message. **Admitting `meta.alias` closed means giving it the alias's own entry**, not just letting it
-  through: `!meta.alias { target: X }` resolves to `kind: ALIAS` with `X` as its body, the same entry `name => X` denotes
-  (§8.3), where a construction of any other head takes the head's kind and records the head as its constructor
+  through: `!meta.alias { target: X }` resolves to an `Alias` with `X` as its body, the same entry `name => X` denotes
+  (§8.3), where a construction of any other head records the head as its constructor
   (`design/schema-resolution.md`); the path dispatches on the *body* being an `Alias`, having already read it. **A
   construction of `meta.record` writing `parameters` is refused** (`refuseWrittenParameters`, tested at the head's chain
   end): admitted, it would build an open record whose parameters no `<…>` put in scope, skipping every declaration-time
   check §5.10 makes of a template. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's question —
-  *is this an atom instance?* — as **ATOM-kinded and not itself applicable**, which is exactly what an instance is: §4.1's
-  "IS-A
-  does not extend below construction" is what separates the pair, `!T {}` transferring kind and not supertypes, so `integer`
-  carries an empty chain where `numeric.integer_type => meta.atom & { … }` carries `[meta.atom, meta.top]`. **Both halves are
-  needed, and the obvious single test runs backwards.** IS-A `meta.atom` is true of the *constructor* and false of every
-  instance — over the bundled entries it selects precisely the wrong side — while kind alone cannot separate them either,
-  an atom constructor being ATOM-kinded exactly like its instances. Together they agree on every bundled entry. The
+  *is this an atom instance?* — as **a body that is an `Atom`**, which is exactly what an instance is: §4.1's "IS-A
+  does not extend below construction" is what separates the pair, `!T {}` granting no supertypes, so `integer`
+  carries an empty chain where `numeric.integer_type => meta.atom & { … }` carries `[meta.atom, meta.top]`. **The
+  obvious chain test runs backwards.** IS-A `meta.atom` is true of the *constructor* and false of every
+  instance — over the bundled entries it selects precisely the wrong side — while the body's class separates them: an
+  atom constructor's body is a `!meta.record`, an instance's an `Atom`. The
   construction hint in the refusal rides on the same applicability question, so
   `!meta.top ^ { … }` gets the plain answer rather than advice that would fail in turn. **There is no marker.** §12.1's
   grammar has no constructor sigil and §8.1's `meta.type` no `constructor` field: what makes an entry a constructor is that
   it IS-A `meta.top`, which its supertype chain records. **There is no level discipline**: composition propagates the chain,
   so an entry deriving from a constructor *is* one, and any schema may declare one (§4.2).
-  **Construction is exempt**: §5.5 transfers kind and no supertypes, so `!C { … }` yields an entry with an empty chain,
+  **Construction is exempt**: §5.5 grants no supertypes, so `!C { … }` yields an entry with an empty chain,
   which is why an instance is not itself a constructor. `ApplicabilityIsIsATopTest` and `ConstructorLevelDisciplineTest` pin
   both halves; §3.3.1 and §4.2 are the spec side.
 - **What an instance of a schema's own constructor holds** (`SchemaResolver.constructed`). The constructors meta.tn,

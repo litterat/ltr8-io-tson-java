@@ -2,7 +2,6 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -56,9 +55,8 @@ class DirectApplicationDeclarationTest {
                 """);
 
         Top bx = linked.schema().entries().get("bx");
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(bx, n -> true),
-                "the declaration is the instantiation, not a hop to one");
-        RecordBody body = assertInstanceOf(RecordBody.class, bx, "its body is the closed record");
+        RecordBody body = assertInstanceOf(RecordBody.class, bx,
+                "the declaration is the instantiation, its body the closed record, not a hop to one");
         assertEquals(List.of("item"), body.fields().keySet().stream().toList());
     }
 
@@ -110,8 +108,8 @@ class DirectApplicationDeclarationTest {
                   by  => box<text>
                 """);
 
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("bx"), n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("by"), n -> true));
+        assertInstanceOf(RecordBody.class, linked.schema().entries().get("bx"));
+        assertInstanceOf(RecordBody.class, linked.schema().entries().get("by"));
         assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().head().name());
         assertEquals("box", linked.schema().applicationOf("by").orElseThrow().head().name());
         assertEquals(java.util.List.of(), TypeChain.subtypesOf(linked.schema().entries().get("box")),

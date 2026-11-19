@@ -558,7 +558,6 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
     public Optional<Top> nameType(String entryName); // a record's name_type, where it states one
     public boolean isKernel(String entryName);      // declared by meta.tn, judged by origin
-    public EntryKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
     public boolean isConstructor(String name, Top value); // IS-A the kernel's meta.top
     public Optional<NamespaceBody> namespace(String entryName); // the namespace type it is, if it is one
 }

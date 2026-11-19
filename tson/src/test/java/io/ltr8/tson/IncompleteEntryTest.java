@@ -7,7 +7,6 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -95,7 +94,6 @@ class IncompleteEntryTest {
         IncompleteEntry nonempty = assertInstanceOf(IncompleteEntry.class, linked.schema().entries().get("nonempty"));
         assertEquals("meta.array", nonempty.constructor());
         assertEquals(List.of("element_type"), nonempty.absent());
-        assertEquals(EntryKind.INCOMPLETE, linked.kindOf("nonempty"));
     }
 
     @Test
@@ -547,7 +545,8 @@ class IncompleteEntryTest {
     void aFinishedTypeRefusesRefinementAndSaysSo() {
         refused("""
                   pair => [text, int32]
-                  bad  => !pair ^ { voidable: false }""", "kind=PRODUCT, which is finished and takes no refinement");
+                  bad  => !pair ^ { voidable: false }""",
+                "is a '!meta.tuple' value, which is finished and takes no refinement");
         refused("""
                   either => ( int32 | text )
                   bad    => !either ^ { disjoint: true }""", "which is finished and takes no refinement");

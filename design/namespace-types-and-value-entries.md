@@ -8,9 +8,9 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
 
 **Invariants**
 
-- **An entry is a type exactly when its value is built by a constructor** (IS-A `top`, `EntryKind.isConstructor`).
+- **An entry is a type exactly when its value is built by a constructor** (IS-A `top`, `TypeChain.isConstructor`).
   `name => !T { … }` with `T` a constructor builds a type; with `T` any other type of the closure -- a record type, a
-  namespace type -- the entry is a value of `T` (`ValueEntry(type, value)`, `EntryKind.VALUE`), read against `T` as a
+  namespace type -- the entry is a value of `T` (`ValueEntry(type, value)`), read against `T` as a
   data value is and marked by nothing but its tag. A record component, `!meta.record_field { … }`, is a value entry too.
 - **A value of `meta.schema` declares instead** (§4.1). `geo => !schema { … }` is a schema map nested
   as an entry: the parser reads its payload as schema grammar, never as a value body, and its members are declarations
@@ -18,8 +18,8 @@ it are judged, and how a qualified name walks into it ([TSON-SCHEMA] §4.1, §4.
   those path entries (`SchemaPaths.synced`, `design/schema-resolution.md`). It is open: several documents of a closure
   declaring one map path contribute to one map, the union of their members (`design/linking-and-compilation.md`).
   Every other namespace type's value stays a value entry.
-- `Top` is sealed all the way down (`permits Type, Alias, Extern, ValueEntry, IncompleteEntry`). A switch over a body's kind
-  is exhaustive with explicit `ValueEntry` and `IncompleteEntry` arms and no `default`: `EntryKind.of`, `TypeInhabitance`,
+- `Top` is sealed all the way down (`permits Type, Alias, Extern, ValueEntry, IncompleteEntry`). A switch over a
+  body's branch is exhaustive with explicit `ValueEntry` and `IncompleteEntry` arms and no `default`: `TypeInhabitance`,
   `DiscriminationClass`, and the linker's `validateBody`, `collectNames` and coherence check.
 - **`meta.namespace` composes `meta.map`** (`meta.map & { key_type: meta.identifier_ref voidable?: = false
   }`), IS-A `meta.map` and `meta.product`, and a namespace type is an instance of it, resolved to a `NamespaceBody`
@@ -135,7 +135,7 @@ families, and pins `voidable` false;
 type, and a map that is no namespace is still never entered by a qualified name. Both compilers read a namespace type
 through the map factory with the map `NamespaceBody.read()` states (`design/linking-and-compilation.md`).
 
-**A kind is judged by origin.** `EntryKind.of` counts the base kinds only as the kernel's own entries (declared by
+**A base kind is judged by origin.** It counts only as the kernel's own entry (declared by
 meta.tn, `TsonBundledSchemas.isKernel`), and kind membership walks construction to the kernel's
 `meta.namespace`. A schema's own root `namespace` is an unrelated name, and a schema contributing `namespace` to `meta`
 meets §2.2.3's collision with the kernel's member of that path.
@@ -143,7 +143,7 @@ meets §2.2.3's collision with the kernel's member of that path.
 ## Value entries (`DefinitionResolver.resolveValueEntry`)
 
 `resolveInstance` resolves `T` in the schema's one namespace, refuses a template head (it closes by application),
-and asks `EntryKind.isConstructor`. A constructor builds a type; anything else goes to `resolveValueEntry`, which
+and asks `TypeChain.isConstructor`. A constructor builds a type; anything else goes to `resolveValueEntry`, which
 refuses a head that is itself a value (a value has no instances) and a braced payload at an atom type (almost always
 an atom refinement missing its `^`), then reads the payload against `T` (`SchemaResolver`'s `value`) and records `T`
 as the entry's constructor fact, so resolved output writes the tag. A payload that is no value of `T` is refused

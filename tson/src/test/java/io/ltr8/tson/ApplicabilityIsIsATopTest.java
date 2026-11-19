@@ -4,7 +4,6 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Alias;
 
@@ -14,6 +13,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -88,8 +88,7 @@ class ApplicabilityIsIsATopTest {
 
         for (String name : List.of("bare", "closed")) {
             Top definition = entries.get(name);
-            assertEquals(EntryKind.ALIAS, EntryKind.of(definition, n -> true), name);
-            assertEquals("int32", ((Alias) definition).target().name(), name);
+            assertEquals("int32", assertInstanceOf(Alias.class, definition, name).target().name(), name);
         }
     }
 

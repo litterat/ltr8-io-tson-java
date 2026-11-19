@@ -43,7 +43,7 @@ import java.util.function.Function;
  * supertypes. A reference over {@code record} holds the kernel's {@code top}, a fresh
  * abstract record IS-A nothing, and a constructor whose declaration is a record, {@code uuid_type => atom & { … }}:
  * its value is a record whose instances are declarations, and nothing in the predicate sets it apart -- {@link
- * io.ltr8.tson.schema.meta.EntryKind#isConstructor} answers for applicability, a different question, and is not
+ * io.ltr8.tson.schema.meta.TypeChain#isConstructor} answers for applicability, a different question, and is not
  * consulted here.
  *
  * <p><b>A reference is a member of itself where the walk says so.</b> {@code meta.type_ref} is built with {@code

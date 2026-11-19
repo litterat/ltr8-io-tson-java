@@ -34,8 +34,8 @@ import java.util.stream.Stream;
  * <p><b>It answers only for that vocabulary, by declaring document.</b> Those entries are the ones whose values the
  * schema model describes; the libraries' roots, core.tn and policy.tn declare ordinary types over them, whose values are
  * data, and a member a consumer's schema contributes to an open map ({@code meta}, {@code numeric}, …) is the
- * consumer's own. The packages also hold classes no schema declares -- {@code Token}, {@code EntryKind}, {@code
- * OpenEntry}, {@code ValueEntry} and the like, the resolver's own model -- and a name that merely mangles to one of
+ * consumer's own. The packages also hold classes no schema declares -- {@code Token}, {@code OpenEntry}, {@code
+ * ValueEntry} and the like, the resolver's own model -- and a name that merely mangles to one of
  * them ({@code meta.token}) is not this binder's: it refuses it, so a consumer's type of that name binds through the
  * consumer's binder. The vocabulary is read from the bundled sources themselves, once ({@link Vocabulary}), so it
  * cannot drift from them.

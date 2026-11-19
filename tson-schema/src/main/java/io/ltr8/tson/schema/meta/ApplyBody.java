@@ -18,7 +18,7 @@ import java.util.Objects;
  * {@code meta.application} annotation. A constructor's application is its construction before anything reads it, so
  * while a schema resolves one applies an open record, or a head nothing names.
  *
- * <p><b>No kind of its own.</b> It composes {@code meta.type} directly, being none of an atom, a product or a sum: it
+ * <p><b>No base kind.</b> It composes {@code meta.type} directly, being none of an atom, a product or a sum: it
  * stands for a type that exists only once its open record is applied, and nothing reads a value against it.
  *
  * <p>Identity is the head and the arguments, compared as values (§8.2), so two applications written alike are one.
