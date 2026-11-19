@@ -791,7 +791,7 @@ public final class TsonSchemaLinker {
         AnnotatedMap<String, Top> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
         checkTaggedVariantsAreNamed(schema, annotated, facts, localNames, receiver);
-        checkChoiceVariantsAreDisjoint(schema, annotated, facts, localNames, receiver);
+        checkChoiceVariantsAreDisjoint(schema, annotated, facts, localNames, hops, receiver);
         closure.set(annotated);
         reached.set(new ValuesByName(schema, annotated, facts, origins, values, hops));
 
@@ -1126,35 +1126,47 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * A variant that is a choice is disjoint, judged at the end of its alias chain ([TSON-SCHEMA] §5.4): a value of
-     * it carries the tag naming it, and a value carries one tag ([TSON-DATA] §3.2), so it is read at the nested
-     * choice untagged, where a choice that is not disjoint could select nothing. An extern is not followed. Asked of
-     * the choices {@link #checkTaggedVariantsAreNamed} asks.
+     * A variant that is a choice is disjoint, judged at the entry it reaches past its aliases and externs, an extern
+     * being a hop ([TSON-SCHEMA] §5.4, §5.13): a value of it carries the tag naming it, and a value carries one tag
+     * ([TSON-DATA] §3.2), so it is read at the nested choice untagged, where a choice that is not disjoint could
+     * select nothing. A foreign choice's variants are no names of this schema, so the advice for one reached through
+     * an extern is an extern per variant. Asked of the choices {@link #checkTaggedVariantsAreNamed} asks.
      */
     private static void checkChoiceVariantsAreDisjoint(TsonSchema schema, AnnotatedMap<String, Top> entries,
                                                        Map<String, TsonSchema.EntryFacts> facts,
-                                                       Set<String> localNames, DiagnosticsReceiver receiver) {
+                                                       Set<String> localNames, ExternHops hops,
+                                                       DiagnosticsReceiver receiver) {
         for (String name : localNames) {
             for (ChoiceBody choice : choicesJudged(name, entries, facts)) {
                 Map<String, List<String>> nested = new LinkedHashMap<>();
+                Set<String> foreign = new LinkedHashSet<>();
                 for (TypeRef variant : choice.variants().stream().flatMap(v -> TypeExpr.named(v).stream()).toList()) {
-                    if (AliasChain.terminalDefinition(variant.name(), entries).orElse(null) instanceof ChoiceBody inner
-                            && inner.disjoint().equals(Optional.of(false))) {
+                    Optional<ExternTarget.Landing> landing = hops.landing(variant.name());
+                    Top reached = landing.map(ExternTarget.Landing::definition)
+                            .orElseGet(() -> AliasChain.terminalDefinition(variant.name(), entries).orElse(null));
+                    if (reached instanceof ChoiceBody inner && inner.disjoint().equals(Optional.of(false))) {
                         nested.put(variant.name(), inner.variants().stream().map(TypeExpr::text).toList());
+                        if (landing.isPresent()) {
+                            foreign.add(variant.name());
+                        }
                     }
                 }
                 if (nested.isEmpty()) {
                     continue;
                 }
                 Set<String> listed = new LinkedHashSet<>();
-                choice.variants().forEach(variant -> listed.addAll(
-                        nested.getOrDefault(variant.text(), List.of(variant.text()))));
+                choice.variants().forEach(variant -> listed.addAll(foreign.contains(variant.text())
+                        ? List.of(variant.text()) : nested.getOrDefault(variant.text(), List.of(variant.text()))));
+                String advice = foreign.isEmpty() ? "list its variants in its place, '" + spelled(List.copyOf(listed))
+                        + "'" : foreign.size() == nested.size() ? "name each of its variants by an extern of its own "
+                        + "and list those in its place" : "list its variants in its place, '" + spelled(
+                        List.copyOf(listed)) + "', naming each variant of " + foreign + " by an extern of its own";
                 report(receiver, schema, name, at(facts, name), "'" + name + "': the choice '" + spelled(
                         choice.variants().stream().map(TypeExpr::text).toList()) + "' has " + (nested.size() == 1
                         ? "a variant " + nested.keySet() + " that is a choice" : "variants " + nested.keySet()
                         + " that are choices") + " not disjoint -- a value of one carries the tag naming it and no "
                         + "other, so it is read there untagged and none of its variants could be selected (§5.4): "
-                        + "list its variants in its place, '" + spelled(List.copyOf(listed)) + "'");
+                        + advice);
                 break;
             }
         }

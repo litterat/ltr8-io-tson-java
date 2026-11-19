@@ -137,6 +137,36 @@ class JsonNestedChoiceTest {
         assertEquals(fromJson, fromTson);
     }
 
+    /** The tag names the extern, the enclosing scope's name; the foreign choice reads the value untagged (§5.13). */
+    @Test
+    void aTagNamingAnExternOfADisjointChoiceReadsTheValueThereInBothEncodings() {
+        String foreign = "https://example.test/json-nested-choice-foreign.tn";
+        String subject = "https://example.test/json-nested-choice-externs.tn";
+        Map<String, String> documents = Map.of(foreign, """
+                !!id:"%s"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  narrow => ( int32 | text )
+                }""".formatted(foreign), subject, """
+                !!id:"%s"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  narrow_x => !meta.extern { schema: "%s"  type: narrow }
+                  outer    => ( boolean | narrow_x )
+                  h        => { o?: outer }
+                }""".formatted(subject, foreign));
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of((SchemaSource) documents::get)));
+
+        assertEquals(List.of(), tson.validate("!!import:\"" + subject + "\"\n!h { o: !narrow_x 5 }"));
+        Json json = Json.standard().withSchemas(tson.schemaRegistry());
+        assertEquals(List.of(), json.validate("""
+                {"o": {"$type": "narrow_x", "$value": 5}}""", subject, "h"));
+        assertEquals(5, json.treeReader().withSchema(subject).readAs("""
+                {"o": {"$type": "narrow_x", "$value": 5}}""", "h").get("o").asInt());
+    }
+
     /** Refused at link, the schema never becomes the linked schema the JSON encoding compiles from. */
     @Test
     void aVariantThatIsAChoiceNotDisjointIsRefusedBeforeEitherEncodingReads() {

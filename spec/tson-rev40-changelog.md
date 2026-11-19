@@ -1042,7 +1042,11 @@ it.
      `( text | a | b )`. The rule is the one that refuses a variant written in place in a
      choice that is not disjoint, one level down: there no tag names the variant, here the
      tag is spent naming it. A choice holding a choice is never disjoint, so a choice nests
-     one deep. No value a document could write at the nested choice is lost (§5).
+     one deep. The variant is judged at the entry it reaches, through an extern as through
+     an alias, every judgement through an extern being made of its target (§5.13): over
+     `either_x`, an extern of such a choice, `( text | either_x )` is refused the same, and
+     is written with an extern of each variant. No value a document could write at the
+     nested choice is lost (§5).
 
 ### 3.3 Companion artifacts
 
@@ -1268,7 +1272,8 @@ Changes a Revision 39 implementer must act on:
     the new name; the `token_policy` field of a `policy.processor` is unchanged.
 30. **A choice listed as a variant is disjoint** (§3.2 item 128): `( text | either )` over a
     choice of two records fails to load, where it loaded and held values no document could
-    write. It is written `( text | a | b )`.
+    write. It is written `( text | a | b )`. An extern of such a choice is refused as a
+    variant the same, and each variant is named by an extern of its own.
 
 ---
 
