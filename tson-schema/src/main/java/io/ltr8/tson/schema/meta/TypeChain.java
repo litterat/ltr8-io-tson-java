@@ -59,8 +59,8 @@ public record TypeChain(List<TypeExpr> parents, List<String> supertypes, List<St
     }
 
     /**
-     * Whether {@code value} IS-A the kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind,
-     * {@code alias} or {@code template} -- what a construction may apply, and what a compiled
+     * Whether {@code value} IS-A the kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind
+     * or {@code alias} -- what a construction may apply, and what a compiled
      * schema builds an instance reader for. Read off the chain, so a
      * parametric record composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would;
      * and judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:

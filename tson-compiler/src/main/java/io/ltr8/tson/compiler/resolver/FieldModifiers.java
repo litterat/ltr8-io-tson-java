@@ -27,12 +27,6 @@ final class FieldModifiers {
     /**
      * What §5.2 makes of one field's marks. {@code value} is absent exactly where the role is {@link
      * FieldRole#FREE}.
-     *
-     * <p><b>A token naming a parameter rides {@code value} like any other</b> (§5.7's "Open modifiers"), and
-     * nothing here labels it as one: §8.1's shadowing rule -- a token is a parameter exactly when its text
-     * resolves into the enclosing entry's own {@code parameters} -- is what tells the two apart wherever the
-     * question is asked. The role is the modifier's either way, so {@code = P} is FIXED where it is written,
-     * as {@code = 201} is, and closing substitutes the value and changes no fact ([TSON-SCHEMA] §5.7).
      */
     record Resolved(boolean optional, boolean voidable, FieldRole role, Optional<TokenValue> value) {
     }
@@ -40,7 +34,7 @@ final class FieldModifiers {
     /**
      * Whether this field is written {@code =?} -- a discriminator, whose name the enclosing record collects
      * into {@code record.discriminators}. A group member cannot be one: §5.11 makes a value modifier a parse
-     * error on a member, so the spelling does not reach one, and a member reached by refinement is the
+     * error on a member, so the spelling does not reach one, and a member reached by a restatement is the
      * linker's to refuse.
      */
     static boolean discriminates(FieldDef field) {
@@ -63,8 +57,8 @@ final class FieldModifiers {
         boolean fixed = modifier.get().kind() == FieldDef.Modifier.Kind.FIXED;
 
         if (modifier.get().value() instanceof FieldDef.Modifier.Value.Deferred) {
-            // `=?`: a discriminator. The field is required and unpinned here -- §5.7's identity diagonal
-            // forbids the base pinning what each member pins differently -- and the name is collected into
+            // `=?`: a discriminator. The field is required and unpinned here -- a restatement never changing a
+            // pin (§5.8), the base cannot pin what each member pins differently -- and the name is collected into
             // the enclosing `record.discriminators` by the phase that holds the record. Its omission, `_` and
             // value answers are each member's pin, so the base admits exactly the one shape a pin fills.
             if (omittable || voidable) {

@@ -281,8 +281,8 @@ class DependentFieldTest {
     }
 
     /**
-     * A sibling naming no readable type is refused at the sibling. A parametric record is no type (§5.10), so a reference
-     * over types holds none, and naming one is refused whether or not the dependent field is written.
+     * A sibling naming no readable type is refused at the sibling. No reference names a parametric record bare (§5.10), so a
+     * reference over types holds none, and naming one is refused whether or not the dependent field is written.
      */
     @Test
     void aSiblingNamingNoReadableTypeIsRefusedAtTheSibling() {

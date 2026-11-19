@@ -32,7 +32,7 @@ import java.util.function.Predicate;
  * select, judged from what each writes, never by resolving one ([TSON-SCHEMA] §3.4.1): its written operands (a
  * composition's, a refinement's source, an alias's target, an application's head) reach the family's base, an entry
  * IS-A it, or a declaration that may be a member; a subtraction joins nothing (§5.9). Its pin for a selector is the
- * nearest one written on that walk, its own first, since a restatement never changes a pin (§5.7), and a declaration
+ * nearest one written on that walk, its own first, since a restatement never changes a pin (§5.8), and a declaration
  * whose pin differs from the value's is none.
  */
 final class FamilyJoiners {
@@ -47,7 +47,7 @@ final class FamilyJoiners {
         Walk walk = new Walk(base, declarations, entries);
         List<String> joiners = new ArrayList<>();
         for (String name : declarations.keySet()) {
-            // A parametric record is no type, so no member (§5.10); it is an operand of the applications that close it.
+            // A parametric record is no member (§5.10); it is an operand of the applications that close it.
             if (notHeld.test(name) && SchemaDesugarer.typeParams(declarations.get(name).typeDef()).isEmpty()
                     && walk.mayJoin(name, new HashSet<>()) && selectors.stream().allMatch(selector ->
                     walk.pin(name, selector, new HashSet<>()).map(pin -> samePin.test(selector, pin)).orElse(true))) {

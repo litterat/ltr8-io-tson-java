@@ -207,7 +207,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             return null;
         }
         // A deeper tag wins over the dispatched member ([TSON-JSON] §6.1.5's "deeper than one level"): the
-        // pins are inherited and §5.7 forbids changing them, so a family dispatches one level by member and
+        // pins are inherited and §5.8 forbids changing them, so a family dispatches one level by member and
         // every level below it by tag.
         return readerFor.resolve(tag.orElse(selected)).read(ctx);
     }

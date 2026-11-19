@@ -234,8 +234,8 @@ class TsonCliTest {
      * exit 1 and a diagnostic naming the route. It used to reach an ErrorReader and exit 70 under "this is a
      * bug in tson", the worst answer in the whole surface for one of the likeliest mistakes.
      *
-     * <p><b>The exit code is what this pins</b>, and the message names the route: a parametric record is not a type
-     * (§5.10), so the document names the declaration of its application.
+     * <p><b>The exit code is what this pins</b>, and the message names the route: no position names a parametric record
+     * bare (§5.10), so the document names the declaration of its application.
      */
     @Test
     void dataNamingAParametricRecordIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
@@ -258,7 +258,7 @@ class TsonCliTest {
                 assertEquals(1, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
 
         assertTrue(out.contains("'paged' is a parametric record"), out);
-        assertTrue(out.contains("a parametric record is not a type"), out);
+        assertTrue(out.contains("no position names a parametric record bare"), out);
     }
 
     @Test

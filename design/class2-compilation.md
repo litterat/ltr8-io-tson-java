@@ -54,7 +54,7 @@ choices. Current form only; history lives in git.
 - The writer (`DataClassObjectWriter`) writes a `TypeInline` as the untagged wrapper with its body under the recorded
   constructor, never under the `@Typename` of the body's class: a schema's own constructor of arrays writes
   `{ of: !list_type { … } }`.
-- A bind lookup redirects through an alias only for a derived entry (one with no source position).
+- A bind lookup redirects through an alias only for an entry with no source position.
 
 Related: `design/linking-and-compilation.md`, `design/choice-disjointness.md`, `design/compiled-registries.md`,
 `design/readers-and-diagnostics.md`, `design/schema-resolution.md`.
@@ -159,23 +159,20 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   record's container-typed fields) differ per mode. `ValueReaderFactoryResolver` (the `constructor
   name → factory` dispatch interface) lives in the unexported `reader` package — a consumer picks a mode
   by which registry they hold, never by naming it.
-- **A bind lookup asks under the name the author wrote.** An entry an application of a parametric record materialised is
-  named by content (§8.2 — resolver-chosen, fresh, unreachable from source), so a binding map cannot be keyed
-  on one: the hash is not knowable when the map is written, and a generator emitting bindings cannot invent
-  it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
-  an alias body, in declaration order, then the entry's own name — and `RecordBindReader` and `TupleBindReader`
-  try them in that order, so `ping => msg_of<"ping", ping_body>` binds under `ping`. Nothing falls back along a
-  chain: the kernel's set and enum are incomplete entries, whose completions are the constructor's own construction
-  (§5.5). Lost: binding an entry by its supertype's class, which an ordinary record composing another could not share
-  without silently losing a narrower class.
+- **A bind lookup asks under the name the author wrote.** An entry with a source position was declared, so its own
+  name is that name and an alias naming it never redirects its binding. An entry with none — one the kernel's
+  bootstrap builds, or one read from a resolved form — is asked first under the names that reach it through an alias
+  body, in declaration order, then under its own (`ValueReaderContext.bindingNamesFor`, the inverse of §8.3's hop), by
+  `RecordBindReader` and `TupleBindReader` alike. Nothing falls back along a chain: the kernel's set and enum are
+  incomplete entries, whose completions are the constructor's own construction (§5.5). Lost: binding an entry by its
+  supertype's class, which an ordinary record composing another could not share without silently losing a narrower
+  class.
   **Every lookup is by entry identity**: a name is asked within the canonical identity of the schema declaring it
   (`ValueReaderContext.namespaceOf`, `DataNameBinder.resolve(namespace, name)`), never the scope it was reached
   through, so a type two schemas share binds once, and two schemas' entries of one name bind apart through one
   context. Lost: the scope's identity, which binds a shared import once per importer.
-  **Only a derived entry is reached this way**, which is the test `EntryDisplayName` already applies: an entry
-  with a source position was declared, so its own name is the one the author wrote and an alias naming it must
-  never redirect its binding. The index is built once per compile beside `namesMeaning`, for that one's
-  reason — a property of the schema, not of the entry being looked up. **A class that is mapped and fails
+  The test is `EntryDisplayName`'s, and the alias index is built once per compile beside `namesMeaning`, for that
+  one's reason — a property of the schema, not of the entry being looked up. **A class that is mapped and fails
   analysis stops the search at once** and says so — `'sets' binds Sets, which cannot be analysed: …`, each
   cause along the chain — rather than reading as a name nothing binds; only `ltr8-bind`'s
   `UnboundNameException` moves on to the next candidate, and a search that finds nothing reports the first,

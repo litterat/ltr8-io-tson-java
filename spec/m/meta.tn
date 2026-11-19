@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=a578541ae676c988fa77b1cc3d0771c9f3f27df8a39cff9e4404f8d4139ce526"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=291ddaf37566f9f084515d09626f1855d05f2cfb9413e3ce0073323f4933ddcd"
 @doc:"""
   The TSON kernel: the vocabulary every schema is written in. Its root holds the
   names an author writes: `text`, `integer`, `int64`, `boolean`, `bytes`, `iri`,
@@ -362,7 +362,7 @@
       own. `parameters` makes it a parametric record, `<T> { item: T }`.
       `extension` is its `abstract` or `final` mark, `discriminators` names the fields its
       members are selected by, and `name_type` the type its field names are
-      values of ([TSON-SCHEMA] §5.2; §5.8 for composition, §5.10 for open
+      values of ([TSON-SCHEMA] §5.2; §5.8 for composition, §5.10 for parametric
       records).
       """
     record => meta.product & {

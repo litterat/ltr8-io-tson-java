@@ -283,10 +283,10 @@ final class ParametricMaterialiser {
         List<TypeRef> arguments = new ArrayList<>();
         for (TypeRef name : application.arguments()) {
             if (appliesAParametricRecord(name.name())) {
-                // A parametric record is no type, and no position names one bare, an argument included (§5.10).
+                // No position names a parametric record bare, an argument included (§5.10).
                 throw new SchemaValidationException("'" + name.name() + "', passed as an argument of '"
-                        + application.text() + "', is a parametric record, and a parametric record is not a type -- "
-                        + "write it with its arguments, declared under a name, and pass that name (§5.10)");
+                        + application.text() + "', is a parametric record, and no position names a parametric "
+                        + "record bare -- write it with its arguments, declared under a name, and pass that name (§5.10)");
             }
             arguments.add(dereferenced(name));
         }

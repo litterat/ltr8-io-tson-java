@@ -19,10 +19,10 @@ import java.util.SequencedMap;
  * <em>type</em> as well: a pin is a bare token (§12.1) and only the type says which parser reads it. So the
  * names are resolved back to the base's own fields here.
  *
- * <p><b>Every base is a record and declares them itself.</b> A parametric record is no type (§5.10), so no position is
- * typed by one: a family whose base is an abstract parametric record's application is based on the closed record that
- * application denotes, which carries the parametric record's selectors. A family with no declared member has a table like
- * any other, with nothing in it to select.
+ * <p><b>Every base is a record and declares them itself.</b> No position names a parametric record bare (§5.10), so no
+ * position is typed by one: a family whose base is an abstract parametric record's application is based on the closed record
+ * that application denotes, which carries the parametric record's selectors. A family with no declared member has a table
+ * like any other, with nothing in it to select.
  */
 public final class FamilySelectors {
 

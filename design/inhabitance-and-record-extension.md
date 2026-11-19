@@ -2,7 +2,7 @@
 
 Design notes for two structural checks the linker runs over the merged closure after validation: the inhabitance
 check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extension` obliges (`RecordExtension`, §5.2,
-§5.7, §5.9). Both are checkers that hand back verdicts and leave reporting to `TsonSchemaLinker`, the shape
+§5.8, §5.9). Both are checkers that hand back verdicts and leave reporting to `TsonSchemaLinker`, the shape
 `ChoiceDisjointness` keeps. Current form only; history lives in git.
 
 **Invariants**
@@ -11,7 +11,8 @@ check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extensi
 - Every local entry is judged, referenced or not; imported entries are skipped, having been judged when their own
   schema linked.
 - A parametric record (a `RecordBody` with `parameters`) is inhabited by fiat; the declarations closing its
-  applications are judged like any other entry, so a parametric record nobody applies is judged nowhere.
+  applications are judged like any other entry, so a parametric record nobody applies is judged nowhere, short of
+  §5.10.1, which judges it with its parameters assumed inhabited (`BACKLOG.md`).
 - An unresolved reference is inhabited by fiat, and the check runs after `validateEntry`, so one defect is reported
   once.
 - A kind is inhabited exactly when it has a member; a value entry and every atom are inhabited here. An atom whose
@@ -60,8 +61,7 @@ the schema, at a line the data's author does not control. The diagnostic spells 
 - **A parametric record is not walked.** Its parameters mean nothing until an application supplies them, so it is inhabited
   here, and a declaration closing one of its applications is an ordinary entry in the map by the time linking runs,
   judged like any other. §8's own `tree` fixture is caught the moment anything applies it, and a parametric record nobody
-  applies is judged nowhere, the same answer §5.10's deferred checking gives everywhere else. `TypeInhabitanceTest` pins both
-  halves.
+  applies is judged nowhere. `TypeInhabitanceTest` pins both halves.
 - **An unresolved reference is inhabited by fiat.** `validateEntry` has already reported it against this entry;
   calling it uninhabited too would report one defect twice, the second time naming a different problem.
 - **Scope is structural.** An atom whose facets admit nothing (`!int8 ^ { min: 300 }`) is uninhabited too, but that is
@@ -93,8 +93,8 @@ usable and its members pin them distinctly, and every member is declared.
   no discriminators of its own, so an inherited selector needs no exemption. Only a record is a base: a parametric record
   is no type, and the record an abstract parametric record's application closes to carries the parametric record's
   `extension`, `discriminators` and groups, so its selectors are checked as a hand-written base's are, wherever the
-  application is closed. A parametric record nobody applies is judged nowhere, as §5.10's deferred checking gives everywhere
-  else.
+  application is closed. A parametric record nobody applies is judged nowhere, short of §5.10, which judges its marks
+  at its declaration (`BACKLOG.md`).
 - **Every family in the closure is judged**, not only one with a part declared here. §3.3.4 makes `subtypes` open
   across schemas, so an importer can add a member that collides with an imported one, and two imports that each link
   cleanly can each add a member that collides with the other's. The second is the merge's own fault and is reported
@@ -105,7 +105,7 @@ usable and its members pin them distinctly, and every member is declared.
   refused before linking, with the application in hand (`ParametricMaterialiser.refuseMembership`), at the declaration
   that wrote it or whose application closed it. A member is what a read reports, a tag names and a binding maps, all
   by name, so every member `RecordExtension` judges is a declaration.
-  A parametric record is in no `subtypes` index (the linker credits no open entry), so a parametric record
+  A parametric record is in no `subtypes` index (no application is IS-A its head, §5.10), so a parametric record
   composing a base is no member of it, its declared applications being the members.
 - **Pins compare as values through `ValueIdentity`**, which is why that class is visible outside its package. §4.3
   makes `= 255` and `= 0xFF` one pin and §5.5 makes `= 1` and `= 1.0` one, so a comparison of tokens would accept a

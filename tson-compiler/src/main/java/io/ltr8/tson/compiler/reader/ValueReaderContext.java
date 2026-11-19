@@ -130,7 +130,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
-     * Which entries name each target through an {@code ALIAS} body, in declaration order.
+     * Which entries name each target through an alias body, in declaration order.
      *
      * <p>The inverse of the alias hop, and the index {@link #bindingNamesFor} answers from. Built once per
      * compilation for the reason {@code namesMeaning} is: it is a property of the schema, not of the entry

@@ -107,7 +107,7 @@ spec-required case:
   constructor and value entry, check that every `-resolved.tn` re-resolves to itself, and drop
   `ResolvedFixtureTest`'s reading of a fixture beside its source, which each library's needs because its instances
   (net.tn's `ipv4 => !net.ipv4_type {}`) name constructors the form declares.
-- [ ] **An instance of a constructor composing `record` is refused** ([TSON-SCHEMA] §4.1, §5.7). `c => record & {
+- [ ] **An instance of a constructor composing `record` is refused** ([TSON-SCHEMA] §4.1, §5.8). `c => record & {
   extra: text }` is a constructor whose instances are record types carrying one facet more, and `x => !c { fields: {
   id => { type: text } }  extra: "hello" }` should follow record composition: `x` is a record type read by the record
   reader (`!x { id: abc }` validates, in tree and bind mode) and its body holds `extra`. Today `x` is refused as
@@ -166,14 +166,15 @@ spec-required case:
   ("has no usable compiled reader"), and so does a JSON root read at `nonempty`: `JsonSchemaCompiler.constructorOf`
   throws `IllegalStateException` for an `IncompleteEntry`, which the compile loop turns into an `ErrorReader`. Give the
   JSON stack `IncompleteEntryReader`'s refusal and a `CrossEncodingParityTest` case.
-- [ ] **§5.7: a field restated where no closed record is on the chain is not judged for its type.** The link
-  judges a restated type against the nearest closed records on the chain (`TsonSchemaLinker.checkRestatedFieldTypes`).
-  `dog => pet<dog_type> & { pet: cat_type }`, where no entry names `pet<dog_type>`, has an edge only to
-  the parametric family base `pet`, whose `pet` is `T`, so it links; so does `wrap<text>` from `wrap => <T> box<T> & { v:
-  int32 }` where nothing denotes `box<text>`. A subtraction's tightening entries, which §5.9's rule 4 puts under
-  §5.7's rules, are not judged either: its chain is empty. The resolver holds the inherited field
-  (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a deferred judgement there, or the inherited
-  fields carried to link, would close all three without reporting a case the link already judges twice.
+- [ ] **§5.8: a field restated where no closed record is on the chain is not judged for its type.** The link judges a
+  restated type against the nearest closed records on the chain (`TsonSchemaLinker.checkRestatedFieldTypes`). An
+  applied operand gives no edge to its head (§5.10), so `dog => pet_of<dog_type> & { pet: cat_type }` over `pet_of =>
+  <T> { pet: T }`, where no entry names `pet_of<dog_type>`, has no record on its chain holding `pet`, and links; so
+  does `wrap<text>` from `wrap => <T> box<T> & { v: int32 }` where nothing declares `box<text>`. A subtraction's
+  tightening entries, which §5.9's rule 4 puts under §5.8's rules, are not judged either: its chain is empty. The
+  resolver holds the inherited field (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a
+  deferred judgement there, or the inherited fields carried to link, would close all three without reporting a case
+  the link already judges twice.
 
 - [ ] **A dependent field whose sibling names an unbound type fails each read, not the bind-mode compile.** With
   `payload: kind!` and `kind` admitting a type no class binds, a document naming that type throws
@@ -200,8 +201,8 @@ spec-required case:
   `UpstreamGapsTest.aReferenceInsideAnAnnotationValueIsNotJudged`).
 
 
-- [ ] **A restatement that changes a pin is accepted** ([TSON-SCHEMA] §5.7, §5.2). With `base => { pet_type: text =
-  "pet"  name: text }`, `dog => base & { pet_type: = "dog" }` loads; §5.7's restatement "MUST NOT change a pin", and a
+- [ ] **A restatement that changes a pin is accepted** ([TSON-SCHEMA] §5.8, §5.2). With `base => { pet_type: text =
+  "pet"  name: text }`, `dog => base & { pet_type: = "dog" }` loads; §5.8's restatement "MUST NOT change a pin", and a
   discriminated family's arrangement (§5.2) rests on it — a subtype of a member that could re-pin its parent's
   selector would break the family's one-level dispatch. Refuse a FIXED restatement whose value differs, under the
   field type's own equality (§5.5, so `= 255` over `= 0xFF` is the identity case), at the restating declaration. Add
@@ -229,6 +230,12 @@ spec-required case:
   can be left out"); §3.4.1 says a loop of aliases is not a wait cycle and §8.3 refuses it as an alias chain with no
   terminal. The verdict is right; report the chain (`'a' is an alias of 'b', an alias of 'a', which names no type`)
   once, at the first entry, before the productivity check sees it.
+- [ ] **A parametric record nobody applies is not judged for productivity or its selectors** ([TSON-SCHEMA] §5.10,
+  §5.10.1). `bad => <T> { v: T  inner: bad<T> }` links: `TypeInhabitance` counts a parametric record inhabited and
+  judges only the declarations closing its applications, where §5.10.1 judges every entry, a parametric record with
+  its parameters assumed inhabited. `p => <T> { k: base =?  v: T }` over a record `base` links too, where the same
+  selector on a closed record is refused; §5.10 judges a parametric record's marks at its declaration. Walk the first
+  with a `ParamRef` inhabited, run `RecordExtension`'s selector check on the second, and add `schema/invalid` vectors.
 - [ ] **A tag that names nothing is a mismatch below the root, not an unresolved name** ([TSON-DATA] §8.1;
   [TSON-SCHEMA] §3.3, §7.2). Under `outer => { inner: inner }` and `inner => { a: text }`, `!outer { inner: !nosuch {
   a: "x" } }` reports `TYPE_MISMATCH` ("'nosuch' is not admissible at a 'inner' position"), as does the tag at an atom

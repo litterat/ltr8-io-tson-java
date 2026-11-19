@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The kernel's {@code regex_type} constructor (Part 2 §5.7: {@code regex_type => ~text_type &
- * atom.specification & { spec: = "https://www.rfc-editor.org/rfc/rfc9485" } }) -- {@code text_type}'s
+ * The kernel's {@code regex_type} constructor ({@code unicode.text_type & atom.specification & { … }}, Part 2
+ * §5.8) -- {@code text_type}'s
  * length and pattern facets plus {@code atom.specification}'s {@code spec}, pinned to RFC 9485, the
  * I-Regexp specification. Pure constraint values, no parsing/validation behavior -- {@code
  * tson-compiler}'s {@code RegexParser} holds one of these and does the actual reading/writing.

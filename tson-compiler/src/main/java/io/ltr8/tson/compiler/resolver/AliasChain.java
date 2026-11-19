@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * Following a chain of {@code ALIAS} entries to the type at the end of it -- [TSON-SCHEMA] §8.3's walk,
+ * Following a chain of alias entries to the type at the end of it -- [TSON-SCHEMA] §8.3's walk,
  * stated once.
  *
  * <p><b>Why this is a shared class rather than a loop each caller writes.</b> Resolved output states the

@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * has nothing to do with {@code result<int32>}.
  *
  * <p><b>The edge cannot be stated where the author writes it.</b> At {@code ok}'s declaration {@code
- * result<T>} denotes no entry -- a parametric record is not a type (§5.10) -- so there is nothing to name in a chain.
+ * result<T>} denotes no entry -- no application is IS-A its head (§5.10) -- so there is nothing to name in a chain.
  * What the held body keeps is the application itself as a written parent, {@code parents} being a
  * {@code [meta.type_ref]} slot whose reference may carry arguments, and materialisation substitutes and closes it
  * with the rest of the held body.
@@ -109,14 +109,14 @@ class ParametricSubtypeFamilyTest {
         assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get("ok")),
                 "the parametric record is IS-A no head name");
         assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
-                "nothing names result<text>, and a parametric record is no type, so ok_of is IS-A nothing");
+                "nothing names result<text>, and no application is IS-A its head, so ok_of is IS-A nothing");
         assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get("result")));
     }
 
     /**
      * <b>A parametric record's applications are IS-A its written parents</b> ([TSON-SCHEMA] §5.8, §5.10). A parametric
      * record carries a chain, holding {@code base} as written and as reached, and every application closing from it
-     * completes the same parents into a chain naming {@code base}. The parametric record itself is no type and in no index.
+     * completes the same parents into a chain naming {@code base}. The parametric record itself is in no index.
      */
     @Test
     void aParametricRecordsApplicationsAreIndexedUnderItsParent() {
@@ -130,7 +130,7 @@ class ParametricSubtypeFamilyTest {
         assertTrue(TypeChain.subtypesOf(baseEntry).contains(target(compiled, "box_text")),
                 () -> "the instantiation is indexed: " + TypeChain.subtypesOf(baseEntry));
         assertFalse(TypeChain.subtypesOf(baseEntry).contains("box"),
-                () -> "the parametric record is no type, and in no index: " + TypeChain.subtypesOf(baseEntry));
+                () -> "the parametric record is in no index: " + TypeChain.subtypesOf(baseEntry));
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(compiled.schema().entries().get("box")),
                 "the parametric record keeps its parent as written, which closing completes");
     }
@@ -208,7 +208,7 @@ class ParametricSubtypeFamilyTest {
 
         assertEquals(List.of("payload"), ((RecordBody) compiled.schema().entries().get(thin)).fields()
                 .keySet().stream().toList(), "the subtraction really ran");
-        // Not IS-A result<text>, and not IS-A thin either, a parametric record being no type (§5.10).
+        // Not IS-A result<text>, and not IS-A thin either, no application being IS-A its head (§5.10).
         assertEquals(List.of(), ((RecordBody) compiled.schema().entries().get(thin)).supertypes(),
                 "contract: broken, and no application left in the chain to close into an edge");
         assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get(target(compiled, "result_of"))));

@@ -139,7 +139,7 @@ public enum DiscriminationClass {
             case Cidr6Type ignored -> Optional.of(STRING);
             case MacType ignored -> Optional.of(STRING);
             case EnumBody members -> ofEnum(members);
-            case RecordBody record when record.isParametric() -> Optional.empty(); // a parametric record is no type
+            case RecordBody record when record.isParametric() -> Optional.empty(); // never named bare (§5.10)
             case RecordBody ignored -> Optional.of(BRACE);
             case MapBody m -> hasScalarKey(m, namespace) ? Optional.of(BRACE) : Optional.empty();
             case NamespaceBody ignored -> Optional.of(BRACE); // its keys are names

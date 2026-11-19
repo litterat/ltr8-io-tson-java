@@ -298,5 +298,5 @@ every schema importing it names them: an `!!import` contributes its whole namesp
 reservation: every root name in the closure is taken, so a schema importing core.tn cannot declare `text`, `enum`,
 `set`, `uuid` or `title` of its own, nor `meta`, `atom`, `numeric`, `unicode`, `net`, `binary` or `temporal`
 (`ImportedVocabularyTest`). The machinery is under those seven prefixes, so `record`, `identifier`, `map`, `namespace`,
-`template`, `type_ref`, `bounded`, `value` and `kind` are free; a schema importing only the libraries it wants
+`apply`, `type_ref`, `bounded`, `value` and `kind` are free; a schema importing only the libraries it wants
 leaves the rest's root names free too (one importing temporal.tn alone may declare `title` or `int32`).

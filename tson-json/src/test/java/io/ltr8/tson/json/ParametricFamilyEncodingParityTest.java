@@ -20,11 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * <b>A family declared through a parametric record dispatches the same way in both encodings</b> ([TSON-JSON] §9.4, and
- * [TSON-SCHEMA] §5.10). A parametric record is no type, so a family's base is a record: an abstract record a parametric
- * record composes, its members reaching it through the parametric record's written parent, or an abstract parametric
- * record's application, which is an abstract record carrying the parametric record's selector. A value at the base's
- * position is a value of one of its members, selected by the discriminators where the base states them and by a tag where it
- * states none.
+ * [TSON-SCHEMA] §5.10). No position names a parametric record bare, so a family's base is a record: an abstract record a
+ * parametric record composes, its members reaching it through the parametric record's written parent, or an abstract
+ * parametric record's application, which is an abstract record carrying the parametric record's selector. A value at the
+ * base's position is a value of one of its members, selected by the discriminators where the base states them and by a tag
+ * where it states none.
  *
  * <p><b>Why this sits beside {@link CrossEncodingParityTest} rather than inside it.</b> That test compares one
  * schema, held statically, which is what lets it be terse; the family's shapes and the tag cases need a schema

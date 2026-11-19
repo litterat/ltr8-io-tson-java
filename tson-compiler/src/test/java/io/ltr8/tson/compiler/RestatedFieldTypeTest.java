@@ -14,9 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §5.7's rule for a restated field's type, and §5.8's application of it to a composition's
- * tightening entries: the restated type is the inherited one or a type IS-A it (§7.2), or {@code void} at a voidable
- * position. Judged at link, where every name both types hold resolves.
+ * [TSON-SCHEMA] §5.8's rule for a restated field's type: the restated type is the inherited one or a type IS-A it
+ * (§7.2), or {@code void} at a voidable position. Judged at link, where every name both types hold resolves.
  */
 class RestatedFieldTypeTest {
 
@@ -50,7 +49,7 @@ class RestatedFieldTypeTest {
                 }
                 """);
 
-        assertTrue(message.contains("'b': not a valid restatement of 'a''s fields (§5.7): field 'x' is typed "
+        assertTrue(message.contains("'b': not a valid restatement of 'a''s fields (§5.8): field 'x' is typed "
                 + "'int32', which is not 'text' or IS-A it"), message);
     }
 
@@ -77,7 +76,7 @@ class RestatedFieldTypeTest {
                 }
                 """);
 
-        assertTrue(message.contains("'b': not a valid restatement of 'a''s fields (§5.7): field 'x' is typed 'int32'"),
+        assertTrue(message.contains("'b': not a valid restatement of 'a''s fields (§5.8): field 'x' is typed 'int32'"),
                 message);
     }
 
@@ -167,7 +166,7 @@ class RestatedFieldTypeTest {
                 }
                 """);
 
-        assertTrue(message.contains("'b': not a valid restatement of 'held''s fields (§5.7): field 'v' is typed 'int32', "
+        assertTrue(message.contains("'b': not a valid restatement of 'held''s fields (§5.8): field 'v' is typed 'int32', "
                 + "which is not 'text' or IS-A it"), message);
     }
 }

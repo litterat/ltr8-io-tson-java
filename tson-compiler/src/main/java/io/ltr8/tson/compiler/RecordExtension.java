@@ -34,7 +34,7 @@ import java.util.SequencedMap;
 import java.util.Set;
 
 /**
- * What each {@code record.extension} member obliges, checked over the linked closure ([TSON-SCHEMA] §5.2, §5.7,
+ * What each {@code record.extension} member obliges, checked over the linked closure ([TSON-SCHEMA] §5.2, §5.8,
  * §5.9). The peer of {@link ChoiceDisjointness}, and a checker rather than a derivation: the fact is written by
  * the author's mark and lowered by the resolver, and what is left is whether the rest of the closure agrees with
  * it.
@@ -147,8 +147,8 @@ final class RecordExtension {
 
     /**
      * §5.2's own rule for a field carrying a value, applied to a field that carries none. The base declares
-     * the discriminator unpinned -- §5.7's identity diagonal forbids it pinning what its subtypes each pin
-     * differently -- so nothing else asks whether its type could hold a pin at all, and a family whose
+     * the discriminator unpinned -- a restatement never changing a pin (§5.8), it cannot pin what its subtypes
+     * each pin differently -- so nothing else asks whether its type could hold a pin at all, and a family whose
      * selector is a record would be discovered only by the subtypes failing one at a time.
      */
     private static void checkDiscriminatorField(String name, String fieldName, RecordField field,
@@ -165,7 +165,7 @@ final class RecordExtension {
             violations.add(new Violation(name, "'" + name + "': discriminator field '" + fieldName
                     + "' is " + field.describe() + ", and must be required -- an optional selector leaves a value "
                     + "with nothing to dispatch on, and a pinned or defaulted one fixes in the base what each "
-                    + "subtype has to state differently (§5.2, §5.7)"));
+                    + "subtype has to state differently (§5.2, §5.8)"));
         }
         Optional<AtomType<?>> parser = parserFor(field, merged, facts);
         if (parser.isEmpty()) {
@@ -253,7 +253,7 @@ final class RecordExtension {
                             + "and it is those values a position typed '" + base + "' dispatches on. "
                             + (pinned == null ? "The field is not restated here."
                                     : "It is " + pinned.describe() + " here, and a default is omissible so it "
-                                            + "cannot dispatch.") + " (§5.2, §5.7)"));
+                                            + "cannot dispatch.") + " (§5.2, §5.8)"));
                 }
                 return null;
             }

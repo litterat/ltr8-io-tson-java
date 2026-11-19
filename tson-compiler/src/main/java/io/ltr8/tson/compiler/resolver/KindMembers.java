@@ -36,7 +36,7 @@ import java.util.function.Function;
  *
  * <p><b>Membership of a type name is one walk</b> over resolved entries, never over spellings. From an entry, alias
  * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, a
- * parametric record (no type, §5.10) and a value entry are no type's name, so no member set over {@code
+ * parametric record (§5.10) and a value entry are no type's name, so no member set over {@code
  * meta.ref<meta.record>} reaches a parametric record. For every other entry the type of its value -- the tag resolved output
  * writes, {@code !meta.record}, {@code !unicode.identifier_type}, {@code !meta.namespace} -- is followed until a
  * constructor is reached, and the entry is a member when that constructor is {@code of} or has {@code of} among its

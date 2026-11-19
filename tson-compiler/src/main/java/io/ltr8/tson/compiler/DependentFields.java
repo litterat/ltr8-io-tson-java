@@ -133,8 +133,8 @@ final class DependentFields {
     }
 
     /**
-     * A sibling's default or pin names a type a value can be read against. A parametric record is refused: a parametric
-     * record is no type (§5.10), and reading never starts a materialisation.
+     * A sibling's default or pin names a type a value can be read against. A parametric record is refused: no position
+     * names one bare (§5.10), and reading never starts a materialisation.
      */
     private static void checkSiblingValue(String about, RecordField field, Token value, Map<String, Top> namespace) {
         String noun = field.role() == FieldRole.FIXED ? "pin" : "default";
@@ -178,7 +178,7 @@ final class DependentFields {
 
     /**
      * Why {@code restated} is no restatement of {@code inherited} where either is a dependent field, or empty where
-     * neither is or the two agree: a dependent field is restated only as itself, its marks moving along §5.7's order as
+     * neither is or the two agree: a dependent field is restated only as itself, its marks moving along §5.8's orders as
      * any field's do. Its type stays the dependent type on every member of the family, and pinning the sibling is what
      * fixes the type.
      */

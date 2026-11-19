@@ -71,7 +71,7 @@ final class DispatchFactories {
     }
 
     /**
-     * A parametric record, which is not a type ([TSON-SCHEMA] §5.10): no value is read against it, so it
+     * A parametric record, which no position names bare ([TSON-SCHEMA] §5.10): no value is read against it, so it
      * reaches {@link ParametricRecordReader} unexamined.
      */
     static final ValueReaderFactory PARAMETRIC_RECORD = (name, definition, context) ->

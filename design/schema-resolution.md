@@ -158,7 +158,7 @@ why extensibility is never inherited: a composition's body arrives OPEN from its
 is the author's error.
 
 **A selector is `=?`** (`FieldModifiers.discriminates`), and the record it is written in is the family base: the
-field stays required and unpinned (§5.7's identity diagonal forbids a base pinning what each member pins
+field stays required and unpinned (a pin may not change, §5.8, so a base cannot pin what each member pins
 differently) and its name goes into `record.discriminators`. ABSTRACT is derived from it — the members pin the
 selector, so the base has no values of its own; `abstract` beside it is admitted, `final` refused. **Only the
 source's `=?` derives it.** The kernel's form states both facts, so a `!meta.record` whose `discriminators` stand
@@ -273,15 +273,14 @@ it its voidability; its name's `?` is always its own. That is why `resolveField`
 
 **A restatement is three orders** (`refines`), each least to most determined: what omission yields, absent →
 missing-field error → injected (`RecordField.omitted`, asked of a plain field); voidable → not; role FREE → DEFAULT
-→ FIXED. A restatement refines its source when no order moves backwards, which reproduces §5.7's transition matrix
-cell for cell without the matrix existing in code.
+→ FIXED. A restatement refines its source when no order moves backwards (§5.8).
 
-**A restated type narrows, and the link judges it** (`TsonSchemaLinker.checkRestatedFieldTypes`, §5.7, §5.8). The
+**A restated type narrows, and the link judges it** (`TsonSchemaLinker.checkRestatedFieldTypes`, §5.8). The
 restated type is the inherited one or IS-A it by §7.2's chain, alias hops followed on both sides, or `void` at a
 voidable position: `nickname?: void?` restating `nickname?: text?` narrows the field to `_`. The resolver binds a
 restatement before the names it holds need be ready, so the IS-A is asked at link, as a reference's `of` is; the
 kernel's `meta.namespace` narrowing `meta.map`'s `key_type: meta.type_ref` to `meta.identifier_ref` passes by
-`meta.identifier_ref`'s refinement of `meta.type_ref`. The relation is nominal and nothing more (§5.7): `[int8]`
+`meta.identifier_ref`'s refinement of `meta.type_ref`. The relation is nominal and nothing more (§5.8): `[int8]`
 restating `[int32]` and a variant restating its choice are refused, no IS-A edge joining either pair.
 Each record is judged against the nearest closed records on its chain, so an applied operand is judged through the
 entry its application denotes. One denoting none is judged against the closed parents its head writes, and a
@@ -320,7 +319,7 @@ judged once its application closes it:
 - **Its pin or default names a type a value can be read against**: a parametric record is refused. Membership
   of the sibling's reference is `checkKindValue`'s, as for any field value.
 - **The dependent field** is never voidable and carries no default or pin: its type is not fixed at its declaration.
-  It may be restated only as itself, its marks moving along §5.7's orders as any field's do; restating it with a named
+  It may be restated only as itself, its marks moving along §5.8's orders as any field's do; restating it with a named
   type, or a typed field as a dependent one, is refused (`DependentFields.restates`, asked by
   `checkRestatedFieldTypes`). A sibling may be a discriminator: the family rules ask of it what they ask of any
   required atom-typed field, and a dependent field named as a discriminator is no atom-typed field and is refused.
@@ -439,5 +438,5 @@ model is idiomatic Java; the textual differences from the `*-resolved.tn` fixtur
 
 ## Deferred
 
-The identity-diagonal FIXED-value invariant — a restated FIXED field MUST NOT change its pinned value (§5.7) — is
-unchecked: `resolveTighteningField` does not compare the two values.
+A restated FIXED field MUST NOT change its pinned value (§5.8); this is unchecked: `resolveTighteningField` does not
+compare the two values.

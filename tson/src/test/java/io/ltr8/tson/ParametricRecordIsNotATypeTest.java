@@ -58,7 +58,7 @@ class ParametricRecordIsNotATypeTest {
     private static boolean refusedAsAParametricRecord(List<Diagnostic> problems, String record) {
         return problems.stream().anyMatch(d -> d.message().contains("'" + record + "'")
                 && d.message().contains("is a parametric record")
-                && d.message().contains("a parametric record is not a type"));
+                && d.message().contains("no position names a parametric record bare"));
     }
 
     /** The family §5.10 declares with records: the base states the selector, the parametric record composes it. */

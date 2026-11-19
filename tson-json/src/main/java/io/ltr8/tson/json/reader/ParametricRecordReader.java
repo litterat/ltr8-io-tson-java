@@ -8,7 +8,7 @@ import io.ltr8.tson.json.JsonTypeReader;
 import java.util.List;
 
 /**
- * An entry that declares type parameters. A parametric record is not a type until it is applied ([TSON-SCHEMA] §5.10),
+ * An entry that declares type parameters. No position names a parametric record bare ([TSON-SCHEMA] §5.10),
  * so naming one as a root type or reaching one from a position is an ordinary data diagnostic rather than a
  * fault -- a schema naming one unapplied was already refused at link time.
  *
@@ -36,8 +36,8 @@ final class ParametricRecordReader implements JsonTypeReader<Object> {
 
     private String message() {
         return "'" + name + "' is a parametric record taking " + parameters.size() + " type argument"
-                + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", and a parametric record is not a type "
-                + "until it is applied (§5.10) -- name the application in the schema ('my_type => " + name
-                + "<...>') and bind this document to 'my_type'";
+                + (parameters.size() == 1 ? "" : "s") + " " + parameters
+                + ", and no position names a parametric record bare (§5.10) -- name the application in the schema "
+                + "('my_type => " + name + "<...>') and bind this document to 'my_type'";
     }
 }

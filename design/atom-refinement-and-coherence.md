@@ -118,7 +118,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `SchemaValidationException`
   when a body's own facets admit nothing (`{ min_length: 10 max_length: 3 }`, `{ min: 10 max: 3 }`,
   `{ min_prefix: 40 max_prefix: 8 }`). §7.2 puts the rule and its home in one sentence — "family coherence
-  between bindings (e.g. `min ≤ max`) is a **compilation** and ingest concern (§8), **not data validation**"
+  between bindings (e.g. `min ≤ max`) is a compilation concern (§8), not data validation"
   — which is also why it cannot live in the atom parsers. Running it at *resolution* rather than compilation
   is deliberate and strictly earlier: the bound constraint objects first exist here, and both are schema-load
   time. It asks the **container** families the same question through `Product.coherenceCheck()`, the
@@ -126,16 +126,13 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the one rule since they carry the identical pair. Stating it on the family rather than with any one
   spelling is what makes `[text; 5..3]` and the `!meta.array { … min_items: 5 max_items: 3 }` body it denotes get
   the same verdict — they are one type, and a rule kept in the desugar phase would only ever see the
-  first. `TsonSchemaLinker` asks it a second time for the bodies **materialisation** produces, which
-  resolution never saw closed: §8.2's "family coherence rules whose operands were parameters" is exactly a
-  parametric record whose bounds were `MIN`/`MAX` until an application supplied both. numeric.tn's header `@doc` states the
+  first. `TsonSchemaLinker` asks it again of every entry (`checkCoherent`), the bodies **materialisation**
+  produces among them; no facet holds a parameter (§5.10), so a closed body's facets are ones its declaration already
+  wrote, and §8.2 re-judges only what an argument decides. numeric.tn's header `@doc` states the
   same obligation from the other side, for its families and temporal.tn's: bounds are field groups, so an
   inclusive/exclusive pair on one side is unrepresentable, while "a lower bound does not exceed the upper" is a
   rule over the body. `net.cidr4_type`'s `@doc` adds the family range, `min_prefix` and `max_prefix` lying in
   0-32, so the CIDR pair is judged against its address width as well as against itself.
-  - **The linker asks every family, and needs no list to do it.** `TsonSchemaLinker` asks **every** family the
-    same question again for the bodies materialisation produces, which is how §8.2's "every family coherence rule
-    ... asked once more of the closed record" is met without a list — "a resolver needs no list", as it puts it.
   - **Hooked in `bindAtomInstance`, not at either call site**, because that is where the `!C value` and `!I ^ { ... }`
     paths meet — one hook covers both. `checkCoherent` asks an `Atom`, `Product` or `Sum` body; any other passes
     through. Running it after binding is what makes it generic: facets arrive converted to the host type their family

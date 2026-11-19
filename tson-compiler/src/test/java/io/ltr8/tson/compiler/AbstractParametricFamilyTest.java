@@ -24,9 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * { payload: T }} makes every instantiation abstract, so a value at a {@code result<text>} position is a
  * value of one of that instantiation's own subtypes and must name which.
  *
- * <p><b>The mark is each application's {@code extension}.</b> A parametric record is no type, so {@code abstract} on one
- * says nothing of the parametric record itself: closing carries it, with the parametric record's selectors, to the record
- * each application denotes. {@code final} is refused on a parametric record, which is applied to be composed (§5.2, §5.10).
+ * <p><b>The mark is each application's {@code extension}.</b> No position names a parametric record bare, so {@code
+ * abstract} on one says nothing of the parametric record itself: closing carries it, with the parametric record's selectors,
+ * to the record each application denotes. {@code final} is refused on a parametric record, which is applied to be composed
+ * (§5.2, §5.10).
  *
  * <p><b>The family it is abstract over is the one {@code ParametricSubtypeFamilyTest} builds</b>: a subtype
  * parametric record's closed application gets an IS-A edge to its base's instantiation at the same argument, so

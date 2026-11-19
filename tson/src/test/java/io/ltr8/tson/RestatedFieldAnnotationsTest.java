@@ -15,12 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §5.7/§5.8: what happens to a field's annotations when a composition body restates it.
+ * [TSON-SCHEMA] §5.8: what happens to a field's annotations when a composition body restates it.
  *
  * <p><b>They merge over, restatement first.</b> An inherited field is absorbed whole and keeps everything;
  * a restated one keeps its own annotations and the inherited ones after them.
  *
- * <p>The spelling that makes the rule necessary is §5.7's modifier-only entry: {@code legacy_id?: ~ "none"}
+ * <p>The spelling that makes the rule necessary is §5.8's modifier-only entry: {@code legacy_id?: ~ "none"}
  * names no type, tightens the value and nothing else, and has no annotation position at all -- so an entry that
  * mentions nothing must not be able to erase what it does not mention.
  *

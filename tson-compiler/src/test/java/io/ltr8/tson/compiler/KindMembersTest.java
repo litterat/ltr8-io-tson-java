@@ -118,7 +118,7 @@ class KindMembersTest {
     }
 
     /**
-     * A parametric record is no type and no member (§5.10): it is a record with parameters, built with {@code record}, and a
+     * A parametric record is no member (§5.10): it is a record with parameters, built with {@code record}, and a
      * kind of {@code record} holds its applications and not it. A set is an array, so a kind of {@code meta.array} holds it,
      * and the root's {@code set}, an alias of an incomplete entry, is no type and no member.
      */

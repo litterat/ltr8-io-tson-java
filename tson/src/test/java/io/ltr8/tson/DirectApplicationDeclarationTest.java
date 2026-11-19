@@ -113,7 +113,7 @@ class DirectApplicationDeclarationTest {
         assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().head().name());
         assertEquals("box", linked.schema().applicationOf("by").orElseThrow().head().name());
         assertEquals(java.util.List.of(), TypeChain.subtypesOf(linked.schema().entries().get("box")),
-                "a parametric record is no type, and indexes neither");
+                "a parametric record is in no index");
     }
 
     // ── What it buys a family: the member is named by its declaration ───

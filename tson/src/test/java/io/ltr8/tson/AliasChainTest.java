@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * [TSON-SCHEMA] §8.3: an alias is a hop, not a rewrite.
  *
- * <p>Resolved output states the chain as the author wrote it. A type position naming an {@code ALIAS}
+ * <p>Resolved output states the chain as the author wrote it. A type position naming an alias
  * entry keeps that name, no annotation records where it "really" points, and the chain stays walkable end to
  * end — which it had to anyway, since {@code alias.target} was never flattened and the entries never
  * left the namespace.
@@ -106,7 +106,7 @@ class AliasChainTest {
 
     /**
      * The behavioural half, and the reason none of the above costs anything: a read still reaches the end of
-     * the chain, because the reader for an {@code ALIAS} entry <em>is</em> its target's reader. The
+     * the chain, because the reader for an alias entry <em>is</em> its target's reader. The
      * constraint at the end of the chain applies at a position two hops in front of it.
      */
     @Test

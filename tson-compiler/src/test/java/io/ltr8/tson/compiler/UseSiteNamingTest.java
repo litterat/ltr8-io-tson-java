@@ -18,9 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A diagnostic names the type <b>the author wrote at that position</b>, not the entry at the end of the
  * alias chain it resolves to.
  *
- * <p>[TSON-SCHEMA] §8.3 flattens a type position past an {@code ALIAS} entry and records the name the
- * author wrote as {@code @alias} on the type-ref, so {@code c: pct} over {@code pct => small} arrives at the
- * reader as {@code small} -- one shared reader, correctly named {@code small} for a position that names it
+ * <p>An alias entry's reader is its target's ({@code UseSite}), so {@code c: pct} over {@code pct => small} reaches
+ * one shared reader, correctly named {@code small} for a position that names it
  * directly, and wrong for one that does not. A construction written in place ({@code e: pair_of<int32>}) has no
  * entry, so its message names the application it was written as, its constructor and arguments.
  *

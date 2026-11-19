@@ -182,8 +182,9 @@ piece of work. `design/json-encoding.md` states that goal and what it rules out 
 
 **A JSON member name that is not an identifier is a value of the record's name type.** A field name is an
 identifier unless its record's `name_type` says otherwise ([TSON-SCHEMA] §5.2; [TSON-DATA] §2.5), so a converted
-schema declares an identifier type admitting what the vocabulary's names use (`json_name => !identifier_type {
-start_add: "@$" }`) and `{"first name": 1}` is read under a name type admitting the space; schemaless, it is refused.
+schema declares an identifier type admitting what the vocabulary's names use (`json_name =>
+!unicode.identifier_type { start_add: "@$" }`) and `{"first name": 1}` is read under a name type admitting the
+space; schemaless, it is refused.
 
 **Untagged unions.** Native TSON data announces a union member with `!typeName value` — the type-ref *is* the
 discriminator — and bare JSON has no such mechanism. [TSON-JSON] §8.2 lets a tag be omitted by exactly two

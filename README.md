@@ -57,8 +57,8 @@ including records, record groups, enums and some in-built types. The `2026/40` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/40/getting-started/person.tn?sha256=8ec8a8c76fce66577d6b4725e9f2211efe2fe076a97141b3f7f616d5b9207113"
-!!import:"https://tson.io/2026/40/m/core.tn?sha256=f3a36e6b91d108f89e24f65bb55a66e8f3661b58581688848f4d8215d7308d21"
+!!id:"https://example.com/2026/40/getting-started/person.tn?sha256=1db107ec9fc3708817ab76390f1327696f1b26bea1f869515c28c17a03a967cf"
+!!import:"https://tson.io/2026/40/m/core.tn?sha256=00eaf2174c7ba05510ce8410a4b7577bf6fd4bf6db8f099a7c8ec02edd053241"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 !schema {
   role => !enum [admin member guest]
@@ -550,7 +550,7 @@ vocabulary — parse → resolve → link → register → compile → read:
    written in place, `{ of: !meta.array { … } }`, with no entry of its own, and equal forms are one type.
 3. **Resolve** (`SchemaResolver`) — one declaration at a time, the AST becomes a concrete
    value (`Top`): composition induces supertypes, flattens fields and tightens a restated
-   inherited field against a state-transition table, a constructor application (`!C value`) builds an
+   inherited field along its three orders (Part 2 §5.8), a constructor application (`!C value`) builds an
    instance tagged with its constructor and IS-A nothing, and so on. A reference to another declaration is
    still a bare, unverified name at this point.
 4. **Link** (`TsonSchemaLinker`) — the whole-schema pass: merges `!!import`s, populates `subtypes`, derives

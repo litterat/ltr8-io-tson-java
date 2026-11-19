@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The rules a type written in place is held to beside a name ([TSON-SCHEMA] §5.2, §5.4, §5.7, §8.2): a value modifier
+ * The rules a type written in place is held to beside a name ([TSON-SCHEMA] §5.2, §5.4, §5.8, §8.2): a value modifier
  * on an inline reference, a name never one type with a construction, a choice that is not disjoint naming every
  * variant, an application of a parametric record absorbed at a composition operand, what a type in place may carry, and an
  * abstract record in place empty.
@@ -183,7 +183,7 @@ class InlineTypeRulesTest {
         refused("  c => @meta.disjoint ( [text] | [int32] )", "asserts @meta.disjoint");
     }
 
-    // ── An application at a composition operand is absorbed (§5.7, §5.8) ────────────────────────
+    // ── An application at a composition operand is absorbed (§5.8) ────────────────────────
 
     @Test
     void anApplicationRestatedAtAnOperandIsAbsorbed() {

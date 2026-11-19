@@ -38,7 +38,7 @@ import java.util.Optional;
  * enclosing record's own statement ({@code record.discriminators}), because §5.8 flattens a base's fields
  * into every member -- a per-field mark would have to be cleared again at each one, where a member's record
  * simply states none. What the linker checks of a named field -- required, not voidable, no group member, an
- * atom or enum type, no value of its own, and every subtype pinning it distinctly -- is §5.2's and §5.7's.
+ * atom or enum type, no value of its own, and every subtype pinning it distinctly -- is §5.2's and §5.8's.
  *
  * <p><b>{@code position} is {@code @Unbound}</b>: §8.1's {@code meta.record_field} declares no such field, so nothing
  * fills it and the strict binding check would call it a mismatch. It is this implementation's own, kept for diagnostics
@@ -192,10 +192,10 @@ public record RecordField(TypeExpr type, boolean optional, boolean voidable, Fie
     /**
      * A copy of this field with {@code type} replaced -- every other component unchanged.
      *
-     * <p><b>Use this rather than the constructor wherever a field is rebuilt.</b> §8.3's use-site flattening
-     * rewrites every field's type-ref, and a rebuild that names components positionally silently drops the
-     * ones it does not mention -- {@code annotations} and {@code position} both, the second of which no test
-     * comparing resolved values can catch, since it is excluded from equality.
+     * <p><b>Use this rather than the constructor wherever a field is rebuilt.</b> A rebuild that names
+     * components positionally silently drops the ones it does not mention -- {@code annotations} and {@code
+     * position} both, the second of which no test comparing resolved values can catch, since it is excluded from
+     * equality.
      */
     public RecordField withType(TypeExpr type) {
         return new RecordField(type, optional, voidable, role, value, annotations, position);

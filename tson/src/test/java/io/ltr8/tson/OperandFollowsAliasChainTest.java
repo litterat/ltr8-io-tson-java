@@ -146,7 +146,7 @@ class OperandFollowsAliasChainTest {
                   sub => bx & { item?: text = "x" }
                 """);
 
-        assertEquals(List.of("item"), fieldNames(linked, "sub"), "a restatement adds no field (§5.7)");
+        assertEquals(List.of("item"), fieldNames(linked, "sub"), "a restatement adds no field (§5.8)");
         assertTrue(TypeChain.supertypesOf(linked.schema().entries().get("sub")).contains("bx"),
                 () -> "and preserves IS-A: " + TypeChain.supertypesOf(linked.schema().entries().get("sub")));
     }

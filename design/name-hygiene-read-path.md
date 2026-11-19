@@ -77,14 +77,12 @@ the pair reads coherently where the suppressed one contradicted it.
 *set*, asked of a record's field names after the record is read, so there is no `next()` to checkpoint
 around — and it produces no comparable misinstruction.
 
-A Class 1 document carries two names — a type-ref name and an annotation name, the positions §7.4 marks
-`meta.identifier` — and §8.2's restricted-character and restricted-script rules apply to both, **on by default**. They
-run in
-`DefaultTsonReadContext` as the name's event is first pulled, that being the first point on the read path
-holding the read's diagnostics receiver for names: what `TsonDataStream` raises of its own is a thrown
-`ParseException`, so a name check there could only say
-"invalid", which is the one thing a refusal is not. What stays in the stream is §7.7's grammar, where a
-failure really is a parse error.
+Beside its field names a Class 1 document carries two names, a tag's and an annotation's, each a qualified name whose
+segments are identifiers (§7.4, §7.7), and §8.2's restricted-character and restricted-script rules apply to both, **on
+by default**. They run in `DefaultTsonReadContext` as the name's event is first pulled, that being the first point on
+the read path holding the read's diagnostics receiver for names: what `TsonDataStream` raises of its own is a thrown
+`ParseException`, so a name check there could only say "invalid", which is the one thing a refusal is not. What stays
+in the stream is §7.7's grammar, where a failure really is a parse error.
 
 **Only on a freshly pulled event.** `lookingAhead` rewinds what it consumed and a reader replays it, and
 `AnnotationCapture` builds a probe context over events already seen — so checking every event would report

@@ -534,11 +534,6 @@ public final class TsonSchemaParser extends TsonDataParser {
         // instance = [type-params] "!" qualified-name ws core-value (§12.1) -- see Instance's own Javadoc. The
         // constructor name goes straight into the wrapping DataValue's own typeRef; there is no room in this
         // production for the payload to carry further annotations or a second, competing type-ref.
-        //
-        // A parameter list makes it a parametric record and changes nothing else, which is the point: the payload is
-        // held rather than read against the constructor's own vocabulary, so every core-value the closed form
-        // admits the open one admits too -- a collection included, which is what the separate template-def
-        // production could not express.
         return new Instance(typeParams, new DataValue(List.of(), Optional.of(target), parseCoreValue()));
     }
 

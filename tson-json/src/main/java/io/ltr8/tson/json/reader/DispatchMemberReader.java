@@ -80,7 +80,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     private final Set<String> selectorNames;
     private final Normalization nameForm;
 
-    /** The pins, as they compare, to the member that states them -- §5.7's mapping, derived and never declared. */
+    /** The pins, as they compare, to the member that states them -- §1.6's mapping, derived and never declared. */
     private final Map<List<Object>, String> members;
 
     /** Where a value goes once selected, by every name a member or a deeper tag may reach it under. */
@@ -247,8 +247,8 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
             return routes.get(selected).read(ctx, tag);
         }
         // A tag goes where it names, which is §6.1.5's "deeper than one level": the pins are inherited and
-        // §5.7 forbids changing them, so a family dispatches one level by member and every level below it by
-        // tag. Whether the tag agrees with the discriminator is the selected reader's to say -- it re-reads
+        // [TSON-SCHEMA] §5.8 forbids changing them, so a family dispatches one level by member and every level
+        // below it by tag. Whether the tag agrees with the discriminator is the selected reader's to say -- it re-reads
         // the whole object and re-verifies each pin as an ordinary FIXED check, so a tag naming anything but
         // the dispatched member or a subtype of it meets a pinned field the document contradicts.
         Route route = routes.get(tag.type());

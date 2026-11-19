@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Construction sugar ([TSON-SCHEMA] §5.3, proposed for Revision 40): {@code C<a₁ … aₙ>} over a constructor {@code C}
+ * Construction sugar ([TSON-SCHEMA] §5.3): {@code C<a₁ … aₙ>} over a constructor {@code C}
  * is the construction {@code !C { f₁: a₁ … fₙ: aₙ }}, its required fields typed by a reference naming types and not
  * pinned by its chain, in declaration order -- one entry with the sugar forms {@code [T]} and {@code {K => V}}, and
  * every verdict the construction written in braces would get.
