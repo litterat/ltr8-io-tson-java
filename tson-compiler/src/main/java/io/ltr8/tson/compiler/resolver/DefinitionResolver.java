@@ -39,7 +39,6 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.CollectionFacets;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Completion;
@@ -132,9 +131,8 @@ import java.util.stream.Stream;
  * loosens its source ({@link #checkNarrows}); a name in a {@code !} position that resolves nowhere in the
  * namespace ({@link #resolveConstructorTarget}, {@link #resolveAtomRefinement}); a {@code !} form used
  * against the wrong kind of target -- refining a constructor of values or a record, applying a non-constructor,
- * refining a non-atom -- each answered with the form the author probably meant; a supertype chain reaching two
- * base kinds ({@link #determineKind}); and a body or annotation value the compiled reader rejects, which
- * arrives as a {@link ReadException} and is restated as a schema error
+ * refining a non-atom -- each answered with the form the author probably meant; and a body or annotation value
+ * the compiled reader rejects, which arrives as a {@link ReadException} and is restated as a schema error
  * ({@link #bodyIsNotValidData}).
  *
  * <p><b>No construct of the schema grammar is a gap.</b> Every {@code UnsupportedOperationException} this
@@ -169,14 +167,6 @@ import java.util.stream.Stream;
  *   §3.4).</li>
  * </ul>
  * Either getter can be an always-{@code null} lookup for a resolver that never needs it.
- *
- * <p><b>Kind determination</b> (§4.1, {@link #determineKind}) checks the transitive supertype chain for the
- * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum} -- not a general
- * "inherit the nearest ancestor's own kind" rule, which would be wrong: {@code atom} the entry is itself
- * {@code kind: PRODUCT}, its own chain being {@code [top type]}. None found is {@code PRODUCT} (the
- * structural default), exactly one is that kind, and two or more is a schema error. A fresh (non-composed)
- * record has an empty chain by construction, so it is always {@code PRODUCT}. The kind is not stored: it is
- * the value's ({@code EntryKind.of}), read from the same chain.
  *
  * <p><b>A chain is the resolver's to compute, never the author's to write</b> ([TSON-SCHEMA] §4.1): a
  * construction or an atom refinement stating {@code supertypes} or {@code subtypes} is refused
@@ -734,8 +724,8 @@ final class DefinitionResolver {
      * already names {@code C} (per {@code Instance}'s own reshape, matching §12.1's {@code instance = "!"
      * type-name ws core-value}); positional form (§5.6) and schema-composed defaults (§5.2/§5.7) are handled
      * uniformly by the compiled {@code Record*Reader} itself (see {@code RecordAbstractReader}'s own
-     * Javadoc), not by a separate normalization step here. Construction transfers only {@code C}'s {@code
-     * kind} (§5.5): no supertypes, no parameters, {@code constructor: false} on the result -- except for an
+     * Javadoc), not by a separate normalization step here. Construction grants no IS-A (§5.5): no
+     * supertypes, no parameters, {@code constructor: false} on the result -- except for an
      * alias, where the result is the entry {@code name => X} denotes, since {@code !meta.alias { target: X }}
      * is that alias written out (§8.3).
      *
@@ -770,7 +760,7 @@ final class DefinitionResolver {
                     + "<...>' with its arguments (§5.10). '!" + target + " { ... }' fills a constructor's own "
                     + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
         }
-        if (!EntryKind.isConstructor(head.name(), constructor, vocabularyKernel)) {
+        if (!TypeChain.isConstructor(head.name(), constructor, vocabularyKernel)) {
             return resolveValueEntry(name, target, head, instance.value());
         }
         refuseAbstractHead(name, target, constructor);
@@ -976,7 +966,7 @@ final class DefinitionResolver {
         }
         String prefix = "'" + name + "': a template's body is a record body -- braces or a composition (§5.10) -- "
                 + "and '!" + target + " { ... }' ";
-        if (EntryKind.isConstructor(head.name(), head.definition(), vocabularyKernel)) {
+        if (TypeChain.isConstructor(head.name(), head.definition(), vocabularyKernel)) {
             String open = head.name().equals(KernelNames.of("array"))
                     ? "'nonempty => !" + target + " ^ { min_items: 1 }'"
                     : "'my_" + target.substring(target.lastIndexOf('.') + 1) + " => !" + target + " ^ { ... }'";
@@ -1174,8 +1164,8 @@ final class DefinitionResolver {
     /**
      * {@code !I ^ { values }} -- refines an atom-family instance by tightening its constructor's
      * constraint fields. {@code I} resolves in the schema's one namespace, this document's own entries
-     * included (§3.3.1), and MUST be a non-constructor instance of an atom family (kind {@code ATOM},
-     * {@code constructor: false}). The constructor {@code I} was built from is reached through {@code I}'s
+     * included (§3.3.1), and MUST be a non-constructor instance of an atom family, its body an
+     * {@link Atom}. The constructor {@code I} was built from is reached through {@code I}'s
      * own facts -- the tag its value carries -- never a further name lookup.
      *
      * <p>Unlike {@link #resolveInstance}, {@code refinement.bindings()}'s own {@code typeRef} is not
@@ -1217,8 +1207,8 @@ final class DefinitionResolver {
         // (`integer` carries an `!numeric.integer_type {}`), where its constructor's body is the vocabulary record
         // describing one (`integer_type` carries a `!meta.record { ... }`). So one test separates the pair and
         // establishes atom-ness at once, where neither half does alone -- a plain record has no supertypes
-        // either, and `integer_type` is ATOM-kinded exactly like its instances. It is also how the reader
-        // stack decides everything of this shape (`Subsumption`), rather than trusting a stated kind.
+        // either, and `integer_type`'s chain reaches `meta.atom` as surely as its instances are atoms. It is also
+        // how the reader stack decides everything of this shape (`Subsumption`), rather than reading a chain.
         if (source instanceof Extern extern) {
             throw Externs.sealed("'" + name + "'", "'^' refines", refinement.target(), sourceName, extern);
         }
@@ -1238,14 +1228,14 @@ final class DefinitionResolver {
             throw new SchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an atom "
                     + "instance, an array or a map type to narrow, or a constructor of types to build from (§5.5), and '"
                     + sourceName + "' is "
-                    + (EntryKind.isConstructor(sourceName, source, kernel)
+                    + (TypeChain.isConstructor(sourceName, source, kernel)
                             ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
                                     + "constructor application ('!" + sourceName + " { ... }')?"
                             : source instanceof RecordBody record
                                     ? "a record, which takes no '^' -- its fields are restated in a composition, '"
                                             + sourceName + (record.isOpen() ? "<...>" : "") + " & { ... }' (§5.8)"
-                                    : "kind=" + EntryKind.of(source, kernel) + ", which is finished and takes no "
-                                            + "refinement"));
+                                    : "a '!" + tagOf(sourceName, source) + "' value, which is finished and takes "
+                                            + "no refinement"));
         }
         // Every resolved instance records its tag, and a hand-assembled one is the class's own.
         String constructor = tagOf(sourceName, source);
@@ -1594,10 +1584,9 @@ final class DefinitionResolver {
      * <p>An alias is a hop, not a rewrite: resolved output states the chain the author wrote, and a
      * processor collapses it when it needs the type. So {@code alias_array => array} makes
      * {@code !alias_array { ... }} an application of {@code array}, and everything this resolver then asks of
-     * the head -- is it a template, is it applicable, what kind does construction transfer, whose vocabulary
-     * reads the payload -- is a question about the entry at the end. Asking the alias instead answered every
-     * one of them from an empty supertype chain and an {@code ALIAS} kind, which is what a hop looks like
-     * rather than what it points at.
+     * the head -- is it a template, is it applicable, whose vocabulary reads the payload -- is a question about
+     * the entry at the end. Asking the alias instead answers every one of them from an empty supertype chain and
+     * an {@link io.ltr8.tson.schema.meta.Alias} body, which is what a hop looks like rather than what it points at.
      *
      * <p>The author's own spelling survives where it is visible: {@link #resolveInstance} records {@code C} as
      * the value's tag, not the terminal, so the chain stays walkable from resolved output.
@@ -1996,8 +1985,6 @@ final class DefinitionResolver {
         if (construction.removal().isPresent()) {
             applyRemovals(name, construction.removal().get(), bodyNames(construction), fields, groups);
         }
-        // Two base kinds in one chain describe nothing (§4.1), refused here whether or not a removal empties it.
-        determineKind(name, transitiveSupertypes);
         // §5.9: subtraction breaks IS-A, so a subtracted record's chain is empty -- for EVERY supertype,
         // including one that contributed nothing to the removal: `A & B - { f }` with `f` from A loses IS-A with
         // B as well, though every field B declares survives untouched. The clause is head-level, so its effect
@@ -2131,36 +2118,6 @@ final class DefinitionResolver {
             list.add(name);
         }
     }
-
-    /**
-     * [TSON-SCHEMA] §4.1, §5.5: a type's kind is settled by which of the kernel's base kinds -- {@code atom}/
-     * {@code product}/{@code sum}, {@code top} never counts -- its transitive supertype chain reaches, each judged by
-     * where it is defined ({@link #kernel}), never by its spelling: a schema's own {@code atom} is an ordinary
-     * record. The base kinds themselves and not each ancestor's own kind: the {@code atom} entry is itself a PRODUCT
-     * (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's kind" would give the wrong
-     * answer even for {@code atom}'s own subtypes. A chain reaching two of them is refused.
-     */
-    EntryKind determineKind(String name, List<String> transitiveSupertypes) {
-        List<String> baseKindsFound = new ArrayList<>();
-        for (String supertype : transitiveSupertypes) {
-            if (BASE_KINDS.contains(supertype) && kernel.test(supertype)) {
-                baseKindsFound.add(supertype);
-            }
-        }
-        if (baseKindsFound.size() > 1) {
-            // §4.1's base kinds are disjoint categories, not facets a type can hold several of, so a chain
-            // reaching two of them describes nothing. A verdict, not a gap: no improvement to this library
-            // makes a type both an atom and a product.
-            throw new SchemaValidationException("'" + name + "' reaches " + baseKindsFound.size()
-                    + " base kinds through its supertypes (" + String.join(", ", baseKindsFound) + ") -- §4.1 "
-                    + "gives a type exactly one, so nothing can be both. Compose or refine from sources that "
-                    + "agree on their base kind");
-        }
-        return EntryKind.ofChain(baseKindsFound, kernel);
-    }
-
-    private static final Set<String> BASE_KINDS = Set.of(KernelNames.of("atom"), KernelNames.of("product"),
-            KernelNames.of("sum"));
 
     /**
      * One source's fields and groups copied into the record being built. Shared by the two composition paths

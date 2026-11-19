@@ -5,7 +5,6 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
@@ -128,7 +127,6 @@ class NamespaceEntryTest {
         assertEquals(new Method(TypeRef.of("order"), TypeRef.of("order"), null, null),
                 myapi.entries().get("place_order"));
         assertEquals(Optional.of("api"), linked.schema().factsOf("myapi").constructor());
-        assertEquals(EntryKind.VALUE, linked.kindOf("myapi"));
     }
 
     /** A key's annotations are the entry's, kept beside the key as a schema map's are. */
@@ -226,7 +224,6 @@ class NamespaceEntryTest {
         String id = schema("constructed", "more => !meta.namespace { key_type: meta.identifier  value_type: text }");
         assertEquals(List.of(), problems(id));
         TsonLinkedSchema linked = registry().resolveLinked(id);
-        assertEquals(EntryKind.PRODUCT, linked.kindOf("more"));
         assertTrue(linked.namespace("more").isPresent());
     }
 

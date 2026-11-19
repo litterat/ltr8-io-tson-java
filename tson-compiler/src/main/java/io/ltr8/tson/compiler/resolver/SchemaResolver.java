@@ -40,7 +40,6 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Type;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.NamespaceBody;
@@ -356,7 +355,7 @@ public final class SchemaResolver {
                             value.coreValue());
                 }
                 Top head = heads.definition(type);
-                if (head != null && !EntryKind.isConstructor(type, head, kernel)) {
+                if (head != null && !TypeChain.isConstructor(type, head, kernel)) {
                     return new ValueEntry(type, readValue(type, value));
                 }
                 return constructed(type, head, value);

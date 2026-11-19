@@ -19,6 +19,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.binary.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -27,7 +28,6 @@ import io.ltr8.tson.schema.net.Cidr6Type;
 import io.ltr8.tson.schema.numeric.ComplexType;
 import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.net.EmailType;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.FamilySelectors;
@@ -324,7 +324,6 @@ class DefinitionResolverTest {
 
         Top top = resolver.resolve(schemaMap.declarations().get("meta.top"));
 
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(top, n -> true));
         assertEquals(List.of(), TypeChain.supertypesOf(top));
         assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } parameters: [] fields: {} groups: [] extension: "
                 + "\"ABSTRACT\" "
@@ -347,13 +346,7 @@ class DefinitionResolverTest {
         Top alias = resolver.resolve(schemaMap.declarations().get("meta.alias"));
         resolved.put("meta.alias", alias);
 
-        // §4.1: atom/product/sum are each kind PRODUCT -- their own transitive chain is just
-        // [type, top], which contains none of the three literal base-kind names, so the structural
-        // default applies even to the base kinds' own entries. They compose with `type`; alias with top.
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(atom, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(product, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(sum, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(alias, n -> true));
+        // §4.1: the base kinds compose with `type`, `alias` with `top`, and no base kind's chain reaches one.
         assertEquals(List.of("meta.top", "meta.type"), TypeChain.supertypesOf(atom));
         assertEquals(List.of("meta.top", "meta.type"), TypeChain.supertypesOf(product));
         assertEquals(List.of("meta.top", "meta.type"), TypeChain.supertypesOf(sum));
@@ -398,10 +391,7 @@ class DefinitionResolverTest {
 
         Top integerType = resolver.resolve(schemaMap.declarations().get("numeric.integer_type"));
 
-        // ~atom & {...} -- propagates straight from the "~" marker; kind: ATOM
-        // because "atom" (the literal base-kind name) is in integer_type's own transitive chain.
         assertTrue(TypeChain.supertypesOf(integerType).contains("meta.top"), "a constructor: IS-A meta.top");
-        assertEquals(EntryKind.ATOM, EntryKind.of(integerType, n -> true));
         assertEquals(List.of("meta.atom", "meta.top", "meta.type"), TypeChain.supertypesOf(integerType));
 
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
@@ -428,7 +418,7 @@ class DefinitionResolverTest {
     //    regardless of what the referenced name itself resolves to.
 
     @Test
-    void resolvesBareTypeReferencesToAnAliasKindEntry() throws IOException, DataBindException {
+    void resolvesBareTypeReferencesToAnAliasEntry() throws IOException, DataBindException {
         SchemaMap schemaMap = kernelDeclarations();
 
         Top typeName = resolver.resolve(schemaMap.declarations().get("meta.type_name"));
@@ -436,12 +426,11 @@ class DefinitionResolverTest {
         Top annotation = resolver.resolve(schemaMap.declarations().get("meta.annotation"));
         Top doc = resolver.resolve(schemaMap.declarations().get("doc"));
 
-        // meta.type_name/param_name => meta.identifier; each is its own fresh ALIAS entry, not
+        // meta.type_name/param_name => meta.identifier; each is its own fresh alias entry, not
         // two views of the same one -- source/target both name "meta.identifier" for both.
-        assertEquals(EntryKind.ALIAS, EntryKind.of(typeName, n -> true));
-        assertEquals(EntryKind.ALIAS, EntryKind.of(paramName, n -> true));
-        assertEquals(EntryKind.ALIAS, EntryKind.of(annotation, n -> true));
-        assertEquals(EntryKind.ALIAS, EntryKind.of(doc, n -> true));
+        for (Top each : List.of(typeName, paramName, annotation, doc)) {
+            assertInstanceOf(Alias.class, each);
+        }
 
         assertEquals("{ target: meta.identifier }", write(typeName));
         assertEquals(write(typeName), write(paramName));
@@ -496,7 +485,7 @@ class DefinitionResolverTest {
     void resolvesASizedArrayToAConstructionOfArray() {
         Top frame = resolveSnippet("frame => [text; 1920]");
 
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(frame, n -> true));
+        assertInstanceOf(ArrayBody.class, frame);
         assertEquals(List.of(), OpenEntry.parameterNames(frame));
         assertEquals(List.of(), TypeChain.supertypesOf(frame));
         assertEquals(Optional.of("meta.array"), snippetFacts.get("frame").constructor(),
@@ -532,7 +521,6 @@ class DefinitionResolverTest {
     void aSizeLessDeclarationLevelArrayIsAConstructionWithNoSupertypes() {
         Top idList = resolveSnippet("id_list => [text]");
 
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(idList, n -> true));
         assertEquals(List.of(), TypeChain.supertypesOf(idList));
         assertEquals(Optional.of("meta.array"), snippetFacts.get("id_list").constructor());
         assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, idList).elementType());
@@ -736,7 +724,6 @@ class DefinitionResolverTest {
 
         Top array = resolver.resolve(schemaMap.declarations().get("meta.array"));
 
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(array, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(array), "the container constructors carry no parameters");
         assertTrue(TypeChain.supertypesOf(array).contains("meta.top"), "a constructor: IS-A meta.top");
         assertEquals(List.of("meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(array));
@@ -769,7 +756,6 @@ class DefinitionResolverTest {
 
         Top map = resolver.resolve(schemaMap.declarations().get("meta.map"));
 
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(map, n -> true));
         assertEquals(List.of(), OpenEntry.parameterNames(map), "the container constructors carry no parameters");
         assertTrue(TypeChain.supertypesOf(map).contains("meta.top"), "a constructor: IS-A meta.top");
         assertEquals(List.of("meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(map));
@@ -887,7 +873,6 @@ class DefinitionResolverTest {
                 .resolve(schemaMap.declarations().get("enum"));
 
         // enum_type => atom & { name_type: meta.identifier_ref  members: meta.enum_set }: the constructor.
-        assertEquals(EntryKind.ATOM, EntryKind.of(enumType, n -> true));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.atom\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
                 + "parameters: [] "
                         + "fields: { \"chain\" => { type: meta.type_chain optional: true voidable: false role: \"FREE\" } "
@@ -926,7 +911,7 @@ class DefinitionResolverTest {
         resolved.put("enum", accessResolver.resolve(schemaMap.declarations().get("enum")));
         Top accessType = accessResolver.resolve(schemaMap.declarations().get("meta.product_access_type"));
 
-        assertEquals(EntryKind.ATOM, EntryKind.of(accessType, n -> true));
+        assertInstanceOf(EnumBody.class, accessType);
         assertFalse(TypeChain.supertypesOf(accessType).contains("meta.top"), "an instance: IS-A stops at construction");
         assertEquals(List.of(), TypeChain.supertypesOf(accessType));
         assertEquals(Optional.of("meta.enum_type"), accessResolver.factsOf("meta.product_access_type").constructor());
@@ -1087,7 +1072,6 @@ class DefinitionResolverTest {
                 .parseSchemaDocument().body().declarations().get("declared"));
 
         assertEquals(ComplexType.UNCONSTRAINED, complex);
-        assertEquals(EntryKind.SUM, EntryKind.of(declared, n -> true));
         assertEquals(new DeclaredType(), declared);
     }
 
@@ -1110,7 +1094,7 @@ class DefinitionResolverTest {
 
     @Test
     void atomRefinementRejectsANonAtomFamilySource() {
-        // top resolves fine (a fresh record, kind PRODUCT by the structural default) but isn't
+        // top resolves fine (a fresh record) but isn't
         // atom-family -- !top ^ {...} must be rejected (§5.5).
         Namespace<Top> metaKernelEntries = KernelBootstrapResolver.kernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
@@ -2095,7 +2079,6 @@ class DefinitionResolverTest {
         assertEquals(List.of("name", "email"), fieldNames(subtracted));
         // IS-A broken: a subtracted record is a record with an empty chain.
         assertEquals(List.of(), bodyOf(subtracted).supertypes());
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(subtracted, n -> true));
         // the source is untouched -- removal builds a new field list, it does not edit the supertype's
         assertEquals(List.of("name", "email", "password"), fieldNames(entries.get("account")));
     }

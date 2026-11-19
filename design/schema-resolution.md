@@ -47,8 +47,10 @@ applications, field facts and refinement, groups, subtraction, and the exception
   none (`closeChains`). A declaration never writes `chain`, and a constructor never declares a field of that
   name (`refuseWrittenChain`, `refuseDeclaredChain`).
 - `subtypes` is linking's throughout: no resolved entry carries any.
-- A kind and a constructor are judged by where `top` and the base kinds are defined, never by their spelling: the
-  resolver's `kernel` predicates, `EntryKind.of(value, kernel)` and `TsonLinkedSchema.isKernel`.
+- A base kind and a constructor are judged by where `top` and the base kinds are defined, never by their spelling:
+  the resolver's `kernel` predicates, `TypeChain.isConstructor(name, value, kernel)` and `TsonLinkedSchema.isKernel`.
+- No entry carries a kind (§5.5), and nothing asks which base kind a chain reaches. Two are refused by no check of
+  their own: each base kind holds `meta.type`'s `chain`, so the composition is a diamond (§5.8).
 - No entry is IS-A a template (§5.10): an application's edges are its template's written parents'. A use-site
   application whose record in place would be IS-A a declared type is refused (`TemplateMaterialiser.refuseMembership`,
   §5.2).
@@ -215,9 +217,9 @@ A resolved entry's `subtypes` is empty: linking computes it one phase later, ove
 
 ## Value entries
 
-`name => !T { … }` with `T` no constructor (not IS-A `top`, `EntryKind.isConstructor`) is a value entry: `resolveInstance`
+`name => !T { … }` with `T` no constructor (not IS-A `top`, `TypeChain.isConstructor`) is a value entry: `resolveInstance`
 hands it to `resolveValueEntry`, which reads the payload against `T` as a data value is read and returns a `ValueEntry(T,
-value)` of kind `VALUE`, `T` recorded as the entry's constructor fact for the tag
+value)`, `T` recorded as the entry's constructor fact for the tag
 (`design/namespace-types-and-value-entries.md` has the read, the binding and the tree fallback). The resolver's part: a head
 that is itself a value is refused (a value has no instances), a braced payload at an atom type is refused with the `^` it is
 missing, and a payload that is no value of `T` is refused against the entry with the read's path. A namespace type is the
@@ -410,8 +412,8 @@ at the value it could not read (`TsonCli.exitCodeFor` lifts the run to 70).
 One Java type per kernel record or enum, in the package of the namespace that declares its entry (`schema.meta`,
 `schema.unicode`, `schema.numeric`, `schema.net`, `schema.binary`, `schema.temporal`), so the binder reaches it by
 path (`design/front-door-and-config.md`); a class no entry declares stays in `schema.meta`.
-`Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as Java subtyping, and an entry's kind is
-`EntryKind.of(value, kernel)`, derived and never stored. Every `Type` record carries `TypeChain chain` as its first
+`Top`/`Type`/`Atom`/`Product`/`Sum` replicate §4.1's composition chain as Java subtyping, so what an entry is
+reads off its value's class. Every `Type` record carries `TypeChain chain` as its first
 component, mirroring the constructor's flattened shape (`type`'s field first);
 `Alias`, `ValueEntry` and `IncompleteEntry` carry none. `TypeRef` is the parsed form of a reference value, a name:
 sealed over `NameRef` and `ParamRef`, which only an open record makes of a name its parameters declare. An application

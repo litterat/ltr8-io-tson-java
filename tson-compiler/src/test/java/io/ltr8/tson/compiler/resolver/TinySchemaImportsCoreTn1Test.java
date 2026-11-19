@@ -16,13 +16,13 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * A small, user-defined schema -- not one of this library's own bundled documents -- that imports
@@ -103,9 +103,9 @@ class TinySchemaImportsCoreTn1Test {
         assertEquals(Set.of("my_int", "my_percentage", "my_record"), resolvedTiny.entries().keySet());
 
         Top myInt = resolvedTiny.entries().get("my_int");
-        assertEquals(EntryKind.ALIAS, EntryKind.of(myInt, n -> true));
+        assertInstanceOf(io.ltr8.tson.schema.meta.Alias.class, myInt);
         Top myRecord = resolvedTiny.entries().get("my_record");
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(myRecord, n -> true));
+        assertInstanceOf(io.ltr8.tson.schema.meta.RecordBody.class, myRecord);
 
         // Links (merging core.tn's own entries in, via the shared schemaRegistry this time --
         // TsonSchemaLinker's own import-merge, a separate pass from resolveSchema's own above) and

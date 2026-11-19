@@ -6,7 +6,6 @@ import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import org.junit.jupiter.api.Test;
@@ -50,16 +49,15 @@ class ChoiceSugarResolutionTest {
     /**
      * At declaration position the sugar <em>is</em> the construction, so the entry itself carries the
      * {@code ChoiceBody}. It resolves as the ordinary construction of
-     * {@code choice} it desugars to: its tag is the constructor, SUM kind comes from that
-     * constructor, and {@code supertypes} stays empty because §5.5 transfers the target's kind and nothing
-     * else -- which is also all §8.1's own Choice row claims.
+     * {@code choice} it desugars to: its tag is the constructor, and {@code supertypes} stays empty because
+     * construction grants no IS-A (§5.5) -- which is also all §8.1's own Choice row claims.
      */
     @Test
-    void aDeclaredChoiceIsASumEntryCarryingAChoiceBody() {
+    void aDeclaredChoiceIsAnEntryCarryingAChoiceBody() {
         TsonSchema schema = resolve("  contact => (text | integer)");
 
         Top contact = schema.entries().get("contact");
-        assertEquals(EntryKind.SUM, EntryKind.of(contact, n -> true));
+        assertInstanceOf(ChoiceBody.class, contact);
         assertEquals(List.of("text", "integer"), variantNames(contact));
         assertEquals(java.util.Optional.of("meta.choice"), schema.constructorOf("contact"));
         assertTrue(TypeChain.supertypesOf(contact).isEmpty(), () -> "expected no supertypes, got "

@@ -85,7 +85,7 @@ that names values gets `namesTypes` false and no members.
   member of nothing and no `of`: `tags => set<text>` is a member of `meta.ref<meta.array>`, `meta.top` of
   `meta.type_ref`,
   `meta.ref<meta.product>` and `meta.ref<meta.record>`, and so is a constructor whose declaration is a record:
-  membership is not `EntryKind.isConstructor`, which answers applicability.
+  membership is not `TypeChain.isConstructor`, which answers applicability.
 - **A kind is a member of itself where the walk says so.** `meta.type_ref` is built with `meta.ref`, which IS-A
   `meta.type`, so it lists itself. Nothing loops: the walk reads construction chains and never a kind's members.
 - **A constructor is read in the schema's one namespace.** `KindMembers` and `NameType` take a `structure` lookup beside

@@ -6,7 +6,6 @@ import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.OpenEntry;
@@ -94,7 +93,7 @@ final class ExternHops {
             }
             Set<String> constructors = new LinkedHashSet<>();
             constructors.add(declaredBy.apply(head) + "#" + head);
-            if (headDefinition != null && !EntryKind.isConstructor(head, headDefinition,
+            if (headDefinition != null && !TypeChain.isConstructor(head, headDefinition,
                     entry -> TsonBundledSchemas.isKernel(in.originOf(entry)) || TsonBundledSchemas.isKernel(
                             originOf.apply(entry)))) {
                 return false;

@@ -145,8 +145,8 @@ class TsonTest {
     }
 
     /**
-     * Only a name the kernel declares is fixed. {@code token} and {@code entry_kind} mangle to classes of
-     * the schema model ({@code Token}, {@code EntryKind}) and are entries of no bundled schema, so a consumer's schema
+     * Only a name the kernel declares is fixed. {@code token} and {@code value_entry} mangle to classes of
+     * the schema model ({@code Token}, {@code ValueEntry}) and are entries of no bundled schema, so a consumer's schema
      * declaring them binds them through the consumer's binder like any other name it declares.
      */
     @Test
@@ -157,12 +157,12 @@ class TsonTest {
                 !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   token => { text: text }
-                  entry_kind => { label: text }
+                  value_entry => { label: text }
                 }
                 """;
         DataBindContext context = DataBindContext.builder()
                 .nameBinder(io.ltr8.bind.DataNameBinder.ofMap(Map.of(
-                        "token", Token.class, "entry_kind", EntryKind.class, "meta.record", Point.class)))
+                        "token", Token.class, "value_entry", ValueEntry.class, "meta.record", Point.class)))
                 .build();
         Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(io.ltr8.tson.base.source.SchemaAccess.of(uri -> schema))
@@ -170,16 +170,16 @@ class TsonTest {
         io.ltr8.bind.DataNameBinder binder = tson.dataBindContext().nameBinder();
 
         assertEquals(Token.class, binder.resolve("token"));
-        assertEquals(EntryKind.class, binder.resolve("entry_kind"));
+        assertEquals(ValueEntry.class, binder.resolve("value_entry"));
         assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("meta.record"),
                 "a name the kernel declares still binds to the schema model");
 
         assertEquals(new Token("a"), tson.objectReader().read("""
                 !!import:"https://example.test/tokens.tn"
                 !token { text: "a" }""", Token.class));
-        assertEquals(new EntryKind("b"), tson.objectReader().read("""
+        assertEquals(new ValueEntry("b"), tson.objectReader().read("""
                 !!import:"https://example.test/tokens.tn"
-                !entry_kind { label: "b" }""", EntryKind.class));
+                !value_entry { label: "b" }""", ValueEntry.class));
     }
 
     @Test
@@ -204,7 +204,7 @@ class TsonTest {
     public record Token(String text) {
     }
 
-    /** A consumer's {@code entry_kind}, named as a class of the schema model is. */
-    public record EntryKind(String label) {
+    /** A consumer's {@code value_entry}, named as a class of the schema model is. */
+    public record ValueEntry(String label) {
     }
 }

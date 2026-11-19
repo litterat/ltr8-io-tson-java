@@ -10,10 +10,10 @@ package io.ltr8.tson.schema.meta;
  * {@code sum => type & {}} become {@link Atom}/{@link Product}/{@link Sum} each {@code extends Type};
  * {@code alias => top & { target: meta.type_ref } } (which composes with {@code top} directly, not
  * through {@code type}) becomes {@link Alias} implementing this interface directly. Lets a consumer
- * test kind ancestry with an ordinary {@code instanceof Type}/{@code instanceof Product} rather than
- * switching on {@link EntryKind} by hand, and also lets {@code ltr8-bind}'s generic writer/reader dispatch on this same
- * sealed hierarchy directly for {@code !meta.record}/{@code !meta.array}/etc. type-refs -- {@code
- * DefaultUnionBinder} recurses through a multi-level sealed hierarchy like this one (a permitted
+ * test base-kind ancestry with an ordinary {@code instanceof Type}/{@code instanceof Product}, and also lets
+ * {@code ltr8-bind}'s generic writer/reader dispatch on this same sealed hierarchy directly for {@code
+ * !meta.record}/{@code !meta.array}/etc. type-refs -- {@code DefaultUnionBinder} recurses through a
+ * multi-level sealed hierarchy like this one (a permitted
  * subclass that's itself sealed is flattened, not left as an unusable "member"), which is what
  * makes binding straight against {@code Top}/{@link Atom} practical at all (see {@code ltr8-bind}'s
  * own README "Under development" history for the bug this fixed).
@@ -21,8 +21,8 @@ package io.ltr8.tson.schema.meta;
 
  * <p>{@link ValueEntry} is the one branch that is not built by a constructor: an entry whose value is an instance of
  * an ordinary type, {@code orders => !api { ... }} or {@code create_order => !operation { ... }}. It is a value,
- * never a type, and is how a schema puts vocabulary of its own in a schema map. Every branch is sealed, so an
- * entry's kind is decidable by inspection and every switch over them is exhaustive.
+ * never a type, and is how a schema puts vocabulary of its own in a schema map. Every branch is sealed, so
+ * every switch over them is exhaustive.
  *
  * <p>{@link Extern} is the other hop beside {@link Alias}: another schema's entry under a local name, which composes
  * {@code top} directly as an alias does.

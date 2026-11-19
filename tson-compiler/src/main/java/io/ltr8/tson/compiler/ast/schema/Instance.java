@@ -28,7 +28,7 @@ import java.util.List;
  * type-ref, since it's already there.
  *
  * <p>{@link #target()} MUST resolve to a constructor (a semantic-layer check, not enforced here).
- * Establishes no IS-A -- construction transfers only {@code target()}'s kind (§4.1, §5.5), unlike
+ * Establishes no IS-A -- construction grants none (§5.5), unlike
  * {@link AtomRefinement}.
  */
 public record Instance(List<String> typeParams, DataValue value) implements TypeDef {

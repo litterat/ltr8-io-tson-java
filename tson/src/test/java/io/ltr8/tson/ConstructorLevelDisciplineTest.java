@@ -71,6 +71,27 @@ class ConstructorLevelDisciplineTest {
                 "and everything deriving from it");
     }
 
+    /**
+     * A base kind counts only as the kernel's own entry ([TSON-SCHEMA] §5.5): a schema's own {@code product} beside
+     * the kernel's {@code atom} leaves the chain reaching one.
+     */
+    @Test
+    void aSchemasOwnProductIsNoBaseKind() {
+        assertEquals(List.of(), problems(META, CORE, """
+                  product => { size: int32 }
+                  mine    => meta.atom & product & { extra: text }
+                """));
+    }
+
+    /** Two base kinds are a diamond over {@code meta.type}'s {@code chain} ([TSON-SCHEMA] §5.5, §5.8). */
+    @Test
+    void twoBaseKindsAreRefusedAsADiamond() {
+        List<Diagnostic> problems = problems(META, CORE, "  both => meta.atom & meta.product & { extra: text }");
+
+        assertEquals(1, problems.size(), problems.toString());
+        assertTrue(problems.getFirst().message().contains("chain"), problems.toString());
+    }
+
     /** An ordinary schema composes a base kind: the kernel's {@code product} is in its namespace. */
     @Test
     void anOrdinarySchemaDeclaresAConstructor() {

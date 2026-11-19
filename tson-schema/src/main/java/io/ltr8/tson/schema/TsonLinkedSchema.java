@@ -3,12 +3,12 @@ package io.ltr8.tson.schema;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Alias;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.unicode.Normalization;
 
 import java.util.List;
@@ -230,7 +230,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
 
     /**
      * Whether {@code entryName} denotes the kernel's own entry of that name: declared by the kernel, meta.tn,
-     * or merged in from it. What a kind and a constructor are judged by
+     * or merged in from it. What a base kind and a constructor are judged by
      * ([TSON-SCHEMA] §4.1), so a schema's own {@code namespace} or {@code top} is an ordinary declaration, the
      * kernel's being {@code meta.namespace} and {@code meta.top}.
      */
@@ -238,16 +238,10 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
         return schema.entries().containsKey(entryName) && TsonBundledSchemas.isKernel(originOf(entryName));
     }
 
-    /** {@code entryName}'s kind ({@link EntryKind#of}), judged by origin; {@code null} for a name it lacks. */
-    public EntryKind kindOf(String entryName) {
-        Top value = schema.entries().get(entryName);
-        return value == null ? null : EntryKind.of(value, this::isKernel);
-    }
-
     /** Whether entry {@code name}, whose value is {@code value}, IS-A the kernel's {@code top} ({@link
-     * EntryKind#isConstructor}). */
+     * TypeChain#isConstructor}). */
     public boolean isConstructor(String name, Top value) {
-        return EntryKind.isConstructor(name, value, this::isKernel);
+        return TypeChain.isConstructor(name, value, this::isKernel);
     }
 
 }

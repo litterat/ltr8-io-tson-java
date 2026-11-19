@@ -1,14 +1,18 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.TsonSchema;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiPredicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -108,5 +112,45 @@ class TopKindHierarchyTest {
         // (Alias isn't in Atom's/Product's/Sum's own permits lists).
         Alias alias = new Alias(TypeRef.of("token"));
         assertInstanceOf(Top.class, alias);
+    }
+
+    /** The three base kinds, and an application, which stands for a type only once its open record is applied. */
+    @Test
+    void theThreeBaseKindsAndAnApplicationAreTypes() {
+        assertEquals(Set.of(Atom.class, Product.class, Sum.class, ApplyBody.class),
+                Set.of(Type.class.getPermittedSubclasses()));
+    }
+
+    @Test
+    void whatComposesWithTopDirectlyIsNoType() {
+        assertEquals(Set.of(Type.class, Alias.class, Extern.class, ValueEntry.class, IncompleteEntry.class),
+                Set.of(Top.class.getPermittedSubclasses()));
+        assertFalse(Type.class.isAssignableFrom(Alias.class));
+        assertFalse(Type.class.isAssignableFrom(Extern.class));
+        assertFalse(Type.class.isAssignableFrom(ValueEntry.class));
+        assertFalse(Type.class.isAssignableFrom(IncompleteEntry.class));
+    }
+
+    @Test
+    void anExternNamesItsConstructor() {
+        assertEquals("meta.extern", TsonSchema.constructorOf(new Extern("https://example.test/order-1.tn", "order")));
+    }
+
+    @Test
+    void anIncompleteEntryNamesItsConstructor() {
+        IncompleteEntry nonempty = new IncompleteEntry("meta.array", List.of("element_type"), "written", Map.of(),
+                List.of());
+        assertEquals("meta.array", TsonSchema.constructorOf(nonempty));
+    }
+
+    @Test
+    void anIncompleteEntryWithNothingAbsentIsABrokenInvariant() {
+        assertThrows(IllegalStateException.class,
+                () -> new IncompleteEntry("meta.array", List.of(), "written", Map.of(), List.of()));
+    }
+
+    @Test
+    void aNamespaceTypeIsAProductLikeAMapType() {
+        assertInstanceOf(Product.class, NamespaceBody.of(TypeRef.of("meta.identifier"), TypeRef.of("method"), false));
     }
 }

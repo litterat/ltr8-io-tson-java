@@ -5,7 +5,6 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -96,12 +95,11 @@ class NamespaceTypeTest {
     }
 
     @Test
-    void theLinkedSchemaRecordsTheMapAndTheKind() {
+    void theLinkedSchemaRecordsTheMapAndItsConstructor() {
         TsonLinkedSchema meta = tson("").bindRegistry().core().resolveLinked(META);
 
         assertEquals(Optional.of(NamespaceBody.of(TypeRef.of("header_name"), TypeRef.of("text"), false)),
                 meta.namespace("headers"));
-        assertEquals(EntryKind.PRODUCT, meta.kindOf("headers"));
         assertEquals(Optional.of("meta.namespace"), meta.schema().constructorOf("headers"));
         assertEquals(Optional.empty(), meta.namespace("header_name"));
     }

@@ -87,7 +87,7 @@ distinction. They rethrow the original untouched (the linker re-states only an `
   resolve. That is javac's error-type contract (it answers every question) rather than Swift's (every questioner must
   check first), and the choice is load-bearing: a `Sum`-bodied placeholder makes `parent => child & { ... }` fail
   *because* `child` did, reporting a consequence beside its cause. Swift's other half is kept — producing one means a
-  diagnostic was already reported, so it never escapes a reporting resolve and needs no `EntryKind` of its own.
+  diagnostic was already reported, so it never escapes a reporting resolve and needs no branch of `Top` of its own.
   - **It keeps the declaration's own type parameters**, the one declaration-specific thing it carries. With the arity
     dropped, an application `bl<int32>` of a broken template `bl => <T> …` is told that `bl` "declares no type
     parameters … drop the argument list" — a fix that breaks the schema further, the real one being upstream. With the

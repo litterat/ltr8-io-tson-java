@@ -9,7 +9,6 @@ import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -101,7 +100,6 @@ class NamespaceRefinementTest {
         assertEquals(TypeRef.of("meta.identifier"), small.keyType());
         assertEquals(Optional.of(3L), small.maxItems());
         assertEquals(Optional.of("meta.namespace"), linked.schema().constructorOf("small"));
-        assertEquals(EntryKind.PRODUCT, linked.kindOf("small"));
         NamespaceBody tiny = linked.namespace("tiny").orElseThrow();
         assertEquals(Set.of("small", "api"), Set.copyOf(tiny.supertypes()));
         assertEquals(Optional.of(1L), tiny.minItems());

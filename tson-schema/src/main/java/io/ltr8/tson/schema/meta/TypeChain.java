@@ -4,6 +4,7 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * The kernel's {@code meta.type_chain} ([TSON-SCHEMA] §4.1): where an entry sits in the
@@ -55,6 +56,23 @@ public record TypeChain(List<TypeExpr> parents, List<String> supertypes, List<St
     /** {@code value}'s supertypes, empty for a value that carries no chain. */
     public static List<String> supertypesOf(Top value) {
         return chainOf(value).supertypes();
+    }
+
+    /**
+     * Whether {@code value} IS-A the kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind,
+     * {@code alias} or {@code template} -- what a construction may apply, and what a compiled
+     * schema builds an instance reader for. Read off the chain, so a
+     * template composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would; and
+     * judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:
+     * it is what every other answer IS-A, and as abstract as the base kinds beneath it, so its own reader is what
+     * refuses a direct application of it. That is applicability, not kind membership: by the chain {@code top} is
+     * a type, and a member of {@code meta.type_ref}.
+     *
+     * @param name   the entry whose value {@code value} is
+     * @param kernel whether a name denotes the kernel's own entry of that name
+     */
+    public static boolean isConstructor(String name, Top value, Predicate<String> kernel) {
+        return (supertypesOf(value).contains("meta.top") || "meta.top".equals(name)) && kernel.test("meta.top");
     }
 
     /** {@code value}'s subtypes, empty for a value that carries no chain. */

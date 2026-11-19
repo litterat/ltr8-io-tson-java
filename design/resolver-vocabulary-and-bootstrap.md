@@ -17,7 +17,7 @@ itself. Current form only; history lives in git.
 - Nothing is named by its content: every entry has an author-written name. `CanonicalApplication` is one method,
   `of`, the comparison §8.2 keys an application on (the applied-parent fold, a recursion closing into its declaration).
 - Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
-  `ALIAS` entry. `AliasChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
+  alias entry. `AliasChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
 - `@meta.application` goes on the **key** of exactly the declarations that close an application of an open record,
   and `@meta.completion` on the key of exactly the declarations that complete an incomplete entry; the linker
   re-attaches both (`withNameAnnotations`), imports included; each is read as stated on ingest, and an author writing
@@ -91,11 +91,11 @@ the materialiser asks it whether a nested application is the one a declaration i
 ## References are hops, not rewrites (`tson-compiler/.../TsonSchemaCompiler.java`)
 
 **There is no use-site flattening pass and no `@alias` marker.** Resolved output states the chain the author
-wrote: a type position naming an `ALIAS` entry keeps that name, nothing is attached to record where it
+wrote: a type position naming an alias entry keeps that name, nothing is attached to record where it
 "really" points, and the chain stays walkable through the entries themselves.
 
 **A processor collapses the chain when it compiles readers** — after linking, once per entry, where the whole
-namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an `ALIAS` entry's reader
+namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an alias entry's reader
 *is* its target's reader, resolved recursively, named for the entry doing the referring, so a use site naming
 `pct` over `pct => small` reads and reports as `pct`.
 

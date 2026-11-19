@@ -902,9 +902,9 @@ it.
      `meta.extern => meta.top & { schema: iri_reference  type: text }` beside `meta.alias` (§6).
      - **A hop.** An extern is another name for its target, across a schema boundary: its
        identity is the target's, and a reference's membership, a choice's distinct variants
-       and its disjointness are judged of the target, by identity. Its entry takes a fifth
-       kind, EXTERN, from its form, as an alias takes ALIAS, and carries no chain (§4.1,
-       §8.1); resolver output writes it as written and each use by the extern's name.
+       and its disjointness are judged of the target, by identity. Its entry is no type
+       and carries no chain, as an alias's (§4.1, §8.1); resolver output writes it as
+       written and each use by the extern's name.
      - **What it names.** A type a value can have, anywhere in the foreign schema's
        namespace. A template, an incomplete entry, a constructor, a value entry, a
        schema map and an unknown name are each refused. An extern names a type and nothing
@@ -1084,6 +1084,20 @@ it.
      and a family across schemas, and an open record reads outside the series as a record
      admitting further fields. An application still **closes** a template, and a record
      without parameters is **closed**. §8.1's paragraph is **Templates**.
+134. **§4.1, §5.5, §8.1** — an entry has no derived kind. §8.1 gave a consumer of resolver
+     output a rule labelling each entry ATOM, PRODUCT, SUM or ALIAS, and §4.1 said every
+     entry has exactly one. No rule of the series turns on the label, and its default was
+     wrong: `meta.top`, `meta.type`, `meta.alias`, `meta.apply`, `meta.atom` and `meta.sum`
+     came out PRODUCT, as did any constructor reaching no base kind. The derivation and
+     the membership sentence are deleted, and with them the fifth label this revision
+     would have added for an extern. What stays is the base kinds themselves and §5.5's
+     statement that a constructor's chain reaches at most one, which it now gives its
+     reason for: two are a diamond over `meta.type`, refused by §5.8, and no rule of
+     §5.5's own. What a consumer read
+     from the label it reads from the entry: an alias or an extern by its tag, the base
+     kind of a type by whether its constructor IS-A `meta.atom`, `meta.product` or
+     `meta.sum`. "-kinded" is reworded wherever it stood (§5.2, §5.4, §5.5, §7.8, §8.1's
+     table, §8.3), and the glossary's **kind** is a reference's admitted set alone.
 
 ### 3.3 Companion artifacts
 
@@ -1371,7 +1385,7 @@ carries no open questions.
 | Item 109 (ruled) | `^` always follows `!name` and its body is values; `&` always follows a bare name and its body is field definitions, the only way to derive a record. | **[settled]** — the spec author's ruling. |
 | Items 108–109 (lost) | `a: enum`; a reference over sets alone; a set's `voidable: false` as a pin; a resolved form listing every name its source offers; `^`'s refusal of a new field. | Recorded — items 108 and 109 state each, and the replacement where there is one. |
 | Items 116–118 (ruled) | The extern is singular and a scope change; the tag at its boundary is the enclosing scope's; `type` is `text`; its schema loads with the imports and the declaring document is refused unless every foreign schema loads, holds the same kernel and closes no cycle; the head is written `meta.extern`; the boundary is absolute, no value entry brought in and no name selecting through it; a default or pin at a field typed by it is refused; an annotation through it is admitted; the import closure limit counts it. | **[settled]** — the spec author's rulings. |
-| Item 116 (reading) | An extern entry's kind. The text gives it a fifth kind, EXTERN, conferred by its form as ALIAS is, so a consumer of resolver output derives it from the entry alone; the alternative, its target's kind, needs the foreign schema loaded to derive. | **[settled]** — the spec author's ruling, who expects the derived kind to go, nothing reading it; EXTERN goes with it. |
+| Item 116 (reading) | An extern entry's kind: a fifth, EXTERN, conferred by its form, or its target's. | **Superseded by item 134**: no entry has a derived kind. |
 | Item 116 (ruled) | `meta.extern.schema` is `iri_reference`, what an `!!import`'s value is ([TSON-DATA] §3.3), so an extern names every schema an import may, a path-only reference to a library entry among them. `iri`, as first written, required a scheme and refused `/local/orders.tn` where `file:/local/orders.tn`, the same identity, passed. | **[settled]** — the spec author's ruling. |
 | Item 116 (reading) | A schema declares no value entry of an extern type: `!order_v1 { … }` at a declaration is refused with the other heads, beside the refused default and pin, so no foreign value is written in the declaring schema but an annotation's. | **[settled]** — the spec author's ruling: confirmed as written. |
 | Item 118 (reading) | Which tags the boundary admits. The text applies §7.2's subsumption with each name followed to the entry it reaches, by identity, so a name of the enclosing scope that is no extern is admitted where it reaches the target or a subtype of it (the scope importing the schema that declares it), and a variant's name is admitted where the target is a choice; the narrower reading admits externs alone. A tag naming the position's own extern is read as no tag, so an extern of a member-dispatched base may be written at a choice and its value placed by its selectors. | **[settled]** — the spec author's ruling, §3.2 item 126: by identity, as written. |

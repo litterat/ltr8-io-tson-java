@@ -22,7 +22,7 @@ choices. Current form only; history lives in git.
   `meta.schema` entry's reader marks its read as a schema document's (`readsSchemaNames`), so a resolved form read as data
   reads its kind and reference names by grammar alone.
 - The read mode is which factory registry you hold; `ValueReaderFactoryResolver` stays in the unexported `reader` package.
-- The subsumption guard follows the body, not `kind()`, admits an entry's aliases as the entry itself, and is transparent
+- The subsumption guard follows the body, admits an entry's aliases as the entry itself, and is transparent
   to `UseSite` renaming and bind-mode container rebinding.
 - `Subsumption.namesMeaning` and the binding-name index are built once per compile, not per entry.
 - A type written in place (`TypeInline`) has no entry and no compiled entry reader: a slot's reader is
@@ -162,7 +162,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   named by content (§8.2 — resolver-chosen, fresh, unreachable from source), so a binding map cannot be keyed
   on one: the hash is not knowable when the map is written, and a generator emitting bindings cannot invent
   it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
-  an `ALIAS` body, in declaration order, then the entry's own name — and `RecordBindReader` and `TupleBindReader`
+  an alias body, in declaration order, then the entry's own name — and `RecordBindReader` and `TupleBindReader`
   try them in that order, so `ping => msg_of<"ping", ping_body>` binds under `ping`. Nothing falls back along a
   chain: the kernel's set and enum are incomplete entries, whose completions are the constructor's own construction
   (§5.5). Lost: binding an entry by its supertype's class, which an ordinary record composing another could not share
@@ -192,8 +192,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
 non-empty `subtypes()`. An atom, array, map, tuple, or record whose type has no subtype would otherwise
 consume the type-ref and discard it, so a document could claim any type at those positions. The guard is the
 same `VariantSchemaReader` a record with subtypes dispatches through, wired wherever the rule
-applies. Three things it has to get right: it **follows the body, not
-`kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and declared instances have their
+applies. Three things it has to get right: it **follows the body** (choices and declared instances have their
 own membership relations §7.2 excludes); it accepts an entry's **aliases as the entry itself**, since §7.2
 compares "after following both alias chains to their terminal entries" and resolving an alias would
 arrive back at the same reader and recurse; and it is **transparent to `UseSite` renaming and to bind-mode

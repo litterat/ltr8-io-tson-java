@@ -244,7 +244,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   rule holds: a class lives where its entry is declared. A vocabulary name the model binds no class for (`enum`, a root
   name, which mangles into `io.ltr8.tson.schema` itself) is still never a consumer class's, and a name no library schema
   declares never reaches the model's packages however it mangles -- they also hold the resolver's own classes (`Token`,
-  `EntryKind`, `OpenEntry`, `ValueEntry`), which are no schema's vocabulary. The libraries' roots,
+  `OpenEntry`, `ValueEntry`), which are no schema's vocabulary. The libraries' roots,
   core.tn and policy.tn are outside the set: their values are data (the CLI binds policy.tn's `policy.processor` and its
   parts to its own classes). A value entry whose type the context binds no class for is held as a tree, so the schema still
   loads and validates; the bind registry refuses it (`design/compiled-registries.md`).

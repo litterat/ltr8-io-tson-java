@@ -4,10 +4,10 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.EntryKind;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,7 +36,7 @@ class DirectDefinitionShapeTest {
         var schema = resolve("dd1", "  text_list => [text]\n").schema();
         Top textList = schema.entries().get("text_list");
 
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(textList, n -> true),
+        assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class, textList,
                 "the declaration is the array entry, not a hop to one");
         assertEquals(java.util.Optional.of("meta.array"), schema.constructorOf("text_list"));
     }
