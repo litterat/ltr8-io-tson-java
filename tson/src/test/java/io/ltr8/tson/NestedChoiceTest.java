@@ -162,6 +162,94 @@ class NestedChoiceTest {
                 () -> tson.objectReader().read(document, Object.class)).getMessage().contains("has a variant [either]"));
     }
 
+    // ── through an extern (§5.13) ──
+
+    private static final String FOREIGN = "https://example.test/nested-choice-foreign.tn";
+
+    private static final String EXTERNS = "https://example.test/nested-choice-externs.tn";
+
+    private static String externed(String declarations) {
+        return """
+                !!id:"%s"
+                !!import:"%s"
+                !!import:"%s"
+                !schema {
+                  a      => { x: text }
+                  b      => { y: text }
+                  either => ( a | b )
+                %s
+                }""".formatted(EXTERNS, TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID, declarations);
+    }
+
+    private static String extern(String entry, String type) {
+        return "  " + entry + " => !meta.extern { schema: \"" + FOREIGN + "\"  type: " + type + " }\n";
+    }
+
+    /** A processor serving {@code subject} and a foreign schema whose choices it names through externs. */
+    private static Tson withForeign(String subject) {
+        Map<String, String> documents = Map.of(FOREIGN, """
+                !!id:"%s"
+                !!import:"%s"
+                !schema {
+                  a      => { x: text }
+                  b      => { y: text }
+                  either => ( a | b )
+                  held   => either
+                  narrow => ( int32 | text )
+                }""".formatted(FOREIGN, TsonBundledSchemas.CORE_ID), EXTERNS, subject);
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of((SchemaSource) documents::get)));
+    }
+
+    private static Diagnostic externRefusal(String declarations) {
+        String subject = externed(declarations);
+        List<Diagnostic> found = withForeign(subject).validateSchema(subject);
+        assertEquals(1, found.size(), found::toString);
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, found.getFirst().code(), found::toString);
+        return found.getFirst();
+    }
+
+    @Test
+    void aVariantThatIsAnExternOfAChoiceNotDisjointIsRefusedAtTheDeclaration() {
+        Diagnostic refused = externRefusal(extern("either_x", "either") + "  pick => ( text | either_x )");
+
+        assertTrue(refused.message().startsWith("'pick': the choice '( text | either_x )' has a variant [either_x]"),
+                refused.message());
+        assertTrue(refused.message().endsWith("name each of its variants by an extern of its own and list those in "
+                + "its place"), refused.message());
+        assertEquals(Optional.of("/pick"), refused.schemaPointer());
+    }
+
+    /** A local alias, an extern and a foreign alias are hops alike, followed in any order. */
+    @Test
+    void aLocalAliasOfAnExternOfAForeignAliasIsFollowedToTheChoice() {
+        Diagnostic refused = externRefusal(extern("held_x", "held") + "  mine => held_x\n  pick => ( text | mine )");
+
+        assertTrue(refused.message().startsWith("'pick': the choice '( text | mine )' has a variant [mine]"),
+                refused.message());
+        assertTrue(refused.message().contains("by an extern of its own"), refused.message());
+    }
+
+    /** The local choice's variants are names here, and the foreign one's are not: each takes its own advice. */
+    @Test
+    void aLocalAndAForeignNestedChoiceEachTakeTheirOwnAdvice() {
+        Diagnostic refused = externRefusal(extern("either_x", "either") + "  pick => ( text | either | either_x )");
+
+        assertTrue(refused.message().endsWith("list its variants in its place, '( text | a | b | either_x )', naming "
+                + "each variant of [either_x] by an extern of its own"), refused.message());
+    }
+
+    @Test
+    void aVariantThatIsAnExternOfADisjointChoiceLoadsAndReads() {
+        String subject = externed(extern("narrow_x", "narrow") + "  outer => ( boolean | narrow_x )\n"
+                + "  h => { o?: outer }");
+        Tson tson = withForeign(subject);
+
+        assertEquals(List.of(), tson.validateSchema(subject));
+        String document = "!!import:\"" + EXTERNS + "\"\n!h { o: !narrow_x 5 }";
+        assertEquals(List.of(), tson.validate(document).stream().map(Diagnostic::message).toList());
+        assertEquals(5, tson.treeReader().read(document).get("o").asInt().orElseThrow());
+    }
+
     // ── the text reader, tree mode ──
 
     @Test

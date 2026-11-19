@@ -29,10 +29,10 @@ and why the same table is what untagged reading dispatches on. Current form only
   [text] | [int32] )`, both bracket-class, is refused at the declaration, a choice written in place at any depth
   included; `( [text] | text )` is disjoint and unaffected, and so is a non-disjoint choice of names. A choice whose
   `@meta.disjoint` fails keeps that diagnostic alone, and a repeated variant is distinctness's to refuse.
-- **A variant that is a choice is disjoint** (`checkChoiceVariantsAreDisjoint`, §5.4), judged at the end of its alias
-  chain, an extern not followed: a value carries one tag, spent naming the variant (`TsonReadContext.spendTypeRef`),
-  so the nested choice reads it untagged. A choice holding a choice is never disjoint, so nesting stops one deep. Lost:
-  a nested choice standing for its variants, left to the next revision.
+- **A variant that is a choice is disjoint** (`checkChoiceVariantsAreDisjoint`, §5.4), judged at the entry it reaches,
+  an extern followed as an alias is (§5.13, `ExternHops`): a value carries one tag, spent naming the variant
+  (`TsonReadContext.spendTypeRef`), so the nested choice reads it untagged. A choice holding a choice is never
+  disjoint, so nesting stops one deep. Lost: a nested choice standing for its variants, left to the next revision.
 - **Distinctness compares a name with a name and a construction with a construction**, never one with the other
   (`checkVariantsAreDistinct`, §8.2): `( text_list | [text] )` over `text_list => [text]` lists two types.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's

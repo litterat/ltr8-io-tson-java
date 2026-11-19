@@ -23,7 +23,8 @@ and a value read, bound and written through it in both encodings.
   refused extern stays unattached and lands nowhere, so a use of it reports nothing further.
 - **Every judgement through the hop compares the landing by identity** (`ExternHops`): the declaring schema and path
   at the end of alias hops and further externs. A choice's distinct variants, IS-A, a reference's membership, the
-  disjointness class (classified in the namespace holding the entry) and a value name's type all go through it.
+  disjointness class (classified in the namespace holding the entry), whether a variant is a choice not disjoint and
+  a value name's type all go through it.
   `KindMembers` alone treats an extern as no member, since its own construction is `meta.extern`, IS-A `meta.top`:
   only a caller holding the link can judge it.
 - **A foreign schema importing nothing writes the processor's kernel's forms** (§3.3.1), so a constructor its closure
