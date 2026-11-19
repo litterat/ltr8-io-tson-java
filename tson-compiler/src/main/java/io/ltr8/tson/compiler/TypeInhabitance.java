@@ -215,8 +215,6 @@ final class TypeInhabitance {
      * A type written in place, inhabited by the rules its body would be judged by as an entry, but for an abstract
      * record in place, which is empty ([TSON-SCHEMA] §4.2): it has no direct instances, and with no name no schema can
      * declare a member of it, where a declared abstract record stays open to the members an importing schema adds.
-     * {@code discriminators} alone decide nothing: a record in place stating them and not abstract is read as any
-     * record is.
      */
     private static boolean inlineInhabited(TypeInline inline, Map<String, Top> namespace, Set<String> inhabited) {
         return !abstractInPlace(inline) && isInhabited(inline.of(), namespace, inhabited);

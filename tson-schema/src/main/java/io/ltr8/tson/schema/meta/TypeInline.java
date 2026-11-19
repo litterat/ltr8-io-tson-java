@@ -105,25 +105,29 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound ApplyBod
     }
 
     /**
-     * Why this type may not be written in place ([TSON-SCHEMA] §4.2, §5.2), naming it by its form; empty where it may.
-     * A type in place has no name: nothing composes it or applies it.
+     * Why this type may not be written in place as it is ([TSON-SCHEMA] §4.2, §5.2), naming it by its form, the
+     * section and the remedy; empty where it may. A type in place has no name: nothing composes it or applies it.
      */
     public Optional<String> refusal() {
+        String nameIt = " ([TSON-SCHEMA] §4.2, §5.2): declare it under a name and write that name";
         if (!constructible(of) && !(of instanceof DependentBody) && !(of instanceof RecordBody)
                 && !(of instanceof ApplyBody)) {
             return Optional.of("'!" + constructor + " { ... }' is written in place, and only a container, a tuple, a "
                     + "choice, a reference, a dependent type, a record or an application is: an enum, an atom and a "
-                    + "namespace type are declared and named");
+                    + "namespace type are declared and named" + nameIt);
         }
         String form = (of instanceof RecordBody ? "the record written in place '" : "the type written in place '")
                 + text() + "'";
         if (!of.chain().isEmpty()) {
             return Optional.of(form + " states a chain, and a type written in place carries none: it has no name, "
-                    + "so it is a member of nothing and nothing composes it");
+                    + "so it is a member of nothing and nothing composes it" + nameIt);
         }
         if (of instanceof RecordBody record && record.isOpen()) {
             return Optional.of(form + " takes parameters, and an open record is applied by its name, which a record "
-                    + "written in place has none of");
+                    + "written in place has none of" + nameIt);
+        }
+        if (of instanceof RecordBody record) {
+            return record.discriminatorsRefusal(form).map(why -> why + " ([TSON-SCHEMA] §5.2)");
         }
         return Optional.empty();
     }

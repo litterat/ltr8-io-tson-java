@@ -242,6 +242,22 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
         }
     }
 
+    /**
+     * Why this record's {@code discriminators} cannot stand beside its {@code extension}, the record named {@code
+     * form}; empty where they can ([TSON-SCHEMA] §5.2). A record its members are selected from has no values of its
+     * own, and the kernel's form says so only by {@code extension: ABSTRACT}: nothing is derived over a stated
+     * extension, nor over the default a missing one takes.
+     */
+    public Optional<String> discriminatorsRefusal(String form) {
+        if (discriminators.isEmpty() || extension == RecordExtensionType.ABSTRACT) {
+            return Optional.empty();
+        }
+        return Optional.of(form + " states 'discriminators: " + discriminators.toString().replace(",", "")
+                + "' beside 'extension: " + extension + "'" + (extension == RecordExtensionType.OPEN
+                ? ", the default where none is written" : "") + ", and a record its members are selected from has "
+                + "no values of its own -- write 'extension: ABSTRACT' beside 'discriminators'");
+    }
+
     /** The name type's name, for a message: the one stated, or {@link #DEFAULT_NAME_TYPE}. */
     public String nameTypeName() {
         return nameType.orElse(DEFAULT_NAME_TYPE);

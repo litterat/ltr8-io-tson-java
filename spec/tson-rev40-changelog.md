@@ -1093,11 +1093,18 @@ it.
      would have added for an extern. What stays is the base kinds themselves and §5.5's
      statement that a constructor's chain reaches at most one, which it now gives its
      reason for: two are a diamond over `meta.type`, refused by §5.8, and no rule of
-     §5.5's own. What a consumer read
-     from the label it reads from the entry: an alias or an extern by its tag, the base
+     §5.5's own. What a consumer read from the label it reads from the entry: an alias
+     or an extern by its tag, the base
      kind of a type by whether its constructor IS-A `meta.atom`, `meta.product` or
      `meta.sum`. "-kinded" is reworded wherever it stood (§5.2, §5.4, §5.5, §7.8, §8.1's
      table, §8.3), and the glossary's **kind** is a reference's admitted set alone.
+135. **§5.2** — `discriminators` stands beside `extension: ABSTRACT`. §5.2 ruled on the
+     source marks alone, `=?` implying ABSTRACT and `final` beside it refused, and said
+     nothing of a record written as `!meta.record`: `{ … extension: FINAL  discriminators:
+     [x] }` had no verdict, and could load as a record no value names. Such a record,
+     declared or in place, is a resolver error unless its `extension` is `ABSTRACT`, a
+     missing one being `OPEN` by the field's default. Deriving ABSTRACT over what is
+     stated was the alternative, and made a stated field mean something else.
 
 ### 3.3 Companion artifacts
 
@@ -1394,6 +1401,7 @@ carries no open questions.
 | Items 129, 133 (ruled) | Two matters of arrangement. A restated field's rules stand with composition (§5.8) and refinement has §5.7 to itself; retitling §5.7 to cover both was the alternative. A record with parameters is a template; "open record" was the alternative, and "generic record" was not taken. | **[settled]** — the spec author's rulings. |
 | §3.4 item 17 (ruled) | A map holding an annotation member's name as a key, at a choice whose map variant is written in place, had no encoding. The variant is named; a wrapper with no `$type`, read by class, was the alternative. | **[settled]** — the spec author's ruling. |
 | §5.12 (ruled) | A qualified name's segment selecting a dependent field. The walk stands, taking the type the sibling names, the one §5.2 judges the held value by at link; refusing the segment was the alternative, and left a value inside a dependent field unnameable. | **[settled]** — the spec author's ruling; no text changes. |
+| Item 135 (ruled) | `discriminators` on a `!meta.record` whose `extension` is not `ABSTRACT`: refused, a missing `extension` being `OPEN`. Deriving ABSTRACT was the alternative. | **[settled]** — the spec author's ruling. |
 | Items 116–118 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |

@@ -47,13 +47,6 @@ spec-required case:
   dependent type no reader is needed: §5.2 refuses it as naming no type a value can be read against, and a tree read
   reports `NOT_IMPLEMENTED` there too (`!meta.record_field { type: { of: !meta.dependent { on: kind } }  role: DEFAULT
   value: 5 }` read as data).
-- [ ] **A declared record stating `discriminators` is made abstract whatever its `extension` says** ([TSON-SCHEMA]
-  §5.2). `d => !meta.record { fields: { x => !meta.record_field { type: int32 } }  extension: FINAL  discriminators:
-  [x] }` loads, and `!d { x: 1 }` is refused as a tag naming an abstract record: the definition-mark step in
-  `DefinitionResolver` derives ABSTRACT from `discriminators` over a stated `OPEN` or `FINAL`, where §5.2 makes such
-  a record ABSTRACT and refuses the mark `final` beside `=?`. A record
-  written in place keeps its stated `extension`, and its `discriminators` decide nothing at read. Decide refusal or
-  derivation for the canonical form, and apply it in both places.
 - [ ] **A record written in place carries its fields' annotations beside its payload** ([TSON-SCHEMA] §3.3.3).
   The desugarer keeps the annotations on a field of `r => { at: { @note:"hi" a: int32 } }` off the `meta.record_field`
   payload it writes, in `SchemaPositions.WrittenField`, for `DefinitionResolver` to resolve in the schema's namespace;
@@ -144,9 +137,10 @@ spec-required case:
 - [ ] **Ingest of resolved output** ([TSON-SCHEMA] §8.1, §10.1) — a schema is always re-resolved from source,
   so no path reads a resolved `{type_name => top}` map and verifies it. §8.1's ingest re-runs the
   family checks (no record written in place a member of anything) over the ingested map and its closure, the §5.11 group
-  declaration rules over every `meta.field_group`, and every kind-typed slot's name against its kind, which a resolved
-  form's read checks for grammar alone ([TSON-SCHEMA] §4.2, `TsonReadContext.readsSchemaNames`). A resolved
-  form is read today only where a caller says it is one (`TsonDataParser.parseResolvedForm`, a reader's
+  declaration rules over every `meta.field_group`, §5.2's `discriminators` beside `extension: ABSTRACT` at a declared
+  record (one in place is held to it as it is read, `TypeInline.refusal`), and every kind-typed slot's name against its
+  kind, which a resolved form's read checks for grammar alone ([TSON-SCHEMA] §4.2, `TsonReadContext.readsSchemaNames`).
+  A resolved form is read today only where a caller says it is one (`TsonDataParser.parseResolvedForm`, a reader's
   `readAs(text, "schema")`), with nothing verified.
 
 

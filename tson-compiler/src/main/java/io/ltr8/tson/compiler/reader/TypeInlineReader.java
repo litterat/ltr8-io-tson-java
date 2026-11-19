@@ -38,8 +38,8 @@ record TypeInlineReader(TsonTypeReader<?> wrapper, UnaryOperator<String> termina
         TypeInline tagged = constructor.map(tag -> inline.withConstructor(terminal.apply(tag))).orElse(inline);
         Optional<String> refusal = tagged.refusal();
         if (refusal.isPresent()) {
-            ctx.report(Diagnostic.Code.SCHEMA_ERROR, refusal.get() + " ([TSON-SCHEMA] §4.2, §5.2): declare it under a "
-                    + "name and write that name", "a type that may be written in place", tagged.constructor());
+            ctx.report(Diagnostic.Code.SCHEMA_ERROR, refusal.get(), "a type that may be written in place",
+                    tagged.constructor());
             return null;
         }
         return tagged;

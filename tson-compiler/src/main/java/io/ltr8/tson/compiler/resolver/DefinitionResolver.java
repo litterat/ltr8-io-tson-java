@@ -371,8 +371,12 @@ final class DefinitionResolver {
 
     /**
      * A declaration's own {@code abstract}/{@code final} mark lowered into {@code record.extension} ({@link
-     * DefinitionMarks}), and ABSTRACT derived where the body names selectors -- the resolved definition
+     * DefinitionMarks}), and ABSTRACT derived where a source record names selectors -- the resolved definition
      * unchanged where neither applies, every record being OPEN by default.
+     *
+     * <p><b>Derived from the source's {@code =?} alone.</b> A record written as {@code !meta.record { … }} states its
+     * {@code extension}, or takes the field's default, and a stated field means what it says: {@code discriminators}
+     * beside anything but ABSTRACT, after the mark, is refused rather than overridden (§5.2).
      *
      * <p><b>Applied here rather than where the body is built</b>, because every route to a record body reaches
      * this method and none of them owns the mark: a fresh record, a composition and a refinement each build
@@ -399,7 +403,14 @@ final class DefinitionResolver {
                     + " of it, and the mark would forbid that of every application. Declare the application and mark"
                     + " that declaration instead ([TSON-SCHEMA] §5.2, §5.10)");
         }
-        boolean selectors = resolved instanceof RecordBody body && !body.discriminators().isEmpty();
+        boolean written = declaration.typeDef() instanceof Instance;
+        if (written && resolved instanceof RecordBody stated) {
+            RecordBody marked = extension.map(stated::withExtension).orElse(stated);
+            marked.discriminatorsRefusal("'" + declaration.name() + "'").ifPresent(why -> {
+                throw new SchemaValidationException(why + " ([TSON-SCHEMA] §5.2)");
+            });
+        }
+        boolean selectors = !written && resolved instanceof RecordBody body && !body.discriminators().isEmpty();
         if (selectors) {
             // A selector says the members pin it, so the record is the base they are selected from and has
             // no values of its own -- ABSTRACT, derived. `abstract` beside it asserts what the body already
