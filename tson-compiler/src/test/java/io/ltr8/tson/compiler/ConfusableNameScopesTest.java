@@ -2,12 +2,12 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -185,7 +185,7 @@ class ConfusableNameScopesTest {
      */
     @Test
     void theConfusableRuleNeverFiresOnALoneName() {
-        assertNotNull(compileWith(IdentifierPolicy.of(TokenPolicy.highlyRestrictive()).perSegment(),
+        assertNotNull(compileWith(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment(),
                 "  rec => { id_" + new String(Character.toChars(0x043F))
                         + ": text  url_" + new String(Character.toChars(0x0430)) + ": text }"));
     }

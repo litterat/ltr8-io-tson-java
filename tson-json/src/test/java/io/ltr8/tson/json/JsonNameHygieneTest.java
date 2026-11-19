@@ -7,8 +7,8 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.json.tree.JsonValue;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -164,7 +164,7 @@ class JsonNameHygieneTest {
     @Test
     void anUnrestrictedPolicyRefusesNothingAndTheClosureRuleSpeaks() {
         Json relaxed = jsonUnder(ProcessorPolicy.defaults()
-                .withIdentifierPolicy(IdentifierPolicy.of(TokenPolicy.unrestricted())));
+                .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED)));
         List<Diagnostic> problems = read(relaxed, "account",
                 "{\"password\": \"s3cret\", \"p" + CYRILLIC_A + "ssword\": \"evil\"}").problems();
         assertEquals(1, problems.size(), () -> String.valueOf(problems));

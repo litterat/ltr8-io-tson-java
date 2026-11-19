@@ -29,7 +29,7 @@ class PolicyOptionsTest {
     void noFlagsIsTheDefaultPair() {
         PolicyOptions options = consume();
 
-        assertEquals(RestrictionLevel.HIGHLY_RESTRICTIVE, options.identifierPolicy().scripts().level());
+        assertEquals(RestrictionLevel.HIGHLY_RESTRICTIVE, options.identifierPolicy().level());
         assertFalse(options.identifierPolicy().isPerSegment());
         assertEquals(RestrictionLevel.UNRESTRICTED, options.tokenPolicy().level());
     }
@@ -45,8 +45,8 @@ class PolicyOptionsTest {
         var tson = Tson.standard();
         var applied = tson.processorPolicy();
 
-        assertEquals(applied.identifierPolicy().scripts().level(),
-                PolicyOptions.DEFAULTS.identifierPolicy().scripts().level());
+        assertEquals(applied.identifierPolicy().level(),
+                PolicyOptions.DEFAULTS.identifierPolicy().level());
         assertEquals(applied.identifierPolicy().isPerSegment(),
                 PolicyOptions.DEFAULTS.identifierPolicy().isPerSegment());
         assertEquals(applied.tokenPolicy().level(), PolicyOptions.DEFAULTS.tokenPolicy().level());
@@ -63,11 +63,11 @@ class PolicyOptionsTest {
     @Test
     void aLevelIsAcceptedInEitherSpelling() {
         assertEquals(RestrictionLevel.ASCII_ONLY,
-                consume("--identifier-policy", "ascii-only").identifierPolicy().scripts().level());
+                consume("--identifier-policy", "ascii-only").identifierPolicy().level());
         assertEquals(RestrictionLevel.ASCII_ONLY,
-                consume("--identifier-policy", "ASCII_ONLY").identifierPolicy().scripts().level());
+                consume("--identifier-policy", "ASCII_ONLY").identifierPolicy().level());
         assertEquals(RestrictionLevel.MODERATELY_RESTRICTIVE,
-                consume("--identifier-policy", "Moderately-Restrictive").identifierPolicy().scripts().level());
+                consume("--identifier-policy", "Moderately-Restrictive").identifierPolicy().level());
     }
 
     @Test
@@ -76,11 +76,11 @@ class PolicyOptionsTest {
                 "--identifier-scripts", "Latin+Cyrillic", "--identifier-scripts", "Latin+Greek");
 
         IdentifierPolicy policy = options.identifierPolicy();
-        assertEquals(RestrictionLevel.HIGHLY_RESTRICTIVE, policy.scripts().level(), "the default is kept");
+        assertEquals(RestrictionLevel.HIGHLY_RESTRICTIVE, policy.level(), "the default is kept");
         assertTrue(policy.isPerSegment());
         assertTrue(policy.appliesSkeletonDistinctness(), "untouched by the other relaxations");
         assertEquals(List.of(Set.of(UnicodeScript.LATIN, UnicodeScript.CYRILLIC),
-                Set.of(UnicodeScript.LATIN, UnicodeScript.GREEK)), policy.scripts().permittedScripts());
+                Set.of(UnicodeScript.LATIN, UnicodeScript.GREEK)), policy.permittedScripts());
     }
 
     /**
@@ -117,7 +117,7 @@ class PolicyOptionsTest {
         assertTrue(options.tokenPolicy().checksScripts());
         assertEquals(List.of(Set.of(UnicodeScript.LATIN, UnicodeScript.GREEK)),
                 options.tokenPolicy().permittedScripts());
-        assertEquals(RestrictionLevel.HIGHLY_RESTRICTIVE, options.identifierPolicy().scripts().level(),
+        assertEquals(RestrictionLevel.HIGHLY_RESTRICTIVE, options.identifierPolicy().level(),
                 "the identifier surface is untouched by a token flag");
     }
 
@@ -125,7 +125,7 @@ class PolicyOptionsTest {
     @Test
     void anIdentifierScriptListKeepsTheDefaultLevel() {
         assertEquals(RestrictionLevel.HIGHLY_RESTRICTIVE,
-                consume("--identifier-scripts", "Latin+Cyrillic").identifierPolicy().scripts().level());
+                consume("--identifier-scripts", "Latin+Cyrillic").identifierPolicy().level());
     }
 
     /** A level the caller stated is never overridden -- the lift is for a default, not for a decision. */
@@ -180,6 +180,6 @@ class PolicyOptionsTest {
         PolicyOptions options = PolicyOptions.consume(args);
 
         assertEquals(List.of("--output", "json", "schema.tn", "data.tn", "-"), args);
-        assertEquals(RestrictionLevel.ASCII_ONLY, options.identifierPolicy().scripts().level());
+        assertEquals(RestrictionLevel.ASCII_ONLY, options.identifierPolicy().level());
     }
 }

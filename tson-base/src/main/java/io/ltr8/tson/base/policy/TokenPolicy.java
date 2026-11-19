@@ -8,16 +8,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * A UTS #39 §5.2 {@link RestrictionLevel} and the script combinations admitted beside it, as a policy a caller
- * holds -- [TSON-DATA] §8.2's restricted-script rule, with its refusal messages. It is the <b>token policy</b> as
- * it stands, and the script half of an {@link IdentifierPolicy}, which adds what only a name has: a unit that may be
- * each segment, the restricted-character rule, and skeleton distinctness over a scope.
- *
- * <p><b>Why the level is the rule here at all</b>, having been the second choice for confusable
- * <em>names</em>: {@code ConfusableNames} is a relation and needs a set to hold over, and this is the rule
- * for the cases that have no set — one identifier judged alone, and every value in a document. It is the
- * same reasoning that makes restriction levels right for a browser judging a domain name, which likewise
- * cannot enumerate what it might be confused with.
+ * [TSON-DATA] §8.2's <b>token policy</b>: a UTS #39 §5.2 {@link RestrictionLevel} and the script combinations
+ * admitted beside it, applied to the whole of each token's text, with its refusal messages.
  *
  * <p><b>No unit, because a value has no segments.</b> {@code _} and {@code -} are word separators by
  * convention in a name and ordinary characters in a value, so segmenting a value would admit UTS #39's own
@@ -28,16 +20,14 @@ import java.util.Set;
  */
 public final class TokenPolicy {
 
-    private final RestrictionLevel level;
-    private final List<Set<UnicodeScript>> permitted;
+    private final ScriptRule rule;
 
-    private TokenPolicy(RestrictionLevel level, List<Set<UnicodeScript>> permitted) {
-        this.level = level;
-        this.permitted = List.copyOf(permitted);
+    private TokenPolicy(ScriptRule rule) {
+        this.rule = rule;
     }
 
     public static TokenPolicy of(RestrictionLevel level) {
-        return new TokenPolicy(level, List.of());
+        return new TokenPolicy(new ScriptRule(level));
     }
 
     public static TokenPolicy asciiOnly() {
@@ -56,12 +46,15 @@ public final class TokenPolicy {
         return of(RestrictionLevel.MODERATELY_RESTRICTIVE);
     }
 
-    /** §5.2 level 5: no script restriction, the identifier profile kept. */
+    /** §5.2 level 5: no script restriction. */
     public static TokenPolicy scriptsUnchecked() {
         return of(RestrictionLevel.MINIMALLY_RESTRICTIVE);
     }
 
-    /** §5.2 level 6: no script restriction and no identifier profile. See {@link RestrictionLevel#UNRESTRICTED}. */
+    /**
+     * §5.2 level 6: no script restriction. Over a token it judges as {@link #scriptsUnchecked()} does, the
+     * identifier profile it drops being one no token is judged under. See {@link RestrictionLevel#UNRESTRICTED}.
+     */
     public static TokenPolicy unrestricted() {
         return of(RestrictionLevel.UNRESTRICTED);
     }
@@ -72,9 +65,7 @@ public final class TokenPolicy {
      * {@code permitting(LATIN, CYRILLIC)} rather than dropping a level and losing the rule everywhere else.
      */
     public TokenPolicy permitting(UnicodeScript... scripts) {
-        List<Set<UnicodeScript>> extended = new java.util.ArrayList<>(permitted);
-        extended.add(Set.of(scripts));
-        return new TokenPolicy(level, extended);
+        return new TokenPolicy(rule.permitting(scripts));
     }
 
     /**
@@ -88,7 +79,7 @@ public final class TokenPolicy {
      * {@link ProcessorPolicy#dataVersion()} as one value a run or a response states once.
      */
     public RestrictionLevel level() {
-        return level;
+        return rule.level();
     }
 
     /**
@@ -100,44 +91,20 @@ public final class TokenPolicy {
      * CYRILLIC)} is by definition a local decision.
      */
     public List<Set<UnicodeScript>> permittedScripts() {
-        return permitted;
+        return rule.permittedScripts();
     }
 
     /** Whether the check does anything at all -- an {@code UNRESTRICTED} whole-text policy scans nothing. */
     public boolean checksScripts() {
-        return level.restrictsScripts();
-    }
-
-    /** Whether the identifier profile ({@code IdentifierStatus}) still applies -- everything but level 6. */
-    public boolean appliesIdentifierProfile() {
-        return level.keepsIdentifierProfile();
+        return rule.checksScripts();
     }
 
     /** The reason {@code text} fails this policy, or empty when it satisfies it. */
     public Optional<String> violation(String text) {
-        if (!checksScripts() || text.isEmpty()) {
+        if (!rule.checksScripts() || text.isEmpty()) {
             return Optional.empty();
         }
-        return checkUnit(text, 0, text.length(), false);
-    }
-
-    /**
-     * This level over {@code text[from, to)} -- the unit an {@link IdentifierPolicy} chose, which is the whole
-     * name or one segment of it. {@code segment} says which, for the message. Allocation-free when the unit
-     * passes, as {@link RestrictionLevel#admits} is.
-     */
-    Optional<String> checkUnit(String text, int from, int to, boolean segment) {
-        if (level.admits(text, from, to, permitted)) {
-            return Optional.empty();
-        }
-        String unit = text.substring(from, to);
-        if (level == RestrictionLevel.ASCII_ONLY) {
-            return Optional.of("'" + unit + "' is not ASCII, and this processor requires ASCII-only "
-                    + (segment ? "segments" : "names") + " (UTS #39 §5.2)");
-        }
-        return Optional.of("'" + unit + "' mixes the scripts " + RestrictionLevel.scriptsOf(text, from, to)
-                + ", which UTS #39 §5.2's " + level + " does not admit -- a homograph reads as another name exactly "
-                + "by mixing scripts inside one word");
+        return rule.checkUnit(text, 0, text.length(), false);
     }
 
     /**
@@ -150,16 +117,16 @@ public final class TokenPolicy {
      */
     @Override
     public boolean equals(Object o) {
-        return o instanceof TokenPolicy other && level == other.level && permitted.equals(other.permitted);
+        return o instanceof TokenPolicy other && rule.equals(other.rule);
     }
 
     @Override
     public int hashCode() {
-        return java.util.Objects.hash(level, permitted);
+        return rule.hashCode();
     }
 
     @Override
     public String toString() {
-        return level + (permitted.isEmpty() ? "" : " permitting " + permitted);
+        return level() + (permittedScripts().isEmpty() ? "" : " permitting " + permittedScripts());
     }
 }

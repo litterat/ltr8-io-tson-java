@@ -9,10 +9,10 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -160,7 +160,7 @@ class IdentifierValueHygieneTest {
     /** §8.2's relaxation is the deployment's, stated in code, and reaches these values as it reaches names. */
     @Test
     void aRelaxedPolicyAdmitsWhatItRelaxes() {
-        assertEquals(List.of(), validate(IdentifierPolicy.of(TokenPolicy.unrestricted()),
+        assertEquals(List.of(), validate(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED),
                 "!handlers { " + MIXED + " => b }"));
     }
 

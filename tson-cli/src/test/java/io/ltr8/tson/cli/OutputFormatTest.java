@@ -6,6 +6,7 @@ import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.lang.Character.UnicodeScript;
@@ -240,8 +241,8 @@ class OutputFormatTest {
     @Test
     void tsonOutputRoundTripsARelaxedPolicy() {
         CliPolicy relaxed = CliPolicy.from(ProcessorPolicy.of(
-                IdentifierPolicy.of(TokenPolicy.moderatelyRestrictive()
-                        .permitting(UnicodeScript.LATIN, UnicodeScript.CYRILLIC)).perSegment()
+                IdentifierPolicy.of(RestrictionLevel.MODERATELY_RESTRICTIVE)
+                        .permitting(UnicodeScript.LATIN, UnicodeScript.CYRILLIC).perSegment()
                         .withSkeletonDistinctness(false),
                 TokenPolicy.unrestricted(), LimitsPolicy.defaults()));
         ValidationReport original = ValidationReport.ok(relaxed);
@@ -262,11 +263,11 @@ class OutputFormatTest {
      */
     @Test
     void aScriptIsWrittenAsItsUnicodeAlias() {
-        assertEquals("Latin", CliPolicy.CliTokenPolicy.alias(UnicodeScript.LATIN));
-        assertEquals("Old_Italic", CliPolicy.CliTokenPolicy.alias(UnicodeScript.OLD_ITALIC));
-        assertEquals("SignWriting", CliPolicy.CliTokenPolicy.alias(UnicodeScript.SIGNWRITING));
+        assertEquals("Latin", CliPolicy.alias(UnicodeScript.LATIN));
+        assertEquals("Old_Italic", CliPolicy.alias(UnicodeScript.OLD_ITALIC));
+        assertEquals("SignWriting", CliPolicy.alias(UnicodeScript.SIGNWRITING));
         for (UnicodeScript script : UnicodeScript.values()) {
-            assertEquals(script, UnicodeScript.forName(CliPolicy.CliTokenPolicy.alias(script)), script::name);
+            assertEquals(script, UnicodeScript.forName(CliPolicy.alias(script)), script::name);
         }
     }
 
@@ -326,7 +327,7 @@ class OutputFormatTest {
     @Test
     void textPrintsANonDefaultPolicyEvenWhenNothingWasRefused() {
         CliPolicy relaxed = CliPolicy.from(ProcessorPolicy.of(
-                IdentifierPolicy.of(TokenPolicy.scriptsUnchecked()), TokenPolicy.unrestricted(),
+                IdentifierPolicy.of(RestrictionLevel.MINIMALLY_RESTRICTIVE), TokenPolicy.unrestricted(),
                 LimitsPolicy.defaults()));
 
         String rendered = OutputFormat.TEXT.render(ValidationReport.ok(relaxed));

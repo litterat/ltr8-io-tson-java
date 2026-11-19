@@ -89,11 +89,18 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, TokenPolicy tokenPolicy,
         args.clear();
         args.addAll(rest);
 
-        IdentifierPolicy identifiers = IdentifierPolicy.of(assemble("identifier", identifierLevel,
-                DEFAULTS.identifierPolicy().scripts().level(), perSegment, identifierScripts))
+        IdentifierPolicy identifiers = IdentifierPolicy.of(surfaceLevel("identifier", identifierLevel,
+                DEFAULTS.identifierPolicy().level(), perSegment, identifierScripts))
                 .withSkeletonDistinctness(!lookAlikes);
-        return new PolicyOptions(perSegment ? identifiers.perSegment() : identifiers,
-                assemble("token", tokenLevel, DEFAULTS.tokenPolicy().level(), false, tokenScripts),
+        for (UnicodeScript[] combination : identifierScripts) {
+            identifiers = identifiers.permitting(combination);
+        }
+        TokenPolicy tokens = TokenPolicy.of(surfaceLevel("token", tokenLevel, DEFAULTS.tokenPolicy().level(), false,
+                tokenScripts));
+        for (UnicodeScript[] combination : tokenScripts) {
+            tokens = tokens.permitting(combination);
+        }
+        return new PolicyOptions(perSegment ? identifiers.perSegment() : identifiers, tokens,
                 LimitsPolicy.defaults().withMaxDepth(maxDepth).withMaxWaitDepth(maxWaitDepth));
     }
 
@@ -120,9 +127,9 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, TokenPolicy tokenPolicy,
     }
 
     /**
-     * One surface's level: the stated level or the default, then the script combinations layered on it.
-     * {@code perSegment} is the identifier surface's unit, which the caller applies; it is passed here because it
-     * is a relaxation of the level, and so refused with the others against a level that scans nothing.
+     * One surface's level: the stated level or the default, which the caller layers {@code scripts} on.
+     * {@code perSegment} is the identifier surface's unit, which the caller applies; both are passed here because
+     * they are relaxations of the level, and so refused against a level that scans nothing.
      *
      * <p><b>A script list brings its own level where the default scans nothing</b> (see {@link
      * #IMPLIED_BY_SCRIPTS}) -- {@code --token-scripts Latin+Cyrillic} on its own means "values are one
@@ -135,27 +142,23 @@ record PolicyOptions(IdentifierPolicy identifierPolicy, TokenPolicy tokenPolicy,
      * says is never quietly accepted. {@code --identifier-allow-look-alikes} is not such a relaxation -- skeleton
      * distinctness is no part of the level, and means the same under every one.
      */
-    private static TokenPolicy assemble(String surface, RestrictionLevel stated,
-                                         RestrictionLevel fallback, boolean perSegment,
-                                         List<UnicodeScript[]> scripts) {
+    private static RestrictionLevel surfaceLevel(String surface, RestrictionLevel stated,
+                                                 RestrictionLevel fallback, boolean perSegment,
+                                                 List<UnicodeScript[]> scripts) {
         boolean relaxed = perSegment || !scripts.isEmpty();
         RestrictionLevel level = stated;
         if (level == null) {
-            level = relaxed && !TokenPolicy.of(fallback).checksScripts() ? IMPLIED_BY_SCRIPTS : fallback;
+            level = relaxed && !fallback.restrictsScripts() ? IMPLIED_BY_SCRIPTS : fallback;
         }
 
-        TokenPolicy policy = TokenPolicy.of(level);
-        if (relaxed && !policy.checksScripts()) {
+        if (relaxed && !level.restrictsScripts()) {
             String given = scripts.isEmpty() ? "--" + surface + "-per-segment"
                     : "--" + surface + "-scripts" + (perSegment ? " and --" + surface + "-per-segment" : "");
             throw new UsageException("--" + surface + "-policy " + spelling(level) + " scans no scripts, so the "
                     + given + " given with it would configure nothing -- state a level that scans, or drop the"
                     + " relaxation");
         }
-        for (UnicodeScript[] combination : scripts) {
-            policy = policy.permitting(combination);
-        }
-        return policy;
+        return level;
     }
 
     /**

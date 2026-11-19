@@ -214,38 +214,37 @@ in order not to be refused is this record *before* it writes. `tson policy` prin
 public final class IdentifierPolicy {                       // io.ltr8.tson.base.policy -- §8.2's identifier policy
     public record Violation(Diagnostic.Code code, String reason) {}
 
-    public static IdentifierPolicy of(TokenPolicy scripts);       // whole name, skeleton distinctness on
-    public static IdentifierPolicy defaults();                    // of(highlyRestrictive())
+    public static IdentifierPolicy of(RestrictionLevel level);    // whole name, skeleton distinctness on
+    public static IdentifierPolicy defaults();                    // of(HIGHLY_RESTRICTIVE)
     public static IdentifierPolicy none();                        // judges nothing -- a synthetic source
 
+    public IdentifierPolicy permitting(UnicodeScript... scripts);  // one more script combination admitted
     public IdentifierPolicy perSegment();                  // the level per segment, split at the profile's separators
     public IdentifierPolicy withSkeletonDistinctness(boolean on);  // mechanism 1, the look-alike rule over a scope
 
-    public TokenPolicy scripts();
+    public RestrictionLevel level();
+    public List<Set<UnicodeScript>> permittedScripts();
     public boolean isPerSegment();
     public boolean appliesSkeletonDistinctness();
     public boolean appliesIdentifierProfile();
     public List<Violation> judge(String name, IdentifierProfile profile);   // the per-name rules; empty if none
+    // equals/hashCode are by value: two policies configured alike are equal
 }
 
-public final class TokenPolicy {                           // the token policy, and an identifier policy's level
-    public enum Level { ASCII_ONLY, SINGLE_SCRIPT, HIGHLY_RESTRICTIVE,
-                        MODERATELY_RESTRICTIVE, MINIMALLY_RESTRICTIVE, UNRESTRICTED }
-
-    public static TokenPolicy of(Level level);
+public final class TokenPolicy {                           // §8.2's token policy: a level over whole text, no unit
+    public static TokenPolicy of(RestrictionLevel level);
     public static TokenPolicy asciiOnly();
     public static TokenPolicy singleScript();
-    public static TokenPolicy highlyRestrictive();        // the identifier default
+    public static TokenPolicy highlyRestrictive();
     public static TokenPolicy moderatelyRestrictive();
     public static TokenPolicy scriptsUnchecked();
     public static TokenPolicy unrestricted();             // the token default
 
     public TokenPolicy permitting(UnicodeScript... scripts);
 
-    public Level level();                                      // with permittedScripts, the whole of a policy
+    public RestrictionLevel level();                           // with permittedScripts, the whole of a policy
     public List<Set<UnicodeScript>> permittedScripts();
     public boolean checksScripts();
-    public boolean appliesIdentifierProfile();
     public Optional<String> violation(String text);
     // equals/hashCode are by value: two policies configured alike are equal
 }
@@ -262,9 +261,9 @@ public final class TokenPolicy {                           // the token policy, 
 - `io.ltr8.tson.base.io` — `ByteSource`/`ByteSink`: bytes, never characters; closing releases only what was
   acquired, and closing is not flushing.
 - `io.ltr8.unicode` (module `ltr8-unicode`) — the Unicode mechanisms beneath it, TSON-free: `RestrictionLevel`
-  (the levels a `TokenPolicy` states), `Normalization` (`NONE`, `NFC`, `NFKC`, `NFKC_CASEFOLD`, `ASCII_CASEFOLD`;
-  `apply(text)`, `holds(text)`), `IdentifierProfile`, `ConfusableNames`, `Xid`, `Nfc.of(text)`,
-  `NfkcCasefold.apply(text)`, `IdentifierStatus`, `Confusables.skeleton(text)`, `JoiningControls`.
+  (`ASCII_ONLY` … `UNRESTRICTED`, the levels both §8.2 policies state), `Normalization` (`NONE`, `NFC`, `NFKC`,
+  `NFKC_CASEFOLD`, `ASCII_CASEFOLD`; `apply(text)`, `holds(text)`), `IdentifierProfile`, `ConfusableNames`, `Xid`,
+  `Nfc.of(text)`, `NfkcCasefold.apply(text)`, `IdentifierStatus`, `Confusables.skeleton(text)`, `JoiningControls`.
 - `io.ltr8.tson.base.diagnostics` — the rule classes whose prose and `expected` both encodings report.
 
 ---

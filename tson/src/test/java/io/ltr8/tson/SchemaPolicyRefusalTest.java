@@ -5,7 +5,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.unicode.RestrictionLevel;
-import io.ltr8.tson.base.policy.TokenPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -111,7 +110,8 @@ class SchemaPolicyRefusalTest {
      */
     @Test
     void theInstanceStatesThePolicyThatRefusedTheName() {
-        Tson tson = Tson.of(ProcessorConfig.defaults().withIdentifierPolicy(IdentifierPolicy.of(TokenPolicy.asciiOnly())));
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.ASCII_ONLY)));
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, tson.validateSchema("""
                 !!id:"https://example.test/refusal-policy.tn"
@@ -121,7 +121,7 @@ class SchemaPolicyRefusalTest {
                 """.formatted(CYR_A)).getFirst().code());
 
         assertEquals(RestrictionLevel.ASCII_ONLY,
-                tson.processorPolicy().identifierPolicy().scripts().level());
+                tson.processorPolicy().identifierPolicy().level());
         assertEquals(ProcessorPolicy.dataVersion(), tson.processorPolicy().unicodeDataVersion());
     }
 
@@ -142,8 +142,8 @@ class SchemaPolicyRefusalTest {
                 "the default policy refuses a mixed-script type-ref");
 
         List<Diagnostic> relaxed = Tson.of(ProcessorConfig.defaults()
-                        .withIdentifierPolicy(IdentifierPolicy.of(TokenPolicy.highlyRestrictive()
-                                .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC))))
+                        .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE)
+                                .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC)))
                 .validate(document);
 
         assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
