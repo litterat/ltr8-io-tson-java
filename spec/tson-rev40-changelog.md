@@ -1072,7 +1072,12 @@ it.
 132. **§5.10** — instantiation terminates because an argument is a name: no application is
      an argument of a template's application, so the applications a schema reaches are
      drawn from its names, and a recursive one ties to a declaration. The text relied on
-     it and gave no reason. Stated, not changed.
+     it and gave no reason. Stated, not changed. §5.10.1's regularity rule stands with its
+     reason corrected: it said an irregular recursion "could demand an unbounded family of
+     distinct instantiations", which name-only arguments already exclude; what the rule buys
+     is one verdict at the template, every recursive application tying to the declaration
+     closing it, where `dup<A, A>` inside `dup` would close for some arguments and not
+     others, refused at whichever declaration applied it.
 133. **Throughout** — a record with parameters is a **template**, the one word for it.
      This revision's text defined "an open record, a template" and wrote the first where
      Revision 39 wrote the second. "Open" already names a record's extension, a schema map
