@@ -49,7 +49,7 @@ final class FieldNames {
 
     /**
      * The definition {@code record}'s field names are read by, where its field name type is not the kernel's
-     * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#nameTypes} carries to its readers. An open
+     * default -- what {@link io.ltr8.tson.schema.TsonLinkedSchema#nameTypes} carries to its readers. A parametric
      * record's too: no reader reads a value against it, and its member dispatch matches the selectors' keys in
      * the form its members read them. Empty for the default, which every reader applies without being told, and
      * for a type that resolves to nothing.
@@ -68,7 +68,7 @@ final class FieldNames {
         List<EnumLabels.Violation> violations = new ArrayList<>();
         for (String name : localNames) {
             Top definition = merged.get(name);
-            // An open record's field names are each application's, so they are judged once, here.
+            // A parametric record's field names are each application's, so they are judged once, here.
             Optional<EnumLabels.Violation> violation = definition instanceof RecordBody record
                     ? check(name, "'" + name + "'", definition, record, merged, structure) : Optional.empty();
             for (TypeInline inline : inPlace(definition)) {
@@ -82,8 +82,8 @@ final class FieldNames {
 
     /**
      * Every record written in place {@code definition} holds, at any depth, in the order written: at a field's type and
-     * inside a container, a tuple, a choice or another record in place. A record an application of an open record
-     * closes to is left out with everything it holds: its names are the open record's, judged where it is declared.
+     * inside a container, a tuple, a choice or another record in place. A record an application of a parametric record
+     * closes to is left out with everything it holds: its names are the parametric record's, judged where it is declared.
      */
     static List<TypeInline> inPlace(Top definition) {
         List<TypeInline> found = new ArrayList<>();

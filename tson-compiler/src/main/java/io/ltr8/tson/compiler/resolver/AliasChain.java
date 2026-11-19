@@ -35,7 +35,7 @@ import java.util.function.Function;
  *
  * <p><b>Not every walk over references is this one.</b> {@code ParameterTypes} follows a chain to reach a
  * slot's declared body and deliberately does <em>not</em> stop at an argument-bearing target -- it is after
- * the constructor's own vocabulary, where the template is the answer. It keeps its own loop, and the
+ * the constructor's own vocabulary, where the parametric record is the answer. It keeps its own loop, and the
  * difference is the reason to say so here rather than let a future reader assume the four were five.
  */
 public final class AliasChain {
@@ -80,7 +80,7 @@ public final class AliasChain {
 
     /**
      * The same walk over a namespace still being built, which has a lookup rather than a finished map --
-     * {@code TemplateMaterialiser} normalises an application's arguments through this while resolution runs.
+     * {@code ParametricMaterialiser} normalises an application's arguments through this while resolution runs.
      */
     public static String terminal(String name, Function<String, ? extends Top> entries) {
         return walk(name, entries).name();

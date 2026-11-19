@@ -107,7 +107,7 @@ class BytesEncodingSelectorTest {
 
     /**
      * <b>Every position the type reaches, including the two an annotation could not.</b> A container element
-     * and a map value have no annotation position of their own, and a template argument is normalised by
+     * and a map value have no annotation position of their own, and an application's argument is normalised by
      * §8.2's identity -- so all three work here only because the alphabet travels as part of the type.
      */
     @Test

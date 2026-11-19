@@ -71,7 +71,7 @@ import java.util.function.BiPredicate;
  *       KernelBootstrapResolverTest} holds it to the measured cycle, so a kernel edit that moves the cycle fails
  *       there rather than here.</li>
  *   <li><b>A declaration no read produces is resolved from its grammar</b> by {@link DefinitionResolver}, as {@link
- *       SchemaResolver} resolves a record: a composition, an alias, a template. A record
+ *       SchemaResolver} resolves a record: a composition, an alias, a parametric record. A record
  *       holding a type written in place reads it, through its constructor's reader, and waits on what that read
  *       reaches; {@code meta.type_inline}, the wrapper a type slot's choice recovers a brace to, is made ready with
  *       the pre-loaded set, so the first such read classifies both of the choice's variants.</li>
@@ -367,7 +367,7 @@ public final class KernelBootstrapResolver {
 
         /**
          * Every chain transitively closed, as {@link SchemaResolver} closes a schema's once every entry is ready: an
-         * entry IS-A every entry its supertypes are. The kernel applies no template in a chain, so the
+         * entry IS-A every entry its supertypes are. The kernel applies no parametric record in a chain, so the
          * closure is over names alone, to a fixed point.
          */
         private void completeChains() {
@@ -394,7 +394,7 @@ public final class KernelBootstrapResolver {
 
         /**
          * §5.10's parameters, checked once every entry is ready, as {@link SchemaResolver} checks a schema's: each
-         * written bound. A failure is a broken kernel; the kernel declares no open record, so nothing is checked.
+         * written bound. A failure is a broken kernel; the kernel declares no parametric record, so nothing is checked.
          */
         private void checkParameters() {
             ParameterTypes.check(entries, declarations.keySet(), entries::get,

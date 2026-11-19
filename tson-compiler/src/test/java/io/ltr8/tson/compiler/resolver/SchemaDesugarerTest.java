@@ -138,9 +138,9 @@ class SchemaDesugarerTest {
                 firstFieldConstruction(desugar("  holder => { m: {text => integer} }"), "holder"));
     }
 
-    /** A concrete form inside an open record is written in place exactly as outside one. */
+    /** A concrete form inside a parametric record is written in place exactly as outside one. */
     @Test
-    void aConcreteFormInsideATemplateIsInPlace() {
+    void aConcreteFormInsideAParametricRecordIsInPlace() {
         assertEquals("!meta.array { element_type: text }",
                 firstFieldConstruction(desugar("  tmpl => <T> { tags: [text]  v: T }"), "tmpl"));
     }
@@ -227,7 +227,7 @@ class SchemaDesugarerTest {
         assertEquals(4, written.position().orElseThrow().line());
     }
 
-    /** A record in place over a parameter of its open record is its construction, the parameter at its slot. */
+    /** A record in place over a parameter of its parametric record is its construction, the parameter at its slot. */
     @Test
     void aRecordInPlaceOverAParameterIsItsConstruction() {
         SchemaDocument document = desugar("  page => <T> { meta: { cursor: T  total: int32 } }");
@@ -237,9 +237,9 @@ class SchemaDesugarerTest {
         assertEquals(Optional.of("meta.record"), meta.value().typeRef());
     }
 
-    /** One that names no parameter is closed, inside an open record as anywhere. */
+    /** One that names no parameter is closed, inside a parametric record as anywhere. */
     @Test
-    void aRecordInPlaceNamingNoParameterIsClosedInsideAnOpenRecord() {
+    void aRecordInPlaceNamingNoParameterIsClosedInsideAParametricRecord() {
         assertEquals("!meta.record { fields: { total => { type: int32 } } }",
                 firstFieldConstruction(desugar("  page => <T> { meta: { total: int32 }  items: [T] }"), "page"));
     }
@@ -333,7 +333,7 @@ class SchemaDesugarerTest {
 
     /**
      * §5.3's size specifier as the {@code min_items}/{@code max_items} pair it binds -- one rule for arrays and
-     * maps alike, since both constructors declare the same two fields. There is no template in the middle any
+     * maps alike, since both constructors declare the same two fields. There is no parametric record in the middle any
      * more: the kernel's {@code array_min}/{@code array_max}/{@code array_ranged} are deleted, and the four
      * spellings land directly on {@code !array}.
      */
@@ -451,7 +451,7 @@ class SchemaDesugarerTest {
     // ── Generic application heads (§3.3.1, §5.10) ────────────────────────
 
     /**
-     * Inside an open record a form over one of its parameters is the construction it denotes anywhere, written in
+     * Inside a parametric record a form over one of its parameters is the construction it denotes anywhere, written in
      * place with the parameter at its slot, whatever else it sets (§5.3, §5.10).
      */
     @Test
@@ -466,25 +466,25 @@ class SchemaDesugarerTest {
         }
     }
 
-    /** A template's body is a record body: a parameter list before anything else is refused (§5.10). */
+    /** A parametric record's body is a record body: a parameter list before anything else is refused (§5.10). */
     @Test
-    void aTemplateBodyThatIsNoRecordIsRefused() {
+    void aParametricRecordsBodyThatIsNoRecordIsRefused() {
         for (String body : List.of("<T> [T]", "<T> [T; 3]", "<V> {text => V}", "<T> ( T | text )", "<A, B> [A, B]",
                 "<T> T", "<B> pair<uuid, B>")) {
             SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                     () -> desugar("  bad => " + body), body);
-            assertTrue(thrown.getMessage().contains("'bad': a template's body is a record body"),
+            assertTrue(thrown.getMessage().contains("'bad': a parametric record's body is a record body"),
                     thrown.getMessage());
         }
     }
 
     /**
-     * An open record passes through as the record body it is written as, and the <b>application</b> of it too:
-     * substitution happens over the resolved open record ({@code TemplateMaterialiser}), not over the AST, so this
+     * A parametric record passes through as the record body it is written as, and the <b>application</b> of it too:
+     * substitution happens over the resolved parametric record ({@code ParametricMaterialiser}), not over the AST, so this
      * phase leaves {@code box<text>}'s head and arguments alone.
      */
     @Test
-    void anOpenRecordAndItsApplicationPassThrough() {
+    void aParametricRecordAndItsApplicationPassThrough() {
         SchemaDocument document = parse("""
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
@@ -493,11 +493,11 @@ class SchemaDesugarerTest {
     }
 
     /**
-     * A template whose body writes a container over a parameter passes through as well: the form is the reference
+     * A parametric record whose body writes a container over a parameter passes through as well: the form is the reference
      * it spells, and the application closes it at materialisation.
      */
     @Test
-    void applyingATemplateWhoseBodyCarriesSugarPassesThroughToo() {
+    void applyingAParametricRecordWhoseBodyCarriesSugarPassesThroughToo() {
         SchemaDocument document = desugar("""
                   box => <T> { v: [T] }
                   holder => { b: box<text> }""");
@@ -511,11 +511,11 @@ class SchemaDesugarerTest {
 
     /**
      * An <em>imported</em> head passes through too, and needs no check here even though this phase is handed
-     * only the imported names. A template carrying a sugar form cannot link, so it cannot have been
-     * registered, so it cannot be imported: every imported template is sugar-free by construction.
+     * only the imported names. A parametric record carrying a sugar form cannot link, so it cannot have been
+     * registered, so it cannot be imported: every imported parametric record is sugar-free by construction.
      */
     @Test
-    void applyingAnImportedTemplateIsLeftForMaterialisationToo() {
+    void applyingAnImportedParametricRecordIsLeftForMaterialisationToo() {
         SchemaDocument document = parse("  holder => { b: elsewhere<text> }");
 
         assertSame(document, SchemaDesugarer.desugar(document));
@@ -600,9 +600,9 @@ class SchemaDesugarerTest {
         return ((InlineConstruction) written).value().typeRef().orElseThrow();
     }
 
-    /** An open record's field holds it in the record body, as a closed record's does. */
+    /** A parametric record's field holds it in the record body, as a closed record's does. */
     @Test
-    void anOpenRecordsDependentFieldIsItsConstructionInPlace() {
+    void aParametricRecordsDependentFieldIsItsConstructionInPlace() {
         StructuralTypeDef typeDef = assertInstanceOf(StructuralTypeDef.class, desugar(
                 "  cell => <T> { kind: meta.type_ref  v?: kind!  w: T }").body().declarations().get("cell").typeDef());
         FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);

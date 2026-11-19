@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -54,7 +54,7 @@ import java.util.Set;
  * <p><b>Extending a family is a declaration.</b> A family's members are open across schemas (§3.3.4), so a
  * member changes what every position typed by its base does, in every schema that imports it; and a member is
  * something a read reports, a tag names (§6.1.5) and a binding maps, all by name. An application at a use site
- * whose record in place would be a member is refused before linking ({@code TemplateMaterialiser}), so every
+ * whose record in place would be a member is refused before linking ({@code ParametricMaterialiser}), so every
  * member this checks is a declaration.
  */
 final class RecordExtension {
@@ -88,9 +88,9 @@ final class RecordExtension {
             Top def = merged.get(name);
             if (def instanceof RecordBody record) {
                 checkDeclaration(name, def, record, merged, facts, violations);
-            } else if (OpenEntry.isOpen(def)) {
-                // Every application of a template IS-A what its written parents reach, so a template composing a
-                // final record is refused at its own declaration, whether or not anything applies it.
+            } else if (ParametricEntry.isParametric(def)) {
+                // Every application of a parametric record IS-A what its written parents reach, so a parametric record
+                // composing a final record is refused at its own declaration, whether or not anything applies it.
                 checkNothingComposesOntoFinal(name, def, merged, facts, violations);
             }
         }
@@ -303,7 +303,7 @@ final class RecordExtension {
                 return Optional.empty(); // a dependent field, or an application a resolution has not closed
             }
         }
-        if (target == null || OpenEntry.isOpen(target) || target instanceof Alias) {
+        if (target == null || ParametricEntry.isParametric(target) || target instanceof Alias) {
             return Optional.empty();
         }
         if (target instanceof RefBody reference && !reference.namesTypes()) {

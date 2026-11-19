@@ -146,7 +146,7 @@ public final class ExternReader implements JsonTypeReader<Object>, ExactReader {
 
     /** Whether a value of {@code definition} is a record, whose annotation members may stand inline (§3.3). */
     private static boolean readsARecord(Top definition) {
-        return definition instanceof RecordBody record && !record.isOpen();
+        return definition instanceof RecordBody record && !record.isParametric();
     }
 
     private ExternReader(String name, ValueReaderContext context, Crossing own, Map<String, Crossing> admitted,

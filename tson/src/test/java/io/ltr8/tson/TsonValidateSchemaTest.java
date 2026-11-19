@@ -62,9 +62,9 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * <b>A choice or a tuple is no template body</b> (§5.10): a template's body is a record body, so a choice or a
-     * tuple over a parameter there is one diagnostic against the declaration. Inside an open record either is written
-     * in place, the parameter at its slot.
+     * <b>A choice or a tuple is no parametric record's body</b> (§5.10): a parametric record's body is a record body, so a
+     * choice or a tuple over a parameter there is one diagnostic against the declaration. Inside a parametric record either
+     * is written in place, the parameter at its slot.
      */
     @ParameterizedTest
     @ValueSource(strings = {
@@ -79,7 +79,7 @@ class TsonValidateSchemaTest {
     /**
      * A failure inside a form written in place is reported against the declaration that wrote it, and names
      * the form: {@code use => { u: [some_typo] }} lands on {@code /use} at its own line, as the same mistake
-     * spelled {@code u: some_typo} does. Nothing here involves a template.
+     * spelled {@code u: some_typo} does. Nothing here involves a parametric record.
      */
     @Test
     void aFailureInsideAFormInPlaceIsReportedAgainstTheDeclarationThatWroteIt() {
@@ -96,7 +96,7 @@ class TsonValidateSchemaTest {
 
     /**
      * <b>A defect a held body deferred belongs to the declaration whose text wrote it, not to whoever applied
-     * the template.</b> Nothing checks {@code box}'s own references at its declaration -- a template's
+     * the parametric record.</b> Nothing checks {@code box}'s own references at its declaration -- a parametric record's
      * references cannot be settled until an application supplies arguments -- so the verdict arrives where
      * {@code box<text>} closes, in place at {@code holder}'s field. That line is not wrong and does not contain
      * the name. Deferred checking is what holding buys, and it is
@@ -107,7 +107,7 @@ class TsonValidateSchemaTest {
      * different one for every applier.
      */
     @Test
-    void aDefectInsideATemplateIsReportedAgainstTheTemplate() {
+    void aDefectInsideAParametricRecordIsReportedAgainstTheParametricRecord() {
         List<Diagnostic> problems = check("""
                 {
                   box => <T> { v: T  w: no_such_type }
@@ -122,17 +122,17 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * A closed form an open record holds in place is reported against the open record that wrote it, and named by
+     * A closed form a parametric record holds in place is reported against the parametric record that wrote it, and named by
      * the form, as one inside a closed record is.
      */
     @Test
-    void anOpenRecordHoldingAContainerIsBlamedForItsOwnText() {
+    void aParametricRecordHoldingAContainerIsBlamedForItsOwnText() {
         assertBlamed("boxes => <T> { t: T  bad: [no_such_type] }", "/boxes",
                 "'[no_such_type]' element_type has an unresolved reference 'no_such_type'");
     }
 
     @Test
-    void aTemplateAppliedByAnotherTemplateIsBlamedForItsOwnHeldText() {
+    void aParametricRecordAppliedByAnotherParametricRecordIsBlamedForItsOwnHeldText() {
         assertBlamed("inner => <T> { i: T  bad: no_such_type }", "/inner",
                 "'inner' field 'bad' has an unresolved reference 'no_such_type'");
     }
@@ -164,12 +164,12 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * One mistake in a template is one mistake however many declarations apply it. Each application closes its
+     * One mistake in a parametric record is one mistake however many declarations apply it. Each application closes its
      * own record in place and each fails identically, so without this the author gets the same sentence once per
      * applier -- and the count is a property of the schema's callers rather than of the defect.
      */
     @Test
-    void aTemplateDefectIsReportedOncePerDefectNotOncePerApplication() {
+    void aParametricRecordDefectIsReportedOncePerDefectNotOncePerApplication() {
         List<Diagnostic> problems = check("""
                 {
                   box => <T> { v: T  w: no_such_type }
@@ -182,7 +182,7 @@ class TsonValidateSchemaTest {
         assertEquals(Optional.of("/box"), problems.getFirst().schemaPointer());
     }
 
-    /** The same rule for a name that is a name: {@code some_typo} is the applier's typo, not the template's. */
+    /** The same rule for a name that is a name: {@code some_typo} is the applier's typo, not the parametric record's. */
     @Test
     void anUnresolvedArgumentStaysWithTheApplier() {
         assertStaysWithTheApplier("box<some_typo>",
@@ -213,11 +213,11 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * A closed declaration's own typo is never handed to a template, however the name reads there: the failing entry
-     * here is the author's own declaration and already carries the line they wrote.
+     * A closed declaration's own typo is never handed to a parametric record, however the name reads there: the failing
+     * entry here is the author's own declaration and already carries the line they wrote.
      */
     @Test
-    void aClosedDeclarationKeepsItsOwnTypoEvenWhenATemplateNamesIt() {
+    void aClosedDeclarationKeepsItsOwnTypoEvenWhenAParametricRecordNamesIt() {
         List<Diagnostic> problems = check("""
                 {
                   box => <T> { no_such_type: T }
@@ -249,7 +249,7 @@ class TsonValidateSchemaTest {
      * consumer conflating them is wrong in the direction that matters, calling a document invalid that was
      * never judged. Three fixtures held that in turn and each was closed by the work that followed it: a
      * parameter in a collection-valued slot (the author's error now), a parameterized supertype, and one
-     * template applied to another. The machinery is untouched -- {@code SchemaResolver} still routes an
+     * parametric record applied to another. The machinery is untouched -- {@code SchemaResolver} still routes an
      * {@code UnsupportedOperationException} through the receiver, in the catch inside its memoized getter --
      * so the day a schema-side gap reappears this should become a fixture again.
      *
@@ -274,16 +274,16 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * A broken template declaration is one problem, and its applications are not further problems. The
+     * A broken parametric record declaration is one problem, and its applications are not further problems. The
      * placeholder a failed declaration leaves behind keeps that declaration's own type parameters, so
      * {@code bl<int32>} arity-checks against it and closes silently; with the parameter list dropped, the
      * application was told that {@code bl} "declares no type parameters ... drop the argument list" -- the
      * one piece of advice guaranteed to be wrong, since following it breaks the schema further while the
      * real fix is upstream. Both placeholders are pinned, the desugarer's and the resolver's, because a
-     * template can fail at either phase.
+     * parametric record can fail at either phase.
      */
     @Test
-    void anApplicationOfABrokenTemplateAddsNoDiagnosticOfItsOwn() {
+    void anApplicationOfABrokenParametricRecordAddsNoDiagnosticOfItsOwn() {
         for (String broken : List.of("bl => <T> { v: T  v: T }", "bl => <T> [T; 0..]")) {
             List<Diagnostic> problems = check("""
                     {
@@ -302,7 +302,7 @@ class TsonValidateSchemaTest {
      * fails, and an application of it closes against the placeholder left in its place, reporting nothing further.
      */
     @Test
-    void aGrowingTemplateIsReportedAtItsDeclarationAndNotAgainAtItsApplication() {
+    void aGrowingParametricRecordIsReportedAtItsDeclarationAndNotAgainAtItsApplication() {
         List<Diagnostic> problems = check("""
                 {
                   box => <T> { v: T }

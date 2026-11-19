@@ -8,8 +8,8 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.ValueEntry;
-import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.ExternAdmission;
@@ -51,9 +51,9 @@ import java.util.function.Function;
  * but rejects this particular entry. Every constructor the kernel and the three libraries declare has a factory,
  * so the first case is a constructor a schema declared itself that this library has never seen.
  *
- * <p><b>An entry declaring type parameters never reaches a factory at all.</b> A template is not a type (§5.10)
- * and compiles to an {@link OpenTemplateReader}, which reports against the data and skips the value: only a
- * <em>data</em> type-ref can reach one -- a schema naming a template without applying it is refused when it links
+ * <p><b>An entry declaring type parameters never reaches a factory at all.</b> A parametric record is not a type (§5.10)
+ * and compiles to a {@link ParametricRecordReader}, which reports against the data and skips the value: only a
+ * <em>data</em> type-ref can reach one -- a schema naming a parametric record without applying it is refused when it links
  * -- and that is the author's error, not a gap.
  *
  * <p>A compile dispatches each body's constructor name to a factory through one factory set ({@link
@@ -425,10 +425,10 @@ public final class TsonSchemaCompiler {
         }
 
         private TsonTypeReader<?> build(String name, Top definition) {
-            if (OpenEntry.isOpen(definition)) {
-                // A template is not a type ([TSON-SCHEMA] §5.10). See OpenTemplateReader for why the refusal is
+            if (ParametricEntry.isParametric(definition)) {
+                // A parametric record is not a type ([TSON-SCHEMA] §5.10). See ParametricRecordReader for why the refusal is
                 // the entry's own reader rather than a check at the root.
-                return new OpenTemplateReader(name, OpenEntry.parameterNames(definition),
+                return new ParametricRecordReader(name, ParametricEntry.parameterNames(definition),
                         new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
             }
             Top body = definition;

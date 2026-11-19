@@ -9,7 +9,7 @@ package io.ltr8.tson.compiler.ast.schema;
  *
  * <p>Each bound is preserved as raw token text, not parsed to a number: the bound is read where the
  * desugared construction binds it, against {@code array}'s own {@code min_items}/{@code max_items}, so a token that is
- * no {@code decimal-natural} is refused there -- a template's parameter among them, which stands only where
+ * no {@code decimal-natural} is refused there -- a parametric record's parameter among them, which stands only where
  * a type is named (§5.10).
  */
 public sealed interface SizeSpec {

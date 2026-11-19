@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A constructor's application is its construction on the written form, before anything reads it ([TSON-SCHEMA] §5.3,
  * §5.10): {@code meta.map<text meta.array<box<T>>>} is {@code {text => [box<T>]}}, read once, every application left
- * an open record's over names, so nothing stands in for an argument written in place.
+ * a parametric record's over names, so nothing stands in for an argument written in place.
  */
 class ConstructionOnTheWrittenFormTest {
 
@@ -85,11 +85,11 @@ class ConstructionOnTheWrittenFormTest {
     }
 
     /**
-     * A constructor's application three deep is constructed innermost first, in a closed record and in an open one,
-     * and the open record's application closes to what the closed record holds.
+     * A constructor's application three deep is constructed innermost first, in a closed record and in a parametric one,
+     * and the parametric record's application closes to what the closed record holds.
      */
     @Test
-    void aConstructorsApplicationThreeDeepClosesWhenItsOpenRecordIsApplied() {
+    void aConstructorsApplicationThreeDeepClosesWhenItsParametricRecordIsApplied() {
         TsonLinkedSchema linked = resolve("three-deep", """
                   k  => { f: meta.map<text meta.array<meta.array<box<text>>>> }
                   s  => { f: {text => [[box<text>]]} }
@@ -98,8 +98,8 @@ class ConstructionOnTheWrittenFormTest {
 
         assertEquals(fieldType(linked, "s", "f"), fieldType(linked, "k", "f"));
         assertEquals(fieldType(linked, "k", "f"), fieldType(linked, "wt", "f"));
-        MapBody open = assertInstanceOf(MapBody.class, ((TypeInline) fieldType(linked, "w", "f")).of());
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, ((TypeInline) open.valueType()).of());
+        MapBody overParameter = assertInstanceOf(MapBody.class, ((TypeInline) fieldType(linked, "w", "f")).of());
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, ((TypeInline) overParameter.valueType()).of());
         ArrayBody inner = assertInstanceOf(ArrayBody.class, ((TypeInline) outer.elementType()).of());
         assertEquals(new ApplyBody(TypeRef.of("box"), List.of(ParamRef.of("T"))).inPlace(), inner.elementType());
     }

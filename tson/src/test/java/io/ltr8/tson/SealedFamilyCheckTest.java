@@ -253,7 +253,7 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * <b>A colliding member is named the way the author wrote it.</b> Both members here compose a template's
+     * <b>A colliding member is named the way the author wrote it.</b> Both members here compose a parametric record's
      * application, and each is the author's own declaration (§8.2), so the names that collide are {@code a} and
      * {@code b} -- names an author can open and edit.
      */
@@ -302,7 +302,7 @@ class SealedFamilyCheckTest {
 
     // ── A member is declared ─────────────────────────────────────────────
 
-    private static final String MEMBER_TEMPLATE = """
+    private static final String MEMBER_PARAMETRIC = """
               pet    => abstract { pet_type: text =?  name: text }
               dog_of => <T> pet & { pet_type?: = "dog"  breed: T }
             """;
@@ -314,7 +314,7 @@ class SealedFamilyCheckTest {
      */
     @Test
     void aMemberAppliedAtAUseSiteIsRefused() {
-        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("use-site", "{\n" + MEMBER_TEMPLATE + """
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("use-site", "{\n" + MEMBER_PARAMETRIC + """
                   kennel => { k: dog_of<text> }
                 }"""));
 
@@ -327,12 +327,12 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * A template body applying a member would put one in place at each application, and is reported at the
+     * A parametric record's body applying a member would put one in place at each application, and is reported at the
      * declaration whose application closed it.
      */
     @Test
-    void aMemberAppliedInsideATemplateIsRefusedAtItsApplication() {
-        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_TEMPLATE
+    void aMemberAppliedInsideAParametricRecordIsRefusedAtItsApplication() {
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_PARAMETRIC
                 + """
                   kennel_of => <T> { d: dog_of<T> }
                   kt        => kennel_of<text>
@@ -346,7 +346,7 @@ class SealedFamilyCheckTest {
     /** The declared spelling of the same member loads, and a use site writes its name. */
     @Test
     void aDeclaredMemberLoads() {
-        isClean(Tson.standard(), "declared", "{\n" + MEMBER_TEMPLATE + """
+        isClean(Tson.standard(), "declared", "{\n" + MEMBER_PARAMETRIC + """
                   dogs   => dog_of<text>
                   kennel => { k: dogs }
                 }""");

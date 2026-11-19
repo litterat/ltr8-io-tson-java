@@ -2,10 +2,10 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Extern;
-import io.ltr8.tson.schema.meta.OpenEntry;
 
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -35,9 +35,9 @@ import java.util.function.Function;
  * meta.ref<order>} names values and {@code meta.ref<record>} types.
  *
  * <p><b>Membership of a type name is one walk</b> over resolved entries, never over spellings. From an entry, alias
- * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, an open
- * record (a template, no type, §5.10) and a value entry are no type's name, so no member set over {@code
- * meta.ref<meta.record>} reaches an open record. For every other entry the type of its value -- the tag resolved output
+ * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, a
+ * parametric record (no type, §5.10) and a value entry are no type's name, so no member set over {@code
+ * meta.ref<meta.record>} reaches a parametric record. For every other entry the type of its value -- the tag resolved output
  * writes, {@code !meta.record}, {@code !unicode.identifier_type}, {@code !meta.namespace} -- is followed until a
  * constructor is reached, and the entry is a member when that constructor is {@code of} or has {@code of} among its
  * supertypes. A reference over {@code record} holds the kernel's {@code top}, a fresh
@@ -106,7 +106,7 @@ public final class KindMembers {
                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
         // An extern is a member where the entry it lands on is, which only a caller holding the link can judge.
-        if (type == null || OpenEntry.isOpen(type) || type instanceof Alias || type instanceof Extern
+        if (type == null || ParametricEntry.isParametric(type) || type instanceof Alias || type instanceof Extern
                 || type instanceof ValueEntry || type instanceof IncompleteEntry) {
             return false;
         }
@@ -136,7 +136,7 @@ public final class KindMembers {
     /**
      * Why {@code reference}'s {@code of} cannot be one, or empty where it can: any type or constructor of the writer's
      * namespace may be. Refused are a name {@code structure} does not declare (an empty answer from this method's
-     * caller's resolution, reported as an unresolved reference), an open entry, which denotes no type until it is
+     * caller's resolution, reported as an unresolved reference), a parametric record, which denotes no type until it is
      * applied (§5.10), a value entry, which is a value and no type, and an incomplete entry, which is no type.
      */
     public static Optional<String> ofRefusal(RefBody reference, Function<String, Top> structure) {
@@ -150,8 +150,8 @@ public final class KindMembers {
             return Optional.of("its 'of' names '" + of + "', which is a value and no type -- a reference admits the "
                     + "names of entries whose values are of a type, and nothing has a value of a value");
         }
-        if (OpenEntry.isOpen(definition)) {
-            return Optional.of("its 'of' names '" + of + "', an open record: a template denotes no type until it is "
+        if (ParametricEntry.isParametric(definition)) {
+            return Optional.of("its 'of' names '" + of + "', a parametric record, which denotes no type until it is "
                     + "applied (§5.10)");
         }
         if (definition instanceof IncompleteEntry incomplete) {

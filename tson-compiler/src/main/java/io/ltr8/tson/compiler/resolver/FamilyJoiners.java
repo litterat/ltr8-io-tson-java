@@ -47,7 +47,7 @@ final class FamilyJoiners {
         Walk walk = new Walk(base, declarations, entries);
         List<String> joiners = new ArrayList<>();
         for (String name : declarations.keySet()) {
-            // An open record is no type, so no member (§5.10); it is an operand of the applications that close it.
+            // A parametric record is no type, so no member (§5.10); it is an operand of the applications that close it.
             if (notHeld.test(name) && SchemaDesugarer.typeParams(declarations.get(name).typeDef()).isEmpty()
                     && walk.mayJoin(name, new HashSet<>()) && selectors.stream().allMatch(selector ->
                     walk.pin(name, selector, new HashSet<>()).map(pin -> samePin.test(selector, pin)).orElse(true))) {

@@ -137,9 +137,9 @@ class ConstructionSugarTest {
                 ((RecordBody) linked.schema().entries().get(record)).fields().get(field).typeExpr());
     }
 
-    /** Inside a record template the construction is held with the field and closed with each application. */
+    /** Inside a parametric record the construction is held with the field and closed with each application. */
     @Test
-    void aConstructionOverATemplateParameterClosesWithTheApplication() {
+    void aConstructionOverAParametricRecordsParameterClosesWithTheApplication() {
         TsonLinkedSchema linked = resolve("template", """
                   page      => <T> { items: meta.array<T> }
                   page_uuid => page<uuid>

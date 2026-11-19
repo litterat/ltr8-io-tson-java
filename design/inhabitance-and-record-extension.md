@@ -10,25 +10,25 @@ check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extensi
 - Inhabitance is a least fixed point over the entry graph: exact, total and two-valued, with no third answer.
 - Every local entry is judged, referenced or not; imported entries are skipped, having been judged when their own
   schema linked.
-- An open record (a template, a `RecordBody` with `parameters`) is inhabited by fiat; the declarations closing its
-  applications are judged like any other entry, so a template nobody applies is judged nowhere.
+- A parametric record (a `RecordBody` with `parameters`) is inhabited by fiat; the declarations closing its
+  applications are judged like any other entry, so a parametric record nobody applies is judged nowhere.
 - An unresolved reference is inhabited by fiat, and the check runs after `validateEntry`, so one defect is reported
   once.
 - A kind is inhabited exactly when it has a member; a value entry and every atom are inhabited here. An atom whose
   facets admit nothing is its family's coherence question, not this one.
-- `RecordExtension`'s FINAL check reads the entry's chain (`TypeChain.supertypesOf`), a template's included, which a
+- `RecordExtension`'s FINAL check reads the entry's chain (`TypeChain.supertypesOf`), a parametric record's included, which a
   §5.9 subtraction leaves empty.
 - A family's base is a record, and its selectors are the base's own `discriminators` statement, read through
-  `FamilySelectors`, the derivation the readers dispatch on. A template is no type and no base (§5.10); an abstract
-  template's application is a closed record carrying the template's selectors, judged as any base is.
+  `FamilySelectors`, the derivation the readers dispatch on. A parametric record is no type and no base (§5.10); an abstract
+  parametric record's application is a closed record carrying the parametric record's selectors, judged as any base is.
 - Every family in the closure is judged; a pin collision only the merge produced is reported against the schema
   (`""`), naming both origins.
 - A family member is declared: an application at a use site whose record in place would compose onto a declared type
-  is refused before linking (`TemplateMaterialiser.refuseMembership`).
+  is refused before linking (`ParametricMaterialiser.refuseMembership`).
 - Pins compare as values (`ValueIdentity`), read at the base's declared type.
 
-Related: `design/linking-and-compilation.md` (the link order), `design/schema-resolution.md` (marks and template
-families), `design/template-materialisation.md` (`refuseMembership`), `design/record-dispatch.md`,
+Related: `design/linking-and-compilation.md` (the link order), `design/schema-resolution.md` (marks and parametric record
+families), `design/parametric-materialisation.md` (`refuseMembership`), `design/record-dispatch.md`,
 `design/choice-disjointness.md`.
 
 ## The inhabitance check (`TypeInhabitance`)
@@ -57,10 +57,10 @@ the schema, at a line the data's author does not control. The diagnostic spells 
 - **Every local entry is judged, referenced or not**, on the footing of a declared type parameter the body never uses
   (§5.10). So an uninhabited *variant* is rejected even where the choice around it still works. Repeating the verdict
   for imported entries would report one defect once per importer.
-- **An open record is not walked.** Its parameters mean nothing until an application supplies them, so it is inhabited
+- **A parametric record is not walked.** Its parameters mean nothing until an application supplies them, so it is inhabited
   here, and a declaration closing one of its applications is an ordinary entry in the map by the time linking runs,
-  judged like any other. §8's own `tree` fixture is caught the moment anything applies it, and a template nobody applies
-  is judged nowhere, the same answer §5.10's deferred checking gives everywhere else. `TypeInhabitanceTest` pins both
+  judged like any other. §8's own `tree` fixture is caught the moment anything applies it, and a parametric record nobody
+  applies is judged nowhere, the same answer §5.10's deferred checking gives everywhere else. `TypeInhabitanceTest` pins both
   halves.
 - **An unresolved reference is inhabited by fiat.** `validateEntry` has already reported it against this entry;
   calling it uninhabited too would report one defect twice, the second time naming a different problem.
@@ -82,30 +82,31 @@ usable and its members pin them distinctly, and every member is declared.
   local (two definition marks on one declaration, a mark carrying a value, a mark on a non-record) the resolver
   already refused while lowering. It runs on the merged map, not the annotated one: the marks are consumed into the
   body, so no annotation is left to consult.
-- **The FINAL check reads the entry's chain**, a template's as a closed type's: a template composing a
+- **The FINAL check reads the entry's chain**, a parametric record's as a closed type's: a parametric record composing a
   final record is refused at its own declaration, whether or not anything applies it, since every application IS-A
-  what the template's written parents reach. §5.9's subtraction leaves the chain empty, adding no IS-A edge, which is
-  the only thing FINAL constrains, so subtracting from a final type is admitted. No *invalid* case would show a
+  what the parametric record's written parents reach. §5.9's subtraction leaves the chain empty, adding no IS-A edge, which
+  is the only thing FINAL constrains, so subtracting from a final type is admitted. No *invalid* case would show a
   regression there; the corpus carries a `valid` vector for that reason.
 - **The selectors are the base's statement.** A family dispatches on the fields its ABSTRACT base names in
   `discriminators` (§5.2), resolved to the base's own fields by `FamilySelectors`, the derivation both encodings'
   readers dispatch on, so the check and the read cannot disagree about which fields select a member. A member states
-  no discriminators of its own, so an inherited selector needs no exemption. Only a record is a base: a template is
-  no type, and the record an abstract template's application closes to carries the template's `extension`,
-  `discriminators` and groups, so its selectors are checked as a hand-written base's are, wherever the application
-  is closed. A template nobody applies is judged nowhere, as §5.10's deferred checking gives everywhere else.
+  no discriminators of its own, so an inherited selector needs no exemption. Only a record is a base: a parametric record
+  is no type, and the record an abstract parametric record's application closes to carries the parametric record's
+  `extension`, `discriminators` and groups, so its selectors are checked as a hand-written base's are, wherever the
+  application is closed. A parametric record nobody applies is judged nowhere, as §5.10's deferred checking gives everywhere
+  else.
 - **Every family in the closure is judged**, not only one with a part declared here. §3.3.4 makes `subtypes` open
   across schemas, so an importer can add a member that collides with an imported one, and two imports that each link
   cleanly can each add a member that collides with the other's. The second is the merge's own fault and is reported
   against the schema (`""`), naming both origins. A collision inside one import cannot reach here: that import was
   refused when it linked.
 - **Extending a family is a declaration** (§5.2). An application at a use site whose record in place would compose
-  onto a declared type (`k: dog_of<text>`, or `dog_of<T>` held in a template body and closed by a declaration) is
-  refused before linking, with the application in hand (`TemplateMaterialiser.refuseMembership`), at the declaration
+  onto a declared type (`k: dog_of<text>`, or `dog_of<T>` held in a parametric record's body and closed by a declaration) is
+  refused before linking, with the application in hand (`ParametricMaterialiser.refuseMembership`), at the declaration
   that wrote it or whose application closed it. A member is what a read reports, a tag names and a binding maps, all
   by name, so every member `RecordExtension` judges is a declaration.
-  A template is in no `subtypes` index (the linker credits no open entry), so a template composing a base is no
-  member of it, its declared applications being the members.
+  A parametric record is in no `subtypes` index (the linker credits no open entry), so a parametric record
+  composing a base is no member of it, its declared applications being the members.
 - **Pins compare as values through `ValueIdentity`**, which is why that class is visible outside its package. §4.3
   makes `= 255` and `= 0xFF` one pin and §5.5 makes `= 1` and `= 1.0` one, so a comparison of tokens would accept a
   schema whose dispatch table is not a function. They are read **at the base's declared type**, an enum selector in

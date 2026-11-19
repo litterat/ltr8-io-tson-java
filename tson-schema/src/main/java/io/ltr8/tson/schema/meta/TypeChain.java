@@ -12,7 +12,7 @@ import java.util.function.Predicate;
  * statics here, which answer empty for a value that carries none. Which application an entry is the instantiation
  * of is no part of it: that fact sits on the entry's key ({@code TsonSchema#applicationOf}).
  *
- * <p><b>Three states, one record.</b> {@link #parents} is what was written -- an open record's parents, one of which
+ * <p><b>Three states, one record.</b> {@link #parents} is what was written -- a parametric record's parents, one of which
  * may be an application written in place ({@link ApplyBody}, {@code <T> result<T> & { ... }}), and a closed
  * declaration's applied parents until {@code SchemaResolver} folds them into edges. It is the only list that ever
  * holds an application, and a closed type carries none once linked. {@link #supertypes} is the closed chain: every
@@ -62,8 +62,8 @@ public record TypeChain(List<TypeExpr> parents, List<String> supertypes, List<St
      * Whether {@code value} IS-A the kernel's {@code top} ([TSON-SCHEMA] §4.1): a constructor, a base kind,
      * {@code alias} or {@code template} -- what a construction may apply, and what a compiled
      * schema builds an instance reader for. Read off the chain, so a
-     * template composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would; and
-     * judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:
+     * parametric record composing a base kind ({@code op => <T> product & { path: T }}) answers as its closed form would;
+     * and judged by where {@code top} is defined, never by its spelling. The kernel's {@code top} answers for itself:
      * it is what every other answer IS-A, and as abstract as the base kinds beneath it, so its own reader is what
      * refuses a direct application of it. That is applicability, not kind membership: by the chain {@code top} is
      * a type, and a member of {@code meta.type_ref}.

@@ -104,7 +104,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
 
     /**
      * The entries IS-A {@code name}, whose value is {@code definition}: its chain's {@code subtypes} ({@link
-     * TypeChain#subtypesOf}), each a type, a template being in no index.
+     * TypeChain#subtypesOf}), each a type, a parametric record being in no index.
      */
     public List<String> subtypesOf(String name, Top definition) {
         return TypeChain.subtypesOf(definition);

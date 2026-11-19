@@ -21,14 +21,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * <b>A binding map is written in the names the author wrote.</b> A family member composing an application of an
- * open record ({@code ping => msg_of<ping_body> & { … }}) is a declaration like any other, so a bind context keys it
+ * parametric record ({@code ping => msg_of<ping_body> & { … }}) is a declaration like any other, so a bind context keys it
  * by its own name, whether the application's argument is a record or a container ([TSON-SCHEMA] §5.8, §5.10).
  */
 class AppliedOperandBindingTest {
 
     private static final String ENVELOPE_ID = "https://example.test/envelope.tn";
 
-    /** A discriminated family whose members compose an open record's applications (§5.10). */
+    /** A discriminated family whose members compose a parametric record's applications (§5.10). */
     private static final String ENVELOPE = """
             !!id:"https://example.test/envelope.tn"
             !!import:"%s"
@@ -120,7 +120,7 @@ class AppliedOperandBindingTest {
               boxes   => { a: int_box }
             }""".formatted(TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
-    /** The generic class a code generator would emit for a template: its component erases to {@code Object}. */
+    /** The generic class a code generator would emit for a parametric record: its component erases to {@code Object}. */
     public record Box<V>(V item) {
     }
 

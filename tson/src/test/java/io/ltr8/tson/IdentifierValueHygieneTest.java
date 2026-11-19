@@ -182,11 +182,11 @@ class IdentifierValueHygieneTest {
     }
 
     /**
-     * A record template's literal value is every application's, so it is judged once, at the template, against the
-     * template's own declaration -- applied or not.
+     * A parametric record's literal value is every application's, so it is judged once, at the parametric record, against
+     * the parametric record's own declaration -- applied or not.
      */
     @Test
-    void aRecordTemplatesIdentifierTypedValueIsAName() {
+    void aParametricRecordsIdentifierTypedValueIsAName() {
         Diagnostic refused = only(tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
                 "acct => <T> { kind: slug = a\u0132b  v: T }")));
         assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, refused.code());

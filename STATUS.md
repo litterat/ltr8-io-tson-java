@@ -52,16 +52,16 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       link. `kind!` is no data form in either encoding
 - [x] A record written in place (Part 2 §5.2) — a record body at a field's type, a group member's, an array's
       element, a map's value, a tuple's element or a choice's variant (`at: { x: int32 }`) is the record an
-      application of an open record closes to in place, read untagged in tree and bind mode in both encodings; one over
-      a parameter of its open record is `NOT_IMPLEMENTED`
+      application of a parametric record closes to in place, read untagged in tree and bind mode in both encodings; one
+      over a parameter of its parametric record is `NOT_IMPLEMENTED`
 - [x] Dependent fields (Part 2 §5.2) — `v?: kind!` is read per instance
       against the type its sibling's value names, in tree and bind mode (an `Object` component) and in JSON. The
       sibling's rules are checked at the declaration against the flattened record: declared first, typed by a reference
       to types, there to read whenever it is (a field group's member only beside an optional dependent field, which is
-      refused where it is read without it), its pin or default no template; the dependent field never voidable, carrying
-      no value, restated only as itself. A pinned sibling gives the field a fixed reader, a discriminator a member's, and a
-      free sibling is written before its dependent field. A value's qualified name going on through one takes the
-      type its sibling names in that value (Part 2 §5.12). The kernel's `record_field.value` and
+      refused where it is read without it), its pin or default no parametric record; the dependent field never voidable,
+      carrying no value, restated only as itself. A pinned sibling gives the field a fixed reader, a discriminator a
+      member's, and a free sibling is written before its dependent field. A value's qualified name going on through one takes
+      the type its sibling names in that value (Part 2 §5.12). The kernel's `record_field.value` and
       `record_template_field.value` are `type!`. A value entry's dependent value, of any form, is held as written and
       judged when the schema links against the type its sibling names in the schema's own namespace
 - [x] Every `!schema` value declares (Part 2 §4.1) — `geo => !schema { address => { … }
@@ -75,7 +75,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       "geo.address"` in JSON), and resolved output writes a nested map nested
 - [x] A bundled document's root holds only what an author writes (Part 2 §9) — the
       one kernel document, meta.tn, pre-loaded and importing nothing, is its wait cycle's closure plus the map, tuple,
-      choice, template, reference and octet-sequence vocabulary and the classifying annotations; its root is `void`,
+      choice, parametric record, reference and octet-sequence vocabulary and the classifying annotations; its root is `void`,
       `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum` (`!enum [A B]`) and
       `set<T>`, each completing an incomplete entry, and `schema`, the alias of `meta.schema` every schema map's tag
       names, and all its machinery sits under the open namespace `meta` (`meta.record`, `meta.identifier`,
@@ -124,7 +124,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
       directives during resolution, closes each argument-bearing type reference into its declaration or in place
-      (a construction, or the record an open record's application closes to, with no name), merges every
+      (a construction, or the record a parametric record's application closes to, with no name), merges every
       `!!import`'s namespace into one per schema
       (Part 2 §2.2.3, §3.3), validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`

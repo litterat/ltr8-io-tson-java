@@ -294,13 +294,13 @@ class FieldNameTypeTest {
     }
 
     /**
-     * A template's held body is text, and a declared name that is no identifier is written quoted in it, so a
-     * template composing a translation's base, a plain template declaring one, and an explicit one over a words
-     * type all hold and close; a plain one applied gives the identifier verdict its hand-written record would.
+     * A parametric record's held body is text, and a declared name that is no identifier is written quoted in it, so a
+     * parametric record composing a translation's base, a plain parametric record declaring one, and an explicit one over a
+     * words type all hold and close; a plain one applied gives the identifier verdict its hand-written record would.
      */
     @Test
-    void aTemplateHoldsAndClosesNamesThatAreNoIdentifiers() {
-        String templates = schema("templates", """
+    void aParametricRecordHoldsAndClosesNamesThatAreNoIdentifiers() {
+        String records = schema("templates", """
                   json_name => !unicode.identifier_type { start_add: "@" }
                   json_record => !meta.record { name_type: json_name  extension: ABSTRACT  fields: {} }
                   page => <T> json_record & { "@id": T  "@type"?: text }
@@ -309,8 +309,8 @@ class FieldNameTypeTest {
                   row => <T> !meta.record { name_type: words  fields: { "first name" => { type: T } } }
                   r => row<text>
                 """);
-        assertEquals(List.of(), read(templates, "templates", "!p { \"@id\": \"x\" }"));
-        assertEquals(List.of(), read(templates, "templates", "!r { \"first name\": \"Ada\" }"));
+        assertEquals(List.of(), read(records, "templates", "!p { \"@id\": \"x\" }"));
+        assertEquals(List.of(), read(records, "templates", "!r { \"first name\": \"Ada\" }"));
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("plain-template", """
                       box => <T> { "@id": T }
@@ -320,12 +320,12 @@ class FieldNameTypeTest {
     }
 
     /**
-     * A template composing a base closes to the record its hand-written spelling is, the base's name type
+     * A parametric record composing a base closes to the record its hand-written spelling is, the base's name type
      * included; and the chain is the resolver's, so the explicit {@code !record} cannot state one
      * ([TSON-SCHEMA] §4.1) -- a record takes a name type from supertypes only through {@code &}.
      */
     @Test
-    void aClosedTemplateTakesItsBasesNameTypeAndADeclarationWritesNoChain() {
+    void aParametricRecordClosesToItsBasesNameTypeAndADeclarationWritesNoChain() {
         String explicit = schema("explicit", """
                   folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }
                   fbase => !meta.record { name_type: folded  extension: ABSTRACT  fields: {} }
@@ -536,11 +536,11 @@ class FieldNameTypeTest {
     }
 
     /**
-     * A selector is found in its name form at a base that is a template's application too, which takes the
-     * template's name type, as its members do.
+     * A selector is found in its name form at a base that is a parametric record's application too, which takes the
+     * parametric record's name type, as its members do.
      */
     @Test
-    void aSelectorIsMatchedInATemplateApplicationsNameForm() {
+    void aSelectorIsMatchedInTheNameFormOfAParametricRecordsApplication() {
         String family = schema("folded-template-family", """
                   folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }
                   base => !meta.record { name_type: folded  extension: ABSTRACT  fields: {} }

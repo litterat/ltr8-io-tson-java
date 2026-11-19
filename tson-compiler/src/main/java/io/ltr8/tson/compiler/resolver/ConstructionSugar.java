@@ -26,7 +26,7 @@ import java.util.function.Function;
  * value, and nothing is written on a constructor to permit it.
  *
  * <p><b>A constructor</b> here is a closed record IS-A {@code meta.type}: one whose instances are types. A head
- * that composes {@code meta.top} alone builds values, and an open entry substitutes rather than constructs, so
+ * that composes {@code meta.top} alone builds values, and a parametric record substitutes rather than constructs, so
  * neither is one.
  *
  * <p><b>A reference names types</b> where its {@code of}, past its alias hops, is {@code meta.top} or a constructor
@@ -57,11 +57,11 @@ public final class ConstructionSugar {
 
     /**
      * Whether {@code definition}, the entry at the end of {@code name}'s alias chain, is a constructor construction
-     * sugar applies: a closed record IS-A {@code meta.type}. An open record is applied by substitution, never
+     * sugar applies: a closed record IS-A {@code meta.type}. A parametric record is applied by substitution, never
      * constructed, whatever its chain reaches (§5.10).
      */
     public static boolean constructs(String name, Top definition) {
-        return definition instanceof RecordBody record && !record.isOpen()
+        return definition instanceof RecordBody record && !record.isParametric()
                 && (TYPE.equals(name) || TypeChain.supertypesOf(record).contains(TYPE));
     }
 

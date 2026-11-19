@@ -293,11 +293,11 @@ class ValuesByNameTest {
     }
 
     @Test
-    void anOpenEntryNamesNoValue() {
+    void aParametricRecordNamesNoValue() {
         refused(api("template", """
                 box => <T> { v: T }
                 api => !interface { m => { request: box } }"""),
-                "'box' is an open entry", "denotes no value until it is applied");
+                "'box' is a parametric record", "denotes no value until it is applied");
     }
 
     @Test
@@ -467,7 +467,9 @@ class ValuesByNameTest {
                 l => !labels { x => { text: p.x.value } }""")));
     }
 
-    /** The read path's rule: a template is no type a value can be read against, so the walk has none to go on with. */
+    /**
+     * The read path's rule: a parametric record is no type a value can be read against, so the walk has none to go on with.
+     */
     @Test
     void aSiblingNamingNoTypeIsRefusedAtTheName() {
         List<Diagnostic> problems = problems(api("dependent-template", """
@@ -476,7 +478,7 @@ class ValuesByNameTest {
                 l => !labels { x => { text: d.s.value } }"""));
         assertTrue(problems.stream().anyMatch(p -> p.code() == Diagnostic.Code.SCHEMA_ERROR
                 && p.message().contains("'l' at /x/text names 'd.s.value', and 'd.s.value' is a dependent field, "
-                        + "typed by its sibling 'kind', which holds 'box', a template")), problems.toString());
+                        + "typed by its sibling 'kind', which holds 'box', a parametric record")), problems.toString());
     }
 
     /** Past a dependent field a segment selects a field of the type its sibling names, and no other. */
@@ -566,7 +568,7 @@ class ValuesByNameTest {
         refused(api("held-template", """
                 box => <T> { v: T }
                 d => !settings { s => { kind: box  value: { v: 1 } } }"""),
-                "'d' at /s/kind names 'box', and 'box' is an open entry");
+                "'d' at /s/kind names 'box', and 'box' is a parametric record");
     }
 
     /** A value by name goes on through a dependent field into the record it holds. */

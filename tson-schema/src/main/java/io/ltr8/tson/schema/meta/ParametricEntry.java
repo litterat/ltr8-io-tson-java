@@ -9,20 +9,20 @@ import java.util.Set;
 
 /**
  * The questions a phase asks of an entry because it may be open ([TSON-SCHEMA] §5.10): whether it is, what it binds,
- * and what its body writes. An open entry is an open record, a {@link RecordBody} whose {@code parameters} is not
- * empty -- the one shape a template has -- so each answer is a question of that record, asked of any entry.
+ * and what its body writes. An open entry is a parametric record, a {@link RecordBody} whose {@code parameters} is not
+ * empty -- the one shape a parametric record has -- so each answer is a question of that record, asked of any entry.
  *
- * <p><b>An open record is no type</b> (§5.10): no position names one bare, and only an application of one is a
- * type. Code that builds a reader or a writer from a {@link RecordBody} asks {@link #isOpen} first.
+ * <p><b>A parametric record is no type</b> (§5.10): no position names one bare, and only an application of one is a
+ * type. Code that builds a reader or a writer from a {@link RecordBody} asks {@link #isParametric} first.
  */
-public final class OpenEntry {
+public final class ParametricEntry {
 
-    private OpenEntry() {
+    private ParametricEntry() {
     }
 
-    /** Whether an entry whose value is {@code value} is an open record. */
-    public static boolean isOpen(Top value) {
-        return value instanceof RecordBody record && record.isOpen();
+    /** Whether an entry whose value is {@code value} is a parametric record. */
+    public static boolean isParametric(Top value) {
+        return value instanceof RecordBody record && record.isParametric();
     }
 
     /** The parameters {@code value} binds, in declaration order -- {@code []} for a closed entry. */
@@ -39,11 +39,11 @@ public final class OpenEntry {
     }
 
     /**
-     * Every application an open record writes ({@link ApplyBody}), in its fields' types and its parents, at any depth
+     * Every application a parametric record writes ({@link ApplyBody}), in its fields' types and its parents, at any depth
      * of types written in place, each as written. Empty for a closed entry.
      */
     public static List<ApplyBody> applications(Top value) {
-        if (!isOpen(value)) {
+        if (!isParametric(value)) {
             return List.of();
         }
         RecordBody record = (RecordBody) value;
@@ -54,12 +54,12 @@ public final class OpenEntry {
     }
 
     /**
-     * Every name an open record's references write, at any depth -- each head, each name and each parameter. What
+     * Every name a parametric record's references write, at any depth -- each head, each name and each parameter. What
      * §5.10's unreferenced-parameter rule asks: a declared parameter none of them writes is the author's error.
      */
     public static Set<String> names(Top value) {
         Set<String> names = new LinkedHashSet<>();
-        if (isOpen(value)) {
+        if (isParametric(value)) {
             ((RecordBody) value).references().forEach(reference -> names.add(reference.name()));
         }
         return names;
@@ -80,7 +80,7 @@ public final class OpenEntry {
      * declaration's written bounds are put on its parameters. A closed entry is returned as it is.
      */
     public static Top withParameters(Top value, Map<String, Param> settled) {
-        if (!isOpen(value)) {
+        if (!isParametric(value)) {
             return value;
         }
         RecordBody record = (RecordBody) value;

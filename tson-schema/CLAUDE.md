@@ -5,7 +5,8 @@ are declared in (`schema.meta`, `unicode`, `numeric`, `net`, `binary`, `temporal
 families' shared facet mechanics), `TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`, and
 `TsonBundledSchemas`. Read `design/linking-and-compilation.md` for the
 registry and identity, `design/namespace-types-and-value-entries.md` for `NamespaceBody`, `Namespace` and `ValueEntry`,
-`design/open-records.md` for an open record (`RecordBody` with `parameters`, `Param`, `ParamRef`, `OpenEntry`).
+`design/parametric-records.md` for a parametric record (`RecordBody` with `parameters`, `Param`, `ParamRef`,
+`ParametricEntry`).
 
 - Names no `tson-compiler` type — the engine depends on this module, not the reverse. Where a compiler type is needed
   structurally, declare a stand-in (`schema.meta.Token`, `tson-base`'s `SourcePosition`).
@@ -13,11 +14,11 @@ registry and identity, `design/namespace-types-and-value-entries.md` for `Namesp
   (`numeric.integer_type` is `schema.numeric.IntegerType`); a class no entry declares stays in `schema.meta`.
 - `Top` is sealed all the way down: `Type`, `Alias`, `Extern`, `ValueEntry`, `IncompleteEntry`. An entry whose tag names an
   ordinary type is a `ValueEntry` wrapping the value (a `Namespace`, a bound object, or a tree); `Namespace` is the
-  value of a namespace type and no `Top`. A template is a `RecordBody` with `parameters`, open and no type.
+  value of a namespace type and no `Top`. A parametric record is a `RecordBody` with `parameters`, and no type.
 - An atom body's components mirror its constructor's *resolved*, flattened shape — one component per schema field name.
   A nested or missing component binds `null` silently.
 - A bind target with more than one public constructor needs `@Record` on the canonical one.
-- A `TypeRef` is a name or, inside an open record, a `ParamRef`; an application is an `ApplyBody` written in place.
+- A `TypeRef` is a name or, inside a parametric record, a `ParamRef`; an application is an `ApplyBody` written in place.
   `RecordBody`'s constructor turns the names its `parameters` declare into `ParamRef`s and refuses a `ParamRef` they do
   not declare. `RecordField.position` is `@Unbound`; an entry's position, annotations and constructor tag live beside
   the map in `TsonSchema`'s per-entry facts, never in a body.

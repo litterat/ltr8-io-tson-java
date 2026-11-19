@@ -15,16 +15,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A selector inside a <b>template</b> body survives onto the open record, and stops at the members that pin it.
+ * A selector inside a <b>parametric record's</b> body survives onto that record, and stops at the members that pin it.
  *
- * <p>An open record is a {@code RecordBody} with parameters (§5.10), so its fields and the statement of which of
+ * <p>A parametric record is a {@code RecordBody} with parameters (§5.10), so its fields and the statement of which of
  * them a family dispatches on ({@code discriminators}) are both on it, and the pin each member writes arrives
  * beside the fact that gives it meaning.
  *
  * <p>Nothing reads it back specially: {@code discriminators} is a declared kernel member, so the
  * constructor's own reader binds it with the rest of the body, exactly as it binds the pins beside it.
  */
-class TemplateDiscriminatorTest {
+class ParametricRecordDiscriminatorTest {
 
     private static final String ID = "https://example.test/template-discriminator.tn";
 
@@ -73,19 +73,19 @@ class TemplateDiscriminatorTest {
             """;
 
     /**
-     * <b>The template names the selector, because the template's field is the base's.</b> The author marks it
-     * {@code =?} and each member pins it where its application is declared (§5.10), so the statement belongs on the
-     * template, and without it a template family could never dispatch on its members, the fact having been dropped
-     * between the declaration and anything able to read it.
+     * <b>The parametric record names the selector, because the parametric record's field is the base's.</b> The author marks
+     * it {@code =?} and each member pins it where its application is declared (§5.10), so the statement belongs on the
+     * parametric record, and without it a parametric record family could never dispatch on its members, the fact having been
+     * dropped between the declaration and anything able to read it.
      */
     @Test
-    void theOpenRecordNamesTheSelector() {
+    void theParametricRecordNamesTheSelector() {
         TsonCompiledSchema compiled = compile(FAMILY);
 
         RecordBody base = (RecordBody) compiled.schema().entries().get("pet");
 
         assertEquals(List.of("type"), base.discriminators(),
-                () -> "the field the author marked survives onto the open record: " + base);
+                () -> "the field the author marked survives onto the parametric record: " + base);
     }
 
     /**

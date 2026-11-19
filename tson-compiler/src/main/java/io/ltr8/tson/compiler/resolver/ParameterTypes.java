@@ -12,7 +12,7 @@ import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RefBody;
@@ -41,32 +41,32 @@ import java.util.function.Function;
  * holds a type or a name, or as an argument of an application at any of those or in a parent. A parameter anywhere
  * else is refused at the declaration, naming the slot ({@link #at}): a field's default or fixed value ({@link
  * #atValue}), a size bound, a field name, a group member, a field's {@code optional}, {@code voidable} or {@code
- * role}, the record's {@code extension}, {@code name_type} or {@code discriminators}. Each would leave the open record
+ * role}, the record's {@code extension}, {@code name_type} or {@code discriminators}. Each would leave the parametric record
  * without one shape its applications share, and a field's value in particular is never a parameter, whatever the
  * field's type: a pin on a slot typed {@code meta.type_ref} ({@code <T> meta.array & { element_type?: = T }}) is
- * refused with every other parameter at a value. An open record built from a record body holds a parameter only where
+ * refused with every other parameter at a value. A parametric record built from a record body holds a parameter only where
  * it may stand, its fields' types, at any depth, and its parents' arguments being the only references it has; the
  * explicit spelling, {@code <T> !meta.record { … }}, is walked against {@code record}'s own vocabulary before it is
  * bound ({@link #checkSlots}).
  *
  * <p><b>A bound is written.</b> A declaration writes one after the name ({@code <T: text>}), which must name a type;
  * otherwise the parameter is unbounded. Nothing about a parameter is inferred from its uses. A parameter passed as an
- * argument to a bounded parameter of another template must itself be written with a bound that IS-A that one, so
+ * argument to a bounded parameter of another parametric record must itself be written with a bound that IS-A that one, so
  * {@code rebox => <T> { b: boxed<T> }} over {@code boxed => <T: text> { v: T }} is refused at {@code rebox}. Each
- * declaration is checked once, against the bounds its callees wrote, so no order among templates is needed. A
+ * declaration is checked once, against the bounds its callees wrote, so no order among parametric records is needed. A
  * constructor's slot judges the argument that arrives when the record is applied, so a parameter at one ({@code
  * meta.map<K text>}, {@code [T]}) needs no bound, an application held at its other slots ({@code [boxed<T>]}) being
  * judged in turn.
  */
 final class ParameterTypes {
 
-    /** The kernel record whose {@code type} and {@code value} slots an open record's field binds. */
+    /** The kernel record whose {@code type} and {@code value} slots a parametric record's field binds. */
     private static final String RECORD_FIELD = "meta.record_field";
 
-    /** The constructor an open record applies. */
+    /** The constructor a parametric record applies. */
     private static final String RECORD = KernelNames.of("record");
 
-    /** The one slot of an open record a parameter may stand in as a whole token: a field's type. */
+    /** The one slot of a parametric record a parameter may stand in as a whole token: a field's type. */
     private static final String FIELD_TYPE = RECORD_FIELD + "." + WireForm.TYPE;
 
     /** The kernel's type a type slot holds: a name or a type written in place, {@code { of: … }}. */
@@ -96,16 +96,16 @@ final class ParameterTypes {
         return new SchemaValidationException("parameter '" + parameter + "' stands at the value of field '" + field
                 + "' (" + FIELD_VALUE + ") -- a parameter is a type, and stands only at a field's type or as an "
                 + "argument of an application there or in a parent, so a field's value is never one (§5.10). State "
-                + "the value where the application is declared: 'name => template<argument> & { " + field
+                + "the value where the application is declared: 'name => head<argument> & { " + field
                 + "?: = value }'");
     }
 
     /**
-     * Checks every local open record's parameters at its declaration, and returns the entries refused: that each
+     * Checks every local parametric record's parameters at its declaration, and returns the entries refused: that each
      * written bound names a type, and that each parameter passed to a bounded parameter is written with a bound that
      * IS-A it.
      *
-     * <p>{@code entries} is the <b>whole namespace</b>, imports included, because a local template may pass a
+     * <p>{@code entries} is the <b>whole namespace</b>, imports included, because a local parametric record may pass a
      * parameter to an imported one, whose recorded bounds are what its author wrote. {@code local} is the subset this
      * schema produced: those are checked, and the only names a failure is reported against, since an imported entry
      * was checked in its own schema. {@code meta} is where a bound's name is read when the schema does not hold it.
@@ -115,12 +115,12 @@ final class ParameterTypes {
         Set<String> refused = new LinkedHashSet<>();
         Map<String, List<ApplyBody>> written = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
-            if (!OpenEntry.isOpen(definition) || !local.contains(name)) {
+            if (!ParametricEntry.isParametric(definition) || !local.contains(name)) {
                 return;
             }
             try {
-                written.put(name, OpenEntry.applications(definition));
-                for (Param parameter : OpenEntry.parameters(definition)) {
+                written.put(name, ParametricEntry.applications(definition));
+                for (Param parameter : ParametricEntry.parameters(definition)) {
                     parameter.bound().ifPresent(bound -> requireType(bound, entries::get));
                 }
             } catch (SchemaValidationException e) {
@@ -131,7 +131,7 @@ final class ParameterTypes {
         Callees callees = new Callees(entries, local, Set.copyOf(refused), meta);
         written.forEach((name, applications) -> {
             Map<String, Param> mine = new LinkedHashMap<>();
-            OpenEntry.parameters(entries.get(name)).forEach(p -> mine.put(p.name(), p));
+            ParametricEntry.parameters(entries.get(name)).forEach(p -> mine.put(p.name(), p));
             try {
                 for (ApplyBody application : applications) {
                     callees.passedOn(application, mine::get);
@@ -145,7 +145,7 @@ final class ParameterTypes {
     }
 
     /**
-     * The walk's own refusals, thrown, over an open record's explicit payload not yet bound, {@code <T> !meta.record {
+     * The walk's own refusals, thrown, over a parametric record's explicit payload not yet bound, {@code <T> !meta.record {
      * … }}: its parameters are confined to its field types before {@code record}'s reader is asked to bind them, so a
      * parameter at a value or a scalar slot is refused for where it stands ([TSON-SCHEMA] §5.10) rather than for the
      * token it is. The payload is walked as the {@code record} construction the author wrote, so each slot is named as
@@ -176,13 +176,13 @@ final class ParameterTypes {
         /**
          * Each argument of {@code application} that is one of the declaration's parameters ({@code parameterOf}
          * maps a name to it, or to {@code null}), against the head's parameter at that position. A head that is no
-         * open record has no parameters to bound.
+         * parametric record has no parameters to bound.
          */
         void passedOn(ApplyBody application, Function<String, Param> parameterOf) {
             String name = application.head().name();
             Top head = entries.get(name);
-            List<Param> heads = OpenEntry.isOpen(head) && !refused.contains(name)
-                    ? OpenEntry.parameters(head) : List.of();
+            List<Param> heads = ParametricEntry.isParametric(head) && !refused.contains(name)
+                    ? ParametricEntry.parameters(head) : List.of();
             for (int i = 0; i < application.arguments().size() && i < heads.size(); i++) {
                 Param mine = parameterOf.apply(application.arguments().get(i).name());
                 if (mine != null) {
@@ -235,8 +235,8 @@ final class ParameterTypes {
     }
 
     /**
-     * One bound, and the namespace its name resolves in first: a local template's bound is the schema's, an imported
-     * one's its own schema's, reached among the imports.
+     * One bound, and the namespace its name resolves in first: a local parametric record's bound is the schema's, an
+     * imported one's its own schema's, reached among the imports.
      */
     private record Use(TypeRef bound, boolean local) {
     }
@@ -279,13 +279,13 @@ final class ParameterTypes {
     // ── The walk ─────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * An open record's explicit payload walked against {@code record}'s own vocabulary, whose one whole-token parameter
+     * A parametric record's explicit payload walked against {@code record}'s own vocabulary, whose one whole-token parameter
      * slot is a field's type; every walk below carries the slot it is in, as {@code constructor.field}, so a refusal
      * can name it.
      *
      * <p><b>A type written in place is walked into</b> ({@code inPlace}), its {@code { of: !C { … } }} body against
      * {@code C}'s vocabulary. A parameter at a slot there that holds a type or a name -- {@code type: { of: !meta.array
-     * { element_type: T } }} -- stands as it does at a field's type, scoped by the open record and substituted when it
+     * { element_type: T } }} -- stands as it does at a field's type, scoped by the parametric record and substituted when it
      * is applied ({@link RecordBody}, {@code Substitution}). A parameter at a slot that holds no type is refused for
      * where it stands, inside the wrapper as outside it.
      */

@@ -811,5 +811,5 @@ next being ready. Token length and document size are not bounded yet; a deployme
 untrusted documents caps bytes before handing them to a reader. `LimitsPolicy`'s Javadoc and `BACKLOG.md`
 carry what is left.
 
-(The schema-side template materialiser carries its own depth backstop, at 64 nested instantiations — a
+(The schema-side materialiser of parametric records carries its own depth backstop, at 64 nested instantiations — a
 resolver guard against non-regular recursion, not a document limit.)

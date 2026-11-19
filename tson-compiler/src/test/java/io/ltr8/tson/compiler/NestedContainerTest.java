@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * compilation and a read.
  *
  * <p>No §5.10 substitution is involved. A nested form carries no parameter its flat sibling does not, which is
- * why this closes independently of the template work.
+ * why this closes independently of the parametric record work.
  */
 class NestedContainerTest {
 

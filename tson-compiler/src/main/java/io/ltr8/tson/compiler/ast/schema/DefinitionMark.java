@@ -15,7 +15,7 @@ import java.util.Optional;
  * <p><b>Surface only.</b> This mirrors the grammar; {@code RecordExtensionType} is the resolved vocabulary the
  * mark lowers into, exactly as {@link FieldDef.Modifier.Kind} mirrors {@code ~}/{@code =} and the resolver maps
  * it to a field state. Keeping the two apart is what lets the AST name a form the resolver may still refuse --
- * {@code final} on a template is written here and rejected there.
+ * {@code final} on a parametric record is written here and rejected there.
  */
 public enum DefinitionMark {
 

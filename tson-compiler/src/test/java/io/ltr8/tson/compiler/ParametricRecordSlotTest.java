@@ -20,11 +20,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Where a template's parameters may stand ([TSON-SCHEMA] §5.10): a parameter is a type, so it stands at a field's
+ * Where a parametric record's parameters may stand ([TSON-SCHEMA] §5.10): a parameter is a type, so it stands at a field's
  * type or as an argument of an application. Anywhere else -- a field's value, a scalar slot of any constructor -- is
  * refused at the declaration, naming the slot, and a parameter is never itself the operand of {@code &} or {@code ^}.
  */
-class RecordTemplateSlotTest {
+class ParametricRecordSlotTest {
 
     private static final String ID = "https://example.test/record-template-slots.tn";
 
@@ -53,11 +53,11 @@ class RecordTemplateSlotTest {
     }
 
     /**
-     * An application of an open record left in another's body by closing it closes in place there ([TSON-SCHEMA]
+     * An application of a parametric record left in another's body by closing it closes in place there ([TSON-SCHEMA]
      * §5.10): {@code bb}'s {@code items} holds the record {@code box<text>} closes to, with no name.
      */
     @Test
-    void aRecordWhoseBodyAppliesAnotherOpenRecordClosesItInPlace() {
+    void aRecordWhoseBodyAppliesAnotherParametricRecordClosesItInPlace() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   boxes => <T> { items: box<T> }
@@ -149,7 +149,7 @@ class RecordTemplateSlotTest {
         });
     }
 
-    /** Another constructor takes no parameter at all: a template's body is a record body (§5.10). */
+    /** Another constructor takes no parameter at all: a parametric record's body is a record body (§5.10). */
     @Test
     void aParameterListBeforeAnotherConstructorIsRefused() {
         String voidable = rejected("""
@@ -159,11 +159,11 @@ class RecordTemplateSlotTest {
                   capped => <N> !meta.array { element_type: text  min_items: N }
                 """);
 
-        assertTrue(voidable.contains("a template's body is a record body"), voidable);
-        assertTrue(capped.contains("a template's body is a record body"), capped);
+        assertTrue(voidable.contains("a parametric record's body is a record body"), voidable);
+        assertTrue(capped.contains("a parametric record's body is a record body"), capped);
     }
 
-    /** A parameter has no fields until the template is applied, so composition has no body to flatten. */
+    /** A parameter has no fields until the parametric record is applied, so composition has no body to flatten. */
     @Test
     void aParameterIsNeverAnOperand() {
         String composed = rejected("""
@@ -177,7 +177,7 @@ class RecordTemplateSlotTest {
     }
 
     /**
-     * §5.10's shadowing rule: a parameter spelled like a schema entry is refused at its declaration, so a template
+     * §5.10's shadowing rule: a parameter spelled like a schema entry is refused at its declaration, so a parametric record
      * whose operand would be that parameter is refused for the shadowing before the operand is read.
      */
     @Test

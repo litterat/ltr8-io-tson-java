@@ -19,7 +19,7 @@ is why they are the linker's. Current form only; history lives in git.
   `RefBody`'s equality is `of` and the chain, never the index, so an importer re-deriving an import's kind
   unifies with it.
 - `of` resolves in the schema's one namespace and names any type or constructor; refused are a name resolving to
-  nothing, an open record and a value entry (`KindMembers.ofRefusal`). A kind is not a bound.
+  nothing, a parametric record and a value entry (`KindMembers.ofRefusal`). A kind is not a bound.
 - A constructor is a member where the walk says so, as any type is: one whose declaration is a record (`net.uuid_type
   => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
   `meta.ref<meta.product>` hold it, `meta.namespace` and `meta.ref` among them. A namespace type is built with
@@ -78,9 +78,9 @@ listed one. The kernel declares `meta.type_ref` and its refinement `meta.identif
 that names values gets `namesTypes` false and no members.
 
 - **Membership is one walk over resolved entries.** `KindMembers`' class Javadoc states the walk: alias hops to the
-  type, an alias stopping at an application, every open record (a template, no type, §5.10) and value entries
+  type, an alias stopping at an application, every parametric record (no type, §5.10) and value entries
   excluded, then the constructor the value applies (its recorded tag, `EntryFacts.constructor`, else its body's
-  `@Typename`) until `of` or a constructor IS-A it is reached. So an open record, built with `meta.record`, is a member
+  `@Typename`) until `of` or a constructor IS-A it is reached. So a parametric record, built with `meta.record`, is a member
   of no reference, `meta.ref<meta.record>` included; its declared applications are records. An incomplete entry is a
   member of nothing and no `of`: `tags => set<text>` is a member of `meta.ref<meta.array>`, `meta.top` of
   `meta.type_ref`,
@@ -97,7 +97,7 @@ that names values gets `namesTypes` false and no members.
   the schema's, and `meta.ref<meta.namespace>` holds a schema's own namespace type `api` beside `meta.schema`, and
   `meta.ref<meta.map>` holds those and `meta.field_map`, which `meta.ref<meta.namespace>` does not.
 - **`of` is checked in `validateBody`**, through its alias hops in the one namespace: a name resolving to nothing is
-  an unresolved reference, and an open record or a value entry is refused (`KindMembers.ofRefusal`), against the
+  an unresolved reference, and a parametric record or a value entry is refused (`KindMembers.ofRefusal`), against the
   declaration that holds the reference. A refinement's `of` is then judged against its source's
   (`checkReferenceNarrows`): the source's or IS-A it, by the chain of the entry `of` names past its alias hops, so a
   widening or an unrelated `of` is refused. The resolver binds a refinement before the names `of` holds are ready
@@ -167,7 +167,7 @@ atom, string-class like any other (`design/choice-disjointness.md`).
 
 `EnumLabels`' peer over field names: the type must be an identifier family, every name the record states (in `fields`,
 `discriminators` and its groups) must be a value of it, and no two fields may be one value under its equality. Where
-no kernel is in scope, the identifier grammar the default stands for applies. An open record is judged the same way,
+no kernel is in scope, the identifier grammar the default stands for applies. A parametric record is judged the same way,
 once, its field names being every application's: it is a `RecordBody`, so `FieldNames`, `NameType.of` and the linker's
 field-name scope read it as they read a closed record. A parameter is never a field's name (`DefinitionResolver.checked`).
 
@@ -180,9 +180,9 @@ field-name scope read it as they read a closed record. A parameter is never a fi
 - **A schema's own references to a field match its declared spelling exactly**, under a folding type too: a group
   member, a composition's restated or removed field, a discriminator. Only a document's names are matched in the
   type's form.
-- **Recorded for the readers.** Each record, open or closed, whose body states a name type is recorded in
+- **Recorded for the readers.** Each record, parametric or closed, whose body states a name type is recorded in
   `TsonLinkedSchema.nameTypes` with the definition it resolves to (`FieldNames.readBy`), because its readers judge a
-  document's names by it and cannot resolve it themselves. A template is read against by no reader, but its member
+  document's names by it and cannot resolve it themselves. A parametric record is read against by no reader, but its member
   dispatch matches its selectors' keys in that form, as its members do; a composition takes an applied operand's
   name type as it takes a closed supertype's.
 - **A duplicate field is refused by whichever layer can see it, and only by that one.** One spelling written twice

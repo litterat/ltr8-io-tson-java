@@ -4,13 +4,12 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Top;
 import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
@@ -24,14 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
- * What [TSON-SCHEMA] §8.1 says about an <b>open</b> entry's resolved form, asked of real documents.
+ * What [TSON-SCHEMA] §8.1 says about a <b>parametric</b> entry's resolved form, asked of real documents.
  *
- * <p>An open entry is an open record: a {@code !meta.record} carrying {@code parameters}, each a type written where it
- * stands as its name, a reference value, so the record is read against {@code record}'s own vocabulary as any record
- * is. The tests below hold that against real documents: the published fixtures validate, an open record validates
- * and reads back with its parameters, and every entry with parameters is one.
+ * <p>A parametric entry is a parametric record: a {@code !meta.record} carrying {@code parameters}, each a type written
+ * where it stands as its name, a reference value, so the record is read against {@code record}'s own vocabulary as any
+ * record is. The tests below hold that against real documents: the published fixtures validate, a parametric record
+ * validates and reads back with its parameters, and every entry with parameters is one.
  */
-class OpenEntryResolvedFormTest {
+class ParametricEntryResolvedFormTest {
 
     private static Tson tson() {
         return Tson.standard();
@@ -64,7 +63,7 @@ class OpenEntryResolvedFormTest {
      * of §8's whole output form -- and the fixtures are the spec's own statement of it, not this
      * implementation's.
      *
-     * <p>The kernel declares no open record, so this is a regression guard over closed entries.
+     * <p>The kernel declares no parametric record, so this is a regression guard over closed entries.
      */
     @Test
     void everyPublishedResolvedFixtureValidatesAgainstItsGoverningSchema() throws Exception {
@@ -85,10 +84,10 @@ class OpenEntryResolvedFormTest {
         }
     }
 
-    // ── An open record's resolved form ───────────────────────────────────
+    // ── A parametric record's resolved form ───────────────────────────────────
 
     /**
-     * <b>An open record validates in §8.1's form</b>: a {@code !meta.record} carrying {@code parameters}, each standing
+     * <b>A parametric record validates in §8.1's form</b>: a {@code !meta.record} carrying {@code parameters}, each standing
      * where it is written as its name, a reference value -- at a field's type, and at a slot of a type written in place.
      * Nothing about it needs a vocabulary of its own: it is read against {@code record}'s, as any record is.
      *
@@ -96,7 +95,7 @@ class OpenEntryResolvedFormTest {
      * test is about the <em>spec's</em> prescribed serialization.
      */
     @Test
-    void anOpenRecordValidatesAsARecord() {
+    void aParametricRecordValidatesAsARecord() {
         assertEquals(List.of(), ResolvedForm.validateResolved(tson(), """
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
@@ -112,12 +111,12 @@ class OpenEntryResolvedFormTest {
     }
 
     /**
-     * <b>And it reads back as the open record it is</b>: the record's parameters are looked up before the namespace,
+     * <b>And it reads back as the parametric record it is</b>: the record's parameters are looked up before the namespace,
      * so its field types are parameters ({@link ParamRef}), whole and inside a type written in place, and no reference
      * names an entry spelled {@code T}.
      */
     @Test
-    void anOpenRecordReadsBackWithItsParameters() {
+    void aParametricRecordReadsBackWithItsParameters() {
         Map<String, Object> read = ResolvedForm.readResolved(metaBoundTson(), """
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
@@ -140,12 +139,12 @@ class OpenEntryResolvedFormTest {
     // ── The biconditional an entry's parameters rest on ─────────────────
 
     /**
-     * <b>An entry declares parameters exactly when it is an open record</b>, asked of every entry of every bundled
-     * schema and of a schema exercising each template shape: a fresh record body, a composition adding a field and
+     * <b>An entry declares parameters exactly when it is a parametric record</b>, asked of every entry of every bundled
+     * schema and of a schema exercising each parametric record shape: a fresh record body, a composition adding a field and
      * one restating a field. The kernel declares none.
      */
     @Test
-    void anEntryWithParametersIsAnOpenRecord() {
+    void anEntryWithParametersIsAParametricRecord() {
         Tson tson = tson();
         tson.resolve("""
                 !!id:"https://example.com/shapes.tn"
@@ -165,23 +164,23 @@ class OpenEntryResolvedFormTest {
                 "https://example.com/shapes.tn");
 
         List<String> broken = new ArrayList<>();
-        List<String> open = new ArrayList<>();
+        List<String> parametric = new ArrayList<>();
         for (String id : ids) {
             for (Map.Entry<String, Top> entry
                     : tson.bindRegistry().core().resolveLinked(id).schema().entries().entrySet()) {
                 Top definition = entry.getValue();
-                boolean declares = !OpenEntry.parameterNames(definition).isEmpty();
+                boolean declares = !ParametricEntry.parameterNames(definition).isEmpty();
                 if (declares) {
-                    open.add(entry.getKey());
+                    parametric.add(entry.getKey());
                 }
-                if (declares != (definition instanceof RecordBody record && record.isOpen())) {
-                    broken.add(id + "#" + entry.getKey() + ": parameters " + OpenEntry.parameterNames(definition)
+                if (declares != (definition instanceof RecordBody record && record.isParametric())) {
+                    broken.add(id + "#" + entry.getKey() + ": parameters " + ParametricEntry.parameterNames(definition)
                             + " with a " + definition.getClass().getSimpleName() + " body");
                 }
             }
         }
 
-        assertEquals(List.of(), broken, "§5.10: a template is an open record");
-        assertEquals(List.of("pair", "composed", "restated"), open, "the kernel declares no open record");
+        assertEquals(List.of(), broken, "§5.10: an entry with parameters is a parametric record");
+        assertEquals(List.of("pair", "composed", "restated"), parametric, "the kernel declares no parametric record");
     }
 }

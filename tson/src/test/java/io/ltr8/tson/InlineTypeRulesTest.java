@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The rules a type written in place is held to beside a name ([TSON-SCHEMA] §5.2, §5.4, §5.7, §8.2): a value modifier
  * on an inline reference, a name never one type with a construction, a choice that is not disjoint naming every
- * variant, an application of an open record absorbed at a composition operand, what a type in place may carry, and an
+ * variant, an application of a parametric record absorbed at a composition operand, what a type in place may carry, and an
  * abstract record in place empty.
  */
 class InlineTypeRulesTest {
@@ -192,10 +192,10 @@ class InlineTypeRulesTest {
                 .schema().entries().get("x"));
         assertEquals(List.of("v", "w"), List.copyOf(x.fields().keySet()));
         assertFalse(x.fields().get("w").optional(), "the restatement made 'w' required");
-        assertFalse(TypeChain.supertypesOf(x).contains("box"), "nothing is IS-A a template");
+        assertFalse(TypeChain.supertypesOf(x).contains("box"), "nothing is IS-A a parametric record");
     }
 
-    /** It is IS-A its template's written parents, and the entry declared for the application where one is. */
+    /** It is IS-A its parametric record's written parents, and the entry declared for the application where one is. */
     @Test
     void anAbsorbedOperandReachesTheDeclaredApplication() {
         String declarations = "  tb => pet_box<text>\n  x => pet_box<text> & { legs: int32 }";
@@ -208,9 +208,9 @@ class InlineTypeRulesTest {
     }
 
     /**
-     * An application whose head is an alias of an open record is the open record's application ([TSON-SCHEMA] §8.3),
-     * absorbed at a composition operand, whether its body restates or adds, its edge naming the entry declared for the
-     * application, and so is one an open record composes over its own parameter.
+     * An application whose head is an alias of a parametric record is the parametric record's application ([TSON-SCHEMA]
+     * §8.3), absorbed at a composition operand, whether its body restates or adds, its edge naming the entry declared for
+     * the application, and so is one a parametric record composes over its own parameter.
      */
     @Test
     void anApplicationThroughAnAliasIsAbsorbedAtAnOperand() {
@@ -407,7 +407,7 @@ class InlineTypeRulesTest {
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, read(optional, "!r { at: { kind: a  x: 1 } }").getFirst().code());
     }
 
-    /** A record in place over a parameter of its open record is substituted where the record is applied. */
+    /** A record in place over a parameter of its parametric record is substituted where the record is applied. */
     @Test
     void aRecordInPlaceOverAParameterReadsWhereItsRecordIsApplied() {
         String declarations = "  page => <T> { meta: { cursor: T  total: int32 } }\n  r => { p: page<int32> }";
@@ -416,9 +416,9 @@ class InlineTypeRulesTest {
                 read(declarations, "!r { p: { meta: { cursor: x  total: 1 } } }").getFirst().path());
     }
 
-    /** One naming no parameter is closed, and an application of its open record reads it. */
+    /** One naming no parameter is closed, and an application of its parametric record reads it. */
     @Test
-    void aRecordInPlaceNamingNoParameterInsideAnOpenRecordReads() {
+    void aRecordInPlaceNamingNoParameterInsideAParametricRecordReads() {
         String declarations = "  page => <T> { items: [T]  meta: { total: int32 } }\n  r => { p: page<text> }";
         assertEquals(List.of(), problems(declarations));
         assertEquals(List.of(), read(declarations, "!r { p: { items: [a]  meta: { total: 1 } } }"));
@@ -445,9 +445,9 @@ class InlineTypeRulesTest {
                 + "} } } }"));
     }
 
-    /** The names a record an application closes to holds are its open record's, refused there and only there. */
+    /** The names a record an application closes to holds are its parametric record's, refused there and only there. */
     @Test
-    void aRecordAnApplicationClosesToIsJudgedAtItsOpenRecord() {
+    void aRecordAnApplicationClosesToIsJudgedAtItsParametricRecord() {
         List<Diagnostic> found = problems("  bad => <T> !meta.record { fields: { \"a b\" => { type: T } } }\n"
                 + "  r => { at: bad<int32> }");
         assertEquals(1, found.size(), found::toString);

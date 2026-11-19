@@ -15,7 +15,7 @@ import io.ltr8.tson.schema.meta.ApplyBody;
  * box<text>}) in a compile of a resolution in progress ({@code TsonSchemaCompiler.compileReady}). Such an application
  * closes in place once every declaration is ready ([TSON-SCHEMA] §5.10), the field then holding the type written in
  * place, so only a compile of the entries ready so far ({@code SchemaResolver.readySoFar}) meets the field still
- * typed by the application. Its head is a template, which no value is read against, so the head's reader is never
+ * typed by the application. Its head is a parametric record, which no value is read against, so the head's reader is never
  * the field's.
  *
  * <ul>

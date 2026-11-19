@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Where an application of an open record may not stand, refused as the rules require rather than reported as a gap
+ * Where an application of a parametric record may not stand, refused as the rules require rather than reported as a gap
  * ([TSON-SCHEMA] §4.2, §5.2, §5.3, §5.10.1), each at the declaration that wrote it and naming the declaration to write;
  * and the one place it may stand and this library does not yet close it, a type slot, still a gap.
  */
@@ -62,30 +62,30 @@ class ApplicationWhereANameStandsTest {
         assertEquals(Optional.of("/" + entry), problem.schemaPointer(), problems::toString);
     }
 
-    // ── An argument of an open record's application is a name or a parameter (§5.3) ───────────
+    // ── An argument of a parametric record's application is a name or a parameter (§5.3) ───────────
 
     @Test
-    void anApplicationAsAnOpenRecordsArgumentIsRefused() {
+    void anApplicationAsAParametricRecordsArgumentIsRefused() {
         refused("  r => { f: pair<box<text> int32> }", "r",
                 "'box<text>' is passed as an argument of 'pair<box<text> int32>'", "'box_text => box<text>'");
         refused("  w => wrap<box<text>>", "w", "'box<text>' is passed as an argument of 'wrap<box<text>>'");
         refused("  r => { f: wrap<meta.array<text>> }", "r", "'meta.array<text>' is passed as an argument");
     }
 
-    /** A template named bare as an argument is no type, and is refused before the gap of closing in place. */
+    /** A parametric record named bare as an argument is no type, and is refused before the gap of closing in place. */
     @Test
-    void aTemplateNamedBareAsAnArgumentIsRefused() {
-        refused("  r => { f: wrap<box> }", "r", "'box', passed as an argument of 'wrap<box>', is a template");
+    void aParametricRecordNamedBareAsAnArgumentIsRefused() {
+        refused("  r => { f: wrap<box> }", "r", "'box', passed as an argument of 'wrap<box>', is a parametric record");
     }
 
-    /** Inside an open record too, at its own declaration, before anything applies it. */
+    /** Inside a parametric record too, at its own declaration, before anything applies it. */
     @Test
-    void anApplicationAsAnOpenRecordsArgumentIsRefusedInAnOpenRecord() {
+    void anApplicationAsAParametricRecordsArgumentIsRefusedInAParametricRecord() {
         refused("  o => <T> { f: pair<box<T> int32> }", "o", "'box<T>' is passed as an argument of 'pair<box<T> int32>'");
         refused("  o => <T> { f: wrap<meta.array<T>> }", "o", "'meta.array<T>' is passed as an argument");
     }
 
-    /** An argument of a constructor's application lands at a type slot, and is held there inside an open record. */
+    /** An argument of a constructor's application lands at a type slot, and is held there inside a parametric record. */
     @Test
     void anApplicationAsAConstructorsArgumentAtATypeSlotIsHeld() {
         assertEquals(List.of(), problems("  o => <T> { f: meta.array<box<T>> }"));
@@ -130,7 +130,7 @@ class ApplicationWhereANameStandsTest {
         assertEquals(List.of(), problems("  dogs => dog_of<text>\n  r => { k: dogs }"));
     }
 
-    /** Held in an open record, it is refused at the declaration whose application closed it. */
+    /** Held in a parametric record, it is refused at the declaration whose application closed it. */
     @Test
     void aHeldFamilyMemberIsRefusedWhereItsApplicationClosed() {
         refused("  kt => kennel_of<text>", "kt", "'dog_of<text>' would close in place");
@@ -139,15 +139,15 @@ class ApplicationWhereANameStandsTest {
     /** A recursive application with no declaration closing it has nothing to tie to. */
     @Test
     void aRecursiveApplicationWithNoDeclarationIsRefused() {
-        refused("  r => { f: node<text> }", "r", "recursive open record 'node'", "'node_text => node<text>'");
+        refused("  r => { f: node<text> }", "r", "recursive parametric record 'node'", "'node_text => node<text>'");
         assertEquals(List.of(), problems("  text_node => node<text>\n  r => { f: text_node }"));
     }
 
     // ── Where an application closes in place ──────────────────────────────────────────────────
 
     /**
-     * An application of an open record at a type slot closes in place ([TSON-SCHEMA] §5.10): at a field, inside a
-     * construction, and left in an open record's body by applying it. None is a refusal or a gap.
+     * An application of a parametric record at a type slot closes in place ([TSON-SCHEMA] §5.10): at a field, inside a
+     * construction, and left in a parametric record's body by applying it. None is a refusal or a gap.
      */
     @Test
     void anApplicationAtATypeSlotClosesInPlace() {

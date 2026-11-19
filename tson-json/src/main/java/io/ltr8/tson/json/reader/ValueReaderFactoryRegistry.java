@@ -18,7 +18,7 @@ import java.util.function.UnaryOperator;
  *
  * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), the
  * choice's ({@link DispatchChoiceReader}) and a declared position's ({@link DispatchDeclaredReader}) select a
- * reader and build nothing, and a template's refusal builds nothing either,
+ * reader and build nothing, and a parametric record's refusal builds nothing either,
  * so every mode registers the same ones. So does a concrete record's loop ({@link RecordReader}); what is the
  * mode's own is the factory that builds it and the {@link RecordBuilder} it hands its slots to.
  *

@@ -19,9 +19,9 @@ import java.util.SequencedMap;
  * <em>type</em> as well: a pin is a bare token (§12.1) and only the type says which parser reads it. So the
  * names are resolved back to the base's own fields here.
  *
- * <p><b>Every base is a record and declares them itself.</b> A template is no type (§5.10), so no position is
- * typed by one: a family whose base is an abstract template's application is based on the closed record that
- * application denotes, which carries the template's selectors. A family with no declared member has a table like
+ * <p><b>Every base is a record and declares them itself.</b> A parametric record is no type (§5.10), so no position is
+ * typed by one: a family whose base is an abstract parametric record's application is based on the closed record that
+ * application denotes, which carries the parametric record's selectors. A family with no declared member has a table like
  * any other, with nothing in it to select.
  */
 public final class FamilySelectors {
@@ -51,13 +51,13 @@ public final class FamilySelectors {
 
     /** The {@code extension} a base states -- empty for anything but a closed record, an open one being no type. */
     public static Optional<RecordExtensionType> extensionOf(Top definition) {
-        return definition instanceof RecordBody record && !record.isOpen() ? Optional.of(record.extension())
+        return definition instanceof RecordBody record && !record.isParametric() ? Optional.of(record.extension())
                 : Optional.empty();
     }
 
     /** The names a base states -- empty where it dispatches by tag or not at all, or is no closed record. */
     public static List<String> namesOf(Top definition) {
-        return definition instanceof RecordBody record && !record.isOpen() ? record.discriminators() : List.of();
+        return definition instanceof RecordBody record && !record.isParametric() ? record.discriminators() : List.of();
     }
 
     /**

@@ -154,9 +154,9 @@ class TsonSchemaParserTest {
     void aNestedSchemaMapIsAMapOfDeclarations() {
         ParseException empty = assertThrows(ParseException.class, () -> parse("!schema { geo => !schema {} }"));
         assertTrue(empty.getMessage().contains("at least one declaration"), empty.getMessage());
-        ParseException open = assertThrows(ParseException.class,
+        ParseException parametric = assertThrows(ParseException.class,
                 () -> parse("!schema { geo => <T> !schema { a => T } }"));
-        assertTrue(open.getMessage().contains("takes no type parameters"), open.getMessage());
+        assertTrue(parametric.getMessage().contains("takes no type parameters"), parametric.getMessage());
     }
 
     /** A {@code !} head is a qualified name, at an instance and an atom refinement alike. */
@@ -757,26 +757,26 @@ class TsonSchemaParserTest {
                 !schema { a => [text, , integer] }"""));
     }
 
-    // ── Instance templates (§12.1) ────────────────────────────────────────
+    // ── Parametric instances (§12.1) ────────────────────────────────────────
     //    `[type-params] "!" type-name ws core-value` -- the same production as a closed instance, with a
-    //    parameter list in front. There is no narrower payload grammar, because an open entry's body is held
+    //    parameter list in front. There is no narrower payload grammar, because a parametric record's body is held
     //    rather than read against the constructor's vocabulary until materialisation substitutes.
 
     @Test
-    void anInstanceTemplateCarriesItsParametersAndItsPayloadWhole() {
-        Instance template = assertInstanceOf(Instance.class,
+    void aParametricInstanceCarriesItsParametersAndItsPayloadWhole() {
+        Instance instance = assertInstanceOf(Instance.class,
                 declOf("vector => <T, N> !array { element_type: T  min_items: N  max_items: N }").typeDef());
 
-        assertEquals(List.of("T", "N"), template.typeParams());
-        assertEquals("array", template.target());
-        RecordValue payload = assertInstanceOf(RecordValue.class, template.value().coreValue());
+        assertEquals(List.of("T", "N"), instance.typeParams());
+        assertEquals("array", instance.target());
+        RecordValue payload = assertInstanceOf(RecordValue.class, instance.value().coreValue());
         assertEquals(List.of("element_type", "min_items", "max_items"),
                 payload.fields().stream().map(RecordValue.Field::name).toList());
     }
 
     /** No parameter list means a closed {@link Instance}: the list is the only thing that distinguishes them. */
     @Test
-    void theParameterListIsWhatDistinguishesATemplateFromAnInstance() {
+    void theParameterListIsWhatDistinguishesAParametricRecordFromAnInstance() {
         assertEquals(List.of(), assertInstanceOf(Instance.class,
                 declOf("x => !array { element_type: text }").typeDef()).typeParams());
         assertEquals(List.of("T"), assertInstanceOf(Instance.class,
@@ -793,7 +793,7 @@ class TsonSchemaParserTest {
             "t => <T> !choice { variants: [T error] }",
             "t => <T> !tuple { elements: [{ element_type: T } { element_type: text }] }",
             "t => <T> !array { element_type: T  min_items: 2 }"})
-    void aCollectionPayloadIsOrdinaryInATemplate(String declaration) {
+    void aCollectionPayloadIsOrdinaryInAParametricRecord(String declaration) {
         assertInstanceOf(Instance.class, declOf(declaration).typeDef());
     }
 

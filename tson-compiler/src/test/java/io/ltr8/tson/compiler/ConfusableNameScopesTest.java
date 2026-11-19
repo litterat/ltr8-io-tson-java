@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-DATA] §8.2's three name-hygiene rules over the schema-layer scopes [TSON-SCHEMA] §11.4 names,
- * plus the one this implementation adds -- a template's parameters, which §11.4 and §5.10 both decline to
+ * plus the one this implementation adds -- a parametric record's parameters, which §11.4 and §5.10 both decline to
  * list.
  *
  * <p><b>All three run in one walk</b> ({@code TsonSchemaLinker.checkNames}), which is what makes the scope
@@ -94,14 +94,14 @@ class ConfusableNameScopesTest {
     }
 
     /**
-     * <b>A template's parameters, which §11.4 declines to list as a scope</b> -- one author writes the list
+     * <b>A parametric record's parameters, which §11.4 declines to list as a scope</b> -- one author writes the list
      * whole on one line, so the population is empty. {@code <T, Т>} declares two parameters that read
      * identically; a body referencing {@code T} binds one of them and a reviewer cannot see which, which is
      * the substitution hazard §8.2 exists to refuse. Only the look-alike rule is a divergence here:
      * mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.2).
      */
     @Test
-    void twoTemplateParametersThatReadAlikeAreRefused() {
+    void twoParametersOfAParametricRecordThatReadAlikeAreRefused() {
         String cyrillicCapT = new String(Character.toChars(0x0422));
         assertTrue(refused("  box => <T, " + cyrillicCapT + "> { a: T  b: " + cyrillicCapT + " }")
                 .contains("has parameters that read alike"));

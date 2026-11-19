@@ -26,7 +26,7 @@ import io.ltr8.tson.compiler.stream.EventSkip;
  * this same {@link Diagnostic} and its code, so a caller that needs the distinction asks {@code
  * e.diagnostic().code()} rather than matching on an exception type.
  *
- * <p>{@link OpenTemplateReader} is the structural twin -- a whole entry that refuses every value -- and the
+ * <p>{@link ParametricRecordReader} is the structural twin -- a whole entry that refuses every value -- and the
  * two behave identically: report before consuming, so the position names the value the author wrote, then
  * skip it so the stream stays in step with its siblings.
  */

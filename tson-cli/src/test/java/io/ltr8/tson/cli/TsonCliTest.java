@@ -230,15 +230,15 @@ class TsonCliTest {
     }
 
     /**
-     * Naming a template as a data document's own type is the author's error, and gets an author's answer:
+     * Naming a parametric record as a data document's own type is the author's error, and gets an author's answer:
      * exit 1 and a diagnostic naming the route. It used to reach an ErrorReader and exit 70 under "this is a
      * bug in tson", the worst answer in the whole surface for one of the likeliest mistakes.
      *
-     * <p><b>The exit code is what this pins</b>, and the message names the route: a template is not a type
+     * <p><b>The exit code is what this pins</b>, and the message names the route: a parametric record is not a type
      * (§5.10), so the document names the declaration of its application.
      */
     @Test
-    void dataNamingATemplateIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
+    void dataNamingAParametricRecordIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "paged.tn", """
                 !!id:"https://example.test/cli-paged.tn"
                 !!import:"https://tson.io/2026/40/m/meta.tn"
@@ -257,8 +257,8 @@ class TsonCliTest {
         String out = captureStdout(() ->
                 assertEquals(1, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
 
-        assertTrue(out.contains("'paged' is a template"), out);
-        assertTrue(out.contains("a template is not a type"), out);
+        assertTrue(out.contains("'paged' is a parametric record"), out);
+        assertTrue(out.contains("a parametric record is not a type"), out);
     }
 
     @Test

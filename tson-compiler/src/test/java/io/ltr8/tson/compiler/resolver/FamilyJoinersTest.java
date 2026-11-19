@@ -111,7 +111,7 @@ class FamilyJoinersTest {
         assertEquals(List.of(), joiners(body, "post"));
     }
 
-    /** An open record is no member, being no type; an application closing it is one. */
+    /** A parametric record is no member, being no type; an application closing it is one. */
     @Test
     void anApplicationsHeadIsAnOperand() {
         String body = """

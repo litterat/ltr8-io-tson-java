@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A parameter is a leaf at a type slot of any type written in place inside an open record, and is replaced when the
+ * A parameter is a leaf at a type slot of any type written in place inside a parametric record, and is replaced when the
  * record is applied ([TSON-SCHEMA] §5.10): a container, a tuple, a choice and a record in place over a parameter are
  * each the construction the sugar denotes anywhere, nested to any depth, and the application closes to the same
  * structure the hand-written type has.
@@ -117,7 +117,7 @@ class TypeInPlaceSubstitutionTest {
             + "pair: [ { id: d } t ]  either: 3  byKey: { k => { id: e } }  keyed: { o => 1 }  "
             + "meta: { cursor: { id: f }  total: 2 }  deep: [ { at: { id: g }  tags: { t => { id: h } } } ] }";
 
-    /** Inside the open record each form is its construction in place, the parameter a leaf at its slot. */
+    /** Inside the parametric record each form is its construction in place, the parameter a leaf at its slot. */
     @Test
     void aFormOverAParameterIsItsConstructionInPlace() {
         RecordBody page = (RecordBody) entries().get("page");
@@ -205,7 +205,7 @@ class TypeInPlaceSubstitutionTest {
 
     /**
      * Written explicitly or as sugar, a constructor's application over a parameter is its construction in place in
-     * the open record, so the two spellings are one resolved form, and their applications one type.
+     * the parametric record, so the two spellings are one resolved form, and their applications one type.
      */
     @Test
     void theExplicitSpellingAndTheSugarAreOneResolvedForm() {
@@ -220,8 +220,8 @@ class TypeInPlaceSubstitutionTest {
     }
 
     /**
-     * In resolved output an application stands only inside an open record, written in place, its head an open record
-     * and one of the record's parameters among its arguments (§5.10).
+     * In resolved output an application stands only inside a parametric record, written in place, its head a parametric
+     * record and one of the record's parameters among its arguments (§5.10).
      */
     @Test
     void noConstructorsApplicationStandsInResolvedOutput() {
@@ -233,8 +233,9 @@ class TypeInPlaceSubstitutionTest {
                 record.fields().values().forEach(field -> TypeSlots.applications(field.type(), held::add));
             }
             for (ApplyBody application : held) {
-                assertTrue(OpenEntry.isOpen(entries.get(application.head().name())) && OpenEntry.isOpen(value)
-                        && OpenEntry.parameterIn(application.inPlace()).isPresent(), name + " holds "
+                assertTrue(ParametricEntry.isParametric(entries.get(application.head().name()))
+                        && ParametricEntry.isParametric(value)
+                        && ParametricEntry.parameterIn(application.inPlace()).isPresent(), name + " holds "
                         + application.text());
             }
         }
@@ -273,7 +274,7 @@ class TypeInPlaceSubstitutionTest {
         refused("  weird => <T> { v: T  m: { next?: weird<text> } }", "does not pass 'T' through unchanged");
     }
 
-    /** A recursive open record held in place with no declaration to tie to is refused where the slot closes it. */
+    /** A recursive parametric record held in place with no declaration to tie to is refused where the slot closes it. */
     @Test
     void aRecursionClosedInPlaceWithNoDeclarationIsRefused() {
         refused("  f => { ns: [node<text>] }", "node<text>");
@@ -286,7 +287,7 @@ class TypeInPlaceSubstitutionTest {
         refused("  boxed => <T: text> { v: T }\n  rebox => <T> { m: { b: [boxed<T>] } }", "is written with no bound");
     }
 
-    /** A literal needs a closed type inside a record in place as at the open record's own field. */
+    /** A literal needs a closed type inside a record in place as at the parametric record's own field. */
     @Test
     void aLiteralOnAParameterTypedFieldInPlaceIsRefused() {
         refused("  p => <T> { m: { w?: T ~ 5 } }", "literal");
@@ -307,9 +308,9 @@ class TypeInPlaceSubstitutionTest {
 
     // ── A closed body holds no parameter (§8.1) ─────────────────────────────────────────────────
 
-    /** In source a parameter outside any open record is a name, and one naming nothing is unresolved. */
+    /** In source a parameter outside any parametric record is a name, and one naming nothing is unresolved. */
     @Test
-    void aParameterOutsideAnOpenRecordIsAnUnresolvedReferenceInSource() {
+    void aParameterOutsideAParametricRecordIsAnUnresolvedReferenceInSource() {
         refused("  r => { m: { cursor: T }  items: [T] }", "unresolved reference 'T'");
     }
 
@@ -318,7 +319,7 @@ class TypeInPlaceSubstitutionTest {
      * parameter; what it names is the schema's link to judge (§8.1), which refuses it as an unresolved reference.
      */
     @Test
-    void aParameterOutsideAnOpenRecordIsRefusedInAResolvedForm() {
+    void aParameterOutsideAParametricRecordIsRefusedInAResolvedForm() {
         Map<String, Object> read = ResolvedForm.readResolved(tson(), """
                 !!import:"%s"
                 !schema {

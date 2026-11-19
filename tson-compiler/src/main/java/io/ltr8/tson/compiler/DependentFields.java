@@ -6,7 +6,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RefBody;
@@ -25,8 +25,8 @@ import java.util.Optional;
 /**
  * [TSON-SCHEMA] §5.2's rules for a dependent field, {@code v?: kind!}, checked at the declaration against the flattened
  * record: a field whose type is a {@code meta.dependent} in place, read per instance against the type its sibling's value
- * names. The linker asks {@link #check} of every closed record, so an open record's member is judged once its application
- * closes it.
+ * names. The linker asks {@link #check} of every closed record, so a parametric record's member is judged once its
+ * application closes it.
  *
  * <ul>
  *   <li><b>The sibling is declared before the dependent field.</b> The fields are a telescope: a field depends only on
@@ -40,9 +40,9 @@ import java.util.Optional;
  *       absent when another option is chosen, so a dependent field written without it is refused where it is read.
  *       A sibling that is optional with no default, or voidable, is refused, as is a member beside a required
  *       dependent field.</li>
- *   <li><b>A sibling's default or pin names a type a value can be read against</b>: a template, which no value is read
- *       against until it is applied, is refused. That it is a member of the sibling's reference is the field-value
- *       check's ({@code TsonSchemaLinker}).</li>
+ *   <li><b>A sibling's default or pin names a type a value can be read against</b>: a parametric record, which no value
+ *       is read against until it is applied, is refused. That it is a member of the sibling's reference is the
+ *       field-value check's ({@code TsonSchemaLinker}).</li>
  *   <li><b>A dependent field is never voidable and carries no default or pin</b>: its type is not fixed at its
  *       declaration, so neither is the type a value of it would be read against. Only the canonical form reaches this
  *       rule: {@code kind!?} does not parse, and a value on a type in place is refused at resolution.</li>
@@ -133,8 +133,8 @@ final class DependentFields {
     }
 
     /**
-     * A sibling's default or pin names a type a value can be read against. A template is refused: a template is no
-     * type (§5.10), and reading never starts a materialisation.
+     * A sibling's default or pin names a type a value can be read against. A parametric record is refused: a parametric
+     * record is no type (§5.10), and reading never starts a materialisation.
      */
     private static void checkSiblingValue(String about, RecordField field, Token value, Map<String, Top> namespace) {
         String noun = field.role() == FieldRole.FIXED ? "pin" : "default";
@@ -145,10 +145,11 @@ final class DependentFields {
             return; // not a reference at all: the field-value check refuses it as a value of the wrong type
         }
         Top target = namespace.get(AliasChain.terminal(type.name(), namespace));
-        if (target != null && OpenEntry.isOpen(target)) {
-            throw new SchemaValidationException(about + ", whose " + noun + " '" + type.text() + "' is a template -- "
-                    + "no value is read against a template until it is applied, so an instance omitting the sibling "
-                    + "would have no type to read by; name a type, or an application this schema closes (§5.2)");
+        if (target != null && ParametricEntry.isParametric(target)) {
+            throw new SchemaValidationException(about + ", whose " + noun + " '" + type.text() + "' is a parametric "
+                    + "record -- no value is read against a parametric record until it is applied, so an instance "
+                    + "omitting the sibling would have no type to read by; name a type, or an application this schema "
+                    + "closes (§5.2)");
         }
     }
 

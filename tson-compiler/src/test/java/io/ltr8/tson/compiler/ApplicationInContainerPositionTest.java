@@ -7,7 +7,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TypeExpr;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A container position holding an <b>application</b> rather than a name -- {@code [tree<T>]}, {@code [[T]]}, {@code
  * [box<text>]}.
  *
- * <p><b>Inside an open record a container over a parameter is the reference it spells</b> ([TSON-SCHEMA] §5.10):
+ * <p><b>Inside a parametric record a container over a parameter is the reference it spells</b> ([TSON-SCHEMA] §5.10):
  * {@code [tree<T>]} is the application {@code meta.array<tree<T>>}, held as written until the record is applied, and
  * then constructed in place. A sized form over a parameter is no reference and is refused. <b>A closed form</b>
  * ({@code [box<text>]}) is the array in place whose element holds the record {@code box<text>} closes to, in place
@@ -87,7 +87,7 @@ class ApplicationInContainerPositionTest {
         return compiled.schema().entries().get(name);
     }
 
-    // ── A recursive template: the knot tied through a construction ──────────
+    // ── A recursive parametric record: the knot tied through a construction ──────────
 
     /**
      * {@code tree => <T> { value: T  children?: [tree<T>] }} closed by {@code text_tree => tree<text>}. The field holds
@@ -96,7 +96,7 @@ class ApplicationInContainerPositionTest {
      * declaration (§5.10.1).
      */
     @Test
-    void aRecursiveTemplateTiesTheKnotThroughTheArray() {
+    void aRecursiveParametricRecordTiesTheKnotThroughTheArray() {
         TsonCompiledSchema compiled = compile("""
                   tree      => <T> { value: T  children?: [tree<T>] }
                   text_tree => tree<text>
@@ -109,14 +109,14 @@ class ApplicationInContainerPositionTest {
         assertEquals(TypeRef.of("text"), slot(entry(compiled, "text_tree"), "value"), "T bound at the value field too");
     }
 
-    /** The template holds the array in place, the application over its parameter at the element's slot. */
+    /** The parametric record holds the array in place, the application over its parameter at the element's slot. */
     @Test
-    void theOpenRecordHoldsTheArrayInPlace() {
+    void theParametricRecordHoldsTheArrayInPlace() {
         TsonCompiledSchema compiled = compile("""
                   tree => <T> { value: T  children?: [tree<T>] }""");
 
         RecordBody tree = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("tree"));
-        assertTrue(tree.isOpen());
+        assertTrue(tree.isParametric());
         assertEquals(new TypeInline(ArrayBody.of(new ApplyBody(TypeRef.of("tree"), List.of(ParamRef.of("T")))
                 .inPlace())), tree.fields().get("children").type());
         assertTrue(unpositioned(compiled).isEmpty(), () -> "no entry added for a form over a parameter: "
@@ -175,11 +175,11 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * <b>Templates are consulted, never modified, by closure.</b> Closing {@code grid<voxel>} after {@code
+     * <b>Parametric records are consulted, never modified, by closure.</b> Closing {@code grid<voxel>} after {@code
      * grid<pixel>} leaves {@code grid} exactly as it was, and adds nothing to the schema.
      */
     @Test
-    void closingASecondArgumentLeavesTheTemplateUntouched() {
+    void closingASecondArgumentLeavesTheParametricRecordUntouched() {
         TsonCompiledSchema one = compile("""
                   pixel => { r: int32 }
                   voxel => { v: int32 }
@@ -193,7 +193,7 @@ class ApplicationInContainerPositionTest {
                   four  => { g: grid<voxel> }""");
 
         Top grid = entry(both, "grid");
-        assertEquals(List.of("T"), OpenEntry.parameterNames(grid), "the declared template, unchanged");
+        assertEquals(List.of("T"), ParametricEntry.parameterNames(grid), "the declared parametric record, unchanged");
         assertEquals(entry(one, "grid"), grid);
         assertEquals(List.of(), unpositioned(both));
     }
@@ -239,7 +239,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody array = assertInstanceOf(ArrayBody.class, inPlace(slot(entry(compiled, "box_carrier"), "a")));
         RecordBody record = assertInstanceOf(RecordBody.class, inPlace(array.elementType()));
 
-        assertEquals(List.of(), OpenEntry.parameterNames(record), "closed");
+        assertEquals(List.of(), ParametricEntry.parameterNames(record), "closed");
         assertEquals(TypeRef.of("text"), slot(record, "a"), "T bound");
         assertNotNull(compiled.get("box_carrier")
                 .read(TestDocuments.document("{ a: [ { a: \"x\" } ] }")));
@@ -271,7 +271,7 @@ class ApplicationInContainerPositionTest {
 
     /**
      * A binding whose application names no parameter is fully bound already, so it closes where it is written, in
-     * the open record's own declaration: {@code [box<text>; 2..]} is the sized array in place, holding the record in
+     * the parametric record's own declaration: {@code [box<text>; 2..]} is the sized array in place, holding the record in
      * place.
      */
     @Test

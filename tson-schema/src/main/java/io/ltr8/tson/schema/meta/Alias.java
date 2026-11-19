@@ -11,7 +11,7 @@ import io.ltr8.annotation.Typename;
  * <p><b>{@code target} is a reference, typed {@code meta.type_ref}, and only a name stands there</b> ([TSON-SCHEMA]
  * §4.2). A declaration that names an application, {@code text_box => box<text>}, is no alias: it is the record the
  * application closes to, under the declared name. An application written at a target closes nowhere and is refused.
- * No alias has parameters: a template's body is a record ([TSON-SCHEMA] §5.10). §8.3 flattens a use site past an
+ * No alias has parameters: a parametric record's body is a record ([TSON-SCHEMA] §5.10). §8.3 flattens a use site past an
  * ALIAS entry but never this slot: the chain has to stay walkable.
  */
 @Typename(name = "meta.alias")

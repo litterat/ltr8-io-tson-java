@@ -30,7 +30,7 @@
     name, closed to a fixed point through applied parents; `subtypes`
     is its inverse over the entries of this map only (inverse edges
     from schemas that import this one are not represented here);
-    `parents` is an open record's, the parents as written. Both
+    `parents` is a parametric record's, the parents as written. Both
     name lists are written lexically sorted; a resolver's native
     ordering is implementation-defined, so comparison tools
     canonicalise both lists before comparing. Set-typed fields are
@@ -69,8 +69,8 @@
     kind when the schema links. An application is no reference: it is
     the construction `meta.apply` written in place, `{ of: !meta.apply
     { head: result  arguments: [T] } }`, and it stands only where an
-    application of an open record is still open, inside an open record
-    over one of its parameters, at its field types and its `parents`;
+    application of a parametric record is still open, inside a parametric
+    record over one of its parameters, at its field types and its `parents`;
     the `application` annotation's value is the same record. A
     constructor's application over a parameter is its construction in
     place.
@@ -84,7 +84,7 @@
     ordered: false  unique_items: true }` (Section 5.5). A declared
     completion carries the derived `@meta.completion` at its schema-map
     key, naming the incomplete entries it closed (Section 8.1).
-  - An open record is a `!meta.record` carrying `parameters` (Part 2
+  - A parametric record is a `!meta.record` carrying `parameters` (Part 2
     Sections 5.10, 8.1), read as the vocabulary and never held as
     text. A parameter is a reference value: it stands as its name at a
     field's `type`, at a slot naming a type of a type written in place
@@ -97,8 +97,8 @@
     application substitutes the arguments and closes to a
     `!meta.record` without `parameters`, which carries the derived
     `@meta.application` at its schema-map key, read as stated on
-    ingest. None appear here: no kernel entry is an open record, and
-    none applies one.
+    ingest. None appear here: no kernel entry is a parametric record,
+    and none applies one.
   - Nothing is lifted. A construction written at a use site, sugar
     or an applied constructor, stands in place in the slot that wrote
     it, in a `meta.type_inline`, and is compared as a value, so every

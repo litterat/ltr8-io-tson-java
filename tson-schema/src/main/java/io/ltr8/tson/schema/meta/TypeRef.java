@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * A type reference, what the kernel's {@code ref} atom reads to where it names types: the object every type-naming
  * position delivers, in a tree read and a bound one alike ([TSON-SCHEMA] §4.2). It is a name, a {@link NameRef};
- * inside an open record it may also be a {@link ParamRef}, one of the record's parameters, which only the record
+ * inside a parametric record it may also be a {@link ParamRef}, one of the record's parameters, which only the record
  * itself makes. {@code name} is the qualified name, its {@link #segments} joined by {@code .}.
  *
  * <p><b>A reference holds a name and nothing else.</b> An application, {@code box<T>}, is no reference: it is the

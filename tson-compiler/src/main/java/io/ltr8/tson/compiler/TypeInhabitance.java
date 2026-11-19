@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.Sum;
@@ -10,7 +11,6 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 
@@ -85,16 +85,15 @@ final class TypeInhabitance {
     /**
      * Whether one definition is satisfied by the entries marked so far.
      *
-     * <p><b>An open entry counts as inhabited, unjudged.</b> A template is not a type and no document ever
-     * has one; its closures are judged where they stand, a declared application as an entry in this map and one
-     * closed in place at the slot holding it. A template nobody applies is judged nowhere -- §5.10: "an unapplied
-     * template is checked no further and receives no verdict".
+     * <p><b>A parametric record counts as inhabited, unjudged.</b> It is not a type and no document ever has one; its
+     * closures are judged where they stand, a declared application as an entry in this map and one closed in place
+     * at the slot holding it.
      */
     private static boolean isInhabited(Top definition, Map<String, Top> namespace,
             Set<String> inhabited) {
-        // An open record is not walked: its parameters mean nothing until substitution supplies the arguments,
-        // so a template is inhabited here and each closure, which does supply them, is judged on its own.
-        if (OpenEntry.isOpen(definition)) {
+        // A parametric record is not walked: its parameters mean nothing until substitution supplies the arguments,
+        // so a parametric record is inhabited here and each closure, which does supply them, is judged on its own.
+        if (ParametricEntry.isParametric(definition)) {
             return true;
         }
         return switch (definition) {
@@ -123,7 +122,7 @@ final class TypeInhabitance {
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
             case io.ltr8.tson.schema.meta.DependentBody ignored -> true; // as a declared type, chosen by its sibling
-            // Only inside an open record, which is not walked; one anywhere else is the linker's refusal.
+            // Only inside a parametric record, which is not walked; one anywhere else is the linker's refusal.
             case io.ltr8.tson.schema.meta.ApplyBody ignored -> true;
             case ValueEntry ignored -> true; // a value, which nothing is typed by
             case io.ltr8.tson.schema.meta.IncompleteEntry ignored -> true; // no type, which nothing is typed by
@@ -328,8 +327,8 @@ final class TypeInhabitance {
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */
     private static String firstUnsatisfiedDependency(Top definition,
             Map<String, Top> namespace, Set<String> inhabited) {
-        if (definition == null || OpenEntry.isOpen(definition)) {
-            return null; // an open entry is inhabited, as isInhabited says
+        if (definition == null || ParametricEntry.isParametric(definition)) {
+            return null; // a parametric record is inhabited, as isInhabited says
         }
         return switch (definition) {
             case RecordBody record -> recordDependency(record, namespace, inhabited);

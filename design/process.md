@@ -43,8 +43,8 @@ re-stamped by hand and is the one that silently drifts.
 `tson hash spec/m/<name>.tn` is the check.
 
 The bundled schemas are the kernel's own statement of its shape. What the resolver derives rather than reads
-from them — a choice's disjointness, a template's parameters — is in
-`design/schema-resolution.md` and `design/open-records.md`.
+from them — a choice's disjointness, a parametric record's parameters — is in
+`design/schema-resolution.md` and `design/parametric-records.md`.
 
 **Changing a bundled schema means re-stamping every digest downstream of it, bottom-up**, moving the matching `*-resolved.tn`
 entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the published values.

@@ -173,11 +173,11 @@ class AliasAtASubsumptionPositionTest {
     }
 
     /**
-     * A subtype template's application, declared, needs no alias: {@code ok_of => ok<text>} is the record the
+     * A subtype parametric record's application, declared, needs no alias: {@code ok_of => ok<text>} is the record the
      * application closes to under the author's name, and a tag spelling that name selects it.
      */
     @Test
-    void aDeclaredTemplateApplicationIsNamedByItsDeclaration() {
+    void aDeclaredApplicationOfAParametricRecordIsNamedByItsDeclaration() {
         read("""
                   result    => <T> { payload: T }
                   ok        => <T> result<T> & { note: text }

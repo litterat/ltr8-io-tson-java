@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/40/m/meta.tn?sha256=05ae93747be29bffeeaf7ebc36ef9a6ba9143b0e7533cbb470dcd1ed5193aec5"
+!!id:"https://tson.io/2026/40/m/meta.tn?sha256=a578541ae676c988fa77b1cc3d0771c9f3f27df8a39cff9e4404f8d4139ce526"
 @doc:"""
   The TSON kernel: the vocabulary every schema is written in. Its root holds the
   names an author writes: `text`, `integer`, `int64`, `boolean`, `bytes`, `iri`,
@@ -193,7 +193,7 @@
 
     @doc:"""
       Where a type sits in the IS-A order. Derived, never written by a
-      declaration: `parents` is an open record's parents as written,
+      declaration: `parents` is a parametric record's parents as written,
       `supertypes` the closed IS-A chain, and `subtypes` its inverse
       ([TSON-SCHEMA] §4.1, §8.1).
       """
@@ -248,8 +248,8 @@
     }
 
     @doc:"""
-      A parameter of an open record, `<T>`, or with a bound every argument must
-      IS-A, `<T: text>` ([TSON-SCHEMA] §5.10).
+      A parameter of a parametric record, `<T>`, or with a bound every argument
+      must IS-A, `<T: text>` ([TSON-SCHEMA] §5.10).
       """
     param => {
       name:   meta.param_name
@@ -299,8 +299,9 @@
     annotation => void
 
     @doc:"""
-      Resolver-attached to an entry's key, never written: the application of an
-      open record the entry closes, `{ head: pair  arguments: [text integer] }`
+      Resolver-attached to an entry's key, never written: the application of a
+      parametric record the entry closes,
+      `{ head: pair  arguments: [text integer] }`
       ([TSON-SCHEMA] §8.2).
       """
     application => @meta.annotation meta.apply
@@ -358,8 +359,8 @@
       `person => { name: text  age?: integer }`.
 
       `fields` is flattened, a composition's fields being its operands' and its
-      own. `parameters` makes it an open record, `<T> { item: T }`. `extension`
-      is its `abstract` or `final` mark, `discriminators` names the fields its
+      own. `parameters` makes it a parametric record, `<T> { item: T }`.
+      `extension` is its `abstract` or `final` mark, `discriminators` names the fields its
       members are selected by, and `name_type` the type its field names are
       values of ([TSON-SCHEMA] §5.2; §5.8 for composition, §5.10 for open
       records).
@@ -494,7 +495,8 @@
 
     @doc:"""
       An application, `box<T>` in source. Written in place it stands only inside
-      an open record, with one of that record's parameters among its arguments;
+      a parametric record, with one of that record's parameters among its
+      arguments;
       closed, it is the value of `@meta.application` ([TSON-SCHEMA] §5.10).
       """
     apply => final meta.type & {

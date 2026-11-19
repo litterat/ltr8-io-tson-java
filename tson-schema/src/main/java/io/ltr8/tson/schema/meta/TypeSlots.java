@@ -10,7 +10,7 @@ import java.util.function.Consumer;
  * element, a map's value, a tuple position, a choice variant, a record field's type) and at a slot that holds a name
  * alone (a map's key, a reference's {@code of}, an alias's target, an application's head and arguments) alike. A type
  * written in place is walked into, each slot inside it rewritten the same way, and may come back as another type in
- * its stead ({@link Rewrite#atInPlace}). A chain is never walked: its parents are an open record's to substitute, and
+ * its stead ({@link Rewrite#atInPlace}). A chain is never walked: its parents are a parametric record's to substitute, and
  * its supertypes are names linking computes.
  *
  * <p><b>The switch over {@link Top} is exhaustive, with no default.</b> {@code Top} is sealed all the way down, so a

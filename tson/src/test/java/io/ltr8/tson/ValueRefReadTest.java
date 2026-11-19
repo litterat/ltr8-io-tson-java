@@ -235,7 +235,7 @@ class ValueRefReadTest {
     /**
      * A field typed by an application written inline, with a default, beside a value entry: a value entry's read
      * compiles the entries ready so far, where the field is still typed by the application, and its default is
-     * decoded there as written rather than through the template's reader, which refuses every value.
+     * decoded there as written rather than through the parametric record's reader, which refuses every value.
      */
     @Test
     void anInlineApplicationsDefaultBesideAValueEntryCompiles() {

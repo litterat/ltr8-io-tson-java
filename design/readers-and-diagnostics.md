@@ -125,7 +125,7 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   `Token` component's slot answers to it (`record_field.value`). `RecordReader` is the same
   rule in JSON.
 
-  A sibling naming no type a value can be read against — a template, an application, which
+  A sibling naming no type a value can be read against — a parametric record, an application, which
   names no entry where a value stands (§4.2) and which the sibling's own read refuses first — is refused at the
   sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and the value is skipped unjudged; a
   sibling whose own read reported leaves the value skipped and nothing more. What a sibling's value names is one

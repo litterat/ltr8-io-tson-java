@@ -6,13 +6,13 @@ import java.util.List;
  * The kernel's {@code type => abstract top & { chain?: meta.type_chain }} (Part 2 §4.1): the
  * kind of the kinds that describe the shape of a data value. {@link Atom}, {@link Product} and {@link Sum} each
  * {@code extends Type}, as {@code atom}, {@code product} and {@code sum} compose with {@code type}, and {@link
- * ApplyBody}, an application standing for a type that exists only once its open record is applied, composes {@code
+ * ApplyBody}, an application standing for a type that exists only once its parametric record is applied, composes {@code
  * type} directly and reaches no base kind; {@link Alias}
  * and {@link Namespace} do not, as their kernel entries compose with {@code top} directly. So a body describes a
  * type exactly when it is an {@code instanceof Type}, and every type body carries its chain ({@link TypeChain}).
  *
- * <p><b>Every question about what an entry IS-A asks this.</b> An open record carries a chain too, recording what its
- * written parents reach, which each application inherits; the open record itself is no type (§5.10) and is in no
+ * <p><b>Every question about what an entry IS-A asks this.</b> A parametric record carries a chain too, recording what its
+ * written parents reach, which each application inherits; the parametric record itself is no type (§5.10) and is in no
  * {@code subtypes} index. {@link Namespace} and {@link Alias} carry no chain: a value and a hop have no IS-A.
  *
  * <p>Every body record carries {@code chain} as its first component, mirroring the constructor's flattened
@@ -35,7 +35,7 @@ public sealed interface Type extends Top permits Atom, Product, Sum, ApplyBody {
     /** Where this value sits in the IS-A order ({@link TypeChain}). */
     TypeChain chain();
 
-    /** The parents as written, an open record's included ({@link TypeChain#parents}). */
+    /** The parents as written, a parametric record's included ({@link TypeChain#parents}). */
     default List<TypeExpr> parents() {
         return chain().parents();
     }

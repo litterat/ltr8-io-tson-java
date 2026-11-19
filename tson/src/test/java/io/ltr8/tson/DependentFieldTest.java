@@ -147,11 +147,11 @@ class DependentFieldTest {
     }
 
     @Test
-    void aSiblingsPinOrDefaultNamesNoTemplate() {
+    void aSiblingsPinOrDefaultNamesNoParametricRecord() {
         assertTrue(refusal("box => <T> { item: T }\n  cell => { kind?: meta.type_ref = box  v?: kind! }")
-                .contains("'box' is a template"));
+                .contains("'box' is a parametric record"));
         assertTrue(refusal("box => <T> { item: T }\n  cell => { kind?: meta.type_ref ~ box  v?: kind! }")
-                .contains("'box' is a template"));
+                .contains("'box' is a parametric record"));
     }
 
     @Test
@@ -281,7 +281,7 @@ class DependentFieldTest {
     }
 
     /**
-     * A sibling naming no readable type is refused at the sibling. A template is no type (§5.10), so a reference
+     * A sibling naming no readable type is refused at the sibling. A parametric record is no type (§5.10), so a reference
      * over types holds none, and naming one is refused whether or not the dependent field is written.
      */
     @Test
@@ -306,9 +306,9 @@ class DependentFieldTest {
                 + "optional: true  role: DEFAULT  value: \"nope\" } } }").contains("is not a value of that type"));
     }
 
-    /** What a template's literal is judged by, and its refusals on an open type, are §5.10's as written. */
+    /** What a parametric record's literal is judged by, and its refusals on an open type, are §5.10's as written. */
     @Test
-    void aTemplateLiteralNeedsAClosedType() {
+    void aParametricRecordsLiteralNeedsAClosedType() {
         assertEquals(List.of(), Tson.standard().validateSchema(schema(
                 "box => <T> { n?: int32 ~ 5  w: T }\n  b => box<text>")));
         assertTrue(refusal("box => <T> { n?: int32 ~ nope  w: T }\n  b => box<text>")

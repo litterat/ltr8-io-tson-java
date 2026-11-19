@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * [TSON-SCHEMA] §5.3's {@code min_items <= max_items} rule, asked of every spelling that reaches it.
  *
  * <p><b>The point of this class is that they agree.</b> A size specifier and the {@code !array { ...
- * min_items: ... }} body it desugars to denote one type, and a template closing onto the same bounds
+ * min_items: ... }} body it desugars to denote one type, and a parametric record closing onto the same bounds
  * denotes it again -- so a rule stated with any one spelling refuses that one and admits the others. It is
  * stated instead on {@code ArrayBody}/{@code MapBody} ({@code Product.coherenceCheck}, the structural twin
  * of {@code Atom.coherenceCheck}), and asked at the two phases where a body becomes concrete: resolution

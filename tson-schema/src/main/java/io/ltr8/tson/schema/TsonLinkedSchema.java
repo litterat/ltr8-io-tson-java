@@ -148,8 +148,8 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     /**
      * What the record a reader is built for under {@code name} judges its field names by: an entry's as {@link
      * #nameType(String)} gives it, and for a record written in place, which no entry holds, the name type its body
-     * states, past its alias hops. A record in place states its open record's (§5.10) and inherits none, being IS-A
-     * nothing.
+     * states, past its alias hops. A record in place states its parametric record's (§5.10) and inherits none, being
+     * IS-A nothing.
      */
     public Optional<Top> nameType(String name, Top definition) {
         if (schema.entries().containsKey(name) || !(definition instanceof RecordBody record)) {

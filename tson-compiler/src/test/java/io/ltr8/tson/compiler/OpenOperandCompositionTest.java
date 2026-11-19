@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Composing against a template application that is <b>still open</b> -- one applied to the
+ * Composing against an application of a parametric record that is <b>still open</b> -- one applied to the
  * absorbing declaration's own parameter, so it denotes no entry: {@code vip => <T> customer & box<T>}.
  *
  * <p><b>The fields need no materialisation, which is why absorption happens here.</b> The operand's body is
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * arguments as written yields a held record still carrying them, and absorbing that is an ordinary flattened
  * record that mentions {@code T}.
  *
- * <p><b>The IS-A edge is the half that has to wait.</b> A template is not a type (§5.10), so the chain an
+ * <p><b>The IS-A edge is the half that has to wait.</b> A parametric record is not a type (§5.10), so the chain an
  * application of the open declaration closes to names {@code customer} and {@code box}'s own ancestors and
  * never {@code box} -- there is no instantiation of it yet to be IS-A. What the declaration <em>can</em> do is
  * keep the application: {@code supertypes} is a reference channel, so {@code box<T>} is written into the held
@@ -50,11 +50,11 @@ class OpenOperandCompositionTest {
     private static final String ID = "https://example.test/open-operand.tn";
 
     /**
-     * <b>A closed application at an operand takes the same route: it is absorbed by value.</b> The template
+     * <b>A closed application at an operand takes the same route: it is absorbed by value.</b> The parametric record
      * is a macro at both ends: it contributes its fields and its own ancestors, and the type the composition
      * produces is the composing declaration (§5.8).
      *
-     * <p><b>Neither {@code box<text>} nor {@code box} is a type to be IS-A here.</b> A template is no type (§5.10),
+     * <p><b>Neither {@code box<text>} nor {@code box} is a type to be IS-A here.</b> A parametric record is no type (§5.10),
      * so no edge runs to it; no declaration names {@code box<text>}, so there is no entry for an edge to reach
      * either. What {@code c} IS-A is what {@code box}'s written parents reach: {@code base}.
      */
@@ -72,7 +72,7 @@ class OpenOperandCompositionTest {
 
         Top c = compiled.schema().entries().get("c");
         assertEquals(List.of("base"), TypeChain.supertypesOf(c),
-                "the ancestors arrive by value, and no edge runs to the template the operand applies");
+                "the ancestors arrive by value, and no edge runs to the parametric record the operand applies");
         assertEquals(List.of("tag", "item", "extra"),
                 ((RecordBody) c).fields().keySet().stream().toList(),
                 "the operand's fields flatten in, left to right, with the body's own appended");
@@ -138,8 +138,8 @@ class OpenOperandCompositionTest {
 
     /**
      * The open operand contributes its ancestors and not itself. {@code base} is a type and its fields
-     * arrived, so the IS-A edge is real; {@code box} is a template, and §5.10 makes a template no type. The
-     * template's chain says so: its parents as written, and the closed entries they reach.
+     * arrived, so the IS-A edge is real; {@code box} is a parametric record, and §5.10 makes a parametric record no type.
+     * The parametric record's chain says so: its parents as written, and the closed entries they reach.
      */
     @Test
     void anOpenOperandContributesItsOwnSupertypesButNotItsOwnName() {
@@ -150,7 +150,7 @@ class OpenOperandCompositionTest {
         assertEquals(List.of("base", "customer"), TypeChain.supertypesOf(vip),
                 () -> "customer directly, base through the open operand: " + TypeChain.supertypesOf(vip));
         assertFalse(TypeChain.supertypesOf(vip).contains("box"),
-                () -> "a template is not a type, so nothing is IS-A one: " + TypeChain.supertypesOf(vip));
+                () -> "a parametric record is not a type, so nothing is IS-A one: " + TypeChain.supertypesOf(vip));
         assertEquals(List.of("customer", "box<T>"), TypeChain.parentsOf(vip).stream()
                 .map(io.ltr8.tson.schema.meta.TypeExpr::text).toList(), "and it keeps its parents as written");
     }
@@ -227,7 +227,7 @@ class OpenOperandCompositionTest {
     /**
      * The one position a bound reference cannot be written into: a reference's own head, which is a
      * {@code meta.type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
-     * at the template's declaration, before substitution has anything to say about it.
+     * at the parametric record's declaration, before substitution has anything to say about it.
      */
     @Test
     void aParameterAppliedAsAHeadIsRefusedAtTheDeclarationThatWritesIt() {

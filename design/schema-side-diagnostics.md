@@ -89,26 +89,26 @@ distinction. They rethrow the original untouched (the linker re-states only an `
   *because* `child` did, reporting a consequence beside its cause. Swift's other half is kept — producing one means a
   diagnostic was already reported, so it never escapes a reporting resolve and needs no branch of `Top` of its own.
   - **It keeps the declaration's own type parameters**, the one declaration-specific thing it carries. With the arity
-    dropped, an application `bl<int32>` of a broken template `bl => <T> …` is told that `bl` "declares no type
+    dropped, an application `bl<int32>` of a broken parametric record `bl => <T> …` is told that `bl` "declares no type
     parameters … drop the argument list" — a fix that breaks the schema further, the real one being upstream. With the
     arity intact the application closes against the empty body and says nothing.
-- **A template condemned by `TemplateRegularity` is replaced before materialisation**, on the same terms.
-  `TemplateRegularity.check` returns the names it rejected and `SchemaResolver.condemn` puts a placeholder in both the
+- **A parametric record condemned by `ParametricRegularity` is replaced before materialisation**, on the same terms.
+  `ParametricRegularity.check` returns the names it rejected and `SchemaResolver.condemn` puts a placeholder in both the
   entry map and the namespace (`materialise` walks the first, an application's head resolves through the second).
   Left in place, an application of one would report the same defect again, against whichever entry applied it.
-- **A defect an open record deferred is reported against the declaration whose text wrote it**
-  (`TsonSchemaLinker.heldDeclarationNaming`). A template's references cannot be settled until an application supplies
-  arguments, so the verdict arrives inside the record an application closes to in place, in the applier's entry --
+- **A defect a parametric record deferred is reported against the declaration whose text wrote it**
+  (`TsonSchemaLinker.heldDeclarationNaming`). A parametric record's references cannot be settled until an application
+  supplies arguments, so the verdict arrives inside the record an application closes to in place, in the applier's entry --
   a line that is not wrong, once per applier. Deferred checking is
   survivable only if the author is sent to the line they can edit.
-  - **The offending name is the evidence, not the entry.** The entry's provenance cannot answer this. Asking which open
-    record *mentions the name* -- among its references (`OpenEntry.names`) or inside a type it holds in place
-    (`writes`) -- reaches the template directly, and reaches nothing when the name came from the argument list, so
+  - **The offending name is the evidence, not the entry.** The entry's provenance cannot answer this. Asking which parametric
+    record *mentions the name* -- among its references (`ParametricEntry.names`) or inside a type it holds in place
+    (`writes`) -- reaches the parametric record directly, and reaches nothing when the name came from the argument list, so
     `box<some_typo>` keeps its verdict at the application, where that mistake is.
   - **Both filters are load-bearing.** Only a failure inside a record in place (`UnresolvedReference.inPlace`, marked
     by `validateSlot`) or in an entry with no position of its own is retargeted, or a closed declaration's own typo
-    would be blamed on any template that names it; and only an authored open declaration (`OpenEntry.isOpen`) is a
-    candidate.
+    would be blamed on any parametric record that names it; and only an authored parametric declaration
+    (`ParametricEntry.isParametric`) is a candidate.
   - **A type written in place is named by its form** (`validateSlot`): a failure inside one states its subject as the
     form written, `'box<some_typo>' field 'v'` or `'[some_typo]' element_type`, reported against the declaration that
     holds it. A construction's form stays the subject when the failure is retargeted (`namedByForm`).
@@ -116,8 +116,8 @@ distinction. They rethrow the original untouched (the linker re-states only an `
     (subject, trail, name): `'box<text>' field 'w'` states the mistake against an application that is itself correct.
     It is linker-internal and re-stated as a `SchemaValidationException` — not a subclass of it, since that type is
     sealed and lives in `tson-base`, which holds no pipeline machinery.
-  - **One mistake gets one diagnostic** (`blamedOnce`), however many declarations apply the template; otherwise the
-    count would be a property of the template's callers rather than of the defect.
+  - **One mistake gets one diagnostic** (`blamedOnce`), however many declarations apply the parametric record; otherwise
+    the count would be a property of the parametric record's callers rather than of the defect.
 
 ### Desugaring
 

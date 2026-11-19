@@ -99,7 +99,7 @@ class JsonFieldNameTypeTest {
 
     /**
      * A member name is matched in the record's name type's form, and so is a family's selector (§5.5) -- a base that
-     * is a template's application included, whose members take the template's name type.
+     * is a parametric record's application included, whose members take the parametric record's name type.
      */
     @Test
     void aMemberNameIsMatchedInItsNameTypesForm() {

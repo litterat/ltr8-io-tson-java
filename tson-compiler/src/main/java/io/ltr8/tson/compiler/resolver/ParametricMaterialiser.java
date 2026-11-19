@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ApplyBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.annotation.AnnotatedMap;
@@ -35,14 +35,14 @@ import java.util.function.Supplier;
  * application reaches here as an {@code ApplyBody} written in place, so closing is a walk over {@code schema.meta}
  * values ({@link TypeSlots}).
  *
- * <p><b>Every application here applies an open record</b> ([TSON-SCHEMA] §5.10, §5.3), or a head nothing names: a
+ * <p><b>Every application here applies a parametric record</b> ([TSON-SCHEMA] §5.10, §5.3), or a head nothing names: a
  * constructor's application is its construction before anything reads it ({@link ConstructionRewrite}), so {@code
  * meta.array<text>} arrives as the construction {@code [text]} is. {@code page<order>} substitutes: the record's
  * parameters are replaced by the arguments on the model and each application at a slot of a field's type closed in
- * turn ({@link #closeOpenRecord}). An application held inside an open record, {@code box<T>} at a field or in {@code
- * [box<T>]}, closes the same way once the record holding it is applied and its parameter substituted.
+ * turn ({@link #closeParametricRecord}). An application held inside a parametric record, {@code box<T>} at a field or
+ * in {@code [box<T>]}, closes the same way once the record holding it is applied and its parameter substituted.
  *
- * <p><b>Nothing is minted.</b> A declaration naming an application of an open record, {@code page_order =>
+ * <p><b>Nothing is minted.</b> A declaration naming an application of a parametric record, {@code page_order =>
  * page<order>}, is the record under that name with the application recorded ({@link #closeApplicationInto}, {@code
  * @meta.application}, §8.2). At a type slot -- of a closed record, or left by substitution in another record's body --
  * an application closes in place to the substituted record, {@code { of: !meta.record { … } }} ({@link TypeInline}):
@@ -54,10 +54,10 @@ import java.util.function.Supplier;
  * declaration closing it ({@code f: node<text>}, §5.10.1).
  *
  * <p><b>Where a name is required</b> -- an argument of an application, a map's key, a reference's {@code of}, an alias's
- * target -- an application closes nowhere: a construction and an application of an open record
+ * target -- an application closes nowhere: a construction and an application of a parametric record
  * are each refused there, and declared under a name first ([TSON-SCHEMA] §4.2, §5.3).
  */
-final class TemplateMaterialiser {
+final class ParametricMaterialiser {
 
     /**
      * Every entry visible to this schema -- local declarations and merged {@code !!import}s alike. A
@@ -68,7 +68,7 @@ final class TemplateMaterialiser {
      */
     private final DefinitionGetter namespace;
 
-    /** The constructor an open record's applications are built with. */
+    /** The constructor a parametric record's applications are built with. */
     private static final String RECORD = KernelNames.of("record");
 
     /**
@@ -104,7 +104,7 @@ final class TemplateMaterialiser {
      */
     private final Map<String, ApplyBody> writtenApplications = new LinkedHashMap<>();
 
-    /** Which open records are refused at their own declaration for a recursion they hold (§5.10.1). */
+    /** Which parametric records are refused at their own declaration for a recursion they hold (§5.10.1). */
     private final HeldRecursion heldRecursion;
 
     /** Whether a name is the kernel's own, for telling a constructor from a family member. */
@@ -136,13 +136,13 @@ final class TemplateMaterialiser {
      */
     private final List<DeferredMembership> deferredMemberships = new ArrayList<>();
 
-    private record DeferredMembership(String declaration, RecordBody template, Map<String, TypeRef> bindings,
+    private record DeferredMembership(String declaration, RecordBody head, Map<String, TypeRef> bindings,
                                       ApplyBody written) {
     }
 
-    TemplateMaterialiser(DefinitionGetter namespace, Function<String, Top> importedTypes, Supplier<String> resolving,
-                         Map<String, TsonSchema.EntryFacts> facts, Map<String, ApplyBody> applications,
-                         Predicate<String> kernel, HeldRecursion heldRecursion) {
+    ParametricMaterialiser(DefinitionGetter namespace, Function<String, Top> importedTypes, Supplier<String> resolving,
+                           Map<String, TsonSchema.EntryFacts> facts, Map<String, ApplyBody> applications,
+                           Predicate<String> kernel, HeldRecursion heldRecursion) {
         this.heldRecursion = Objects.requireNonNull(heldRecursion, "heldRecursion");
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
@@ -160,7 +160,7 @@ final class TemplateMaterialiser {
         Set<String> refused = new LinkedHashSet<>();
         for (DeferredMembership check : deferredMemberships) {
             try {
-                refuseAppliedMembership(check.template(), check.bindings(), check.written());
+                refuseAppliedMembership(check.head(), check.bindings(), check.written());
             } catch (SchemaValidationException e) {
                 if (refused.add(check.declaration())) {
                     reporter.accept(check.declaration(), e);
@@ -169,12 +169,12 @@ final class TemplateMaterialiser {
         }
         deferredMemberships.clear();
         for (DeferredCheck check : deferred) {
-            Top template = namespace.definition(check.head());
-            if (refused.contains(check.declaration()) || !OpenEntry.isOpen(template)) {
+            Top record = namespace.definition(check.head());
+            if (refused.contains(check.declaration()) || !ParametricEntry.isParametric(record)) {
                 continue;
             }
             try {
-                checkBounds(check.head(), template, check.arguments());
+                checkBounds(check.head(), record, check.arguments());
             } catch (SchemaValidationException e) {
                 refused.add(check.declaration());
                 reporter.accept(check.declaration(), e);
@@ -191,15 +191,15 @@ final class TemplateMaterialiser {
         TypeSlots.Rewrite rewrite = slotRewrite();
         for (Map.Entry<String, Top> entry : entries.entrySet()) {
             try {
-                entry.setValue(entry.getValue() instanceof RecordBody record && record.isOpen()
-                        ? TypeSlots.mapBody(record, openRewrite())
+                entry.setValue(entry.getValue() instanceof RecordBody record && record.isParametric()
+                        ? TypeSlots.mapBody(record, parametricRewrite())
                         : TypeSlots.mapBody(entry.getValue(), rewrite));
             } catch (SchemaValidationException | UnsupportedOperationException e) {
                 if (reporter == null) {
                     throw e;
                 }
                 // Reported against the entry that wrote the application, and left as it was: an entry still
-                // naming an open template is one the linker reports again, but that second complaint is
+                // naming a parametric record is one the linker reports again, but that second complaint is
                 // about the same line and does not invent a new problem.
                 reporter.reportFailedApplication(entry.getKey(), e);
             }
@@ -207,13 +207,13 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * What {@link #materialise} applies inside an open record. An application naming none of its parameters means the
+     * What {@link #materialise} applies inside a parametric record. An application naming none of its parameters means the
      * same thing in every application, so it is closed now and every application holds the one type, which is what
      * {@code FamilySelectors} reads a selector's type from. One over a parameter stays the application written in
      * place, which substitution closes.
      */
-    private TypeSlots.Rewrite openRewrite() {
-        return (Closing) application -> OpenEntry.parameterIn(application.inPlace()).isEmpty()
+    private TypeSlots.Rewrite parametricRewrite() {
+        return (Closing) application -> ParametricEntry.parameterIn(application.inPlace()).isEmpty()
                 ? closeApplicationOfRecord(application) : application.inPlace();
     }
 
@@ -244,16 +244,16 @@ final class TemplateMaterialiser {
     /**
      * The entry a declaration naming a fully-bound application <b>is</b> -- see {@link
      * ApplicationCloser#closeApplicationInto}. Closes the application into {@code declaredName} and hands the
-     * definition back for the caller to own. An open record's closure is a record ({@link #closeOpenRecord}). An
+     * definition back for the caller to own. A parametric record's closure is a record ({@link #closeParametricRecord}). An
      * unresolvable or mis-applied head returns {@code null} for the caller to handle.
      */
     Top closeApplicationInto(String declaredName, ApplyBody application) {
-        String head = templateHead(application.head().name());
-        Top template = closable(head, namespace.definition(head));
-        if (!OpenEntry.isOpen(template)) {
+        String head = parametricHead(application.head().name());
+        Top record = closable(head, namespace.definition(head));
+        if (!ParametricEntry.isParametric(record)) {
             return null; // unresolved, or a head taking no parameters -- reported through the ordinary path
         }
-        List<String> parameters = OpenEntry.parameterNames(template);
+        List<String> parameters = ParametricEntry.parameterNames(record);
         if (parameters.size() != application.arguments().size()) {
             return null; // arity is `instantiate`'s to report, in its own words
         }
@@ -261,14 +261,14 @@ final class TemplateMaterialiser {
         // alias chains" -- so an argument naming a pure rename is replaced by the entry at the end of it
         // before anything is derived from the list.
         List<TypeRef> arguments = arguments(application);
-        checkArguments(head, template, arguments);
+        checkArguments(head, record, arguments);
         ApplyBody canonical = CanonicalApplication.of(head, arguments);
         if (closingInto.putIfAbsent(canonical, declaredName) != null) {
             return null; // a second declaration of one application inside the first's closing: the ordinary path
         }
         try {
             note(declaredName, RECORD);
-            Top closed = closeOpenRecord((RecordBody) template, bind(parameters, arguments));
+            Top closed = closeParametricRecord((RecordBody) record, bind(parameters, arguments));
             return instantiation(declaredName, closed, canonical, application);
         } finally {
             closingInto.remove(canonical);
@@ -276,26 +276,26 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * The arguments of an open record's {@code application} past their alias hops. A name naming a template is
+     * The arguments of a parametric record's {@code application} past their alias hops. A name naming a parametric record is
      * refused, as no position names one bare.
      */
     private List<TypeRef> arguments(ApplyBody application) {
         List<TypeRef> arguments = new ArrayList<>();
         for (TypeRef name : application.arguments()) {
-            if (appliesAnOpenRecord(name.name())) {
-                // A template is no type, and no position names one bare, an argument included (§5.10).
+            if (appliesAParametricRecord(name.name())) {
+                // A parametric record is no type, and no position names one bare, an argument included (§5.10).
                 throw new SchemaValidationException("'" + name.name() + "', passed as an argument of '"
-                        + application.text() + "', is a template, and a template is not a type -- write it with its "
-                        + "arguments, declared under a name, and pass that name (§5.10)");
+                        + application.text() + "', is a parametric record, and a parametric record is not a type -- "
+                        + "write it with its arguments, declared under a name, and pass that name (§5.10)");
             }
             arguments.add(dereferenced(name));
         }
         return arguments;
     }
 
-    /** Whether {@code head}, past its alias hops, is an open record. */
-    private boolean appliesAnOpenRecord(String head) {
-        return OpenEntry.isOpen(lookup(AliasChain.terminal(head, this::lookup)));
+    /** Whether {@code head}, past its alias hops, is a parametric record. */
+    private boolean appliesAParametricRecord(String head) {
+        return ParametricEntry.isParametric(lookup(AliasChain.terminal(head, this::lookup)));
     }
 
     /**
@@ -312,12 +312,12 @@ final class TemplateMaterialiser {
 
     /**
      * The refusal of an application or a construction, spelled {@code argument}, passed as an argument of {@code
-     * application} over an open record ([TSON-SCHEMA] §5.3), naming the declaration to write instead, {@code suggested
+     * application} over a parametric record ([TSON-SCHEMA] §5.3), naming the declaration to write instead, {@code suggested
      * => argument}.
      */
     static SchemaValidationException argumentNotAName(String argument, String suggested, String application) {
         return new SchemaValidationException("'" + argument + "' is passed as an argument of '" + application
-                + "', and an argument of an open record's application is a name or a parameter (§5.3): declare it ('"
+                + "', and an argument of a parametric record's application is a name or a parameter (§5.3): declare it ('"
                 + suggested + " => " + argument + "') and pass that name");
     }
 
@@ -334,12 +334,12 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * An application of an open record at a slot, which stays written in place where its head names nothing this pass
+     * An application of a parametric record at a slot, which stays written in place where its head names nothing this pass
      * can close: the list is the evidence the author supplied arguments, and the linker reports on what it is handed.
      */
     private TypeExpr closeApplicationOfRecord(ApplyBody application) {
         List<TypeRef> arguments = arguments(application);
-        TypeExpr closed = instantiate(templateHead(application.head().name()), arguments, application);
+        TypeExpr closed = instantiate(parametricHead(application.head().name()), arguments, application);
         return closed == null ? application.withArguments(arguments).inPlace() : closed;
     }
 
@@ -348,9 +348,9 @@ final class TemplateMaterialiser {
         return (Closing) this::closeApplicationOfRecord;
     }
 
-    /** The open record an application's head names, past its alias hops ({@link Ancestry#templateHead}). */
-    private String templateHead(String head) {
-        return Ancestry.templateHead(head, namespace);
+    /** The parametric record an application's head names, past its alias hops ({@link Ancestry#parametricHead}). */
+    private String parametricHead(String head) {
+        return Ancestry.parametricHead(head, namespace);
     }
 
     /**
@@ -368,7 +368,7 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * What a fully-bound application of an open record at a type slot closes to ([TSON-SCHEMA] §5.10): the
+     * What a fully-bound application of a parametric record at a type slot closes to ([TSON-SCHEMA] §5.10): the
      * declaration closing this very application, where one is (a recursion, §5.10.1), and otherwise the substituted
      * record in place, with no name, no chain and nothing recorded. {@code null} where the head names nothing in
      * scope -- that is {@code TsonSchemaLinker}'s verdict to give as an unresolved reference, not this pass's to
@@ -380,11 +380,11 @@ final class TemplateMaterialiser {
      * is a name, so the applications a closing reaches are finitely many, and a cycle repeats one.
      */
     private TypeExpr instantiate(String head, List<TypeRef> arguments, ApplyBody written) {
-        Top template = closable(head, namespace.definition(head));
-        if (template == null) {
+        Top record = closable(head, namespace.definition(head));
+        if (record == null) {
             return null; // unresolved head -- the linker's verdict, not this pass's
         }
-        List<String> parameters = OpenEntry.parameterNames(template);
+        List<String> parameters = ParametricEntry.parameterNames(record);
         Optional<io.ltr8.tson.schema.meta.Extern> extern = Externs.terminal(head, namespace::definition);
         if (parameters.isEmpty() && extern.isPresent()) {
             throw Externs.sealed("'" + written.text() + "'", "'" + head + "<...>' applies", head,
@@ -401,9 +401,9 @@ final class TemplateMaterialiser {
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
         if (arguments.stream().anyMatch(ParamRef.class::isInstance)) {
-            return null; // over a parameter: substitution closes it, when the open record holding it is applied
+            return null; // over a parameter: substitution closes it, when the parametric record holding it is applied
         }
-        checkArguments(head, template, arguments);
+        checkArguments(head, record, arguments);
         ApplyBody canonical = CanonicalApplication.of(head, arguments);
         String owner = closingInto.get(canonical);
         if (owner != null) {
@@ -412,17 +412,17 @@ final class TemplateMaterialiser {
             return TypeRef.of(owner);
         }
         Map<String, TypeRef> bindings = bind(parameters, arguments);
-        refuseMembership(head, (RecordBody) template, bindings, written);
+        refuseMembership(head, (RecordBody) record, bindings, written);
         ApplyBody repeated = closingInPlace.get(canonical);
         if (repeated != null) {
-            throw new SchemaValidationException("'" + repeated.text() + "' applies the recursive open record '"
+            throw new SchemaValidationException("'" + repeated.text() + "' applies the recursive parametric record '"
                     + head + "' where no declaration is closing it, so its recursion has nothing to tie to "
                     + "(§5.10.1): declare it ('" + suggestedName(repeated) + " => " + repeated.text()
                     + "') and write that name where it is used");
         }
         closingInPlace.put(canonical, written);
         try {
-            RecordBody closed = closeOpenRecord((RecordBody) template, bindings);
+            RecordBody closed = closeParametricRecord((RecordBody) record, bindings);
             return TypeInline.closing(written, closed.withChain(TypeChain.EMPTY));
         } finally {
             closingInPlace.remove(canonical);
@@ -430,41 +430,41 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * {@code template}, or its placeholder where the open record is refused at its own declaration for a recursion it
+     * {@code record}, or its placeholder where the parametric record is refused at its own declaration for a recursion it
      * holds: the refusal is reported there once, and closing an application of it would only report it again against
      * the applier, whose remedy it is not (§5.10.1).
      */
-    private Top closable(String head, Top template) {
-        return OpenEntry.isOpen(template) && heldRecursion.refusedLocally(head)
-                ? SchemaResolver.unresolved(OpenEntry.parameterNames(template)) : template;
+    private Top closable(String head, Top record) {
+        return ParametricEntry.isParametric(record) && heldRecursion.refusedLocally(head)
+                ? SchemaResolver.unresolved(ParametricEntry.parameterNames(record)) : record;
     }
 
     /**
-     * Refuses an application of the open record {@code head} that would close in place to a member of a declared type
-     * ([TSON-SCHEMA] §5.2): one whose template reaches a declared type through its written parents, or whose applied
+     * Refuses an application of the parametric record {@code head} that would close in place to a member of a declared type
+     * ([TSON-SCHEMA] §5.2): one whose head reaches a declared type through its written parents, or whose applied
      * parent, substituted, is an application a declaration names. A member is read, tagged and bound by name, so it is
      * declared. The second is judged once every declaration has closed ({@link #checkDeferred}) where this runs while
      * declarations are being made ready.
      */
-    private void refuseMembership(String head, RecordBody template, Map<String, TypeRef> bindings, ApplyBody written) {
-        TypeChain.supertypesOf(template).stream().findFirst().ifPresent(member -> {
+    private void refuseMembership(String head, RecordBody record, Map<String, TypeRef> bindings, ApplyBody written) {
+        TypeChain.supertypesOf(record).stream().findFirst().ifPresent(member -> {
             throw notAMember(written, member);
         });
         String declaration = resolving.get();
         if (declaration != null) {
-            deferredMemberships.add(new DeferredMembership(declaration, template, Map.copyOf(bindings), written));
+            deferredMemberships.add(new DeferredMembership(declaration, record, Map.copyOf(bindings), written));
             return;
         }
-        refuseAppliedMembership(template, bindings, written);
+        refuseAppliedMembership(record, bindings, written);
     }
 
     /** The applied-parent half of {@link #refuseMembership}. */
-    private void refuseAppliedMembership(RecordBody template, Map<String, TypeRef> bindings, ApplyBody written) {
-        for (TypeExpr parent : Substitution.parents(template, bindings)) {
+    private void refuseAppliedMembership(RecordBody record, Map<String, TypeRef> bindings, ApplyBody written) {
+        for (TypeExpr parent : Substitution.parents(record, bindings)) {
             if (!(parent instanceof TypeInline inline) || !(inline.of() instanceof ApplyBody applied)) {
                 continue;
             }
-            ApplyBody canonical = CanonicalApplication.of(templateHead(applied.head().name()),
+            ApplyBody canonical = CanonicalApplication.of(parametricHead(applied.head().name()),
                     applied.arguments().stream().map(this::dereferenced).toList());
             Optional<String> member = applications.entrySet().stream()
                     .filter(entry -> entry.getValue().equals(canonical)).map(Map.Entry::getKey).findFirst();
@@ -490,29 +490,30 @@ final class TemplateMaterialiser {
         return bindings;
     }
 
-    // ── Closing an open record (§5.10) ───────────────────────────────────────────────────────────
+    // ── Closing a parametric record (§5.10) ───────────────────────────────────────────────────────────
 
     /**
-     * An open record applied: its fields and parents substituted on the model ({@link Substitution}), each field's type
+     * A parametric record applied: its fields and parents substituted on the model ({@link Substitution}), each field's type
      * closed -- every application at a slot of it, at any depth of types written in place ({@code box<T>} in {@code
      * [box<T>]} or in <code>{ cursor: box&lt;T&gt; }</code>), closed now that the parameter is bound -- and the
      * record's own facts kept as they are written: its {@code extension} and its {@code discriminators}, so an
-     * abstract template's application is an abstract record (§5.10). The chain is computed
+     * abstract parametric record's application is an abstract record (§5.10). The chain is computed
      * after substitution, from the parents as written ({@link Ancestry#chainOf}): a parent applied to the record's own
      * parameter stays in {@code parents} for {@code SchemaResolver}'s fold to turn into the edge to the entry the
      * closed application denotes. Parents are substituted and not closed: an operand denotes no entry (§8.2). The
      * result is a record without {@code parameters}, with no subtypes ({@code subtypes} is linking's), and its fields
      * carry no source position.
      */
-    private RecordBody closeOpenRecord(RecordBody open, Map<String, TypeRef> bindings) {
-        AnnotatedMap<String, RecordField> substituted = Substitution.fields(open, bindings);
+    private RecordBody closeParametricRecord(RecordBody record, Map<String, TypeRef> bindings) {
+        AnnotatedMap<String, RecordField> substituted = Substitution.fields(record, bindings);
         AnnotatedMap<String, RecordField> fields = new AnnotatedMap<>();
         TypeSlots.Rewrite close = slotRewrite();
         substituted.forEach((name, field) -> fields.put(name,
                 field.withType(TypeSlots.map(field.type(), close)).withPosition(Optional.empty()),
                 substituted.getAnnotations(name)));
-        return new RecordBody(Ancestry.chainOf(Substitution.parents(open, bindings), namespace),
-                AnnotatedMap.copyOf(fields), open.groups(), open.extension(), open.discriminators(), open.nameType());
+        return new RecordBody(Ancestry.chainOf(Substitution.parents(record, bindings), namespace),
+                AnnotatedMap.copyOf(fields), record.groups(), record.extension(), record.discriminators(),
+                record.nameType());
     }
 
     /** Records the constructor {@code name}'s value applies -- the tag resolved output writes. */
@@ -522,7 +523,7 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * {@code value} as the instantiation of {@code application} (§8.2): the closed record of an open record's
+     * {@code value} as the instantiation of {@code application} (§8.2): the closed record of a parametric record's
      * application under a declared name. Recorded in {@link #applications}, with {@code written}, the application as
      * written, which {@code SchemaResolver} writes onto the entry's key as {@code @meta.application}.
      */
@@ -556,22 +557,22 @@ final class TemplateMaterialiser {
      * <p><b>Shared with the operand path</b>, through {@link ApplicationCloser#checkArguments}: a composition operand
      * absorbs by value and closes nothing, so it never reaches this pass.
      */
-    void checkArguments(String head, Top template, List<TypeRef> arguments) {
+    void checkArguments(String head, Top record, List<TypeRef> arguments) {
         String declaration = resolving.get();
         if (declaration != null) {
             deferred.add(new DeferredCheck(declaration, head, List.copyOf(arguments)));
             return;
         }
-        checkBounds(head, template, arguments);
+        checkBounds(head, record, arguments);
     }
 
     /**
      * Each argument against the bound of the parameter it binds ({@code meta.param}, [TSON-SCHEMA] §5.10).
      * A name nothing declares is left for the linker to refuse.
      */
-    private void checkBounds(String head, Top template, List<TypeRef> arguments) {
-        List<Param> parameters = OpenEntry.parameters(template);
-        if (!OpenEntry.isOpen(template) || parameters.size() != arguments.size()) {
+    private void checkBounds(String head, Top record, List<TypeRef> arguments) {
+        List<Param> parameters = ParametricEntry.parameters(record);
+        if (!ParametricEntry.isParametric(record) || parameters.size() != arguments.size()) {
             return;
         }
         for (int i = 0; i < arguments.size(); i++) {

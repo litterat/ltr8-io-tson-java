@@ -275,12 +275,12 @@ class ImportedVocabularyTest {
     }
 
     /**
-     * <b>A template over a value is refused</b> ([TSON-SCHEMA] §5.10): a template's body is a record body, and {@code
-     * !operations { … }} is a value of the type {@code operations}, no type. The remedy is one value per
+     * <b>A parametric record over a value is refused</b> ([TSON-SCHEMA] §5.10): a parametric record's body is a record body,
+     * and {@code !operations { … }} is a value of the type {@code operations}, no type. The remedy is one value per
      * instantiation, which the message names.
      */
     @Test
-    void aTemplateOverAValueIsRefused() {
+    void aParametricRecordOverAValueIsRefused() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> linked("over-value", """
                 fetch    => <T> !operations {
                     get => { path: "/x"  method: "GET"  request: T  response: T }
@@ -347,8 +347,8 @@ class ImportedVocabularyTest {
     /**
      * <b>Every reference form resolves, applied or not.</b> One namespace per schema ([TSON-SCHEMA] §2.2.3): the
      * {@code !!import} target contributes its namespace, so a name the imported schema declares -- atom, record, or
-     * template -- is a type of the schema importing it, and an application of a template there is judged by its
-     * arity as any other.
+     * parametric record -- is a type of the schema importing it, and an application of a parametric record there is judged
+     * by its arity as any other.
      */
     @Test
     void anImportedNameResolvesWhetherOrNotItIsApplied() {

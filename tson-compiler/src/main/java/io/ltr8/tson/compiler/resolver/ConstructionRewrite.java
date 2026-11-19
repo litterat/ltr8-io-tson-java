@@ -26,7 +26,7 @@ import java.util.function.Predicate;
  * Construction sugar on the written form ([TSON-SCHEMA] §5.3, §5.10): {@code !meta.apply { head: C  arguments: [a₁ …
  * aₙ] }} over a constructor {@code C} is rewritten to the binding record {@code !C { f₁: a₁ … fₙ: aₙ }} before anything
  * reads it, its argument slots ({@link ConstructionSugar#slots}) filled in order, innermost first. Every application
- * left is then kernel data: an open record's, its arguments names or parameters, the kernel's {@code meta.apply}
+ * left is then kernel data: a parametric record's, its arguments names or parameters, the kernel's {@code meta.apply}
  * typing them {@code [meta.type_ref; 1..]}. So a payload is read once, under the kernel's own types.
  *
  * <p><b>Who wrote an application decides how much is rewritten.</b> One desugaring wrote from {@code head<args>} is the
@@ -35,7 +35,7 @@ import java.util.function.Predicate;
  * where its arguments are names (§5.10), and is rewritten then; one whose arguments hold a type in place is left as
  * written, for the kernel's reader to refuse.
  *
- * <p><b>An open record's application orders nothing</b> (a name at a type position, [TSON-SCHEMA] §3.4.1): whether a
+ * <p><b>A parametric record's application orders nothing</b> (a name at a type position, [TSON-SCHEMA] §3.4.1): whether a
  * head is one is asked without making it ready ({@link DefinitionGetter#opens}), so {@code chain => <T> { next?:
  * chain<T> }} and mutual recursion wait on nothing. Any other head is made ready before it is asked whether it
  * constructs, as reading a construction against it would make it.
@@ -52,7 +52,7 @@ final class ConstructionRewrite {
     /** Where a head and a constructor's slots are found; asking for a declaration not yet ready makes it ready. */
     private final Function<String, Top> types;
 
-    /** Whether a head, past its alias hops, is an open record, asked without waiting on it. */
+    /** Whether a head, past its alias hops, is a parametric record, asked without waiting on it. */
     private final Predicate<String> opens;
 
     ConstructionRewrite(Function<String, Top> types, Predicate<String> opens) {
@@ -142,7 +142,7 @@ final class ConstructionRewrite {
     /**
      * One application: a constructor's as its construction, any other as written. A declaration's body is the one
      * construction not {@code inPlace}: it is tagged by the head as written, which its entry records as its
-     * constructor, and no namespace type is refused there, nor an open record's argument, the declaration judging
+     * constructor, and no namespace type is refused there, nor a parametric record's argument, the declaration judging
      * that in its own order.
      */
     private DataValue applied(DataValue written, boolean desugared, boolean inPlace) {
@@ -169,7 +169,7 @@ final class ConstructionRewrite {
         if (constructor.isEmpty()) {
             for (DataValue argument : arguments) {
                 if (!isName(argument)) {
-                    throw TemplateMaterialiser.argumentNotAName(text(argument), suggestedName(argument),
+                    throw ParametricMaterialiser.argumentNotAName(text(argument), suggestedName(argument),
                             text(written));
                 }
             }
@@ -190,7 +190,7 @@ final class ConstructionRewrite {
         List<RecordValue.Field> fields = new ArrayList<>(slots.size());
         for (int i = 0; i < slots.size(); i++) {
             if (!isName(arguments.get(i)) && !slotsInPlace.get(i)) {
-                throw TemplateMaterialiser.nameRequired(text(arguments.get(i)), suggestedName(arguments.get(i)));
+                throw ParametricMaterialiser.nameRequired(text(arguments.get(i)), suggestedName(arguments.get(i)));
             }
             fields.add(new RecordValue.Field(slots.get(i), constructed.get(i)));
         }
@@ -229,7 +229,7 @@ final class ConstructionRewrite {
         List<RecordValue.Field> fields = new ArrayList<>(slots.size());
         for (int i = 0; i < slots.size(); i++) {
             if (!isName(arguments.get(i)) && !slotsInPlace.get(i)) {
-                throw TemplateMaterialiser.nameRequired(text(arguments.get(i)), suggestedName(arguments.get(i)));
+                throw ParametricMaterialiser.nameRequired(text(arguments.get(i)), suggestedName(arguments.get(i)));
             }
             fields.add(new RecordValue.Field(slots.get(i), constructed.get(i)));
         }
@@ -271,21 +271,21 @@ final class ConstructionRewrite {
         return generic.args().stream().allMatch(NameRef.class::isInstance);
     }
 
-    /** The refusal of {@code generic}, written where only a name may stand ({@link TemplateMaterialiser#nameRequired}). */
+    /** The refusal of {@code generic}, written where only a name may stand ({@link ParametricMaterialiser#nameRequired}). */
     static SchemaValidationException nameRequired(ApplicationRef generic) {
         DataValue written = SchemaDesugarer.application(generic);
-        return TemplateMaterialiser.nameRequired(text(written), suggestedName(written));
+        return ParametricMaterialiser.nameRequired(text(written), suggestedName(written));
     }
 
     /**
-     * The refusal of {@code generic}'s first argument that is no name, {@code generic} applying an open record
-     * ({@link TemplateMaterialiser#argumentNotAName}).
+     * The refusal of {@code generic}'s first argument that is no name, {@code generic} applying a parametric record
+     * ({@link ParametricMaterialiser#argumentNotAName}).
      */
     static SchemaValidationException argumentNotAName(ApplicationRef generic) {
         DataValue written = SchemaDesugarer.application(generic);
         DataValue argument = ((ArrayValue) member((RecordValue) written.coreValue(), ARGUMENTS).orElseThrow()
                 .coreValue()).elements().stream().filter(each -> !isName(each)).findFirst().orElseThrow();
-        return TemplateMaterialiser.argumentNotAName(text(argument), suggestedName(argument), text(written));
+        return ParametricMaterialiser.argumentNotAName(text(argument), suggestedName(argument), text(written));
     }
 
     /** {@code generic} as the author wrote it, for a message ({@link #text(DataValue)}). */
@@ -326,7 +326,7 @@ final class ConstructionRewrite {
     }
 
     /**
-     * A name for a declaration of {@code written}, for a message, as {@link TemplateMaterialiser#suggestedName} names
+     * A name for a declaration of {@code written}, for a message, as {@link ParametricMaterialiser#suggestedName} names
      * an application: the head's last segment, then each argument's, {@code my} for one that is no name.
      */
     static String suggestedName(DataValue written) {

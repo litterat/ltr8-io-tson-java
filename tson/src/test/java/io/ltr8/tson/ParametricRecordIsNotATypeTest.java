@@ -21,15 +21,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * <b>No template is a type</b> ([TSON-SCHEMA] §5.10): no position names one bare, an application of one is a type,
- * and an application's IS-A edges are its template's written parents', never the template's own name.
+ * <b>No parametric record is a type</b> ([TSON-SCHEMA] §5.10): no position names one bare, an application of one is a type,
+ * and an application's IS-A edges are its head's written parents', never its head's own name.
  *
  * <p>A family is declared with records: an abstract record states the selectors and the fields every member shares,
- * a template composes it, and each member composes an application and pins the selectors. {@code abstract} and a
- * selector on a template are each application's, so an abstract template's application is itself a family base,
- * over the declarations composing it.
+ * a parametric record composes it, and each member composes an application and pins the selectors. {@code abstract} and a
+ * selector on a parametric record are each application's, so an abstract parametric record's application is itself a family
+ * base, over the declarations composing it.
  */
-class TemplateIsNotATypeTest {
+class ParametricRecordIsNotATypeTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
@@ -55,12 +55,13 @@ class TemplateIsNotATypeTest {
         return problems;
     }
 
-    private static boolean refusedAsATemplate(List<Diagnostic> problems, String template) {
-        return problems.stream().anyMatch(d -> d.message().contains("'" + template + "'")
-                && d.message().contains("is a template") && d.message().contains("a template is not a type"));
+    private static boolean refusedAsAParametricRecord(List<Diagnostic> problems, String record) {
+        return problems.stream().anyMatch(d -> d.message().contains("'" + record + "'")
+                && d.message().contains("is a parametric record")
+                && d.message().contains("a parametric record is not a type"));
     }
 
-    /** The family §5.10 declares with records: the base states the selector, the template composes it. */
+    /** The family §5.10 declares with records: the base states the selector, the parametric record composes it. */
     private static final String RECORD_FAMILY = """
               dog_type => { breed: text }
               cat_type => { indoor: boolean }
@@ -72,7 +73,7 @@ class TemplateIsNotATypeTest {
             """;
 
     /**
-     * The family whose base is an abstract template's declared application: a member reaches it through an applied
+     * The family whose base is an abstract parametric record's declared application: a member reaches it through an applied
      * parent's edge, which names the entry a declaration gives the application (§5.10).
      */
     private static final String APPLIED_FAMILY = """
@@ -83,11 +84,11 @@ class TemplateIsNotATypeTest {
               holder    => { p: tpet_text }
             """;
 
-    // ── No position names a template bare ─────────────────────────────────
+    // ── No position names a parametric record bare ─────────────────────────────────
 
-    /** A record template is refused bare at a position as a held one is, a selector notwithstanding. */
+    /** A parametric record is refused bare at a position as a held one is, a selector notwithstanding. */
     @Test
-    void aTemplateNamedBareAtAPositionIsRefused() {
+    void aParametricRecordNamedBareAtAPositionIsRefused() {
         for (String holder : List.of("holder => { p: pet }", "holder => { ps: [pet] }",
                 "holder => ( pet | text )", "holder => { m: { text => pet } }", "holder => { t: [pet text] }",
                 "wrap => <W> { w: W }\n  holder => { x: wrap<pet> }")) {
@@ -95,21 +96,24 @@ class TemplateIsNotATypeTest {
                       pet    => abstract <V> { kind: text =?  value: V }
                       dogpet => pet<text> & { kind?: = "dog" }
                     """ + "  " + holder + "\n");
-            assertTrue(refusedAsATemplate(problems, "pet"), () -> holder + ": " + problems);
+            assertTrue(refusedAsAParametricRecord(problems, "pet"), () -> holder + ": " + problems);
         }
     }
 
-    /** A template named bare inside a template's own body is refused at the template's declaration. */
+    /**
+     * A parametric record named bare inside a parametric record's own body is refused at the parametric record's
+     * declaration.
+     */
     @Test
-    void aTemplateNamedBareInsideATemplateIsRefused() {
-        assertTrue(refusedAsATemplate(load("b-inner", """
+    void aParametricRecordNamedBareInsideAParametricRecordIsRefused() {
+        assertTrue(refusedAsAParametricRecord(load("b-inner", """
                   chain => <T> { head: T  tail?: chain? }
                 """), "chain"));
     }
 
     // ── A family declared with records ────────────────────────────────────
 
-    /** A member reaches the base through its template's written parent, and is selected by its pin. */
+    /** A member reaches the base through its parametric record's written parent, and is selected by its pin. */
     @Test
     void aMemberComposingAnApplicationIsSelectedByItsPin() {
         assertEquals(List.of(), read("r1", RECORD_FAMILY,
@@ -131,9 +135,9 @@ class TemplateIsNotATypeTest {
                 problems.getFirst()::message);
     }
 
-    /** The base indexes the members; the template is in no index and IS-A-ed by nothing. */
+    /** The base indexes the members; the parametric record is in no index and IS-A-ed by nothing. */
     @Test
-    void theBaseIndexesTheMembersAndNotTheTemplate() {
+    void theBaseIndexesTheMembersAndNotTheParametricRecord() {
         TsonLinkedSchema schema = linked("r4", RECORD_FAMILY);
 
         assertEquals(List.of("cat", "dog"),
@@ -143,11 +147,11 @@ class TemplateIsNotATypeTest {
     }
 
     /**
-     * A declared application is no member of its template and is IS-A its template's written parent: {@code bt}
+     * A declared application is no member of its head and is IS-A its head's written parent: {@code bt}
      * reaches {@code boxed} through {@code box}, and a position typed {@code boxed} dispatches by tag.
      */
     @Test
-    void aDeclaredApplicationIsIsAItsTemplatesParentAndNotItsTemplate() {
+    void aDeclaredApplicationIsIsAItsHeadsParentAndNotItsHead() {
         String declarations = """
                   boxed  => abstract { }
                   box    => <T> boxed & { v: T }
@@ -164,9 +168,9 @@ class TemplateIsNotATypeTest {
         assertTrue(untagged.getFirst().message().contains("one of (bt)"), untagged::toString);
     }
 
-    /** No application indexes under its template, whatever the template's body. */
+    /** No application indexes under its head, whatever the head's body. */
     @Test
-    void noApplicationIndexesUnderItsTemplate() {
+    void noApplicationIndexesUnderItsHead() {
         TsonLinkedSchema schema = linked("r7", """
                   box    => <V> { item: V }
                   a_box  => box<text>
@@ -177,13 +181,13 @@ class TemplateIsNotATypeTest {
                   texts  => arr<text>
                 """);
 
-        for (String template : List.of("box", "pet", "arr")) {
-            assertEquals(List.of(), TypeChain.subtypesOf(schema.schema().entries().get(template)), template);
+        for (String record : List.of("box", "pet", "arr")) {
+            assertEquals(List.of(), TypeChain.subtypesOf(schema.schema().entries().get(record)), record);
         }
         assertEquals(List.of(), TypeChain.supertypesOf(schema.schema().entries().get("a_box")));
     }
 
-    /** A use-site application whose template composes a declared base would be an unnameable member: refused. */
+    /** A use-site application whose head composes a declared base would be an unnameable member: refused. */
     @Test
     void aUseSiteApplicationComposingADeclaredBaseIsRefused() {
         List<Diagnostic> problems = load("r6", """
@@ -195,7 +199,7 @@ class TemplateIsNotATypeTest {
                 + "'boxed'")), problems::toString);
     }
 
-    // ── An abstract template's application is a family base ───────────────
+    // ── An abstract parametric record's application is a family base ───────────────
 
     /**
      * {@code abstract} and the selector are each application's: {@code tpet_text => tpet<text>} dispatches on {@code
@@ -203,7 +207,7 @@ class TemplateIsNotATypeTest {
      * (§5.10).
      */
     @Test
-    void anAbstractTemplatesApplicationDispatchesOverItsMembers() {
+    void anAbstractParametricRecordsApplicationDispatchesOverItsMembers() {
         assertEquals(List.of(), read("a1", APPLIED_FAMILY, "!holder { p: { kind: cat  name: Tom  indoor: true } }"));
         assertEquals(List.of(), read("a2", APPLIED_FAMILY, "!holder { p: { kind: dog  name: Rex  breed: lab } }"));
         List<Diagnostic> problems = read("a3", APPLIED_FAMILY, "!holder { p: { kind: fish  name: x } }");
@@ -215,23 +219,26 @@ class TemplateIsNotATypeTest {
         assertEquals(Optional.of("/p"), inPlace.getFirst().path(), inPlace::toString);
     }
 
-    /** The application closes to an abstract record carrying the template's selector; the template is no base. */
+    /**
+     * The application closes to an abstract record carrying the parametric record's selector; the parametric record is no
+     * base.
+     */
     @Test
-    void theApplicationCarriesTheTemplatesExtensionAndSelector() {
+    void theApplicationCarriesTheParametricRecordsExtensionAndSelector() {
         TsonLinkedSchema schema = linked("a4", APPLIED_FAMILY);
 
         RecordBody base = (RecordBody) schema.schema().entries().get("tpet_text");
         assertEquals(RecordExtensionType.ABSTRACT, base.extension());
         assertEquals(List.of("kind"), base.discriminators());
         assertEquals(List.of("tcat", "tdog"), TypeChain.subtypesOf(base).stream().sorted().toList());
-        RecordBody template = (RecordBody) schema.schema().entries().get("tpet");
-        assertEquals(List.of(), TypeChain.subtypesOf(template));
+        RecordBody record = (RecordBody) schema.schema().entries().get("tpet");
+        assertEquals(List.of(), TypeChain.subtypesOf(record));
         assertFalse(TypeChain.supertypesOf(schema.schema().entries().get("tdog")).contains("tpet"));
     }
 
-    /** A selector template applied with no member composing it is a base with nothing to select. */
+    /** A parametric record with a selector, applied with no member composing it, is a base with nothing to select. */
     @Test
-    void aSelectorTemplatesApplicationWithNoMemberSelectsNothing() {
+    void anApplicationOfAParametricRecordWithASelectorAndNoMemberSelectsNothing() {
         List<Diagnostic> problems = read("a5", """
                   pet    => <V> { kind: text =?  name: V }
                   holder => { p?: pet<text> }
@@ -241,11 +248,11 @@ class TemplateIsNotATypeTest {
         assertEquals("(no cat, and none to name)", problems.getFirst().actual());
     }
 
-    /** {@code final} stays refused on a template. */
+    /** {@code final} stays refused on a parametric record. */
     @Test
-    void finalIsRefusedOnATemplate() {
+    void finalIsRefusedOnAParametricRecord() {
         assertTrue(load("a6", "  pet => final <T> { value: T }\n").stream()
-                .anyMatch(d -> d.message().contains("'final' is refused on a template")));
+                .anyMatch(d -> d.message().contains("'final' is refused on a parametric record")));
     }
 
     // ── A field naming no parameter is one type in every application ───────
@@ -258,11 +265,11 @@ class TemplateIsNotATypeTest {
     }
 
     /**
-     * A field type naming none of the template's parameters is closed in the template, in place, and every
+     * A field type naming none of the parametric record's parameters is closed in the parametric record, in place, and every
      * application holds the same type: nothing is added to the schema for it.
      */
     @Test
-    void aClosedApplicationInATemplateIsOneTypeInEveryApplication() {
+    void aClosedApplicationInAParametricRecordIsOneTypeInEveryApplication() {
         TsonLinkedSchema schema = linked("c1", """
                   box  => <T> { v: T }
                   pet  => <V> { tag: box<text>  tags: [box<text>]  name: V }

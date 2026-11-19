@@ -107,7 +107,7 @@ public final class AtomParsers {
      * ({@code TsonLinkedSchema.enumForms}). Ignored for every other body.
      *
      * <p>A reference that names values is this library's gap here, an {@link UnsupportedOperationException}: these
-     * callers judge a value a schema writes (a template argument, a discriminator's pin) by its token before the
+     * callers judge a value a schema writes (an application's argument, a discriminator's pin) by its token before the
      * schema links, and such a reference's value is judged by what its name reaches, which only the schema's own link
      * can follow -- the linker judges a field's {@code ~}/{@code =} there itself.
      */

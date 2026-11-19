@@ -7,7 +7,7 @@ import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.Top;
 
 /**
- * Bind mode's reader of a record written in place -- the record an application of an open record closes to at a type
+ * Bind mode's reader of a record written in place -- the record an application of a parametric record closes to at a type
  * slot ([TSON-SCHEMA] §5.10) -- before anything says which class it builds.
  *
  * <p><b>A record in place binds by the component that holds it, never by a name.</b> It has no entry, so no binding

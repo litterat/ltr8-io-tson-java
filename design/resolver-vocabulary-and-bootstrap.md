@@ -8,7 +8,7 @@ itself. Current form only; history lives in git.
 **Invariants**
 
 - There is one `WireForm`: a binding record is written by the desugarer and by construction sugar, and a second
-  opinion about what a reference or an application in a slot looks like is what makes one of them wrong. An open
+  opinion about what a reference or an application in a slot looks like is what makes one of them wrong. A parametric
   record is no binding record: it is built on the model and substituted there (`Substitution`).
 - `schema.meta.TypeSlots`' switch over `Top` is exhaustive with no default arm, so a new body shape fails to compile
   there until it says which references it holds. It tells a type slot (`TypeExpr`: may take a construction in place)
@@ -18,7 +18,7 @@ itself. Current form only; history lives in git.
   `of`, the comparison §8.2 keys an application on (the applied-parent fold, a recursion closing into its declaration).
 - Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
   alias entry. `AliasChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
-- `@meta.application` goes on the **key** of exactly the declarations that close an application of an open record,
+- `@meta.application` goes on the **key** of exactly the declarations that close an application of a parametric record,
   and `@meta.completion` on the key of exactly the declarations that complete an incomplete entry; the linker
   re-attaches both (`withNameAnnotations`), imports included; each is read as stated on ingest, and an author writing
   either is refused.
@@ -45,8 +45,8 @@ itself. Current form only; history lives in git.
   The partial link reports nothing, each entry being judged when the whole schema links; a finished schema's link
   refuses an undeclared name.
 
-Related: `design/schema-resolution.md` (definition resolution), `design/template-materialisation.md` and
-`design/open-records.md` (the callers of `WireForm` and `CanonicalApplication`), `design/constructor-application.md`,
+Related: `design/schema-resolution.md` (definition resolution), `design/parametric-materialisation.md` and
+`design/parametric-records.md` (the callers of `WireForm` and `CanonicalApplication`), `design/constructor-application.md`,
 `design/schema-grammar-and-desugaring.md` (sugar written in place), `design/linking-and-compilation.md`.
 
 ## Shared vocabulary: `WireForm`, `TypeSlots`, `CanonicalApplication`
@@ -63,10 +63,10 @@ text whatever it spells, the slot's type and not the token's form deciding. `Tso
 record: its output is canonical-explicit and fully quoted, a different language from the one a binding is written in.
 
 **`TypeSlots`** (`tson-schema`, beside the model it walks) — every reference a value holds, at any depth of types
-written in place, its chain left as written. It lives in the model because `RecordBody` itself needs it: an open
+written in place, its chain left as written. It lives in the model because `RecordBody` itself needs it: a parametric
 record scopes its parameters at every slot, and `references()` is every reference at every depth. Its other callers
-are materialisation (closing an application where it stands, an open record's fields only where they name none of
-its parameters), `Substitution`, `HeldRecursion`, and the declaration checks over an open record's types in place. No
+are materialisation (closing an application where it stands, a parametric record's fields only where they name none of
+its parameters), `Substitution`, `HeldRecursion`, and the declaration checks over a parametric record's types in place. No
 pass rewrites a use site onto the end of an alias chain — see "References are hops" below. A walk is a `Rewrite`:
 `atName` for a reference, which gives a name back, `inPlace` for the body of a type in place before its slots, and
 `atInPlace` for one after them, which may come back as another type. Which body shape carries which references is a
@@ -76,13 +76,13 @@ fact about the value model, stated once, where the model is walked:
   choice's variants are type slots; a type written in place there is walked into, each slot inside it mapped the same
   way.
 - A map's and a namespace type's `key_type`, a reference's `of`, an alias's target and an application's head and
-  arguments hold a name: a construction has nowhere to stand there. A chain's parents are no slot: an open record
+  arguments hold a name: a construction has nowhere to stand there. A chain's parents are no slot: a parametric record
   substitutes them, and linking derives the rest.
 - Nothing in any other atom (its facets are values), a declared type, a value entry, or an extern, whose `type` is a
   name of another schema's namespace.
 
-§5.10's regularity check does not use the walk: every entry with parameters is an open record, and reads its
-applications off its references (`OpenEntry.applications`).
+§5.10's regularity check does not use the walk: every entry with parameters is a parametric record, and reads its
+applications off its references (`ParametricEntry.applications`).
 
 **`CanonicalApplication`** — §8.2's canonical application, `of`: an `ApplyBody` of plain names, its arguments past
 their alias chains, compared as a value (head and arguments), never as text. The applied-parent fold keys on it, and
@@ -111,15 +111,15 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an ali
   — kept in four loops is four decisions that can drift. `terminal` answers with a name, `terminalDefinition` with the entry;
   they differ only on an undeclared name and a cycle, where the first has an answer its caller wants (a type
   parameter is its own terminal) and the second has none. **`ParameterTypes` keeps its own loop deliberately**:
-  it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the template
-  being the answer there. `AliasChainWalkTest` pins all four stops.
-- **Three positions walk a chain where a declared entry might stand.** An application through an alias of a template
-  applies the template (`TemplateMaterialiser.templateHead`, `checkArity`), its identity the template's, so over
-  `ref_of => meta.ref` the applications `ref_of<order>` and `meta.ref<order>` close to one entry; an alias naming a
-  template bare is no use of the template without arguments (`validateBody`'s `Alias` arm). An atom refinement's source
-  written as an alias refines the instance at the end of the chain, and its chain names that instance
-  (`resolveAtomRefinement`: `!count ^ { … }` over `count => integer` IS-A `integer`). An annotation is identified by the
-  entries on its alias chain, not by its end (`AliasChain.annotates`/`passesThrough`): `@meta.disjoint` reaches
+  it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the parametric
+  record being the answer there. `AliasChainWalkTest` pins all four stops.
+- **Three positions walk a chain where a declared entry might stand.** An application through an alias of a parametric record
+  applies the parametric record (`ParametricMaterialiser.parametricHead`, `checkArity`), its identity the parametric
+  record's, so over `ref_of => meta.ref` the applications `ref_of<order>` and `meta.ref<order>` close to one entry; an alias
+  naming a parametric record bare is no use of the parametric record without arguments (`validateBody`'s `Alias` arm). An
+  atom refinement's source written as an alias refines the instance at the end of the chain, and its chain names that
+  instance (`resolveAtomRefinement`: `!count ^ { … }` over `count => integer` IS-A `integer`). An annotation is identified by
+  the entries on its alias chain, not by its end (`AliasChain.annotates`/`passesThrough`): `@meta.disjoint` reaches
   `meta.disjoint` and then `void`, and the linker asks whether `meta.disjoint` is on the way. An alias of a constructor is
   applied as its target wherever it heads a body or an application (§3.3.1): over `list => meta.array`, `!list { … }`
   applies `meta.array` (the definition reader follows the chain and retags the value). An alias of an incomplete entry
@@ -140,10 +140,10 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an ali
 
 ## The derived key annotations: `@meta.application`, `@meta.completion` (`tson-compiler/.../resolver/SchemaResolver.java`)
 
-**`@meta.application`** (§6, §8.1) goes on the key of every declaration that closes an application of an open
+**`@meta.application`** (§6, §8.1) goes on the key of every declaration that closes an application of a parametric
 record, the application it is the instantiation of, `@meta.application:{ head: box  arguments: [int32] }`, a value of
 `meta.apply` (`ApplyBody`), its head as written and each argument a name past its alias hops
-(`TemplateMaterialiser.asWritten`). A construction carries none, its value stating its constructor and its
+(`ParametricMaterialiser.asWritten`). A construction carries none, its value stating its constructor and its
 arguments. It is a fact about the entry and not about its chain -- the record does not state the head it was
 substituted from -- which is why it is no field of `meta.type_chain`. The materialiser records each application in a
 map it shares with `SchemaResolver` (the applied-parent fold keys on it), and `SchemaResolver` writes it where it
@@ -160,7 +160,7 @@ one fact the entry's value does not state. An author writing it is a resolver er
   each past its alias hops (`IncompleteEntry.bases` carries the chain; `DefinitionResolver.complete` records it). The
   names are text, not `meta.type_ref`: the entries are in no resolved form, and a reference would dangle at link. Lost:
   a chain naming the incomplete entry, which made one type two entries by spelling (`design/constructor-application.md`).
-- **There are exactly two.** A sugar form is written in place at its slot, and an application of an open record closes
+- **There are exactly two.** A sugar form is written in place at its slot, and an application of a parametric record closes
   into the declaration naming it or in place at its slot, so every entry has an author-written name and nothing else
   marks a key.
 
@@ -216,8 +216,8 @@ writes (`void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_refe
 and `schema`; `enum` is an incomplete entry and `set` an alias of `meta.set_type`, another, so neither is in the resolved
 form, and `schema => meta.schema` is the alias every schema map's tag names); everything else is a
 member of `meta => !schema { … }`, named by its path (§9), `meta.identifier` among them. It imports
-nothing, applies only its own constructors and declares no open record (§3.4's one cycle, closed by pre-loading, not
-resolution); `meta.param` and `record.parameters` describe an open record and are applied by none. It is never resolved
+nothing, applies only its own constructors and declares no parametric record (§3.4's one cycle, closed by pre-loading, not
+resolution); `meta.param` and `record.parameters` describe a parametric record and are applied by none. It is never resolved
 from a document, and its names reach any other schema only by import. Every name resolves from the root (#14), so an entry
 naming a sibling writes its path, and its sugar is written in place at the fields that write it. A schema importing it
 alone has every sugar form and `meta.ref`. numeric.tn, temporal.tn and net.tn each import it alone and declare their
@@ -284,7 +284,7 @@ constructor, positions included (the bootstrap resolves with the parser's positi
   entry not yet ready (`net.scheme_name` reaching `unicode.identifier_base` and `unicode.normalization`) forces another
   compile. Its output's nested map `meta` is derived from the members, so the order test compares its names.
 - **Parameters are checked after every entry is ready**, through `ParameterTypes.check` as `SchemaResolver` checks a
-  schema's; a failure is a broken kernel. The kernel declares no open record, so the check finds nothing to judge.
+  schema's; a failure is a broken kernel. The kernel declares no parametric record, so the check finds nothing to judge.
 - **The partial link is contained.** It passes over a reference to a pending name, and an entry's walk stops at its
   first one, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed by
   (`TsonCompiledVocabularyRegistry.loadVocabulary` links and compiles the output into the stand-in).
