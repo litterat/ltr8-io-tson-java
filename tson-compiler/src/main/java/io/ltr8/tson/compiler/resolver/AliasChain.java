@@ -35,7 +35,7 @@ import java.util.function.Function;
  *
  * <p><b>Not every walk over references is this one.</b> {@code ParameterTypes} follows a chain to reach a
  * slot's declared body and deliberately does <em>not</em> stop at an argument-bearing target -- it is after
- * the constructor's own vocabulary, where the template is the answer. It keeps its own loop, and the
+ * the constructor's own vocabulary, where the parametric record is the answer. It keeps its own loop, and the
  * difference is the reason to say so here rather than let a future reader assume the four were five.
  */
 public final class AliasChain {

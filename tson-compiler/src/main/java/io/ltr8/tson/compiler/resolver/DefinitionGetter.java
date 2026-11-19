@@ -26,7 +26,7 @@ interface DefinitionGetter {
     Top definition(String name);
 
     /**
-     * Whether {@code name}, past its alias hops, is an open record. An application of one orders nothing (a name at a
+     * Whether {@code name}, past its alias hops, is a parametric record. An application of one orders nothing (a name at a
      * type position, [TSON-SCHEMA] §3.4.1), so an implementation that makes entries ready answers without waiting on
      * the declaration.
      */

@@ -139,16 +139,16 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>A choice is no template body</b> ([TSON-SCHEMA] §5.10): a template's body is a record body. Inside one a
-     * choice over a parameter is written in place, and is judged disjoint where it is applied, once its variants are
-     * known.
+     * <b>A choice is no parametric record's body</b> ([TSON-SCHEMA] §5.10): a parametric record's body is a record body.
+     * Inside one a choice over a parameter is written in place, and is judged disjoint where it is applied, once its
+     * variants are known.
      */
     @Test
     void aChoiceOverAParameterIsNoBodyAndIsJudgedWhereItIsApplied() {
         SchemaValidationException body = assertThrows(SchemaValidationException.class, () -> compile("""
                   box => <T> { v: T }
                   w   => <T> ( box<T> | int32 )"""));
-        assertTrue(body.getMessage().contains("a template's body is a record body"), body.getMessage());
+        assertTrue(body.getMessage().contains("a parametric record's body is a record body"), body.getMessage());
 
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
@@ -160,10 +160,10 @@ class ContainerSugarEndToEndTest {
     /**
      * The property that says the fix is a fix rather than a new path: an application variant is the same
      * type as the bare reference to it, so §5.4's distinctness sees through the spelling. Two applications of
-     * one template are one variant, exactly as two occurrences of one name are.
+     * one parametric record are one variant, exactly as two occurrences of one name are.
      */
     @Test
-    void twoApplicationsOfOneTemplateAreOneVariant() {
+    void twoApplicationsOfOneParametricRecordAreOneVariant() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           box      => <T> { v: T }
@@ -219,7 +219,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * §5.3's sized sugar, end to end. The size specifier binds {@code min_items}/{@code max_items} on the
-     * {@code array} binding record directly -- there is no size template in between any more, so all three
+     * {@code array} binding record directly -- there is no size parametric record in between any more, so all three
      * array spellings land on the same shape, one bound apart
      * ({@link #everySpellingOfAnArrayDeclarationRecordsNoSupertypes}).
      */
@@ -415,11 +415,11 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * A container sugar form written over the enclosing template's own parameter is held as the application it
-     * spells, and applying the template closes it to the container it always described, in place.
+     * A container sugar form written over the enclosing parametric record's own parameter is held as the application it
+     * spells, and applying the parametric record closes it to the container it always described, in place.
      */
     @Test
-    void applyingATemplateWhoseBodyCarriesSugarClosesTheFormItHolds() {
+    void applyingAParametricRecordWhoseBodyCarriesSugarClosesTheFormItHolds() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: [T] }
                   holder => { b: box<text> }""");
@@ -436,7 +436,7 @@ class ContainerSugarEndToEndTest {
      * {@code [T]} closed with {@code T := uuid} are one type, each written in place with no entry.
      */
     @Test
-    void aFormClosedFromATemplateIsTheSameTypeADirectOneIs() {
+    void aFormClosedFromAParametricRecordIsTheSameTypeADirectOneIs() {
         TsonCompiledSchema compiled = compile("""
                   box    => <T> { v: [T] }
                   holder => { b: box<uuid>  direct: [uuid] }""");
@@ -465,7 +465,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * A choice's variants and a tuple's elements are type slots like any other, so a parameter stands there inside an
-     * open record and is substituted where the record is applied (§5.10).
+     * parametric record and is substituted where the record is applied (§5.10).
      */
     @Test
     void aParameterInsideACollectionValuedSlotIsSubstituted() {

@@ -72,7 +72,7 @@ final class DispatchFactories {
     }
 
     /**
-     * An open record, a template, which is not a type ([TSON-SCHEMA] §5.10): no value is read against it, so it
+     * A parametric record, which is not a type ([TSON-SCHEMA] §5.10): no value is read against it, so it
      * reaches {@link OpenTemplateReader} unexamined.
      */
     static final ValueReaderFactory TEMPLATE = (name, definition, context) ->

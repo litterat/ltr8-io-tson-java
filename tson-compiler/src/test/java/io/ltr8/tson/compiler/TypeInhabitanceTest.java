@@ -125,13 +125,13 @@ class TypeInhabitanceTest {
     }
 
     /**
-     * A template is judged when it closes, not where it is written: the element types this rule reads stand over
+     * A parametric record is judged when it closes, not where it is written: the element types this rule reads stand over
      * parameters until an application supplies the arguments. The closure is an ordinary entry by the time linking
      * runs, so §8's {@code tree} fixture, its recursive position non-empty through an incomplete entry's completion,
-     * is caught the moment anything applies it -- and a template nobody applies is judged nowhere.
+     * is caught the moment anything applies it -- and a parametric record nobody applies is judged nowhere.
      */
     @Test
-    void anUninhabitedTemplateIsRejectedWhereItCloses() {
+    void anUninhabitedParametricRecordIsRejectedWhereItCloses() {
         rejection("""
                   nonempty => !meta.array ^ { min_items: 1 }
                   tree => <T> { value: T  children: nonempty<tree<T>> }
@@ -158,7 +158,7 @@ class TypeInhabitanceTest {
 
     /** The other half of the same rule: unapplied, it is not judged, and that is not a warning either. */
     @Test
-    void aTemplateNobodyAppliesGetsNoVerdict() {
+    void aParametricRecordNobodyAppliesGetsNoVerdict() {
         accepted("""
                   nonempty => !meta.array ^ { min_items: 1 }
                   tree => <T> { value: T  children: nonempty<tree<T>> }""");

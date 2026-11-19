@@ -13,17 +13,17 @@ at a record position is: §5.6's positional form, or a value by name. Current fo
 - Both dispatchers are `Subsumption.Applied`; without the marker `Subsumption.guard` puts a second dispatcher in front,
   which wins.
 - Both compare a written tag against flattened names (`Subsumption.admitting`). A record written in place -- an abstract
-  open record applied at a slot -- has no name, so neither admits a tag naming it, and nothing is its member (§5.10):
+  parametric record applied at a slot -- has no name, so neither admits a tag naming it, and nothing is its member (§5.10):
   a value there is refused at its position.
 - A family's verdicts are `base.diagnostics`' `RecordExtensionDiagnostics`, §7.2's refusal is `SubsumptionDiagnostics`,
   and the refusal is located at the value, not at the tag.
 - `UNKNOWN_TYPE_REF` means the written name denotes nothing; a name that resolves and is not admissible, or a required
   selector that is absent, is `TYPE_MISMATCH`.
 - The pin table is keyed by `ValueIdentity`, and the selector scan is a `lookingAhead` that rewinds.
-- A base is a record, and a template is no type (§5.10): no position is typed by one, and a template composing a
-  base is in no `subtypes` index, so a pin only the template states selects nothing and the refusal offers only pins
-  a document could write (`CrossEncodingParityTest`). A family whose base is an abstract template's application is
-  read at the closed record that application denotes, which carries the template's selectors.
+- A base is a record, and a parametric record is no type (§5.10): no position is typed by one, and a parametric record
+  composing a base is in no `subtypes` index, so a pin only the parametric record states selects nothing and the refusal
+  offers only pins a document could write (`CrossEncodingParityTest`). A family whose base is an abstract parametric record's
+  application is read at the closed record that application denotes, which carries the parametric record's selectors.
 - A discriminator may be a dependent field's sibling (`slot => abstract { kind: meta.type_ref =?  v?: kind! }`,
   [TSON-SCHEMA] §5.2): the selector scan finds it before any field is read, wherever the document writes it, and the
   member it selects pins it, so the member's record reader reads the dependent field against the pin. Nothing here
@@ -52,7 +52,7 @@ play.
   `Namespace` (`DeclaredReader`, `design/declared-positions.md`, `design/namespace-types-and-value-entries.md`).
 - **ABSTRACT naming selectors** is `RecordMemberDispatchReader`: those fields are read and the value looked up. Their
   keys are matched in the base's name form (`TsonLinkedSchema.nameForm`): its members take its name type, and an
-  application of a template takes the template's.
+  application of a parametric record takes its head's.
 
 **One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming
 it, so the member's own reader takes the whole data-value and does with it whatever that mode does everywhere
@@ -74,7 +74,7 @@ said which member this is.
 (`Subsumption.admitting`), §7.2 comparing "after following both alias chains to their terminal entries":
 the base's own set, which decides the `tagNamesTheBase` refusal, and each
 member's, which decides selection. Skipping it is not a lost nicety: a family whose base is an **abstract
-template's application** is based on the declaration naming that application, and an alias of the declaration is a
+parametric record's application** is based on the declaration naming that application, and an alias of the declaration is a
 spelling a tag naming the base may use. The dispatchers apply it on the same
 terms as the concrete record readers, or such a family would read in one encoding and be
 refused in the other — the same schema, the same document, two answers. `CrossEncodingParityTest` carries both
@@ -98,8 +98,8 @@ at the value too.
 written name *denotes nothing* — the schemaless reader's own check (`TypeTagCheck`) and an annotation naming
 no type the governing schema declares (`AnnotationCapture`) — two classes, and the only ones that report it. Everything
 where a name resolves and is merely not admissible is `TYPE_MISMATCH`: §7.2 subsumption, a choice's variant
-membership, a union's member test, a type-ref naming a template (`OpenTemplateReader`, which every open record
-compiles to). So is a position where a **required**
+membership, a union's member test, a type-ref naming a parametric record (`OpenTemplateReader`, which every
+parametric record compiles to). So is a position where a **required**
 selector is absent, since no type is established either way — which is what the family readers already gave
 `tagRequired`, and what makes "a required tag is missing" need no member of its own. The distinction is what
 a consumer routes on: one says *correct the name*, the other says *this name means nothing here*. It also

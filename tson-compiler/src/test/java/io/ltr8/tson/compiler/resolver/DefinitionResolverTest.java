@@ -526,17 +526,17 @@ class DefinitionResolverTest {
         assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, idList).elementType());
     }
 
-    // ── Type parameters (§5.10): a template's own <T, ...> list ───────────
+    // ── Type parameters (§5.10): a parametric record's own <T, ...> list ───────────
     //    Threaded straight into Top.parameters, with no substitution or
     //    validation that a field actually uses each parameter.
 
     /**
-     * A template is an open record: {@code { first: A  second: B }} with its parameters stated, each field typed by
+     * A parametric record is a record: {@code { first: A  second: B }} with its parameters stated, each field typed by
      * the parameter that stands there. Its own {@code extension} is each application's, OPEN unless marked, and it is
-     * no family base: a template is no type (§5.10).
+     * no family base: a parametric record is no type (§5.10).
      */
     @Test
-    void resolvesAFreshTemplateAsAnOpenRecord() {
+    void resolvesAFreshParametricRecordAsARecordWithParameters() {
         RecordBody pair = assertInstanceOf(RecordBody.class,
                 resolveSnippet("pair => <A, B> { first: A  second: B }"));
 
@@ -560,12 +560,12 @@ class DefinitionResolverTest {
     }
 
     /**
-     * A <b>composition</b> template is the <em>flattened</em> open record, its parameters stated -- resolved
+     * A <b>composition</b> with parameters is the <em>flattened</em> parametric record, its parameters stated -- resolved
      * against its supertypes first, since §5.8's absorption and §5.7's tightening both need a namespace. Its
      * chain keeps the parents as written beside the closed entries they reach.
      */
     @Test
-    void resolvesACompositionTemplateAsAFlattenedTemplate() {
+    void resolvesAParametricCompositionAsAFlattenedParametricRecord() {
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
@@ -578,7 +578,7 @@ class DefinitionResolverTest {
                 resolver.resolve(schemaMap.declarations().get("box")));
 
         assertEquals(List.of("T"), OpenEntry.parameterNames(box));
-        assertEquals(List.of("base"), TypeChain.supertypesOf(box), "a template is IS-A what its parents reach");
+        assertEquals(List.of("base"), TypeChain.supertypesOf(box), "a parametric record is IS-A what its parents reach");
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "and keeps them as written");
         assertEquals(ParamRef.of("T"), box.fields().get("value").type());
     }
@@ -622,12 +622,12 @@ class DefinitionResolverTest {
 
     /**
      * The flattening is the point, so it is pinned against a supertype that actually contributes: {@code id}
-     * is absorbed from {@code base} and stands in the template beside its own field -- a §5.7
+     * is absorbed from {@code base} and stands in the parametric record beside its own field -- a §5.7
      * tightening entry states a modifier and no type-ref, and is not a {@code meta.record_field} until the
      * inherited field gives it one.
      */
     @Test
-    void aCompositionTemplateHoldsTheFieldsItAbsorbed() {
+    void aParametricCompositionHoldsTheFieldsItAbsorbed() {
         Map<String, Top> entries = resolveAll("""
                 base => { id: text }
                 box  => <T> base & { value: T }
@@ -693,7 +693,7 @@ class DefinitionResolverTest {
     /**
      * A field's value is never a parameter, whatever the field's type ([TSON-SCHEMA] §5.10): a pin on a field typed
      * {@code meta.type_ref} is refused with every other parameter at a value, naming the slot. §5.10's shadowing rule
-     * is what says the token is the parameter: inside a template an unquoted token that resolves into {@code
+     * is what says the token is the parameter: inside a parametric record an unquoted token that resolves into {@code
      * parameters} is one.
      */
     @Test
@@ -2330,11 +2330,11 @@ class DefinitionResolverTest {
 
 
     /**
-     * <b>A selector on a record template is each application's</b> (§5.10): it makes the template ABSTRACT as it
+     * <b>A selector on a parametric record is each application's</b> (§5.10): it makes the parametric record ABSTRACT as it
      * makes a record so, and each application closes to an abstract record dispatching on it.
      */
     @Test
-    void aTemplateMayBeSealed() {
+    void aParametricRecordMayBeSealed() {
         Top box = resolveSnippetsAgainstMetaKernel(
                 "box => <T> { kind: text =?  v: T }");
 
@@ -2345,27 +2345,27 @@ class DefinitionResolverTest {
     }
 
     /**
-     * <b>{@code final} is refused on a template.</b> A template is applied to be composed, each member of a family
-     * composing an application of it, and the mark would forbid that of every application.
+     * <b>{@code final} is refused on a parametric record.</b> A parametric record is applied to be composed, each member of
+     * a family composing an application of it, and the mark would forbid that of every application.
      */
     @Test
-    void aTemplateCannotBeFinal() {
+    void aParametricRecordCannotBeFinal() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel(
                         "box => final <T> { kind: text =?  v: T }"));
 
-        assertTrue(thrown.getMessage().contains("is refused on a template"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("is refused on a parametric record"), thrown.getMessage());
     }
 
     /**
-     * <b>{@code abstract} is the one mark a template takes</b>, the asymmetry being the marks' own: it
+     * <b>{@code abstract} is the one mark a parametric record takes</b>, the asymmetry being the marks' own: it
      * constrains the marked type alone -- no direct instances -- which holds of every instantiation
      * identically, so {@code result => abstract <T> { … }} is meaningful and is what a host language spells
-     * {@code abstract class Result<T>}. It is the template's own {@code extension}, each application's;
+     * {@code abstract class Result<T>}. It is the parametric record's own {@code extension}, each application's;
      * {@code SubtypeTemplateFamilyTest} is where the closed end is checked.
      */
     @Test
-    void aTemplateIsAbstractByMarkingItsRecordTemplate() {
+    void aParametricRecordIsAbstractByMarkingItsRecord() {
         Top box = resolveSnippetsAgainstMetaKernel("box => abstract <T> { v: T }");
 
         assertEquals(RecordExtensionType.ABSTRACT, assertInstanceOf(RecordBody.class, box).extension());
@@ -2451,14 +2451,14 @@ class DefinitionResolverTest {
     }
 
     /**
-     * And there is no <em>open</em> non-record for a mark to land on: a template's body is a record body, so a
+     * And there is no <em>open</em> non-record for a mark to land on: a parametric record's body is a record body, so a
      * parameter list before {@code !meta.array} is refused first.
      */
     @Test
-    void aMarkedTemplateOverAConstructorIsRefusedAsNoRecord() {
+    void aMarkedParametricRecordOverAConstructorIsRefusedAsNoRecord() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel("x => abstract <T> !meta.array { element_type: T }"));
-        assertTrue(thrown.getMessage().contains("a template's body is a record body"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("a parametric record's body is a record body"), thrown.getMessage());
     }
 
     private static String readFixture(String file) throws IOException {

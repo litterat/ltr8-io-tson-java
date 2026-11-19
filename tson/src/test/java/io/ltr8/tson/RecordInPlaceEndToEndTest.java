@@ -28,9 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A record written in place, end to end: an application of an open record at a type slot closes to the substituted
+ * A record written in place, end to end: an application of a parametric record at a type slot closes to the substituted
  * record with no name ([TSON-SCHEMA] §5.10), and a value there is read, written and bound by a reader built from that
- * record's body, its field states those of the open record, with no tag admitted (§7.2), named in a message by the
+ * record's body, its field states those of the parametric record, with no tag admitted (§7.2), named in a message by the
  * application as written, and bound in bind mode to the record class the component holding it declares.
  */
 class RecordInPlaceEndToEndTest {
@@ -129,7 +129,7 @@ class RecordInPlaceEndToEndTest {
     }
 
     @Test
-    void aFieldGroupOfTheOpenRecordIsEachRecordInPlaces() {
+    void aFieldGroupOfTheParametricRecordIsEachRecordInPlaces() {
         assertEquals(List.of(), validate("holder", "{ p: { items: []  last: { id: z } } }"));
         assertEquals(1, validate("holder", "{ p: { items: []  first: { id: a }  last: { id: z } } }").size());
     }
@@ -149,9 +149,9 @@ class RecordInPlaceEndToEndTest {
                 "{ p: { items: [] }  ps: [ { items: [] } { items: [ { id: x  colour: red } ] } ] }")).path());
     }
 
-    /** The open record's name type is the record in place's: a name it admits reads, and one under the default. */
+    /** The parametric record's name type is the record in place's: a name it admits reads, and one under the default. */
     @Test
-    void aRecordInPlaceJudgesItsNamesByItsOpenRecordsNameType() {
+    void aRecordInPlaceJudgesItsNamesByItsParametricRecordsNameType() {
         assertEquals(List.of(), validate("linked", "{ n: { \"@id\": a  v: 1 } }"));
     }
 

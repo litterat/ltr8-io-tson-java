@@ -16,9 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * An open record holding, where it closes in place, an application of a recursive open record whose recursion does not
- * pass back through it could never be closed, and is refused at its own declaration ([TSON-SCHEMA] §5.10.1): whether or
- * not anything applies it, once, and never again at an applier.
+ * A parametric record holding, where it closes in place, an application of a recursive parametric record whose recursion
+ * does not pass back through it could never be closed, and is refused at its own declaration ([TSON-SCHEMA] §5.10.1):
+ * whether or not anything applies it, once, and never again at an applier.
  */
 class HeldRecursionTest {
 
@@ -59,15 +59,17 @@ class HeldRecursionTest {
 
     /** Applied nowhere, it is refused all the same, naming the held application, the record and the remedy. */
     @Test
-    void anOpenRecordHoldingARecursiveOneIsRefusedWhereItIsDeclared() {
+    void aParametricRecordHoldingARecursiveOneIsRefusedWhereItIsDeclared() {
         refusedAt(NODE + "  wrap => <T> { label: text  n: node<T> }", "wrap",
-                "'wrap' holds 'node<T>' at 'n', an application of the recursive open record 'node'",
+                "'wrap' holds 'node<T>' at 'n', an application of the recursive parametric record 'node'",
                 "a recursion ties only to a declaration closing that record itself (§5.10.1)",
                 "'wrap' could never be closed", "write 'n: N', 'N' a parameter of 'wrap'",
                 "a declared application of 'node' ('my_node => node<...>', passed for 'N')");
     }
 
-    /** Applied, it is still reported once, at the open record, in either declaration order; the applier says nothing. */
+    /**
+     * Applied, it is still reported once, at the parametric record, in either declaration order; the applier says nothing.
+     */
     @Test
     void itsApplierReportsNothingInEitherOrder() {
         String wrap = "  wrap => <T> { label: text  n: node<T> }\n";
@@ -134,9 +136,9 @@ class HeldRecursionTest {
                   b_text => b<text>""", List.of("a", "c"), "'a' holds 'b<T>' at 'b'");
     }
 
-    /** An imported recursive open record holds the same way. */
+    /** An imported recursive parametric record holds the same way. */
     @Test
-    void anImportedRecursiveOpenRecordIsHeldTheSameWay() {
+    void anImportedRecursiveParametricRecordIsHeldTheSameWay() {
         String nodes = """
                 !!id:"https://example.test/nodes.tn"
                 !!import:"%s"
@@ -150,7 +152,7 @@ class HeldRecursionTest {
         List<Diagnostic> found = tson.validateSchema(importing);
         assertEquals(List.of(Optional.of("/wrap")), found.stream().map(Diagnostic::schemaPointer).toList(),
                 found::toString);
-        assertTrue(found.getFirst().message().contains("recursive open record 'node'"), found::toString);
+        assertTrue(found.getFirst().message().contains("recursive parametric record 'node'"), found::toString);
         assertEquals(List.of(), tson.validateSchema(schema("  node_text => node<text>")
                 .replace("!schema", "!!import:\"https://example.test/nodes.tn\"\n!schema")));
     }
@@ -170,7 +172,7 @@ class HeldRecursionTest {
     /** A closed record holding the application keeps its own refusal, whose remedy it can follow. */
     @Test
     void aClosedRecordHoldingTheApplicationKeepsItsRefusal() {
-        refusedAt(NODE + "  r => { f: node<text> }", "r", "'node<text>' applies the recursive open record 'node'",
+        refusedAt(NODE + "  r => { f: node<text> }", "r", "'node<text>' applies the recursive parametric record 'node'",
                 "'node_text => node<text>'");
     }
 

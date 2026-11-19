@@ -31,14 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * §5.10 materialisation for <b>record</b> templates -- the form whose parameters occupy field types. Applying one
- * closes it: the arguments are substituted into the open record, under the declaration that names the application,
+ * §5.10 materialisation for <b>parametric records</b> -- the form whose parameters occupy field types. Applying one
+ * closes it: the arguments are substituted into the parametric record, under the declaration that names the application,
  * or in place at the type slot that wrote it ({@code TemplateMaterialiser}).
  *
- * <p>A template whose body writes a §5.3 container sugar form closes here too: a form over a parameter is held as the
- * application it spells and closes to its construction in place when the template is applied. The shape of what it
- * closes into is {@code ContainerSugarEndToEndTest}'s; what these fixtures pin is that applying such a template works
- * at all, and that a parameter reaches the slot it was written for.
+ * <p>A parametric record whose body writes a §5.3 container sugar form closes here too: a form over a parameter is held as
+ * the application it spells and closes to its construction in place when the parametric record is applied. The shape of what
+ * it closes into is {@code ContainerSugarEndToEndTest}'s; what these fixtures pin is that applying such a parametric record
+ * works at all, and that a parameter reaches the slot it was written for.
  */
 class RecordTemplateTest {
 
@@ -70,7 +70,7 @@ class RecordTemplateTest {
                 .map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
     }
 
-    /** The record a field's type holds in place, where an application of an open record closed. */
+    /** The record a field's type holds in place, where an application of a parametric record closed. */
     private static TypeInline inPlace(TsonCompiledSchema compiled, String record, String field) {
         return assertInstanceOf(TypeInline.class, fieldOf(compiled, record, field).type(), record + "." + field);
     }
@@ -139,11 +139,11 @@ class RecordTemplateTest {
     }
 
     /**
-     * Two open records with one field list close to equal records, one type by §8.2's structural identity, each
+     * Two parametric records with one field list close to equal records, one type by §8.2's structural identity, each
      * named in a message by its own application.
      */
     @Test
-    void twoOpenRecordsClosingToOneRecordAreOneType() {
+    void twoParametricRecordsClosingToOneRecordAreOneType() {
         TsonCompiledSchema compiled = compile("""
                   box    => <T> { v: T }
                   crate  => <T> { v: T }
@@ -201,7 +201,7 @@ class RecordTemplateTest {
      * closing it, is refused.
      */
     @Test
-    void aRecursiveTemplateTiesTheKnotThroughItsDeclaration() {
+    void aRecursiveParametricRecordTiesTheKnotThroughItsDeclaration() {
         TsonCompiledSchema compiled = compile("""
                   chain      => <T> { head: T  tail?: chain<T>? }
                   text_chain => chain<text>
@@ -212,14 +212,14 @@ class RecordTemplateTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
                   chain => <T> { head: T  tail?: chain<T>? }
                   use   => { c: chain<text> }"""));
-        assertTrue(thrown.getMessage().contains("'chain<text>' applies the recursive open record 'chain'"),
+        assertTrue(thrown.getMessage().contains("'chain<text>' applies the recursive parametric record 'chain'"),
                 thrown.getMessage());
     }
 
     /**
      * Mutual recursion through a record in place ties to the declaration being closed (§5.10.1): closing {@code
      * a_text} closes {@code b: b<text>} in place, and the {@code a<text>} it holds names {@code a_text}. The same
-     * application at a slot, with nothing closing it, is refused however many declarations exist; the open records
+     * application at a slot, with nothing closing it, is refused however many declarations exist; the parametric records
      * alone, applied nowhere, load.
      */
     @Test
@@ -235,7 +235,7 @@ class RecordTemplateTest {
 
         SchemaValidationException atASlot = assertThrows(SchemaValidationException.class,
                 () -> compile(templates + "  a_text => a<text>\n  holder => { f: b<text> }"));
-        assertTrue(atASlot.getMessage().contains("'b<text>' applies the recursive open record 'b'"),
+        assertTrue(atASlot.getMessage().contains("'b<text>' applies the recursive parametric record 'b'"),
                 atASlot.getMessage());
         assertNotNull(compile(templates));
     }
@@ -272,9 +272,9 @@ class RecordTemplateTest {
         }
     }
 
-    /** The whole arc: a materialised template reads real data. */
+    /** The whole arc: a materialised parametric record reads real data. */
     @Test
-    void aMaterialisedTemplateReadsRealData() {
+    void aMaterialisedParametricRecordReadsRealData() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   holder => { b: box<int32> }""");
@@ -286,13 +286,13 @@ class RecordTemplateTest {
                 .read(TestDocuments.document("{ b: { v: \"seven\" } }"))).getMessage().contains("int32"));
     }
 
-    // ── Sugar inside a template body ─────────────────────────────────────
+    // ── Sugar inside a parametric record's body ─────────────────────────────────────
     //    A *concrete* form is the construction written in place at desugar, exactly as it is outside a
-    //    template, so the template that holds it applies like any other. Only a form written over one of
+    //    parametric record, so the parametric record that holds it applies like any other. Only a form written over one of
     //    the declaration's own parameters waits for the application to close it.
 
     @Test
-    void aConcreteSugarFormInsideATemplateIsInPlaceAndTheTemplateApplies() {
+    void aConcreteSugarFormInsideAParametricRecordIsInPlaceAndTheParametricRecordApplies() {
         TsonCompiledSchema compiled = compile("""
                   order => { id: text }
                   tmpl  => <T> { a: T  b: [order] }
@@ -305,7 +305,7 @@ class RecordTemplateTest {
 
     /** Every sugar form, not just the array: choice, map, and a nested bracket form are all concrete in place. */
     @Test
-    void everyConcreteSugarFormInATemplateBodyIsInPlace() {
+    void everyConcreteSugarFormInAParametricRecordsBodyIsInPlace() {
         for (String field : List.of("[order]", "(order | text)", "[[order]]", "{text => order}")) {
             assertNotNull(compile("""
                       order => { id: text }
@@ -315,11 +315,11 @@ class RecordTemplateTest {
     }
 
     /**
-     * A form closed in an open record is the same type a directly written {@code [order]} is anywhere else in the
+     * A form closed in a parametric record is the same type a directly written {@code [order]} is anywhere else in the
      * schema: two equal constructions written in place are one type (§8.2), with no entry for either.
      */
     @Test
-    void aFormClosedInATemplateIsTheSameTypeADirectOneIs() {
+    void aFormClosedInAParametricRecordIsTheSameTypeADirectOneIs() {
         TsonCompiledSchema compiled = compile("""
                   order => { id: text }
                   tmpl  => <T> { a: T  b: [order] }
@@ -332,7 +332,7 @@ class RecordTemplateTest {
     /**
      * A container written over the declaration's own parameter is the reference it spells, and closes with the
      * application: the field ends up naming an ordinary container entry. {@code ApplicationInContainerPositionTest}
-     * carries the shape of what it closes into; here the point is only that applying the template is accepted.
+     * carries the shape of what it closes into; here the point is only that applying the parametric record is accepted.
      */
     @Test
     void aParameterBearingSugarFormClosesWithTheApplication() {
@@ -352,7 +352,7 @@ class RecordTemplateTest {
     }
 
     /**
-     * The whole arc for an incomplete entry completed over a parameter: held in the open record, constructed when the
+     * The whole arc for an incomplete entry completed over a parameter: held in the parametric record, constructed when the
      * record is applied, compiled, and reading real data -- and rejecting data the bounds the entry writes refuse.
      */
     @Test
@@ -369,7 +369,7 @@ class RecordTemplateTest {
                 "the bound the open form states is the one that is enforced");
     }
 
-    /** A declaration's own body is the construction, with a template beside it as without. */
+    /** A declaration's own body is the construction, with a parametric record beside it as without. */
     @Test
     void aDeclarationsOwnBodyIsTheConstruction() {
         TsonCompiledSchema compiled = compile("""
@@ -399,7 +399,7 @@ class RecordTemplateTest {
     }
 
     /**
-     * A composition restating an application's field restates the closed entry's, so the template's parameters are
+     * A composition restating an application's field restates the closed entry's, so the parametric record's parameters are
      * bound before the body tightens anything: the field carries the argument, never an unresolved reference to a
      * parameter the author did not write.
      */
@@ -434,7 +434,7 @@ class RecordTemplateTest {
      * body is held, so its field set is known while the application is open, and substituting its parameters
      * with the arguments as written leaves the absorbed field carrying {@code T}. {@code
      * OpenOperandCompositionTest} carries the rest, including what such an operand does <em>not</em>
-     * contribute -- its own name, a template being no type.
+     * contribute -- its own name, a parametric record being no type.
      */
     @Test
     void composingWithAnApplicationThatIsStillOpenAbsorbsItsFieldsAndKeepsTheParameter() {
@@ -489,7 +489,7 @@ class RecordTemplateTest {
 
     /**
      * <b>Non-regular recursion never reaches materialisation.</b> {@code weird<box<T>>} would grow its argument every
-     * level, and an argument of an open record's application is a name or a parameter (§5.3), so the declaration is
+     * level, and an argument of a parametric record's application is a name or a parameter (§5.3), so the declaration is
      * refused where its field resolves, whether or not anyone applies it. This pins the contrast with the regular case
      * below.
      */
@@ -516,7 +516,7 @@ class RecordTemplateTest {
 
     /** Applying arguments to something that declares none stays the author's error, wherever it is caught. */
     @Test
-    void applyingArgumentsToANonTemplateIsAnError() {
+    void applyingArgumentsToAnEntryWithNoParametersIsAnError() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           plain => { a: text }
@@ -525,23 +525,23 @@ class RecordTemplateTest {
     }
 
     /**
-     * <b>No alias templates</b> (§5.10): a template's body is a record body, so a body that is a bare reference -- a
-     * partial application, the identity, or one applying itself -- is refused at the declaration. A use site writes
+     * <b>No parametric aliases</b> (§5.10): a parametric record's body is a record body, so a body that is a bare reference
+     * -- a partial application, the identity, or one applying itself -- is refused at the declaration. A use site writes
      * the application it means.
      */
     @Test
-    void anAliasTemplateIsRefused() {
+    void aParametricAliasIsRefused() {
         for (String body : List.of("<B> pair<text, B>", "<T> T", "<T> uuid_pair<T>")) {
             SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
                       pair      => <A, B> { first: A  second: B }
                       uuid_pair => %s""".formatted(body)), body);
-            assertTrue(thrown.getMessage().contains("'uuid_pair': a template's body is a record body")
-                    && thrown.getMessage().contains("alias template"), thrown.getMessage());
+            assertTrue(thrown.getMessage().contains("'uuid_pair': a parametric record's body is a record body")
+                    && thrown.getMessage().contains("parametric alias"), thrown.getMessage());
         }
     }
 
-    // ── A template named as a data value's own type ──────────────────────
-    //    A template is not a type (§5.10), so naming one in data is refused by
+    // ── A parametric record named as a data value's own type ──────────────────────
+    //    A parametric record is not a type (§5.10), so naming one in data is refused by
     //    OpenTemplateReader, whose message names the route: declare the application and name that. It is the
     //    author's error and an ordinary data diagnostic, never a gap in this library.
 
@@ -551,7 +551,7 @@ class RecordTemplateTest {
      * author wrote.
      */
     @Test
-    void namingATemplateAsADataTypeIsADataDiagnostic() {
+    void namingAParametricRecordAsADataTypeIsADataDiagnostic() {
         TsonCompiledSchema compiled = compile("""
                   order => { id: text }
                   paged => <T> { items: [T] }
@@ -564,10 +564,10 @@ class RecordTemplateTest {
         assertNull(value);
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
         Diagnostic problem = problems.diagnostics().get(0);
-        // The name resolves -- to a template, which is no type, so the message names the route: declare the
+        // The name resolves -- to a parametric record, which is no type, so the message names the route: declare the
         // application and write that name.
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
-        assertTrue(problem.message().contains("'paged' is a template"), problem.message());
+        assertTrue(problem.message().contains("'paged' is a parametric record"), problem.message());
         assertTrue(problem.message().contains("'my_type => paged<...>'"),
                 "the route out of it is a declaration of the application: " + problem.message());
         // The applied form is a type and still reads, which is what the message points at.
@@ -576,14 +576,14 @@ class RecordTemplateTest {
     }
 
     /**
-     * The same for a template with no sugar in its body: {@code box}'s field type is the parameter
-     * itself, and the template is refused before any reader for {@code T} is reached.
+     * The same for a parametric record with no sugar in its body: {@code box}'s field type is the parameter
+     * itself, and the parametric record is refused before any reader for {@code T} is reached.
      *
      * <p><b>And the declared application reads</b>, which is the other half of the rule: {@code !box} names a
-     * template and is refused, {@code int_box} is a type.
+     * parametric record and is refused, {@code int_box} is a type.
      */
     @Test
-    void aTemplateWhoseFieldIsTheParameterIsRefusedButItsMemberReads() {
+    void aParametricRecordWhoseFieldIsTheParameterIsRefusedButItsMemberReads() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   int_box => box<int32>""");
@@ -592,7 +592,7 @@ class RecordTemplateTest {
         compiled.get("box").read(TestDocuments.document("!box { v: 1 }", problems));
 
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
-        assertTrue(problems.diagnostics().get(0).message().contains("'box' is a template"),
+        assertTrue(problems.diagnostics().get(0).message().contains("'box' is a parametric record"),
                 problems.diagnostics().get(0).message());
 
         assertEquals(List.of(), collect(compiled, "int_box", "{ v: 1 }"),
@@ -601,7 +601,7 @@ class RecordTemplateTest {
 
     /** A fail-fast read throws the read exception every other data problem throws -- never a library fault. */
     @Test
-    void aFailFastReadOfATemplateThrowsAReadException() {
+    void aFailFastReadOfAParametricRecordThrowsAReadException() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   int_box => box<int32>""");
@@ -609,7 +609,7 @@ class RecordTemplateTest {
         ReadException thrown = assertThrows(ReadException.class,
                 () -> compiled.get("box").read(TestDocuments.document("!box { v: 1 }")));
 
-        assertTrue(thrown.getMessage().contains("a template is not a type"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("a parametric record is not a type"), thrown.getMessage());
     }
 
     /** Every diagnostic one document collects at {@code rootType}. */

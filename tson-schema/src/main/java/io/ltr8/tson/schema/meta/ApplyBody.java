@@ -12,14 +12,14 @@ import java.util.Objects;
  * arguments} supply it, positionally, each a name or a parameter, as the kernel types them ({@code [meta.type_ref;
  * 1..]}, §5.3).
  *
- * <p><b>Where one stands.</b> In resolved output, only inside an open record, at a type slot or among its parents,
- * with one of the record's parameters among its arguments and an open record as its head: every other application
- * has closed, a constructor's to its construction and an open record's to its record. It is also the value of the
+ * <p><b>Where one stands.</b> In resolved output, only inside a parametric record, at a type slot or among its parents,
+ * with one of the record's parameters among its arguments and a parametric record as its head: every other application
+ * has closed, a constructor's to its construction and a parametric record's to its record. It is also the value of the
  * {@code meta.application} annotation. A constructor's application is its construction before anything reads it, so
- * while a schema resolves one applies an open record, or a head nothing names.
+ * while a schema resolves one applies a parametric record, or a head nothing names.
  *
  * <p><b>No base kind.</b> It composes {@code meta.type} directly, being none of an atom, a product or a sum: it
- * stands for a type that exists only once its open record is applied, and nothing reads a value against it.
+ * stands for a type that exists only once its parametric record is applied, and nothing reads a value against it.
  *
  * <p>Identity is the head and the arguments, compared as values (§8.2), so two applications written alike are one.
  */

@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §5.10's template is an open record: a {@code meta.record} carrying {@code parameters}, each standing
+ * [TSON-SCHEMA] §5.10's parametric record is a {@code meta.record} carrying {@code parameters}, each standing
  * at a field's type or as an argument of an application there or in a parent. What is pinned here is the open
  * record's shape, where it must not be mistaken for a closed record, and the bodies that are refused for being no
  * record.
@@ -63,13 +63,13 @@ class OpenRecordShapeTest {
 
     private static RecordBody open(TsonCompiledSchema compiled, String name) {
         RecordBody record = assertInstanceOf(RecordBody.class, compiled.schema().entries().get(name));
-        assertTrue(record.isOpen(), name + " is an open record");
+        assertTrue(record.isOpen(), name + " is a parametric record");
         return record;
     }
 
-    /** A record body with parameters is an open record, a {@code meta.record} carrying them. */
+    /** A record body with parameters is a parametric record, a {@code meta.record} carrying them. */
     @Test
-    void aTemplateIsARecordCarryingParameters() {
+    void aParametricRecordIsARecordCarryingParameters() {
         RecordBody box = open(compile("  box => <T> { v: T }"), "box");
 
         assertEquals(List.of("T"), box.parameterNames());
@@ -128,11 +128,11 @@ class OpenRecordShapeTest {
     }
 
     /**
-     * A template's body is a record body (§5.10): before a container constructor, a container sugar form, a choice, a
-     * tuple, a value, or a bare reference, a parameter list is refused at the declaration with what to write instead.
+     * A parametric record's body is a record body (§5.10): before a container constructor, a container sugar form, a choice,
+     * a tuple, a value, or a bare reference, a parameter list is refused at the declaration with what to write instead.
      */
     @Test
-    void aTemplateBodyThatIsNoRecordIsRefused() {
+    void aParametricRecordsBodyThatIsNoRecordIsRefused() {
         String constructor = assertThrows(SchemaValidationException.class,
                 () -> compile("  rows => <T> !meta.array { element_type: T  min_items: 1 }")).getMessage();
         String sugar = assertThrows(SchemaValidationException.class,
@@ -150,18 +150,18 @@ class OpenRecordShapeTest {
                   orders => <T> !api { get: T }
                 """)).getMessage();
 
-        assertTrue(constructor.contains("a template's body is a record body")
+        assertTrue(constructor.contains("a parametric record's body is a record body")
                 && constructor.contains("leave its construction open"), constructor);
         assertTrue(sugar.contains("'[T]' is an array") && sugar.contains("meta.array<T>"), sugar);
         assertTrue(choice.contains("is a choice") && choice.contains("field group"), choice);
         assertTrue(tuple.contains("is a tuple"), tuple);
-        assertTrue(alias.contains("alias template"), alias);
+        assertTrue(alias.contains("parametric alias"), alias);
         assertTrue(value.contains("is a value of the type 'api'") && value.contains("one value per instantiation"),
                 value);
     }
 
     /**
-     * Inside an open record a form over a parameter is its construction in place, whatever else it sets (§5.10): a
+     * Inside a parametric record a form over a parameter is its construction in place, whatever else it sets (§5.10): a
      * size, a {@code ?} element, a choice and a tuple each load and close where the record is applied.
      */
     @Test
@@ -191,8 +191,8 @@ class OpenRecordShapeTest {
     }
 
     /**
-     * A field taken from a closed source keeps its literal {@code T}, the base's value, though the template absorbing
-     * it declares a parameter spelled {@code T}: a field's value is never a parameter.
+     * A field taken from a closed source keeps its literal {@code T}, the base's value, though the parametric record
+     * absorbing it declares a parameter spelled {@code T}: a field's value is never a parameter.
      */
     @Test
     void anInheritedLiteralSpelledLikeAParameterStaysALiteral() {
@@ -224,8 +224,8 @@ class OpenRecordShapeTest {
     }
 
     /**
-     * An operand's arguments land where its parameters stand: reordered, the absorbing template's own parameters land
-     * as its parameters in the operand's order, and a closed argument lands as a type (§5.10).
+     * An operand's arguments land where its parameters stand: reordered, the absorbing parametric record's own parameters
+     * land as its parameters in the operand's order, and a closed argument lands as a type (§5.10).
      */
     @Test
     void anOperandsArgumentsLandWhereItsParametersStand() {
@@ -246,7 +246,9 @@ class OpenRecordShapeTest {
         assertEquals(TypeRef.of("int32"), swapped.fields().get("second").type());
     }
 
-    /** A member keeps an inherited literal spelled like its template's parameter: substitution reaches references. */
+    /**
+     * A member keeps an inherited literal spelled like its parametric record's parameter: substitution reaches references.
+     */
     @Test
     void aClosedMemberKeepsAnInheritedLiteralSpelledLikeAParameter() {
         TsonCompiledSchema compiled = compile("""
@@ -261,7 +263,7 @@ class OpenRecordShapeTest {
     }
 
     /**
-     * An open operand's own parameters are replaced by what the absorbing template writes, and every other name its
+     * An open operand's own parameters are replaced by what the absorbing parametric record writes, and every other name its
      * fields write stays: {@code pair}'s {@code V} becomes {@code t4}'s {@code X}, and {@code text} stays {@code
      * text} (§5.10).
      */
@@ -310,11 +312,11 @@ class OpenRecordShapeTest {
 
     /**
      * The explicit spelling is read against {@code record}'s own vocabulary as the sugar is: {@code item => T}, {@code
-     * item => { type: T }} and {@code item: T} are one open record, and an application closes {@code item} to its
+     * item => { type: T }} and {@code item: T} are one parametric record, and an application closes {@code item} to its
      * argument.
      */
     @Test
-    void theExplicitSpellingIsTheSameOpenRecord() {
+    void theExplicitSpellingIsTheSameParametricRecord() {
         TsonCompiledSchema compiled = compile("""
                   box   => <T> !meta.record { fields: { item => T } }
                   spelt => <T> !meta.record { fields: { item => { type: T } } }
@@ -358,21 +360,21 @@ class OpenRecordShapeTest {
         assertTrue(refused.contains("states 'parameters', which a construction never writes"), refused);
     }
 
-    /** An operand is flattened into the declaration, so a template there needs its arguments. */
+    /** An operand is flattened into the declaration, so a parametric record there needs its arguments. */
     @Test
-    void aTemplateNamedWithoutArgumentsIsNoOperand() {
+    void aParametricRecordNamedWithoutArgumentsIsNoOperand() {
         String composed = assertThrows(SchemaValidationException.class, () -> compile("""
                   box => <T> { v: T }
                   bad => box & { a: text }
                 """)).getMessage();
 
-        assertTrue(composed.contains("supertype 'box' is a template and is applied to no arguments"), composed);
+        assertTrue(composed.contains("supertype 'box' is a parametric record and is applied to no arguments"), composed);
     }
 
     /**
-     * An open record that composes a member-dispatched base may pin the selector itself, and is no member: a template
-     * is no type. Its declared application is, reaching the base through the template's written parent, so a value
-     * pinned {@code "dog"} reads as {@code dogs}.
+     * A parametric record that composes a member-dispatched base may pin the selector itself, and is no member: a parametric
+     * record is no type. Its declared application is, reaching the base through the parametric record's written parent, so a
+     * value pinned {@code "dog"} reads as {@code dogs}.
      */
     @Test
     void anOpenSubtypeIsNoMemberOfTheFamilyItComposes() {

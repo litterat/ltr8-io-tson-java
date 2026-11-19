@@ -76,10 +76,10 @@ import java.util.function.Function;
  * entries and its import closure: the first segment, alias hops followed ([TSON-SCHEMA] §8.3), and each further segment
  * selects a key of a value of a named product -- a namespace value's key, or a record value's field, the record being a
  * namespace whose keys its type fixes; never a position in a list or a key of a map that is no namespace -- and a type entry
- * admits none. An open entry is no referent at all: a template denotes no value until it is applied. The referent's declared
- * type is then judged against the slot's by §7.2's IS-A, comparing canonical identities: an entry's declared type is the
- * constructor that built its body, a field's is its type, and a map value's is the map's value type. Found first, judged
- * after, never a choice among candidates.
+ * admits none. A parametric record is no referent at all: it denotes no value until it is applied. The referent's
+ * declared type is then judged against the slot's by §7.2's IS-A, comparing canonical identities: an entry's declared type
+ * is the constructor that built its body, a field's is its type, and a map value's is the map's value type. Found first,
+ * judged after, never a choice among candidates.
  *
  * <p><b>An entry's constructor</b> is its value's tag, as its facts record it, where that names a constructor, and
  * otherwise the kernel constructor its body mirrors ({@code @Typename}): a record declaration or a composition is
@@ -319,8 +319,9 @@ final class ValuesByName {
                     + "name of a value ([TSON-SCHEMA] §5.12)");
         }
         if (OpenEntry.isOpen(referent)) {
-            throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is an open "
-                    + "entry: a template denotes no value until it is applied (§5.10), so nothing is there to name");
+            throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
+                    + "parametric record, which denotes no value until it is applied (§5.10), so nothing is there "
+                    + "to name");
         }
         if (namesTypes) {
             judgeMember(where, name, segments, slot, referent, entry);

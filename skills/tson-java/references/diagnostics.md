@@ -11,7 +11,7 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `FIELD_FIXED`               | a field the schema fixes carried a different value                                           |
 | `FIELD_GROUP`               | a field group's rule broke: no option chosen, too many, or a chosen option missing a member |
 | `TYPE_MISMATCH`             | the value's shape does not match the type in scope                                           |
-| `WRONG_ARITY`               | a tuple or template application has the wrong element/argument count                         |
+| `WRONG_ARITY`               | a tuple or parametric record application has the wrong element/argument count                |
 | `UNKNOWN_TYPE_REF`          | a `!type` annotation names a type the schema in scope does not declare                       |
 | `SCOPE_NOT_ADMITTED`        | a `$schema` in JSON anywhere but the root annotation object (a resolver error)              |
 | `ATOM_FORM_INVALID`         | the token is not the atom's grammar — `'thirty'` where an integer goes                      |

@@ -17,13 +17,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A family of <b>subtype templates</b> over one base template -- {@code result<T>} with {@code ok<T>} and
+ * A family of <b>subtype parametric records</b> over one base parametric record -- {@code result<T>} with {@code ok<T>} and
  * {@code err<T>} composing it -- closed at an argument. The edge each instantiation gets is to the base
  * <em>at the same argument</em>, which is the whole claim: {@code ok<text>} is IS-A {@code result<text>} and
  * has nothing to do with {@code result<int32>}.
  *
  * <p><b>The edge cannot be stated where the author writes it.</b> At {@code ok}'s declaration {@code
- * result<T>} denotes no entry -- a template is not a type (§5.10) -- so there is nothing to name in a chain.
+ * result<T>} denotes no entry -- a parametric record is not a type (§5.10) -- so there is nothing to name in a chain.
  * What the held body keeps is the application itself as a written parent, {@code parents} being a
  * {@code [meta.type_ref]} slot whose reference may carry arguments, and materialisation substitutes and closes it
  * with the rest of the held body.
@@ -84,7 +84,7 @@ class SubtypeTemplateFamilyTest {
         assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "err_of")),
                 TypeChain.subtypesOf(compiled.schema().entries().get(base)),
                 () -> base + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(base)));
-        // Neither is IS-A a template (§5.10): each is IS-A the entry its applied parent denotes, and nothing else.
+        // Neither is IS-A a parametric record (§5.10): each is IS-A the entry its applied parent denotes, and nothing else.
         assertEquals(List.of(base),
                 TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))));
         assertEquals(List.of(base),
@@ -94,9 +94,9 @@ class SubtypeTemplateFamilyTest {
     /**
      * <b>An applied parent reaches the entry its arguments name, never its head</b> ([TSON-SCHEMA] §5.8's
      * "Parameterized references", §8.1's derived indexes: "{@code ok<text>} indexes {@code result<text>}, never a
-     * head name"). So the template {@code ok} is IS-A nothing of {@code result}'s, and {@code ok<text>} reaches
+     * head name"). So the parametric record {@code ok} is IS-A nothing of {@code result}'s, and {@code ok<text>} reaches
      * {@code result<text>} only where an entry for that application exists: with none, it is IS-A nothing, and no
-     * template is IS-A or indexes anything (§5.10).
+     * parametric record is IS-A or indexes anything (§5.10).
      */
     @Test
     void anAppliedParentReachesTheEntryItsArgumentsNameAndNeverTheHead() {
@@ -107,19 +107,19 @@ class SubtypeTemplateFamilyTest {
                 """);
 
         assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get("ok")),
-                "the template is IS-A no head name");
+                "the parametric record is IS-A no head name");
         assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
-                "nothing names result<text>, and a template is no type, so ok_of is IS-A nothing");
+                "nothing names result<text>, and a parametric record is no type, so ok_of is IS-A nothing");
         assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get("result")));
     }
 
     /**
-     * <b>A template's applications are IS-A its written parents</b> ([TSON-SCHEMA] §5.8, §5.10). A record template
-     * carries a chain, holding {@code base} as written and as reached, and every application closing from it
-     * completes the same parents into a chain naming {@code base}. The template itself is no type and in no index.
+     * <b>A parametric record's applications are IS-A its written parents</b> ([TSON-SCHEMA] §5.8, §5.10). A parametric
+     * record carries a chain, holding {@code base} as written and as reached, and every application closing from it
+     * completes the same parents into a chain naming {@code base}. The parametric record itself is no type and in no index.
      */
     @Test
-    void aTemplatesApplicationsAreIndexedUnderItsParent() {
+    void aParametricRecordsApplicationsAreIndexedUnderItsParent() {
         TsonCompiledSchema compiled = compile("""
                   base     => { x: int32 }
                   box      => <V> base & { item: V }
@@ -130,9 +130,9 @@ class SubtypeTemplateFamilyTest {
         assertTrue(TypeChain.subtypesOf(baseEntry).contains(target(compiled, "box_text")),
                 () -> "the instantiation is indexed: " + TypeChain.subtypesOf(baseEntry));
         assertFalse(TypeChain.subtypesOf(baseEntry).contains("box"),
-                () -> "the template is no type, and in no index: " + TypeChain.subtypesOf(baseEntry));
+                () -> "the parametric record is no type, and in no index: " + TypeChain.subtypesOf(baseEntry));
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(compiled.schema().entries().get("box")),
-                "the record template keeps its parent as written, which closing completes");
+                "the parametric record keeps its parent as written, which closing completes");
     }
 
     /**
@@ -158,7 +158,7 @@ class SubtypeTemplateFamilyTest {
 
     /** Three levels deep, each hop derived as its own instantiation closes -- the chain is transitive. */
     @Test
-    void aChainOfSubtypeTemplatesAccumulatesTheWholeContract() {
+    void aChainOfSubtypeParametricRecordsAccumulatesTheWholeContract() {
         TsonCompiledSchema compiled = compile("""
                   result   => <T> { payload: T }
                   ok       => <T> result<T> & { note: text }
@@ -188,11 +188,11 @@ class SubtypeTemplateFamilyTest {
 
         assertEquals(List.of(target(compiled, "result_of"), "tagged"),
                 TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
-                "tagged arrives with the template's own chain, beside the entry the applied parent denotes");
+                "tagged arrives with the parametric record's own chain, beside the entry the applied parent denotes");
     }
 
     /**
-     * §5.9 against a subtype template. Subtraction revokes IS-A for every parent, so the closed entry gets no
+     * §5.9 against a subtype parametric record. Subtraction revokes IS-A for every parent, so the closed entry gets no
      * edge to it -- and the application is not kept either: a subtracted record is a record with an empty chain,
      * and an application kept would close into a live edge one pass later.
      */
@@ -208,19 +208,19 @@ class SubtypeTemplateFamilyTest {
 
         assertEquals(List.of("payload"), ((RecordBody) compiled.schema().entries().get(thin)).fields()
                 .keySet().stream().toList(), "the subtraction really ran");
-        // Not IS-A result<text>, and not IS-A thin either, a template being no type (§5.10).
+        // Not IS-A result<text>, and not IS-A thin either, a parametric record being no type (§5.10).
         assertEquals(List.of(), ((RecordBody) compiled.schema().entries().get(thin)).supertypes(),
                 "contract: broken, and no application left in the chain to close into an edge");
         assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get(target(compiled, "result_of"))));
     }
 
-    /** The template itself is untouched: it has no instantiation of its parent to be IS-A. */
+    /** The parametric record itself is untouched: it has no instantiation of its parent to be IS-A. */
     @Test
-    void theOpenTemplateNamesNoParentInItsOwnContractIndex() {
+    void theParametricRecordNamesNoParentInItsOwnContractIndex() {
         TsonCompiledSchema compiled = compile(FAMILY);
 
         Top ok = compiled.schema().entries().get("ok");
         assertEquals(List.of(), TypeChain.supertypesOf(ok),
-                () -> "result is a template and nothing is IS-A one: " + TypeChain.supertypesOf(ok));
+                () -> "result is a parametric record and nothing is IS-A one: " + TypeChain.supertypesOf(ok));
     }
 }

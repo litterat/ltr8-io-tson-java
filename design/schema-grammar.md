@@ -116,7 +116,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   the parameter list, and `parseTypeDef` reads that list *before* dispatching on `!` -- one token then
   decides.
   - **The payload is a `core-value`, and nothing narrower.** Which head a parameter list may precede is the
-    resolver's question, not the grammar's: §5.10 admits `!meta.record` alone (an open record's explicit spelling),
+    resolver's question, not the grammar's: §5.10 admits `!meta.record` alone (a parametric record's explicit spelling),
     and `DefinitionResolver.openInstance` refuses any other head with the remedy in the message
     (`design/open-records.md`).
   - **An application is data too**: `!meta.array { element_type: box<text> }` is a `core-value`, the reference

@@ -69,12 +69,14 @@ class EnumTypeTest {
                   shout      => !enum [LOUD QUIET] }""")));
     }
 
-    /** A template's body is a record body, so a parameter list before an enum is refused at the declaration (§5.10). */
+    /**
+     * A parametric record's body is a record body, so a parameter list before an enum is refused at the declaration (§5.10).
+     */
     @Test
-    void aTemplateOverAnEnumIsRefused() {
+    void aParametricRecordOverAnEnumIsRefused() {
         List<Diagnostic> refused = Tson.standard().validateSchema(schema("held-enum", """
                 { names => <M> !enum [a b M] }"""));
-        assertTrue(messages(refused).contains("a template's body is a record body"), messages(refused));
+        assertTrue(messages(refused).contains("a parametric record's body is a record body"), messages(refused));
     }
 
     /** An author's own identifier type admits names the kernel's does not, and an enum over it has them. */

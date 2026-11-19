@@ -1,7 +1,7 @@
 # Class 2 compilation
 
 Design notes for `TsonSchemaCompiler` and the compiled reader stack it wires: eager compilation, `CompiledReaders`,
-`ErrorReader`, template entries, the two compile and two output modes, §7.2's subsumption guard, and untagged labelled
+`ErrorReader`, parametric records, the two compile and two output modes, §7.2's subsumption guard, and untagged labelled
 choices. Current form only; history lives in git.
 
 **Invariants**
@@ -15,7 +15,7 @@ choices. Current form only; history lives in git.
 - `ErrorReader` reports `NOT_IMPLEMENTED` and skips the value. Two causes are deliberately not reported that way: a
   `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile -- but at a
   checkpoint (`compileReady`), where it is the read's that reaches the entry.
-- An open record never reaches a factory: a template, a `RecordBody` with `parameters`, is no type (§5.10) and compiles
+- A parametric record never reaches a factory: a `RecordBody` with `parameters` is no type (§5.10) and compiles
   to an `OpenTemplateReader`. A value entry (`ValueEntry`) never
   reaches one either: it compiles to a `ValueEntryReader`, which refuses a data tag naming it as `TYPE_MISMATCH`.
 - A namespace type compiles through the `map` factory with the map `NamespaceBody.read()` states; the kernel's
@@ -125,15 +125,15 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
       (`design/resolver-vocabulary-and-bootstrap.md`).
   - A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and propagates
     uncaught.
-- **An open record never reaches a factory.** `TsonSchemaCompiler.build` asks `OpenEntry.isOpen` before any factory
-  is consulted, and a template becomes an `OpenTemplateReader` (in `tson-json` the `meta.record` factory asks the same
-  of the body, `DispatchFactories.over`): a template is not a type (§5.10), so there is nothing a value could validate
-  against, and the record factories, which take a `RecordBody`, would otherwise build a reader over its parameters. A
-  family declared through a template is read at its base, a record.
+- **A parametric record never reaches a factory.** `TsonSchemaCompiler.build` asks `OpenEntry.isOpen` before any factory
+  is consulted, and a parametric record becomes an `OpenTemplateReader` (in `tson-json` the `meta.record` factory asks the
+  same of the body, `DispatchFactories.over`): a parametric record is not a type (§5.10), so there is nothing a value could
+  validate against, and the record factories, which take a `RecordBody`, would otherwise build a reader over its parameters.
+  A family declared through a parametric record is read at its base, a record.
 - **`OpenTemplateReader` reports `TYPE_MISMATCH` against the data and skips the value**, like any other
   reader finding data the schema does not admit. Reaching it is **always** a data error: a *schema* naming
-  any template without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
-  element or supertype routes here — only a data type-ref naming the template, `!paged` against `paged =>
+  any parametric record without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
+  element or supertype routes here — only a data type-ref naming the parametric record, `!paged` against `paged =>
   <T> { … }`, which §5.10 makes an ordinary resolver error rather than anything exceptional. Refusing the
   whole entry is what makes the verdict right: built, a parameterised body would either
   reach the parameter (`ErrorReader`, message blaming the linker for a stray `T`), a library-gap report for a plainly
@@ -158,7 +158,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   record's container-typed fields) differ per mode. `ValueReaderFactoryResolver` (the `constructor
   name → factory` dispatch interface) lives in the unexported `reader` package — a consumer picks a mode
   by which registry they hold, never by naming it.
-- **A bind lookup asks under the name the author wrote.** An entry a template application materialised is
+- **A bind lookup asks under the name the author wrote.** An entry an application of a parametric record materialised is
   named by content (§8.2 — resolver-chosen, fresh, unreachable from source), so a binding map cannot be keyed
   on one: the hash is not knowable when the map is written, and a generator emitting bindings cannot invent
   it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
@@ -206,9 +206,9 @@ a `VariantSchemaReader` go through — the guard's, and the record factories' fo
 Two routes answering separately would admit the same alias at a leaf record and refuse it at one that happens
 to have a subtype, decided by which construction site the entry reached. The subtype end is where it is
 load-bearing rather than tidy: a materialised entry's name is
-implementation-chosen and non-normative (§8.2), so an alias is the *only* name a document has for a template
-instantiation, and without it a subtype-template family exists in the index with no member anything can
-write. **The alias is admitted rather than reduced to its target** — an alias entry compiles to its
+implementation-chosen and non-normative (§8.2), so an alias is the *only* name a document has for an
+instantiation of a parametric record, and without it a family of parametric subtypes exists in the index with no member
+anything can write. **The alias is admitted rather than reduced to its target** — an alias entry compiles to its
 target's reader named for the referring entry, so dispatching on the written name runs the same reader and
 reports under the name the author typed.
 

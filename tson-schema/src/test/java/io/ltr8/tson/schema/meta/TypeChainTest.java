@@ -14,8 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A type carries its own IS-A chain ([TSON-SCHEMA] §4.1): {@code type}'s one field on every type body, a record
- * template's included, and the constructor test, judged by where {@code top} is defined.
+ * A type carries its own IS-A chain ([TSON-SCHEMA] §4.1): {@code type}'s one field on every type body, a
+ * parametric record's included, and the constructor test, judged by where {@code top} is defined.
  */
 class TypeChainTest {
 
@@ -54,14 +54,14 @@ class TypeChainTest {
                 .withSupertypes(List.of("meta.namespace", "meta.top"));
 
         assertTrue(TypeChain.isConstructor("numeric.integer_type", constructor, n -> true));
-        assertTrue(TypeChain.isConstructor("op", templated, n -> true), "a template answers as its closed form");
+        assertTrue(TypeChain.isConstructor("op", templated, n -> true), "a parametric record answers as its closed form");
         assertTrue(TypeChain.isConstructor("meta.top", RecordBody.of(RecordBody.fieldMap()), n -> true));
         assertFalse(TypeChain.isConstructor("numeric.integer_type", constructor, n -> false), "a schema's own top");
         assertFalse(TypeChain.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
     }
 
     @Test
-    void anOpenRecordCarriesAChainAsAnyTypeDoes() {
+    void aParametricRecordCarriesAChainAsAnyTypeDoes() {
         RecordBody pet = emptyTemplate(List.of(new Param("T")));
         RecordBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
                 .withSubtypes(List.of("dog")));
@@ -73,7 +73,7 @@ class TypeChainTest {
     }
 
     @Test
-    void anOpenRecordHoldsItsParametersAsParameterReferences() {
+    void aParametricRecordHoldsItsParametersAsParameterReferences() {
         RecordBody open = new RecordBody(TypeChain.EMPTY.withParents(List.of(ApplyBody.of("base", "T").inPlace())),
                 List.of(new Param("T")), RecordBody.fieldMap(
                 Map.entry("v", RecordField.required(TypeRef.of("T"))),
@@ -90,11 +90,11 @@ class TypeChainTest {
     }
 
     /**
-     * Inside a type written in place an open record's parameter is scoped at every slot, and one it does not declare is
-     * refused there too; a closed record judges none, since one in place holds its open record's.
+     * Inside a type written in place a parametric record's parameter is scoped at every slot, and one it does not declare is
+     * refused there too; a closed record judges none, since one in place holds its parametric record's.
      */
     @Test
-    void anOpenRecordScopesItsParametersInsideATypeWrittenInPlace() {
+    void aParametricRecordScopesItsParametersInsideATypeWrittenInPlace() {
         TypeInline inPlace = new TypeInline(RecordBody.of(RecordBody.fieldMap(
                 Map.entry("cursor", RecordField.required(TypeRef.of("T"))),
                 Map.entry("all", RecordField.required(new TypeInline(ArrayBody.of(TypeRef.of("T"))))))));

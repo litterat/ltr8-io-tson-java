@@ -1,12 +1,12 @@
 # Constructor application
 
-What `!C { … }` builds, how its head resolves, and why a template is never one of the things it applies — the
+What `!C { … }` builds, how its head resolves, and why a parametric record is never one of the things it applies — the
 `DefinitionResolver` rules behind §4.1/§4.2/§5.5 construction. Current form only; history lives in git.
 
 **Invariants**
 
-- A template closes by application (`C<...>`), never by construction (`!C { ... }`); naming one at a construction site
-  is an author error (`SchemaValidationException`), never an `IllegalStateException`.
+- A parametric record closes by application (`C<...>`), never by construction (`!C { ... }`); naming one at a construction
+  site is an author error (`SchemaValidationException`), never an `IllegalStateException`.
 - A construction head resolves in the schema's one namespace, among the entries its closure imports
   (§3.3.1), through its alias chain first (`resolveConstructorTarget`): every question is asked of
   the entry at the end, while the entry's facts record the name the author wrote as its constructor.
@@ -20,7 +20,7 @@ What `!C { … }` builds, how its head resolves, and why a template is never one
   `TsonCompiledVocabulary.buildConstructors` filters on the same predicate, so every constructor head has a reader. With `C`
   any other type the entry is a value of `C` (`resolveValueEntry`, `design/namespace-types-and-value-entries.md`), never a
   refusal for want of applicability.
-- A construction never writes `parameters` (`refuseWrittenParameters`): an open record's parameters are the list before
+- A construction never writes `parameters` (`refuseWrittenParameters`): a parametric record's parameters are the list before
   its body, `<T> { … }` or `<T> !meta.record { … }`, and a parameter list before any other head is refused
   (`openInstance`, `design/open-records.md`).
 - An atom instance is **a body that is an `Atom`**, which no constructor's is: a constructor's body is the
@@ -68,18 +68,18 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
 
 ## Constructor application (`tson-compiler/.../resolver/DefinitionResolver.java`)
 
-- **A template closes by application, never by construction**, and naming one at a construction site is an
-  author error (`DefinitionResolver.resolveInstance`). `C<...>` substitutes a template's parameters away
+- **A parametric record closes by application, never by construction**, and naming one at a construction site is an
+  author error (`DefinitionResolver.resolveInstance`). `C<...>` substitutes a parametric record's parameters away
   (§5.10); `!C { ... }` fills a *constructor's* own vocabulary (§4.2). Different operations, and the check
-  is on being a template — having parameters — so any §5.10 template gets the
+  is on being a parametric record — having parameters — so any §5.10 parametric record gets the
   same advice instead of the "did you mean atom refinement?" hint, which cannot help when what is missing is
   the argument list. **This check is what keeps the construction below it sound**: a parameterised declaration is
-  an open record, a `RecordBody` like any constructor's, so without it `!box { … }` over an open record composing
-  `meta.top` would apply a template as a constructor.
+  a parametric record, a `RecordBody` like any constructor's, so without it `!box { … }` over a parametric record
+  composing `meta.top` would apply a parametric record as a constructor.
   `TemplateClosesByApplicationTest` pins all of it.
 - **A construction head resolves through its alias chain first** (§8.3, `resolveConstructorTarget`).
   An alias is a hop, not a rewrite, so `alias_array => meta.array` makes `!alias_array { … }` an application of
-  `meta.array`, and every question the head is then asked — is it a template, is it applicable, whose vocabulary
+  `meta.array`, and every question the head is then asked — is it a parametric record, is it applicable, whose vocabulary
   reads the payload — is a question about the entry at the end.
   Asking the alias would answer all three from an empty supertype chain and an `Alias` body, which is what
   a hop looks like rather than what it points at. The author's spelling survives where it is visible: the tag resolved output
@@ -90,7 +90,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   nothing else. Over the bundled schemas that is every vocabulary constructor plus `meta.top`, `meta.type`, the three base
   kinds, `meta.namespace`, `meta.alias`, `meta.ref` — judged by where `meta.top`
   is defined (one predicate the resolver, the compiled vocabulary's reader table and the linker all ask), and over an
-  open record's chain as over a closed one's. Every other head is an ordinary type, and the entry is a value of it
+  parametric record's chain as over a closed one's. Every other head is an ordinary type, and the entry is a value of it
   (`resolveValueEntry`): a component record, `!meta.record_field { … }`, a namespace type, `!api { … }`, and a consumer's
   record type, `!operation { … }`, alike. **A
   per-entry constructor marker would be both too narrow and inconsistent.** `meta.alias` describes no value, so it would go
@@ -103,10 +103,10 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   (§8.3), where a construction of any other head records the head as its constructor
   (`design/schema-resolution.md`); the path dispatches on the *body* being an `Alias`, having already read it. **A
   construction of `meta.record` writing `parameters` is refused** (`refuseWrittenParameters`, tested at the head's chain
-  end): admitted, it would build an open record whose parameters no `<…>` put in scope, skipping every declaration-time
-  check §5.10 makes of a template. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's question —
-  *is this an atom instance?* — as **a body that is an `Atom`**, which is exactly what an instance is: §4.1's "IS-A
-  does not extend below construction" is what separates the pair, `!T {}` granting no supertypes, so `integer`
+  end): admitted, it would build a parametric record whose parameters no `<…>` put in scope, skipping every declaration-time
+  check §5.10 makes of a parametric record. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's
+  question — *is this an atom instance?* — as **a body that is an `Atom`**, which is exactly what an instance is: §4.1's
+  "IS-A does not extend below construction" is what separates the pair, `!T {}` granting no supertypes, so `integer`
   carries an empty chain where `numeric.integer_type => meta.atom & { … }` carries `[meta.atom, meta.top]`. **The
   obvious chain test runs backwards.** IS-A `meta.atom` is true of the *constructor* and false of every
   instance — over the bundled entries it selects precisely the wrong side — while the body's class separates them: an
@@ -129,11 +129,11 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   composes `meta.type` (`c => meta.product & { … }`), the instance would be a type, whose body must be one of the schema
   model's, and it is refused as `NOT_IMPLEMENTED` (`unmodelledType`): a gap, since a generic body for such an instance is
   open work.
-- **A template over a constructor is refused; the constructor is applied instead** (§5.10): `<T> !meta.array {
+- **A parametric record over a constructor is refused; the constructor is applied instead** (§5.10): `<T> !meta.array {
   element_type: T  min_items: 1 }` has no home for `parameters`, so `openInstance` refuses it, naming the remedy -- the
   application where it is used (`meta.array<T>`, `[T]`), or its construction left open once and completed where used
   (`nonempty => !meta.array ^ { min_items: 1 }`, then `nonempty<T>`). A pin is a field's value, so a
-  template pinning a slot to its parameter -- `my_set => <T> meta.array & { element_type?: = T }` -- is refused
+  parametric record pinning a slot to its parameter -- `my_set => <T> meta.array & { element_type?: = T }` -- is refused
   with every other parameter at a value (`ParameterTypes.atValue`).
 
 ## Construction sugar (`resolver/ConstructionSugar.java`)
@@ -148,9 +148,9 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   it, and it is the rule `[T]` and `{K => V}` already follow.
 - **A constructor here is a closed record IS-A `meta.type`** (`ConstructionSugar.constructs`), read past the head's
   alias hops: its instances are types. A head composing `meta.top` alone builds values and is no constructor of this
-  rule, and an open record substitutes (§5.10) whatever its chain reaches -- `listed => <T> meta.atom & { … }` composes
-  `meta.top` and is still a template. The check runs before the template path in both places an application resolves,
-  so a head is asked once which operation it stands for.
+  rule, and a parametric record substitutes (§5.10) whatever its chain reaches -- `listed => <T> meta.atom & { … }` composes
+  `meta.top` and is still a parametric record. The check runs before the parametric record path in both places an application
+  resolves, so a head is asked once which operation it stands for.
 - **The kernel applies its own constructors this way**, `meta.ref<method>` being `!meta.ref { of: method }`, and
   completes its own incomplete entries the way a schema does: `set<text>` through the root's alias `set` is
   `!meta.array { element_type: text  ordered: false  unique_items: true }`, `!enum [A B]` is `!meta.enum_type { … }`.
@@ -171,7 +171,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   its own. An author's explicit `{ of: !meta.apply { … } }` means the same where its arguments are names (§5.10) and
   is rewritten then; one whose arguments hold a type in place is left for the kernel's reader to refuse. Rewriting
   every payload's applications alike would accept that explicit form, which the kernel's `meta.apply` refuses.
-- **Asking whether a head constructs never waits on an open record** (`DefinitionGetter.opens`, answered by
+- **Asking whether a head constructs never waits on a parametric record** (`DefinitionGetter.opens`, answered by
   `WaitOrder` from parameter lists and alias targets as written): an application of one orders nothing (§3.4.1), so
   `chain => <T> { next?: chain<T> }` and mutual recursion are no wait cycles. Any other head is made ready before it
   is asked, as reading a construction against it would make it.

@@ -211,8 +211,8 @@ value.
 
 **A dependent field, `v?: kind!`, is read against the type its sibling names in each instance** (Part 2 §5.2): `{ kind:
 point  v: { x: 1  y: 2 } }`. Write a free sibling before its dependent field (a pinned or discriminator sibling may come
-anywhere); a sibling naming a template is refused at the sibling. In tree mode the value is whatever the named type reads
-to; in bind mode declare the component `Object` and register `Object` as an atom in the `DataBindContext`
+anywhere); a sibling naming a parametric record is refused at the sibling. In tree mode the value is whatever the named type
+reads to; in bind mode declare the component `Object` and register `Object` as an atom in the `DataBindContext`
 (`registerAtom(Object.class)`), and it receives what the named type binds to.
 
 **Casting and converting are different questions.** `as(Class)`/`asString`/`asBigDecimal` only ever

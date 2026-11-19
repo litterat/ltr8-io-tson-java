@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>The member is the author's own declaration, and the operand is absorbed by value.</b> §5.8 absorbs
  * the operand's fields, the member pins the selector where it is declared, and what outlives the substitution is
  * that {@code dog} IS-A what {@code pet_of}'s written parents reach: {@code pet}, the abstract record the family is
- * declared with. A template is no type, so no edge runs to {@code pet_of}.
+ * declared with. A parametric record is no type, so no edge runs to {@code pet_of}.
  *
  * <p>That is what puts {@code dog} in {@code pet.subtypes} and makes a {@code pet} position dispatch -- by the
  * discriminators where the base states them, by a tag where it states none.

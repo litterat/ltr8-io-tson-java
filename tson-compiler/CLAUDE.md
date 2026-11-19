@@ -27,7 +27,7 @@ Rules that bite here:
 - No reader requires a materialised tree, and `TsonReadContext` holds no error policy — report through the receiver.
 - A schema-author error is `SchemaValidationException`; a library gap is `UnsupportedOperationException` and travels
   as `NOT_IMPLEMENTED`; a broken invariant is `IllegalStateException`. `DefinitionResolver`'s Javadoc is the boundary.
-- A template is an open record, a `RecordBody` with `parameters`, built directly and substituted on the model; a
+- A parametric record is a `RecordBody` with `parameters`, built directly and substituted on the model; a
   parameter in it is a `ParamRef`, at any depth of a type written in place, and a closed entry holds none. Anything
   that builds a reader or a writer from a `RecordBody`, or treats one as a type, asks `isOpen()` first. There is one
   opinion about a binding's wire form, and it is `WireForm`'s.

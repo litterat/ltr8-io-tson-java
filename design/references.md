@@ -3,7 +3,7 @@
 Design notes for every position in a schema that holds a name: which are references, what a reference's store and
 judgement are, and which kernel slot is typed by what. Current form only; history lives in git. The running shape
 is one reference atom with a constructor an ordinary record type (§4.1, §4.2). A reference is a name: an application
-is no value of that atom but the construction `meta.apply` (`ApplyBody`) written in place (§5.10). Inside an open record
+is no value of that atom but the construction `meta.apply` (`ApplyBody`) written in place (§5.10). Inside a parametric record
 a reference may also be one of the record's parameters, written as its name and looked up in `parameters` before the
 namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an application's arguments.
 
@@ -41,7 +41,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
 - `of` names any type or constructor of the writer's namespace. It is a `TypeRef` at a slot that holds a name alone
   (§4.2): an application there, `!meta.ref { of: box<text> }` or `meta.ref<box<text>>`, is refused, to be
   declared under a name and named (`TypeSlots`' reference arm, `TemplateMaterialiser.nameRequired`), so a resolved `of`
-  is a name. Refused too are a name resolving to nothing (an unresolved reference), an open record and a value entry
+  is a name. Refused too are a name resolving to nothing (an unresolved reference), a parametric record and a value entry
   (`KindMembers.ofRefusal`, from `validateBody`). `meta.ref<meta.top>` holds every type. `meta.ref<meta.alias>`
   admits nothing, no entry past its hops being an alias, and a required field typed by it is refused by §5.10.1's
   productivity check (`TypeInhabitance`). A reference is not a bound: `meta.param.bound` still refuses a constructor
@@ -71,7 +71,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   place is either a construction at a type slot or refused. The model is no wider than the kernel because a wider one
   is a shape the kernel's reader cannot produce, and carrying one means reading a payload with names standing in for the
   arguments and putting them back after: two opinions of what an application holds. In resolved output one stands only
-  inside an open record, over one of its parameters, applying an open record; the linker refuses one anywhere else
+  inside a parametric record, over one of its parameters, applying a parametric record; the linker refuses one anywhere else
   (`TsonSchemaLinker.validateBody`'s apply arm, `requireOpen`), which is how a resolved form read as output is held to
   it. `meta.apply` composes `meta.type` alone and is final: it reaches no base kind, and no
   constructor composes it. Identity is the head and the arguments (`ApplyBody.equals`), so `CanonicalApplication` and
@@ -81,7 +81,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   data or JSON, reads a marked name, so `kind`, `kind<T>` and a type written in place are the only shapes a type slot
   holds. A slot typed by a reference refuses `kind!` as the syntax error it is in data, and `"kind!"` in JSON as a
   string spelling no name.
-- An application stays in place only where it is still open: an open record's `chain.parents` and field types, at
+- An application stays in place only where it is still open: a parametric record's `chain.parents` and field types, at
   any depth, and the `application` annotation's value. A closed application at a type slot is a type written in place
   there, and where only a name may stand an application is refused (§4.2, §5.3). Its head is judged by resolution and
   arity, and every argument is judged as a type's name.
@@ -95,8 +95,8 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   other verdict is the construction's own, so `meta.namespace<int32 text>` is refused at link as `key_type: int32` is,
   and `meta.enum_type<meta.identifier>` by the constructor's reader for the `members` it leaves unwritten. An
   incomplete entry is completed the same way, and its completion is the plain construction: `nonempty<uuid>` over
-  `nonempty => !meta.array ^ { min_items: 1 }` is `[uuid; 1..]`. An application whose head is an open record
-  substitutes (§5.10) -- an open record is never constructed, whatever its chain reaches -- and a head that is neither
+  `nonempty => !meta.array ^ { min_items: 1 }` is `[uuid; 1..]`. An application whose head is a parametric record
+  substitutes (§5.10) -- a parametric record is never constructed, whatever its chain reaches -- and a head that is neither
   takes no arguments.
 - A slot that names the type of a value is typed `meta.type_ref` (`meta.tuple_element.element_type`,
   `meta.array.element_type`, `meta.map.key_type` and `value_type`, `meta.namespace.value_type`, `meta.choice.variants`,
@@ -114,7 +114,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
 - **A constructor is an ordinary record type** (§4.1). A constructor whose declaration is a record
   (`net.uuid_type => meta.atom & { … }`) holds a value of `meta.record`, so `meta.type_ref`, `meta.ref<meta.record>` and
   `meta.ref<meta.product>` hold it, and `meta.record`, `meta.top`, `meta.alias`, `meta.namespace`,
-  `meta.ref` itself. An open record is built with `meta.record` too, and no kind holds it:
+  `meta.ref` itself. A parametric record is built with `meta.record` too, and no kind holds it:
   a reference names it only as the head of an application (`KindMembers.isMember`). A field typed `spec: net.uuid_type` holds
   a declaration body as data (`!holder { spec: {
   version: 4 } }`), in a TSON tree, bound to the constructor's model class (`UuidType`) and read from JSON;
@@ -212,14 +212,14 @@ A name stands in a schema in one of five forms. Two are not references.
 |---|---|---|
 | **Key** | declares: the name an entry, field, parameter or namespace value is addressed by | the map's key type, which judges spelling and equality |
 | **Reference** | names something declared elsewhere, by its key | **store** (where the first segment resolves) and **judgement** (what the referent must be) |
-| **Application** | `meta.apply` written in place, no reference: names an open record and closes it with arguments, or names a constructor and constructs it over its argument slots; at a type slot it closes in place, and a declaration naming it is the closed entry | the head, and the arguments |
+| **Application** | `meta.apply` written in place, no reference: names a parametric record and closes it with arguments, or names a constructor and constructs it over its argument slots; at a type slot it closes in place, and a declaration naming it is the closed entry | the head, and the arguments |
 | **Tag** | names the type of the value it is written on, `!T v` | store and judgement, as a reference, and the payload is read under the referent |
 | **Index** | computed at link and written out: `supertypes`, `subtypes`, the `application` annotation | none; never read as a reference on ingest |
 
 **Stores**, positional: the writer's namespace, its own entries and its import closure (every type a declaration
 names, every `!C` and `!I ^` head, `meta.ref.of`, a tag in a schema map, an annotation, the first segment of a
 qualified name; §3.3); and the enclosing collection (`discriminators` and group members in `fields`, a
-parameter in an open record's `parameters`, the later segments of a qualified name, each selecting in the nested
+parameter in a parametric record's `parameters`, the later segments of a qualified name, each selecting in the nested
 `!schema` map, namespace
 value or record value reached). Neither store is lexical: a name written inside a nested map resolves from the root
 as one written anywhere else (§3.3).
@@ -240,16 +240,16 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 |---|---|---|---|---|
 | schema-map key, `meta.field_map` key, `meta.param.name` | key | — | spelling under the key type; `fields`, keyed by `text`, by the record's `name_type` after resolution | `checkNames`, `checkFieldNameTypes` |
 | `meta.enum_type.members` | values of a set | — | each a value of `name_type`, distinct under its equality | `checkEnumTypes` |
-| `meta.type_chain.parents`, `application` | reference, `meta.type_ref`, with arguments where open | namespace | a constructor or a record type for an operand; an open record or a constructor for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
+| `meta.type_chain.parents`, `application` | reference, `meta.type_ref`, with arguments where open | namespace | a constructor or a record type for an operand; a parametric record or a constructor for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
 | `meta.type_chain.supertypes`, `subtypes` | index, `meta.type_ref` | — | — | link |
 | `meta.alias.target` | reference, `meta.type_ref` | namespace | any entry, type or constructor, by resolution; never arguments in a resolved alias | `validateTypeRef` |
 | `meta.param.bound` | reference | namespace | `meta.type_ref`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
-| `meta.record_field.type` | reference, a parameter of an open record, or a type in place, `meta.dependent` among them | the record's `parameters`, then namespace; enclosing `fields` for a dependent type's `on` | `meta.type_expr`; a parameter by §5.10's shadowing rule; `on` by §5.2's rules | `validateTypeRef`, `checkOpenArity`, `DependentFields` |
+| `meta.record_field.type` | reference, a parameter of a parametric record, or a type in place, `meta.dependent` among them | the record's `parameters`, then namespace; enclosing `fields` for a dependent type's `on` | `meta.type_expr`; a parameter by §5.10's shadowing rule; `on` by §5.2's rules | `validateTypeRef`, `checkOpenArity`, `DependentFields` |
 | `meta.tuple_element.element_type`, `meta.array.element_type`, `meta.map.key_type`, `meta.map.value_type`, `meta.namespace.value_type`, `meta.choice.variants` | reference | namespace | `meta.type_ref`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
 | `meta.record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference (typed `type!`, so read against the field's own `type`) | namespace | member of the slot's kind | `checkKindValue` |
 | `meta.record.discriminators`, `meta.field_group.members` | reference by key | enclosing `fields` | a key of it | linker |
 | `meta.record.name_type`, `meta.enum_type.name_type` | reference | namespace | `meta.identifier_ref` | `NameType.admits` |
-| `meta.ref.of` | reference, `meta.type_ref`; an application is refused | namespace | any type or constructor, never a value entry or an open record | `validateBody`, `KindMembers.ofRefusal` |
+| `meta.ref.of` | reference, `meta.type_ref`; an application is refused | namespace | any type or constructor, never a value entry or a parametric record | `validateBody`, `KindMembers.ofRefusal` |
 | a slot typed by a reference over a type that is no constructor | reference by key, a path | root namespace, then nested `!schema` members, namespace values and record fields | the referent's type IS-A `of` | `ValuesByName.judge` |
 | a schema-map value (`meta.schema.value_type: declared`) | tag | namespace | a constructor builds a type; any other type a value of it | `DefinitionResolver` |
 | `geo => !schema { … }` | tag, a spelling of the pre-loaded kernel's `schema` (an alias of `meta.schema`) or `meta.schema` | pre-loaded kernel | none: the payload is schema grammar, its members declarations keyed by path | `TsonSchemaParser`, `SchemaPaths` |

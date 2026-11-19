@@ -18,7 +18,7 @@ import java.util.Optional;
  *
  * <p><b>Why one class.</b> A binding record is written by two phases -- {@code SchemaDesugarer} rewriting a sugar
  * form into the construction it denotes, and {@code ConstructionSugar} spelling an applied constructor's arguments
- * -- and walked by a third, {@code ParameterTypes}, for where an open record's parameters stand. A second opinion
+ * -- and walked by a third, {@code ParameterTypes}, for where a parametric record's parameters stand. A second opinion
  * about what a reference looks like in a slot is what makes one of them wrong.
  *
  * <p><b>Nothing here is canonical output, and {@code DataClassObjectWriter} cannot serve any of it.</b> That
@@ -37,12 +37,12 @@ final class WireForm {
     /** {@code meta.record_field.value}: §8.1's literal channel. */
     static final String VALUE = "value";
 
-    /** {@code meta.record}: the constructor an open record applies. */
+    /** {@code meta.record}: the constructor a parametric record applies. */
     static final String RECORD = KernelNames.of("record");
 
     static final String RECORD_FIELD = KernelNames.of("record_field");
 
-    /** {@code meta.record.parameters}: an open record's parameters, each a {@code meta.param}. */
+    /** {@code meta.record.parameters}: a parametric record's parameters, each a {@code meta.param}. */
     static final String PARAMETERS = "parameters";
     static final String NAME = "name";
 

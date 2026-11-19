@@ -6,7 +6,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.List;
 
 /**
- * An application of an open record in canonical form ([TSON-SCHEMA] §8.2): what decides whether two applications
+ * An application of a parametric record in canonical form ([TSON-SCHEMA] §8.2): what decides whether two applications
  * are one, where an applied parent's edge looks up the declaration naming its application and §5.10.1's recursion
  * ties a nested application to the declaration closing it. The caller follows each argument's alias chain first.
  *

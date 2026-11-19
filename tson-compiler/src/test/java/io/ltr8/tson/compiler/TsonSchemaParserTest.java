@@ -757,13 +757,13 @@ class TsonSchemaParserTest {
                 !schema { a => [text, , integer] }"""));
     }
 
-    // ── Instance templates (§12.1) ────────────────────────────────────────
+    // ── Parametric instances (§12.1) ────────────────────────────────────────
     //    `[type-params] "!" type-name ws core-value` -- the same production as a closed instance, with a
-    //    parameter list in front. There is no narrower payload grammar, because an open entry's body is held
+    //    parameter list in front. There is no narrower payload grammar, because a parametric record's body is held
     //    rather than read against the constructor's vocabulary until materialisation substitutes.
 
     @Test
-    void anInstanceTemplateCarriesItsParametersAndItsPayloadWhole() {
+    void aParametricInstanceCarriesItsParametersAndItsPayloadWhole() {
         Instance template = assertInstanceOf(Instance.class,
                 declOf("vector => <T, N> !array { element_type: T  min_items: N  max_items: N }").typeDef());
 
@@ -776,7 +776,7 @@ class TsonSchemaParserTest {
 
     /** No parameter list means a closed {@link Instance}: the list is the only thing that distinguishes them. */
     @Test
-    void theParameterListIsWhatDistinguishesATemplateFromAnInstance() {
+    void theParameterListIsWhatDistinguishesAParametricRecordFromAnInstance() {
         assertEquals(List.of(), assertInstanceOf(Instance.class,
                 declOf("x => !array { element_type: text }").typeDef()).typeParams());
         assertEquals(List.of("T"), assertInstanceOf(Instance.class,
@@ -793,7 +793,7 @@ class TsonSchemaParserTest {
             "t => <T> !choice { variants: [T error] }",
             "t => <T> !tuple { elements: [{ element_type: T } { element_type: text }] }",
             "t => <T> !array { element_type: T  min_items: 2 }"})
-    void aCollectionPayloadIsOrdinaryInATemplate(String declaration) {
+    void aCollectionPayloadIsOrdinaryInAParametricRecord(String declaration) {
         assertInstanceOf(Instance.class, declOf(declaration).typeDef());
     }
 

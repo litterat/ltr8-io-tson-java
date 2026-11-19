@@ -253,7 +253,7 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * <b>A colliding member is named the way the author wrote it.</b> Both members here compose a template's
+     * <b>A colliding member is named the way the author wrote it.</b> Both members here compose a parametric record's
      * application, and each is the author's own declaration (§8.2), so the names that collide are {@code a} and
      * {@code b} -- names an author can open and edit.
      */
@@ -327,11 +327,11 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * A template body applying a member would put one in place at each application, and is reported at the
+     * A parametric record's body applying a member would put one in place at each application, and is reported at the
      * declaration whose application closed it.
      */
     @Test
-    void aMemberAppliedInsideATemplateIsRefusedAtItsApplication() {
+    void aMemberAppliedInsideAParametricRecordIsRefusedAtItsApplication() {
         List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_TEMPLATE
                 + """
                   kennel_of => <T> { d: dog_of<T> }

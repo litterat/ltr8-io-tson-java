@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * One parameter of an open record ({@code meta.param}, [TSON-SCHEMA] §5.10, §8.1): its name, and the bound an
+ * One parameter of a parametric record ({@code meta.param}, [TSON-SCHEMA] §5.10, §8.1): its name, and the bound an
  * argument must IS-A.
  *
  * <p><b>A parameter is a type.</b> It is written where it stands as its name, a reference value ({@link ParamRef}),

@@ -381,7 +381,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      */
     private ParseException missingDefinition(DefinitionMark mark) {
         return parseError("'" + mark.word() + "' here marks how the type that follows may be realised (§5.2),"
-                + " and no definition follows -- a type or template named '" + mark.word() + "' may be"
+                + " and no definition follows -- a type or parametric record named '" + mark.word() + "' may be"
                 + " declared and referenced anywhere else, but not named as a whole declaration body");
     }
 
@@ -393,12 +393,12 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private TypeDef parseTypeDef(Optional<DefinitionMark> mark) {
         // The parameter list comes first, so one token then decides the alternative: `!` with no parameters
-        // is an instance or an atom refinement, `!` with parameters an instance-template (§12.1). `<` only
+        // is an instance or an atom refinement, `!` with parameters an instance carrying them (§12.1). `<` only
         // ever starts a parameter list, so consuming it costs no lookahead.
         List<String> typeParams = parseTypeParamsOpt();
         if (mark.isPresent() && !startsTypeDef()) {
             // Reached both by a bare `pet => abstract` and by `pet => abstract<text>`, which applies a
-            // template of that name. The second cannot be caught where the mark is read, since `abstract <T>
+            // parametric record of that name. The second cannot be caught where the mark is read, since `abstract <T>
             // { … }` opens identically; what separates them is whether a definition follows the parameters.
             throw missingDefinition(mark.get());
         }
@@ -535,7 +535,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         // constructor name goes straight into the wrapping DataValue's own typeRef; there is no room in this
         // production for the payload to carry further annotations or a second, competing type-ref.
         //
-        // A parameter list makes it a template and changes nothing else, which is the point: the payload is
+        // A parameter list makes it a parametric record and changes nothing else, which is the point: the payload is
         // held rather than read against the constructor's own vocabulary, so every core-value the closed form
         // admits the open one admits too -- a collection included, which is what the separate template-def
         // production could not express.

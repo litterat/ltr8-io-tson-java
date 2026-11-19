@@ -23,11 +23,11 @@ import java.util.function.UnaryOperator;
  * never appear in output; {@code parameters}, {@code groups} and {@code discriminators} are empty for a record with
  * none.
  *
- * <p><b>Closed or open.</b> A record with no {@link #parameters} is closed: it is what readers and writers are built
- * for. A record with parameters is an <em>open record</em>, a
- * template ([TSON-SCHEMA] §5.10): a reference names it only as the head of an application, never bare, and each
+ * <p><b>Closed or parametric.</b> A record with no {@link #parameters} is closed: it is what readers and writers are built
+ * for. A record with parameters is a <em>parametric record</em>
+ * ([TSON-SCHEMA] §5.10): a reference names it only as the head of an application, never bare, and each
  * application substitutes its arguments for the parameters and closes to a record without them. So no closed
- * position, and no member set over {@code meta.ref<meta.record>}, reaches an open record, and nothing builds a reader
+ * position, and no member set over {@code meta.ref<meta.record>}, reaches a parametric record, and nothing builds a reader
  * or a writer for one ({@link #isOpen}).
  *
  * <p><b>Where a parameter stands is this value's to state.</b> A parameter is written as its name, a reference value
@@ -39,13 +39,13 @@ import java.util.function.UnaryOperator;
  * value} is a literal and never a parameter; that, and a parameter at any other slot, is the author's rule, refused
  * where the declaration resolves.
  *
- * <p><b>A closed record does not judge its parameters.</b> One written in place inside an open record holds that
- * record's parameters, and only the open record can tell them from a stray one; closing an application substitutes
+ * <p><b>A closed record does not judge its parameters.</b> One written in place inside a parametric record holds that
+ * record's parameters, and only the parametric record can tell them from a stray one; closing an application substitutes
  * every one away ({@code TemplateMaterialiser}).
  *
  * <p><b>{@code chain} is {@code chained}'s</b> (see {@link TypeChain}): the complete IS-A chain and its inverse,
  * computed by the resolver and the linker. A fresh record and a subtracted one ([TSON-SCHEMA] §5.9) have an empty
- * chain, and a composition's chain names every operand and each operand's own chain. An open record's chain keeps
+ * chain, and a composition's chain names every operand and each operand's own chain. A parametric record's chain keeps
  * its parents as written, which each application substitutes and completes.
  *
  * <p><b>{@code fields} is a value of the kernel's {@code field_map}</b> ({@value #FIELD_MAP}), the ordered map from
@@ -61,7 +61,7 @@ import java.util.function.UnaryOperator;
  * {@link RecordExtensionType#OPEN} unless the record says otherwise. It is a kernel field rather than a
  * preserved annotation because it decides which values a position typed by this record admits, so erasing
  * it would change the type. Only {@code record} carries one: the other products are constructors, and a
- * constructor's instances are the closed forms a schema writes rather than a family an author extends. On an open
+ * constructor's instances are the closed forms a schema writes rather than a family an author extends. On a parametric
  * record it, the groups, the discriminators and the name type are each application's, unchanged by substitution.
  *
  * <p>Named {@code RecordBody}, not {@code Record} -- the kernel's own constructor is literally
@@ -122,7 +122,7 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
     }
 
     /**
-     * The same record closed, with no parameters: every caller building a record that is no template, its chain
+     * The same record closed, with no parameters: every caller building a record that is no parametric record, its chain
      * empty or already placed.
      */
     public RecordBody(TypeChain chain, AnnotatedMap<String, RecordField> fields, List<FieldGroup> groups,
@@ -193,7 +193,7 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
         return AnnotatedMap.copyOf(mapped);
     }
 
-    /** Whether this record declares parameters: an open record, a template, which no position names bare. */
+    /** Whether this record declares parameters: a parametric record, which no position names bare. */
     public boolean isOpen() {
         return !parameters.isEmpty();
     }

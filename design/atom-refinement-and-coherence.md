@@ -128,7 +128,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the same verdict — they are one type, and a rule kept in the desugar phase would only ever see the
   first. `TsonSchemaLinker` asks it a second time for the bodies **materialisation** produces, which
   resolution never saw closed: §8.2's "family coherence rules whose operands were parameters" is exactly a
-  template whose bounds were `MIN`/`MAX` until an application supplied both. numeric.tn's header `@doc` states the
+  parametric record whose bounds were `MIN`/`MAX` until an application supplied both. numeric.tn's header `@doc` states the
   same obligation from the other side, for its families and temporal.tn's: bounds are field groups, so an
   inclusive/exclusive pair on one side is unrepresentable, while "a lower bound does not exceed the upper" is a
   rule over the body. `net.cidr4_type`'s `@doc` adds the family range, `min_prefix` and `max_prefix` lying in

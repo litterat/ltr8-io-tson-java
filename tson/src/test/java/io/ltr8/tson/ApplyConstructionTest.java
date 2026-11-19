@@ -30,8 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * An application is a construction, {@code meta.apply}, written in place ([TSON-SCHEMA] §5.10): a reference holds a
- * name only. In resolved output one stands only inside an open record, over one of its parameters, applying an open
- * record; the explicit spelling closes as the sugar does; the {@code meta.application} annotation is the same record.
+ * name only. In resolved output one stands only inside a parametric record, over one of its parameters, applying a
+ * parametric record; the explicit spelling closes as the sugar does; the {@code meta.application} annotation is the same
+ * record.
  */
 class ApplyConstructionTest {
 
@@ -74,7 +75,7 @@ class ApplyConstructionTest {
     private record TypeExprAt(io.ltr8.tson.schema.meta.TypeExpr type) {
     }
 
-    /** Inside an open record an application over a parameter is the application written in place, in a parent too. */
+    /** Inside a parametric record an application over a parameter is the application written in place, in a parent too. */
     @Test
     void anApplicationOverAParameterIsAnApplyInPlace() {
         Map<String, Top> entries = entries("  page => <T> result<T> & { cursor: box<T>  more?: [pair<T text>] }");
@@ -86,7 +87,7 @@ class ApplyConstructionTest {
         assertEquals(List.of(new ApplyBody(TypeRef.of("result"), List.of(t)).inPlace()), page.parents());
     }
 
-    /** The explicit spelling means what the sugar means, at a slot and inside an open record. */
+    /** The explicit spelling means what the sugar means, at a slot and inside a parametric record. */
     @Test
     void theExplicitSpellingClosesAsTheSugarDoes() {
         Map<String, Top> entries = entries("""
@@ -132,10 +133,10 @@ class ApplyConstructionTest {
         assertTrue(!problems("  @meta.application:{ head: box  arguments: [text] }\n  x => box<text>").isEmpty());
     }
 
-    /** An open record is named only as an application's head. */
+    /** A parametric record is named only as an application's head. */
     @Test
-    void anOpenRecordIsNamedOnlyAsAHead() {
-        refused("  r => { f: box }", "a template is not a type");
+    void aParametricRecordIsNamedOnlyAsAHead() {
+        refused("  r => { f: box }", "a parametric record is not a type");
         refused("  r => { f: meta.ref<box> }", "box");
     }
 
@@ -153,14 +154,14 @@ class ApplyConstructionTest {
     }
 
     /**
-     * A resolved form is held to where an application may stand: outside an open record, or inside one over names
+     * A resolved form is held to where an application may stand: outside a parametric record, or inside one over names
      * alone, it would have closed, and is refused.
      */
     @Test
     void anApplyWhereItWouldHaveClosedIsRefused() {
         SchemaValidationException closed = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(closedHolding(ApplyBody.of("box", "text"), false), null));
-        assertTrue(closed.getMessage().contains("outside an open record"), closed.getMessage());
+        assertTrue(closed.getMessage().contains("outside a parametric record"), closed.getMessage());
         SchemaValidationException overNames = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(closedHolding(ApplyBody.of("box", "text"), true), null));
         assertTrue(overNames.getMessage().contains("over names alone it closes"), overNames.getMessage());

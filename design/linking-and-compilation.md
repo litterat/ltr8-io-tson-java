@@ -1,7 +1,7 @@
 # Linking and registration
 
 Design notes for canonical identity, the schema registry, and `TsonSchemaLinker`'s pass 2: import merging, the order
-of the link, reference validation, the two §5.10 template rules, the facts linking records on
+of the link, reference validation, the two §5.10 rules for a parametric record, the facts linking records on
 `TsonLinkedSchema`, namespace types and values by name. Current form only; history lives in git.
 
 The linker's other checks have notes of their own: kinds and name types in `design/kinds-and-name-types.md`, the
@@ -44,14 +44,14 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   and each is merged through imports.
 - A namespace type resolves to a `NamespaceBody`, and a value of it is read as the map `NamespaceBody.read()` states:
   both compilers hand that map to the `map` factory, so neither factory table has a `namespace` entry.
-- `checkOpenArity` is the one place an entry's own parameters are in scope: it reads an open record's references, a
+- `checkOpenArity` is the one place an entry's own parameters are in scope: it reads a parametric record's references, a
   `ParamRef` among them, and judges arity alone. A closed entry holds no parameter, so `validateTypeRef` and
   `checkFieldValue` resolve every name in the schema's namespace.
 - `TsonSchemaRegistry` never overwrites an identity and exposes no way to remove or enumerate one: that *is* the
   "locked" guarantee.
 - Everything that asks what an entry IS-A asks its `TypeChain`: `computeSubtypes` credits every closed type and no
-  open record, so a template is in no `subtypes` index, and the constructor test (`TypeChain.isConstructor`) reads an
-  open record's chain as a closed one's, judging `top` by its origin.
+  parametric record, so a parametric record is in no `subtypes` index, and the constructor test
+  (`TypeChain.isConstructor`) reads a parametric record's chain as a closed one's, judging `top` by its origin.
 
 Related: `design/namespace-types-and-value-entries.md`, `design/references.md`, `design/class2-compilation.md`,
 `design/compiled-registries.md`, `design/schema-resolution.md`, `design/template-materialisation.md`.
@@ -65,7 +65,7 @@ the registry is storage over the `schema.meta` value model and stays in `tson-sc
 
 **The linker materializes nothing.** `SchemaDesugarer` and `TemplateMaterialiser` have turned every sugar form and
 closable application into a declaration one phase earlier, in the module that can bind a constructor generically. The
-references carrying arguments the linker sees are inside open records, validated and never rewritten, every argument
+references carrying arguments the linker sees are inside parametric records, validated and never rewritten, every argument
 judged as a type's name; an application
 whose head names nothing in scope keeps its argument list rather than collapsing to its bare head
 (`design/template-materialisation.md`), so what the linker judges is what the author wrote.
@@ -89,7 +89,7 @@ load-bearing, each step reading what an earlier one wrote:
 2. **Add the local entries**: a collision with the closure is refused unless the two are equal. The merged map is
    the one namespace every later step reads.
 3. **`attachExterns`**, each local extern to the foreign entry it lands on, an imported one's carried from its link.
-4. **`computeSubtypes`**, the reverse of `supertypes` over every closed `Type`, an open record left out.
+4. **`computeSubtypes`**, the reverse of `supertypes` over every closed `Type`, a parametric record left out.
 5. **`enumForms`** for each local enum (`EnumLabels.labelForm`).
 6. **`computeKinds`**, every reference's derived index, whether `of` names a constructor and, for a kind, its
    members (`design/kinds-and-name-types.md`).
@@ -147,7 +147,7 @@ are worth their place here, each catching what would otherwise link, compile, an
   value), naming the type it is a value of. A value entry's payload was judged by the read against its type and its
   names by `ValuesByName`, so `validateBody` asks nothing of it.
 - **A `meta.type_ref` slot is judged by membership** of `meta.type_ref` (`KindMembers.isMember`), where `type` is in reach:
-  an alias stopping at an application, an open record and a value entry are no type a value can have. A constructor
+  an alias stopping at an application, a parametric record and a value entry are no type a value can have. A constructor
   is one, its declaration a record (`spec: net.uuid_type` holds a declaration body as data; §4.1).
 - **A choice's variants are distinct at the end of each §8.3 alias chain** (`AliasChain.terminal`), since an
   alias and its target are one type: `(text | my_text)` with `my_text => text` is caught, the only spelling an author
@@ -156,9 +156,9 @@ are worth their place here, each catching what would otherwise link, compile, an
 **A chain's names resolve in the same namespace.** A composition of a kernel constructor reaches one (`list_type =>
 meta.array & {...}` carries `[meta.array, meta.product, meta.top, meta.type]`), and the defining schema's closure is inside
 the importer's, so every name on it is there. A `meta.ref` body's `of` names any type or constructor, an application
-there having closed to its entry during resolution, never a value entry or an open record (`KindMembers.ofRefusal`); what it
-names decides whether the slot holds a type's name or a value's. A namespace type's stated `key_type` must be a member of
-`meta.identifier_ref`: its keys are names.
+there having closed to its entry during resolution, never a value entry or a parametric record (`KindMembers.ofRefusal`);
+what it names decides whether the slot holds a type's name or a value's. A namespace type's stated `key_type` must be a
+member of `meta.identifier_ref`: its keys are names.
 
 **Two narrowings are judged here, both by `isA`** (§7.2's chain IS-A, alias hops followed): a reference refinement's
 `of` (`checkReferenceNarrows`), and a record's restated field types against the nearest closed records on its chain
@@ -169,26 +169,26 @@ neither runs there; `design/schema-resolution.md` has the field rule.
 to; a declared body was already asked at resolution, and one refused there never reaches
 the linker (`design/atom-refinement-and-coherence.md`).
 
-## The two §5.10 template rules
+## The two §5.10 rules for a parametric record
 
-Both are decidable at link and neither depends on anyone applying a template.
+Both are decidable at link and neither depends on anyone applying a parametric record.
 
 - **Arity, over every reference** (`checkArity`): a reference supplies exactly as many arguments as the entry it names
-  declares parameters. Too many, too few, and **none at all**: a template named bare otherwise links and compiles and
-  fails at read time against a document with nothing wrong with it. A template is not a type (§5.10), so a bare
-  template is refused at every position -- a field, element, map key or value, tuple position, choice variant or
-  argument -- the message naming the remedy: the application, or the abstract record a
+  declares parameters. Too many, too few, and **none at all**: a parametric record named bare otherwise links and compiles
+  and fails at read time against a document with nothing wrong with it. A parametric record is not a type (§5.10), so a
+  bare parametric record is refused at every position -- a field, element, map key or value, tuple position, choice variant
+  or argument -- the message naming the remedy: the application, or the abstract record a
   family's applications compose. An operand is `DefinitionResolver.refuseUnappliedTemplate`'s, one phase earlier. A
   type parameter written with arguments (`T<text>`) is refused: §5.10 admits no head abstraction.
-- **Parameter usage** (`checkOpenEntryUsesEveryParameter`): an open record references every parameter it declares, so
+- **Parameter usage** (`checkOpenEntryUsesEveryParameter`): a parametric record references every parameter it declares, so
   `box => <T> { v: text }` is refused. The converse needs no check: at a closed entry a token in a value slot *is* a
   literal, and a parameter reference is already an unresolved one.
-- **An open record answers arity for every reference it holds** (`checkOpenArity`), bare ones included: its field
-  types and parents are references of the model, so a template named bare inside a template is refused at the
-  template's own declaration, and a field named `box` beside a template of that name is told apart, a field name being
-  no reference. What a reference *resolves to* waits for an application, so type-kind validation and inhabitance run
-  on the record an application closes to; arity counts the parameters the referenced entry declares and does not.
-  Nothing ever closes `chain => <T> { tail: chain<T, T>? }`, so deferring it would ship the mistake.
+- **A parametric record answers arity for every reference it holds** (`checkOpenArity`), bare ones included: its field
+  types and parents are references of the model, so a parametric record named bare inside a parametric record is
+  refused at the latter's own declaration, and a field named `box` beside a parametric record of that name is told apart, a
+  field name being no reference. What a reference *resolves to* waits for an application, so type-kind validation and
+  inhabitance run on the record an application closes to; arity counts the parameters the referenced entry declares and does
+  not. Nothing ever closes `chain => <T> { tail: chain<T, T>? }`, so deferring it would ship the mistake.
 
 ## The facts linking records (`TsonLinkedSchema`)
 
@@ -272,7 +272,7 @@ The same walk judges two more names, so one rule decides what a value's name rea
 - **One namespace for the slot's type and the name.** The first segment resolves in `merged`, a segment naming a
   member of a nested `!schema` map collapses onto that member's path entry, alias hops are followed (§8.3), and only
   there, so `method: place_order` is unresolved even though `orders` holds that key. Found first,
-  judged after: nothing is a choice among candidates. A type entry admits no further segment, an open record is no
+  judged after: nothing is a choice among candidates. A type entry admits no further segment, a parametric record is no
   referent, a list has no named members, and a map that is no namespace is not entered whatever its key type.
 - **The judgement is §7.2's IS-A, by canonical identity.** An entry's declared type is the constructor that built its
   body: its recorded tag where that names a constructor, else the kernel constructor its body's class mirrors

@@ -28,11 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Each walk case the kernel's {@code reference} doc names is pinned on its own: a construction is a member, a
  * refinement of a member is one, a type built with another constructor is not, an ABSTRACT record base is a member of
  * {@code meta.ref<record>} with no values of its own, an instantiation is a member of its constructor's kind where the
- * template it closes is not, and a constructor, whose declaration is a record, is a member of {@code meta.ref<record>}
- * and {@code meta.type_ref}. A kind's members are computed over the whole closure, so the kernel's and numeric.tn's own
- * types join them wherever the schema reaches core. Then {@code of}: any type or constructor of the schema's one
- * namespace, a type that is no constructor making the reference one that names values. Last, the kernel's {@code
- * name_type} slots, typed {@code meta.identifier_ref}, judged by membership.
+ * parametric record it closes is not, and a constructor, whose declaration is a record, is a member of {@code
+ * meta.ref<record>} and {@code meta.type_ref}. A kind's members are computed over the whole closure, so the kernel's and
+ * numeric.tn's own types join them wherever the schema reaches core. Then {@code of}: any type or constructor of the
+ * schema's one namespace, a type that is no constructor making the reference one that names values. Last, the kernel's
+ * {@code name_type} slots, typed {@code meta.identifier_ref}, judged by membership.
  */
 class KindMembersTest {
 
@@ -118,12 +118,12 @@ class KindMembersTest {
     }
 
     /**
-     * A template is no type and no member (§5.10): it is an open record, built with {@code record}, and a kind of
-     * {@code record} holds its applications and not it. A set is an array, so a kind of {@code meta.array} holds it,
+     * A parametric record is no type and no member (§5.10): it is a record with parameters, built with {@code record}, and a
+     * kind of {@code record} holds its applications and not it. A set is an array, so a kind of {@code meta.array} holds it,
      * and the root's {@code set}, an alias of an incomplete entry, is no type and no member.
      */
     @Test
-    void anInstantiationIsAMemberOfItsConstructorsKindAndATemplateOfNone() {
+    void anInstantiationIsAMemberOfItsConstructorsKindAndAParametricRecordOfNone() {
         TsonLinkedSchema linked = link("""
                 {
                   tags   => set<text>
@@ -234,7 +234,7 @@ class KindMembersTest {
      * A map type and a namespace type are types: the kernel's {@code meta.type_ref} holds {@code field_map}, built with
      * {@code map}, and {@code schema}, built with {@code namespace}. A constructor is a member too, its value being a
      * record whose instances are declarations: {@code record}, {@code namespace} and {@code array} alike. A held
-     * template is not, nor an incomplete entry, which is no type.
+     * parametric record is not, nor an incomplete entry, which is no type.
      */
     @Test
     void typeRefHoldsTheNamespaceTypesAndTheConstructors() {

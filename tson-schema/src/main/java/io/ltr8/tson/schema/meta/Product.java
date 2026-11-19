@@ -27,7 +27,7 @@ public sealed interface Product extends Type
      * <p><b>Stated here rather than where a container is written.</b> [TSON-SCHEMA] §5.3's size specifier and
      * the explicit {@code !meta.array { ... min_items: ... }} body denote the same type, and a rule that lived
      * with either spelling would refuse one and admit the other. §8.2's materialisation-time check has the
-     * same need from a third direction -- bounds that were parameters when the template was written -- and
+     * same need from a third direction -- bounds that were parameters when the parametric record was written -- and
      * reaches the same rule here.
      */
     default List<String> coherenceCheck() {

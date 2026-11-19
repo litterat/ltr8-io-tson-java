@@ -19,11 +19,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * <b>A family declared through a template dispatches the same way in both encodings</b> ([TSON-JSON] §9.4, and
- * [TSON-SCHEMA] §5.10). A template is no type, so a family's base is a record: an abstract record a template
- * composes, its members reaching it through the template's written parent, or an abstract template's application,
- * which is an abstract record carrying the template's selector. A value at the base's position is a value of one
- * of its members, selected by the discriminators where the base states them and by a tag where it states none.
+ * <b>A family declared through a parametric record dispatches the same way in both encodings</b> ([TSON-JSON] §9.4, and
+ * [TSON-SCHEMA] §5.10). A parametric record is no type, so a family's base is a record: an abstract record a parametric
+ * record composes, its members reaching it through the parametric record's written parent, or an abstract parametric
+ * record's application, which is an abstract record carrying the parametric record's selector. A value at the base's
+ * position is a value of one of its members, selected by the discriminators where the base states them and by a tag where it
+ * states none.
  *
  * <p><b>Why this sits beside {@link CrossEncodingParityTest} rather than inside it.</b> That test compares one
  * schema, held statically, which is what lets it be terse; the family's shapes and the tag cases need a schema
@@ -45,7 +46,7 @@ class TemplateFamilyEncodingParityTest {
             !schema
             """.formatted("%s", TsonBundledSchemas.META_ID, TsonBundledSchemas.CORE_ID);
 
-    /** An abstract record states the selector, a template composes it, and each member pins it -- by the pin. */
+    /** An abstract record states the selector, a parametric record composes it, and each member pins it -- by the pin. */
     private static final String SEALED = HEADER.formatted("tsealed") + """
             {
               dog_type => { breed: text }
@@ -57,7 +58,7 @@ class TemplateFamilyEncodingParityTest {
               holder   => { p: pet }
             }""";
 
-    /** The base states no selector, and each member declares an application of the template -- by tag. */
+    /** The base states no selector, and each member declares an application of the parametric record -- by tag. */
     private static final String ABSTRACT = HEADER.formatted("tabstract") + """
             {
               dog_type => { breed: text }
@@ -69,7 +70,7 @@ class TemplateFamilyEncodingParityTest {
               holder   => { p: pet }
             }""";
 
-    /** The base is an abstract template's application, carrying its selector -- by the pin. */
+    /** The base is an abstract parametric record's application, carrying its selector -- by the pin. */
     private static final String APPLIED = HEADER.formatted("tapplied") + """
             {
               pet      => abstract <V> { type: text =?  value: V }
@@ -138,7 +139,7 @@ class TemplateFamilyEncodingParityTest {
     // ── SEALED: the pin selects, and no tag is written ───────────────────
 
     @Test
-    void aSealedBaseThroughATemplateDispatchesOnItsPinInBoth() {
+    void aSealedBaseThroughAParametricRecordDispatchesOnItsPinInBoth() {
         bothAccept(SEALED, "holder",
                 "!holder { p: { type: \"dog\"  value: { breed: lab } } }",
                 "{\"p\":{\"type\":\"dog\",\"value\":{\"breed\":\"lab\"}}}");
@@ -151,9 +152,9 @@ class TemplateFamilyEncodingParityTest {
                 "{\"p\":{\"type\":\"cat\",\"value\":{\"indoor\":true}}}");
     }
 
-    /** The base is an abstract template's application, and its members are the declarations composing it. */
+    /** The base is an abstract parametric record's application, and its members are the declarations composing it. */
     @Test
-    void anAbstractTemplatesApplicationDispatchesOnItsPinInBoth() {
+    void anAbstractParametricRecordsApplicationDispatchesOnItsPinInBoth() {
         bothAccept(APPLIED, "holder",
                 "!holder { p: { type: \"cat\"  value: x  indoor: true } }",
                 "{\"p\":{\"type\":\"cat\",\"value\":\"x\",\"indoor\":true}}");
@@ -170,7 +171,7 @@ class TemplateFamilyEncodingParityTest {
     // ── ABSTRACT: a tag selects, and only a member's name is one ─────────
 
     @Test
-    void anAbstractBaseThroughATemplateDispatchesOnTheMemberTagInBoth() {
+    void anAbstractBaseThroughAParametricRecordDispatchesOnTheMemberTagInBoth() {
         bothAccept(ABSTRACT, "holder",
                 "!holder { p: !dogpet { value: { breed: lab } } }",
                 "{\"p\":{\"$type\":\"dogpet\",\"value\":{\"breed\":\"lab\"}}}");
@@ -190,7 +191,7 @@ class TemplateFamilyEncodingParityTest {
 
     /** ABSTRACT has no direct instances, so the tag is not optional the way a SEALED base's is. */
     @Test
-    void anAbstractBaseThroughATemplateRequiresItsTagInBoth() {
+    void anAbstractBaseThroughAParametricRecordRequiresItsTagInBoth() {
         sameRule(ABSTRACT, "holder",
                 "!holder { p: { value: { breed: lab } } }",
                 "{\"p\":{\"value\":{\"breed\":\"lab\"}}}");

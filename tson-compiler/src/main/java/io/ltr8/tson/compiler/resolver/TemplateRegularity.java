@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * §5.10's regularity boundary, checked where a template is <em>declared</em>: within a template body, a
+ * §5.10's regularity boundary, checked where a parametric record is <em>declared</em>: within a parametric record's body, a
  * recursive application -- direct or mutual -- must pass each parameter through unchanged.
  *
  * <p><b>Growth is unwritable before this runs.</b> An argument is a name or a parameter (§5.3), so {@code weird => <T>
@@ -30,11 +30,11 @@ import java.util.Set;
  * ML makes of polymorphic recursion. {@code TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate}
  * pins it.
  *
- * <p><b>Mutual recursion needs reachability, not just a self-edge.</b> Neither template in an {@code a → b → a}
+ * <p><b>Mutual recursion needs reachability, not just a self-edge.</b> Neither parametric record in an {@code a → b → a}
  * cycle applies itself, so an application is checked whenever its head can reach the declaration it sits in.
  *
- * <p>Arity is <em>not</em> checked here: {@code TsonSchemaLinker} checks it over every application an open record
- * writes, whether or not the template is ever applied. This compares positionally only where the arity already
+ * <p>Arity is <em>not</em> checked here: {@code TsonSchemaLinker} checks it over every application a parametric record
+ * writes, whether or not the parametric record is ever applied. This compares positionally only where the arity already
  * matches.
  */
 final class TemplateRegularity {
@@ -43,10 +43,10 @@ final class TemplateRegularity {
     }
 
     /**
-     * Checks every template in {@code entries}, reporting each irregular application against the declaration
+     * Checks every parametric record in {@code entries}, reporting each irregular application against the declaration
      * that wrote it. {@code reporter} may be {@code null}, in which case the first failure throws.
      *
-     * @return the templates found irregular, for the caller to replace before anything closes an application
+     * @return the parametric records found irregular, for the caller to replace before anything closes an application
      *         of one, so an application of one reports nothing further. Always empty when {@code reporter} is
      *         {@code null}, that mode having thrown at the first failure.
      */
@@ -86,7 +86,7 @@ final class TemplateRegularity {
         void reportIrregularRecursion(String declaration, SchemaValidationException error);
     }
 
-    /** One application written inside a template body: the head it applies and the arguments it applies to. */
+    /** One application written inside a parametric record's body: the head it applies and the arguments it applies to. */
     private record Application(String head, List<TypeRef> arguments) {
     }
 
@@ -113,7 +113,7 @@ final class TemplateRegularity {
         return null;
     }
 
-    /** Whether {@code from} reaches {@code target} by applying templates, {@code from == target} included. */
+    /** Whether {@code from} reaches {@code target} by applying parametric records, {@code from == target} included. */
     private static boolean reaches(String from, String target, Map<String, List<Application>> applications) {
         Set<String> seen = new HashSet<>();
         Deque<String> pending = new ArrayDeque<>();
@@ -134,9 +134,9 @@ final class TemplateRegularity {
     }
 
     /**
-     * Every application a template's body writes, at any depth of types written in place.
+     * Every application a parametric record's body writes, at any depth of types written in place.
      *
-     * <p>Every entry with parameters is an open record, which answers which applications it writes ({@link
+     * <p>Every entry with parameters is a parametric record, which answers which applications it writes ({@link
      * OpenEntry#applications}), the same kind of declared question as its names, which is what keeps this rule at the
      * declaration, before anything is resolved against it.
      */

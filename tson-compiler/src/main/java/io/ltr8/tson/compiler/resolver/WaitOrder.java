@@ -151,8 +151,8 @@ final class WaitOrder implements DefinitionGetter {
 
     /**
      * Makes every declaration ready. Those whose declaration reads no value -- a record, a composition, an alias, a
-     * template -- and those {@code first} names go first, so the first compile a read needs already holds every head
-     * a read applies; the reads then follow their own waits. The order changes how many compiles run, and nothing
+     * parametric record -- and those {@code first} names go first, so the first compile a read needs already holds every
+     * head a read applies; the reads then follow their own waits. The order changes how many compiles run, and nothing
      * else.
      */
     void readyAll(Predicate<String> first) {
@@ -222,7 +222,7 @@ final class WaitOrder implements DefinitionGetter {
 
     /**
      * Answered over the declarations not yet ready by their parameter lists and alias targets as written, so asking
-     * waits on nothing: an open record applied inside its own declaration, or inside one its declaration waits on,
+     * waits on nothing: a parametric record applied inside its own declaration, or inside one its declaration waits on,
      * would otherwise wait on itself.
      */
     @Override
@@ -329,7 +329,7 @@ final class WaitOrder implements DefinitionGetter {
     /**
      * Drops the compiled readers, so the next read compiles the entries as they stand: called once every
      * declaration is ready, after which a resolution rewrites entries in place (materialisation, a condemned
-     * template's placeholder) rather than adding them one by one.
+     * parametric record's placeholder) rather than adding them one by one.
      */
     void settled() {
         bound = null;

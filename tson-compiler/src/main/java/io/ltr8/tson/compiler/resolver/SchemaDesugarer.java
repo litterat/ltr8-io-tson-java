@@ -85,7 +85,7 @@ import java.util.function.UnaryOperator;
  * }} wrapper, at any depth. No declaration is added. See {@link #elementRef} and {@link #slotValue}.
  *
  * <p><b>An application passes through.</b> {@code name&lt;args&gt;} resolves its head in the schema's
- * namespace -- parameters, then locals, then imports -- and is a §5.10 template application or, over a
+ * namespace -- parameters, then locals, then imports -- and is an application of a §5.10 parametric record or, over a
  * constructor, construction sugar (§5.3); {@code TemplateMaterialiser} closes either over the <em>resolved</em>
  * form one phase later. What is checked here is the one thing an AST alone decides: a head this document
  * declares with no parameters, and with a body no constructor has, takes no arguments at all. See {@link
@@ -100,12 +100,12 @@ import java.util.function.UnaryOperator;
  * being <em>declared</em> or <em>composed</em>, not applied: a declaration's own body reference
  * ({@code TypeExprDef}) and a composition supertype.
  *
- * <p><b>A template's body is a record body</b> ([TSON-SCHEMA] §5.10): braces or a composition, and the
- * record passes through as it would without parameters, for {@code DefinitionResolver} to build as an open record. A
+ * <p><b>A parametric record's body is a record body</b> ([TSON-SCHEMA] §5.10): braces or a composition, and the
+ * record passes through as it would without parameters, for {@code DefinitionResolver} to build as a parametric record. A
  * parameter list before a sugar form or a bare reference -- {@code <T> [T]}, {@code <T> ( T | error )}, {@code <B>
- * pair<uuid, B>} -- is refused here, naming what to write instead ({@link #refuseTemplateBody}). Inside an open record
+ * pair<uuid, B>} -- is refused here, naming what to write instead ({@link #refuseTemplateBody}). Inside a parametric record
  * a form is its construction in place whether or not it names a parameter: a parameter is a name at a type slot like
- * any other, which the open record scopes and each application substitutes.
+ * any other, which the parametric record scopes and each application substitutes.
  *
  * <p><b>An invalid sugar form is reported per declaration, not thrown</b>, when a {@link
  * DesugarFailureReporter} is supplied -- the same one-pass treatment {@code SchemaResolver} and {@code
@@ -179,7 +179,7 @@ final class SchemaDesugarer {
      * <p>It is deliberately never in {@code TsonSchemaParser.declarationPositions()} -- the position belongs
      * to the diagnostic already reported against the real declaration, not to this stand-in.
      *
-     * <p><b>A stand-in keeping parameters is an open empty record</b>, an open record like any other where
+     * <p><b>A stand-in keeping parameters is an empty parametric record</b>, one like any other where
      * {@code DefinitionResolver} resolves it, so {@code TemplateMaterialiser} closes it by the one process.
      */
     private static TypeDef absorbed(SchemaMap.Declaration declaration) {
@@ -189,7 +189,7 @@ final class SchemaDesugarer {
     /** This document's own declarations, for {@link #checkTemplateApplication} -- set before the walk starts. */
     private Map<String, SchemaMap.Declaration> local = Map.of();
 
-    /** The type parameters of the declaration currently being walked, or empty outside a template. */
+    /** The type parameters of the declaration currently being walked, or empty outside a parametric record. */
     private List<String> currentParameters = List.of();
 
     /** The name of the declaration currently being walked, for a refusal that names it. */
@@ -311,7 +311,7 @@ final class SchemaDesugarer {
      * with parameters is the resolver's to admit (before {@code !meta.record}) or refuse, since only it knows what
      * the head is.
      *
-     * <p>A template's record body is walked as any record's; a parameter list before anything but a record body is
+     * <p>A parametric record's body is walked as any record's; a parameter list before anything but a record body is
      * refused ({@link #refuseTemplateBody}).
      */
     private TypeDef typeDef(TypeDef typeDef) {
@@ -345,14 +345,14 @@ final class SchemaDesugarer {
     }
 
     /**
-     * A parameter list before a body that is no record ([TSON-SCHEMA] §5.10: a template's body is a record body --
+     * A parameter list before a body that is no record ([TSON-SCHEMA] §5.10: a parametric record's body is a record body --
      * braces or a composition), refused with what to write instead. A sugar form is a construction,
      * applied where it is used or left open and completed there; a choice or a tuple is a discriminated record
-     * family or a field group; a bare reference is an alias template, which names a partial application nothing
+     * family or a field group; a bare reference is a parametric alias, which names a partial application nothing
      * could close.
      */
     private SchemaValidationException refuseTemplateBody(TypeExpr body) {
-        String prefix = "'" + currentName + "': a template's body is a record body -- braces or a composition "
+        String prefix = "'" + currentName + "': a parametric record's body is a record body -- braces or a composition "
                 + "(§5.10) -- and '" + spell(body) + "' is ";
         return new SchemaValidationException(prefix + switch (body) {
             case ArrayExpr _ -> "an array. Write the application where it is used ('meta.array<T>', '[T]'), or "
@@ -360,11 +360,11 @@ final class SchemaDesugarer {
             case MapExpr _ -> "a map. Write the application where it is used ('meta.map<K V>', '{K => V}'), or "
                     + "leave its construction open ('bounded_map => !meta.map ^ { max_items: 10 }') and complete it";
             case ChoiceExpr _ -> "a choice. Declare a discriminated record family instead (an abstract base with a "
-                    + "selector, a template composing it, and members pinning it), or write the alternative as a "
+                    + "selector, a parametric record composing it, and members pinning it), or write the alternative as a "
                     + "field group inside a record, '( body: T | problem: problem )'";
-            case TupleExpr _ -> "a tuple. Name the positions as the fields of a record template, '<A, B> { first: A "
+            case TupleExpr _ -> "a tuple. Name the positions as the fields of a parametric record, '<A, B> { first: A "
                     + " second: B }', or declare the tuple for each type it holds";
-            default -> "a reference, so the declaration would be an alias template, which a template's body never "
+            default -> "a reference, so the declaration would be a parametric alias, which a parametric record's body never "
                     + "is. Restate the body as a record ('<B> { first: uuid  second: B }'), or write the application "
                     + "at each use ('pair<uuid, int32>')";
         });
@@ -566,9 +566,9 @@ final class SchemaDesugarer {
 
     /**
      * Checks a generic application, which after §3.3.1's type-name-only head resolution can only ever be a
-     * §5.10 user-template application: {@code box => <T> { v: T }} applied as {@code box<text>}.
+     * application of a §5.10 parametric record: {@code box => <T> { v: T }} applied as {@code box<text>}.
      *
-     * <p><b>An open record passes through</b> -- substitution happens over the <em>resolved</em> open record, not
+     * <p><b>A parametric record passes through</b> -- substitution happens over the <em>resolved</em> parametric record, not
      * over the AST, so this phase leaves the application for {@code SchemaResolver} to materialise and the head keeps
      * its arguments into resolution.
      *

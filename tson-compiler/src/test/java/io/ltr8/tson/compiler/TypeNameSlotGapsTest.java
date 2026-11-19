@@ -71,7 +71,7 @@ class TypeNameSlotGapsTest {
         return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.contextExtendedWith(HOSTS), SOURCE);
     }
 
-    /** A schema under the meta above declaring {@code order}, the record template {@code box}, and {@code more}. */
+    /** A schema under the meta above declaring {@code order}, the parametric record {@code box}, and {@code more}. */
     private static String schema(String label, String more) {
         String id = "https://example.test/gap-" + label + ".tn";
         DOCUMENTS.put(id, """

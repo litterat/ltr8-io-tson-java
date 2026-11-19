@@ -47,8 +47,9 @@ class ExternNamingTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', quoteCharacter = '"', value = {
-            "box|is an open record, which denotes no type until it is applied (§5.10)",
-            "box_alias|is an alias of 'box', which is an open record, which denotes no type until it is applied (§5.10)",
+            "box|is a parametric record, which denotes no type until it is applied (§5.10)",
+            "box_alias|is an alias of 'box', which is a parametric record, which denotes no type until it is applied "
+                    + "(§5.10)",
             "set|is an alias of 'meta.set_type', which is an incomplete entry, which is no type until it is completed",
             "enum|is an incomplete entry, which is no type until it is completed",
             "meta.record|is a constructor, whose values are types and which an extern can neither apply nor extend",

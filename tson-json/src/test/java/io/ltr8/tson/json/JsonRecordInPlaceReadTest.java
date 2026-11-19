@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A record written in place read through the JSON encoding ([TSON-SCHEMA] §5.10): in tree mode by a reader built from
- * the record's body, with the open record's field states, admitting no {@code $type} (§7.2), and in bind mode into the
+ * the record's body, with the parametric record's field states, admitting no {@code $type} (§7.2), and in bind mode into the
  * record class the component holding it declares, no binding map being able to name it (§8.2).
  */
 class JsonRecordInPlaceReadTest {

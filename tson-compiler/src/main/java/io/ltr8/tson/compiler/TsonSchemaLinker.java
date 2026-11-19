@@ -123,7 +123,7 @@ import java.util.function.Predicate;
  * construction it denotes, in place, and the resolver binds it through the constructor's compiled reader, which
  * covers every shape generically; the resolver's {@code TemplateMaterialiser} closes every application, in place or
  * into the declaration naming it. What survives into an entry the linker sees is therefore a name or a type written
- * in place in every position except one: an open record's own fields and parents, which legitimately reference its own
+ * in place in every position except one: a parametric record's own fields and parents, which legitimately reference its own
  * parameters ({@code box<T>}) and are checked only for what no argument changes -- the arity of the references it
  * writes ({@link #checkOpenArity}) -- never resolved against the schema. A
  * closed entry holds no parameter, so every name it holds resolves in the schema's own namespace or is unresolved.
@@ -343,7 +343,7 @@ public final class TsonSchemaLinker {
                             merged::get, structure)
                     .orElse(IdentifierGrammar.PROFILE);
             checkScope(receiver, schema, name, "'" + name + "'", position, names, noun, identifiers, profile);
-            // An open record's literal values are every application's, so they are judged here, once.
+            // A parametric record's literal values are every application's, so they are judged here, once.
             if (body instanceof RecordBody record) {
                 checkFieldValues(receiver, schema, name, "'" + name + "'", position, fieldValues(record), merged,
                         identifiers);
@@ -361,7 +361,7 @@ public final class TsonSchemaLinker {
                 }
             }
 
-            // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
+            // [TSON-SCHEMA] §11.4 does not list a parametric record's parameters among its scopes, and this treats
             // them as one anyway -- §11.4 declines the scope. A parameter is a name, §11.4's own reasoning for
             // enum members applies to it unchanged, and `<T, Т>` otherwise declares two parameters that read
             // identically: a body referencing `T` binds one of them and a reviewer cannot see which, which
@@ -515,9 +515,9 @@ public final class TsonSchemaLinker {
     /**
      * A reference resolving to nothing, carried in <b>parts</b> rather than as a finished sentence.
      *
-     * <p>An open record defers every question about what its references resolve to, so an unresolved one
+     * <p>A parametric record defers every question about what its references resolve to, so an unresolved one
      * surfaces inside a record an application closes to in place -- {@code box<int32>} -- when the name was written
-     * in the template's own text. The two statements of that one fact differ in the subject alone, so the subject
+     * in the parametric record's own text. The two statements of that one fact differ in the subject alone, so the subject
      * is supplied at the point the fact is stated rather than baked in at the point it is discovered.
      *
      * <p><b>Linker-internal, and never escapes.</b> It is caught in the one place it is thrown from and
@@ -555,7 +555,7 @@ public final class TsonSchemaLinker {
         }
 
         /**
-         * Whether it surfaced inside a record an application closes to in place, whose text an open record wrote
+         * Whether it surfaced inside a record an application closes to in place, whose text a parametric record wrote
          * ({@link #heldDeclarationNaming}).
          */
         boolean inPlace() {
@@ -586,22 +586,22 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * The declaration a <b>deferred</b> defect belongs to: the open record whose body wrote the name, when the
+     * The declaration a <b>deferred</b> defect belongs to: the parametric record whose body wrote the name, when the
      * failure surfaced inside a record an application closed to in place.
      *
      * <p><b>Deferral is what makes this necessary.</b> A closed declaration's references are checked where the
-     * author wrote them. An open record's are judged where it is applied, so {@code box => <T> { v: T  w:
+     * author wrote them. A parametric record's are judged where it is applied, so {@code box => <T> { v: T  w:
      * no_such_type }} gets its verdict inside each record {@code box<…>} closes to in place, against a line that is
      * not wrong and does not contain the name. The author is sent to the line they can edit instead.
      *
-     * <p><b>The offending name is the evidence.</b> Asking which open record <em>mentions the name</em>, a type it
-     * holds in place included, reaches the template directly, and reaches nothing at all when the name came from an
+     * <p><b>The offending name is the evidence.</b> Asking which parametric record <em>mentions the name</em>, a type it
+     * holds in place included, reaches the parametric record directly, and reaches nothing at all when the name came from an
      * argument the applier wrote -- {@code box<some_typo>} keeps its verdict at the application, which is where that
      * mistake is.
      *
      * <p><b>Both filters are load-bearing.</b> Only a failure inside a record in place is retargeted, or a closed
-     * declaration's own typo would be blamed on any template that happens to name it; and only an open record is a
-     * candidate, since a defect no open record deferred is already located correctly.
+     * declaration's own typo would be blamed on any parametric record that happens to name it; and only a parametric record
+     * is a candidate, since a defect no parametric record deferred is already located correctly.
      *
      * @return the declaration to blame, or {@code null} to leave the failure where it surfaced
      */
@@ -619,7 +619,7 @@ public final class TsonSchemaLinker {
         return null;
     }
 
-    /** Whether the open record {@code open} writes {@code name}, in a reference or inside a type it holds in place. */
+    /** Whether the parametric record {@code open} writes {@code name}, in a reference or inside a type it holds in place. */
     private static boolean writes(Top open, String name) {
         return OpenEntry.names(open).contains(name);
     }
@@ -768,13 +768,13 @@ public final class TsonSchemaLinker {
                     continue; // a declaration not yet ready: judged when the whole schema links
                 }
                 String author = heldDeclarationNaming(e, merged, facts);
-                if (author == null) { // the applier's own text, or a name no open record wrote: blame the entry
+                if (author == null) { // the applier's own text, or a name no parametric record wrote: blame the entry
                     reportOrThrow(receiver, schema, entry.getKey(), facts, e.getMessage(), e);
                     continue;
                 }
-                // One mistake in a template is one mistake however many declarations apply it: each
+                // One mistake in a parametric record is one mistake however many declarations apply it: each
                 // application closes to its own record in place and each fails identically, so the verdict that
-                // names the template would otherwise be repeated once per applier.
+                // names the parametric record would otherwise be repeated once per applier.
                 String message = e.against(author);
                 if (blamedOnce.add(author + "\u0000" + message)) {
                     reportOrThrow(receiver, schema, author, facts, message, e);
@@ -883,7 +883,7 @@ public final class TsonSchemaLinker {
             return Optional.of("is an incomplete entry, which is no type until it is completed");
         }
         if (OpenEntry.isOpen(definition)) {
-            return Optional.of("is an open record, which denotes no type until it is applied (§5.10)");
+            return Optional.of("is a parametric record, which denotes no type until it is applied (§5.10)");
         }
         if (foreign.isConstructor(name, definition)) {
             return Optional.of("is a constructor, whose values are types and which an extern can neither apply "
@@ -1179,7 +1179,7 @@ public final class TsonSchemaLinker {
     /**
      * The choices in local entry {@code name} the variant checks ask: the entry itself where it is one and asserts no
      * {@code @meta.disjoint}, whose failure {@link #checkDisjointAssertions} reports alone, and every choice written in
-     * place in it at any depth. None in an open record: its choices are judged where each application closes, their
+     * place in it at any depth. None in a parametric record: its choices are judged where each application closes, their
      * variants known (§5.4).
      */
     private static List<ChoiceBody> choicesJudged(String name, AnnotatedMap<String, Top> entries,
@@ -1258,9 +1258,9 @@ public final class TsonSchemaLinker {
      * imported schema, examined on its own, correctly doesn't know about it. {@link #withAddedSubtypes} unions
      * with whatever subtypes the target already had rather than replacing them.
      *
-     * <p><b>Every type is credited, and nothing else</b> ({@link Type}). An alias is a hop, and a template is no
+     * <p><b>Every type is credited, and nothing else</b> ({@link Type}). An alias is a hop, and a parametric record is no
      * type (§5.10): its chain records what its written parents reach, which each application inherits, but the
-     * template itself is in no index, so no position typed by its parent can reach an open record.
+     * parametric record itself is in no index, so no position typed by its parent can reach a parametric record.
      */
     private static Map<String, Top> computeSubtypes(Map<String, Top> merged, Set<String> localNames) {
         Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
@@ -1577,10 +1577,10 @@ public final class TsonSchemaLinker {
                                       Function<String, Optional<String>> constructors, Function<String, String> shown,
                                       ValuesByName byName, ExternHops hops) {
         if (OpenEntry.isOpen(body)) {
-            // An open record's references are judged by what they resolve to once substitution supplies the
+            // A parametric record's references are judged by what they resolve to once substitution supplies the
             // arguments, so type-kind validation and inhabitance apply to its applications instead, where the whole
             // record resolves at once. Checking it here by substituting stand-in arguments would report errors on
-            // templates that are correct for every argument anyone passes.
+            // parametric records that are correct for every argument anyone passes.
             //
             // Arity is the exception, and it is decidable: it asks how many parameters the *referenced*
             // entry declares, which no argument changes. See checkOpenArity for why that has to be asked
@@ -1613,8 +1613,8 @@ public final class TsonSchemaLinker {
                 checkRestatedFieldTypes(entryName, r, namespace, shown, hops);
             }
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
-            // An alias naming a template bare names the template under another name (`ref_of => ref`),
-            // applied as its target is, so it is no use of the template without its arguments.
+            // An alias naming a parametric record bare names the parametric record under another name (`ref_of => ref`),
+            // applied as its target is, so it is no use of the parametric record without its arguments.
             case Alias ref when OpenEntry.isOpen(namespace.get(AliasChain.terminal(ref.target().name(), namespace))) -> {
                 if (!namespace.containsKey(ref.target().name())) {
                     throw new UnresolvedReference(entryName, "", ref.target().name());
@@ -1749,8 +1749,8 @@ public final class TsonSchemaLinker {
                     + dependent.text() + "' stands only directly at a record field's type, written in place: it names "
                     + "a field of that record, '" + dependent.on() + "', and a declaration or any other slot has none "
                     + "(§5.2)");
-            // Every application closes where it is written but one inside an open record over its parameters, and an
-            // open record is validated as its applications, so one here is no closing left undone: it was written so.
+            // Every application closes where it is written but one inside a parametric record over its parameters, and a
+            // parametric record is validated as its applications, so one here is no closing left undone: it was written so.
             case ApplyBody apply -> {
                 String head = apply.head().name();
                 if (!namespace.containsKey(head)) {
@@ -1758,8 +1758,8 @@ public final class TsonSchemaLinker {
                 }
                 checkArity(head, apply.arguments().size(), namespace, List.of(), "'" + entryName + "'");
                 throw new SchemaValidationException("the application '" + apply.text() + "' stands written in "
-                        + "place outside an open record: an application stays in place only inside an open record, "
-                        + "with one of its parameters among its arguments, and closes everywhere else (§5.10)");
+                        + "place outside a parametric record: an application stays in place only inside a parametric "
+                        + "record, with one of its parameters among its arguments, and closes everywhere else (§5.10)");
             }
             // A value entry was read against its type, so the read judged its shape; every reference it holds is at a
             // slot typed by a kind or a reference, recorded by the read and judged by its slot (ValuesByName), so
@@ -1898,7 +1898,7 @@ public final class TsonSchemaLinker {
     /**
      * §5.10's parameter-usage rule: an <em>open</em> entry references every parameter it declares. {@code box
      * => <T> { v: text }} declares {@code T} and never uses it, so no application of it could differ from any
-     * other -- the parameter is a mistake, not a degenerate-but-legal template.
+     * other -- the parameter is a mistake, not a degenerate-but-legal parametric record.
      *
      * <p><b>A {@link SchemaValidationException}.</b> A parameter list is author-written, so an unused one
      * is the author's error rather than a library fault.
@@ -1911,7 +1911,7 @@ public final class TsonSchemaLinker {
      * reference is already an unresolved one.
      *
      * <p>Deciding this rather than admitting the degenerate form also settles a question the open
-     * representation would otherwise have to answer: with an unreferenced parameter rejected, a template
+     * representation would otherwise have to answer: with an unreferenced parameter rejected, a parametric record
      * whose bindings are all concrete cannot exist, so nothing has to say whether unused parameters
      * participate in comparing two open entries.
      */
@@ -1934,7 +1934,7 @@ public final class TsonSchemaLinker {
     /** Every name an entry's body mentions, for {@link #checkOpenEntryUsesEveryParameter}. */
     private static void collectBodyNames(Top body, Set<String> into) {
         if (OpenEntry.isOpen(body)) {
-            // The one question an open record answers without being resolved: the names its references write.
+            // The one question a parametric record answers without being resolved: the names its references write.
             into.addAll(OpenEntry.names(body));
             return;
         }
@@ -1942,7 +1942,7 @@ public final class TsonSchemaLinker {
             case RecordBody record -> record.fields().values().forEach(field -> {
                 collectNames(field.type(), into);
                 // A routed parameter rides `value` like any other token, so it is named here too -- which is
-                // what keeps `<S> base & { status: = S }` from reading as a template that never uses S.
+                // what keeps `<S> base & { status: = S }` from reading as a parametric record that never uses S.
                 field.value().map(Token::text).ifPresent(into::add);
             });
             case ArrayBody array -> collectNames(array.elementType(), into);
@@ -2155,7 +2155,7 @@ public final class TsonSchemaLinker {
      * against one declaration is already reported with the declaration's own name and line.
      *
      * <p><b>Atoms and enums only, and the rest is refused.</b> A field typed by a record, container or choice
-     * carries no value ({@link #notAScalarType}). Only a closed record reaches here: an open record's member is
+     * carries no value ({@link #notAScalarType}). Only a closed record reaches here: a parametric record's member is
      * checked once materialisation has substituted its arguments, against the argument it was closed with.
      *
      * <p><b>A reference's value is a name.</b> At a reference over a constructor it is judged a member ({@link
@@ -2301,7 +2301,7 @@ public final class TsonSchemaLinker {
      * What a type slot holds, validated: a name as {@link #validateTypeRef} judges it, and a type written in place
      * as its body would be judged as an entry, named in a message by its form as written ({@code [some_typo]},
      * {@code box<some_typo>}, [TSON-SCHEMA] §8.2) and reported against the entry that holds it. An unresolved name
-     * inside a record in place is marked so, its text being an open record's ({@link #heldDeclarationNaming}).
+     * inside a record in place is marked so, its text being a parametric record's ({@link #heldDeclarationNaming}).
      */
     private static void validateSlot(TypeExpr type, Map<String, Top> namespace,
                                      Function<String, Optional<String>> constructors, String subject, String trail,
@@ -2321,9 +2321,9 @@ public final class TsonSchemaLinker {
     /**
      * One reference validated. The entry it sits in is passed as {@code subject} and the path within that
      * entry as {@code trail} ({@code " field 'w'"}, {@code " element[1]"}) rather than pre-joined, because
-     * {@link UnresolvedReference} has to be able to re-state itself against a different subject: a defect an
-     * open record deferred surfaces inside a record an application closes to in place and belongs to the open
-     * record whose text wrote it, and only the subject differs between the two statements of it.
+     * {@link UnresolvedReference} has to be able to re-state itself against a different subject: a defect a
+     * parametric record deferred surfaces inside a record an application closes to in place and belongs to the
+     * parametric record whose text wrote it, and only the subject differs between the two statements of it.
      *
      * <p>A slot typed {@code meta.type_ref} holds the name of a type a value can have: resolved, then judged a member of
      * the kind ({@link KindMembers}) where {@code constructors} is given, and a value entry refused with its own
@@ -2371,16 +2371,16 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * §5.10's arity rule over the references an open record writes -- {@code chain => <T> { tail:
-     * chain<T, T>? }} applies two arguments to a one-parameter template, and nothing ever closes that
-     * application, so deferring the check would let the template ship with the mistake in it.
+     * §5.10's arity rule over the references a parametric record writes -- {@code chain => <T> { tail:
+     * chain<T, T>? }} applies two arguments to a one-parameter parametric record, and nothing ever closes that
+     * application, so deferring the check would let the parametric record ship with the mistake in it.
      *
      * <p><b>It can be answered without substituting</b>, which is why it belongs here at all: arity compares
      * the argument count written against the parameter count the referenced entry declares, and neither
      * number depends on what the arguments resolve to.
      *
-     * <p><b>An open record's every reference, bare ones included</b>: its field types and parents are references of
-     * the model, so a template named bare there is refused at the template's own declaration (§5.10).
+     * <p><b>A parametric record's every reference, bare ones included</b>: its field types and parents are references of
+     * the model, so a parametric record named bare there is refused at the parametric record's own declaration (§5.10).
      */
     private static void checkOpenArity(String entryName, RecordBody open,
             Map<String, Top> namespace, List<String> ownParameters) {
@@ -2412,17 +2412,17 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * An application stays written in place only over a parameter of the open record holding it, and only an open
+     * An application stays written in place only over a parameter of the parametric record holding it, and only a parametric
      * record's: a constructor's is its construction and one over names alone has closed ([TSON-SCHEMA] §5.10). A
-     * resolved form read as output is held to it here, where its open records are linked.
+     * resolved form read as output is held to it here, where its parametric records are linked.
      */
     private static void requireOpen(String context, ApplyBody application, Map<String, Top> namespace) {
         boolean overAParameter = application.arguments().stream().anyMatch(ParamRef.class::isInstance);
         Top head = namespace.get(AliasChain.terminal(application.head().name(), namespace));
         if (head != null && (!overAParameter || !OpenEntry.isOpen(head))) {
             throw new SchemaValidationException(context + ": the application '" + application.text() + "' stands "
-                    + "written in place, and an application stays in place only inside an open record, over one of "
-                    + "its parameters, applying an open record; " + (OpenEntry.isOpen(head)
+                    + "written in place, and an application stays in place only inside a parametric record, over one of "
+                    + "its parameters, applying a parametric record; " + (OpenEntry.isOpen(head)
                     ? "over names alone it closes to the record it denotes" : "a constructor's is its construction")
                     + " (§5.10)");
         }
@@ -2432,16 +2432,16 @@ public final class TsonSchemaLinker {
      * §5.10's arity rule, over every reference in the schema: a reference supplies exactly as many arguments
      * as the entry it names declares parameters. Three shapes of author error collapse into it -- too many
      * ({@code chain<T, T>} for a one-parameter {@code chain}), too few, and <b>none at all</b>
-     * ({@code use => { u: box } } naming a template without applying it, which is the common one).
+     * ({@code use => { u: box } } naming a parametric record without applying it, which is the common one).
      *
      * <p><b>The zero-argument case is why this check exists here rather than at an application site.</b> An
-     * unapplied template reference is not an application, so nothing on the materialisation path sees it: left
+     * unapplied parametric record reference is not an application, so nothing on the materialisation path sees it: left
      * unchecked, it would link, compile and fail only at <em>read</em> time, as a library fault, for what is
      * plainly the author's error.
      *
      * <p>By the time linking runs, {@code TemplateMaterialiser} has rewritten every application it could
-     * close, so what reaches here is the set that genuinely needs checking: references inside template
-     * bodies, which stay open by design, and bare names anywhere.
+     * close, so what reaches here is the set that genuinely needs checking: references inside the bodies of
+     * parametric records, which stay open by design, and bare names anywhere.
      *
      * <p>A reference naming one of the enclosing declaration's own <em>parameters</em> has no arity to check
      * -- a parameter is not an entry and declares nothing -- but it is not simply skipped: §5.10 admits no
@@ -2454,13 +2454,13 @@ public final class TsonSchemaLinker {
         if (ownParameters.contains(name)) {
             if (supplied > 0) {
                 throw new SchemaValidationException(context + ": '" + name + "' is a type parameter "
-                        + "applied to arguments -- a parameter stands for a type, never for a template, and "
+                        + "applied to arguments -- a parameter stands for a type, never for a parametric record, and "
                         + "§5.10 admits no head abstraction, so '" + name + "<...>' is no form. Name the "
-                        + "template and apply that, or take the applied type as the parameter instead");
+                        + "parametric record and apply that, or take the applied type as the parameter instead");
             }
             return;
         }
-        // An application through an alias of a template applies the template ([TSON-SCHEMA] §8.3).
+        // An application through an alias of a parametric record applies the parametric record ([TSON-SCHEMA] §8.3).
         Top referenced = namespace.get(supplied == 0 ? name : AliasChain.terminal(name, namespace));
         if (referenced == null) {
             return; // a name no entry holds is resolution's to refuse, not arity's
@@ -2490,9 +2490,9 @@ public final class TsonSchemaLinker {
                     + "none (§5.10); drop the argument list");
         }
         if (supplied == 0) {
-            throw new SchemaValidationException(context + ": '" + name + "' is a template taking "
+            throw new SchemaValidationException(context + ": '" + name + "' is a parametric record taking "
                     + declared + " type argument" + (declared == 1 ? "" : "s") + " " + parameters
-                    + ", and a template is not a type -- write '" + name + "<...>' with its arguments, or, "
+                    + ", and a parametric record is not a type -- write '" + name + "<...>' with its arguments, or, "
                     + "for any member of a family, name the abstract record its applications compose (§5.10)");
         }
         throw new SchemaValidationException(context + ": '" + name + "' takes " + declared

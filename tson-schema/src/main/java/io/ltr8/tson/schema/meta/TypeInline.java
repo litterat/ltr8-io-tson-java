@@ -13,7 +13,7 @@ import java.util.function.Function;
 
 /**
  * A type written where it is used, the kernel's {@code meta.type_inline}: the construction a sugar form or an applied
- * constructor denotes, or the record an application of an open record closes to, held at the slot that wrote it,
+ * constructor denotes, or the record an application of a parametric record closes to, held at the slot that wrote it,
  * {@code { of: !meta.array { element_type: text } }}. It is no entry: it has no name, and nothing looks it up.
  *
  * <p><b>What may be inline</b> ([TSON-SCHEMA] §4.2, §5.2), and {@link #refusal} is the one place the line is kept --
@@ -23,10 +23,10 @@ import java.util.function.Function;
  *   <li>a construction of a container, a tuple, a choice or a reference ({@link #constructible}): an {@link
  *       ArrayBody} ({@code meta.array}), a {@link MapBody}, a {@link
  *       TupleBody}, a {@link ChoiceBody} or a {@link RefBody} ({@code meta.ref});</li>
- *   <li>a closed {@link RecordBody}, under {@code meta.record}: the record an application of an open record closes to
+ *   <li>a closed {@link RecordBody}, under {@code meta.record}: the record an application of a parametric record closes to
  *       at a type slot ([TSON-SCHEMA] §5.10), or one a resolved form states.</li>
  *   <li>an {@link ApplyBody}, {@code meta.apply}, an application written in place, which in resolved output stands
- *       only inside an open record, over one of its parameters;</li>
+ *       only inside a parametric record, over one of its parameters;</li>
  *   <li>a {@link DependentBody}, {@code meta.dependent}, which is written in place only, and only directly at a record
  *       field's type ({@link #dependentOn}): a variable bound by that record, so equal text in two records is two
  *       types.</li>
@@ -123,7 +123,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound ApplyBod
                     + "so it is a member of nothing and nothing composes it" + nameIt);
         }
         if (of instanceof RecordBody record && record.isOpen()) {
-            return Optional.of(form + " takes parameters, and an open record is applied by its name, which a record "
+            return Optional.of(form + " takes parameters, and a parametric record is applied by its name, which a record "
                     + "written in place has none of" + nameIt);
         }
         if (of instanceof RecordBody record) {

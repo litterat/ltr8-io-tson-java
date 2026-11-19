@@ -18,7 +18,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
  *
  * <p>Read through its record ({@link RecordReader}), which hands it the sibling's value: the member written before
  * it, the sibling's default where it is not written, or its pin. A sibling naming no type a value can be read against
- * -- a dependent type, a template, an application, which names no entry -- is refused at the sibling, and the
+ * -- a dependent type, a parametric record, an application, which names no entry -- is refused at the sibling, and the
  * member is skipped unjudged.
  */
 final class DependentReader implements JsonTypeReader<Object> {
@@ -66,7 +66,7 @@ final class DependentReader implements JsonTypeReader<Object> {
                 if (body == null) {
                     refusal = "'" + reference.text() + "', which names no type this schema closes";
                 } else if (OpenEntry.isOpen(body)) {
-                    refusal = "'" + reference.text() + "', a template, which no value is read against until it is "
+                    refusal = "'" + reference.text() + "', a parametric record, which no value is read against until it is "
                             + "applied";
                 }
             }

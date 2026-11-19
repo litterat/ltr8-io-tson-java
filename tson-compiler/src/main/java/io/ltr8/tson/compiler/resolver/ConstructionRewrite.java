@@ -26,7 +26,7 @@ import java.util.function.Predicate;
  * Construction sugar on the written form ([TSON-SCHEMA] §5.3, §5.10): {@code !meta.apply { head: C  arguments: [a₁ …
  * aₙ] }} over a constructor {@code C} is rewritten to the binding record {@code !C { f₁: a₁ … fₙ: aₙ }} before anything
  * reads it, its argument slots ({@link ConstructionSugar#slots}) filled in order, innermost first. Every application
- * left is then kernel data: an open record's, its arguments names or parameters, the kernel's {@code meta.apply}
+ * left is then kernel data: a parametric record's, its arguments names or parameters, the kernel's {@code meta.apply}
  * typing them {@code [meta.type_ref; 1..]}. So a payload is read once, under the kernel's own types.
  *
  * <p><b>Who wrote an application decides how much is rewritten.</b> One desugaring wrote from {@code head<args>} is the
@@ -35,7 +35,7 @@ import java.util.function.Predicate;
  * where its arguments are names (§5.10), and is rewritten then; one whose arguments hold a type in place is left as
  * written, for the kernel's reader to refuse.
  *
- * <p><b>An open record's application orders nothing</b> (a name at a type position, [TSON-SCHEMA] §3.4.1): whether a
+ * <p><b>A parametric record's application orders nothing</b> (a name at a type position, [TSON-SCHEMA] §3.4.1): whether a
  * head is one is asked without making it ready ({@link DefinitionGetter#opens}), so {@code chain => <T> { next?:
  * chain<T> }} and mutual recursion wait on nothing. Any other head is made ready before it is asked whether it
  * constructs, as reading a construction against it would make it.
@@ -52,7 +52,7 @@ final class ConstructionRewrite {
     /** Where a head and a constructor's slots are found; asking for a declaration not yet ready makes it ready. */
     private final Function<String, Top> types;
 
-    /** Whether a head, past its alias hops, is an open record, asked without waiting on it. */
+    /** Whether a head, past its alias hops, is a parametric record, asked without waiting on it. */
     private final Predicate<String> opens;
 
     ConstructionRewrite(Function<String, Top> types, Predicate<String> opens) {
@@ -142,7 +142,7 @@ final class ConstructionRewrite {
     /**
      * One application: a constructor's as its construction, any other as written. A declaration's body is the one
      * construction not {@code inPlace}: it is tagged by the head as written, which its entry records as its
-     * constructor, and no namespace type is refused there, nor an open record's argument, the declaration judging
+     * constructor, and no namespace type is refused there, nor a parametric record's argument, the declaration judging
      * that in its own order.
      */
     private DataValue applied(DataValue written, boolean desugared, boolean inPlace) {
@@ -278,7 +278,7 @@ final class ConstructionRewrite {
     }
 
     /**
-     * The refusal of {@code generic}'s first argument that is no name, {@code generic} applying an open record
+     * The refusal of {@code generic}'s first argument that is no name, {@code generic} applying a parametric record
      * ({@link TemplateMaterialiser#argumentNotAName}).
      */
     static SchemaValidationException argumentNotAName(ApplicationRef generic) {

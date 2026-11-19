@@ -10,7 +10,7 @@ import io.ltr8.tson.compiler.stream.EventSkip;
  * The reader a value entry compiles to ({@code ValueEntry}, [TSON-SCHEMA] §4.1): {@code orders => !api { ... }} is a
  * value of {@code api} and no type, so nothing is read against it. A schema naming one at a type position is refused
  * when it links; what reaches this is a data type-ref naming the entry, {@code !orders { ... }}, which is the
- * document's mistake and reported as {@link OpenTemplateReader} reports an unapplied template's.
+ * document's mistake and reported as {@link OpenTemplateReader} reports an unapplied parametric record's.
  */
 public final class ValueEntryReader implements TsonTypeReader<Object> {
 

@@ -9,7 +9,7 @@ package io.ltr8.tson.compiler.ast.schema;
  * <ul>
  *   <li>{@link AtomRefinement} -- {@code "!" qualified-name ws "^" ws record-def} (§5.5)</li>
  *   <li>{@link Instance} -- {@code [type-params] "!" qualified-name ws core-value} (§5.5, constructor
- *       application; a parameter list is admitted only before {@code !meta.record}, an open record -- see
+ *       application; a parameter list is admitted only before {@code !meta.record}, a parametric record -- see
  *       {@link Instance}'s own Javadoc)</li>
  *   <li>{@link StructuralTypeDef} -- {@code [type-params] ["~"] structural-def} (§5.7-§5.9)</li>
  *   <li>{@link TypeExprDef} -- {@code [type-params] type-ref} (§8.3): a plain reference, or any
@@ -21,7 +21,7 @@ package io.ltr8.tson.compiler.ast.schema;
  *
  * <p>Every variant has an ABNF alternative behind it and is parsed. §5.3's sized sugar is no exception:
  * {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its bindings denote -- the
- * sugar names {@code array} and binds its fields directly, with no size template in between.
+ * sugar names {@code array} and binds its fields directly, with no size parametric record in between.
  */
 public sealed interface TypeDef
         permits AtomRefinement, Instance, StructuralTypeDef, TypeExprDef, SchemaMapDef {

@@ -98,7 +98,7 @@ class DirectApplicationDeclarationTest {
      * {@code b => { v: text }} are two entries with one structure. Neither is
      * privileged: §8.2 gives each its name as its identity, and a rule that cares about the duplication --
      * §5.2's pin distinctness over a family's members -- catches it downstream on its own terms. Neither is IS-A
-     * the template (§5.10).
+     * the parametric record (§5.10).
      */
     @Test
     void twoDeclarationsOfOneApplicationAreTwoEntries() {
@@ -113,7 +113,7 @@ class DirectApplicationDeclarationTest {
         assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().head().name());
         assertEquals("box", linked.schema().applicationOf("by").orElseThrow().head().name());
         assertEquals(java.util.List.of(), TypeChain.subtypesOf(linked.schema().entries().get("box")),
-                "a template is no type, and indexes neither");
+                "a parametric record is no type, and indexes neither");
     }
 
     // ── What it buys a family: the member is named by its declaration ───
@@ -129,7 +129,7 @@ class DirectApplicationDeclarationTest {
             """;
 
     /**
-     * The base -- the record the template composes -- indexes the names the author wrote, so a refusal can list
+     * The base -- the record the parametric record composes -- indexes the names the author wrote, so a refusal can list
      * names an author can write.
      */
     @Test

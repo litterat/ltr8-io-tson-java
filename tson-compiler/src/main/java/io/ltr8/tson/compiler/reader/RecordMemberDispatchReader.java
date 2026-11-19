@@ -106,7 +106,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            // Only a record is a member, and a subtype index holds no template (§5.10).
+            // Only a record is a member, and a subtype index holds no parametric record (§5.10).
             if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }

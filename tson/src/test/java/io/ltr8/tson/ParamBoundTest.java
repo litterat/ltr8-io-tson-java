@@ -74,7 +74,7 @@ class ParamBoundTest {
     // ── Recorded ───────────────────────────────────────────────────────────
 
     @Test
-    void aRecordTemplatesWrittenTypeIsATypeParametersBound() {
+    void aParametricRecordsWrittenTypeIsATypeParametersBound() {
         assertEquals(List.of(bounded("T", "text")), parameters().get("boxed"));
     }
 
@@ -110,14 +110,14 @@ class ParamBoundTest {
         assertRefused(BOXED + "  rebox => <T> { b: meta.array<boxed<T>> }", needs);
     }
 
-    /** The message names the declaration that wrote the parameter, not the template it is passed to. */
+    /** The message names the declaration that wrote the parameter, not the parametric record it is passed to. */
     @Test
     void theRefusalIsReportedAtTheDeclarationThatPassesTheParameter() {
         List<Diagnostic> refused = problems(BOXED + "  rebox => <T> { b: boxed<T> }");
         assertRefused(refused, "'rebox': parameter 'T'");
     }
 
-    /** A parameter passed on through a template that does not bound it needs no bound, however deep the chain. */
+    /** A parameter passed on through a parametric record that does not bound it needs no bound, however deep the chain. */
     @Test
     void aParameterPassedToAnUnboundedParameterNeedsNoBound() {
         assertEquals(List.of(), problems("""
@@ -143,9 +143,12 @@ class ParamBoundTest {
         assertRefused(BOXED + "  wrong => <T: int32> boxed<T> & { c: text }", "int32 is not a type that IS-A text");
     }
 
-    /** The bound an imported template records is what its author wrote, and a parameter passed to it is judged by it. */
+    /**
+     * The bound an imported parametric record records is what its author wrote, and a parameter passed to it is judged by
+     * it.
+     */
     @Test
-    void anImportedTemplatesBoundIsRequiredOfAParameterPassedToIt() {
+    void anImportedParametricRecordsBoundIsRequiredOfAParameterPassedToIt() {
         String imported = """
                 !!id:"https://example.test/boxes.tn"
                 !!import:"https://tson.io/2026/40/m/meta.tn"
@@ -207,7 +210,7 @@ class ParamBoundTest {
         assertEquals(List.of(), problems(BOXED + "  short  => !text ^ { max_length: 8 }\n  held   => boxed<short>"));
     }
 
-    /** A passed-on parameter's written bound is enforced where the outer template is applied. */
+    /** A passed-on parameter's written bound is enforced where the outer parametric record is applied. */
     @Test
     void aWrittenBoundIsEnforcedAtTheOuterApplication() {
         assertRefused(BOXED + "  rebox  => <T: text> { b: boxed<T> }\n  holder => { b: rebox<int32> }",

@@ -14,7 +14,7 @@ inputs:
 
 This document records the changes proposed for Revision 40 of the TSON specification
 series. Its one input of substance is the implementation's spec-feedback register entry #3,
-*templates as records with parameters*, whose six steps are built and merged on the Revision 40 proposal
+*parametric records as records with parameters*, whose six steps are built and merged on the Revision 40 proposal
 branch of the first implementation and of the conformance corpus. Its second is entry #5,
 *inline types*: a type slot holds a name or a type written in place, and no entry is lifted
 or minted. Its third is entry #6, *a dependent field's type is a sum in place*: the sibling
@@ -47,25 +47,25 @@ body, and the resolver admits it before a record body alone. It takes **both of 
 are parse errors as they were in Revision 38; and `sibling-ref`, so `kind!` in a data value
 is a parse error ([TSON-DATA] §7.2.5, §7.4). A value that names something is a token.
 
-What it changes is **templates, and with them the kernel**. Revision 39 gave a template two
+What it changes is **parametric records, and with them the kernel**. Revision 39 gave a template two
 representations and a parameter two kinds: a record template was its own constructor and a
 family base, every other template was held as text, and a parameter's type and bound were
 derived by a fixed point across templates. Revision 40 replaces all of it with three rules
 (#3):
 
-1. **A template is a record with parameters.** `meta.record` carries `parameters?: [meta.param;
+1. **A parametric record is a record with parameters.** `meta.record` carries `parameters?: [meta.param;
    1..]`, each a type standing at a field's type or as an argument of an application there
-   or in a parent, and nowhere else. A reference names a template only as the head of
+   or in a parent, and nowhere else. A reference names a parametric record only as the head of
    an application.
 2. **`C<args>` over a constructor is construction sugar**: `!C { f₁: a₁ … }` over its
    required fields typed by a reference naming types, in declaration order, as `[T]` and
    `{K => V}` already were.
 3. **`H<args>` is schema grammar**, sugar for the construction `meta.apply`, substituting
-   where `H` is a template and constructing where it is a constructor. A reference is a
+   where `H` is a parametric record and constructing where it is a constructor. A reference is a
    name, and no value carries an argument list.
 
-What follows from them: no value parameters, no derived or inherited bounds, no template a
-position names, no template over a body that is not a record, no alias template, no open
+What follows from them: no value parameters, no derived or inherited bounds, no parametric record a
+position names, no parametric record over a body that is not a record, no parametric alias, no open
 synthetic entry, and no `meta.template` or `meta.record_template`. Every bundled pin
 changes; the artifact set keeps its shape.
 
@@ -86,14 +86,14 @@ as its baseline. Summarising the normative effect:
   declaration writes; a parameter passed to a bounded parameter is written with a bound
   that IS-A it, wherever it is the argument; a parameter passed to a constructor's slot
   needs none. Nothing about a parameter is derived. (Part 2 §5.10, §8.1; meta.)
-- **#3, step 3 — construction sugar, and no alias template.** `meta.array<text>` is the
+- **#3, step 3 — construction sugar, and no parametric alias.** `meta.array<text>` is the
   entry `[text]` is; a field with a default is no argument slot; a use-site construction
   names its content-keyed entry; an argument is not followed through an alias. A parameter
   list before a bare reference is refused. (Part 2 §3.3.1, §5.3, §5.6, §8.2, §8.3.)
-- **#3, step 4 — no template is a type.** No position, reference, operand or `subtypes`
-  index names a template bare; an application's IS-A edges are its template's written
-  parents'; `abstract` and the selectors on a template are each application's; a family is
-  an abstract base, a template composing it, and members composing an application and
+- **#3, step 4 — no parametric record is a type.** No position, reference, operand or `subtypes`
+  index names a parametric record bare; an application's IS-A edges are its parametric record's written
+  parents'; `abstract` and the selectors on a parametric record are each application's; a family is
+  an abstract base, a parametric record composing it, and members composing an application and
   pinning the selectors. (Part 2 §1.3, §4.2, §5.2, §5.8, §5.10, §8.1.)
 - **#3, step 5 — `parameters` on `record`, and the kernel.** `meta.record` carries
   `parameters?: [meta.param; 1..]`; `meta.param => { name: meta.param_name  bound?:
@@ -101,8 +101,8 @@ as its baseline. Summarising the normative effect:
   `meta.record_template_field`, `meta.record_template_field_map`, `meta.tuple1` and
   `meta.voidable_tuple1` are gone; `meta.ref => meta.reference_type ^ { allow_sibling?: =
   false }` is a refined constructor and the root's `set => meta.set_type` an alias of the
-  constructor, so `meta.ref<X>` and `set<text>` are constructions. A template's body is a
-  record body, and inside a template a form over a parameter is a reference
+  constructor, so `meta.ref<X>` and `set<text>` are constructions. A parametric record's body is a
+  record body, and inside a parametric record a form over a parameter is a reference
   (`[T]` is `meta.array<T>`) or a resolver error; there is no open synthetic entry. The
   kernel measures 81 entries (88 in Revision 39), one wait cycle of 25 holding
   `meta.record`, a closure of 69 with `meta.param` and `meta.param_name` in it, and six
@@ -127,7 +127,7 @@ footing:
 - **Every identity moves to `/2026/40/`**, and each header comment reads "2026 Revision 40
   draft".
 - **`policy.limits.max_materialisation_depth` goes**, with the clause of the `limits` doc
-  that described it: closing in place holds each template of the closure at most once on
+  that described it: closing in place holds each parametric record of the closure at most once on
   its path, so the limit guarded nothing. Part 2 §11.5's row and Part 1 §9.1's mention
   follow.
 
@@ -140,7 +140,7 @@ footing:
 | 1 | [TSON-DATA] §2.1's worked example says untagged tokens resolve by §4's base rules under an imported schema | **Accept** — the sentence is rewritten for a document under a schema: its tags name types of the imported namespace and each untagged token is read by its position's declared type, with what the same tags and tokens mean in a document with no `!!import` (§3.1 item 26). No rule changes. **[settled]** |
 | 2 | Whether a quoted token at a reference-typed position is a reference | **Accept**, the other way from the entry's proposal: a quoted token at a position typed by a reference is the reference its text spells, each segment a name of the family of what it enters, and no family a segment is matched against admits `.` (§3.1 item 28, §3.2 items 119–120). The argument half closed with #3: an argument is schema grammar and stays unquoted. **[settled]** |
 | 5 | Inline types: a type slot holds a name or a type written in place | **Accept** — the kernel's `meta.type_inline`, `meta.type_expr` and `meta.field_type_expr` and the hand-written resolved fixtures are the baseline; Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2, §8.3, §9, §10.1, §11.5, §12.1, §12.2 and §13.2 follow (§3.2, items 34–58, 71 and 72–77), and Part 3 §3.3 (§3.4). Four readings the spec author ruled on (§5). [settled — implemented] |
-| 3 | Templates as records with parameters | **Accept — the baseline above**, every step as the register states what runs. Part 2 §5.10 is rewritten around the three rules; §1.3, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow (§3.2). §1.6's example drops its value parameter. **[editorial]** at five points where the sources disagree or the text needed a reading (§5). [settled — implemented] |
+| 3 | Parametric records as records with parameters | **Accept — the baseline above**, every step as the register states what runs. Part 2 §5.10 is rewritten around the three rules; §1.3, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3, §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow (§3.2). §1.6's example drops its value parameter. **[editorial]** at five points where the sources disagree or the text needed a reading (§5). [settled — implemented] |
 | 6 | A dependent field's type is a sum in place | **Accept** — the kernel's `meta.dependent`, the retyped `meta.record_field.type`, `meta.type_ref` and `meta.ref`, and the hand-written resolved fixture are the baseline (§1); Part 1 §1.3, §1.5, §2.3, §2.5, §2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4, §7.5, §7.7 and §8.1 follow (§3.1, items 11–19), Part 2 §1.4, §4.2, §5.2, §5.3, §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9 and §12 (§3.2, items 59–70), and Part 3 §1.6 and §5.6 (§3.4). Four readings the spec author ruled on; one point stays open (§5). [settled — implemented] |
 | 4 | A tag at a choice names a variant; a choice with an abstract variant has no values | **Accept**, the entry's first resolution: a tag at a choice names a variant, or a type that IS-A exactly one variant, and the value is read at that variant as at a position typed by it, so an abstract variant admits its family; a tag that IS-A two variants and names neither is refused at the data (§3.2 item 121). **[settled]** |
 | 7 | A free sibling hands the choice of a dependent field's type to the document's author | **Accept** — one paragraph in Part 2 §11.1, and no change to §5.2's rules (§3.2 item 111). **[settled]** |
@@ -148,12 +148,12 @@ footing:
 | 9 | `net.uuid_type.version` has no stated meaning | **Accept** — Part 2 §5.5 states it, a UUID whose RFC 9562 version field equals `version`, and §5.7 lists it among the settable-once facets (§3.2 item 113), which is what runs. **[settled]** |
 
 Counts: **9 accepted** (#3, in six steps, #5, #6, #2 and #4; and #1, #7, #8 and #9, which change no rule), **0 declined**, **0 carried**. Revision
-39's open remainders on templates close with #3: #13's (whether a value argument narrows
+39's open remainders on parametric records close with #3: #13's (whether a value argument narrows
 below `token`) by the removal of value arguments, #19's (a shared parent for `record` and
-`record_template`) by the removal of `record_template`, and #21's (a sibling in a template
+`record_template`) by the removal of `record_template`, and #21's (a sibling in a parametric record
 field typed by a parameter, `kind: meta.type_ref = T`) by the refusal of a parameter at a
 field's value — the field is written `v?: T`. #20's head edge is reversed: no application is
-IS-A its template. Revision 39's other open remainders stand as that change log records them.
+IS-A its parametric record. Revision 39's other open remainders stand as that change log records them.
 Open questions are recorded here and are NOT reflected as open text in the specification.
 
 ---
@@ -287,37 +287,37 @@ One name follows the section's own. No rule changes.
 ### 3.2 Part 2 — Type System and Schema
 
 1. **Header** — Revision 40, with a one-paragraph summary of this revision.
-2. **§1.3** — a resolved-output consumer meets a template as a `!meta.record` carrying
+2. **§1.3** — a resolved-output consumer meets a parametric record as a `!meta.record` carrying
    `parameters`, skips it when building readers, and never meets one at a closed position;
-   the record-template family-base exception and the `!meta.template` paragraph go.
-3. **§1.4** — a reference may be, inside a template, one of its parameters;
+   the record-parametric record family-base exception and the `!meta.template` paragraph go.
+3. **§1.4** — a reference may be, inside a parametric record, one of its parameters;
    `template` leaves the list of abbreviated constructor names.
 4. **§1.6** — `flagged => <T> { entry: T  priority?: priority }`, applied as
    `flagged<status>`; the example imports `/2026/40/m/core.tn`.
 5. **§2.1** — the example's import at `/2026/40/`.
 6. **§3, §3.3, §3.3.2** — "a parameter's bound"; the lookup that precedes the namespace is
-   a template's parameter list.
-7. **§3.3.1** — `meta.template` and the record-template vocabulary leave the constructor
+   a parametric record's parameter list.
+7. **§3.3.1** — `meta.template` and the record-parametric record vocabulary leave the constructor
    list, `meta.param` joins the records that are no constructor; an alias of a constructor
    is applied by `!` and by an application alike (`set<text>`); the partial-application
    desugar target and the migration diagnostic for a parameterless head go.
 8. **§3.3.4** — a reference a data document writes is a name, an application there a
    validation error.
 9. **§3.4.1** — only a form naming no parameter lifts; Pass 2 checks every application's
-   arguments against bounds and slots; a template's body leaves rule 3's held values.
+   arguments against bounds and slots; a parametric record's body leaves rule 3's held values.
 10. **§4.1** — one constructor composes `meta.top` directly; `template` leaves the kernel
-    listing; a template is a record, kept from every position by the reference rule; a
-    template over an ordinary type goes; a template is PRODUCT-kinded.
+    listing; a parametric record is a record, kept from every position by the reference rule; a
+    parametric record over an ordinary type goes; a parametric record is PRODUCT-kinded.
 11. **§4.2** — a constructor declares no parameters; `meta.ref` is shown as the refined
     constructor; the application bullet states substitution and construction, and that in
     a data document a reference is a name; `meta.param.bound` replaces
-    `meta.template_param`; the record-template slots go.
-12. **§4.3** — `meta.array<text>` is the finished-instance example; a template is
+    `meta.template_param`; the record-parametric record slots go.
+12. **§4.3** — `meta.array<text>` is the finished-instance example; a parametric record is
     instantiated only through an application.
-13. **§5.2** — value conformance loses its routed-parameter half; the record-template field
-    slot, a template as a sibling's pin and an application at a dependent field's reading go;
-    a template's field names are judged at its declaration; the family-base sentence
-    becomes "a selector on a template is each application's".
+13. **§5.2** — value conformance loses its routed-parameter half; the record-parametric record field
+    slot, a parametric record as a sibling's pin and an application at a dependent field's reading go;
+    a parametric record's field names are judged at its declaration; the family-base sentence
+    becomes "a selector on a parametric record is each application's".
 14. **§5.3** — a size bound is decimal-natural, a parameter there a resolver error; bound
     coherence is checked at load only; `set<T>` is construction sugar over the root alias
     `set`; one-position tuples are declared, `meta.tuple1` gone; **Arguments** rewritten
@@ -328,48 +328,48 @@ One name follows the section's own. No rule changes.
     value comparisons.
 16. **§5.6** — the positional, braced and applied spellings of a one-slot constructor are
     one entry; an application is a schema's, a validation error in data; the end state has
-    one body holding parameters, a template; a declaration naming an application of a template is
+    one body holding parameters, a parametric record; a declaration naming an application of a parametric record is
     the entry, one naming a construction the construction.
-17. **§5.7, §5.8** — "Open modifiers" is replaced by one sentence, **Values in a template**; an
-    applied template is a refinement source, a bare one refused.
+17. **§5.7, §5.8** — "Open modifiers" is replaced by one sentence, **Values in a parametric record**; an
+    applied parametric record is a refinement source, a bare one refused.
 18. **§5.8** — an operand may be an application, never a parameter or an applied
-    constructor; an application at an operand reaches its template's written parents and
+    constructor; an application at an operand reaches its parametric record's written parents and
     never its head; `ok_of => ok<text>` IS-A `ok` goes.
-19. **§5.9** — a parameterised subtraction declares a template.
-20. **§5.10** — rewritten (113 lines, 41 KB → 43 lines, 10 KB): a template; where a
+19. **§5.9** — a parameterised subtraction declares a parametric record.
+20. **§5.10** — rewritten (113 lines, 41 KB → 43 lines, 10 KB): a parametric record; where a
     parameter stands; the body is a record body; forms over a parameter; application; a
-    bound is written; no template is a type a position names, a family declared with
+    bound is written; no parametric record is a type a position names, a family declared with
     records; scoping; what a parameter does not carry; output.
 21. **§5.10.1** — a recursive reference is a held application; a self-reaching expansion
     keeps its closed record under an application-derived name, carrying
     `@meta.application`, in place of a `!meta.alias` to a synthetic; the example is a record.
-22. **§5.12** — the example's import at `/2026/40/`; a template is no referent; an
+22. **§5.12** — the example's import at `/2026/40/`; a parametric record is no referent; an
     application in a value body names a declaration of it.
 23. **§6** — `@meta.application` is carried by a declared application and a self-reaching
     instantiation entry, and by no construction.
-24. **§7.2** — an application in data is a validation error; a tag naming a template is
+24. **§7.2** — an application in data is a validation error; a tag naming a parametric record is
     a validation error.
-25. **§7.4, §7.5** — a template's held body, a name type written as an application and the
+25. **§7.4, §7.5** — a parametric record's held body, a name type written as an application and the
     coherence rules' re-run at materialisation go; an application at a reference over a
     constructor in data is a validation error; `set<T>` is applied through the root alias.
-26. **§8.1** — **Templates** replaces **Open entries**; the kind derivation loses
+26. **§8.1** — **Parametric records** replaces **Open entries**; the kind derivation loses
     TEMPLATE; `!meta.alias`'s target is a bare name; a record field's `type` may name a
-    parameter, no label saying which; a parameter appears only inside a template;
+    parameter, no label saying which; a parameter appears only inside a parametric record;
     `@meta.application` is a substitution's; `subtypes` never names a head; a resolved-form
-    read checks a template's parameters as stated and re-resolves no held text; the
-    body-patterns table loses the instance-template and record-template rows and gains the
-    construction and template rows.
+    read checks a parametric record's parameters as stated and re-resolves no held text; the
+    body-patterns table loses the instance-parametric record and record-parametric record rows and gains the
+    construction and parametric record rows.
 27. **§8.2** — an application nothing declares is its expansion, a self-reaching one a
     closed record; following alias chains is a substitution's rule, a construction's
     arguments compared as written; the value-argument and open-synthetic identity bullets
     go; the merge pass is restated for a held `meta.array<box<T>>`; the entry-shape example
     is `text_pair => pair<text, text>`.
 28. **§8.3** — an alias body is a bare name; an application is the instantiation or the
-    construction in place; the alias-template bullet goes; no `!meta.alias` carries
+    construction in place; the alias-parametric record bullet goes; no `!meta.alias` carries
     `@meta.application`.
 29. **§9** — the kernel row lists `meta.param` and drops the seven removed entries.
 30. **§11.5** — the materialisation-depth row goes, and §3.4.1 rule 7 says what bounds
-    closing instead: each template of the closure at most once on a path, a repeat tied
+    closing instead: each parametric record of the closure at most once on a path, a repeat tied
     or refused (§5.10.1).
 31. **§12.1** — `type-arg = type-expr`, a number or a quoted token being no argument in
     either grammar; `value-literal` goes; `size-bound` is decimal-natural; the `type-param`
@@ -400,7 +400,7 @@ Items 34–58 carry #5, inline types. Each names the rule before and after.
 40. **§4.1** — a value entry's payload "lifts and mints nothing" becomes a reference-typed
     slot there holding a name; a nested map's members "lift, mint" becomes "resolve", and
     "synthetics mint at the root" goes; the container constructors' type slots hold a name
-    or a type written in place, not `meta.type_ref`; a template's application is
+    or a type written in place, not `meta.type_ref`; a parametric record's application is
     PRODUCT-kinded, not "its expansion's kind".
 41. **§4.2** — new paragraph **A type slot holds a name or a type written in place**: the
     kernel's `type_inline`, `type_expr` and `field_type_expr`, the wrapper untagged and the
@@ -412,9 +412,9 @@ Items 34–58 carry #5, inline types. Each names the rule before and after.
     an application closes nowhere: one at a map's key, a reference's `of`, a bound or an
     alias's target is refused. The application bullet "every application denotes an entry: a
     closed one lifts to the entry it denotes" becomes "a closed application at a type slot is
-    a type written in place"; an argument of a template's application is a name or a
+    a type written in place"; an argument of a parametric record's application is a name or a
     parameter.
-42. **§4.3** — a template's application is cited to §5.10.
+42. **§4.3** — a parametric record's application is cited to §5.10.
 43. **§5.2** — a value modifier is admitted on an atom or an enum, a reference written in
     place included (`handler?: meta.ref<method> ~ …` stands), and refused on a container,
     tuple or choice whether named or written in place (before: named types only). The
@@ -434,8 +434,8 @@ Items 34–58 carry #5, inline types. Each names the rule before and after.
     arguments"; it is a name, an application there refused and declared. **Arguments**
     admitted any type expression, sugar nesting (`box<[integer]>`); an argument of an open
     record's application is a name or a parameter, and a sugar form, an applied constructor
-    or an application of another template there is refused and declared first, a form
-    over a parameter at a constructor's application inside a template excepted. A
+    or an application of another parametric record there is refused and declared first, a form
+    over a parameter at a constructor's application inside a parametric record excepted. A
     constructor's argument slots include fields typed `meta.type_expr`. "A use-site
     construction names its content-keyed entry" becomes "is written in place". **Nested forms
     and synthetic entries** and **A use-site application never resolves in place** are
@@ -453,7 +453,7 @@ Items 34–58 carry #5, inline types. Each names the rule before and after.
 47. **§5.7, §5.8** — a type written in place narrows only to an equal one, and a name never to a
     construction or the reverse (`tags: text_list` over `text_list => [text]` is not restated
     as `tags: [text]`); a refinement source's application is absorbed as an operand's, IS-A the
-    template's written parents and a declared entry for it.
+    parametric record's written parents and a declared entry for it.
 48. **§5.8** — an operand's application "mints no entry" becomes "is no entry"; an applied
     parent's edge names "the entry a declaration gives that application", and a parent
     application nothing declares gives no edge, the minted-record clause gone.
@@ -463,7 +463,7 @@ Items 34–58 carry #5, inline types. Each names the rule before and after.
     its head and closing in place when the record is applied. "Resolves at once, to the
     declaration that names it or to its expansion" goes. The forms-over-a-parameter remedy
     `page<[uuid; 1..]>` becomes a declared `uuids`; "no open synthetic entry" goes. An
-    abstract template applied in place has no member, members reaching a family through a
+    abstract parametric record applied in place has no member, members reaching a family through a
     declared application.
 50. **§5.10.1** — **Template materialisation** (the self-reaching instantiation entry under
     an internal name) becomes **Recursion ties to a declaration**: a nested application equal
@@ -500,7 +500,7 @@ Items 34–58 carry #5, inline types. Each names the rule before and after.
     §12.1's `map-key`, `element-type` and `type-arg` comments state the new rules and the
     `type-name` note on internal names goes; §12.2's generic-key dispatch notes the refusal.
     **§13.2** — the six artifact pins follow the re-stamped kernel (§6).
-57. **§5.10, §5.10.1** — a template holding an application of a recursive template
+57. **§5.10, §5.10.1** — a parametric record holding an application of a recursive parametric record
     it is not on a cycle of (`wrap => <T> { n: node<T> }`) was accepted, and the refusal fell
     on whoever applied it (`wrap_text => wrap<text>`), where its remedy, declare
     `node_text` and write it, could not be followed. It is a resolver error at its own
@@ -603,7 +603,7 @@ Item 71 completes #5's line on a record written in place. It names the rule befo
 Items 72–77 carry #5's record written at a type slot. Each names the rule before and after.
 
 72. **§5.2** — "bare records (`{ name: text }`) MUST be introduced via named declarations" and
-    "the one record in place is the one an application of a template closes to": a
+    "the one record in place is the one an application of a parametric record closes to": a
     record body may be written at a type slot. New paragraph **A record written in place**:
     a record body at a field's type, a group member's, an array's element, a map's value, a
     tuple's element or a choice's variant is one form with the record an application closes
@@ -612,14 +612,14 @@ Items 72–77 carry #5's record written at a type slot. Each names the rule befo
     as one is; a selector makes it abstract, and so empty. It is not written where only a
     name stands, and composition, refinement and subtraction are declared, `at: point & { z:
     int32 }` a parse error. An enum, every other atom and a namespace type stay declared.
-73. **§4.2** — what `of` holds named "the record an application of a template closes to";
+73. **§4.2** — what `of` holds named "the record an application of a parametric record closes to";
     it is a record, written at the slot or closed to by an application.
 74. **§5.3** — the sugar table's `{ fields }` row is the construction in place at a type
     slot; **Nested forms are written in place** shows `at: { x: int32 }`.
 75. **§5.10** — "Only an application produces a record in place: an author's bare record at a
     slot stays refused" becomes: the record an application closes to is the record written
     in place with the same fields, one type with it. **Forms over a parameter** gains the
-    record written in place over a parameter, a record body substituted with the template
+    record written in place over a parameter, a record body substituted with the parametric record
     holding it when that record is applied.
 76. **§12.1, §12.2** — `type-expr` admitted `map-type` where a brace opens a type; it admits
     `brace-type = map-type / record-def`, and §12.2 states one brace dispatch for a
@@ -637,23 +637,23 @@ record, replaced when the record is applied. Each names the rule before and afte
     `meta.array<T>` and `{K => V}` is `meta.map<K V>`"; a size or a `?`, a tuple and a choice
     over a parameter were resolver errors. A form is written in place whether or not it names
     a parameter, the parameter a name at its slot, nested to any depth, a record written in
-    place included; each is substituted when the template is applied and judged as the
+    place included; each is substituted when the parametric record is applied and judged as the
     same type written with the argument in place. A size bound naming a parameter, and an
     application at a slot that holds only a name, stay resolver errors at the declaration.
 79. **§5.10, §5.3, §8.1** — a constructor's application over a parameter, `meta.array<T>`,
     `set<T>`, `meta.ref<T>`, was held as written until the record was applied. It is its
     construction in place at once, so `meta.array<T>` and `[T]` are one resolved form, and an
-    application in resolved output applies a template. **Where an application closes**
+    application in resolved output applies a parametric record. **Where an application closes**
     and **In output** say so; §8.1's row for a type at a slot follows.
 80. **§5.4, §5.10** — a choice over a parameter, `( T | int32 )`, was refused because its
-    disjointness "cannot be judged until it is applied". It loads at the template, and
+    disjointness "cannot be judged until it is applied". It loads at the parametric record, and
     each application is judged where it closes, its variants' distinctness and its
     disjointness alike: `pick<text>` loads, and `p => pick<int32>` is a resolver error at
-    `p`. The template's own choice states `disjoint: false`, a parameter having no class.
+    `p`. The parametric record's own choice states `disjoint: false`, a parameter having no class.
     New paragraph in §5.4, **A choice over a parameter is judged where it is applied**.
 81. **§5.10** — **Where a parameter stands** names the slots of a type written in place, at
     any depth; the field that takes no value is one whose type names a parameter anywhere,
-    the template's or a record written in place inside it. **A bound is written** names
+    the parametric record's or a record written in place inside it. **A bound is written** names
     a type written in place among the places a parameter is passed on. **Scoping**: a
     closed record holds no parameter but where it is written in place inside an open
     record; anywhere else a name that would resolve only as a parameter is an unresolved
@@ -665,7 +665,7 @@ record, replaced when the record is applied. Each names the rule before and afte
     **Nested forms are written in place** (a size or `?` is legal over a parameter too), and
     §5.6's end state ("a binding record never holds a parameter") are restated.
 83. **Header, §1.3, §8.1, §12.1** — the summary, the resolved-output consumers' paragraph,
-    §8.1's **Templates** and **Reading parameter references**, and the `type-arg` comment
+    §8.1's **Parametric records** and **Reading parameter references**, and the `type-arg` comment
     follow.
 84. **Kernel** — the documentation of `meta.param`, `meta.reference_type` and
     `meta.type_inline` states where a parameter stands as above; `meta-resolved.tn`'s
@@ -677,21 +677,21 @@ and after.
 
 85. **§4.2, §1.4** — "a reference is a name, an application or a parameter", and "a value
     may be an application", `geo.address<T>`, read as a reference value. A reference is a
-    name or, inside a template, a parameter. A value carrying an argument list, which
+    name or, inside a parametric record, a parameter. A value carrying an argument list, which
     the data grammar still parses, is refused at every reference-typed slot: a validation
     error in data and a resolver error in a schema document, a construction's payload and a
     value entry's included, the diagnostic naming how an application is written.
 86. **§4.1, §4.2, Kernel** — new constructor `apply => final meta.type & { head:
     meta.type_ref  arguments: [meta.type_ref; 1..] }`. It composes `meta.type` and no base
-    kind: an application stands for a type that exists only once its template is applied,
+    kind: an application stands for a type that exists only once its parametric record is applied,
     so it has no kind and nothing reads a value against it. What `of` holds gains it, inside
-    a template only.
-87. **§5.10, §5.3, §8.1** — a template's application over a parameter "held as written"
+    a parametric record only.
+87. **§5.10, §5.3, §8.1** — a parametric record's application over a parameter "held as written"
     as a reference with arguments is the construction written in place, `{ of: !meta.apply {
     head: box  arguments: [T] } }`, at a field's type, at a slot of a type written there or
     among `chain.parents`, and closes when the record is applied. The explicit spelling
     means what `box<T>` means and closes the same way. In resolved output an application
-    stands only inside a template, over one of its parameters, applying a template;
+    stands only inside a parametric record, over one of its parameters, applying a parametric record;
     reading a resolved form checks it, as a dependent type's position is checked.
 88. **§4.1, §5.8, Kernel** — `type_chain.parents` was `[meta.type_ref]`, holding `result<T>`
     with its arguments; it is `[meta.type_expr]`, a name or an application in place.
@@ -906,7 +906,7 @@ it.
        and carries no chain, as an alias's (§4.1, §8.1); resolver output writes it as
        written and each use by the extern's name.
      - **What it names.** A type a value can have, anywhere in the foreign schema's
-       namespace. A template, an incomplete entry, a constructor, a value entry, a
+       namespace. A parametric record, an incomplete entry, a constructor, a value entry, a
        schema map and an unknown name are each refused. An extern names a type and nothing
        else: a schema that wants another's value or constructor imports it.
      - **Where it stands, and sealed.** It stands where a type's name stands and at a
@@ -1057,7 +1057,7 @@ it.
      record's field is restated only under `&`, so the section named for one operator
      carried the other's rules. Moved whole and unchanged: the three orders a field's facts
      move along, a restated type narrowing by IS-A, a default changing where a pin does not,
-     narrowing to `void`, the elided type, a value in a template, and body
+     narrowing to `void`, the elided type, a value in a parametric record, and body
      materialisation. §5.7 keeps what `^` refines and the facet kinds. Each citation of
      §5.7 for a restated field names §5.8 (§4.2, §4.3, §5.2, §5.5, §5.9, §5.11, §8.2;
      [TSON-JSON] §6.1.5). No rule changes, and the section numbers stand.
@@ -1070,20 +1070,24 @@ it.
      `( text | int32 )` are two types, `variants` being an array. §8.2's comparison of a
      type written in place implied it. Stated, not changed.
 132. **§5.10** — instantiation terminates because an argument is a name: no application is
-     an argument of a template's application, so the applications a schema reaches are
+     an argument of a parametric record's application, so the applications a schema reaches are
      drawn from its names, and a recursive one ties to a declaration. The text relied on
      it and gave no reason. Stated, not changed. §5.10.1's regularity rule stands with its
      reason corrected: it said an irregular recursion "could demand an unbounded family of
      distinct instantiations", which name-only arguments already exclude; what the rule buys
-     is one verdict at the template, every recursive application tying to the declaration
+     is one verdict at the parametric record, every recursive application tying to the declaration
      closing it, where `dup<A, A>` inside `dup` would close for some arguments and not
      others, refused at whichever declaration applied it.
-133. **Throughout** — a record with parameters is a **template**, the one word for it.
-     This revision's text defined "an open record, a template" and wrote the first where
-     Revision 39 wrote the second. "Open" already names a record's extension, a schema map
-     and a family across schemas, and an open record reads outside the series as a record
-     admitting further fields. An application still **closes** a template, and a record
-     without parameters is **closed**. §8.1's paragraph is **Templates**.
+133. **Throughout, §5.10's title** — a record with parameters is a **parametric record**.
+     Revision 39 called it a template, and this revision's text defined "an open record,
+     a template" and wrote the first. Neither stands. A template carries what other
+     languages mean by one — specialisation, value parameters, expansion — and none of
+     it holds here. "Open" already names a record's extension, a schema map and a family
+     across schemas, and an open record reads outside the series as a record admitting
+     further fields. The term says what the record is and nothing more. An application
+     still **closes** a parametric record, and a record without parameters is **closed**.
+     §5.10 is **Parametric Records**, §8.1's paragraph has the same head, and the
+     kernel's `@doc` text uses the term.
 134. **§4.1, §5.5, §8.1** — an entry has no derived kind. §8.1 gave a consumer of resolver
      output a rule labelling each entry ATOM, PRODUCT, SUM or ALIAS, and §4.1 said every
      entry has exactly one. No rule of the series turns on the label, and its default was
@@ -1133,10 +1137,10 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
 1. **Header and status** — Revision 40, the fifth published revision of Part 3, written
    against Revision 40 of [TSON-DATA] and [TSON-SCHEMA].
 2. **§1.6** — the item list names item 23 as Revision 40's; item 16's sentence on an
-   application in data moves to the new **item 23**, *a template is a record with parameters, and a
+   application in data moves to the new **item 23**, *a parametric record is a record with parameters, and a
    reference in data is a name*, which names the sections consuming it.
-3. **§3.3** — a `$type` naming a template is a validation error.
-4. **§3.4** — a root type supplied out of band naming a template is refused on the same
+3. **§3.3** — a `$type` naming a parametric record is a validation error.
+4. **§3.4** — a root type supplied out of band naming a parametric record is refused on the same
    terms.
 5. **§11.2** — `TSON-DATA` and `TSON-SCHEMA` at `/2026/40/`; `TSON-GUIDE` stays at
    `/2026/39/`.
@@ -1220,7 +1224,7 @@ Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
 Changes a Revision 39 implementer must act on:
 
-1. **A template is a record with parameters.** `meta.record` carries `parameters`; `meta.template`,
+1. **A parametric record is a record with parameters.** `meta.record` carries `parameters`; `meta.template`,
    `meta.template_param`, `meta.record_template` and its field records are gone, and so are
    held text bodies.
 2. **A parameter is a type**, standing at a field's type, at a slot of a type written in
@@ -1232,15 +1236,15 @@ Changes a Revision 39 implementer must act on:
 4. **`C<args>` over a constructor constructs it**: `meta.array<text>` is `[text]` and
    `meta.ref<method>` is `!meta.ref { of: method }`; `set<text>` completes an incomplete
    entry (entry 18).
-5. **No template is a type a position names**, and no application is IS-A its template. A
-   family is an abstract base, a template composing it, and members composing an
+5. **No parametric record is a type a position names**, and no application is IS-A its parametric record. A
+   family is an abstract base, a parametric record composing it, and members composing an
    application and pinning the selectors.
-6. **A template's body is a record body.** No template over a container, an atom, a
-   choice, a tuple, a value or a bare reference; no alias template, no partial application.
+6. **A parametric record's body is a record body.** No parametric record over a container, an atom, a
+   choice, a tuple, a value or a bare reference; no parametric alias, no partial application.
 7. **An application is no reference** (items 85–90): it is `meta.apply` written in place,
-   which resolved output holds only inside a template over one of its parameters, and a
+   which resolved output holds only inside a parametric record over one of its parameters, and a
    value carrying an argument list is refused wherever a reference is read.
-   **Inside a template** a form over a parameter is written in place like any other
+   **Inside a parametric record** a form over a parameter is written in place like any other
    (items 78–80): `[T; 1..]`, `[T?]`, `[T, text]`, `( T | int32 )` and `{ cursor: T }` load,
    a constructor's application over a parameter is its construction in place, and a choice
    over a parameter is judged where each application closes. There is no open synthetic
@@ -1253,11 +1257,11 @@ Changes a Revision 39 implementer must act on:
 11. **A type slot holds a name or a type written in place** (#5): `tags: [text]` resolves to
     `type: { of: !meta.array { element_type: text } }`. Nothing is lifted, minted or merged;
     `@meta.synthetic`, internal names and comparison up to renaming are gone. An application
-    of a template at a type slot closes in place to a record with no name; a recursive
-    one ties to the declaration closing it, and is refused where none does; a template
+    of a parametric record at a type slot closes in place to a record with no name; a recursive
+    one ties to the declaration closing it, and is refused where none does; a parametric record
     holding a recursive one it is not on a cycle of could never close, and is refused at its
     declaration. An argument of
-    a template's application is a name or a parameter, and a map's key is a name. A
+    a parametric record's application is a name or a parameter, and a map's key is a name. A
     record body may be written at a type slot, `at: { x: int32 }`, the same form an
     application closes to; composition and refinement stay declared.
 12. **Every bundled pin changes** (§6).
@@ -1371,11 +1375,11 @@ carries no open questions.
 | #4 (considered) | The tag kept exact, and an abstract variant refused at the declaration. | Recorded — it gives up "text or any shape" as an open family, the members listed and the choice edited for each new one. |
 | #3 (reading) | A number or a quoted token in a *schema* document's argument list: a grammar error, as the register and the proposal have it: Part 2 §12.1 is `type-arg = type-expr`, and [TSON-DATA] §7.4's data argument is narrowed the same way. The corpus records the schema-document case under the `resolver` category, which every schema-document error carries, so it does not tell a grammar error from a resolver one. | **[settled]** — the running behaviour. |
 | #3 (reading) | The proposal narrows §12.1's `type-def` alternative `[type-params] type-expr` to a record body. A parameter list before a sugar form or a bare reference is a resolver error naming the remedy, so the production keeps the alternative and a comment says the resolver admits a record body alone. | **[editorial]** — the running behaviour. |
-| #3 (reading) | §4.1 makes a template a type by its constructor, `meta.record`, while §5.10's rule is that no template is a type a position names. The text keeps §4.1's predicate and states the refusal on references, as the proposal's §1.3 does; §5.10's heading says "no template is a type a position names". | **[editorial]** — for confirmation. |
+| #3 (reading) | §4.1 makes a parametric record a type by its constructor, `meta.record`, while §5.10's rule is that no parametric record is a type a position names. The text keeps §4.1's predicate and states the refusal on references, as the proposal's §1.3 does; §5.10's heading says "no parametric record is a type a position names". | **[editorial]** — for confirmation. |
 | #3 (reading) | A self-reaching expansion kept its closed record under a name derived from the canonical application. | **Superseded by #5**: a recursive application ties to the declaration closing it, and one with none is refused. |
-| #3 (reading) | A tag naming a template in data is a validation error (Revision 39: a resolver error as a data annotation). | **[editorial]** — the running behaviour. |
-| #3 (remainder) | A template is read at its declaration against `record`'s vocabulary, but a name in it that resolves to nothing is reported per application, and not at all while nothing applies the record. The proposal's reading at the declaration asks for more. | Open — outstanding work in the implementation; the text states the declaration-time checks it runs. |
-| #5 (ruled) | An application at a refinement source (`x => box<text> ^ { … }`) is absorbed as one at a composition operand is, IS-A the template's written parents and a declaration of the application where one exists. | **Superseded by item 109**: `box<text> ^ { … }` is a parse error, written `box<text> & { … }`, whose operand rule (Part 2 §5.8) it followed. |
+| #3 (reading) | A tag naming a parametric record in data is a validation error (Revision 39: a resolver error as a data annotation). | **[editorial]** — the running behaviour. |
+| #3 (remainder) | A parametric record is read at its declaration against `record`'s vocabulary, but a name in it that resolves to nothing is reported per application, and not at all while nothing applies the record. The proposal's reading at the declaration asks for more. | Open — outstanding work in the implementation; the text states the declaration-time checks it runs. |
+| #5 (ruled) | An application at a refinement source (`x => box<text> ^ { … }`) is absorbed as one at a composition operand is, IS-A the parametric record's written parents and a declaration of the application where one exists. | **Superseded by item 109**: `box<text> ^ { … }` is a parse error, written `box<text> & { … }`, whose operand rule (Part 2 §5.8) it followed. |
 | #5 (ruled) | A value modifier on a field typed by a reference written in place (`handler?: meta.ref<method> ~ …`) is admitted, read against the reference as against a declared one; on a container, tuple or choice written in place it is refused, as on a declared one. | **[settled]** — the spec author's ruling. |
 | #5 (ruled) | A choice that is not disjoint names every variant: one holding a variant written in place is a resolver error, a tag naming a variant by its name. | **[settled]** — the spec author's ruling. |
 | #5 (ruled) | A name and a type written in place are never the same type, even where the name's construction is identical; a name is a name's type past alias hops, and a type written in place an equal one's. | **[settled]** — the spec author's ruling. |
@@ -1385,7 +1389,7 @@ carries no open questions.
 | #6 (ruled) | `meta.dependent.on` is `text`, naming a field of the record by its declared spelling, declared before the dependent field, as a `discriminators` entry names one. | **[settled]** — the spec author's ruling. |
 | #6 (ruled) | A declared sum written in place was refused only by its absence from Part 2 §4.2's list of what `of` holds. §4.2 states it, beside a namespace type. | **[settled]** — the spec author's ruling. |
 | #6 (ruled) | A data document typed by the kernel can write a type in place that §4.2's list refuses (`!meta.array { element_type: { of: !meta.dependent { on: kind } } }` reads with no diagnostic): `meta.type_inline.of` is typed `meta.type`, and the list is a resolver rule. It predates `meta.dependent`, which adds one entry to the list. | **[settled]** — the spec author's ruling, §3.2 item 124: the shape alone, the resolver's rules being a declaration's. |
-| Items 78–84 (ruled) | A choice over a parameter, `( T \| int32 )`, is disjoint for some arguments and not others. Refusing it at the declaration, or requiring disjointness for every argument, were the alternatives; it loads at the template, and each application is judged where it closes. | **[settled]** — the spec author's ruling. |
+| Items 78–84 (ruled) | A choice over a parameter, `( T \| int32 )`, is disjoint for some arguments and not others. Refusing it at the declaration, or requiring disjointness for every argument, were the alternatives; it loads at the parametric record, and each application is judged where it closes. | **[settled]** — the spec author's ruling. |
 | #8 (remainder) | A name in a schema document's annotation value is judged at link (Part 2 §5.12). The first implementation checks the value's shape and delivers the name unjudged; a data document's is judged at the read. | Open — outstanding work in the implementation; the text states the rule. |
 | Item 114 (ruled) | A type built by a constructor composed from `meta.array` or `meta.map`, a namespace type, takes `^` under the collection's rules: §5.7's source of `^` is a type built by `meta.array`, by `meta.map` or by a constructor that IS-A either. Keeping the source to the two constructors, so that a namespace type is bounded only where it is constructed, was the reading first taken. | **[settled]** — the spec author's ruling, §3.2 item 122: the general rule, with no case for a namespace. |
 | Items 107–108 (ruled) | Over an incomplete entry nothing is replaced: a field written again is refused, whatever the value, and to narrow, the entry is completed and the type refined. One rule covers required fields: `^` writes any unwritten field and leaves one required field absent. An alias of an incomplete entry is allowed and not written. An incomplete entry is imported like any entry. | **[settled]** — the spec author's ruling. |
@@ -1398,13 +1402,13 @@ carries no open questions.
 | Item 118 (reading) | Which tags the boundary admits. The text applies §7.2's subsumption with each name followed to the entry it reaches, by identity, so a name of the enclosing scope that is no extern is admitted where it reaches the target or a subtype of it (the scope importing the schema that declares it), and a variant's name is admitted where the target is a choice; the narrower reading admits externs alone. A tag naming the position's own extern is read as no tag, so an extern of a member-dispatched base may be written at a choice and its value placed by its selectors. | **[settled]** — the spec author's ruling, §3.2 item 126: by identity, as written. |
 | Items 116–118 (ruled) | A wrapper's inner `$type` at an extern's boundary named a foreign subtype by the foreign schema's name, which text cannot write. The encodings align on one type name for a value, the boundary's. A second tag in text was the alternative. | **[settled]** — the spec author's ruling, §3.4 item 16. |
 | Item 128 (ruled) | A choice that is a variant of a choice. The text refuses the one case no document can write, a nested choice that is not disjoint, and keeps a disjoint one, tagged by its name. A nested choice standing for its variants, so that a tag names a variant's variant and disjointness is judged over all of them, is the question of how sums are expressed and is left to the next revision; it lifts this refusal and refuses nothing this text admits. Refusing every nested choice was the alternative, and would refuse `( boolean | narrow )`, which reads. | **[settled]** — the spec author's ruling. |
-| Items 129, 133 (ruled) | Two matters of arrangement. A restated field's rules stand with composition (§5.8) and refinement has §5.7 to itself; retitling §5.7 to cover both was the alternative. A record with parameters is a template; "open record" was the alternative, and "generic record" was not taken. | **[settled]** — the spec author's rulings. |
+| Items 129, 133 (ruled) | Two matters of arrangement. A restated field's rules stand with composition (§5.8) and refinement has §5.7 to itself; retitling §5.7 to cover both was the alternative. A record with parameters is a parametric record; "open record" was the alternative, and "generic record" was not taken. | **[settled]** — the spec author's rulings. |
 | §3.4 item 17 (ruled) | A map holding an annotation member's name as a key, at a choice whose map variant is written in place, had no encoding. The variant is named; a wrapper with no `$type`, read by class, was the alternative. | **[settled]** — the spec author's ruling. |
 | §5.12 (ruled) | A qualified name's segment selecting a dependent field. The walk stands, taking the type the sibling names, the one §5.2 judges the held value by at link; refusing the segment was the alternative, and left a value inside a dependent field unnameable. | **[settled]** — the spec author's ruling; no text changes. |
 | Item 135 (ruled) | `discriminators` on a `!meta.record` whose `extension` is not `ABSTRACT`: refused, a missing `extension` being `OPEN`. Deriving ABSTRACT was the alternative. | **[settled]** — the spec author's ruling. |
 | Items 116–118 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
-| #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
+| #3 (lost) | Abstracting over a facet value or a size; a parametric record over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
 
 ---
 
@@ -1431,7 +1435,7 @@ carries no open questions.
 2. **The kernel changes shape, the artifact set does not.** `meta.tn` loses seven entries
    and gains `meta.param`; `meta.ref` and the root's `set` change form; the documentation of
    `meta.record`, `meta.record_field`, `meta.reference_type`, `meta.alias`, `meta.array`
-   and `meta.application` is rewritten for the template. #6 removes `allow_sibling`,
+   and `meta.application` is rewritten for the parametric record. #6 removes `allow_sibling`,
    `meta.field_type_ref` and `meta.field_type_expr`, adds `meta.dependent`, and rewrites the
    documentation of `meta.record_field`, `meta.reference_type`, `meta.ref`, `meta.type_ref`,
    `meta.type_inline` and `meta.type_expr`; #5's record written at a slot rewrites
@@ -1463,20 +1467,20 @@ carries no open questions.
    `created`, `text_pair`, `nested`, the one-position tuples (`[a]` admitted, `[_]` refused,
    and admitted with `voidable: true`), `nonempty<uuid>`, `meta.array<user_id>`,
    `x => box<text> & { … }`, `<T> !meta.record { … }` and a parameterised subtraction
-   resolve; and each refusal the text names — a bare template at a field or an operand, an
+   resolve; and each refusal the text names — a bare parametric record at a field or an operand, an
    argument outside its bound, an unbounded or mis-bounded parameter passed on, a bound
    naming a constructor, a literal on a parameter-typed field, a parameter at a value or a
    size bound, the six refused bodies, the four refused forms over a parameter, a parameter
    as an operand or a head, an applied constructor at an operand, `meta.namespace<int32
-   text>`, `meta.enum_type<meta.identifier>`, `final` on a template, a shadowing parameter,
+   text>`, `meta.enum_type<meta.identifier>`, `final` on a parametric record, a shadowing parameter,
    a written `parameters` binding, an unreferenced parameter, irregular recursion, a minted
-   family member, an application in data and a tag naming a template — is refused with the
+   family member, an application in data and a tag naming a parametric record — is refused with the
    diagnostic the text describes.
    For Part 1: a schemaless `{ t: pair<box<text> int32> … }` reads; `maxint<10>` and
    `box<"a b">` are refused at the argument; under a schema `t: set<text>` at a
    `meta.type_ref` field is refused and `t: names` over `names => set<text>` is admitted.
    For Part 3: a string holding an application at a reference-typed position, a `$type`
-   naming a template, and a root type supplied out of band naming one are each refused.
+   naming a parametric record, and a root type supplied out of band naming one are each refused.
 2. **The pins** — §6 item 1.
 3. **#5's examples** — the examples #5 writes or changes run: §1.6's schema, its `history`
    closing `flagged<status>` in place, and its data document; §5.10's `f: page<order>` beside
@@ -1519,7 +1523,7 @@ carries no open questions.
    and an extern at a `meta.ref<meta.record>` slot. Each refusal the text names is refused
    with the diagnostic it describes: `&`, `-`, `^`, a construction head and an application
    head on an extern; a default at a field typed by one; a qualified name through one; a
-   target that is a template, an incomplete entry, a constructor, a value entry, a
+   target that is a parametric record, an incomplete entry, a constructor, a value entry, a
    schema map or a name the foreign closure lacks; an alias of `meta.extern` at the head;
    two externs of one entry as variants of one choice; an extern of a record at a
    reference over `meta.enum_type`; a cycle through an extern; a foreign schema over

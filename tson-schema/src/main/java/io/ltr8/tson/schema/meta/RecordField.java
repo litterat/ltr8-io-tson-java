@@ -30,7 +30,7 @@ import java.util.Optional;
  * read against the type that instance's sibling names ([TSON-SCHEMA] §5.2). {@link #ownType()} is the type where
  * there is one.
  *
- * <p><b>In an open record {@code type} may be a parameter</b> ({@link ParamRef}), whole or among an application's
+ * <p><b>In a parametric record {@code type} may be a parameter</b> ({@link ParamRef}), whole or among an application's
  * arguments, and no label says which: a parameter is a reference value. An application substitutes it away, so a
  * closed record's fields name none. {@code value} is a literal and never a parameter.
  *

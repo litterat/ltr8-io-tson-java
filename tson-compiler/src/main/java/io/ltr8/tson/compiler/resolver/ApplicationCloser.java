@@ -21,7 +21,7 @@ interface ApplicationCloser {
     void checkArguments(String head, Top template, List<TypeRef> arguments);
 
     /**
-     * The entry a <b>declaration</b> naming a fully-bound application <em>is</em> (§8.2): the open record's
+     * The entry a <b>declaration</b> naming a fully-bound application <em>is</em> (§8.2): the parametric record's
      * application closed into this declaration's own name, its key recording the application.
      *
      * <p>§8.2 gives a declared entry its name as its identity, so two declarations of one application are two
@@ -29,7 +29,8 @@ interface ApplicationCloser {
      * cares (§5.2's pin distinctness over a family's members) catches them on its own terms.
      *
      * <p>Returns {@code null} where this declaration cannot own an entry, and the caller falls back to the
-     * reference form: an unresolved or non-template head, or an arity mismatch, both the ordinary path's to report.
+     * reference form: an unresolved head or one that is no parametric record, or an arity mismatch, both the ordinary
+     * path's to report.
      */
     Top closeApplicationInto(String declaredName, ApplyBody application);
 }

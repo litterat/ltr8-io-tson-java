@@ -89,8 +89,8 @@ final class RecordExtension {
             if (def instanceof RecordBody record) {
                 checkDeclaration(name, def, record, merged, facts, violations);
             } else if (OpenEntry.isOpen(def)) {
-                // Every application of a template IS-A what its written parents reach, so a template composing a
-                // final record is refused at its own declaration, whether or not anything applies it.
+                // Every application of a parametric record IS-A what its written parents reach, so a parametric record
+                // composing a final record is refused at its own declaration, whether or not anything applies it.
                 checkNothingComposesOntoFinal(name, def, merged, facts, violations);
             }
         }

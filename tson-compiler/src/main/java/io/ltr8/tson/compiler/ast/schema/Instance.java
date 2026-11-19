@@ -12,9 +12,9 @@ import java.util.List;
  * type-ref; §12.1 states that no production of the schema grammar takes the full {@code data-value}.
  *
  * <p><b>A parameter list is the grammar's, and the resolver narrows it.</b> {@code <T> !meta.record { … }} is this
- * same production with {@code typeParams} non-empty: an open record, its payload read against {@code record}'s own
+ * same production with {@code typeParams} non-empty: a parametric record, its payload read against {@code record}'s own
  * vocabulary with the parameters in scope. Before any other head -- {@code <T> !meta.array { element_type: T }}, a
- * value of an ordinary type -- it is a resolver error ([TSON-SCHEMA] §5.10: a template's body is a record). A
+ * value of an ordinary type -- it is a resolver error ([TSON-SCHEMA] §5.10: a parametric record's body is a record). A
  * parameterized {@link AtomRefinement} is not a form at all (§12.1 gives {@code atom-refinement} no parameter list,
  * a refinement of an atom instance having no parameter to take).
  *

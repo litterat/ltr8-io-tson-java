@@ -64,19 +64,19 @@ spec-required case:
   adjacency and separator errors under `parser`. The validate vectors that state `parser` (an argument list in data)
   are checked by the subject failing a Class 1 parse instead (`Class2ConformanceSuiteTest.checkValidateVector`). Give
   the read a code the runner maps to `parser`, and check those vectors by it.
-- [ ] **A literal under a closed type in an open record is judged only when the template closes**
+- [ ] **A literal under a closed type in a parametric record is judged only when the parametric record closes**
   ([TSON-SCHEMA] §5.10). `t => <T> { a: T  n?: int8 ~ 500 }` loads, the default held until an application closes the
   field; the type is closed, so its verdict cannot vary by application and §5.10 judges it at the declaration, as
-  §5.2 judges any default or pin. Judge a literal whose field type mentions no parameter when the template is
-  declared, and add a `schema/invalid` vector for the out-of-range default.
-- [ ] **An open record's own references are judged only where it is applied** ([TSON-SCHEMA] §5.10, §3.3). An open
-  record is read at its declaration, and a name its fields or parents write that is neither one of its parameters nor
-  an entry is an unresolved reference there; the linker checks only arity over an open record
+  §5.2 judges any default or pin. Judge a literal whose field type mentions no parameter when the parametric record
+  is declared, and add a `schema/invalid` vector for the out-of-range default.
+- [ ] **A parametric record's own references are judged only where it is applied** ([TSON-SCHEMA] §5.10, §3.3). A
+  parametric record is read at its declaration, and a name its fields or parents write that is neither one of its parameters
+  nor an entry is an unresolved reference there; the linker checks only arity over a parametric record
   (`TsonSchemaLinker.checkOpenArity`), so `box => <T> { v: T  w: no_such_type }` gets its verdict at each application,
   retargeted to `box` (`heldDeclarationNaming`), and none while nothing applies it. Judge the references that are no
   `ParamRef` with `validateTypeRef` at the declaration, and add a `schema/invalid` vector for the unapplied case.
-- [ ] **An application through an alias of an open record is pinned at a composition operand alone** ([TSON-SCHEMA]
-  §8.3). It applies the open record (`TemplateMaterialiser.templateHead`: `bx<text>` over `bx => box` closes to the
+- [ ] **An application through an alias of a parametric record is pinned at a composition operand alone** ([TSON-SCHEMA]
+  §8.3). It applies the parametric record (`TemplateMaterialiser.templateHead`: `bx<text>` over `bx => box` closes to the
   record `box<text>` closes to), and the corpus holds that at an operand, `box_of<text> & { … }`. Add a
   `schema/valid` vector for one at a declaration and one at a field's type, with the expected resolved form.
 - [ ] **No vector pins a parameter at a facet** ([TSON-SCHEMA] §5.10). §5.10 refuses a parameter at a facet as at a
@@ -169,7 +169,7 @@ spec-required case:
 - [ ] **§5.7: a field restated where no closed record is on the chain is not judged for its type.** The link
   judges a restated type against the nearest closed records on the chain (`TsonSchemaLinker.checkRestatedFieldTypes`).
   `dog => pet<dog_type> & { pet: cat_type }`, where no entry names `pet<dog_type>`, has an edge only to
-  the open family base `pet`, whose `pet` is `T`, so it links; so does `wrap<text>` from `wrap => <T> box<T> & { v:
+  the parametric family base `pet`, whose `pet` is `T`, so it links; so does `wrap<text>` from `wrap => <T> box<T> & { v:
   int32 }` where nothing denotes `box<text>`. A subtraction's tightening entries, which §5.9's rule 4 puts under
   §5.7's rules, are not judged either: its chain is empty. The resolver holds the inherited field
   (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a deferred judgement there, or the inherited
@@ -214,7 +214,7 @@ spec-required case:
   and `{ type: int32  optional: true  voidable: true  role: FIXED  value: 5 }` (`FIXED` requires `voidable: false`).
   Verify the three per field wherever a `meta.record` value is resolved, at the declaration, with a `schema/invalid`
   vector for each.
-- [ ] **`extension: FINAL` on an open record written as `!meta.record` is accepted** ([TSON-SCHEMA] §5.2).
+- [ ] **`extension: FINAL` on a parametric record written as `!meta.record` is accepted** ([TSON-SCHEMA] §5.2).
   `box => final <T> { x: T }` is refused, the mark forbidding the composition every application exists for;
   `box => <T> !meta.record { fields: { v => { type: T } }  extension: FINAL }` is the same record and loads. Refuse
   it on the lowered form, so both spellings meet one check, and add a `schema/invalid` vector.

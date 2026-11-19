@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * An open record's parameters substituted on the model ([TSON-SCHEMA] §5.10): each {@link ParamRef} in its fields'
+ * A parametric record's parameters substituted on the model ([TSON-SCHEMA] §5.10): each {@link ParamRef} in its fields'
  * types and its parents replaced by the argument bound to it, at any depth, and nothing else changed. A parameter
  * stands only at a slot of a field's type ({@link TypeSlots}) or as an argument of an application there or in a parent,
  * so those references are all substitution visits.
@@ -50,7 +50,7 @@ final class Substitution {
         TypeRef argument = bindings.get(parameter);
         if (argument == null) {
             throw new IllegalStateException("parameter '" + parameter + "' has no argument -- arity is checked "
-                    + "before an open record is substituted");
+                    + "before a parametric record is substituted");
         }
         return argument;
     }

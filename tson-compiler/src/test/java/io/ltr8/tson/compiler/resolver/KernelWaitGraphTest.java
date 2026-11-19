@@ -55,7 +55,7 @@ class KernelWaitGraphTest {
      * @meta.completion} among them), and every entry a declaration of that set names, closed to a fixed point -- and
      * the concepts that belong with them, which nothing in the closure names: the tuple and choice constructors and the
      * tuple's element, the {@code application} annotation, the {@code ref} reference, the {@code disjoint}
-     * assertion, and the octet-sequence constructor with its encodings and instance. An open record's
+     * assertion, and the octet-sequence constructor with its encodings and instance. A parametric record's
      * {@code param} and {@code param_name} are in the closure, reached through {@code record.parameters}. The choice
      * constructor and the disjoint assertion are on the cycle: a record field's type is read against {@code
      * meta.type_expr}, a choice asserted disjoint, and a type written in place reaches every constructor's record

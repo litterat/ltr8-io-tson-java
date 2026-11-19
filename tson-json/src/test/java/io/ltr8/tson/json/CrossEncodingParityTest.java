@@ -500,12 +500,12 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A template composing a sealed base is no member of it, though it pins the selector: a template is no type
-     * (§5.10), and only a declaration composing one of its applications is a member. So {@code pending}'s {@code
+     * A parametric record composing a sealed base is no member of it, though it pins the selector: a parametric record is no
+     * type (§5.10), and only a declaration composing one of its applications is a member. So {@code pending}'s {@code
      * "wait"} selects nothing, and the refusal offers only the pins a document could write.
      */
     @Test
-    void aRecordTemplateUnderASealedBaseIsNoMemberInBoth() {
+    void aParametricRecordUnderASealedBaseIsNoMemberInBoth() {
         sameRule("ruling", "{ v: { v_kind: \"wait\"  detail: 1 } }", """
                 {"v": {"v_kind": "wait", "detail": 1}}""");
         assertEquals(List.of("pass"), jsonDiagnostics("ruling", """
@@ -513,71 +513,71 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A family whose base is an <b>abstract template's application</b>: {@code abstract} on {@code outcome} is
+     * A family whose base is an <b>abstract parametric record's application</b>: {@code abstract} on {@code outcome} is
      * each application's, so {@code outcome<text>} is abstract and {@code won<text>}, which composes it, is its
      * one member. Both are named by declarations, and a tag naming a declaration is compared past its alias hops in
      * both encodings (§7.2's "after alias flattening of both").
      */
     @Test
-    void anAliasOfATemplateFamilyMemberSelectsItInBoth() {
+    void anAliasOfAParametricRecordFamilyMemberSelectsItInBoth() {
         bothAccept("ledger", "{ o: !won_of { code: \"c\"  prize: \"p\" } }", """
                 {"o": {"$type": "won_of", "code": "c", "prize": "p"}}""");
     }
 
     /** And an alias of the <em>base</em> selects nothing in both, which is the other end of the same set. */
     @Test
-    void anAliasOfATemplateFamilyBaseSelectsNothingInBoth() {
+    void anAliasOfAParametricRecordFamilyBaseSelectsNothingInBoth() {
         sameRule("ledger", "{ o: !outcome_of { code: \"c\" } }", """
                 {"o": {"$type": "outcome_of", "code": "c"}}""");
     }
 
     /**
-     * The untagged case over a template family, which compares the two {@code expected} lists as well as the
+     * The untagged case over a parametric record family, which compares the two {@code expected} lists as well as the
      * prose -- so a stack flattening aliases on one side of the comparison and not the other is caught by
      * what it offers the author, not only by what it admits.
      */
     @Test
-    void anAbstractTemplatePositionRequiresItsTagInBoth() {
+    void anAbstractParametricRecordPositionRequiresItsTagInBoth() {
         sameRule("ledger", "{ o: { code: \"c\"  prize: \"p\" } }", """
                 {"o": {"code": "c", "prize": "p"}}""");
     }
 
-    // ── A family declared through a template ──────────────────────────────
-    //    A template is no type (§5.10), so `crate => { b: boxed }` names the abstract record `box` composes, and
+    // ── A family declared through a parametric record ──────────────────────────────
+    //    A parametric record is no type (§5.10), so `crate => { b: boxed }` names the abstract record `box` composes, and
     //    each declared application of `box` is a member through that written parent. The base states no
     //    selector, so the tag is the selector in both encodings.
 
     /** A declared application reads at the base's position, in both encodings. */
     @Test
-    void aMemberThroughATemplatesParentReadsInBoth() {
+    void aMemberThroughAParametricRecordsParentReadsInBoth() {
         bothAccept("crate", "{ b: !int_box { v: 1 } }", """
                 {"b": {"$type": "int_box", "v": 1}}""");
     }
 
     /** And the other member, which is what makes the dispatch a dispatch rather than a single admission. */
     @Test
-    void theOtherMemberThroughATemplatesParentReadsInBoth() {
+    void theOtherMemberThroughAParametricRecordsParentReadsInBoth() {
         bothAccept("crate", "{ b: !text_box { v: \"x\" } }", """
                 {"b": {"$type": "text_box", "v": "x"}}""");
     }
 
     /** Untagged selects nothing: the base has no direct instances, so both encodings require the tag. */
     @Test
-    void aBaseOfTemplateApplicationsRequiresItsTagInBoth() {
+    void aBaseOfAParametricRecordsApplicationsRequiresItsTagInBoth() {
         sameRule("crate", "{ b: { v: 1 } }", """
                 {"b": {"v": 1}}""");
     }
 
     /** A tag naming the base itself selects nothing either, which is the other end of the same set. */
     @Test
-    void aTagNamingTheBaseOfTemplateApplicationsSelectsNothingInBoth() {
+    void aTagNamingTheBaseOfAParametricRecordsApplicationsSelectsNothingInBoth() {
         sameRule("crate", "{ b: !boxed { v: 1 } }", """
                 {"b": {"$type": "boxed", "v": 1}}""");
     }
 
     /**
-     * A member composing a template's application and pinning the selector there reaches the base through the
-     * template's written parent (§5.8, §5.10), and is selected by its pin in both encodings.
+     * A member composing a parametric record's application and pinning the selector there reaches the base through the
+     * parametric record's written parent (§5.8, §5.10), and is selected by its pin in both encodings.
      */
     @Test
     void aMemberComposingAnApplicationIsSelectedByItsPinInBoth() {
@@ -588,12 +588,12 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * An abstract template's application is an abstract record carrying the template's selector (§5.10), so a
-     * position typed {@code tpet_of}, the declaration of {@code tpet<text>}, dispatches over the declarations composing
+     * An abstract parametric record's application is an abstract record carrying the parametric record's selector (§5.10),
+     * so a position typed {@code tpet_of}, the declaration of {@code tpet<text>}, dispatches over the declarations composing
      * it, in both encodings.
      */
     @Test
-    void anAbstractTemplatesApplicationDispatchesOverItsMembersInBoth() {
+    void anAbstractParametricRecordsApplicationDispatchesOverItsMembersInBoth() {
         bothAccept("tpen", "{ t: { tk: cat  indoor: true } }", """
                 {"t": {"tk": "cat", "indoor": true}}""");
         sameRule("tpen", "{ t: { tk: bird  indoor: true } }", """
@@ -743,7 +743,7 @@ class CrossEncodingParityTest {
     /**
      * A dependent field ([TSON-SCHEMA] §5.2) is read in both encodings against the type its sibling names in the same
      * record -- the sibling as written, its default, or its pin -- and refused alike: a value of another type, a free
-     * sibling written after it, and a sibling naming a template, which is refused at the sibling.
+     * sibling written after it, and a sibling naming a parametric record, which is refused at the sibling.
      */
     @Test
     void aDependentFieldIsReadAgainstItsSiblingByBoth() {
@@ -763,7 +763,7 @@ class CrossEncodingParityTest {
                 {"kind": "tmpl", "v": {"item": 5}}""");
         assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/v")),
                 tson("cell", "{ v: 5  kind: int32 }"));
-        // A template is no type (§5.10), so the reference over types refuses it before the dependent field is read.
+        // A parametric record is no type (§5.10), so the reference over types refuses it before the dependent field is read.
         assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/kind")),
                 tson("cell", "{ kind: tmpl  v: { item: 5 } }"));
     }
@@ -1070,7 +1070,7 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * An application of an open record at a slot closes in place to a record with no name, read alike in both: its
+     * An application of a parametric record at a slot closes in place to a record with no name, read alike in both: its
      * fields, its default, an element of a list holding one, and a field it does not declare, at one pointer.
      */
     @Test

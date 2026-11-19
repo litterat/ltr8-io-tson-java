@@ -20,18 +20,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code abstract} on a <b>template</b> ([TSON-SCHEMA] §5.2, §5.10): {@code result => abstract <T>
+ * {@code abstract} on a <b>parametric record</b> ([TSON-SCHEMA] §5.2, §5.10): {@code result => abstract <T>
  * { payload: T }} makes every instantiation abstract, so a value at a {@code result<text>} position is a
  * value of one of that instantiation's own subtypes and must name which.
  *
- * <p><b>The mark is each application's {@code extension}.</b> A template is no type, so {@code abstract} on one
- * says nothing of the template itself: closing carries it, with the template's selectors, to the record each
- * application denotes. {@code final} is refused on a template, which is applied to be composed (§5.2, §5.10).
+ * <p><b>The mark is each application's {@code extension}.</b> A parametric record is no type, so {@code abstract} on one
+ * says nothing of the parametric record itself: closing carries it, with the parametric record's selectors, to the record
+ * each application denotes. {@code final} is refused on a parametric record, which is applied to be composed (§5.2, §5.10).
  *
  * <p><b>The family it is abstract over is the one {@code SubtypeTemplateFamilyTest} builds</b>: a subtype
- * template's closed application gets an IS-A edge to its base's instantiation at the same argument, so
+ * parametric record's closed application gets an IS-A edge to its base's instantiation at the same argument, so
  * {@code ok<text>} is a member of {@code result<text>}'s family and not of {@code result<int32>}'s. An
- * abstract template whose family was always empty would be a type nothing could ever stand at.
+ * abstract parametric record whose family was always empty would be a type nothing could ever stand at.
  *
  * <p><b>Every member is the author's declaration.</b> {@code ok_of => ok<text>} is the record {@code ok<text>}
  * closes to, under the name the author wrote (§8.2), so a tag names a member as it names any declared record.
@@ -99,15 +99,15 @@ class AbstractTemplateFamilyTest {
     // ── The mark, closed ────────────────────────────────────────────────────
 
     @Test
-    void closingAnAbstractTemplateYieldsAnAbstractInstantiation() {
+    void closingAnAbstractParametricRecordYieldsAnAbstractInstantiation() {
         TsonCompiledSchemaRegistry registry = compile(FAMILY);
 
         assertEquals(RecordExtensionType.ABSTRACT, bodyOf(registry, "result_of").extension());
     }
 
-    /** Extensibility is never inherited (§5.2), and a closed subtype template is where that is easiest to lose. */
+    /** Extensibility is never inherited (§5.2), and a closed subtype parametric record is where that is easiest to lose. */
     @Test
-    void aSubtypeOfAnAbstractTemplateClosesOpen() {
+    void aSubtypeOfAnAbstractParametricRecordClosesOpen() {
         TsonCompiledSchemaRegistry registry = compile(FAMILY);
 
         assertEquals(RecordExtensionType.OPEN, bodyOf(registry, "ok_of").extension());
@@ -190,19 +190,19 @@ class AbstractTemplateFamilyTest {
     // ── What is still refused ───────────────────────────────────────────────
 
     /**
-     * {@code abstract} <b>is</b> a claim with a subject on a template (§5.10): a
-     * template carrying {@code extension} takes part in IS-A and {@code subtypes} holds its own
+     * {@code abstract} <b>is</b> a claim with a subject on a parametric record (§5.10): a
+     * parametric record carrying {@code extension} takes part in IS-A and {@code subtypes} holds its own
      * instantiations, which is the set the claim ranges over. Only {@code final} still cannot hold --
-     * every application is a subtype of the template by construction, so the claim is false before an
+     * every application is a subtype of the parametric record by construction, so the claim is false before an
      * author writes anything else.
      */
     @Test
-    void aTemplateMayStateASelectorButNeverBeFinal() {
+    void aParametricRecordMayStateASelectorButNeverBeFinal() {
         assertNotNull(compile("      box => abstract <T> { kind: text =?  v: T }\n"),
                 "abstract states the fact the derivation reaches anyway");
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("      box => final <T> { kind: text =?  v: T }\n"));
-        assertTrue(thrown.getMessage().contains("is refused on a template"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("is refused on a parametric record"), thrown.getMessage());
     }
 }

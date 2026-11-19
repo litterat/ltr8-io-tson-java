@@ -9,10 +9,10 @@ git.
 - All three §8.2 rules run in one walk over scopes (`checkNames`), never at the positions where a name is read.
 - What stays at the reading positions is §7.7's grammar (`IdentifierGrammar.validate`); `IdentifierGrammar.hygiene`
   returns a verdict rather than throwing.
-- A template's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
+- A parametric record's parameters are a checked scope although §11.4 declines to list them; a choice's variants are not.
 - A record written in place is a scope of its own, its field names judged under its own name type, at any depth
   (`FieldNames.inPlace`), and reported against the declaration holding it; the record holding it is another scope. A
-  record an application closes to is skipped with all it holds: its names are its open record's, judged there once.
+  record an application closes to is skipped with all it holds: its names are its head's, judged there once.
 - Each schema map is a scope of its own, the root and each nested `!schema` map, grouped by `SchemaPaths.parent`; the
   per-name rules judge a member's own name, its path's last segment, never the dotted path.
 - A value entry's payload and an annotation value are judged at the payload read (`SchemaResolver`, under the
@@ -32,20 +32,21 @@ admit. The scopes are §11.4's — the
 merged namespace, which is where §2.2.3's own disjointness rule is exact equality and a confusable pair passes
 it by construction, split into one scope per schema map (the root's entries, and each nested `!schema` map's members
 by their own names, a refusal naming the map); each entry's record field names, its groups' member labels arriving flattened
-among them; and its enum members, where the enum declares itself a vocabulary — plus **a template's parameters, which §11.4
-declines to list** (`<T, Т>` otherwise declares two parameters that render identically, and a body referencing `T` binds one
-of them with nothing in the source to say which). §11.4 and §5.10 both say why they are left out — one author writes the list
-whole on one line — and this stays stricter deliberately: mechanisms 2 and 3 reach every identifier position anyway (§8.2),
-so only the look-alike rule is a divergence, and a walk with an exemption is the shape that grows the holes one walk exists
-to close. A **choice's variants are deliberately not checked**: a variant is a reference to a declared name, so a confusable
-pair is already two confusable namespace entries and a check there could never fire.
+among them; and its enum members, where the enum declares itself a vocabulary — plus **a parametric record's parameters,
+which §11.4 declines to list** (`<T, Т>` otherwise declares two parameters that render identically, and a body referencing
+`T` binds one of them with nothing in the source to say which). §11.4 and §5.10 both say why they are left out — one author
+writes the list whole on one line — and this stays stricter deliberately: mechanisms 2 and 3 reach every identifier position
+anyway (§8.2), so only the look-alike rule is a divergence, and a walk with an exemption is the shape that grows the holes
+one walk exists to close. A **choice's variants are deliberately not checked**: a variant is a reference to a declared name,
+so a confusable pair is already two confusable namespace entries and a check there could never fire.
 
 **A field's default or fixed value is a name when its type is an identifier family** (`checkFieldValues`), and
 meets the two per-name rules in the same pass, under that family's own profile. It is not a scope — one value
 stands alone — but it is the schema's own copy of a value a read judges: a default reaches every document that
 omits the field, so a value the reader would refuse if written must not be one it injects
-(`design/name-hygiene-read-path.md`). An open record's literal values are judged the same way, once, at the
-template, applied or not: they are every application's, and are judged once, against the declaration that wrote them.
+(`design/name-hygiene-read-path.md`). A parametric record's literal values are judged the same way, once, at the
+parametric record, applied or not: they are every application's, and are judged once, against the declaration that wrote
+them.
 
 **A value entry and an annotation value are judged where they are read, not in the walk.** A value entry's payload (`!api { …
 }`, a map keyed by names) binds to the consumer's own classes or is held as a tree

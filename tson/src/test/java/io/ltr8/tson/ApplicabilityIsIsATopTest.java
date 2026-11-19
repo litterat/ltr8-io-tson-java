@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>Asking whether {@code C} is a constructor was both too narrow and inconsistent.</b> Too narrow:
  * {@code alias} is deliberately unmarked in the kernel (it describes no value) and the language needs it
- * applicable, so it took a by-name exception in the template path and none in the closed one — leaving
+ * applicable, so it took a by-name exception in the parametric record path and none in the closed one — leaving
  * {@code <T> !alias { target: T }} legal and {@code !alias { target: int32 }} refused, one
  * construction with two answers. Inconsistent, because nothing about the marker said which.
  *
@@ -51,7 +51,7 @@ class ApplicabilityIsIsATopTest {
 
     /**
      * A construction applies {@code alias}, {@code alias} being IS-A {@code top}; a parameter list before it is
-     * refused, a template's body being a record (§5.10).
+     * refused, a parametric record's body being a record (§5.10).
      */
     @Test
     void aliasAppliesClosedAndRefusesParameters() {
@@ -60,7 +60,7 @@ class ApplicabilityIsIsATopTest {
                   r => <T> !meta.alias { target: T }
                 """);
         assertEquals(1, open.size(), open::toString);
-        assertTrue(open.getFirst().message().contains("a template's body is a record body"), open::toString);
+        assertTrue(open.getFirst().message().contains("a parametric record's body is a record body"), open::toString);
     }
 
     /**
@@ -95,7 +95,7 @@ class ApplicabilityIsIsATopTest {
     /**
      * <b>An alias is a hop, not a rewrite (§8.3), so applicability follows the chain.</b> An alias to a
      * constructor is applicable, because the entry at the end of the chain is — and so is an alias to that
-     * alias. Everything the head is asked (is it a template, is it applicable, what kind does construction
+     * alias. Everything the head is asked (is it a parametric record, is it applicable, what kind does construction
      * transfer, whose vocabulary reads the payload) is a question about the terminal entry.
      *
      * <p>Asking the alias instead would answer every one of them from an empty supertype chain and a {@code

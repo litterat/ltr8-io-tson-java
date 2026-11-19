@@ -114,7 +114,7 @@ class TopKindHierarchyTest {
         assertInstanceOf(Top.class, alias);
     }
 
-    /** The three base kinds, and an application, which stands for a type only once its open record is applied. */
+    /** The three base kinds, and an application, which stands for a type only once its parametric record is applied. */
     @Test
     void theThreeBaseKindsAndAnApplicationAreTypes() {
         assertEquals(Set.of(Atom.class, Product.class, Sum.class, ApplyBody.class),

@@ -70,7 +70,7 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
     whatever the descent had established rather than replacing it with an absence. Entries without a line
     are exactly those nobody wrote, and taking their absence answered "which line do I open" with nothing
     for a document whose author has a perfectly good line: the alias they wrote, or the record whose field
-    the application sits at. That half is independent of the seed: a template application at a *field* has
+    the application sits at. That half is independent of the seed: an application of a parametric record at a *field* has
     the right pointer from the descent and needs only its line kept.
 
 ## The cursor's position is wrapped when it is asked for, not when it is set

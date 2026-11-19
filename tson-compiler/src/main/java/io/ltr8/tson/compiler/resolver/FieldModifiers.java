@@ -16,7 +16,7 @@ import java.util.Optional;
  * the author wrote, which is why it can be answered before a field's type is known.
  *
  * <p>{@code DefinitionResolver} asks it when it resolves a record body, open or closed, and writes the answer into a
- * {@code RecordField}, so the spellings and the errors around them are one table for a template and the closed
+ * {@code RecordField}, so the spellings and the errors around them are one table for a parametric record and the closed
  * record beside it.
  */
 final class FieldModifiers {

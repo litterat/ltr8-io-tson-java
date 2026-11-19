@@ -16,10 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A template's {@code extension} and selectors are <b>each application's</b> (§5.10). A template is no type, so it is
- * no family base whatever it states ({@code FamilySelectors} answers nothing for it); the record each application
- * closes to carries the template's {@code extension} and {@code discriminators}, a selector making the template
- * ABSTRACT as it makes a record so.
+ * A parametric record's {@code extension} and selectors are <b>each application's</b> (§5.10). A parametric record is no
+ * type, so it is no family base whatever it states ({@code FamilySelectors} answers nothing for it); the record each
+ * application closes to carries the parametric record's {@code extension} and {@code discriminators}, a selector making the
+ * parametric record ABSTRACT as it makes a record so.
  */
 class TemplateExtensionTest {
 
@@ -41,9 +41,9 @@ class TemplateExtensionTest {
         return diagnostics.stream().map(Diagnostic::message).reduce("", (a, b) -> a + "\n" + b);
     }
 
-    /** No template is a family base: an unmarked one, a marked one and a selector one alike. */
+    /** No parametric record is a family base: an unmarked one, a marked one and a selector one alike. */
     @Test
-    void noTemplateIsAFamilyBase() {
+    void noParametricRecordIsAFamilyBase() {
         Namespace<Top> entries = entries("e1", """
                   box  => <V> { item: V }
                   abox => abstract <V> { item: V }
@@ -58,24 +58,24 @@ class TemplateExtensionTest {
 
     /** Unmarked and with no selector, each application is OPEN, as an unmarked record is. */
     @Test
-    void anUnmarkedTemplatesApplicationIsOpen() {
+    void anUnmarkedParametricRecordsApplicationIsOpen() {
         Namespace<Top> entries = entries("e2", "  box => <V> { item: V }\n  bt => box<text>\n");
 
         assertEquals(RecordExtensionType.OPEN, ((RecordBody) entries.get("box")).extension());
         assertEquals(RecordExtensionType.OPEN, ((RecordBody) entries.get("bt")).extension());
     }
 
-    /** {@code abstract} on a template makes each application abstract. */
+    /** {@code abstract} on a parametric record makes each application abstract. */
     @Test
-    void anAbstractTemplatesApplicationIsAbstract() {
+    void anAbstractParametricRecordsApplicationIsAbstract() {
         Namespace<Top> entries = entries("e3", "  box => abstract <V> { item: V }\n  bt => box<text>\n");
 
         assertEquals(RecordExtensionType.ABSTRACT, ((RecordBody) entries.get("bt")).extension());
     }
 
-    /** A selector makes the template ABSTRACT, and each application an abstract record dispatching on it. */
+    /** A selector makes the parametric record ABSTRACT, and each application an abstract record dispatching on it. */
     @Test
-    void aSelectorTemplatesApplicationDispatchesOnIt() {
+    void anApplicationOfAParametricRecordWithASelectorDispatchesOnIt() {
         Namespace<Top> entries = entries("e4", "  pet => <V> { type: text =?  value: V }\n  pt => pet<text>\n");
 
         assertEquals(RecordExtensionType.ABSTRACT, ((RecordBody) entries.get("pet")).extension());

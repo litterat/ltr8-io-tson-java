@@ -142,7 +142,7 @@ meets §2.2.3's collision with the kernel's member of that path.
 
 ## Value entries (`DefinitionResolver.resolveValueEntry`)
 
-`resolveInstance` resolves `T` in the schema's one namespace, refuses a template head (it closes by application),
+`resolveInstance` resolves `T` in the schema's one namespace, refuses a parametric record as head (it closes by application),
 and asks `TypeChain.isConstructor`. A constructor builds a type; anything else goes to `resolveValueEntry`, which
 refuses a head that is itself a value (a value has no instances) and a braced payload at an atom type (almost always
 an atom refinement missing its `^`), then reads the payload against `T` (`SchemaResolver`'s `value`) and records `T`
@@ -152,9 +152,9 @@ against the entry with the read's path.
 A value entry's payload is a **value body** (`TsonReadContext.readsValueBody`; a nested `!schema` map's is none, its
 members being declarations): nothing in it is closed or written in place, so a
 kind-typed slot holds one bare name and an application (`request: box<order>`) is refused with the alias spelling
-named (`order_box => box<order>`, then `request: order_box`). There is no template over an ordinary type: a template's
-body is a record, so `fetch => <T> !operations { … }` is refused at the declaration, and a value is declared once per
-instantiation (`design/open-records.md`).
+named (`order_box => box<order>`, then `request: order_box`). There is no parametric record over an ordinary type: a
+parametric record's body is a record, so `fetch => <T> !operations { … }` is refused at the declaration, and a value is
+declared once per instantiation (`design/open-records.md`).
 
 **§8.2 reaches the payload at the read, not at the link.** The linker cannot see into a value -- its fields' types are
 left in the declaring schema -- so the payload is read under the loader's identifier policy (`SchemaResolver`'s `value`)
@@ -244,7 +244,7 @@ step reported as a gap.
 `ValuesByName.dependentType`): the sibling's pin from the declared `RecordField` (so a host holding no component for
 a pinned sibling is never asked), else what the record value holds there, else the sibling's default, and the walk
 goes on with that type. What the sibling holds is judged by the read path's rule, `DependentFieldReader.typeNamed`: a
-template or an application the closure does not hold names no type, and so does a value entry
+parametric record or an application the closure does not hold names no type, and so does a value entry
 (`aValueNoType`); each, and a sibling the value does not hold, is a `SCHEMA_ERROR` naming the name, the dependent field
 and the sibling. Past a field the value does not hold there is no value to read the sibling from: a pin or default
 still types the field and the name is refused as reaching no value after its type is judged, as any such name is, and
@@ -293,8 +293,8 @@ core.tn or net.tn compiles to one.
 
 ## One namespace, so shared vocabulary sits beside the types
 
-A schema declaring `method` puts its shared types beside it -- a `status_code` atom, an envelope template -- and every
-schema importing it names them: an `!!import` contributes its whole namespace (§2.2.3). The cost is
+A schema declaring `method` puts its shared types beside it -- a `status_code` atom, a parametric envelope record -- and
+every schema importing it names them: an `!!import` contributes its whole namespace (§2.2.3). The cost is
 reservation: every root name in the closure is taken, so a schema importing core.tn cannot declare `text`, `enum`,
 `set`, `uuid` or `title` of its own, nor `meta`, `atom`, `numeric`, `unicode`, `net`, `binary` or `temporal`
 (`ImportedVocabularyTest`). The machinery is under those seven prefixes, so `record`, `identifier`, `map`, `namespace`,

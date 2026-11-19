@@ -12,13 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * §5.10's regularity boundary ({@code TemplateRegularity}): within a template body, a recursive application
+ * §5.10's regularity boundary ({@code TemplateRegularity}): within a parametric record's body, a recursive application
  * -- direct or mutual -- must pass each parameter through unchanged.
  *
- * <p>Checked where the template is <b>declared</b>, which is the point of the rule. A template that grows
+ * <p>Checked where the parametric record is <b>declared</b>, which is the point of the rule. A parametric record that grows
  * its argument every level has no finite set of types to build, and catching it only while materialising
- * costs a depth counter -- a non-portable limit, and the retrofit C++ reached for after shipping templates
- * without a regularity restriction. Every fixture here declares the offending template and never applies it.
+ * costs a depth counter -- a non-portable limit, and the retrofit C++ reached for after shipping parametric records
+ * without a regularity restriction. Every fixture here declares the offending parametric record and never applies it.
  */
 class TemplateRegularityTest {
 
@@ -50,11 +50,11 @@ class TemplateRegularityTest {
     }
 
     /**
-     * A growing argument is unwritable: an argument of an open record's application is a name or a parameter (§5.3),
+     * A growing argument is unwritable: an argument of a parametric record's application is a name or a parameter (§5.3),
      * refused at the declaration, with nothing applying it, before regularity is asked.
      */
     @Test
-    void aGrowingArgumentIsRefusedAsNoNameEvenWhenTheTemplateIsNeverApplied() {
+    void aGrowingArgumentIsRefusedAsNoNameEvenWhenTheParametricRecordIsNeverApplied() {
         String message = rejected("  weird => <T> { next: weird<box<T>>? }");
 
         assertTrue(message.contains("'box<T>' is passed as an argument of 'weird<box<T>>'"), message);
@@ -98,7 +98,7 @@ class TemplateRegularityTest {
         assertTrue(message.contains("'box<T>' is passed as an argument of 'deep<box<T>>'"), message);
     }
 
-    /** Mutual recursion needs reachability, not a self-edge: neither template applies itself. */
+    /** Mutual recursion needs reachability, not a self-edge: neither parametric record applies itself. */
     @Test
     void mutualRecursionIsCheckedAcrossTheCycle() {
         assertNotNull(compile("""
@@ -112,7 +112,7 @@ class TemplateRegularityTest {
     }
 
     /**
-     * An application that is not on a cycle back to its own declaration is left alone. An open record's argument is
+     * An application that is not on a cycle back to its own declaration is left alone. A parametric record's argument is
      * a name or a parameter (§5.3), so an argument grows only through a constructor's application.
      */
     @Test
@@ -122,34 +122,34 @@ class TemplateRegularityTest {
     }
 
     // ── The other §5.10 declaration-time rules ───────────────────────────
-    //    All four are rules a template must satisfy whether or not anyone applies it, and all four were
+    //    All four are rules a parametric record must satisfy whether or not anyone applies it, and all four were
     //    unchecked: three are one arity rule, and the fourth is the converse of the closed-entry rule.
 
     /**
-     * <b>A template is not a type.</b> Naming one without arguments is refused where the schema links, a record
-     * template and a held one alike (§5.10), rather than failing at <em>read</em> time against a document with
+     * <b>A parametric record is not a type.</b> Naming one without arguments is refused where the schema links, a
+     * parametric record and a held one alike (§5.10), rather than failing at <em>read</em> time against a document with
      * nothing wrong with it. {@code TemplateAtATypePositionTest} carries the positions.
      */
     @Test
-    void namingATemplateWithoutArgumentsIsRejected() {
+    void namingAParametricRecordWithoutArgumentsIsRejected() {
         String message = rejected("""
                   tmpl => <T> { a: [T] }
                   use  => { u: tmpl }""");
 
-        assertTrue(message.contains("is a template taking 1 type argument [T]"), message);
-        assertTrue(message.contains("a template is not a type"), message);
+        assertTrue(message.contains("is a parametric record taking 1 type argument [T]"), message);
+        assertTrue(message.contains("a parametric record is not a type"), message);
     }
 
     /**
-     * A recursive <b>bare</b> reference inside a record template is refused at the template's own declaration,
-     * applied or not: a template is no type (§5.10), so {@code tail: chain} names nothing a value could be. The
+     * A recursive <b>bare</b> reference inside a parametric record is refused at the parametric record's own declaration,
+     * applied or not: a parametric record is no type (§5.10), so {@code tail: chain} names nothing a value could be. The
      * recursion is written {@code chain<T>}. {@code head: T} is not decoration: without it the parameter's only use
      * would have been the missing argument list, and the unused-parameter rule fires first.
      */
     @Test
     void aRecursiveBareReferenceIsRefused() {
         assertTrue(rejected("  chain => <T> { head: T  tail: chain? }")
-                .contains("'chain' is a template taking 1 type argument [T]"));
+                .contains("'chain' is a parametric record taking 1 type argument [T]"));
         assertNotNull(compile("""
                   chain      => <T> { head: T  tail?: chain<T>? }
                   text_chain => chain<text>
@@ -169,7 +169,7 @@ class TemplateRegularityTest {
     }
 
     /**
-     * The converse of §5.10's closed-entry rule: an open entry references every parameter it declares.
+     * The converse of §5.10's closed-entry rule: a parametric record references every parameter it declares.
      * {@code <T> { v: text }} declares `T` and never uses it, so every application would denote the same
      * type. Deciding this also settles what an open form with no parameter-bearing binding would mean:
      * nothing, because it cannot exist.

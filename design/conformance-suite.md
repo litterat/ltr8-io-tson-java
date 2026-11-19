@@ -56,7 +56,7 @@ implementation does not carry is `RUNNER.md` rule 5's fourth legitimate skip —
 the vector rather than the conformance class. It has two homes: `class1/reader/refused/` for Part 1's one
 scope, and `class2/schema/refused/` for §11.4's, where the enum-member and group-member-label vectors are
 the ones that catch a processor checking each name where it is *read* rather than where a scope is
-*walked* — the failure this implementation had. Template parameters stay out of the corpus: §11.4 and §5.10
+*walked* — the failure this implementation had. The parameters of a parametric record stay out of the corpus: §11.4 and §5.10
 both decline to list them as a scope, so a vector asserting the look-alike refusal would fail a conforming
 implementation, and `ConfusableNameScopesTest` carries those cases instead. Only that rule diverges —
 mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.2).
@@ -77,7 +77,7 @@ single-script name is refused with nothing mixed):
 
 | Layer | Walk | Scopes |
 |---|---|---|
-| Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (§11.4 declines the scope) |
+| Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a parametric record's parameters (§11.4 declines the scope) |
 | Data (TSON) | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
 | Data (JSON), schemaless | `reader.DataClassObjectReader.checkNameHygiene` | one record's member names — the two per-name rules only |
 | Data (JSON), schema-directed | `reader.NameHygiene`, from the record and choice readers | an **unmatched** member name; a `$type` naming nothing — the two per-name rules only |
@@ -181,8 +181,8 @@ record-shaped code and is still a resolver error. What is checked per diagnostic
 a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch codes say the vector could not be judged, and
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
 
-**A template's expected resolved form is a record.** An open record is a `!meta.record` carrying `parameters`, its
-parameters written where they stand as their names (`type: T`, `element_type: T` in place, `parents: [result<T>]`), so it
+**A parametric record's expected resolved form is a record.** A parametric record is a `!meta.record` carrying `parameters`,
+its parameters written where they stand as their names (`type: T`, `element_type: T` in place, `parents: [result<T>]`), so it
 is a schema-map value like any other, read back through `record`'s own reader with the record's `parameters`
 consulted before the namespace, and compared by `ResolvedForm` as every other entry is. An application of one is a
 closed `!meta.record` carrying `@meta.application` at its key; a construction (`meta.ref<X>`) is an instance of its

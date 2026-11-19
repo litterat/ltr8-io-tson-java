@@ -444,8 +444,8 @@ public final class SchemaResolver {
         });
 
         // §5.10 materialisation, after every declaration has resolved and before anything reads the result:
-        // a template application reaches here as an ApplyBody written in place, and closing it needs the
-        // template's own *resolved* open form, which only exists once the driving loop above has run. It adds no
+        // an application of a parametric record reaches here as an ApplyBody written in place, and closing it needs the
+        // parametric record's own *resolved* open form, which only exists once the driving loop above has run. It adds no
         // entry: an application closes in place, or into the declaration naming it.
         Map<String, Top> resolvedLocals = new LinkedHashMap<>();
         for (String name : declarations.keySet()) {
@@ -453,12 +453,12 @@ public final class SchemaResolver {
         }
 
         // §5.10.1's regularity boundary, before anything closes: a recursive application passes each parameter
-        // through unchanged, judged at the declaration, so a template refused for it is refused even if nobody
+        // through unchanged, judged at the declaration, so a parametric record refused for it is refused even if nobody
         // ever applies it.
         Set<String> irregular = TemplateRegularity.check(resolvedLocals, problems.collecting()
                 ? (name, error) -> problems.report(declarations.get(name), error) : null);
 
-        // A condemned template is replaced before materialisation, on the same terms as a declaration that
+        // A condemned parametric record is replaced before materialisation, on the same terms as a declaration that
         // failed to resolve: the verdict is in, and closing an application of one would only report its
         // consequence against whichever entry applied it. Both maps, because the two are read by
         // different halves: `materialise` walks `resolvedLocals`, while the application's head is looked up
@@ -466,7 +466,7 @@ public final class SchemaResolver {
         condemn(irregular, resolvedLocals, namespace);
         // §5.10's parameters, before anything closes, each declaration once: that a written bound names a type, and
         // that a parameter passed to a bounded parameter is written with a bound IS-A it. Here because a callee's
-        // bound comes from its declaration, ready only now. A refused template is condemned on the same terms as an
+        // bound comes from its declaration, ready only now. A refused parametric record is condemned on the same terms as an
         // irregular one: the verdict is in, and closing an application of it only reports the consequence against
         // whichever entry applied it.
         Set<String> refusedParameters = ParameterTypes.check(namespace, declarations.keySet(), heads::definition,
@@ -477,8 +477,8 @@ public final class SchemaResolver {
                     problems.report(declarations.get(name), "'" + name + "': " + error.getMessage(), error);
                 });
         condemn(refusedParameters, resolvedLocals, namespace);
-        // §5.10.1's held recursion, over the open records as the two checks above left them, each declaration once:
-        // one holding where it closes in place an application of a recursive open record whose recursion does not
+        // §5.10.1's held recursion, over the parametric records as the two checks above left them, each declaration once:
+        // one holding where it closes in place an application of a recursive parametric record whose recursion does not
         // pass back through it could never be closed. Its appliers closed against its placeholder while declarations
         // were made ready, so this is the one report, and condemning it keeps materialisation from a second.
         heldRecursion.forget();
@@ -542,7 +542,7 @@ public final class SchemaResolver {
         for (String name : declarations.keySet()) {
             localOnly.put(name, resolvedLocals.get(name), nameAnnotations.getOrDefault(name, Annotations.empty()));
         }
-        // §8.2's derived key annotation: every entry that closes an application of an open record carries
+        // §8.2's derived key annotation: every entry that closes an application of a parametric record carries
         // `@meta.application` on its key, which is where resolved output states a declared application and where
         // ingest reads it back as stated. A construction carries none: its value states its constructor.
         // The application is stated as written, its nested arguments unreduced.
@@ -626,12 +626,12 @@ public final class SchemaResolver {
 
     /**
      * Replaces each named entry with the placeholder {@link #unresolved} builds, keeping its position and its
-     * type parameters -- the same treatment a declaration that failed to resolve gets, applied to a template
+     * type parameters -- the same treatment a declaration that failed to resolve gets, applied to a parametric record
      * whose verdict is already in.
      *
      * <p><b>Both maps, because the two halves are read by different phases</b>: {@code materialise} walks the
      * locals, while an application's head is looked up through the getter over the namespace. Leaving one
-     * behind would close applications against the condemned template through whichever map was missed.
+     * behind would close applications against the condemned parametric record through whichever map was missed.
      */
     private static void condemn(Set<String> names, Map<String, Top> resolvedLocals, Map<String, Top> namespace) {
         for (String name : names) {
@@ -646,7 +646,7 @@ public final class SchemaResolver {
      * resolved, and the chains made complete through it.
      *
      * <p>Composition needs the operand's <em>fields</em> and nothing else, so a closed declaration and a closed
-     * template both keep the application in their chain's {@code parents} and absorb it by value (§5.8). The
+     * parametric record both keep the application in their chain's {@code parents} and absorb it by value (§5.8). The
      * edge is the half that has to wait: the entry an application denotes is whichever declaration names the
      * same application, and asking that <em>during</em> materialisation would make the answer depend on
      * declaration order -- {@code text_box} declared before the composition found, declared after it not. A
@@ -687,10 +687,10 @@ public final class SchemaResolver {
     /**
      * Every closed chain with the applications the fold left standing dropped: an application no declaration
      * names denotes an entry nothing can be declared as, so it reaches no edge, and a closed type's parents are
-     * not part of it ([TSON-SCHEMA] §4.1). A template keeps its written parents.
+     * not part of it ([TSON-SCHEMA] §4.1). A parametric record keeps its written parents.
      */
     private static void closeChains(Map<String, Top> namespace, Map<String, Top> resolvedLocals) {
-        // An open record keeps the parents as written: they may still name its own parameters, and
+        // A parametric record keeps the parents as written: they may still name its own parameters, and
         // closing each application is what completes that application's chain from them.
         resolvedLocals.replaceAll((name, definition) -> definition instanceof Type type && !type.parents().isEmpty()
                 && !OpenEntry.isOpen(definition)
@@ -741,7 +741,7 @@ public final class SchemaResolver {
                     || !(inline.of() instanceof ApplyBody application)) {
                 continue;
             }
-            // A parent written through an alias of its open record is that open record's application (§8.3).
+            // A parent written through an alias of a parametric record is that parametric record's application (§8.3).
             String head = Ancestry.templateHead(application.head().name(), namespace::get);
             String owner = byApplication.get(CanonicalApplication.of(head, application.arguments()));
             if (owner != null) {
@@ -816,7 +816,7 @@ public final class SchemaResolver {
         }
 
         /**
-         * [TSON-SCHEMA] §5.10: within a template's body a parameter's name is read before the schema's, so a
+         * [TSON-SCHEMA] §5.10: within a parametric record's body a parameter's name is read before the schema's, so a
          * parameter spelled like an entry the schema's namespace holds -- a type or a value entry, its own or an
          * import's -- makes that entry unreachable there, and is a resolver error at the declaration rather than a
          * silent capture. Judged by the name alone, before anything resolves, so no entry is waited on.
@@ -825,7 +825,7 @@ public final class SchemaResolver {
             for (String parameter : parameters) {
                 if (declarations.containsKey(parameter) || imported.contains(parameter)) {
                     throw new SchemaValidationException("'" + name + "': parameter '" + parameter + "' shadows the "
-                            + "entry '" + parameter + "' this schema's namespace holds -- inside a template a "
+                            + "entry '" + parameter + "' this schema's namespace holds -- inside a parametric record a "
                             + "parameter's name is read before the schema's, so the entry would be unreachable there "
                             + "(§5.10). Rename the parameter");
                 }
@@ -881,8 +881,8 @@ public final class SchemaResolver {
     }
 
     /**
-     * §5.10 admits no head abstraction: a type parameter stands for a type, never for a template, so
-     * {@code <T> { v: T<text> }} is no form. Refused here, over every application the open record writes,
+     * §5.10 admits no head abstraction: a type parameter stands for a type, never for a parametric record, so
+     * {@code <T> { v: T<text> }} is no form. Refused here, over every application the parametric record writes,
      * because here is the last point at which the author's own spelling is still what fails.
      *
      * <p><b>It cannot wait for the linker</b>, which checks the rest of §5.10's arity rule off the same
@@ -900,7 +900,7 @@ public final class SchemaResolver {
             if (parameters.contains(head)) {
                 throw new SchemaValidationException("'" + name + "': '" + head
                         + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
-                        + "for a template, and §5.10 admits no head abstraction, so '" + head
+                        + "for a parametric record, and §5.10 admits no head abstraction, so '" + head
                         + "<...>' is no form. Take the applied type as the parameter instead");
             }
         }
@@ -925,7 +925,7 @@ public final class SchemaResolver {
      * the schema further, the actual fix being upstream at the declaration that failed. With the arity
      * intact the application closes against an empty body and says nothing.
      *
-     * <p><b>An empty record (an empty open record, for an open declaration), because the point is to absorb
+     * <p><b>An empty record (an empty parametric record, for a declaration with parameters), because the point is to absorb
      * rather than to be recognised</b> -- javac's model,
      * where the error type answers every question, rather than Swift's, where every questioner must first ask
      * whether it is looking at one. A dependent that composes with a failed declaration ({@code parent =>
@@ -935,7 +935,7 @@ public final class SchemaResolver {
      * placeholder exists to prevent.
      */
     static Top unresolved(List<String> parameters) {
-        // An open placeholder is an empty open record, so it closes by the one process a template does.
+        // A placeholder with parameters is an empty parametric record, so it closes by the one process any does.
         return parameters.isEmpty() ? RecordBody.of(RecordBody.fieldMap())
                 : new RecordBody(TypeChain.EMPTY, parameters.stream().map(Param::new).toList(), new AnnotatedMap<>(),
                         List.of(), RecordExtensionType.OPEN, List.of(), Optional.empty());

@@ -19,14 +19,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
- * <b>A sealed family whose members compose a subtype template's application reads alike in both encodings</b>
+ * <b>A sealed family whose members compose a subtype parametric record's application reads alike in both encodings</b>
  * ([TSON-JSON] §9.4): the pin each member writes where its factory application is declared ({@code kind?: =
  * "ping"}) places a value exactly as a hand-written pin does, and a payload nested under a single field is read the
  * same way in both.
  *
  * <p><b>The shape is distinct from the two parity tests beside it, which is why it has its own.</b> {@link
  * CrossEncodingParityTest}'s factory sits over an {@code abstract} base, so it dispatches by tag and its
- * payload is flat; {@link TemplateFamilyEncodingParityTest}'s base is the template itself. Here the base is a
+ * payload is flat; {@link TemplateFamilyEncodingParityTest}'s base is the parametric record itself. Here the base is a
  * closed {@code abstract} record and every member composes an application, which puts a member's own pin on the
  * dispatch path: {@code kind?: = "ping"} is an ordinary FIXED field of the closed member by the time either
  * encoding reads it, and {@code FamilySelectors} states the selector on the entry, so neither stack
