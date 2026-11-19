@@ -84,7 +84,7 @@ and a value read, bound and written through it in both encodings.
 
 - **Admission stated in each encoding**: two copies of a judgement made of the link alone, which names no reader.
 - **Teaching the foreign record reader to skip an outer `$type`**: it would have to know which scope it is in.
-- **`@Typename.namespace` naming a class's entry when writing**: a second authority beside the binder, which the read
+- **A namespace on `@Typename` naming a class's entry when writing**: a second authority beside the binder, which the read
   cannot consult (no index runs from an annotation to its class).
 - **Handing the boundary's annotations to the foreign reader through the context**: bytes on every context copy.
 - **Tags derived from `describing(uri, root)`**: a fetch, or a failure, at derivation for a schema never loaded.

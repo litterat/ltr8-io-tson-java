@@ -24,8 +24,6 @@ import java.lang.annotation.Target;
 @Target({ ElementType.TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER })
 public @interface Typename {
 
-	String namespace() default "";
-
 	// specify the model type.
 	String name();
 
