@@ -38,14 +38,6 @@ happens to fit a narrow shape this pipeline already handles — declared in depe
 callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case:
 
-- [ ] **Remove the derived kind of an entry** ([TSON-SCHEMA] §4.1, §5.5, §8.1). Nothing decides by it: no main
-  code branches on an `EntryKind` value, `determineKind`'s result is discarded, `kindOf` on the linked and compiled
-  schema has no caller outside tests, and no corpus vector names a kind. Its default is also wrong: `meta.top`,
-  `meta.type`, `meta.alias`, `meta.apply`, `meta.atom` and `meta.sum` report PRODUCT. Delete §8.1's derivation and
-  §4.1's kind membership, keep §5.5's rule that a chain reaches at most one base kind, and reword "-kinded" as
-  IS-A the base kind. In Java delete `EntryKind` and both `kindOf` methods, give `isConstructor` another home,
-  reword the refinement diagnostic that prints `kind=`, and have the tests assert on the value's class.
-
 - [ ] **A tree read does not read a dependent value against a sibling written in place** ([TSON-SCHEMA] §5.2).
   `setting => { kind: meta.type_expr  v?: kind! }` with `kind: { of: !meta.array { element_type: int32 } }` reads `v`
   against the array in bind mode, where the sibling binds to its `TypeInline`; a tree read holds the sibling as the
@@ -378,7 +370,7 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   side matches.
 
 - [ ] **A JSON diagnostic names the type at the end of an alias chain, not the alias the author wrote.**
-  `JsonSchemaCompiler` collapses an `ALIAS` entry onto its target's reader ([TSON-SCHEMA] §8.3 permits
+  `JsonSchemaCompiler` collapses an alias entry onto its target's reader ([TSON-SCHEMA] §8.3 permits
   exactly that when compiling for reading), and the target's reader carries the target's name — so a refusal at
   `day => date` says `date`. The schema *location* is already right, because the entry point seeds the root
   declaration (`JsonCompiledSchema.rootDeclaration`), but the name in the message is not. `tson-compiler` solves

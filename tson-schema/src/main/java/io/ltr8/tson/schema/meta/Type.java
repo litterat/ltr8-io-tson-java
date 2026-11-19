@@ -7,7 +7,7 @@ import java.util.List;
  * kind of the kinds that describe the shape of a data value. {@link Atom}, {@link Product} and {@link Sum} each
  * {@code extends Type}, as {@code atom}, {@code product} and {@code sum} compose with {@code type}, and {@link
  * ApplyBody}, an application standing for a type that exists only once its open record is applied, composes {@code
- * type} directly and has no kind; {@link Alias}
+ * type} directly and reaches no base kind; {@link Alias}
  * and {@link Namespace} do not, as their kernel entries compose with {@code top} directly. So a body describes a
  * type exactly when it is an {@code instanceof Type}, and every type body carries its chain ({@link TypeChain}).
  *
@@ -18,7 +18,7 @@ import java.util.List;
  * <p>Every body record carries {@code chain} as its first component, mirroring the constructor's flattened
  * shape, where {@code type}'s field comes first.
  *
- * <p>Not a base kind: {@link EntryKind} has no {@code TYPE}, and a kind is read from the base kind below it.
+ * <p>Not a base kind: {@link Atom}, {@link Product} and {@link Sum} are, and an {@link ApplyBody} reaches none.
  */
 public sealed interface Type extends Top permits Atom, Product, Sum, ApplyBody {
 

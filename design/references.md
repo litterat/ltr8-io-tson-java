@@ -73,7 +73,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   arguments and putting them back after: two opinions of what an application holds. In resolved output one stands only
   inside an open record, over one of its parameters, applying an open record; the linker refuses one anywhere else
   (`TsonSchemaLinker.validateBody`'s apply arm, `requireOpen`), which is how a resolved form read as output is held to
-  it. `meta.apply` composes `meta.type` alone and is final: it has no kind (`EntryKind.of` refuses one), and no
+  it. `meta.apply` composes `meta.type` alone and is final: it reaches no base kind, and no
   constructor composes it. Identity is the head and the arguments (`ApplyBody.equals`), so `CanonicalApplication` and
   the applied-parent fold compare structure, never text.
 - **A dependent field's type is no reference** (§5.2): `kind!` is schema-grammar sugar for `{ of: !meta.dependent { on:
@@ -131,7 +131,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   either, an alias being applied as its target is (§3.3.1). No reference covers "a constructor" alone: its value is a
   record, as a record type's is, and the series has no classifier of constructors.
 - `meta.top` is a member of `meta.type_ref`, `meta.ref<meta.product>` and `meta.ref<meta.record>`: a fresh abstract record
-  IS-A nothing holds a value of `meta.record` by the one predicate. `EntryKind.isConstructor` answers a different question,
+  IS-A nothing holds a value of `meta.record` by the one predicate. `TypeChain.isConstructor` answers a different question,
   applicability, and counts `meta.top` by name and origin.
 - Every parameter is a type parameter, recording its name and the bound it is written with (`Param`); one stands only
   at a field's type or as an argument of an application there or in a parent (`design/open-records.md`).
@@ -267,8 +267,8 @@ written and read as a map from its `key_type` to its `value_type` (`NamespaceBod
 An entry may itself be a value of a namespace type: `myapi => !api { get_orders => { response: order_list } }`,
 in a schema importing one declaring `api => !meta.namespace { key_type: meta.identifier value_type: method }`. Its tag is the
 type, its keys the key rows above under `api`'s family, its values judged by `method`, and it is what a qualified name's
-further segment enters (`myapi.get_orders` at a `meta.ref<method>` slot). In Java it is a `ValueEntry` holding a `Namespace`,
-and its kind is `VALUE`; a value of a record type, `create_order => !operation { … }`, is one too, and a further segment
+further segment enters (`myapi.get_orders` at a `meta.ref<method>` slot). In Java it is a `ValueEntry` holding a `Namespace`;
+a value of a record type, `create_order => !operation { … }`, is one too, and a further segment
 selects its fields.
 
 A value of `meta.schema` is the one namespace value that declares: `geo => !schema { address => { … } }` is a schema map

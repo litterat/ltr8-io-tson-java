@@ -29,8 +29,7 @@ import java.util.Optional;
  *
  * <p><b>An entry is its value</b> ([TSON-SCHEMA] §8.1): a name maps to the body it resolves to -- a {@code
  * RecordBody} (an open record's included), an atom family's instance, an {@code Alias}, a {@code ValueEntry} -- and a
- * type body carries its own IS-A chain ({@code Type.chain}). The entry's kind is
- * its value's ({@code EntryKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
+ * type body carries its own IS-A chain ({@code Type.chain}).
  *
  * <p><b>A schema map nested as an entry keys its members under their paths</b> ({@link SchemaPaths}): {@code
  * geo.address} is an entry of {@link #entries} beside {@code geo}, whose value, a {@code ValueEntry} of {@value

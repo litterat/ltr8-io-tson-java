@@ -28,7 +28,7 @@ import java.util.Set;
  * The rule is unconditional, so the enforcement is -- applied only where a record has a non-empty
  * {@code subtypes()}, a stray or wrong annotation is silently discarded everywhere else.
  *
- * <p><b>The guard follows the body, not the declared kind</b>, and only {@code Atom} and {@code Product}
+ * <p><b>The guard follows the body</b>, and only {@code Atom} and {@code Product}
  * bodies take it. §7.2 excludes the others by name: a choice discriminates "by variant membership (§5.4)"
  * and a {@code declared} position by the governing closure (§7.8), each its own relation with its own
  * dispatcher, and subsumption would refuse the very variant tags those positions exist to take. An

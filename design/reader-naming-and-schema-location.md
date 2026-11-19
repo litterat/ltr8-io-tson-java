@@ -46,7 +46,7 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
   chain, and a message from it would otherwise name a declaration the author did write but did not write
   *here*. §8.3 makes a reference a hop and forbids collapsing it in resolved output, so a position reaches its
   child by resolving the name it names and nothing more — no carrier on the type-ref, and nothing added to
-  `TsonReadContext`. The renaming happens one level up instead: the `ALIAS` entry's own compile names its
+  `TsonReadContext`. The renaming happens one level up instead: the alias entry's own compile names its
   target's reader for the entry doing the referring (`TsonSchemaCompiler`, through `UseSite.named`), which is
   the collapse §8.3 permits *after linking, when a processor compiles for reading*. It runs where a composite
   reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only

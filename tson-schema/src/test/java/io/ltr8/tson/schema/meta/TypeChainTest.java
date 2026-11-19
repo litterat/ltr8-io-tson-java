@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A type carries its own IS-A chain ([TSON-SCHEMA] §4.1): {@code type}'s one field on every type body, a record
- * template's included, the kind an entry's value gives it, judged by where a base kind is defined, and the constructor test.
+ * template's included, and the constructor test, judged by where {@code top} is defined.
  */
 class TypeChainTest {
 
@@ -47,38 +47,17 @@ class TypeChainTest {
     }
 
     @Test
-    void anEntrysKindIsItsValuesAndARecordsIsTheBaseKindItsChainReaches() {
-        RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
-                .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
-
-        assertEquals(EntryKind.ATOM, EntryKind.of(constructor, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(RecordBody.of(RecordBody.fieldMap()), n -> true));
-        assertEquals(EntryKind.ATOM, EntryKind.of(IntegerType.UNCONSTRAINED, n -> true));
-        assertEquals(EntryKind.ALIAS, EntryKind.of(new Alias(TypeRef.of("text")), n -> true));
-    }
-
-    @Test
-    void aBaseKindIsJudgedByWhereItIsDefinedNeverBySpelling() {
-        RecordBody payload = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("meta.atom"));
-
-        assertEquals(EntryKind.ATOM, EntryKind.of(payload, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(payload, n -> false), "a schema's own `meta.atom` is a record");
-        RecordBody bare = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("atom"));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(bare, n -> true), "a schema's own `atom` is no kernel name");
-    }
-
-    @Test
     void aConstructorIsWhatIsATheKernelsTopAndTheKernelsTopItself() {
         RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
                 .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
         RecordBody templated = emptyTemplate(List.of(new Param("T")))
                 .withSupertypes(List.of("meta.namespace", "meta.top"));
 
-        assertTrue(EntryKind.isConstructor("numeric.integer_type", constructor, n -> true));
-        assertTrue(EntryKind.isConstructor("op", templated, n -> true), "a template answers as its closed form");
-        assertTrue(EntryKind.isConstructor("meta.top", RecordBody.of(RecordBody.fieldMap()), n -> true));
-        assertFalse(EntryKind.isConstructor("numeric.integer_type", constructor, n -> false), "a schema's own top");
-        assertFalse(EntryKind.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
+        assertTrue(TypeChain.isConstructor("numeric.integer_type", constructor, n -> true));
+        assertTrue(TypeChain.isConstructor("op", templated, n -> true), "a template answers as its closed form");
+        assertTrue(TypeChain.isConstructor("meta.top", RecordBody.of(RecordBody.fieldMap()), n -> true));
+        assertFalse(TypeChain.isConstructor("numeric.integer_type", constructor, n -> false), "a schema's own top");
+        assertFalse(TypeChain.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
     }
 
     @Test

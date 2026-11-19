@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * The kernel's {@code product => type & { access_pattern: ... size_type: ... } }} base kind
- * (Part 2 §4.1) -- every PRODUCT-kind {@link Top} variant IS-A this: {@link RecordBody},
+ * (Part 2 §4.1) -- every product {@link Top} variant IS-A this: {@link RecordBody},
  * {@link ArrayBody} (a set among them), {@link MapBody} (and {@link NamespaceBody}, whose constructor composes
  * it), and {@link TupleBody} -- exactly {@code record}/{@code array}/{@code map}/{@code namespace}/{@code tuple}, the
  * kernel's own structural-type family (Part 2 §4.1).

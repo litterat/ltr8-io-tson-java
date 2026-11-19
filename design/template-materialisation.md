@@ -61,7 +61,6 @@ derived — and the static check that runs before any of it.
   read off the open record's chain `parents`; a closed type keeps no `parents` once `closeChains` has run.
 - No application is IS-A its template (§5.10): its edges are what its template's written parents reach, each closed
   parent through `Ancestry`, and an applied parent through the fold to the declaration that application denotes.
-- Kind is derived (`EntryKind.of`, judged by where each base kind is defined) and never written.
 
 Related: `design/open-records.md` (what an open record is, where a parameter stands, bounds and argument
 checks), `design/schema-resolution.md` (chains, applied parents),
@@ -193,28 +192,19 @@ A composition operand (§5.8) needs its *fields* while a declaration resolves, b
     a field, element, map key or value, tuple position, choice variant or argument -- is the linker's arity check
     (`TsonSchemaLinker.checkArity`), refused against the declaration that wrote it.
 
-## Kind (`schema.meta.EntryKind`)
+## Base kinds
 
-- **`kind` is derived, never stored.** `EntryKind.of(value, kernel)` reads it off the value — a record's chain
-  (`ofChain`), otherwise its branch of `Top` — so no slot in the model carries it. A base kind in the chain counts
-  only as the kernel's own entry: a schema's own `atom => { … }` composed into `payload => atom & { … }` leaves
-  `payload` a PRODUCT. The reader stack branches on the body itself.
-  - **The atom-refinement test rests on it** (`DefinitionResolver`): an atom *instance's* body is an `Atom`
-    (`integer` carries `!numeric.integer_type {}`), where its constructor's is the vocabulary record describing one
-    (`numeric.integer_type` carries a `!meta.record { ... }`). So `body instanceof Atom` separates the pair, where neither
-    the kind nor the chain does alone: `numeric.integer_type` is ATOM-kinded exactly like its instances.
-- **An open record takes the kind its chain reaches, as a closed record does**: PRODUCT, or the base kind its
-  written parents reach. It is no type (§5.10), and its kind says what each application's is.
-  - **A closed entry's kind is its substituted value's**, §4.1's "construction transfers kind" asked of the
-    construction — not the constructor's *name*.
-  - **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }` makes
-    `listed<text>` a constructor whose `!meta.record` body describes its instances, so its kind is the base kind its chain
-    reaches (ATOM), as for a declared entry (`EntryKind.ofChain`, which `DefinitionResolver.determineKind` guards);
-    construction then transfers it to `!listed_text [...]`. An open record is never constructed, whatever its chain
-    reaches: `ConstructionSugar.constructs` excludes it, so `listed<text>` substitutes.
-  - **This keeps the derivation total**: every entry's kind follows from what it states, where an open record
-    claiming its application's kind would need a lookup outside itself. `OpenEntryResolvedFormTest` covers the
-    template above and asserts the rule over every entry of every schema.
+- **No entry carries a kind, and nothing decides by one** (§5.5). A rule reads what it needs off the value: its
+  branch of `Top`, its tag, or the kernel base kind its chain reaches, counted only as the kernel's own entry -- a
+  schema's own `atom => { … }` composed into `payload => atom & { … }` leaves `payload` an ordinary record.
+  - **The atom-refinement test** (`DefinitionResolver`): an atom *instance's* body is an `Atom` (`integer` carries
+    `!numeric.integer_type {}`), where its constructor's is the vocabulary record describing one
+    (`numeric.integer_type` carries a `!meta.record { ... }`). So `body instanceof Atom` separates the pair, where
+    the chain does not: `numeric.integer_type`'s chain reaches `meta.atom`.
+- **A template composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }` makes
+  `listed<text>` a constructor whose `!meta.record` body describes its instances, its chain reaching `meta.atom` as a
+  declared constructor's does. An open record is never constructed, whatever its chain reaches:
+  `ConstructionSugar.constructs` excludes it, so `listed<text>` substitutes.
 
 ## Template regularity (`tson-compiler/.../resolver/TemplateRegularity.java`)
 

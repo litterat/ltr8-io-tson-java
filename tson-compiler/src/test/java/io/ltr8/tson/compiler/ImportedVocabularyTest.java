@@ -8,7 +8,6 @@ import io.ltr8.tson.compiler.consumer.Operation;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Top;
@@ -146,11 +145,11 @@ class ImportedVocabularyTest {
         TsonLinkedSchema vocabulary = core(consumerContext()).resolveLinked(META_HTTP);
         Top operations = vocabulary.schema().entries().get("operations");
 
-        assertEquals(EntryKind.PRODUCT, vocabulary.kindOf("operations"));
-        assertEquals(List.of(), TypeChain.supertypesOf(operations), "construction transfers kind, not IS-A");
+        assertInstanceOf(io.ltr8.tson.schema.meta.NamespaceBody.class, operations);
+        assertEquals(List.of(), TypeChain.supertypesOf(operations), "construction grants no IS-A");
         assertFalse(vocabulary.isConstructor("operations", operations),
                 "a namespace type is a type: `!operations { ... }` builds a value of it");
-        assertEquals(EntryKind.PRODUCT, vocabulary.kindOf("operation"));
+        assertInstanceOf(io.ltr8.tson.schema.meta.RecordBody.class, vocabulary.schema().entries().get("operation"));
         assertFalse(vocabulary.isConstructor("operation", vocabulary.schema().entries().get("operation")),
                 "the record its values are is a type too");
     }
@@ -167,8 +166,8 @@ class ImportedVocabularyTest {
 
         assertTrue(thrown.getMessage().contains("the body is no value of the type 'meta.record_field'")
                 && thrown.getMessage().contains("unknown field 'name'"), thrown.getMessage());
-        assertEquals(EntryKind.VALUE, linked("component-value", "  good => !meta.record_field { type: text }")
-                .kindOf("good"));
+        assertInstanceOf(ValueEntry.class, linked("component-value", "  good => !meta.record_field { type: text }")
+                .schema().entries().get("good"));
     }
 
     // ── Binding the record to the consumer's class ───────────────────────────────────────────────
@@ -205,7 +204,6 @@ class ImportedVocabularyTest {
         TsonLinkedSchema schema = linked("retrieve", SEARCH);
 
         Namespace<?> api = assertInstanceOf(Namespace.class, ((ValueEntry) schema.schema().entries().get("api")).value());
-        assertEquals(EntryKind.VALUE, schema.kindOf("api"));
         assertEquals(Optional.of("operations"), schema.schema().constructorOf("api"), "§8.2 records what built it");
 
         Operation operation = assertInstanceOf(Operation.class, api.get("search"));
@@ -388,7 +386,7 @@ class ImportedVocabularyTest {
 
         String written = new TsonObjectWriter(consumerContext()).toTson(entry).replaceAll("\\s+", " ");
 
-        // `kind` is not written: it is derived at resolution and §8's output has no field for it. What
+        // No `kind` is written: §8.1's output has no field for one. What
         // identifies a namespace entry in output is its value -- the constructor's instance the entry is.
         assertFalse(written.contains("kind:"), written);
         assertTrue(written.startsWith("!operations { search => "), written);

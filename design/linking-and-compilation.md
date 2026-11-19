@@ -50,7 +50,7 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
 - `TsonSchemaRegistry` never overwrites an identity and exposes no way to remove or enumerate one: that *is* the
   "locked" guarantee.
 - Everything that asks what an entry IS-A asks its `TypeChain`: `computeSubtypes` credits every closed type and no
-  open record, so a template is in no `subtypes` index, and the constructor test (`EntryKind.isConstructor`) reads an
+  open record, so a template is in no `subtypes` index, and the constructor test (`TypeChain.isConstructor`) reads an
   open record's chain as a closed one's, judging `top` by its origin.
 
 Related: `design/namespace-types-and-value-entries.md`, `design/references.md`, `design/class2-compilation.md`,
