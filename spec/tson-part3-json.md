@@ -434,10 +434,11 @@ The remaining families — `text` and its refinements, `uri`, `uri_reference`, `
 **Declared positions.** No type in the series admits an untyped JSON value of any shape. The open sum is the kernel's `meta.declared` ([TSON-SCHEMA] §7.8), and *a value at a declared position must name its type*: in this encoding it MUST be an annotation object (§3.3) whose `$type` names a type of the document's closure, inline when the named type reads the value as a record and wrapper otherwise, and a bare JSON value there is a validation error in every mode. The rules are §8.5's; what this section records is the consequence for a contract that wants any value at all. A contract that must carry *arbitrary JSON* declares it, and the declaration is short:
 
 ```
-json => ( text | number | boolean | [json?] | {text => json?} )
+json        => ( text | number | boolean | [json?] | json_object )
+json_object => {text => json?}
 ```
 
-The choice is `disjoint: true` by construction — string, number, boolean, bracket, and brace, one variant per class — so every JSON value of §3.1's profile decodes at a `json` position tag-free by §8.2's condition, nulls inside arrays and objects landing as void values, and re-encodes to the JSON it was: arbitrary JSON, obtained from an ordinary declaration the schema controls rather than from a permissive type the encoding has to interpret.
+The choice is `disjoint: true` by construction — string, number, boolean, bracket, and brace, one variant per class — so a JSON value of §3.1's profile decodes at a `json` position tag-free by §8.2's condition, nulls inside arrays and objects landing as void values, and re-encodes to the JSON it was: arbitrary JSON, obtained from an ordinary declaration the schema controls rather than from a permissive type the encoding has to interpret. One object is the exception, the one holding a key that spells an annotation member (§3.2): it is written wrapped, `{ "$type": "json_object", "$value": { "$type": 1 } }`, and an object that leads with such a key is read as an annotation object, never as a map (§8.3.1). The map variant is declared under a name so that the wrapper has a type to name.
 
 
 ## 6. Containers
@@ -573,6 +574,8 @@ The untagged route can put a bare map on the wire (a disjoint choice whose brace
 - **Encoder:** a map value emitted at such a position MUST use the tagged wrapper form if any of its keys' encoded member names is one of the three; bare emission is permitted otherwise.
 
 The encoder's rule tests every key and not only the first, because a map's key order carries no meaning, and a rule about which key comes first would give it one; wrapping puts every key where the three mean nothing (`{ "$type": "…", "$value": { … } }`). The rule costs a wrapper on a vanishing case and buys determinism on every case, at a decoder cost of one member name. Keys beginning with `$` that are *not* among the three trigger nothing: recognition tests the closed set only.
+
+**The escape names the variant.** The wrapper's `$type` is the map variant's name, so a choice that is to carry such a key declares its map variant under one: `json_object => {text => json?}`, and not the map written in place, which has no name and takes no `$type` (§3.3). A map value holding one of the three as a key at a variant written in place has no encoding, and an encoder MUST refuse it.
 
 
 ### 8.4 Why a Choice Has No Discriminator

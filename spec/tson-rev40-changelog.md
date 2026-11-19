@@ -1173,6 +1173,15 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
     object; a subtype across a boundary is named as it is in text, by a name of the
     enclosing scope ([TSON-SCHEMA] §5.13). A second tag in text, `!order_v1 !rush { … }`,
     was the alternative, and gives one value two spellings in both encodings.
+17. **§5.7, §8.3.1** — the escape names the variant. §8.3.1 has an encoder wrap a map
+    holding an annotation member's name as a key, `{ "$type": …, "$value": { … } }`, and
+    §5.7's arbitrary-JSON declaration wrote its map variant in place, which has no name
+    for the `$type` to hold: such an object had no encoding at a `json` position. The
+    declaration names the variant, `json_object => {text => json?}`; §8.3.1 says a variant
+    written in place cannot carry such a key and the encoder refuses it; and §5.7's "every
+    JSON value" excepts the object holding one, written wrapped, and read as an annotation
+    object where it leads with one. A wrapper with no `$type`, `{ "$value": { … } }`, read
+    by class, was the alternative: a wire form for a case a name already covers.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 
@@ -1361,6 +1370,8 @@ carries no open questions.
 | Items 116–118 (ruled) | A wrapper's inner `$type` at an extern's boundary named a foreign subtype by the foreign schema's name, which text cannot write. The encodings align on one type name for a value, the boundary's. A second tag in text was the alternative. | **[settled]** — the spec author's ruling, §3.4 item 16. |
 | Item 128 (ruled) | A choice that is a variant of a choice. The text refuses the one case no document can write, a nested choice that is not disjoint, and keeps a disjoint one, tagged by its name. A nested choice standing for its variants, so that a tag names a variant's variant and disjointness is judged over all of them, is the question of how sums are expressed and is left to the next revision; it lifts this refusal and refuses nothing this text admits. Refusing every nested choice was the alternative, and would refuse `( boolean | narrow )`, which reads. | **[settled]** — the spec author's ruling. |
 | Items 129, 133 (ruled) | Two matters of arrangement. A restated field's rules stand with composition (§5.8) and refinement has §5.7 to itself; retitling §5.7 to cover both was the alternative. A record with parameters is a template; "open record" was the alternative, and "generic record" was not taken. | **[settled]** — the spec author's rulings. |
+| §3.4 item 17 (ruled) | A map holding an annotation member's name as a key, at a choice whose map variant is written in place, had no encoding. The variant is named; a wrapper with no `$type`, read by class, was the alternative. | **[settled]** — the spec author's ruling. |
+| §5.12 (ruled) | A qualified name's segment selecting a dependent field. The walk stands, taking the type the sibling names, the one §5.2 judges the held value by at link; refusing the segment was the alternative, and left a value inside a dependent field unnameable. | **[settled]** — the spec author's ruling; no text changes. |
 | Items 116–118 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |
