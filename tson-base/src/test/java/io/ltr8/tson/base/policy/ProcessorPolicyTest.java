@@ -17,7 +17,7 @@ class ProcessorPolicyTest {
     /** The unit is the identifier policy's, where it means something; a token policy has none to state. */
     @Test
     void the_identifier_policy_may_be_per_segment() {
-        IdentifierPolicy perSegment = IdentifierPolicy.of(TokenPolicy.highlyRestrictive()).perSegment();
+        IdentifierPolicy perSegment = IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment();
         ProcessorPolicy policy = ProcessorPolicy.defaults().withIdentifierPolicy(perSegment);
         assertEquals(perSegment, policy.identifierPolicy());
     }

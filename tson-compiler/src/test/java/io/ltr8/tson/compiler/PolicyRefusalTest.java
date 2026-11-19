@@ -204,11 +204,11 @@ class PolicyRefusalTest {
      */
     @Test
     void twoPoliciesConfiguredAlikeAreEqual() {
-        IdentifierPolicy one = IdentifierPolicy.of(TokenPolicy.highlyRestrictive()
-                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC))
+        IdentifierPolicy one = IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE)
+                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC)
                 .perSegment();
-        IdentifierPolicy same = IdentifierPolicy.of(TokenPolicy.highlyRestrictive()
-                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC))
+        IdentifierPolicy same = IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE)
+                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC)
                 .perSegment();
 
         assertEquals(one, same);
@@ -216,7 +216,7 @@ class PolicyRefusalTest {
         assertEquals(ProcessorPolicy.of(one, TokenPolicy.unrestricted(), LimitsPolicy.defaults()),
                 ProcessorPolicy.of(same, TokenPolicy.unrestricted(), LimitsPolicy.defaults()),
                 "the record that reports them is component-wise, so it inherits this");
-        assertNotEquals(one, IdentifierPolicy.of(TokenPolicy.highlyRestrictive()).perSegment());
+        assertNotEquals(one, IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment());
         assertNotEquals(TokenPolicy.highlyRestrictive(), TokenPolicy.singleScript());
     }
 
@@ -235,10 +235,10 @@ class PolicyRefusalTest {
     void theProcessorPolicyIsReachableWithoutARefusal() {
         ProcessorPolicy policy = new TsonTreeReader()
                 .withTokenPolicy(TokenPolicy.asciiOnly())
-                .withIdentifierPolicy(IdentifierPolicy.of(TokenPolicy.singleScript()).perSegment())
+                .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.SINGLE_SCRIPT).perSegment())
                 .processorPolicy();
 
-        assertEquals(RestrictionLevel.SINGLE_SCRIPT, policy.identifierPolicy().scripts().level());
+        assertEquals(RestrictionLevel.SINGLE_SCRIPT, policy.identifierPolicy().level());
         assertTrue(policy.identifierPolicy().isPerSegment());
         assertEquals(RestrictionLevel.ASCII_ONLY, policy.tokenPolicy().level());
         assertEquals(Xid.UNICODE_VERSION, policy.unicodeDataVersion());

@@ -1,11 +1,11 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.ProcessorConfig;
-import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import static java.lang.Character.UnicodeScript.CYRILLIC;
@@ -67,29 +67,29 @@ class IdentifierPolicyConfigTest {
     /** The first relaxation to reach for: same level, applied per segment. */
     @Test
     void perSegmentAdmitsTheCompoundAndStillRefusesTheHomograph() {
-        accepts(IdentifierPolicy.of(TokenPolicy.highlyRestrictive()).perSegment(), COMPOUND);
-        assertTrue(refuses(IdentifierPolicy.of(TokenPolicy.highlyRestrictive()).perSegment(), HOMOGRAPH)
+        accepts(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment(), COMPOUND);
+        assertTrue(refuses(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment(), HOMOGRAPH)
                 .contains("mixes the scripts"));
     }
 
     /** Narrower still: name the combination rather than change the shape of the rule. */
     @Test
     void anExplicitlyPermittedCombinationAdmitsOnlyThat() {
-        accepts(IdentifierPolicy.of(TokenPolicy.highlyRestrictive().permitting(LATIN, CYRILLIC)), COMPOUND);
+        accepts(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).permitting(LATIN, CYRILLIC), COMPOUND);
     }
 
     /** And the off positions reach the linker like any other rung. */
     @Test
     void scriptsUncheckedTurnsTheRuleOff() {
-        accepts(IdentifierPolicy.of(TokenPolicy.scriptsUnchecked()), COMPOUND);
-        accepts(IdentifierPolicy.of(TokenPolicy.scriptsUnchecked()), HOMOGRAPH);
+        accepts(IdentifierPolicy.of(RestrictionLevel.MINIMALLY_RESTRICTIVE), COMPOUND);
+        accepts(IdentifierPolicy.of(RestrictionLevel.MINIMALLY_RESTRICTIVE), HOMOGRAPH);
     }
 
     /** An all-Latin schema is unaffected at every rung, which is what keeps the default deployable. */
     @Test
     void anOrdinarySchemaIsUnaffected() {
         for (IdentifierPolicy policy : new IdentifierPolicy[] {null, IdentifierPolicy.defaults(),
-                IdentifierPolicy.defaults().perSegment(), IdentifierPolicy.of(TokenPolicy.asciiOnly())}) {
+                IdentifierPolicy.defaults().perSegment(), IdentifierPolicy.of(RestrictionLevel.ASCII_ONLY)}) {
             accepts(policy, schema("order_id"));
         }
     }

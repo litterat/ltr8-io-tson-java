@@ -76,19 +76,14 @@ class TokenPolicyTest {
         refuses(TokenPolicy.asciiOnly(), "café");
     }
 
-    /**
-     * The two "off" positions differ, and only on whether the identifier profile survives. §5.2 makes level 6
-     * the one that drops it; a deployment meaning "stop checking scripts" wants level 5.
-     */
+    /** Over a token the two "off" positions judge alike: the identifier profile level 6 drops is no token's. */
     @Test
-    void theTwoOffPositionsDifferOnlyInTheIdentifierProfile() {
+    void theTwoOffPositionsScanNothing() {
         TokenPolicy five = TokenPolicy.scriptsUnchecked();
         TokenPolicy six = TokenPolicy.unrestricted();
 
         assertFalse(five.checksScripts());
         assertFalse(six.checksScripts());
-        assertTrue(five.appliesIdentifierProfile(), "level 5 keeps the identifier profile");
-        assertFalse(six.appliesIdentifierProfile(), "level 6 drops it -- §5.2 says so");
 
         accepts(five, CYR_A + "dmin");
         accepts(six, CYR_A + "dmin");

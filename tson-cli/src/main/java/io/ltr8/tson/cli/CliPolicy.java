@@ -119,8 +119,8 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
                                       List<List<String>> permitting) {
 
         static CliIdentifierPolicy from(IdentifierPolicy policy) {
-            return new CliIdentifierPolicy(policy.scripts().level(), policy.isPerSegment(),
-                    policy.appliesSkeletonDistinctness(), CliTokenPolicy.from(policy.scripts()).permitting());
+            return new CliIdentifierPolicy(policy.level(), policy.isPerSegment(),
+                    policy.appliesSkeletonDistinctness(), scriptNames(policy.permittedScripts()));
         }
     }
 
@@ -131,32 +131,32 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
     public record CliTokenPolicy(RestrictionLevel level, List<List<String>> permitting) {
 
         static CliTokenPolicy from(TokenPolicy policy) {
-            return new CliTokenPolicy(policy.level(),
-                    policy.permittedScripts().stream().map(CliTokenPolicy::names).toList());
+            return new CliTokenPolicy(policy.level(), scriptNames(policy.permittedScripts()));
         }
+    }
 
-        /** One admitted combination, script names sorted so two deployments' reports compare as text. */
-        private static List<String> names(Set<UnicodeScript> scripts) {
-            return scripts.stream().map(CliTokenPolicy::alias).sorted().toList();
-        }
+    /** Each admitted combination, script names sorted so two deployments' reports compare as text. */
+    private static List<List<String>> scriptNames(List<Set<UnicodeScript>> combinations) {
+        return combinations.stream().map(scripts -> scripts.stream().map(CliPolicy::alias).sorted().toList())
+                .toList();
+    }
 
-        /**
-         * A script's UAX #24 property value alias, the name {@code policy.tn} states a script by: {@code
-         * Latin}, {@code Old_Italic}. The JDK's constant is the alias upper-cased, so each segment is
-         * title-cased back; {@code SignWriting} is the one alias with a capital inside a segment.
-         */
-        static String alias(UnicodeScript script) {
-            if (script == UnicodeScript.SIGNWRITING) {
-                return "SignWriting";
-            }
-            StringBuilder alias = new StringBuilder();
-            for (String segment : script.name().split("_")) {
-                if (!alias.isEmpty()) {
-                    alias.append('_');
-                }
-                alias.append(segment.charAt(0)).append(segment.substring(1).toLowerCase(Locale.ROOT));
-            }
-            return alias.toString();
+    /**
+     * A script's UAX #24 property value alias, the name {@code policy.tn} states a script by: {@code
+     * Latin}, {@code Old_Italic}. The JDK's constant is the alias upper-cased, so each segment is
+     * title-cased back; {@code SignWriting} is the one alias with a capital inside a segment.
+     */
+    static String alias(UnicodeScript script) {
+        if (script == UnicodeScript.SIGNWRITING) {
+            return "SignWriting";
         }
+        StringBuilder alias = new StringBuilder();
+        for (String segment : script.name().split("_")) {
+            if (!alias.isEmpty()) {
+                alias.append('_');
+            }
+            alias.append(segment.charAt(0)).append(segment.substring(1).toLowerCase(Locale.ROOT));
+        }
+        return alias.toString();
     }
 }

@@ -426,7 +426,7 @@ Tson tson = Tson.of(ProcessorConfig.defaults()
 
 `identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names, and every
 value whose type is a `unicode.identifier_type` family — with all three §8.2 mechanisms on and Highly Restrictive over
-the whole name (§8.2's SHOULD). Reach for `perSegment()`, or `permitting(scripts…)` on the level, before
+the whole name (§8.2's SHOULD). Reach for `perSegment()`, or `permitting(scripts…)`, before
 loosening the level: both keep the rule everywhere else. A segment ends at `_`, and at whatever a name's profile
 adds that is not a letter or digit (`-` for core names, a `$` or a medial `.` for a family that adds one).
 `withSkeletonDistinctness(false)` drops the look-alike rule over a scope, independently of the level. `tokenPolicy`

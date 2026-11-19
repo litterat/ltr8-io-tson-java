@@ -28,7 +28,7 @@ class ProcessorPolicyConfigTest {
     private static final String CYR_A = new String(Character.toChars(0x0430));
 
     private static final ProcessorPolicy TIGHTENED = ProcessorPolicy.of(
-            IdentifierPolicy.of(TokenPolicy.asciiOnly()), TokenPolicy.asciiOnly(),
+            IdentifierPolicy.of(RestrictionLevel.ASCII_ONLY), TokenPolicy.asciiOnly(),
             LimitsPolicy.defaults().withMaxDepth(8));
 
     @Test
@@ -61,11 +61,11 @@ class ProcessorPolicyConfigTest {
     void statingOneComponentLeavesTheOthersAlone() {
         ProcessorPolicy stated = Tson.of(ProcessorConfig.defaults()
                         .withLimits(LimitsPolicy.defaults().withMaxDepth(8))
-                        .withIdentifierPolicy(IdentifierPolicy.of(TokenPolicy.asciiOnly())))
+                        .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.ASCII_ONLY)))
                 .processorPolicy();
 
         assertEquals(8, stated.limits().maxDepth(), "the limit stated first survives the policy stated after it");
-        assertEquals(RestrictionLevel.ASCII_ONLY, stated.identifierPolicy().scripts().level());
+        assertEquals(RestrictionLevel.ASCII_ONLY, stated.identifierPolicy().level());
         assertEquals(ProcessorPolicy.defaults().tokenPolicy(), stated.tokenPolicy(),
                 "the component nothing stated keeps its default");
     }
