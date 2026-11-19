@@ -29,6 +29,10 @@ and why the same table is what untagged reading dispatches on. Current form only
   [text] | [int32] )`, both bracket-class, is refused at the declaration, a choice written in place at any depth
   included; `( [text] | text )` is disjoint and unaffected, and so is a non-disjoint choice of names. A choice whose
   `@meta.disjoint` fails keeps that diagnostic alone, and a repeated variant is distinctness's to refuse.
+- **A variant that is a choice is disjoint** (`checkChoiceVariantsAreDisjoint`, §5.4), judged at the end of its alias
+  chain, an extern not followed: a value carries one tag, spent naming the variant (`TsonReadContext.spendTypeRef`),
+  so the nested choice reads it untagged. A choice holding a choice is never disjoint, so nesting stops one deep. Lost:
+  a nested choice standing for its variants, left to the next revision.
 - **Distinctness compares a name with a name and a construction with a construction**, never one with the other
   (`checkVariantsAreDistinct`, §8.2): `( text_list | [text] )` over `text_list => [text]` lists two types.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
@@ -46,17 +50,12 @@ Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `d
 
 ## The disjointness derivation (`ChoiceDisjointness`, `reader/DiscriminationClass`)
 
-`ChoiceDisjointness.derive` decides §5.4's question for a choice **totally and two-valued**: `disjoint` is
-`true` exactly when every variant has a *discrimination class* and no class appears twice, `false`
-otherwise — never absent, and §5.4 asks for exactly this: "a resolver MUST record exactly this — it MUST
-NOT prove more ... or less". The question the fact exists to answer is not "do the value sets intersect" but
-"can an encoding's single form-resolution pass tell the variants apart", and *that* is a total function of
-the declarations. A value-set prover (interval algebra, exact I-Regexp intersection-emptiness, record
-closure) is deliberately not what this is: it answers questions no conforming reader may
-act on — separating same-class variants takes the type-directed second inspection [TSON-DATA] §2.4
-forbids — at the price of verdicts an author cannot predict (two default-`allow_nan` floats overlap via
-NaN however far apart their ranges sit) and a conformance bar no second implementation should have to
-match.
+`ChoiceDisjointness.derive` decides §5.4's question totally and two-valued, as §5.4 asks: "it MUST NOT prove more
+... or less". The question is not "do the value sets intersect" but "can an encoding's single form-resolution pass tell
+the variants apart", a total function of the declarations. A value-set prover is deliberately not what this is: it
+answers questions no conforming reader may act on — separating same-class variants takes the type-directed second
+inspection [TSON-DATA] §2.4 forbids — at the price of verdicts an author cannot predict (two default-`allow_nan` floats
+overlap via NaN however far apart their ranges sit).
 
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
 §4's three scalar classes — `boolean`, `number` (every numeric family: an `integer` and a `decimal`
@@ -76,10 +75,8 @@ map whose key type is not "a type a single scalar token denotes by its content �
 array). This is what makes `disjoint` class-stable: every classed type's values land in its class in every encoding,
 so a choice's untagged values are one set whichever encoding reads it, and no encoding needs a second condition.
 
-A `void` variant never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`) —
-`(T | void)` confuses optionality with choice, which belongs to the position (`?`, `_`), per §5.4's "a
-variant MUST NOT resolve to `void`", judged after following the variant's alias chain (§8.3) as §5.4
-requires, so an alias of `void` is caught too.
+A `void` variant never gets that far: `(T | void)` confuses optionality, which belongs to the position (`?`, `_`),
+with choice.
 
 **`disjoint` ⇔ the tag is droppable — one fact, not two.** `ChoiceReader.untaggedRecovery` builds its
 `class → variant` dispatch map through the same `DiscriminationClass.of` the derivation classifies with,

@@ -438,6 +438,15 @@ public interface TsonReadContext {
     }
 
     /**
+     * Consumes the type-ref of the data-value at {@code ctx}'s cursor and nothing else, its annotations left to be
+     * read: a tag spent naming a choice's variant that is itself a choice, where the value is read untagged
+     * ([TSON-SCHEMA] §5.4). A value with no type-ref is left as it is. Static for the reason {@link #lookingAhead} is.
+     */
+    static void spendTypeRef(TsonReadContext ctx) {
+        DefaultTsonReadContext.spendTypeRef(ctx);
+    }
+
+    /**
      * Skips the data value at {@code ctx}'s cursor -- a record field's --
      * holding no name in it to a name rule: the value of a field its record does not declare, which is reported
      * once, at the field, and read no further. No type governs it, so judging its names by the schemaless rule
