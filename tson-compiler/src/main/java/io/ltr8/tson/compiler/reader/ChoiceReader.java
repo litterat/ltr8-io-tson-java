@@ -68,7 +68,7 @@ final class ChoiceReader {
         return new NamedDispatchReader(context.displayName(name, typeDefinition),
                 "is a choice -- a value at this position requires an explicit type annotation (!typeName) "
                         + "naming one of its declared variants to disambiguate",
-                variantNames, Map.copyOf(selects), Map.copyOf(selectsNone), context.readers(),
+                variantNames, Map.copyOf(selects), choices(body, context), Map.copyOf(selectsNone), context.readers(),
                 untaggedRecovery(body, context.linked()), context.schema().entries()::containsKey);
     };
 
@@ -92,6 +92,18 @@ final class ChoiceReader {
                 });
         ambiguous.putAll(selection.selectsNone());
         return new LinkedHashMap<>(selection.selects());
+    }
+
+    /** The variants that are choices at the end of their alias chains (§8.3), an extern not followed. */
+    private static Set<TypeExpr> choices(ChoiceBody body, ValueReaderContext context) {
+        var entries = context.schema().entries();
+        Set<TypeExpr> choices = new LinkedHashSet<>();
+        for (TypeRef variant : body.variants().stream().flatMap(v -> TypeExpr.named(v).stream()).toList()) {
+            if (entries.get(AliasChain.terminal(variant.name(), entries::get)) instanceof ChoiceBody) {
+                choices.add(variant);
+            }
+        }
+        return Set.copyOf(choices);
     }
 
     /**

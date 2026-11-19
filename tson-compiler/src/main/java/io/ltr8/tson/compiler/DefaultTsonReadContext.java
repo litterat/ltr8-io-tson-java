@@ -533,6 +533,29 @@ final class DefaultTsonReadContext implements TsonReadContext {
         });
     }
 
+    /**
+     * {@link TsonReadContext#spendTypeRef}: the annotations are looked past and put back, and the type-ref behind them
+     * is the one event taken out of the queue. A lookahead records what it reads to rewind it, and a type-ref taken
+     * out from under one would be missing from what it puts back.
+     */
+    static void spendTypeRef(TsonReadContext ctx) {
+        Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;
+        if (cursor.recording != null) {
+            throw new IllegalStateException("a type-ref is spent by a read, never inside a lookahead");
+        }
+        List<TsonEvent> annotations = lookingAhead(ctx, lookahead -> {
+            io.ltr8.tson.compiler.stream.EventSkip.annotations(lookahead);
+            return List.copyOf(cursor.recording);
+        });
+        annotations.forEach(ignored -> cursor.rewound.removeFirst());
+        if (ctx.peek() instanceof io.ltr8.tson.compiler.stream.TypeRef) {
+            ctx.next();
+        }
+        for (int i = annotations.size() - 1; i >= 0; i--) {
+            cursor.rewound.addFirst(annotations.get(i));
+        }
+    }
+
     @Override
     public Optional<SourcePosition> position() {
         return positionOverride.isPresent() ? positionOverride : Optional.ofNullable(cursor.position);

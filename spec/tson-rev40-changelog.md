@@ -1032,6 +1032,18 @@ it.
      an alias or an extern: it is the entry the tag reaches, past its alias chain and an
      extern, being the variant's, as every judgement through a hop is made (§5.13, §8.3).
 
+128. **§5.4** — a variant that is a choice is disjoint. A nested choice has no class, so the
+     choice holding it takes a tag, and the tag names the nested choice; the value is then
+     read there with its one tag spent. Where the nested choice is disjoint that reads:
+     `!narrow 5` at `( boolean | narrow )` over `narrow => ( int32 | text )`. Where it is
+     not, `( text | either )` over `either => ( a | b )`, two records, a value of `a` or of
+     `b` had no spelling in either encoding, and the schema loaded. The choice is a resolver
+     error at the declaration, naming the variant, and is written with the variants listed,
+     `( text | a | b )`. The rule is the one that refuses a variant written in place in a
+     choice that is not disjoint, one level down: there no tag names the variant, here the
+     tag is spent naming it. A choice holding a choice is never disjoint, so a choice nests
+     one deep. No value a document could write at the nested choice is lost (§5).
+
 ### 3.3 Companion artifacts
 
 The revised artifacts carry the baseline of §1. Seven entries are edited by this revision of
@@ -1254,6 +1266,9 @@ Changes a Revision 39 implementer must act on:
 29. **`policy.script_policy` is `policy.token_policy`** (§3.1 item 29): the type is named
     for the policy [TSON-DATA] §8.2 names. A schema or a document naming the type writes
     the new name; the `token_policy` field of a `policy.processor` is unchanged.
+30. **A choice listed as a variant is disjoint** (§3.2 item 128): `( text | either )` over a
+    choice of two records fails to load, where it loaded and held values no document could
+    write. It is written `( text | a | b )`.
 
 ---
 
@@ -1302,6 +1317,7 @@ carries no open questions.
 | Item 116 (reading) | A schema declares no value entry of an extern type: `!order_v1 { … }` at a declaration is refused with the other heads, beside the refused default and pin, so no foreign value is written in the declaring schema but an annotation's. | **[settled]** — the spec author's ruling: confirmed as written. |
 | Item 118 (reading) | Which tags the boundary admits. The text applies §7.2's subsumption with each name followed to the entry it reaches, by identity, so a name of the enclosing scope that is no extern is admitted where it reaches the target or a subtype of it (the scope importing the schema that declares it), and a variant's name is admitted where the target is a choice; the narrower reading admits externs alone. A tag naming the position's own extern is read as no tag, so an extern of a member-dispatched base may be written at a choice and its value placed by its selectors. | **[settled]** — the spec author's ruling, §3.2 item 126: by identity, as written. |
 | Items 116–118 (ruled) | A wrapper's inner `$type` at an extern's boundary named a foreign subtype by the foreign schema's name, which text cannot write. The encodings align on one type name for a value, the boundary's. A second tag in text was the alternative. | **[settled]** — the spec author's ruling, §3.4 item 16. |
+| Item 128 (ruled) | A choice that is a variant of a choice. The text refuses the one case no document can write, a nested choice that is not disjoint, and keeps a disjoint one, tagged by its name. A nested choice standing for its variants, so that a tag names a variant's variant and disjointness is judged over all of them, is the question of how sums are expressed and is left to the next revision; it lifts this refusal and refuses nothing this text admits. Refusing every nested choice was the alternative, and would refuse `( boolean | narrow )`, which reads. | **[settled]** — the spec author's ruling. |
 | Items 116–118 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a template over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |

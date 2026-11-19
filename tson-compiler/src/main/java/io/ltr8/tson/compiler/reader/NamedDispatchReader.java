@@ -25,7 +25,9 @@ import java.util.function.Predicate;
  * Dispatch-by-{@code !typeName} over a table, built by {@link ChoiceReader}, from every name a tag may carry to the
  * variant it selects. Reads the value's own type-ref (via {@link EventSkip#annotationsAndTypeRef}) and delegates to
  * that variant's own reader, resolved lazily at dispatch time, which is handed the whole data-value, tag included. A
- * variant written in place has no name a tag could give, so it is reached by untagged recovery alone.
+ * variant written in place has no name a tag could give, so it is reached by untagged recovery alone. A variant
+ * that is a choice spends the tag ([TSON-SCHEMA] §5.4): the value carries the one tag naming it, and is read there
+ * untagged ({@link TsonReadContext#spendTypeRef}).
  *
  * <p><b>Untagged recovery.</b> When {@code untaggedRecovery} is non-empty and the value carries no type-ref,
  * the value is instead recovered structurally: its own §4 base-type class selects the variant (§5.4) -- a scalar
@@ -39,6 +41,7 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
     private final String missingTypeRefMessage;
     private final Set<String> candidateNames;
     private final Map<String, TypeExpr> selects;
+    private final Set<TypeExpr> spendTag;
     private final Map<String, List<String>> selectsNone;
     private final TsonTypeReaderResolver resolver;
     private final Map<DiscriminationClass, TypeExpr> untaggedRecovery;
@@ -47,17 +50,19 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
     /**
      * @param candidateNames the variants as declared, for a message to list
      * @param selects        every name a tag may carry, to the variant it selects
+     * @param spendTag       the variants that are choices, at which the value is read without the tag that named them
      * @param selectsNone    every name IS-A more than one variant and meaning none, to those variants
      * @param inScope        whether a name is one of the enclosing scope, where a tag at a choice is read (§7.9)
      */
     NamedDispatchReader(String positionName, String missingTypeRefMessage, Set<String> candidateNames,
-                        Map<String, TypeExpr> selects, Map<String, List<String>> selectsNone,
+                        Map<String, TypeExpr> selects, Set<TypeExpr> spendTag, Map<String, List<String>> selectsNone,
                         TsonTypeReaderResolver resolver, Map<DiscriminationClass, TypeExpr> untaggedRecovery,
                         Predicate<String> inScope) {
         this.positionName = positionName;
         this.missingTypeRefMessage = missingTypeRefMessage;
         this.candidateNames = candidateNames;
         this.selects = selects;
+        this.spendTag = spendTag;
         this.selectsNone = selectsNone;
         this.resolver = resolver;
         this.untaggedRecovery = untaggedRecovery;
@@ -105,6 +110,9 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
             String ref = typeRef.get();
             TypeExpr variant = selects.get(ref);
             if (variant != null) {
+                if (spendTag.contains(variant)) {
+                    TsonReadContext.spendTypeRef(ctx);
+                }
                 return resolver.resolve(variant).read(ctx);
             }
             List<String> among = selectsNone.get(ref);

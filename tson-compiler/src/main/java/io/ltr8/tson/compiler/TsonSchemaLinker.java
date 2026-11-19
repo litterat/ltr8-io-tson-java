@@ -791,6 +791,7 @@ public final class TsonSchemaLinker {
         AnnotatedMap<String, Top> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, facts, localNames, receiver);
         checkTaggedVariantsAreNamed(schema, annotated, facts, localNames, receiver);
+        checkChoiceVariantsAreDisjoint(schema, annotated, facts, localNames, receiver);
         closure.set(annotated);
         reached.set(new ValuesByName(schema, annotated, facts, origins, values, hops));
 
@@ -1103,25 +1104,7 @@ public final class TsonSchemaLinker {
                                                     Map<String, TsonSchema.EntryFacts> facts,
                                                     Set<String> localNames, DiagnosticsReceiver receiver) {
         for (String name : localNames) {
-            Top entry = entries.get(name);
-            // An open record's choices are judged where each application closes, their variants known (§5.4).
-            if (entry == null || OpenEntry.isOpen(entry)) {
-                continue;
-            }
-            boolean asserted = AliasChain.annotates(facts.getOrDefault(name, TsonSchema.EntryFacts.NONE)
-                    .annotations(), DISJOINT, entries) || AliasChain.annotates(entries.getAnnotations(name), DISJOINT,
-                    entries);
-            List<ChoiceBody> choices = new ArrayList<>();
-            if (entry instanceof ChoiceBody declared && !asserted) {
-                choices.add(declared);
-            }
-            mapInline(entry, body -> {
-                if (body instanceof ChoiceBody inPlace) {
-                    choices.add(inPlace);
-                }
-                return body;
-            });
-            for (ChoiceBody choice : choices) {
+            for (ChoiceBody choice : choicesJudged(name, entries, facts)) {
                 if (!choice.disjoint().equals(Optional.of(false))
                         || Set.copyOf(choice.variants()).size() != choice.variants().size()) {
                     continue; // disjoint, or a repeated variant, which distinctness has refused
@@ -1140,6 +1123,72 @@ public final class TsonSchemaLinker {
                 break;
             }
         }
+    }
+
+    /**
+     * A variant that is a choice is disjoint, judged at the end of its alias chain ([TSON-SCHEMA] §5.4): a value of
+     * it carries the tag naming it, and a value carries one tag ([TSON-DATA] §3.2), so it is read at the nested
+     * choice untagged, where a choice that is not disjoint could select nothing. An extern is not followed. Asked of
+     * the choices {@link #checkTaggedVariantsAreNamed} asks.
+     */
+    private static void checkChoiceVariantsAreDisjoint(TsonSchema schema, AnnotatedMap<String, Top> entries,
+                                                       Map<String, TsonSchema.EntryFacts> facts,
+                                                       Set<String> localNames, DiagnosticsReceiver receiver) {
+        for (String name : localNames) {
+            for (ChoiceBody choice : choicesJudged(name, entries, facts)) {
+                Map<String, List<String>> nested = new LinkedHashMap<>();
+                for (TypeRef variant : choice.variants().stream().flatMap(v -> TypeExpr.named(v).stream()).toList()) {
+                    if (AliasChain.terminalDefinition(variant.name(), entries).orElse(null) instanceof ChoiceBody inner
+                            && inner.disjoint().equals(Optional.of(false))) {
+                        nested.put(variant.name(), inner.variants().stream().map(TypeExpr::text).toList());
+                    }
+                }
+                if (nested.isEmpty()) {
+                    continue;
+                }
+                Set<String> listed = new LinkedHashSet<>();
+                choice.variants().forEach(variant -> listed.addAll(
+                        nested.getOrDefault(variant.text(), List.of(variant.text()))));
+                report(receiver, schema, name, at(facts, name), "'" + name + "': the choice '" + spelled(
+                        choice.variants().stream().map(TypeExpr::text).toList()) + "' has " + (nested.size() == 1
+                        ? "a variant " + nested.keySet() + " that is a choice" : "variants " + nested.keySet()
+                        + " that are choices") + " not disjoint -- a value of one carries the tag naming it and no "
+                        + "other, so it is read there untagged and none of its variants could be selected (§5.4): "
+                        + "list its variants in its place, '" + spelled(List.copyOf(listed)) + "'");
+                break;
+            }
+        }
+    }
+
+    private static String spelled(List<String> variants) {
+        return "( " + String.join(" | ", variants) + " )";
+    }
+
+    /**
+     * The choices in local entry {@code name} the variant checks ask: the entry itself where it is one and asserts no
+     * {@code @meta.disjoint}, whose failure {@link #checkDisjointAssertions} reports alone, and every choice written in
+     * place in it at any depth. None in an open record: its choices are judged where each application closes, their
+     * variants known (§5.4).
+     */
+    private static List<ChoiceBody> choicesJudged(String name, AnnotatedMap<String, Top> entries,
+                                                  Map<String, TsonSchema.EntryFacts> facts) {
+        Top entry = entries.get(name);
+        if (entry == null || OpenEntry.isOpen(entry)) {
+            return List.of();
+        }
+        boolean asserted = AliasChain.annotates(facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).annotations(),
+                DISJOINT, entries) || AliasChain.annotates(entries.getAnnotations(name), DISJOINT, entries);
+        List<ChoiceBody> choices = new ArrayList<>();
+        if (entry instanceof ChoiceBody declared && !asserted) {
+            choices.add(declared);
+        }
+        mapInline(entry, body -> {
+            if (body instanceof ChoiceBody inPlace) {
+                choices.add(inPlace);
+            }
+            return body;
+        });
+        return choices;
     }
 
     /**
