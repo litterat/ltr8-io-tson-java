@@ -350,12 +350,13 @@ class InlineTypeRulesTest {
         }
     }
 
-    /** {@code discriminators} alone decide nothing: a record in place that is not abstract reads as any record. */
+    /** {@code discriminators} stand only beside {@code extension: ABSTRACT}, in place as at a declaration. */
     @Test
-    void discriminatorsWithoutAbstractDoNotEmptyARecordInPlace() {
-        String declarations = atInPlace("!meta.record { " + X + "  discriminators: [x] }");
-        assertEquals(List.of(), problems(declarations));
-        assertEquals(List.of(), read(declarations, "!r { at: { x: 1 } }"));
+    void discriminatorsWithoutAbstractAreRefusedOnARecordInPlace() {
+        refused(atInPlace("!meta.record { " + X + "  discriminators: [x] }"),
+                "states 'discriminators: [x]' beside 'extension: OPEN'");
+        refused(atInPlace("!meta.record { " + X + "  extension: FINAL  discriminators: [x] }"),
+                "states 'discriminators: [x]' beside 'extension: FINAL'");
     }
 
     // ── A record body written at a slot (§5.2) ──────────────────────────────────────────────────

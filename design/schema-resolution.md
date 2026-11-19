@@ -157,7 +157,11 @@ is the author's error.
 **A selector is `=?`** (`FieldModifiers.discriminates`), and the record it is written in is the family base: the
 field stays required and unpinned (§5.7's identity diagonal forbids a base pinning what each member pins
 differently) and its name goes into `record.discriminators`. ABSTRACT is derived from it — the members pin the
-selector, so the base has no values of its own; `abstract` beside it is admitted, `final` refused. Member
+selector, so the base has no values of its own; `abstract` beside it is admitted, `final` refused. **Only the
+source's `=?` derives it.** The kernel's form states both facts, so a `!meta.record` whose `discriminators` stand
+beside any `extension` but ABSTRACT — the default OPEN of a missing one included, judged after the declaration's mark —
+is refused, at a declaration (`withExtension`) and in place (`TypeInline.refusal`, as the record is read). Deriving
+over it lost: it made a stated `extension: FINAL` mean ABSTRACT. Member
 dispatch is ABSTRACT plus non-empty `discriminators`, read where needed (`FamilySelectors.dispatchesOnMembers`)
 and never stored as a second fact. A group member cannot be a selector: §5.11 makes a value modifier a parse
 error there.

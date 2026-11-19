@@ -2388,6 +2388,76 @@ class DefinitionResolverTest {
         assertEquals(RecordExtensionType.ABSTRACT, assertInstanceOf(RecordBody.class, box).extension());
     }
 
+    private static final String KIND = "fields: { kind => !meta.record_field { type: text } }";
+
+    /**
+     * <b>The kernel's form states both facts</b> (§5.2): {@code discriminators} stands beside {@code extension:
+     * ABSTRACT}, and a stated FINAL or OPEN is refused at the declaration rather than overridden.
+     */
+    @Test
+    void theKernelsFormStatingDiscriminatorsBesideFinalOrOpenIsRefused() {
+        for (String extension : List.of("FINAL", "OPEN")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> resolveSnippetsAgainstMetaKernel("pet => !meta.record { " + KIND + "  extension: "
+                            + extension + "  discriminators: [kind] }"));
+            assertTrue(thrown.getMessage().contains("'pet' states 'discriminators: [kind]' beside 'extension: "
+                    + extension + "'"), thrown.getMessage());
+            assertTrue(thrown.getMessage().contains("write 'extension: ABSTRACT'"), thrown.getMessage());
+        }
+    }
+
+    /** A missing {@code extension} is the field's default, OPEN, and nothing is derived over a default either. */
+    @Test
+    void theKernelsFormStatingDiscriminatorsAndNoExtensionIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("pet => !meta.record { " + KIND + "  discriminators: [kind] }"));
+        assertTrue(thrown.getMessage().contains("beside 'extension: OPEN', the default where none is written"),
+                thrown.getMessage());
+    }
+
+    @Test
+    void theKernelsFormStatingDiscriminatorsBesideAbstractLoads() {
+        RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
+                "pet => !meta.record { " + KIND + "  extension: ABSTRACT  discriminators: [kind] }"));
+        assertEquals(RecordExtensionType.ABSTRACT, body.extension());
+        assertEquals(List.of("kind"), body.discriminators());
+    }
+
+    /** A record written in place in the kernel's form is held to the pair as a declared one is. */
+    @Test
+    void aRecordInPlaceStatingDiscriminatorsWithoutAbstractIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("r => !meta.record { fields: { at => !meta.record_field { "
+                        + "type: { of: !meta.record { " + KIND + "  discriminators: [kind] } }  optional: true } } }"));
+        assertTrue(thrown.getMessage().contains("the record written in place '{ kind: text }' states "
+                + "'discriminators: [kind]' beside 'extension: OPEN'"), thrown.getMessage());
+    }
+
+    /**
+     * The declaration's mark is its statement of {@code extension}, so the pair is judged after it: {@code abstract}
+     * beside the kernel's form completes it, and {@code final} contradicts a stated ABSTRACT.
+     */
+    @Test
+    void theKernelsFormIsJudgedAfterTheDeclarationsMark() {
+        RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
+                "pet => abstract !meta.record { " + KIND + "  discriminators: [kind] }"));
+        assertEquals(RecordExtensionType.ABSTRACT, body.extension());
+
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("pet => final !meta.record { " + KIND
+                        + "  extension: ABSTRACT  discriminators: [kind] }"));
+        assertTrue(thrown.getMessage().contains("beside 'extension: FINAL'"), thrown.getMessage());
+    }
+
+    /** The source's {@code =?} still implies ABSTRACT with no mark written. */
+    @Test
+    void aSelectorInTheSourceStillImpliesAbstract() {
+        RecordBody body = assertInstanceOf(RecordBody.class,
+                resolveSnippetsAgainstMetaKernel("pet => { kind: text =?  name: text }"));
+        assertEquals(RecordExtensionType.ABSTRACT, body.extension());
+        assertEquals(List.of("kind"), body.discriminators());
+    }
+
     /** Only a record has an extension fact to state; the mark has nowhere to land on anything else. */
     @Test
     void aDefinitionMarkOnANonRecordIsRefused() {
