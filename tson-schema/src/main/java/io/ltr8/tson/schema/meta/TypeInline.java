@@ -122,7 +122,7 @@ public record TypeInline(@Unbound String constructor, Type of, @Unbound ApplyBod
             return Optional.of(form + " states a chain, and a type written in place carries none: it has no name, "
                     + "so it is a member of nothing and nothing composes it" + nameIt);
         }
-        if (of instanceof RecordBody record && record.isOpen()) {
+        if (of instanceof RecordBody record && record.isParametric()) {
             return Optional.of(form + " takes parameters, and a parametric record is applied by its name, which a record "
                     + "written in place has none of" + nameIt);
         }

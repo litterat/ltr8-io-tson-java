@@ -140,14 +140,14 @@ class ApplyConstructionTest {
         refused("  r => { f: meta.ref<box> }", "box");
     }
 
-    private static TsonSchema closedHolding(ApplyBody application, boolean open) {
+    private static TsonSchema closedHolding(ApplyBody application, boolean parametric) {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("text", io.ltr8.tson.schema.unicode.TextType.UNCONSTRAINED);
         entries.put("box", new RecordBody(null, List.of(new Param("T")), RecordBody.fieldMap(Map.entry("v",
                 RecordField.required(TypeRef.of("T")))), null, RecordExtensionType.OPEN, null, Optional.empty()));
-        entries.put("r", new RecordBody(null, open ? List.of(new Param("U")) : List.of(), RecordBody.fieldMap(
+        entries.put("r", new RecordBody(null, parametric ? List.of(new Param("U")) : List.of(), RecordBody.fieldMap(
                 Map.entry("f", RecordField.required(application.inPlace())),
-                Map.entry("u", RecordField.required(TypeRef.of(open ? "U" : "text")))), null,
+                Map.entry("u", RecordField.required(TypeRef.of(parametric ? "U" : "text")))), null,
                 RecordExtensionType.OPEN, null, Optional.empty()));
         return new TsonSchema("https://example.test/held.tn", List.of(), AnnotatedMap.of(entries), false, Map.of(),
                 Map.of());

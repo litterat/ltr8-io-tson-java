@@ -302,7 +302,7 @@ class SealedFamilyCheckTest {
 
     // ── A member is declared ─────────────────────────────────────────────
 
-    private static final String MEMBER_TEMPLATE = """
+    private static final String MEMBER_PARAMETRIC = """
               pet    => abstract { pet_type: text =?  name: text }
               dog_of => <T> pet & { pet_type?: = "dog"  breed: T }
             """;
@@ -314,7 +314,7 @@ class SealedFamilyCheckTest {
      */
     @Test
     void aMemberAppliedAtAUseSiteIsRefused() {
-        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("use-site", "{\n" + MEMBER_TEMPLATE + """
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("use-site", "{\n" + MEMBER_PARAMETRIC + """
                   kennel => { k: dog_of<text> }
                 }"""));
 
@@ -332,7 +332,7 @@ class SealedFamilyCheckTest {
      */
     @Test
     void aMemberAppliedInsideAParametricRecordIsRefusedAtItsApplication() {
-        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_TEMPLATE
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_PARAMETRIC
                 + """
                   kennel_of => <T> { d: dog_of<T> }
                   kt        => kennel_of<text>
@@ -346,7 +346,7 @@ class SealedFamilyCheckTest {
     /** The declared spelling of the same member loads, and a use site writes its name. */
     @Test
     void aDeclaredMemberLoads() {
-        isClean(Tson.standard(), "declared", "{\n" + MEMBER_TEMPLATE + """
+        isClean(Tson.standard(), "declared", "{\n" + MEMBER_PARAMETRIC + """
                   dogs   => dog_of<text>
                   kennel => { k: dogs }
                 }""");

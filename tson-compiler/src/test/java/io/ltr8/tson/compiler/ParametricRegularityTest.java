@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * §5.10's regularity boundary ({@code TemplateRegularity}): within a parametric record's body, a recursive application
+ * §5.10's regularity boundary ({@code ParametricRegularity}): within a parametric record's body, a recursive application
  * -- direct or mutual -- must pass each parameter through unchanged.
  *
  * <p>Checked where the parametric record is <b>declared</b>, which is the point of the rule. A parametric record that grows
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * costs a depth counter -- a non-portable limit, and the retrofit C++ reached for after shipping parametric records
  * without a regularity restriction. Every fixture here declares the offending parametric record and never applies it.
  */
-class TemplateRegularityTest {
+class ParametricRegularityTest {
 
     private static final String ID = "https://example.test/regularity.tn";
 
@@ -128,7 +128,7 @@ class TemplateRegularityTest {
     /**
      * <b>A parametric record is not a type.</b> Naming one without arguments is refused where the schema links, a
      * parametric record and a held one alike (§5.10), rather than failing at <em>read</em> time against a document with
-     * nothing wrong with it. {@code TemplateAtATypePositionTest} carries the positions.
+     * nothing wrong with it. {@code ParametricRecordAtATypePositionTest} carries the positions.
      */
     @Test
     void namingAParametricRecordWithoutArgumentsIsRejected() {
@@ -158,7 +158,7 @@ class TemplateRegularityTest {
     }
 
     /**
-     * A recursive application's arity is decidable where it is written. {@code TemplateRegularity} cannot
+     * A recursive application's arity is decidable where it is written. {@code ParametricRegularity} cannot
      * report it -- comparing parameters positionally needs the positions to line up -- so it passed through
      * to a materialisation that may never happen.
      */

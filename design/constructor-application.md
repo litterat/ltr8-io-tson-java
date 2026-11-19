@@ -22,7 +22,7 @@ What `!C { … }` builds, how its head resolves, and why a parametric record is 
   refusal for want of applicability.
 - A construction never writes `parameters` (`refuseWrittenParameters`): a parametric record's parameters are the list before
   its body, `<T> { … }` or `<T> !meta.record { … }`, and a parameter list before any other head is refused
-  (`openInstance`, `design/open-records.md`).
+  (`parametricInstance`, `design/parametric-records.md`).
 - An atom instance is **a body that is an `Atom`**, which no constructor's is: a constructor's body is the
   `!meta.record` describing its instances. IS-A `meta.atom` runs backwards (true of the constructor, false of every
   instance).
@@ -63,7 +63,7 @@ What `!C { … }` builds, how its head resolves, and why a parametric record is 
   entries lost: both import merges and the collision rule would be written twice.
 
 Related: `design/schema-resolution.md` (the resolution phase around this), `design/atom-refinement-and-coherence.md`
-(`!I ^ { ... }`), `design/template-materialisation.md` and `design/open-records.md` (how `C<...>` closes),
+(`!I ^ { ... }`), `design/parametric-materialisation.md` and `design/parametric-records.md` (how `C<...>` closes),
 `design/resolver-vocabulary-and-bootstrap.md` (alias hops, the vocabulary), `design/linking-and-compilation.md`.
 
 ## Constructor application (`tson-compiler/.../resolver/DefinitionResolver.java`)
@@ -76,7 +76,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   the argument list. **This check is what keeps the construction below it sound**: a parameterised declaration is
   a parametric record, a `RecordBody` like any constructor's, so without it `!box { … }` over a parametric record
   composing `meta.top` would apply a parametric record as a constructor.
-  `TemplateClosesByApplicationTest` pins all of it.
+  `ParametricRecordClosesByApplicationTest` pins all of it.
 - **A construction head resolves through its alias chain first** (§8.3, `resolveConstructorTarget`).
   An alias is a hop, not a rewrite, so `alias_array => meta.array` makes `!alias_array { … }` an application of
   `meta.array`, and every question the head is then asked — is it a parametric record, is it applicable, whose vocabulary
@@ -130,7 +130,7 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   model's, and it is refused as `NOT_IMPLEMENTED` (`unmodelledType`): a gap, since a generic body for such an instance is
   open work.
 - **A parametric record over a constructor is refused; the constructor is applied instead** (§5.10): `<T> !meta.array {
-  element_type: T  min_items: 1 }` has no home for `parameters`, so `openInstance` refuses it, naming the remedy -- the
+  element_type: T  min_items: 1 }` has no home for `parameters`, so `parametricInstance` refuses it, naming the remedy -- the
   application where it is used (`meta.array<T>`, `[T]`), or its construction left open once and completed where used
   (`nonempty => !meta.array ^ { min_items: 1 }`, then `nonempty<T>`). A pin is a field's value, so a
   parametric record pinning a slot to its parameter -- `my_set => <T> meta.array & { element_type?: = T }` -- is refused
@@ -183,6 +183,6 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   `of` refuses is refused at link as the braced form's is; a required field no
   slot fills leaves the construction incomplete and the constructor's reader refuses it. `ConstructionSugarTest` pins
   all of it.
-- **The desugarer cannot tell a constructor from a record**, so `checkTemplateApplication` refuses an argument list
+- **The desugarer cannot tell a constructor from a record**, so `checkApplication` refuses an argument list
   only on a local head whose body says it is none: a fresh record or a construction. A composition, an
   alias or an atom refinement (an incomplete entry, completed by application) passes through for resolution to judge.

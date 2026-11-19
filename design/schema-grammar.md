@@ -35,7 +35,7 @@ history lives in git.
 - A mismatch names the construct the position admits, in the author's voice, not the token class.
 
 Related: `design/schema-grammar-and-desugaring.md` (the desugaring phase that runs next),
-`design/desugaring-open-forms-and-templates.md`, `design/lexer-and-data-parsing.md` (the data grammar this imports),
+`design/desugaring-forms-over-parameters.md`, `design/lexer-and-data-parsing.md` (the data grammar this imports),
 `design/schema-side-diagnostics.md` (schema-side diagnostics and the recovering parse).
 
 ## Schema grammar (`tson-compiler/TsonSchemaParser.java`, `.../ast/schema/`)
@@ -117,8 +117,8 @@ materialization, no validation (those are the resolver's/linker's jobs).
   decides.
   - **The payload is a `core-value`, and nothing narrower.** Which head a parameter list may precede is the
     resolver's question, not the grammar's: §5.10 admits `!meta.record` alone (a parametric record's explicit spelling),
-    and `DefinitionResolver.openInstance` refuses any other head with the remedy in the message
-    (`design/open-records.md`).
+    and `DefinitionResolver.parametricInstance` refuses any other head with the remedy in the message
+    (`design/parametric-records.md`).
   - **An application is data too**: `!meta.array { element_type: box<text> }` is a `core-value`, the reference
     production being [TSON-DATA] §7.4's, and it is what the sugar `[box<text>]` expands
     to. What a payload cannot spell is sugar: `[text]` in a payload is a data array, never the array type, so a

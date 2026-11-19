@@ -169,7 +169,7 @@ final class ConstructionRewrite {
         if (constructor.isEmpty()) {
             for (DataValue argument : arguments) {
                 if (!isName(argument)) {
-                    throw TemplateMaterialiser.argumentNotAName(text(argument), suggestedName(argument),
+                    throw ParametricMaterialiser.argumentNotAName(text(argument), suggestedName(argument),
                             text(written));
                 }
             }
@@ -190,7 +190,7 @@ final class ConstructionRewrite {
         List<RecordValue.Field> fields = new ArrayList<>(slots.size());
         for (int i = 0; i < slots.size(); i++) {
             if (!isName(arguments.get(i)) && !slotsInPlace.get(i)) {
-                throw TemplateMaterialiser.nameRequired(text(arguments.get(i)), suggestedName(arguments.get(i)));
+                throw ParametricMaterialiser.nameRequired(text(arguments.get(i)), suggestedName(arguments.get(i)));
             }
             fields.add(new RecordValue.Field(slots.get(i), constructed.get(i)));
         }
@@ -229,7 +229,7 @@ final class ConstructionRewrite {
         List<RecordValue.Field> fields = new ArrayList<>(slots.size());
         for (int i = 0; i < slots.size(); i++) {
             if (!isName(arguments.get(i)) && !slotsInPlace.get(i)) {
-                throw TemplateMaterialiser.nameRequired(text(arguments.get(i)), suggestedName(arguments.get(i)));
+                throw ParametricMaterialiser.nameRequired(text(arguments.get(i)), suggestedName(arguments.get(i)));
             }
             fields.add(new RecordValue.Field(slots.get(i), constructed.get(i)));
         }
@@ -271,21 +271,21 @@ final class ConstructionRewrite {
         return generic.args().stream().allMatch(NameRef.class::isInstance);
     }
 
-    /** The refusal of {@code generic}, written where only a name may stand ({@link TemplateMaterialiser#nameRequired}). */
+    /** The refusal of {@code generic}, written where only a name may stand ({@link ParametricMaterialiser#nameRequired}). */
     static SchemaValidationException nameRequired(ApplicationRef generic) {
         DataValue written = SchemaDesugarer.application(generic);
-        return TemplateMaterialiser.nameRequired(text(written), suggestedName(written));
+        return ParametricMaterialiser.nameRequired(text(written), suggestedName(written));
     }
 
     /**
      * The refusal of {@code generic}'s first argument that is no name, {@code generic} applying a parametric record
-     * ({@link TemplateMaterialiser#argumentNotAName}).
+     * ({@link ParametricMaterialiser#argumentNotAName}).
      */
     static SchemaValidationException argumentNotAName(ApplicationRef generic) {
         DataValue written = SchemaDesugarer.application(generic);
         DataValue argument = ((ArrayValue) member((RecordValue) written.coreValue(), ARGUMENTS).orElseThrow()
                 .coreValue()).elements().stream().filter(each -> !isName(each)).findFirst().orElseThrow();
-        return TemplateMaterialiser.argumentNotAName(text(argument), suggestedName(argument), text(written));
+        return ParametricMaterialiser.argumentNotAName(text(argument), suggestedName(argument), text(written));
     }
 
     /** {@code generic} as the author wrote it, for a message ({@link #text(DataValue)}). */
@@ -326,7 +326,7 @@ final class ConstructionRewrite {
     }
 
     /**
-     * A name for a declaration of {@code written}, for a message, as {@link TemplateMaterialiser#suggestedName} names
+     * A name for a declaration of {@code written}, for a message, as {@link ParametricMaterialiser#suggestedName} names
      * an application: the head's last segment, then each argument's, {@code my} for one that is no name.
      */
     static String suggestedName(DataValue written) {

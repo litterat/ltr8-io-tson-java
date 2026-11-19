@@ -5,9 +5,8 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FamilySelectors;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.List;
@@ -42,8 +41,8 @@ final class DispatchFactories {
     static ValueReaderFactory over(ValueReaderFactory concrete) {
         return (name, definition, context) -> {
             RecordBody body = (RecordBody) definition;
-            if (body.isOpen()) {
-                return TEMPLATE.create(name, definition, context);
+            if (body.isParametric()) {
+                return PARAMETRIC_RECORD.create(name, definition, context);
             }
             return switch (body.extension()) {
                 // Linking refuses anything composed onto a FINAL record, so it has no subtype a tag could name.
@@ -73,10 +72,10 @@ final class DispatchFactories {
 
     /**
      * A parametric record, which is not a type ([TSON-SCHEMA] §5.10): no value is read against it, so it
-     * reaches {@link OpenTemplateReader} unexamined.
+     * reaches {@link ParametricRecordReader} unexamined.
      */
-    static final ValueReaderFactory TEMPLATE = (name, definition, context) ->
-            new OpenTemplateReader(name, OpenEntry.parameterNames(definition), context.locationOf(name));
+    static final ValueReaderFactory PARAMETRIC_RECORD = (name, definition, context) ->
+            new ParametricRecordReader(name, ParametricEntry.parameterNames(definition), context.locationOf(name));
 
     /**
      * An ABSTRACT base: the family's dispatcher, with no concrete reading. Which

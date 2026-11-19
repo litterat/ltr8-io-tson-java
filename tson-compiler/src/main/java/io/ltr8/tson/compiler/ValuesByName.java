@@ -25,11 +25,11 @@ import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.compiler.resolver.Externs;
 import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonValue;
-import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
@@ -318,7 +318,7 @@ final class ValuesByName {
                     + Externs.describe(extern) + ", a type and no value -- a slot over '" + slot.of() + "' holds the "
                     + "name of a value ([TSON-SCHEMA] §5.12)");
         }
-        if (OpenEntry.isOpen(referent)) {
+        if (ParametricEntry.isParametric(referent)) {
             throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
                     + "parametric record, which denotes no value until it is applied (§5.10), so nothing is there "
                     + "to name");

@@ -2,19 +2,19 @@
 
 Design notes for the half of `SchemaDesugarer` that deals with type parameters: what a sugar form over a parameter
 becomes inside a parametric record, and which bodies of a parametric record are refused before anything resolves
-(`refuseTemplateBody`). Current form only; history lives in git. The sugar table and the naming rule these bullets refer to
-are in `design/schema-grammar-and-desugaring.md`; what a parametric record is, in `design/open-records.md`.
+(`refuseParametricBody`). Current form only; history lives in git. The sugar table and the naming rule these bullets refer to
+are in `design/schema-grammar-and-desugaring.md`; what a parametric record is, in `design/parametric-records.md`.
 
 **Invariants**
 
 - **A parametric record's body is a record body** ([TSON-SCHEMA] §5.10): braces or a composition, which pass through
   as they would without parameters, for `DefinitionResolver` to build as a parametric record. A parameter list before a
-  sugar form or a bare reference is refused here, naming what to write instead (`refuseTemplateBody`); before a
-  construction (`<T> !C { … }`) it passes through, `DefinitionResolver.openInstance` admitting `!meta.record` alone,
+  sugar form or a bare reference is refused here, naming what to write instead (`refuseParametricBody`); before a
+  construction (`<T> !C { … }`) it passes through, `DefinitionResolver.parametricInstance` admitting `!meta.record` alone,
   since only the resolver knows what the head is.
 - **Inside a parametric record a form is its construction in place, whether or not it names a parameter.** The desugarer
   never asks whether a position names one: a parameter is a name at a type slot, which `RecordBody` scopes as a
-  `ParamRef` at any depth and `Substitution` replaces when the record is applied (`design/template-materialisation.md`).
+  `ParamRef` at any depth and `Substitution` replaces when the record is applied (`design/parametric-materialisation.md`).
   So `[T; 1..]`, `[T?]`, `[T, text]`, `( T | int32 )`, `{T => int32}` and `{ cursor: T }` are each the construction the
   table gives, with no rule of their own.
 - **A size bound naming one of the declaration's parameters is refused** (`refuseParameterBound`), naming the slot: a
@@ -27,8 +27,8 @@ are in `design/schema-grammar-and-desugaring.md`; what a parametric record is, i
   (`absorbed`), so an application of it closes against an empty body and says nothing further.
 
 Related: `design/schema-grammar-and-desugaring.md` (the sugar table, reporting),
-`design/schema-grammar.md`, `design/template-materialisation.md` (substitution and closing),
-`design/open-records.md`, `design/references.md` (a reference carrying arguments),
+`design/schema-grammar.md`, `design/parametric-materialisation.md` (substitution and closing),
+`design/parametric-records.md`, `design/references.md` (a reference carrying arguments),
 `design/constructor-application.md` (construction sugar).
 
 ## Why a form over a parameter is not special
@@ -50,7 +50,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, reporting),
   is read (`ConstructionRewrite`). The sugar and the explicit spelling are one resolved form, and an application
   left in resolved output always applies a parametric record.
 
-## Bodies of a parametric record (`refuseTemplateBody`)
+## Bodies of a parametric record (`refuseParametricBody`)
 
 - **Before a sugar form**: `<T> [T]` and `<V> {text => V}` are constructions, written where they are used
   (`meta.array<T>`, `[T]`) or left open once and completed where used; `<T> ( T | error )` is a discriminated
@@ -65,4 +65,4 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, reporting),
   resolver, for a parametric record and the closed record beside it alike (`FieldModifiers`).
 - **An application passes through.** `box<text>` keeps its head and arguments for materialisation; the one thing
   asked here is that a local head declaring no parameters, with a body no constructor has, takes no arguments
-  (`checkTemplateApplication`).
+  (`checkApplication`).

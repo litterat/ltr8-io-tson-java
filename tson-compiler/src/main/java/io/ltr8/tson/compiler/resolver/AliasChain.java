@@ -80,7 +80,7 @@ public final class AliasChain {
 
     /**
      * The same walk over a namespace still being built, which has a lookup rather than a finished map --
-     * {@code TemplateMaterialiser} normalises an application's arguments through this while resolution runs.
+     * {@code ParametricMaterialiser} normalises an application's arguments through this while resolution runs.
      */
     public static String terminal(String name, Function<String, ? extends Top> entries) {
         return walk(name, entries).name();

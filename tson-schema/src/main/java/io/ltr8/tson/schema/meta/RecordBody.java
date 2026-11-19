@@ -28,7 +28,7 @@ import java.util.function.UnaryOperator;
  * ([TSON-SCHEMA] §5.10): a reference names it only as the head of an application, never bare, and each
  * application substitutes its arguments for the parameters and closes to a record without them. So no closed
  * position, and no member set over {@code meta.ref<meta.record>}, reaches a parametric record, and nothing builds a reader
- * or a writer for one ({@link #isOpen}).
+ * or a writer for one ({@link #isParametric}).
  *
  * <p><b>Where a parameter stands is this value's to state.</b> A parameter is written as its name, a reference value
  * looked up in {@link #parameters} before the namespace, and stands at a field's {@code type}, at a slot of a type
@@ -41,7 +41,7 @@ import java.util.function.UnaryOperator;
  *
  * <p><b>A closed record does not judge its parameters.</b> One written in place inside a parametric record holds that
  * record's parameters, and only the parametric record can tell them from a stray one; closing an application substitutes
- * every one away ({@code TemplateMaterialiser}).
+ * every one away ({@code ParametricMaterialiser}).
  *
  * <p><b>{@code chain} is {@code chained}'s</b> (see {@link TypeChain}): the complete IS-A chain and its inverse,
  * computed by the resolver and the linker. A fresh record and a subtracted one ([TSON-SCHEMA] §5.9) have an empty
@@ -194,7 +194,7 @@ public record RecordBody(TypeChain chain, List<Param> parameters, AnnotatedMap<S
     }
 
     /** Whether this record declares parameters: a parametric record, which no position names bare. */
-    public boolean isOpen() {
+    public boolean isParametric() {
         return !parameters.isEmpty();
     }
 

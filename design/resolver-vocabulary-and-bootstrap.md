@@ -45,8 +45,8 @@ itself. Current form only; history lives in git.
   The partial link reports nothing, each entry being judged when the whole schema links; a finished schema's link
   refuses an undeclared name.
 
-Related: `design/schema-resolution.md` (definition resolution), `design/template-materialisation.md` and
-`design/open-records.md` (the callers of `WireForm` and `CanonicalApplication`), `design/constructor-application.md`,
+Related: `design/schema-resolution.md` (definition resolution), `design/parametric-materialisation.md` and
+`design/parametric-records.md` (the callers of `WireForm` and `CanonicalApplication`), `design/constructor-application.md`,
 `design/schema-grammar-and-desugaring.md` (sugar written in place), `design/linking-and-compilation.md`.
 
 ## Shared vocabulary: `WireForm`, `TypeSlots`, `CanonicalApplication`
@@ -82,7 +82,7 @@ fact about the value model, stated once, where the model is walked:
   name of another schema's namespace.
 
 §5.10's regularity check does not use the walk: every entry with parameters is a parametric record, and reads its
-applications off its references (`OpenEntry.applications`).
+applications off its references (`ParametricEntry.applications`).
 
 **`CanonicalApplication`** — §8.2's canonical application, `of`: an `ApplyBody` of plain names, its arguments past
 their alias chains, compared as a value (head and arguments), never as text. The applied-parent fold keys on it, and
@@ -114,7 +114,7 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an ali
   it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the parametric
   record being the answer there. `AliasChainWalkTest` pins all four stops.
 - **Three positions walk a chain where a declared entry might stand.** An application through an alias of a parametric record
-  applies the parametric record (`TemplateMaterialiser.templateHead`, `checkArity`), its identity the parametric
+  applies the parametric record (`ParametricMaterialiser.parametricHead`, `checkArity`), its identity the parametric
   record's, so over `ref_of => meta.ref` the applications `ref_of<order>` and `meta.ref<order>` close to one entry; an alias
   naming a parametric record bare is no use of the parametric record without arguments (`validateBody`'s `Alias` arm). An
   atom refinement's source written as an alias refines the instance at the end of the chain, and its chain names that
@@ -143,7 +143,7 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an ali
 **`@meta.application`** (§6, §8.1) goes on the key of every declaration that closes an application of a parametric
 record, the application it is the instantiation of, `@meta.application:{ head: box  arguments: [int32] }`, a value of
 `meta.apply` (`ApplyBody`), its head as written and each argument a name past its alias hops
-(`TemplateMaterialiser.asWritten`). A construction carries none, its value stating its constructor and its
+(`ParametricMaterialiser.asWritten`). A construction carries none, its value stating its constructor and its
 arguments. It is a fact about the entry and not about its chain -- the record does not state the head it was
 substituted from -- which is why it is no field of `meta.type_chain`. The materialiser records each application in a
 map it shares with `SchemaResolver` (the applied-parent fold keys on it), and `SchemaResolver` writes it where it

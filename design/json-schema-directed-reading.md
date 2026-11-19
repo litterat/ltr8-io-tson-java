@@ -180,12 +180,13 @@ record factory, because the concrete reading is the only one that differs by mod
   value up. In the wrapper form the discriminators are inside `$value`, so the tag places the value and is required.
 - **A parametric record is no type** ([TSON-SCHEMA] §5.10): its `@Typename` is `meta.record`, so
   `JsonSchemaCompiler` picks the record factory for it as for every record, and that factory (`DispatchFactories.over`)
-  answers a parametric record's body with `DispatchFactories.TEMPLATE`, an `OpenTemplateReader`. A family declared
-  through a parametric record is read at its base, a record: an abstract record a parametric record composes (`{ b: boxed }`
-  over `box => <T> boxed & { … }` admits `{"$type": "int_box", "v": 1}` and refuses an untagged object, as TSON text does),
-  or an abstract parametric record's application, a closed record carrying the parametric record's selectors. The selectors
-  are stated on the base (`tson-schema`'s `FamilySelectors`), so neither side of the module wall keeps its own opinion of
-  them. A subtype index holds no parametric record, so a parametric record composing a base is no member.
+  answers a parametric record's body with `DispatchFactories.PARAMETRIC_RECORD`, a `ParametricRecordReader`. A family
+  declared through a parametric record is read at its base, a record: an abstract record a parametric record composes
+  (`{ b: boxed }` over `box => <T> boxed & { … }` admits `{"$type": "int_box", "v": 1}` and refuses an untagged object,
+  as TSON text does), or an abstract parametric record's application, a closed record carrying the parametric record's
+  selectors. The selectors are stated on the base (`tson-schema`'s `FamilySelectors`), so neither side of the module
+  wall keeps its own opinion of them. A subtype index holds no parametric record, so a parametric record composing a
+  base is no member.
 
 **Every reader a dispatcher can select is wired at compile** (`Route`). A base's `subtypes` is its whole family, so a
 tag reaches a type any levels down, or an alias of one, in one step. A route holds two readers because §3.3's forms want

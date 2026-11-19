@@ -98,8 +98,8 @@ class ConstructionOnTheWrittenFormTest {
 
         assertEquals(fieldType(linked, "s", "f"), fieldType(linked, "k", "f"));
         assertEquals(fieldType(linked, "k", "f"), fieldType(linked, "wt", "f"));
-        MapBody open = assertInstanceOf(MapBody.class, ((TypeInline) fieldType(linked, "w", "f")).of());
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, ((TypeInline) open.valueType()).of());
+        MapBody overParameter = assertInstanceOf(MapBody.class, ((TypeInline) fieldType(linked, "w", "f")).of());
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, ((TypeInline) overParameter.valueType()).of());
         ArrayBody inner = assertInstanceOf(ArrayBody.class, ((TypeInline) outer.elementType()).of());
         assertEquals(new ApplyBody(TypeRef.of("box"), List.of(ParamRef.of("T"))).inPlace(), inner.elementType());
     }

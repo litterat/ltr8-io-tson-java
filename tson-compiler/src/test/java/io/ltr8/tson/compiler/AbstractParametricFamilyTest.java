@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * says nothing of the parametric record itself: closing carries it, with the parametric record's selectors, to the record
  * each application denotes. {@code final} is refused on a parametric record, which is applied to be composed (§5.2, §5.10).
  *
- * <p><b>The family it is abstract over is the one {@code SubtypeTemplateFamilyTest} builds</b>: a subtype
+ * <p><b>The family it is abstract over is the one {@code ParametricSubtypeFamilyTest} builds</b>: a subtype
  * parametric record's closed application gets an IS-A edge to its base's instantiation at the same argument, so
  * {@code ok<text>} is a member of {@code result<text>}'s family and not of {@code result<int32>}'s. An
  * abstract parametric record whose family was always empty would be a type nothing could ever stand at.
@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>Every member is the author's declaration.</b> {@code ok_of => ok<text>} is the record {@code ok<text>}
  * closes to, under the name the author wrote (§8.2), so a tag names a member as it names any declared record.
  */
-class AbstractTemplateFamilyTest {
+class AbstractParametricFamilyTest {
 
     private static final String ID = "https://example.test/abstract-template.tn";
 

@@ -6,7 +6,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.compiler.resolver.KindMembers;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RefBody;
@@ -145,7 +145,7 @@ final class DependentFields {
             return; // not a reference at all: the field-value check refuses it as a value of the wrong type
         }
         Top target = namespace.get(AliasChain.terminal(type.name(), namespace));
-        if (target != null && OpenEntry.isOpen(target)) {
+        if (target != null && ParametricEntry.isParametric(target)) {
             throw new SchemaValidationException(about + ", whose " + noun + " '" + type.text() + "' is a parametric "
                     + "record -- no value is read against a parametric record until it is applied, so an instance "
                     + "omitting the sibling would have no type to read by; name a type, or an application this schema "

@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * selector on a parametric record are each application's, so an abstract parametric record's application is itself a family
  * base, over the declarations composing it.
  */
-class TemplateIsNotATypeTest {
+class ParametricRecordIsNotATypeTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
@@ -55,8 +55,8 @@ class TemplateIsNotATypeTest {
         return problems;
     }
 
-    private static boolean refusedAsATemplate(List<Diagnostic> problems, String template) {
-        return problems.stream().anyMatch(d -> d.message().contains("'" + template + "'")
+    private static boolean refusedAsAParametricRecord(List<Diagnostic> problems, String record) {
+        return problems.stream().anyMatch(d -> d.message().contains("'" + record + "'")
                 && d.message().contains("is a parametric record")
                 && d.message().contains("a parametric record is not a type"));
     }
@@ -96,7 +96,7 @@ class TemplateIsNotATypeTest {
                       pet    => abstract <V> { kind: text =?  value: V }
                       dogpet => pet<text> & { kind?: = "dog" }
                     """ + "  " + holder + "\n");
-            assertTrue(refusedAsATemplate(problems, "pet"), () -> holder + ": " + problems);
+            assertTrue(refusedAsAParametricRecord(problems, "pet"), () -> holder + ": " + problems);
         }
     }
 
@@ -106,7 +106,7 @@ class TemplateIsNotATypeTest {
      */
     @Test
     void aParametricRecordNamedBareInsideAParametricRecordIsRefused() {
-        assertTrue(refusedAsATemplate(load("b-inner", """
+        assertTrue(refusedAsAParametricRecord(load("b-inner", """
                   chain => <T> { head: T  tail?: chain? }
                 """), "chain"));
     }
@@ -181,8 +181,8 @@ class TemplateIsNotATypeTest {
                   texts  => arr<text>
                 """);
 
-        for (String template : List.of("box", "pet", "arr")) {
-            assertEquals(List.of(), TypeChain.subtypesOf(schema.schema().entries().get(template)), template);
+        for (String record : List.of("box", "pet", "arr")) {
+            assertEquals(List.of(), TypeChain.subtypesOf(schema.schema().entries().get(record)), record);
         }
         assertEquals(List.of(), TypeChain.supertypesOf(schema.schema().entries().get("a_box")));
     }
@@ -231,8 +231,8 @@ class TemplateIsNotATypeTest {
         assertEquals(RecordExtensionType.ABSTRACT, base.extension());
         assertEquals(List.of("kind"), base.discriminators());
         assertEquals(List.of("tcat", "tdog"), TypeChain.subtypesOf(base).stream().sorted().toList());
-        RecordBody template = (RecordBody) schema.schema().entries().get("tpet");
-        assertEquals(List.of(), TypeChain.subtypesOf(template));
+        RecordBody record = (RecordBody) schema.schema().entries().get("tpet");
+        assertEquals(List.of(), TypeChain.subtypesOf(record));
         assertFalse(TypeChain.supertypesOf(schema.schema().entries().get("tdog")).contains("tpet"));
     }
 

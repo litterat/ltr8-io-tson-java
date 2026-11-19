@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Nothing reads it back specially: {@code discriminators} is a declared kernel member, so the
  * constructor's own reader binds it with the rest of the body, exactly as it binds the pins beside it.
  */
-class TemplateDiscriminatorTest {
+class ParametricRecordDiscriminatorTest {
 
     private static final String ID = "https://example.test/template-discriminator.tn";
 

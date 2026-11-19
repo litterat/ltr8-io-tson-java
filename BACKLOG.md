@@ -72,11 +72,11 @@ spec-required case:
 - [ ] **A parametric record's own references are judged only where it is applied** ([TSON-SCHEMA] §5.10, §3.3). A
   parametric record is read at its declaration, and a name its fields or parents write that is neither one of its parameters
   nor an entry is an unresolved reference there; the linker checks only arity over a parametric record
-  (`TsonSchemaLinker.checkOpenArity`), so `box => <T> { v: T  w: no_such_type }` gets its verdict at each application,
+  (`TsonSchemaLinker.checkParametricArity`), so `box => <T> { v: T  w: no_such_type }` gets its verdict at each application,
   retargeted to `box` (`heldDeclarationNaming`), and none while nothing applies it. Judge the references that are no
   `ParamRef` with `validateTypeRef` at the declaration, and add a `schema/invalid` vector for the unapplied case.
 - [ ] **An application through an alias of a parametric record is pinned at a composition operand alone** ([TSON-SCHEMA]
-  §8.3). It applies the parametric record (`TemplateMaterialiser.templateHead`: `bx<text>` over `bx => box` closes to the
+  §8.3). It applies the parametric record (`ParametricMaterialiser.parametricHead`: `bx<text>` over `bx => box` closes to the
   record `box<text>` closes to), and the corpus holds that at an operand, `box_of<text> & { … }`. Add a
   `schema/valid` vector for one at a declaration and one at a field's type, with the expected resolved form.
 - [ ] **No vector pins a parameter at a facet** ([TSON-SCHEMA] §5.10). §5.10 refuses a parameter at a facet as at a

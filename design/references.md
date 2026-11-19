@@ -5,7 +5,7 @@ judgement are, and which kernel slot is typed by what. Current form only; histor
 is one reference atom with a constructor an ordinary record type (§4.1, §4.2). A reference is a name: an application
 is no value of that atom but the construction `meta.apply` (`ApplyBody`) written in place (§5.10). Inside a parametric record
 a reference may also be one of the record's parameters, written as its name and looked up in `parameters` before the
-namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an application's arguments.
+namespace (`ParamRef`, `design/parametric-records.md`), at a type slot or among an application's arguments.
 
 **Invariants**
 
@@ -40,7 +40,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   equality and `toString` exclude it (`RefBody.memberNames()` is the processor's own).
 - `of` names any type or constructor of the writer's namespace. It is a `TypeRef` at a slot that holds a name alone
   (§4.2): an application there, `!meta.ref { of: box<text> }` or `meta.ref<box<text>>`, is refused, to be
-  declared under a name and named (`TypeSlots`' reference arm, `TemplateMaterialiser.nameRequired`), so a resolved `of`
+  declared under a name and named (`TypeSlots`' reference arm, `ParametricMaterialiser.nameRequired`), so a resolved `of`
   is a name. Refused too are a name resolving to nothing (an unresolved reference), a parametric record and a value entry
   (`KindMembers.ofRefusal`, from `validateBody`). `meta.ref<meta.top>` holds every type. `meta.ref<meta.alias>`
   admits nothing, no entry past its hops being an alias, and a required field typed by it is refused by §5.10.1's
@@ -134,7 +134,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   IS-A nothing holds a value of `meta.record` by the one predicate. `TypeChain.isConstructor` answers a different question,
   applicability, and counts `meta.top` by name and origin.
 - Every parameter is a type parameter, recording its name and the bound it is written with (`Param`); one stands only
-  at a field's type or as an argument of an application there or in a parent (`design/open-records.md`).
+  at a field's type or as an argument of an application there or in a parent (`design/parametric-records.md`).
 - A kind-typed slot whose host component is a `TypeRef` reads through `TypeRefSlotReader`: a bare token through the
   kind's own atom reader (grammar, hygiene; members only where the document is data), recorded with its path and the
   slot's declared type (`TsonReadContext.heldByName`, `TsonSchema.SlotType`). An application is never a value
@@ -185,7 +185,7 @@ namespace (`ParamRef`, `design/open-records.md`), at a type slot or among an app
   hand, carries `Closure.NONE` and names nothing. A schemaless read has no closure at all and keeps a name as a
   `TsonAtom` holding its text (`design/tree-model.md`), with no referent.
 
-Related: `design/linking-and-compilation.md` (the judgements), `design/open-records.md` (parameter positions),
+Related: `design/linking-and-compilation.md` (the judgements), `design/parametric-records.md` (parameter positions),
 `design/namespace-types-and-value-entries.md` (value entries' slots), `design/record-dispatch.md` (the positional form).
 
 **Why two facts, and why the store is positional.** Store and judgement are Strachey's environment and typed
@@ -243,8 +243,8 @@ A namespace type is no exception: `api => !meta.namespace { … }` is an instanc
 | `meta.type_chain.parents`, `application` | reference, `meta.type_ref`, with arguments where open | namespace | a constructor or a record type for an operand; a parametric record or a constructor for a head; an argument at a type parameter a type's name | resolver, `checkArity`, `typeArguments` |
 | `meta.type_chain.supertypes`, `subtypes` | index, `meta.type_ref` | — | — | link |
 | `meta.alias.target` | reference, `meta.type_ref` | namespace | any entry, type or constructor, by resolution; never arguments in a resolved alias | `validateTypeRef` |
-| `meta.param.bound` | reference | namespace | `meta.type_ref`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `TemplateMaterialiser.checkBound` |
-| `meta.record_field.type` | reference, a parameter of a parametric record, or a type in place, `meta.dependent` among them | the record's `parameters`, then namespace; enclosing `fields` for a dependent type's `on` | `meta.type_expr`; a parameter by §5.10's shadowing rule; `on` by §5.2's rules | `validateTypeRef`, `checkOpenArity`, `DependentFields` |
+| `meta.param.bound` | reference | namespace | `meta.type_ref`; the argument is judged IS-A `bound` at the application | `ParameterTypes`, `ParametricMaterialiser.checkBound` |
+| `meta.record_field.type` | reference, a parameter of a parametric record, or a type in place, `meta.dependent` among them | the record's `parameters`, then namespace; enclosing `fields` for a dependent type's `on` | `meta.type_expr`; a parameter by §5.10's shadowing rule; `on` by §5.2's rules | `validateTypeRef`, `checkParametricArity`, `DependentFields` |
 | `meta.tuple_element.element_type`, `meta.array.element_type`, `meta.map.key_type`, `meta.map.value_type`, `meta.namespace.value_type`, `meta.choice.variants` | reference | namespace | `meta.type_ref`; variants distinct and none void | `validateTypeRef`, `checkVariants*` |
 | `meta.record_field.value` at a kind-typed slot, a namespace type's `key_type` and `value_type` among them | reference (typed `type!`, so read against the field's own `type`) | namespace | member of the slot's kind | `checkKindValue` |
 | `meta.record.discriminators`, `meta.field_group.members` | reference by key | enclosing `fields` | a key of it | linker |

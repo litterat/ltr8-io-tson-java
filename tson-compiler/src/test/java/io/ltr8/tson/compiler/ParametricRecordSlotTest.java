@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * type or as an argument of an application. Anywhere else -- a field's value, a scalar slot of any constructor -- is
  * refused at the declaration, naming the slot, and a parameter is never itself the operand of {@code &} or {@code ^}.
  */
-class RecordTemplateSlotTest {
+class ParametricRecordSlotTest {
 
     private static final String ID = "https://example.test/record-template-slots.tn";
 

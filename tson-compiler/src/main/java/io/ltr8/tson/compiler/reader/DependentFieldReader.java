@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.resolver.AliasChain;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.Top;
@@ -86,7 +86,7 @@ public final class DependentFieldReader implements TsonTypeReader<Object> {
                 if (entries != null && body == null) {
                     yield new TypeNamed.None("'" + reference.text() + "', which names no type of this schema");
                 }
-                if (body != null && OpenEntry.isOpen(body)) {
+                if (body != null && ParametricEntry.isParametric(body)) {
                     yield new TypeNamed.None("'" + reference.text() + "', a parametric record, which no value is read "
                             + "against until it is applied");
                 }

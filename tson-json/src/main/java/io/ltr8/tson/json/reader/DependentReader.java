@@ -5,7 +5,7 @@ import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.Top;
@@ -65,7 +65,7 @@ final class DependentReader implements JsonTypeReader<Object> {
                         .orElse(null);
                 if (body == null) {
                     refusal = "'" + reference.text() + "', which names no type this schema closes";
-                } else if (OpenEntry.isOpen(body)) {
+                } else if (ParametricEntry.isParametric(body)) {
                     refusal = "'" + reference.text() + "', a parametric record, which no value is read against until it is "
                             + "applied";
                 }

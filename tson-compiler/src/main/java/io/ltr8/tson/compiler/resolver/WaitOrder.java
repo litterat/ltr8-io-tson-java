@@ -12,7 +12,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
 import io.ltr8.tson.compiler.reader.PendingTypeReader;
 import io.ltr8.tson.schema.meta.Alias;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.ArrayList;
@@ -232,7 +232,7 @@ final class WaitOrder implements DefinitionGetter {
             Top ready = entries.get(at);
             if (ready != null) {
                 if (!(ready instanceof Alias alias)) {
-                    return OpenEntry.isOpen(ready);
+                    return ParametricEntry.isParametric(ready);
                 }
                 at = alias.target().name();
                 continue;

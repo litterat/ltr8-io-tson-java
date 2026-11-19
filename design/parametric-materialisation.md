@@ -1,20 +1,20 @@
 # Materialising a parametric record, and regularity
 
-§5.10's closing pass and §5.10.1's regularity check: how `TemplateMaterialiser` turns an application of a parametric record
+§5.10's closing pass and §5.10.1's regularity check: how `ParametricMaterialiser` turns an application of a parametric record
 into an entry — identity, declared applications, operands and on-demand closing, the IS-A edges closing feeds, how `kind` is
 derived — and the static check that runs before any of it.
 
 **Invariants**
 
 - The pass order in `SchemaResolver` is fixed: the driving loop resolves every declaration, then
-  `TemplateRegularity.check`, then `ParameterTypes.check`, `HeldRecursion` and `checkDeferred`, then `materialise`,
+  `ParametricRegularity.check`, then `ParameterTypes.check`, `HeldRecursion` and `checkDeferred`, then `materialise`,
   then `appliedParentEdges` and `closeChains`. Every step reads what the one before it settled.
 - **Nothing is minted.** An application is closed where it stands, or closes into the declaration that names it, or
   is reported; no entry is added under a name derived from content or from the application.
 - A parametric record that fails the regularity check, or whose parameters stand where none may, is replaced with the
   error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
   application's head resolves).
-- The pass runs over the **resolved** form through `schema.meta.TypeSlots`. In a parametric record (`openRewrite`) it
+- The pass runs over the **resolved** form through `schema.meta.TypeSlots`. In a parametric record (`parametricRewrite`) it
   closes each application that names none of its parameters and leaves each over one for substitution.
 - **Every application it meets applies a parametric record**, or a head nothing names. A constructor's application is
   its construction before anything is read (`ConstructionRewrite`, `design/constructor-application.md`), so
@@ -62,12 +62,12 @@ derived — and the static check that runs before any of it.
 - No application is IS-A its head (§5.10): its edges are what its head's written parents reach, each closed
   parent through `Ancestry`, and an applied parent through the fold to the declaration that application denotes.
 
-Related: `design/open-records.md` (what a parametric record is, where a parameter stands, bounds and argument
+Related: `design/parametric-records.md` (what a parametric record is, where a parameter stands, bounds and argument
 checks), `design/schema-resolution.md` (chains, applied parents),
 `design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `CanonicalApplication`, `TypeSlots`, `@meta.application`),
 `design/constructor-application.md`, `design/linking-and-compilation.md`.
 
-## Materialisation (`tson-compiler/.../resolver/TemplateMaterialiser.java`)
+## Materialisation (`tson-compiler/.../resolver/ParametricMaterialiser.java`)
 
 - **Arguments are dereferenced before an application closes** (`dereferenced`). A reference is a pure rename (§8.3:
   "a reference is the same type under another name"), so `box<user_id>` over `user_id => uuid` *is* `box<uuid>`
@@ -116,7 +116,7 @@ checks), `design/schema-resolution.md` (chains, applied parents),
   §5.10.1), so regular recursion ties on its first repeat or stops there, and nothing nests without bound.
 - **Substitution changes no field fact, and reaches every type slot.** A field's value is never a parameter (§5.10),
   so replacing each `ParamRef` with its argument, at any depth of types written in place, is the whole of it
-  (`Substitution`, in `closeOpenRecord`): every field's type is then closed by the same walk, each application at a
+  (`Substitution`, in `closeParametricRecord`): every field's type is then closed by the same walk, each application at a
   slot of it -- `box<T>` at a field, in `[box<T>]` or in `{ c: box<T> }` -- closed now that
   the parameter is bound, and nothing is written out or read back. One walk serves every body kind
   (`schema.meta.TypeSlots`), so a record in place, a container, a tuple and a choice need no case each. The result is a
@@ -133,7 +133,7 @@ checks), `design/schema-resolution.md` (chains, applied parents),
   as an unresolved reference; a head stripped of its arguments would instead be faulted for supplying none, the
   opposite of what the author wrote (`'box<some_typo>' field 'v' has an unresolved reference 'some_typo'`).
 - **Argument checking.** Arity is checked first, against the head's own `parameters`. Each argument is then
-  checked against the parameter it binds (`checkArguments`; `design/open-records.md` has the rule): it must
+  checked against the parameter it binds (`checkArguments`; `design/parametric-records.md` has the rule): it must
   name a type that IS-A the parameter's bound. A literal argument (`box<3>`) never reaches here: an argument is a
   reference, and the grammar refuses a literal token where it is written (`TsonSchemaParser`, `ReferenceGrammar`,
   `TsonDataStream`).
@@ -144,18 +144,18 @@ checks), `design/schema-resolution.md` (chains, applied parents),
 
 A composition operand (§5.8) needs its *fields* while a declaration resolves, before the batch pass runs.
 
-- **A composition operand never closes, open or closed** (`DefinitionResolver.openOperand`): it is absorbed by
+- **A composition operand never closes, open or closed** (`DefinitionResolver.parametricOperand`): it is absorbed by
   value (§5.8). The operand, a parametric record, is substituted on the model with
   the arguments as written (`Substitution.fields`), an argument naming the absorbing declaration's own parameter
   landing as that declaration's name for it, which its own record holds as its parameter in turn; the fields are
   absorbed, the operand contributes its head's
-  ancestors (`Ancestry.ofTemplate`) and not its own name, and the application is kept in the declaration's
+  ancestors (`Ancestry.ofApplication`) and not its own name, and the application is kept in the declaration's
   `parents`, arguments and all. The arguments still need §5.10's bound check, which closing would have given them, so
-  `openOperand` calls `ApplicationCloser.checkArguments`, deferred like every check asked for during resolution
-  (`design/open-records.md`, "The call-site check").
+  `parametricOperand` calls `ApplicationCloser.checkArguments`, deferred like every check asked for during resolution
+  (`design/parametric-records.md`, "The call-site check").
   - **Open** (`vip => <T> customer & box<T>`): the parametric record writes `box<T>` as a parent, and it is substituted
     with everything else when `vip` is applied. Closing builds the chain from those parents (`Ancestry.chainOf`, in
-    `closeOpenRecord`), the fold turns `box<text>` into the edge to the entry that application denotes, and
+    `closeParametricRecord`), the fold turns `box<text>` into the edge to the entry that application denotes, and
     `closeChains` drops the parents. A closed `vip<text>` therefore stands where `customer`, `base` and `box<text>`
     are expected, the same entry the hand-written `customer & box<text>` reaches. The parent is carried as a
     reference rather than as the head name §5.8 describes because the edge is to `box<text>` and not to
@@ -165,29 +165,29 @@ A composition operand (§5.8) needs its *fields* while a declaration resolves, b
     typed `pet` dispatches to it), and the application kept in the chain is folded like any other, to the entry
     `pet_of<dog_type>` denotes where one exists. No edge is stated to the head: a parametric record is no type (§5.10).
     A removal empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
-- **An operand's head is followed past its alias hops** (`Ancestry.templateHead`, §8.3): over `pet_of => pet_box`,
+- **An operand's head is followed past its alias hops** (`Ancestry.parametricHead`, §8.3): over `pet_of => pet_box`,
   `pet_of<text>` at `&`, and `<T> pet_of<T> & { … }`, apply `pet_box` and are absorbed as `pet_box<text>` is.
-  The one rule serves every place an applied head is read: `openOperand`, `Ancestry.ofTemplate` when a chain is
+  The one rule serves every place an applied head is read: `parametricOperand`, `Ancestry.ofApplication` when a chain is
   built, the materialiser's closing, and the fold, which keys a parent written through the alias on the parametric record's
   application, so its edge still names the declaration of it. The
   parent itself stays as written. `InlineTypeRulesTest.anApplicationThroughAnAliasIsAbsorbedAtAnOperand` pins it.
 - **The cycle guard still applies.** An operand's head resolves through the resolution's `WaitOrder`,
   where an entry waiting on itself is refused, so a cycle reached through an application
   (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on
-  'a'`) rather than recursing (`RecordTemplateTest.aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle`).
+  'a'`) rather than recursing (`ParametricRecordTest.aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle`).
 - **An argument is a name or a parameter** (§5.3): an operand's argument list holds no application, refused where the
   operand resolves (`DefinitionResolver.typeArguments`).
 - **What an operand may not be.** Each is refused at the declaration that writes it:
   - a parameter as a head, `<T> { v: T<text> }` (`SchemaResolver.refuseHeadAbstraction`, over the parametric record's
-    applications, `OpenEntry.applications`): §5.10 admits no head abstraction. The linker's arity check reads the
+    applications, `ParametricEntry.applications`): §5.10 admits no head abstraction. The linker's arity check reads the
     same references, but
     materialisation runs first and removes the parameter, leaving a verdict against a name nobody typed;
   - a parameter as an operand, `<T> T & { … }` or `<T> T ^ { … }` (`DefinitionResolver.refuseParameterOperand`,
     §5.8): a parameter has no field set until applied. The check runs before the name is looked up, so a parameter
     shadows an entry of the same name;
-  - a constructor applied to a parameter, `<T> customer & meta.array<T>` (`openOperand`): a construction is a
+  - a constructor applied to a parameter, `<T> customer & meta.array<T>` (`parametricOperand`): a construction is a
     binding record with no fields to contribute, the verdict its closed spelling gets once it closes;
-  - a parametric record named without arguments, `x => box & { … }` (`DefinitionResolver.refuseUnappliedTemplate`): a
+  - a parametric record named without arguments, `x => box & { … }` (`DefinitionResolver.refuseUnappliedParametricRecord`): a
     parametric record is no type, and has fields only once its parameters are bound. Every other bare naming of a
     parametric record -- a field, element, map key or value, tuple position, choice variant or argument -- is the linker's
     arity check (`TsonSchemaLinker.checkArity`), refused against the declaration that wrote it.
@@ -206,7 +206,7 @@ A composition operand (§5.8) needs its *fields* while a declaration resolves, b
   declared constructor's does. A parametric record is never constructed, whatever its chain reaches:
   `ConstructionSugar.constructs` excludes it, so `listed<text>` substitutes.
 
-## Regularity of a parametric record (`tson-compiler/.../resolver/TemplateRegularity.java`)
+## Regularity of a parametric record (`tson-compiler/.../resolver/ParametricRegularity.java`)
 
 §5.10.1's regularity rule, checked over the resolved entries before anything materialises: **within a parametric record's
 body, a recursive application — direct or mutual — must pass each parameter through unchanged.**
@@ -221,11 +221,11 @@ body, a recursive application — direct or mutual — must pass each parameter 
   refused at its declaration rather than at whichever application meets it.
 - **Mutual recursion needs reachability, not a self-edge**: neither parametric record in an `a → b → a` cycle applies
   itself, so an application is checked whenever its head can reach the declaration it sits in. The applications
-  come from the parametric record's type slots (`OpenEntry.applications`), at any depth of a type in place
+  come from the parametric record's type slots (`ParametricEntry.applications`), at any depth of a type in place
   (`TypeSlots.applications`), so `kids?: [tree<T>]` is judged as `next?: tree<T>` is.
 - **Deliberately stricter than termination requires**: positional identity is the restriction §5.10.1 names, and an
   over-restriction simple to state can be loosened later where the reverse cannot.
-  `TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate` pins it.
+  `ParametricRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate` pins it.
 - **Arity is not checked here**; the linker checks it over a parametric record's references (`TsonSchemaLinker`, §5.10), so
   this compares positionally only where the arity already matches.
 - **A condemned parametric record does not reach materialisation.** `check` returns the names it rejected and

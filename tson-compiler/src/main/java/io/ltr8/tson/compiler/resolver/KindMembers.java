@@ -2,10 +2,10 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Extern;
-import io.ltr8.tson.schema.meta.OpenEntry;
 
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -106,7 +106,7 @@ public final class KindMembers {
                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
         // An extern is a member where the entry it lands on is, which only a caller holding the link can judge.
-        if (type == null || OpenEntry.isOpen(type) || type instanceof Alias || type instanceof Extern
+        if (type == null || ParametricEntry.isParametric(type) || type instanceof Alias || type instanceof Extern
                 || type instanceof ValueEntry || type instanceof IncompleteEntry) {
             return false;
         }
@@ -150,7 +150,7 @@ public final class KindMembers {
             return Optional.of("its 'of' names '" + of + "', which is a value and no type -- a reference admits the "
                     + "names of entries whose values are of a type, and nothing has a value of a value");
         }
-        if (OpenEntry.isOpen(definition)) {
+        if (ParametricEntry.isParametric(definition)) {
             return Optional.of("its 'of' names '" + of + "', a parametric record, which denotes no type until it is "
                     + "applied (§5.10)");
         }

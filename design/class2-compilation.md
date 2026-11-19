@@ -16,7 +16,7 @@ choices. Current form only; history lives in git.
   `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile -- but at a
   checkpoint (`compileReady`), where it is the read's that reaches the entry.
 - A parametric record never reaches a factory: a `RecordBody` with `parameters` is no type (§5.10) and compiles
-  to an `OpenTemplateReader`. A value entry (`ValueEntry`) never
+  to a `ParametricRecordReader`. A value entry (`ValueEntry`) never
   reaches one either: it compiles to a `ValueEntryReader`, which refuses a data tag naming it as `TYPE_MISMATCH`.
 - A namespace type compiles through the `map` factory with the map `NamespaceBody.read()` states; the kernel's
   `meta.schema` entry's reader marks its read as a schema document's (`readsSchemaNames`), so a resolved form read as data
@@ -105,7 +105,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   *reading* that entry fails, with the original message preserved. Real causes: a constructor with no
   registered factory — which only a schema's own constructor this library has never seen can be, every
   constructor meta.tn, numeric.tn, temporal.tn and net.tn declare having a factory — or a factory that rejects one entry.
-    - **It reports `NOT_IMPLEMENTED` and skips the value**, the same report-then-skip shape `OpenTemplateReader` uses
+    - **It reports `NOT_IMPLEMENTED` and skips the value**, the same report-then-skip shape `ParametricRecordReader` uses
       (with `TYPE_MISMATCH`) for the entry it refuses — report before consuming so the position names the value, then
       `EventSkip.dataValue` so the stream stays in step. The code, not the channel, is what says this is a gap rather
       than a verdict, which is the same rule the schema pipeline follows: throwing instead would cost the whole read,
@@ -125,12 +125,13 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
       (`design/resolver-vocabulary-and-bootstrap.md`).
   - A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and propagates
     uncaught.
-- **A parametric record never reaches a factory.** `TsonSchemaCompiler.build` asks `OpenEntry.isOpen` before any factory
-  is consulted, and a parametric record becomes an `OpenTemplateReader` (in `tson-json` the `meta.record` factory asks the
-  same of the body, `DispatchFactories.over`): a parametric record is not a type (§5.10), so there is nothing a value could
-  validate against, and the record factories, which take a `RecordBody`, would otherwise build a reader over its parameters.
+- **A parametric record never reaches a factory.** `TsonSchemaCompiler.build` asks `ParametricEntry.isParametric`
+  before any factory is consulted, and a parametric record becomes a `ParametricRecordReader` (in `tson-json` the
+  `meta.record` factory asks the same of the body, `DispatchFactories.over`): a parametric record is not a type (§5.10),
+  so there is nothing a value could validate against, and the record factories, which take a `RecordBody`, would
+  otherwise build a reader over its parameters.
   A family declared through a parametric record is read at its base, a record.
-- **`OpenTemplateReader` reports `TYPE_MISMATCH` against the data and skips the value**, like any other
+- **`ParametricRecordReader` reports `TYPE_MISMATCH` against the data and skips the value**, like any other
   reader finding data the schema does not admit. Reaching it is **always** a data error: a *schema* naming
   any parametric record without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
   element or supertype routes here — only a data type-ref naming the parametric record, `!paged` against `paged =>

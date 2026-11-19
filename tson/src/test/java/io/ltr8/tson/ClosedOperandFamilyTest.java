@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * discriminators where the base states them, by a tag where it states none.
  *
  * <p>The sibling shape, where the argument is the declaration's own parameter ({@code ok => <T> result<T> &
- * { … }}), is {@code SubtypeTemplateFamilyTest}'s: that operand stays open, the declaration is held, and each
+ * { … }}), is {@code ParametricSubtypeFamilyTest}'s: that operand stays open, the declaration is held, and each
  * instantiation derives its own edge as it closes.
  */
 class ClosedOperandFamilyTest {

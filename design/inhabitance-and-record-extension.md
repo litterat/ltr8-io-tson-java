@@ -24,11 +24,11 @@ check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extensi
 - Every family in the closure is judged; a pin collision only the merge produced is reported against the schema
   (`""`), naming both origins.
 - A family member is declared: an application at a use site whose record in place would compose onto a declared type
-  is refused before linking (`TemplateMaterialiser.refuseMembership`).
+  is refused before linking (`ParametricMaterialiser.refuseMembership`).
 - Pins compare as values (`ValueIdentity`), read at the base's declared type.
 
 Related: `design/linking-and-compilation.md` (the link order), `design/schema-resolution.md` (marks and parametric record
-families), `design/template-materialisation.md` (`refuseMembership`), `design/record-dispatch.md`,
+families), `design/parametric-materialisation.md` (`refuseMembership`), `design/record-dispatch.md`,
 `design/choice-disjointness.md`.
 
 ## The inhabitance check (`TypeInhabitance`)
@@ -102,7 +102,7 @@ usable and its members pin them distinctly, and every member is declared.
   refused when it linked.
 - **Extending a family is a declaration** (§5.2). An application at a use site whose record in place would compose
   onto a declared type (`k: dog_of<text>`, or `dog_of<T>` held in a parametric record's body and closed by a declaration) is
-  refused before linking, with the application in hand (`TemplateMaterialiser.refuseMembership`), at the declaration
+  refused before linking, with the application in hand (`ParametricMaterialiser.refuseMembership`), at the declaration
   that wrote it or whose application closed it. A member is what a read reports, a tag names and a binding maps, all
   by name, so every member `RecordExtension` judges is a declaration.
   A parametric record is in no `subtypes` index (the linker credits no open entry), so a parametric record

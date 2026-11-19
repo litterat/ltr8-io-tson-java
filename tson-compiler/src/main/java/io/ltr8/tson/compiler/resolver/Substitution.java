@@ -17,7 +17,7 @@ import java.util.Map;
  * stands only at a slot of a field's type ({@link TypeSlots}) or as an argument of an application there or in a parent,
  * so those references are all substitution visits.
  *
- * <p><b>Two callers, one rule.</b> {@code TemplateMaterialiser} closes an application, where every argument is closed;
+ * <p><b>Two callers, one rule.</b> {@code ParametricMaterialiser} closes an application, where every argument is closed;
  * {@code DefinitionResolver} absorbs an applied operand, where an argument may be one of the absorbing declaration's
  * own parameters, written as its name, which that declaration's record then holds as its parameter in turn.
  */

@@ -2,11 +2,10 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ApplyBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeSlots;
 
@@ -92,12 +91,12 @@ final class HeldRecursion {
 
     private Optional<SchemaValidationException> judge(String name) {
         Top record = lookup.apply(name);
-        if (!OpenEntry.isOpen(record)) {
+        if (!ParametricEntry.isParametric(record)) {
             return Optional.empty();
         }
         for (Held held : held(name)) {
             if (!held.head().equals(name) && onCycleAvoiding(held.head(), name)) {
-                return Optional.of(refused(name, OpenEntry.parameterNames(record), held));
+                return Optional.of(refused(name, ParametricEntry.parameterNames(record), held));
             }
         }
         return Optional.empty();
@@ -127,7 +126,7 @@ final class HeldRecursion {
             return known;
         }
         List<Held> found = new ArrayList<>();
-        if (lookup.apply(name) instanceof RecordBody record && record.isOpen()) {
+        if (lookup.apply(name) instanceof RecordBody record && record.isParametric()) {
             record.fields().forEach((field, declared) -> heldIn(field, declared, found));
         }
         heldBy.put(name, found);
@@ -142,7 +141,7 @@ final class HeldRecursion {
     private void heldIn(String field, RecordField declared, List<Held> found) {
         TypeSlots.applications(declared.type(), application -> {
             String head = AliasChain.terminal(application.head().name(), lookup);
-            if (OpenEntry.isOpen(lookup.apply(head))) {
+            if (ParametricEntry.isParametric(lookup.apply(head))) {
                 boolean whole = declared.type() instanceof TypeInline inline && inline.of() == application;
                 found.add(new Held(field, whole, application, head));
             }
@@ -154,7 +153,7 @@ final class HeldRecursion {
         boolean closed = held.written().arguments().stream()
                 .noneMatch(argument -> parameters.contains(argument.name()));
         String declared = closed
-                ? TemplateMaterialiser.suggestedName(held.written()) + " => " + held.written().text()
+                ? ParametricMaterialiser.suggestedName(held.written()) + " => " + held.written().text()
                 : "my_" + held.written().head().segments().getLast() + " => " + held.written().head().name() + "<"
                         + String.join(" ", held.written().arguments().stream().map(argument -> "...").toList()) + ">";
         String spelled = held.written().text();

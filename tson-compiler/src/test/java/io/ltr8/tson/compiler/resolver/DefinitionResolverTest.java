@@ -42,7 +42,7 @@ import io.ltr8.tson.schema.net.IriType;
 import io.ltr8.tson.schema.net.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
@@ -486,7 +486,7 @@ class DefinitionResolverTest {
         Top frame = resolveSnippet("frame => [text; 1920]");
 
         assertInstanceOf(ArrayBody.class, frame);
-        assertEquals(List.of(), OpenEntry.parameterNames(frame));
+        assertEquals(List.of(), ParametricEntry.parameterNames(frame));
         assertEquals(List.of(), TypeChain.supertypesOf(frame));
         assertEquals(Optional.of("meta.array"), snippetFacts.get("frame").constructor(),
                 "the constructor the application closes at, not the template it was spelled through");
@@ -540,7 +540,7 @@ class DefinitionResolverTest {
         RecordBody pair = assertInstanceOf(RecordBody.class,
                 resolveSnippet("pair => <A, B> { first: A  second: B }"));
 
-        assertEquals(List.of("A", "B"), OpenEntry.parameterNames(pair));
+        assertEquals(List.of("A", "B"), ParametricEntry.parameterNames(pair));
         assertEquals(ParamRef.of("A"), pair.fields().get("first").type());
         assertEquals(ParamRef.of("B"), pair.fields().get("second").type());
         assertEquals(RecordExtensionType.OPEN, pair.extension(), "each application's");
@@ -577,7 +577,7 @@ class DefinitionResolverTest {
         RecordBody box = assertInstanceOf(RecordBody.class,
                 resolver.resolve(schemaMap.declarations().get("box")));
 
-        assertEquals(List.of("T"), OpenEntry.parameterNames(box));
+        assertEquals(List.of("T"), ParametricEntry.parameterNames(box));
         assertEquals(List.of("base"), TypeChain.supertypesOf(box), "a parametric record is IS-A what its parents reach");
         assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(box), "and keeps them as written");
         assertEquals(ParamRef.of("T"), box.fields().get("value").type());
@@ -724,7 +724,7 @@ class DefinitionResolverTest {
 
         Top array = resolver.resolve(schemaMap.declarations().get("meta.array"));
 
-        assertEquals(List.of(), OpenEntry.parameterNames(array), "the container constructors carry no parameters");
+        assertEquals(List.of(), ParametricEntry.parameterNames(array), "the container constructors carry no parameters");
         assertTrue(TypeChain.supertypesOf(array).contains("meta.top"), "a constructor: IS-A meta.top");
         assertEquals(List.of("meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(array));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.product\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
@@ -756,7 +756,7 @@ class DefinitionResolverTest {
 
         Top map = resolver.resolve(schemaMap.declarations().get("meta.map"));
 
-        assertEquals(List.of(), OpenEntry.parameterNames(map), "the container constructors carry no parameters");
+        assertEquals(List.of(), ParametricEntry.parameterNames(map), "the container constructors carry no parameters");
         assertTrue(TypeChain.supertypesOf(map).contains("meta.top"), "a constructor: IS-A meta.top");
         assertEquals(List.of("meta.product", "meta.top", "meta.type"), TypeChain.supertypesOf(map));
         assertEquals("{ chain: { parents: [] supertypes: [ \"meta.product\" \"meta.top\" \"meta.type\" ] subtypes: [] } "
@@ -2338,10 +2338,10 @@ class DefinitionResolverTest {
         Top box = resolveSnippetsAgainstMetaKernel(
                 "box => <T> { kind: text =?  v: T }");
 
-        RecordBody open = assertInstanceOf(RecordBody.class, box);
-        assertEquals(List.of("T"), open.parameterNames());
-        assertEquals(RecordExtensionType.ABSTRACT, open.extension(), "derived from the selector, each application's");
-        assertEquals(List.of("kind"), open.discriminators());
+        RecordBody record = assertInstanceOf(RecordBody.class, box);
+        assertEquals(List.of("T"), record.parameterNames());
+        assertEquals(RecordExtensionType.ABSTRACT, record.extension(), "derived from the selector, each application's");
+        assertEquals(List.of("kind"), record.discriminators());
     }
 
     /**
@@ -2362,7 +2362,7 @@ class DefinitionResolverTest {
      * constrains the marked type alone -- no direct instances -- which holds of every instantiation
      * identically, so {@code result => abstract <T> { … }} is meaningful and is what a host language spells
      * {@code abstract class Result<T>}. It is the parametric record's own {@code extension}, each application's;
-     * {@code SubtypeTemplateFamilyTest} is where the closed end is checked.
+     * {@code ParametricSubtypeFamilyTest} is where the closed end is checked.
      */
     @Test
     void aParametricRecordIsAbstractByMarkingItsRecord() {

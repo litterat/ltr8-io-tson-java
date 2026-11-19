@@ -300,7 +300,7 @@ class FieldNameTypeTest {
      */
     @Test
     void aParametricRecordHoldsAndClosesNamesThatAreNoIdentifiers() {
-        String templates = schema("templates", """
+        String records = schema("templates", """
                   json_name => !unicode.identifier_type { start_add: "@" }
                   json_record => !meta.record { name_type: json_name  extension: ABSTRACT  fields: {} }
                   page => <T> json_record & { "@id": T  "@type"?: text }
@@ -309,8 +309,8 @@ class FieldNameTypeTest {
                   row => <T> !meta.record { name_type: words  fields: { "first name" => { type: T } } }
                   r => row<text>
                 """);
-        assertEquals(List.of(), read(templates, "templates", "!p { \"@id\": \"x\" }"));
-        assertEquals(List.of(), read(templates, "templates", "!r { \"first name\": \"Ada\" }"));
+        assertEquals(List.of(), read(records, "templates", "!p { \"@id\": \"x\" }"));
+        assertEquals(List.of(), read(records, "templates", "!r { \"first name\": \"Ada\" }"));
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("plain-template", """
                       box => <T> { "@id": T }

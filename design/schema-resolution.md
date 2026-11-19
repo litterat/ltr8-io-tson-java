@@ -52,7 +52,7 @@ applications, field facts and refinement, groups, subtraction, and the exception
 - No entry carries a kind (§5.5), and nothing asks which base kind a chain reaches. Two are refused by no check of
   their own: each base kind holds `meta.type`'s `chain`, so the composition is a diamond (§5.8).
 - No entry is IS-A a parametric record (§5.10): an application's edges are its head's written parents'. A use-site
-  application whose record in place would be IS-A a declared type is refused (`TemplateMaterialiser.refuseMembership`,
+  application whose record in place would be IS-A a declared type is refused (`ParametricMaterialiser.refuseMembership`,
   §5.2).
 - Subtraction runs last and empties the chain (every supertype goes); nothing is kept in its place.
 - **A dependent field's rules are the link's, over the flattened record** (`DependentFields`, [TSON-SCHEMA] §5.2): the
@@ -67,7 +67,7 @@ applications, field facts and refinement, groups, subtraction, and the exception
 
 Related: `design/constructor-application.md` (what `!C { … }` may apply and how its head resolves),
 `design/atom-refinement-and-coherence.md` (atom refinement's merge, narrowing and coherence),
-`design/template-materialisation.md` and `design/open-records.md` (§5.10 closing, applied-parent edges),
+`design/parametric-materialisation.md` and `design/parametric-records.md` (§5.10 closing, applied-parent edges),
 `design/resolver-vocabulary-and-bootstrap.md` (`WireForm`/`TypeSlots`/`CanonicalApplication`, alias hops,
 `@meta.application`, the kernel's bootstrap), `design/namespace-types-and-value-entries.md` (value entries),
 `design/schema-grammar-and-desugaring.md`, `design/linking-and-compilation.md`.
@@ -87,7 +87,7 @@ consults is fixed at construction: two `DefinitionGetter`s, `namespaceDefinition
 `vocabularyDefinitions` where a construction head and an annotation name resolve — the same wait order, except in the
 kernel's ordinary resolution, which resolves heads through its pre-loaded stand-in (§3.4) — the vocabulary's
 compiled reader (`ConstructionReader`) and annotation reader (`AnnotationValueReader`), the `ApplicationCloser` onto the
-schema's one `TemplateMaterialiser`, and the `EntryFacts` map it shares with `SchemaResolver` and the materialiser,
+schema's one `ParametricMaterialiser`, and the `EntryFacts` map it shares with `SchemaResolver` and the materialiser,
 so an atom refinement finds the constructor of a source another schema declared. Its class Javadoc lists the
 shapes it dispatches and the exact exception boundary.
 
@@ -116,7 +116,7 @@ goes through, so an entry is made ready the first time anything asks for it, and
 - **Cycles are the author's error.** An entry reached again while it is being made ready is a
   `SchemaValidationException` naming the cycle in wait order: `'a' waits on 'b' waits on 'a': entries waiting on each
   other are never ready -- …`, or `'step' waits on 'step'`. A composition cycle is this same rule,
-  reached through an application too (`design/template-materialisation.md`). An alias loop is §8.3's reference-chain
+  reached through an application too (`design/parametric-materialisation.md`). An alias loop is §8.3's reference-chain
   refusal, not a wait (`WaitOrderTest.anAliasLoopIsRefusedAsAnAliasChainNotAWaitCycle`).
 - **Wait depth is counted here**, order-independently, and a chain past `LimitsPolicy.maxWaitDepth` refuses its head
   with `LIMIT_EXCEEDED` (`design/processor-policy.md`).
@@ -177,22 +177,22 @@ value is never a parameter (§5.10), so no pin is derived from one. A selector w
 
 **On a parametric record**, `abstract` and a selector are each application's and `final` is refused (§5.2, §5.10). The mark,
 or ABSTRACT derived from a selector as on a record, sets the parametric record's own `extension`, and closing carries it and
-`discriminators` to the record each application denotes (`TemplateMaterialiser.closeOpenRecord`). `final` is
+`discriminators` to the record each application denotes (`ParametricMaterialiser.closeParametricRecord`). `final` is
 refused because a parametric record is applied to be composed, each member of a family composing an application, and the mark
 would forbid that of every application; a final type is a declaration of the application, marked as itself.
 
 ## Parametric records: no type
 
-A parametric record is a `RecordBody` carrying `parameters` (`design/open-records.md`). It is not a type
+A parametric record is a `RecordBody` carrying `parameters` (`design/parametric-records.md`). It is not a type
 (§5.10): no position names it bare (`TsonSchemaLinker.checkArity` at a position,
-`DefinitionResolver.refuseUnappliedTemplate` at an operand), it is in no `subtypes` index, no reference holds it, no
-`FamilySelectors` question treats it as a base, and it compiles to `OpenTemplateReader`, the refusal a data tag naming
+`DefinitionResolver.refuseUnappliedParametricRecord` at an operand), it is in no `subtypes` index, no reference holds it, no
+`FamilySelectors` question treats it as a base, and it compiles to `ParametricRecordReader`, the refusal a data tag naming
 it gets. It is built as a closed record is (`resolveRecordBody`, `resolveComposition`, then
-`Built.finish` with the declaration's parameters), its explicit spelling `<T> !meta.record { … }` through `openRecord`;
+`Built.finish` with the declaration's parameters), its explicit spelling `<T> !meta.record { … }` through `parametricRecord`;
 a parameter in it is the `ParamRef` the record's constructor makes of a name its parameters declare. `checked` refuses
 a field or `name_type` named like a parameter, a selector typed by one and a literal value on a parameter-typed field;
 a parameter spelled like a schema entry is refused by the shadowing rule. A parametric record over any other body is refused
-at its declaration (`SchemaDesugarer.refuseTemplateBody`, `DefinitionResolver.openInstance`).
+at its declaration (`SchemaDesugarer.refuseParametricBody`, `DefinitionResolver.parametricInstance`).
 
 **A family is declared with records.** An abstract record states the selectors and the fields every member shares,
 a parametric record composes it, and each member composes an application and pins the selectors:
@@ -207,13 +207,13 @@ holder => { p: pet }
 **An application's IS-A edges are its head's written parents', and never the head.** Two mechanisms give
 them:
 
-- **A closed parent** reaches every application through the head's own chain (`Ancestry.ofTemplate`): `dog`
+- **A closed parent** reaches every application through the head's own chain (`Ancestry.ofApplication`): `dog`
   IS-A `pet` because `pet_of` writes `pet`, at a closed operand and at a declared application alike.
 - **An applied parent** (§5.8's reference-valued parents). With `result => abstract <T> { payload: T }` and
   `ok => <T> result<T> & { note: text }`, `ok<text>`'s chain keeps `result<text>` in `parents` until
   `appliedParentEdges` folds it into the edge to the declaration naming that application, where one exists
-  (`design/template-materialisation.md`); the linker inverts it, so `result<text>`'s `subtypes` holds `ok<text>` and
-  not `ok<int32>` (`SubtypeTemplateFamilyTest`, `OpenOperandCompositionTest`).
+  (`design/parametric-materialisation.md`); the linker inverts it, so `result<text>`'s `subtypes` holds `ok<text>` and
+  not `ok<int32>` (`ParametricSubtypeFamilyTest`, `OpenOperandCompositionTest`).
 
 A use-site application whose record in place would be IS-A a declared type is refused (`refuseMembership`, §5.2),
 so every family member is declared.
@@ -333,7 +333,7 @@ as written at the read and judged against that type when the schema links (`Held
 `design/linking-and-compilation.md`).
 
 **A literal in a parametric record is judged on the closed type it needs.** A field typed by a parameter, whole or as an
-argument, takes no literal (`refuseLiteralOnOpenType`; in the explicit spelling `refuseLiteralOnParameter` refuses one
+argument, takes no literal (`refuseLiteralOnParameterType`; in the explicit spelling `refuseLiteralOnParameter` refuses one
 beside `type: T` before the payload is bound, so the author reads §5.10's reason and not the reader's). A literal on a
 closed type is judged when the parametric record closes, against the closed field's type (`checkFieldValue`), its §8.2
 hygiene on the parametric record (`TsonSchemaLinker.checkFieldValues`).

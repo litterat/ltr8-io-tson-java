@@ -34,7 +34,6 @@ import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
-import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.SourcePosition;
@@ -86,10 +85,10 @@ import java.util.function.UnaryOperator;
  *
  * <p><b>An application passes through.</b> {@code name&lt;args&gt;} resolves its head in the schema's
  * namespace -- parameters, then locals, then imports -- and is an application of a §5.10 parametric record or, over a
- * constructor, construction sugar (§5.3); {@code TemplateMaterialiser} closes either over the <em>resolved</em>
+ * constructor, construction sugar (§5.3); {@code ParametricMaterialiser} closes either over the <em>resolved</em>
  * form one phase later. What is checked here is the one thing an AST alone decides: a head this document
  * declares with no parameters, and with a body no constructor has, takes no arguments at all. See {@link
- * #checkTemplateApplication}.
+ * #checkApplication}.
  *
  * <p><b>Structural sharing.</b> Every method returns its input unchanged when nothing beneath it changed, so
  * a document with no sugar comes back as the same object graph. Source positions live in identity-keyed side
@@ -103,9 +102,9 @@ import java.util.function.UnaryOperator;
  * <p><b>A parametric record's body is a record body</b> ([TSON-SCHEMA] §5.10): braces or a composition, and the
  * record passes through as it would without parameters, for {@code DefinitionResolver} to build as a parametric record. A
  * parameter list before a sugar form or a bare reference -- {@code <T> [T]}, {@code <T> ( T | error )}, {@code <B>
- * pair<uuid, B>} -- is refused here, naming what to write instead ({@link #refuseTemplateBody}). Inside a parametric record
- * a form is its construction in place whether or not it names a parameter: a parameter is a name at a type slot like
- * any other, which the parametric record scopes and each application substitutes.
+ * pair<uuid, B>} -- is refused here, naming what to write instead ({@link #refuseParametricBody}). Inside a parametric
+ * record a form is its construction in place whether or not it names a parameter: a parameter is a name at a type slot
+ * like any other, which the parametric record scopes and each application substitutes.
  *
  * <p><b>An invalid sugar form is reported per declaration, not thrown</b>, when a {@link
  * DesugarFailureReporter} is supplied -- the same one-pass treatment {@code SchemaResolver} and {@code
@@ -180,13 +179,13 @@ final class SchemaDesugarer {
      * to the diagnostic already reported against the real declaration, not to this stand-in.
      *
      * <p><b>A stand-in keeping parameters is an empty parametric record</b>, one like any other where
-     * {@code DefinitionResolver} resolves it, so {@code TemplateMaterialiser} closes it by the one process.
+     * {@code DefinitionResolver} resolves it, so {@code ParametricMaterialiser} closes it by the one process.
      */
     private static TypeDef absorbed(SchemaMap.Declaration declaration) {
         return new StructuralTypeDef(typeParams(declaration.typeDef()), new RecordDef(List.of()));
     }
 
-    /** This document's own declarations, for {@link #checkTemplateApplication} -- set before the walk starts. */
+    /** This document's own declarations, for {@link #checkApplication} -- set before the walk starts. */
     private Map<String, SchemaMap.Declaration> local = Map.of();
 
     /** The type parameters of the declaration currently being walked, or empty outside a parametric record. */
@@ -312,7 +311,7 @@ final class SchemaDesugarer {
      * the head is.
      *
      * <p>A parametric record's body is walked as any record's; a parameter list before anything but a record body is
-     * refused ({@link #refuseTemplateBody}).
+     * refused ({@link #refuseParametricBody}).
      */
     private TypeDef typeDef(TypeDef typeDef) {
         return switch (typeDef) {
@@ -324,7 +323,7 @@ final class SchemaDesugarer {
             // A declaration's own body reference names what this declaration *is*; only its arguments are
             // expandable, so the head stays put and its own handling is unchanged.
             case TypeExprDef reference when !reference.typeParams().isEmpty() ->
-                    throw refuseTemplateBody(reference.ref());
+                    throw refuseParametricBody(reference.ref());
             case TypeExprDef reference -> {
                 // **A declaration's own body is the construction** (§5.3): the form becomes the instance
                 // directly, which keeps `score_list => [integer; 1..]` a PRODUCT entry with a real body and
@@ -351,7 +350,7 @@ final class SchemaDesugarer {
      * family or a field group; a bare reference is a parametric alias, which names a partial application nothing
      * could close.
      */
-    private SchemaValidationException refuseTemplateBody(TypeExpr body) {
+    private SchemaValidationException refuseParametricBody(TypeExpr body) {
         String prefix = "'" + currentName + "': a parametric record's body is a record body -- braces or a composition "
                 + "(§5.10) -- and '" + spell(body) + "' is ";
         return new SchemaValidationException(prefix + switch (body) {
@@ -542,7 +541,7 @@ final class SchemaDesugarer {
      * parameter ([TSON-SCHEMA] §5.10), so a sugar form as one is refused, naming what to declare.
      */
     private ApplicationRef applicationArguments(ApplicationRef generic) {
-        checkTemplateApplication(generic.name());
+        checkApplication(generic.name());
         for (TypeExpr arg : generic.args()) {
             if (arg instanceof RecordExpr) {
                 throw constructionAsArgument(generic, arg);
@@ -579,7 +578,7 @@ final class SchemaDesugarer {
      * be a constructor, which construction sugar applies (§5.3), and an atom refinement may be an
      * incomplete entry, which an application completes (§5.5); only resolution can tell, so each passes through.
      */
-    private void checkTemplateApplication(String head) {
+    private void checkApplication(String head) {
         SchemaMap.Declaration declaration = local.get(head);
         if (declaration == null) {
             return;

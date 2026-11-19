@@ -10,6 +10,7 @@ import io.ltr8.tson.base.CountingReceiver;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.resolver.ConstructionSugar;
 import io.ltr8.tson.compiler.resolver.IncompleteEntries;
@@ -23,7 +24,6 @@ import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.ConfusableNames;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.binary.BytesType;
@@ -121,11 +121,11 @@ import java.util.function.Predicate;
  *
  * <p><b>No materialization.</b> The linker builds no type. {@code SchemaDesugarer} writes every sugar form as the
  * construction it denotes, in place, and the resolver binds it through the constructor's compiled reader, which
- * covers every shape generically; the resolver's {@code TemplateMaterialiser} closes every application, in place or
+ * covers every shape generically; the resolver's {@code ParametricMaterialiser} closes every application, in place or
  * into the declaration naming it. What survives into an entry the linker sees is therefore a name or a type written
  * in place in every position except one: a parametric record's own fields and parents, which legitimately reference its own
  * parameters ({@code box<T>}) and are checked only for what no argument changes -- the arity of the references it
- * writes ({@link #checkOpenArity}) -- never resolved against the schema. A
+ * writes ({@link #checkParametricArity}) -- never resolved against the schema. A
  * closed entry holds no parameter, so every name it holds resolves in the schema's own namespace or is unresolved.
  *
  * <p><b>One namespace per schema (Part 2 §2.2.3, §3.3).</b> The namespace a schema is checked
@@ -366,7 +366,7 @@ public final class TsonSchemaLinker {
             // enum members applies to it unchanged, and `<T, Т>` otherwise declares two parameters that read
             // identically: a body referencing `T` binds one of them and a reviewer cannot see which, which
             // is the substitution hazard §8.2 exists to refuse.
-            checkScope(receiver, schema, name, position, OpenEntry.parameterNames(definition), "parameters",
+            checkScope(receiver, schema, name, position, ParametricEntry.parameterNames(definition), "parameters",
                     identifiers);
         });
     }
@@ -611,7 +611,7 @@ public final class TsonSchemaLinker {
             return null; // the author's own text: it already names the line they wrote
         }
         for (Map.Entry<String, Top> candidate : entries.entrySet()) {
-            if (at(facts, candidate.getKey()).isPresent() && OpenEntry.isOpen(candidate.getValue())
+            if (at(facts, candidate.getKey()).isPresent() && ParametricEntry.isParametric(candidate.getValue())
                     && writes(candidate.getValue(), failure.name())) {
                 return candidate.getKey();
             }
@@ -619,9 +619,12 @@ public final class TsonSchemaLinker {
         return null;
     }
 
-    /** Whether the parametric record {@code open} writes {@code name}, in a reference or inside a type it holds in place. */
-    private static boolean writes(Top open, String name) {
-        return OpenEntry.names(open).contains(name);
+    /**
+     * Whether the parametric record {@code record} writes {@code name}, in a reference or inside a type it holds in
+     * place.
+     */
+    private static boolean writes(Top record, String name) {
+        return ParametricEntry.names(record).contains(name);
     }
 
     /** One entry's failure, reported when there is a receiver and rethrown as a schema error when there is not. */
@@ -882,7 +885,7 @@ public final class TsonSchemaLinker {
         if (definition instanceof IncompleteEntry) {
             return Optional.of("is an incomplete entry, which is no type until it is completed");
         }
-        if (OpenEntry.isOpen(definition)) {
+        if (ParametricEntry.isParametric(definition)) {
             return Optional.of("is a parametric record, which denotes no type until it is applied (§5.10)");
         }
         if (foreign.isConstructor(name, definition)) {
@@ -1185,7 +1188,7 @@ public final class TsonSchemaLinker {
     private static List<ChoiceBody> choicesJudged(String name, AnnotatedMap<String, Top> entries,
                                                   Map<String, TsonSchema.EntryFacts> facts) {
         Top entry = entries.get(name);
-        if (entry == null || OpenEntry.isOpen(entry)) {
+        if (entry == null || ParametricEntry.isParametric(entry)) {
             return List.of();
         }
         boolean asserted = AliasChain.annotates(facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).annotations(),
@@ -1266,7 +1269,7 @@ public final class TsonSchemaLinker {
         Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
         for (String localName : localNames) {
             Top local = merged.get(localName);
-            if (OpenEntry.isOpen(local)) {
+            if (ParametricEntry.isParametric(local)) {
                 continue;
             }
             for (String supertype : TypeChain.supertypesOf(local)) {
@@ -1557,7 +1560,7 @@ public final class TsonSchemaLinker {
     private static void validateEntry(String name, Top def, Map<String, Top> namespace,
                                        Function<String, Optional<String>> constructors,
                                        Function<String, String> shown, ValuesByName byName, ExternHops hops) {
-        checkOpenEntryUsesEveryParameter(name, def);
+        checkParametricRecordUsesEveryParameter(name, def);
         // Every name on a chain is in the one namespace, the defining schema's closure being inside the
         // importer's (§2.2.3).
         for (String supertype : TypeChain.supertypesOf(def)) {
@@ -1576,16 +1579,16 @@ public final class TsonSchemaLinker {
     private static void validateBody(String entryName, Top body, Map<String, Top> namespace,
                                       Function<String, Optional<String>> constructors, Function<String, String> shown,
                                       ValuesByName byName, ExternHops hops) {
-        if (OpenEntry.isOpen(body)) {
+        if (ParametricEntry.isParametric(body)) {
             // A parametric record's references are judged by what they resolve to once substitution supplies the
             // arguments, so type-kind validation and inhabitance apply to its applications instead, where the whole
             // record resolves at once. Checking it here by substituting stand-in arguments would report errors on
             // parametric records that are correct for every argument anyone passes.
             //
             // Arity is the exception, and it is decidable: it asks how many parameters the *referenced*
-            // entry declares, which no argument changes. See checkOpenArity for why that has to be asked
+            // entry declares, which no argument changes. See checkParametricArity for why that has to be asked
             // here rather than left to an application that may never happen.
-            checkOpenArity(entryName, (RecordBody) body, namespace, OpenEntry.parameterNames(body));
+            checkParametricArity(entryName, (RecordBody) body, namespace, ParametricEntry.parameterNames(body));
             return;
         }
         checkCoherent(body);
@@ -1615,7 +1618,8 @@ public final class TsonSchemaLinker {
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
             // An alias naming a parametric record bare names the parametric record under another name (`ref_of => ref`),
             // applied as its target is, so it is no use of the parametric record without its arguments.
-            case Alias ref when OpenEntry.isOpen(namespace.get(AliasChain.terminal(ref.target().name(), namespace))) -> {
+            case Alias ref when ParametricEntry.isParametric(
+                    namespace.get(AliasChain.terminal(ref.target().name(), namespace))) -> {
                 if (!namespace.containsKey(ref.target().name())) {
                     throw new UnresolvedReference(entryName, "", ref.target().name());
                 }
@@ -1913,10 +1917,10 @@ public final class TsonSchemaLinker {
      * <p>Deciding this rather than admitting the degenerate form also settles a question the open
      * representation would otherwise have to answer: with an unreferenced parameter rejected, a parametric record
      * whose bindings are all concrete cannot exist, so nothing has to say whether unused parameters
-     * participate in comparing two open entries.
+     * participate in comparing two parametric records.
      */
-    private static void checkOpenEntryUsesEveryParameter(String entryName, Top def) {
-        List<String> parameters = OpenEntry.parameterNames(def);
+    private static void checkParametricRecordUsesEveryParameter(String entryName, Top def) {
+        List<String> parameters = ParametricEntry.parameterNames(def);
         if (parameters.isEmpty()) {
             return;
         }
@@ -1931,11 +1935,11 @@ public final class TsonSchemaLinker {
         }
     }
 
-    /** Every name an entry's body mentions, for {@link #checkOpenEntryUsesEveryParameter}. */
+    /** Every name an entry's body mentions, for {@link #checkParametricRecordUsesEveryParameter}. */
     private static void collectBodyNames(Top body, Set<String> into) {
-        if (OpenEntry.isOpen(body)) {
+        if (ParametricEntry.isParametric(body)) {
             // The one question a parametric record answers without being resolved: the names its references write.
-            into.addAll(OpenEntry.names(body));
+            into.addAll(ParametricEntry.names(body));
             return;
         }
         switch (body) {
@@ -1957,7 +1961,7 @@ public final class TsonSchemaLinker {
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Alias alias -> collectNames(alias.target(), into);
-            case Extern ignored -> { } // never open
+            case Extern ignored -> { } // never parametric
             case Atom ignored -> { } // an atom body names no type
             case DeclaredType ignored -> { } // its variants are the closure's, named by no field
             case DependentBody ignored -> { } // it names a field of the enclosing record, never an entry
@@ -1966,7 +1970,7 @@ public final class TsonSchemaLinker {
                 apply.arguments().forEach(argument -> collectNames(argument, into));
             }
             case ValueEntry ignored -> { } // a value names no type of its own
-            case IncompleteEntry ignored -> { } // never open
+            case IncompleteEntry ignored -> { } // never parametric
         }
     }
 
@@ -2191,7 +2195,8 @@ public final class TsonSchemaLinker {
         // application of one) has no single body to check against until materialisation closes it. A body
         // still an Alias means the walk stopped on a cycle or an argument-bearing target, neither of
         // which has one either.
-        if (target == null || OpenEntry.isOpen(target) || target instanceof ApplyBody || target instanceof Alias) {
+        if (target == null || ParametricEntry.isParametric(target) || target instanceof ApplyBody
+                || target instanceof Alias) {
             return;
         }
         Token value = field.value().get();
@@ -2382,7 +2387,7 @@ public final class TsonSchemaLinker {
      * <p><b>A parametric record's every reference, bare ones included</b>: its field types and parents are references of
      * the model, so a parametric record named bare there is refused at the parametric record's own declaration (§5.10).
      */
-    private static void checkOpenArity(String entryName, RecordBody open,
+    private static void checkParametricArity(String entryName, RecordBody record,
             Map<String, Top> namespace, List<String> ownParameters) {
         String context = "'" + entryName + "'";
         // A head is checked with its application's arguments, and every other name with none.
@@ -2407,8 +2412,8 @@ public final class TsonSchemaLinker {
                 return body;
             }
         };
-        open.fields().values().forEach(field -> TypeSlots.map(field.type(), arity));
-        open.parents().forEach(parent -> TypeSlots.map(parent, arity));
+        record.fields().values().forEach(field -> TypeSlots.map(field.type(), arity));
+        record.parents().forEach(parent -> TypeSlots.map(parent, arity));
     }
 
     /**
@@ -2419,10 +2424,10 @@ public final class TsonSchemaLinker {
     private static void requireOpen(String context, ApplyBody application, Map<String, Top> namespace) {
         boolean overAParameter = application.arguments().stream().anyMatch(ParamRef.class::isInstance);
         Top head = namespace.get(AliasChain.terminal(application.head().name(), namespace));
-        if (head != null && (!overAParameter || !OpenEntry.isOpen(head))) {
+        if (head != null && (!overAParameter || !ParametricEntry.isParametric(head))) {
             throw new SchemaValidationException(context + ": the application '" + application.text() + "' stands "
                     + "written in place, and an application stays in place only inside a parametric record, over one of "
-                    + "its parameters, applying a parametric record; " + (OpenEntry.isOpen(head)
+                    + "its parameters, applying a parametric record; " + (ParametricEntry.isParametric(head)
                     ? "over names alone it closes to the record it denotes" : "a constructor's is its construction")
                     + " (§5.10)");
         }
@@ -2439,7 +2444,7 @@ public final class TsonSchemaLinker {
      * unchecked, it would link, compile and fail only at <em>read</em> time, as a library fault, for what is
      * plainly the author's error.
      *
-     * <p>By the time linking runs, {@code TemplateMaterialiser} has rewritten every application it could
+     * <p>By the time linking runs, {@code ParametricMaterialiser} has rewritten every application it could
      * close, so what reaches here is the set that genuinely needs checking: references inside the bodies of
      * parametric records, which stay open by design, and bare names anywhere.
      *
@@ -2465,7 +2470,7 @@ public final class TsonSchemaLinker {
         if (referenced == null) {
             return; // a name no entry holds is resolution's to refuse, not arity's
         }
-        List<String> parameters = OpenEntry.parameterNames(referenced);
+        List<String> parameters = ParametricEntry.parameterNames(referenced);
         int declared = parameters.size();
         if (declared == supplied) {
             return;

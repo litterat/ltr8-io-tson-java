@@ -30,13 +30,13 @@ import java.util.List;
  * of one rule read as one rule, and adds the route out: name the application in the schema, then write that
  * name in the data.
  */
-public final class OpenTemplateReader implements TsonTypeReader<Object> {
+public final class ParametricRecordReader implements TsonTypeReader<Object> {
 
     private final String name;
     private final List<String> parameters;
     private final SchemaLocation schemaLocation;
 
-    public OpenTemplateReader(String name, List<String> parameters, SchemaLocation schemaLocation) {
+    public ParametricRecordReader(String name, List<String> parameters, SchemaLocation schemaLocation) {
         this.name = name;
         this.parameters = List.copyOf(parameters);
         this.schemaLocation = schemaLocation;

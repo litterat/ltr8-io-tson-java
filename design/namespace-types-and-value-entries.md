@@ -154,7 +154,7 @@ members being declarations): nothing in it is closed or written in place, so a
 kind-typed slot holds one bare name and an application (`request: box<order>`) is refused with the alias spelling
 named (`order_box => box<order>`, then `request: order_box`). There is no parametric record over an ordinary type: a
 parametric record's body is a record, so `fetch => <T> !operations { … }` is refused at the declaration, and a value is
-declared once per instantiation (`design/open-records.md`).
+declared once per instantiation (`design/parametric-records.md`).
 
 **§8.2 reaches the payload at the read, not at the link.** The linker cannot see into a value -- its fields' types are
 left in the declaring schema -- so the payload is read under the loader's identifier policy (`SchemaResolver`'s `value`)

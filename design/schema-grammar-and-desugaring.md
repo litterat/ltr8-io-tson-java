@@ -34,8 +34,9 @@ The schema grammar itself is in `design/schema-grammar.md`.
   `=?` implying it (§5.2).
 
 Related: `design/schema-grammar.md` (the parser producing the AST this rewrites),
-`design/desugaring-open-forms-and-templates.md` (forms over a parameter, bodies of a parametric record refused),
-`design/template-materialisation.md` (materialisation), `design/open-records.md`, `design/schema-side-diagnostics.md`.
+`design/desugaring-forms-over-parameters.md` (forms over a parameter, bodies of a parametric record refused),
+`design/parametric-materialisation.md` (materialisation), `design/parametric-records.md`,
+`design/schema-side-diagnostics.md`.
 
 ## Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
 
@@ -68,11 +69,11 @@ does ([TSON-SCHEMA] §3.4.1).
 - **A generic application passes through this phase.** `name<args>` resolves its head in the schema's one namespace
   (§3.3.1) — parameters, then locals, then the closure. A head that resolves to a parametric record is a §5.10
   application; one that resolves to a constructor is construction sugar (§5.3), so `meta.map<text, text>` is the
-  construction `{text => text}` spells. Both are decided over the **resolved** form (`TemplateMaterialiser`,
-  `design/template-materialisation.md`), where a head's chain is known. `checkTemplateApplication` refuses exactly one
+  construction `{text => text}` spells. Both are decided over the **resolved** form (`ParametricMaterialiser`,
+  `design/parametric-materialisation.md`), where a head's chain is known. `checkApplication` refuses exactly one
   thing: a local head declaring *no* parameters whose body says it is no constructor. A head this document neither
   declares nor imports is the linker's unresolved reference. A sugar form over one of the enclosing parametric record's own
-  parameters is its construction in place like any other (`design/desugaring-open-forms-and-templates.md`).
+  parameters is its construction in place like any other (`design/desugaring-forms-over-parameters.md`).
 - **Identity is structural.** Two constructions written in place are one type when their constructor and fields are
   equal, compared as values (`TypeInline.equals`, which leaves out the application a record in place is named by and
   the annotations on its field keys), so `[T; 3]` and `[T; 3..3]`, and a radix-spelled bound and

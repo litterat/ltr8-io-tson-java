@@ -63,7 +63,7 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   exactly (`IntegerWidthTest`).
 
 Related: `design/schema-resolution.md` (the resolution phase and its exception boundary),
-`design/constructor-application.md` (what makes an entry an atom instance), `design/template-materialisation.md`
+`design/constructor-application.md` (what makes an entry an atom instance), `design/parametric-materialisation.md`
 (the closed bodies the linker re-checks), `design/linking-and-compilation.md`.
 
 ## Atom refinement, narrowing and coherence (`tson-compiler/.../resolver/DefinitionResolver.java`)

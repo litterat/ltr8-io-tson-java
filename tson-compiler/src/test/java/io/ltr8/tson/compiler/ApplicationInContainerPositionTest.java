@@ -7,7 +7,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TypeExpr;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -116,7 +116,7 @@ class ApplicationInContainerPositionTest {
                   tree => <T> { value: T  children?: [tree<T>] }""");
 
         RecordBody tree = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("tree"));
-        assertTrue(tree.isOpen());
+        assertTrue(tree.isParametric());
         assertEquals(new TypeInline(ArrayBody.of(new ApplyBody(TypeRef.of("tree"), List.of(ParamRef.of("T")))
                 .inPlace())), tree.fields().get("children").type());
         assertTrue(unpositioned(compiled).isEmpty(), () -> "no entry added for a form over a parameter: "
@@ -193,7 +193,7 @@ class ApplicationInContainerPositionTest {
                   four  => { g: grid<voxel> }""");
 
         Top grid = entry(both, "grid");
-        assertEquals(List.of("T"), OpenEntry.parameterNames(grid), "the declared parametric record, unchanged");
+        assertEquals(List.of("T"), ParametricEntry.parameterNames(grid), "the declared parametric record, unchanged");
         assertEquals(entry(one, "grid"), grid);
         assertEquals(List.of(), unpositioned(both));
     }
@@ -239,7 +239,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody array = assertInstanceOf(ArrayBody.class, inPlace(slot(entry(compiled, "box_carrier"), "a")));
         RecordBody record = assertInstanceOf(RecordBody.class, inPlace(array.elementType()));
 
-        assertEquals(List.of(), OpenEntry.parameterNames(record), "closed");
+        assertEquals(List.of(), ParametricEntry.parameterNames(record), "closed");
         assertEquals(TypeRef.of("text"), slot(record, "a"), "T bound");
         assertNotNull(compiled.get("box_carrier")
                 .read(TestDocuments.document("{ a: [ { a: \"x\" } ] }")));

@@ -64,7 +64,7 @@ enum DiscriminationClass {
             case FloatType floats -> floats.allowNan() || floats.allowInfinity()
                     ? Optional.empty() : Optional.of(NUMBER);
             case EnumBody members -> ofEnum(members);
-            case RecordBody record when record.isOpen() -> Optional.empty(); // a parametric record is no type
+            case RecordBody record when record.isParametric() -> Optional.empty(); // a parametric record is no type
             case RecordBody ignored -> Optional.of(BRACE);
             case MapBody map -> MapPlan.isObjectForm(linked, map) ? Optional.of(BRACE) : Optional.empty();
             case ArrayBody ignored -> Optional.of(BRACKET);

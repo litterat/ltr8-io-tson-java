@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
  * materialises it, so the group travels through the held wire form and back into {@code meta.field_group} -- options,
  * optional members and state intact.
  */
-class FieldGroupInTemplateTest {
+class FieldGroupInParametricRecordTest {
 
     private static final String ID = "https://example.test/grouped-template.tn";
 

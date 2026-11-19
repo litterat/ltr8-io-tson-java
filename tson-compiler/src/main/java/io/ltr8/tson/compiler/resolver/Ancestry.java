@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.meta.ApplyBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeExpr;
@@ -55,9 +55,9 @@ final class Ancestry {
      * What an application of the parametric record {@code head} contributes: the ancestors its own written parents reach,
      * and nothing for the parametric record itself. Empty for a head that is no parametric record.
      */
-    static List<String> ofTemplate(String head, DefinitionGetter namespace) {
-        Top template = namespace.definition(templateHead(head, namespace));
-        return OpenEntry.isOpen(template) ? TypeChain.supertypesOf(template) : List.of();
+    static List<String> ofApplication(String head, DefinitionGetter namespace) {
+        Top record = namespace.definition(parametricHead(head, namespace));
+        return ParametricEntry.isParametric(record) ? TypeChain.supertypesOf(record) : List.of();
     }
 
     /**
@@ -65,9 +65,9 @@ final class Ancestry {
      * record ({@code pet_of => pet_box}), the parametric record at the end of its alias chain, the alias being the same
      * entry under another name ([TSON-SCHEMA] §8.3). {@code head} itself where the chain ends at anything else.
      */
-    static String templateHead(String head, DefinitionGetter namespace) {
+    static String parametricHead(String head, DefinitionGetter namespace) {
         String terminal = AliasChain.terminal(head, namespace::definition);
-        return !terminal.equals(head) && OpenEntry.isOpen(namespace.definition(terminal)) ? terminal : head;
+        return !terminal.equals(head) && ParametricEntry.isParametric(namespace.definition(terminal)) ? terminal : head;
     }
 
     /**
@@ -81,7 +81,7 @@ final class Ancestry {
             switch (parent) {
                 case TypeRef name -> names.addAll(ofParent(name.name(), namespace));
                 case TypeInline inline when inline.of() instanceof ApplyBody application -> {
-                    names.addAll(ofTemplate(application.head().name(), namespace));
+                    names.addAll(ofApplication(application.head().name(), namespace));
                     applied.add(parent);
                 }
                 case TypeInline inline -> throw new IllegalStateException("a parent is a name or an application, "

@@ -480,7 +480,7 @@ class SchemaDesugarerTest {
 
     /**
      * A parametric record passes through as the record body it is written as, and the <b>application</b> of it too:
-     * substitution happens over the resolved parametric record ({@code TemplateMaterialiser}), not over the AST, so this
+     * substitution happens over the resolved parametric record ({@code ParametricMaterialiser}), not over the AST, so this
      * phase leaves {@code box<text>}'s head and arguments alone.
      */
     @Test

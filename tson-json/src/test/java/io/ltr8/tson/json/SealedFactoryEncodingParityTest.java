@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  *
  * <p><b>The shape is distinct from the two parity tests beside it, which is why it has its own.</b> {@link
  * CrossEncodingParityTest}'s factory sits over an {@code abstract} base, so it dispatches by tag and its
- * payload is flat; {@link TemplateFamilyEncodingParityTest}'s base is the parametric record itself. Here the base is a
+ * payload is flat; {@link ParametricFamilyEncodingParityTest}'s base is the parametric record itself. Here the base is a
  * closed {@code abstract} record and every member composes an application, which puts a member's own pin on the
  * dispatch path: {@code kind?: = "ping"} is an ordinary FIXED field of the closed member by the time either
  * encoding reads it, and {@code FamilySelectors} states the selector on the entry, so neither stack

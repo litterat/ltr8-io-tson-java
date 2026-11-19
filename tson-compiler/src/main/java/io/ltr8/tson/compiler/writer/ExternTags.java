@@ -88,7 +88,7 @@ public final class ExternTags {
             }
             Map<String, Boundary> boundaries = new HashMap<>();
             scope.schema().entries().forEach((name, definition) -> {
-                if (!(definition instanceof RecordBody record) || record.isOpen()) {
+                if (!(definition instanceof RecordBody record) || record.isParametric()) {
                     return;
                 }
                 Class<?> bound = bound(context, scope.declaringIdentity(name), name);

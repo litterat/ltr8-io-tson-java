@@ -8,11 +8,9 @@ import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -33,14 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * §5.10 materialisation for <b>parametric records</b> -- the form whose parameters occupy field types. Applying one
  * closes it: the arguments are substituted into the parametric record, under the declaration that names the application,
- * or in place at the type slot that wrote it ({@code TemplateMaterialiser}).
+ * or in place at the type slot that wrote it ({@code ParametricMaterialiser}).
  *
  * <p>A parametric record whose body writes a §5.3 container sugar form closes here too: a form over a parameter is held as
  * the application it spells and closes to its construction in place when the parametric record is applied. The shape of what
  * it closes into is {@code ContainerSugarEndToEndTest}'s; what these fixtures pin is that applying such a parametric record
  * works at all, and that a parameter reaches the slot it was written for.
  */
-class RecordTemplateTest {
+class ParametricRecordTest {
 
     private static final String ID = "https://example.test/template.tn";
 
@@ -100,7 +98,7 @@ class RecordTemplateTest {
 
         TypeInline b = inPlace(compiled, "holder", "b");
         RecordBody record = assertInstanceOf(RecordBody.class, b.of());
-        assertEquals(List.of(), OpenEntry.parameterNames(record), "closed -- §5.10");
+        assertEquals(List.of(), ParametricEntry.parameterNames(record), "closed -- §5.10");
         assertEquals(TypeChain.EMPTY, record.chain(), "no chain");
         assertEquals(TypeRef.of("text"), fieldOf(b, "v").type(), "T := text");
         assertEquals("box<text>", b.text(), "named in a message by the application as written");
@@ -224,20 +222,20 @@ class RecordTemplateTest {
      */
     @Test
     void mutualRecursionTiesToTheDeclarationOrIsRefused() {
-        String templates = """
+        String records = """
                   a => <T> { v: T  b: b<T> }
                   b => <T> { a?: a<T> }
                 """;
-        TsonCompiledSchema closed = compile(templates + "  a_text => a<text>");
+        TsonCompiledSchema closed = compile(records + "  a_text => a<text>");
         TypeInline b = inPlace(closed, "a_text", "b");
         assertEquals(TypeRef.of("a_text"), fieldOf(b, "a").type());
         assertNotNull(closed.get("a_text").read(TestDocuments.document("{ v: x  b: { a: { v: y  b: {} } } }")));
 
         SchemaValidationException atASlot = assertThrows(SchemaValidationException.class,
-                () -> compile(templates + "  a_text => a<text>\n  holder => { f: b<text> }"));
+                () -> compile(records + "  a_text => a<text>\n  holder => { f: b<text> }"));
         assertTrue(atASlot.getMessage().contains("'b<text>' applies the recursive parametric record 'b'"),
                 atASlot.getMessage());
-        assertNotNull(compile(templates));
+        assertNotNull(compile(records));
     }
 
     /** A mutual recursion every step of which is required describes no finite value, and is refused (§5.10.1). */
@@ -256,7 +254,7 @@ class RecordTemplateTest {
      */
     @Test
     void anApplicationJoiningADeclaredApplicationIsRefusedInEitherOrder() {
-        String templates = """
+        String records = """
                   animal_of => <T> { a: T }
                   dog_of    => <T> animal_of<T> & { d: text }
                   kennel_of => <T> { k: dog_of<T> }
@@ -267,7 +265,7 @@ class RecordTemplateTest {
                 "  animal_text => animal_of<text>\n  kt => { k: dog_of<text> }",
                 "  kt => { k: dog_of<text> }\n  animal_text => animal_of<text>")) {
             SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> compile(templates + declarations), declarations);
+                    () -> compile(records + declarations), declarations);
             assertTrue(thrown.getMessage().contains("IS-A 'animal_text'"), thrown.getMessage());
         }
     }
@@ -356,7 +354,7 @@ class RecordTemplateTest {
      * record is applied, compiled, and reading real data -- and rejecting data the bounds the entry writes refuse.
      */
     @Test
-    void anOpenFormClosedByAnApplicationReadsRealData() {
+    void aFormOverAParameterClosedByAnApplicationReadsRealData() {
         TsonCompiledSchema compiled = compile("""
                   two_of => !meta.array ^ { min_items: 2  max_items: 2 }
                   tags   => <T> { xs: two_of<T> }
@@ -542,7 +540,7 @@ class RecordTemplateTest {
 
     // ── A parametric record named as a data value's own type ──────────────────────
     //    A parametric record is not a type (§5.10), so naming one in data is refused by
-    //    OpenTemplateReader, whose message names the route: declare the application and name that. It is the
+    //    ParametricRecordReader, whose message names the route: declare the application and name that. It is the
     //    author's error and an ordinary data diagnostic, never a gap in this library.
 
     /**

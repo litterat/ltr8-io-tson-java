@@ -14,9 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * record is not a type, so no position names one bare -- a parametric record, a parametric record with a selector, a
  * parametric container, a parametric constructor application and a parametric alias alike -- and the message names the
  * remedy: write the application, or name the abstract record a family's applications compose. Reading a family declared
- * through a parametric record is {@code TemplateIsNotATypeTest}'s.
+ * through a parametric record is {@code ParametricRecordIsNotATypeTest}'s.
  */
-class TemplateAtATypePositionTest {
+class ParametricRecordAtATypePositionTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"

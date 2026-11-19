@@ -4,7 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
@@ -47,8 +47,8 @@ class ParamBoundTest {
     private static Map<String, List<Param>> parameters() {
         Map<String, List<Param>> parameters = new LinkedHashMap<>();
         Tson.standard().resolve(SCHEMA).schema().entries().forEach((name, definition) -> {
-            if (OpenEntry.isOpen(definition)) {
-                parameters.put(name, OpenEntry.parameters(definition));
+            if (ParametricEntry.isParametric(definition)) {
+                parameters.put(name, ParametricEntry.parameters(definition));
             }
         });
         return parameters;

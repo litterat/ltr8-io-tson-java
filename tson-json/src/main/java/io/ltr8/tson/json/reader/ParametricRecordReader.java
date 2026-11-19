@@ -14,13 +14,13 @@ import java.util.List;
  *
  * <p>Built before the body is looked at at all, so a parametric record's unsubstituted body never reaches a factory.
  */
-final class OpenTemplateReader implements JsonTypeReader<Object> {
+final class ParametricRecordReader implements JsonTypeReader<Object> {
 
     private final String name;
     private final List<String> parameters;
     private final JsonSchemaLocation schemaLocation;
 
-    OpenTemplateReader(String name, List<String> parameters, JsonSchemaLocation schemaLocation) {
+    ParametricRecordReader(String name, List<String> parameters, JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.parameters = List.copyOf(parameters);
         this.schemaLocation = schemaLocation;

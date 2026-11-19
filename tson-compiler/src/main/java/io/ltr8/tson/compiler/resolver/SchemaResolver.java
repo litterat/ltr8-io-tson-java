@@ -32,7 +32,7 @@ import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.ContentHashMismatchException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ApplyBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 
@@ -398,7 +398,7 @@ public final class SchemaResolver {
             Top visible = waitOrder.definition(name);
             return visible != null ? visible : heads.definition(name);
         }, declarations::containsKey);
-        TemplateMaterialiser materialiser = new TemplateMaterialiser(waitOrder, heads::definition, waitOrder::current,
+        ParametricMaterialiser materialiser = new ParametricMaterialiser(waitOrder, heads::definition, waitOrder::current,
                 facts, applications, kernel, heldRecursion);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
@@ -412,9 +412,9 @@ public final class SchemaResolver {
 
                     /** An operand absorbed by value gets the same bound check an application closing does. */
                     @Override
-                    public void checkArguments(String head, Top template,
+                    public void checkArguments(String head, Top record,
                             List<io.ltr8.tson.schema.meta.TypeRef> arguments) {
-                        materialiser.checkArguments(head, template, arguments);
+                        materialiser.checkArguments(head, record, arguments);
                     }
 
                     /**
@@ -455,7 +455,7 @@ public final class SchemaResolver {
         // §5.10.1's regularity boundary, before anything closes: a recursive application passes each parameter
         // through unchanged, judged at the declaration, so a parametric record refused for it is refused even if nobody
         // ever applies it.
-        Set<String> irregular = TemplateRegularity.check(resolvedLocals, problems.collecting()
+        Set<String> irregular = ParametricRegularity.check(resolvedLocals, problems.collecting()
                 ? (name, error) -> problems.report(declarations.get(name), error) : null);
 
         // A condemned parametric record is replaced before materialisation, on the same terms as a declaration that
@@ -635,7 +635,7 @@ public final class SchemaResolver {
      */
     private static void condemn(Set<String> names, Map<String, Top> resolvedLocals, Map<String, Top> namespace) {
         for (String name : names) {
-            Top placeholder = unresolved(OpenEntry.parameterNames(resolvedLocals.get(name)));
+            Top placeholder = unresolved(ParametricEntry.parameterNames(resolvedLocals.get(name)));
             resolvedLocals.put(name, placeholder);
             namespace.put(name, placeholder);
         }
@@ -693,7 +693,7 @@ public final class SchemaResolver {
         // A parametric record keeps the parents as written: they may still name its own parameters, and
         // closing each application is what completes that application's chain from them.
         resolvedLocals.replaceAll((name, definition) -> definition instanceof Type type && !type.parents().isEmpty()
-                && !OpenEntry.isOpen(definition)
+                && !ParametricEntry.isParametric(definition)
                 ? type.withChain(type.chain().withParents(List.of()))
                 : definition);
         republish(namespace, resolvedLocals);
@@ -742,7 +742,7 @@ public final class SchemaResolver {
                 continue;
             }
             // A parent written through an alias of a parametric record is that parametric record's application (§8.3).
-            String head = Ancestry.templateHead(application.head().name(), namespace::get);
+            String head = Ancestry.parametricHead(application.head().name(), namespace::get);
             String owner = byApplication.get(CanonicalApplication.of(head, application.arguments()));
             if (owner != null) {
                 chain.add(owner);
@@ -891,11 +891,11 @@ public final class SchemaResolver {
      * type the author passed as an argument and never applied, which names nothing the author did.
      */
     private static void refuseHeadAbstraction(String name, Top resolved) {
-        if (!OpenEntry.isOpen(resolved)) {
+        if (!ParametricEntry.isParametric(resolved)) {
             return;
         }
-        List<String> parameters = OpenEntry.parameterNames(resolved);
-        for (ApplyBody application : OpenEntry.applications(resolved)) {
+        List<String> parameters = ParametricEntry.parameterNames(resolved);
+        for (ApplyBody application : ParametricEntry.applications(resolved)) {
             String head = application.head().name();
             if (parameters.contains(head)) {
                 throw new SchemaValidationException("'" + name + "': '" + head

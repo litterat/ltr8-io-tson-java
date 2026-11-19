@@ -13,16 +13,16 @@ import java.util.Set;
  * empty -- the one shape a parametric record has -- so each answer is a question of that record, asked of any entry.
  *
  * <p><b>A parametric record is no type</b> (§5.10): no position names one bare, and only an application of one is a
- * type. Code that builds a reader or a writer from a {@link RecordBody} asks {@link #isOpen} first.
+ * type. Code that builds a reader or a writer from a {@link RecordBody} asks {@link #isParametric} first.
  */
-public final class OpenEntry {
+public final class ParametricEntry {
 
-    private OpenEntry() {
+    private ParametricEntry() {
     }
 
     /** Whether an entry whose value is {@code value} is a parametric record. */
-    public static boolean isOpen(Top value) {
-        return value instanceof RecordBody record && record.isOpen();
+    public static boolean isParametric(Top value) {
+        return value instanceof RecordBody record && record.isParametric();
     }
 
     /** The parameters {@code value} binds, in declaration order -- {@code []} for a closed entry. */
@@ -43,7 +43,7 @@ public final class OpenEntry {
      * of types written in place, each as written. Empty for a closed entry.
      */
     public static List<ApplyBody> applications(Top value) {
-        if (!isOpen(value)) {
+        if (!isParametric(value)) {
             return List.of();
         }
         RecordBody record = (RecordBody) value;
@@ -59,7 +59,7 @@ public final class OpenEntry {
      */
     public static Set<String> names(Top value) {
         Set<String> names = new LinkedHashSet<>();
-        if (isOpen(value)) {
+        if (isParametric(value)) {
             ((RecordBody) value).references().forEach(reference -> names.add(reference.name()));
         }
         return names;
@@ -80,7 +80,7 @@ public final class OpenEntry {
      * declaration's written bounds are put on its parameters. A closed entry is returned as it is.
      */
     public static Top withParameters(Top value, Map<String, Param> settled) {
-        if (!isOpen(value)) {
+        if (!isParametric(value)) {
             return value;
         }
         RecordBody record = (RecordBody) value;

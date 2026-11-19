@@ -1,11 +1,10 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -22,12 +21,12 @@ import java.util.Set;
  * <p><b>Growth is unwritable before this runs.</b> An argument is a name or a parameter (§5.3), so {@code weird => <T>
  * { next?: weird<box<T>> } } is refused where its field resolves, and every application a closing reaches draws its
  * arguments from the schema's finitely many names: each recursion repeats an application, which ties to the
- * declaration closing it or is refused where none does ({@code TemplateMaterialiser}). What this rule still refuses
+ * declaration closing it or is refused where none does ({@code ParametricMaterialiser}). What this rule still refuses
  * is a recursive application that permutes the parameters ({@code swap => <A, B> { x?: swap<B, A> } }), duplicates
  * one ({@code dup => <A, B> { x?: dup<A, A> } }) or passes a name for one ({@code c => <T> { next?: c<text> } }), at
  * the declaration, applied or not: with it a cycle of heads is a cycle of applications, which is what lets {@link
  * HeldRecursion} judge at the declaration from the heads alone. It is §5.10.1's positional identity, the restriction
- * ML makes of polymorphic recursion. {@code TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate}
+ * ML makes of polymorphic recursion. {@code ParametricRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate}
  * pins it.
  *
  * <p><b>Mutual recursion needs reachability, not just a self-edge.</b> Neither parametric record in an {@code a → b → a}
@@ -37,9 +36,9 @@ import java.util.Set;
  * writes, whether or not the parametric record is ever applied. This compares positionally only where the arity already
  * matches.
  */
-final class TemplateRegularity {
+final class ParametricRegularity {
 
-    private TemplateRegularity() {
+    private ParametricRegularity() {
     }
 
     /**
@@ -54,14 +53,14 @@ final class TemplateRegularity {
         Set<String> irregular = new LinkedHashSet<>();
         Map<String, List<Application>> applications = new LinkedHashMap<>();
         for (Map.Entry<String, Top> entry : entries.entrySet()) {
-            if (!OpenEntry.parameterNames(entry.getValue()).isEmpty()) {
+            if (!ParametricEntry.parameterNames(entry.getValue()).isEmpty()) {
                 applications.put(entry.getKey(), applicationsIn(entry.getValue()));
             }
         }
-        for (Map.Entry<String, List<Application>> template : applications.entrySet()) {
-            String name = template.getKey();
-            List<String> parameters = OpenEntry.parameterNames(entries.get(name));
-            for (Application application : template.getValue()) {
+        for (Map.Entry<String, List<Application>> record : applications.entrySet()) {
+            String name = record.getKey();
+            List<String> parameters = ParametricEntry.parameterNames(entries.get(name));
+            for (Application application : record.getValue()) {
                 if (!reaches(application.head(), name, applications)) {
                     continue; // not on a cycle back to this declaration -- nothing to keep regular
                 }
@@ -137,11 +136,11 @@ final class TemplateRegularity {
      * Every application a parametric record's body writes, at any depth of types written in place.
      *
      * <p>Every entry with parameters is a parametric record, which answers which applications it writes ({@link
-     * OpenEntry#applications}), the same kind of declared question as its names, which is what keeps this rule at the
+     * ParametricEntry#applications}), the same kind of declared question as its names, which is what keeps this rule at the
      * declaration, before anything is resolved against it.
      */
-    private static List<Application> applicationsIn(Top template) {
-        return OpenEntry.applications(template).stream()
+    private static List<Application> applicationsIn(Top record) {
+        return ParametricEntry.applications(record).stream()
                 .map(application -> new Application(application.head().name(), application.arguments())).toList();
     }
 }

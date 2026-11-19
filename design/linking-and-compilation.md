@@ -44,8 +44,8 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   and each is merged through imports.
 - A namespace type resolves to a `NamespaceBody`, and a value of it is read as the map `NamespaceBody.read()` states:
   both compilers hand that map to the `map` factory, so neither factory table has a `namespace` entry.
-- `checkOpenArity` is the one place an entry's own parameters are in scope: it reads a parametric record's references, a
-  `ParamRef` among them, and judges arity alone. A closed entry holds no parameter, so `validateTypeRef` and
+- `checkParametricArity` is the one place an entry's own parameters are in scope: it reads a parametric record's
+  references, a `ParamRef` among them, and judges arity alone. A closed entry holds no parameter, so `validateTypeRef` and
   `checkFieldValue` resolve every name in the schema's namespace.
 - `TsonSchemaRegistry` never overwrites an identity and exposes no way to remove or enumerate one: that *is* the
   "locked" guarantee.
@@ -54,7 +54,7 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   (`TypeChain.isConstructor`) reads a parametric record's chain as a closed one's, judging `top` by its origin.
 
 Related: `design/namespace-types-and-value-entries.md`, `design/references.md`, `design/class2-compilation.md`,
-`design/compiled-registries.md`, `design/schema-resolution.md`, `design/template-materialisation.md`.
+`design/compiled-registries.md`, `design/schema-resolution.md`, `design/parametric-materialisation.md`.
 
 ## Why two modules
 
@@ -63,12 +63,12 @@ Resolution handles one declaration at a time, references carried as unverified s
 `tson-compiler` beside parse, desugar, resolve and compile, with `Diagnostic` and with `ltr8-regex` in direct reach;
 the registry is storage over the `schema.meta` value model and stays in `tson-schema`, the leaf everything depends on.
 
-**The linker materializes nothing.** `SchemaDesugarer` and `TemplateMaterialiser` have turned every sugar form and
+**The linker materializes nothing.** `SchemaDesugarer` and `ParametricMaterialiser` have turned every sugar form and
 closable application into a declaration one phase earlier, in the module that can bind a constructor generically. The
 references carrying arguments the linker sees are inside parametric records, validated and never rewritten, every argument
 judged as a type's name; an application
 whose head names nothing in scope keeps its argument list rather than collapsing to its bare head
-(`design/template-materialisation.md`), so what the linker judges is what the author wrote.
+(`design/parametric-materialisation.md`), so what the linker judges is what the author wrote.
 
 ## Canonical identity (`CanonicalIdentity`, [TSON-DATA] §2.2.1)
 
@@ -178,12 +178,12 @@ Both are decidable at link and neither depends on anyone applying a parametric r
   and fails at read time against a document with nothing wrong with it. A parametric record is not a type (§5.10), so a
   bare parametric record is refused at every position -- a field, element, map key or value, tuple position, choice variant
   or argument -- the message naming the remedy: the application, or the abstract record a
-  family's applications compose. An operand is `DefinitionResolver.refuseUnappliedTemplate`'s, one phase earlier. A
+  family's applications compose. An operand is `DefinitionResolver.refuseUnappliedParametricRecord`'s, one phase earlier. A
   type parameter written with arguments (`T<text>`) is refused: §5.10 admits no head abstraction.
-- **Parameter usage** (`checkOpenEntryUsesEveryParameter`): a parametric record references every parameter it declares, so
-  `box => <T> { v: text }` is refused. The converse needs no check: at a closed entry a token in a value slot *is* a
-  literal, and a parameter reference is already an unresolved one.
-- **A parametric record answers arity for every reference it holds** (`checkOpenArity`), bare ones included: its field
+- **Parameter usage** (`checkParametricRecordUsesEveryParameter`): a parametric record references every parameter it
+  declares, so `box => <T> { v: text }` is refused. The converse needs no check: at a closed entry a token in a value
+  slot *is* a literal, and a parameter reference is already an unresolved one.
+- **A parametric record answers arity for every reference it holds** (`checkParametricArity`), bare ones included: its field
   types and parents are references of the model, so a parametric record named bare inside a parametric record is
   refused at the latter's own declaration, and a field named `box` beside a parametric record of that name is told apart, a
   field name being no reference. What a reference *resolves to* waits for an application, so type-kind validation and

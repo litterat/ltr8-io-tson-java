@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.Sum;
@@ -10,7 +11,6 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 
@@ -93,7 +93,7 @@ final class TypeInhabitance {
             Set<String> inhabited) {
         // A parametric record is not walked: its parameters mean nothing until substitution supplies the arguments,
         // so a parametric record is inhabited here and each closure, which does supply them, is judged on its own.
-        if (OpenEntry.isOpen(definition)) {
+        if (ParametricEntry.isParametric(definition)) {
             return true;
         }
         return switch (definition) {
@@ -327,7 +327,7 @@ final class TypeInhabitance {
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */
     private static String firstUnsatisfiedDependency(Top definition,
             Map<String, Top> namespace, Set<String> inhabited) {
-        if (definition == null || OpenEntry.isOpen(definition)) {
+        if (definition == null || ParametricEntry.isParametric(definition)) {
             return null; // a parametric record is inhabited, as isInhabited says
         }
         return switch (definition) {

@@ -5,7 +5,8 @@ are declared in (`schema.meta`, `unicode`, `numeric`, `net`, `binary`, `temporal
 families' shared facet mechanics), `TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`, and
 `TsonBundledSchemas`. Read `design/linking-and-compilation.md` for the
 registry and identity, `design/namespace-types-and-value-entries.md` for `NamespaceBody`, `Namespace` and `ValueEntry`,
-`design/open-records.md` for a parametric record (`RecordBody` with `parameters`, `Param`, `ParamRef`, `OpenEntry`).
+`design/parametric-records.md` for a parametric record (`RecordBody` with `parameters`, `Param`, `ParamRef`,
+`ParametricEntry`).
 
 - Names no `tson-compiler` type — the engine depends on this module, not the reverse. Where a compiler type is needed
   structurally, declare a stand-in (`schema.meta.Token`, `tson-base`'s `SourcePosition`).

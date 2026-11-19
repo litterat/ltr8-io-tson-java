@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Top;
 
 /**
@@ -31,6 +31,6 @@ interface DefinitionGetter {
      * the declaration.
      */
     default boolean opens(String name) {
-        return OpenEntry.isOpen(definition(AliasChain.terminal(name, this::definition)));
+        return ParametricEntry.isParametric(definition(AliasChain.terminal(name, this::definition)));
     }
 }

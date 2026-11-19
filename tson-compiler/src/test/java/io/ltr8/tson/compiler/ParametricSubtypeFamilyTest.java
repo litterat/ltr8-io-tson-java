@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * would hold for every instantiation at once -- {@code ok<int32>} at a {@code result<text>} position included.
  * Carrying the arguments makes the index answer on its own, which is what every reader already consults.
  */
-class SubtypeTemplateFamilyTest {
+class ParametricSubtypeFamilyTest {
 
     private static final String ID = "https://example.test/subtype-template.tn";
 

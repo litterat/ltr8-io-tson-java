@@ -50,11 +50,11 @@ class TypeChainTest {
     void aConstructorIsWhatIsATheKernelsTopAndTheKernelsTopItself() {
         RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
                 .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
-        RecordBody templated = emptyTemplate(List.of(new Param("T")))
+        RecordBody parametric = emptyParametricRecord(List.of(new Param("T")))
                 .withSupertypes(List.of("meta.namespace", "meta.top"));
 
         assertTrue(TypeChain.isConstructor("numeric.integer_type", constructor, n -> true));
-        assertTrue(TypeChain.isConstructor("op", templated, n -> true), "a parametric record answers as its closed form");
+        assertTrue(TypeChain.isConstructor("op", parametric, n -> true), "a parametric record answers as its closed form");
         assertTrue(TypeChain.isConstructor("meta.top", RecordBody.of(RecordBody.fieldMap()), n -> true));
         assertFalse(TypeChain.isConstructor("numeric.integer_type", constructor, n -> false), "a schema's own top");
         assertFalse(TypeChain.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
@@ -62,7 +62,7 @@ class TypeChainTest {
 
     @Test
     void aParametricRecordCarriesAChainAsAnyTypeDoes() {
-        RecordBody pet = emptyTemplate(List.of(new Param("T")));
+        RecordBody pet = emptyParametricRecord(List.of(new Param("T")));
         RecordBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
                 .withSubtypes(List.of("dog")));
 
@@ -74,19 +74,19 @@ class TypeChainTest {
 
     @Test
     void aParametricRecordHoldsItsParametersAsParameterReferences() {
-        RecordBody open = new RecordBody(TypeChain.EMPTY.withParents(List.of(ApplyBody.of("base", "T").inPlace())),
+        RecordBody record = new RecordBody(TypeChain.EMPTY.withParents(List.of(ApplyBody.of("base", "T").inPlace())),
                 List.of(new Param("T")), RecordBody.fieldMap(
                 Map.entry("v", RecordField.required(TypeRef.of("T"))),
                 Map.entry("w", RecordField.required(ApplyBody.of("box", "T").inPlace())),
                 Map.entry("x", RecordField.required(TypeRef.of("text")))),
                 List.of(), RecordExtensionType.OPEN, List.of(), Optional.empty());
 
-        assertTrue(open.isOpen());
-        assertEquals(ParamRef.of("T"), open.fields().get("v").type());
+        assertTrue(record.isParametric());
+        assertEquals(ParamRef.of("T"), record.fields().get("v").type());
         assertEquals(new ApplyBody(TypeRef.of("box"), List.of(ParamRef.of("T"))).inPlace(),
-                open.fields().get("w").type());
-        assertEquals(TypeRef.of("text"), open.fields().get("x").type());
-        assertEquals(List.of(new ApplyBody(TypeRef.of("base"), List.of(ParamRef.of("T"))).inPlace()), open.parents());
+                record.fields().get("w").type());
+        assertEquals(TypeRef.of("text"), record.fields().get("x").type());
+        assertEquals(List.of(new ApplyBody(TypeRef.of("base"), List.of(ParamRef.of("T"))).inPlace()), record.parents());
     }
 
     /**
@@ -98,11 +98,11 @@ class TypeChainTest {
         TypeInline inPlace = new TypeInline(RecordBody.of(RecordBody.fieldMap(
                 Map.entry("cursor", RecordField.required(TypeRef.of("T"))),
                 Map.entry("all", RecordField.required(new TypeInline(ArrayBody.of(TypeRef.of("T"))))))));
-        RecordBody open = new RecordBody(TypeChain.EMPTY, List.of(new Param("T")), RecordBody.fieldMap(
+        RecordBody record = new RecordBody(TypeChain.EMPTY, List.of(new Param("T")), RecordBody.fieldMap(
                 Map.entry("meta", RecordField.required(inPlace))), List.of(), RecordExtensionType.OPEN, List.of(),
                 Optional.empty());
 
-        RecordBody meta = (RecordBody) ((TypeInline) open.fields().get("meta").type()).of();
+        RecordBody meta = (RecordBody) ((TypeInline) record.fields().get("meta").type()).of();
         assertEquals(ParamRef.of("T"), meta.fields().get("cursor").type());
         assertEquals(new TypeInline(ArrayBody.of(ParamRef.of("T"))), meta.fields().get("all").type());
         assertThrows(IllegalArgumentException.class, () -> new RecordBody(TypeChain.EMPTY, List.of(new Param("U")),
@@ -110,7 +110,7 @@ class TypeChainTest {
                 RecordExtensionType.OPEN, List.of(), Optional.empty()), "T is not U's");
     }
 
-    private static RecordBody emptyTemplate(List<Param> parameters) {
+    private static RecordBody emptyParametricRecord(List<Param> parameters) {
         return new RecordBody(TypeChain.EMPTY, parameters, new io.ltr8.annotation.AnnotatedMap<>(), List.of(),
                 RecordExtensionType.OPEN, List.of(), Optional.empty());
     }

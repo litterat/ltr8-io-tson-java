@@ -183,7 +183,7 @@ class TsonSchemaLinkerTest {
     }
 
     /** A one-parameter parametric record whose one field {@code field} is typed by the parameter ([TSON-SCHEMA] §5.10). */
-    private static Top recordTemplate(String parameter, String field) {
+    private static Top parametricRecord(String parameter, String field) {
         return new RecordBody(null, List.of(new Param(parameter)),
                 RecordBody.fieldMap(Map.entry(field, RecordField.required(TypeRef.of(parameter)))), null,
                 RecordExtensionType.OPEN, null, Optional.empty());
@@ -201,7 +201,7 @@ class TsonSchemaLinkerTest {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", textEntry());
         entries.put("other",
-                recordTemplate("U", "v"));
+                parametricRecord("U", "v"));
         ApplyBody otherOfToken = new ApplyBody(TypeRef.of("other"), List.of(TypeRef.of("token")));
         entries.put("generic", RecordBody.of(RecordBody.fieldMap()));
 

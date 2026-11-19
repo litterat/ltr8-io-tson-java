@@ -12,7 +12,7 @@ import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RefBody;
@@ -115,12 +115,12 @@ final class ParameterTypes {
         Set<String> refused = new LinkedHashSet<>();
         Map<String, List<ApplyBody>> written = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
-            if (!OpenEntry.isOpen(definition) || !local.contains(name)) {
+            if (!ParametricEntry.isParametric(definition) || !local.contains(name)) {
                 return;
             }
             try {
-                written.put(name, OpenEntry.applications(definition));
-                for (Param parameter : OpenEntry.parameters(definition)) {
+                written.put(name, ParametricEntry.applications(definition));
+                for (Param parameter : ParametricEntry.parameters(definition)) {
                     parameter.bound().ifPresent(bound -> requireType(bound, entries::get));
                 }
             } catch (SchemaValidationException e) {
@@ -131,7 +131,7 @@ final class ParameterTypes {
         Callees callees = new Callees(entries, local, Set.copyOf(refused), meta);
         written.forEach((name, applications) -> {
             Map<String, Param> mine = new LinkedHashMap<>();
-            OpenEntry.parameters(entries.get(name)).forEach(p -> mine.put(p.name(), p));
+            ParametricEntry.parameters(entries.get(name)).forEach(p -> mine.put(p.name(), p));
             try {
                 for (ApplyBody application : applications) {
                     callees.passedOn(application, mine::get);
@@ -181,8 +181,8 @@ final class ParameterTypes {
         void passedOn(ApplyBody application, Function<String, Param> parameterOf) {
             String name = application.head().name();
             Top head = entries.get(name);
-            List<Param> heads = OpenEntry.isOpen(head) && !refused.contains(name)
-                    ? OpenEntry.parameters(head) : List.of();
+            List<Param> heads = ParametricEntry.isParametric(head) && !refused.contains(name)
+                    ? ParametricEntry.parameters(head) : List.of();
             for (int i = 0; i < application.arguments().size() && i < heads.size(); i++) {
                 Param mine = parameterOf.apply(application.arguments().get(i).name());
                 if (mine != null) {

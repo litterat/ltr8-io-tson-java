@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * because what is being asserted is the user-visible half: the problem arrives as a collected {@link
  * Diagnostic}, not as an exception past the collector.
  */
-class TemplateClosesByApplicationTest {
+class ParametricRecordClosesByApplicationTest {
 
     private static final String VOCABULARY = "https://example.test/m.tn";
     private static final String USER = "https://example.test/u.tn";

@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -233,8 +233,9 @@ class TypeInPlaceSubstitutionTest {
                 record.fields().values().forEach(field -> TypeSlots.applications(field.type(), held::add));
             }
             for (ApplyBody application : held) {
-                assertTrue(OpenEntry.isOpen(entries.get(application.head().name())) && OpenEntry.isOpen(value)
-                        && OpenEntry.parameterIn(application.inPlace()).isPresent(), name + " holds "
+                assertTrue(ParametricEntry.isParametric(entries.get(application.head().name()))
+                        && ParametricEntry.isParametric(value)
+                        && ParametricEntry.parameterIn(application.inPlace()).isPresent(), name + " holds "
                         + application.text());
             }
         }

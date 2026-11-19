@@ -44,7 +44,7 @@ import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Completion;
 import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.Extern;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
@@ -94,11 +94,11 @@ import java.util.stream.Stream;
  *   <em>tightening</em> entry (§5.7, {@link #resolveTighteningField}) that replaces it in place, checked
  *   against §5.7's transition table ({@link #refines}), with an elided type-ref inheriting
  *   the source field's type. A supertype may be an application of a parametric record, absorbed by value whether its
- *   arguments are concrete or the declaration's own parameters ({@link #openOperand}). A body group naming an
+ *   arguments are concrete or the declaration's own parameters ({@link #parametricOperand}). A body group naming an
  *   inherited group restates it ({@link #restatesInheritedGroup}).</li>
  *   <li><b>An alias</b> ({@code name => other_name}, §8.3) -- an {@code ALIAS}-kind entry whatever the
  *   name resolves to, carried unverified; the linker validates it. <b>An application</b>
- *   ({@code bx => box<text>}, {@link #resolveTemplateApplication}) is the same declaration carrying
+ *   ({@code bx => box<text>}, {@link #resolveApplication}) is the same declaration carrying
  *   arguments: over a constructor it is the construction it spells, a constructor's application among its arguments
  *   constructed in turn, and over a parametric record, its arguments names, it closes <em>into</em> the declared
  *   name.</li>
@@ -115,10 +115,10 @@ import java.util.stream.Stream;
  * <p><b>A declaration carrying type parameters (§5.10) is a parametric record</b>: a {@code meta.record} carrying
  * {@code parameters}, read at its declaration against {@code record}'s own vocabulary as any record is -- a fresh
  * record or a composition built over the builder's own fields ({@link Built}), or the explicit {@code
- * <T> !meta.record { … }} bound through {@code record}'s reader ({@link #openInstance}). Inside it a name its
+ * <T> !meta.record { … }} bound through {@code record}'s reader ({@link #parametricInstance}). Inside it a name its
  * parameters declare is a parameter, which {@link RecordBody} holds as a {@code ParamRef}. Any other head under a
- * parameter list is refused ({@link #openInstance}). Nothing is substituted here -- that is {@code
- * TemplateMaterialiser}'s, over the resolved form.
+ * parameter list is refused ({@link #parametricInstance}). Nothing is substituted here -- that is {@code
+ * ParametricMaterialiser}'s, over the resolved form.
  *
  * <p><b>The exception types are the classification.</b> A {@link io.ltr8.tson.base.SchemaValidationException}
  * says the author's schema is wrong and the spec says so; an {@link UnsupportedOperationException} says this
@@ -342,13 +342,13 @@ final class DefinitionResolver {
      * bound its callee admits, are judged once every declaration is ready ({@link ParameterTypes#check}).
      */
     private Top withBounds(SchemaMap.Declaration declaration, Top resolved) {
-        if (declaration.parameterTypes().isEmpty() || !OpenEntry.isOpen(resolved)) {
+        if (declaration.parameterTypes().isEmpty() || !ParametricEntry.isParametric(resolved)) {
             return resolved;
         }
         Map<String, Param> bounded = new LinkedHashMap<>();
         declaration.parameterTypes().forEach((parameter, written) -> bounded.put(parameter,
                 new Param(parameter, Optional.of(parameterType(parameter, written)))));
-        return OpenEntry.withParameters(resolved, bounded);
+        return ParametricEntry.withParameters(resolved, bounded);
     }
 
     /**
@@ -396,8 +396,8 @@ final class DefinitionResolver {
      */
     private Top withExtension(SchemaMap.Declaration declaration, Top resolved) {
         Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.mark());
-        boolean open = OpenEntry.isOpen(resolved);
-        if (open && extension.orElse(null) == RecordExtensionType.FINAL) {
+        boolean parametric = ParametricEntry.isParametric(resolved);
+        if (parametric && extension.orElse(null) == RecordExtensionType.FINAL) {
             throw new SchemaValidationException("'" + declaration.name() + "': 'final' is refused on a parametric record"
                     + " -- a parametric record is applied to be composed, each member of a family composing an application"
                     + " of it, and the mark would forbid that of every application. Declare the application and mark"
@@ -542,7 +542,7 @@ final class DefinitionResolver {
                 yield switch (typeExprDef.ref()) {
                     case NameRef simple -> new io.ltr8.tson.schema.meta.Alias(
                             io.ltr8.tson.schema.meta.TypeRef.of(simple.name()));
-                    case ApplicationRef generic -> resolveTemplateApplication(name, generic);
+                    case ApplicationRef generic -> resolveApplication(name, generic);
                     // A declaration-level container form is rewritten by SchemaDesugarer before resolution into the
                     // `!meta.array { ... }` (or map, tuple, choice) construction it denotes (§5.3), and a construction
                     // in place stands only at a field's type -- so one here is that phase not having run.
@@ -552,7 +552,7 @@ final class DefinitionResolver {
             }
             // A parameter list admits only a parametric record's explicit spelling, `<T> !meta.record { ... }` (§5.10).
             case Instance instance -> instance.typeParams().isEmpty() ? resolveInstance(name, instance)
-                    : openInstance(name, instance);
+                    : parametricInstance(name, instance);
             case AtomRefinement refinement -> resolveAtomRefinement(name, refinement);
             // A schema map nested as an entry: a value of `schema` whose members are declarations of this document
             // under their paths, each resolved as any entry is. Its namespace is built from them wherever the
@@ -684,7 +684,7 @@ final class DefinitionResolver {
 
     /** Whether a construction may apply {@code definition} directly: a closed entry that is not abstract. */
     private static boolean isInstantiable(Top definition) {
-        return definition != null && !OpenEntry.isOpen(definition)
+        return definition != null && !ParametricEntry.isParametric(definition)
                 && !(definition instanceof RecordBody record && record.extension() == RecordExtensionType.ABSTRACT);
     }
 
@@ -762,7 +762,7 @@ final class DefinitionResolver {
         refuseDeclaredApplication(name, head, instance.value());
         refuseWrittenParameters(name, head, instance.value());
         Top constructor = head.definition();
-        List<String> constructorParameters = OpenEntry.parameterNames(constructor);
+        List<String> constructorParameters = ParametricEntry.parameterNames(constructor);
         if (!constructorParameters.isEmpty()) {
             int declared = constructorParameters.size();
             throw new SchemaValidationException("'" + name + "': '" + target + "' is a parametric record taking "
@@ -964,16 +964,16 @@ final class DefinitionResolver {
     /**
      * {@code <T> !C value} -- a parameter list before a construction. A parametric record's body is a record body
      * ([TSON-SCHEMA] §5.10), so it is admitted before {@code record} alone, past its alias hops:
-     * {@code <T> !meta.record { … }} is the explicit spelling of a parametric record ({@link #openRecord}). Before a
+     * {@code <T> !meta.record { … }} is the explicit spelling of a parametric record ({@link #parametricRecord}). Before a
      * constructor it is refused with what to write instead -- the application where it is used, or its construction left
      * open and completed -- and before an ordinary type,
      * whose value is no record body at all, with one declaration per instantiation.
      */
-    private Top openInstance(String name, Instance template) {
-        String target = template.target();
+    private Top parametricInstance(String name, Instance instance) {
+        String target = instance.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
         if (head.name().equals(WireForm.RECORD)) {
-            return openRecord(name, template);
+            return parametricRecord(name, instance);
         }
         String prefix = "'" + name + "': a parametric record's body is a record body -- braces or a composition (§5.10) -- "
                 + "and '!" + target + " { ... }' ";
@@ -997,8 +997,8 @@ final class DefinitionResolver {
      * does not declare names the record's vocabulary, and a parameter at a slot that names no type is refused for
      * standing there ({@link ParameterTypes#checkSlots}) rather than for not reading as a boolean.
      */
-    private Top openRecord(String name, Instance template) {
-        DataValue payload = template.value();
+    private Top parametricRecord(String name, Instance instance) {
+        DataValue payload = instance.value();
         if (!(resolveConstructorTarget(name, WireForm.RECORD).definition() instanceof RecordBody vocabulary)) {
             throw new IllegalStateException("'" + name + "': constructor '" + WireForm.RECORD + "' is no record");
         }
@@ -1009,17 +1009,17 @@ final class DefinitionResolver {
             throw new SchemaValidationException("'" + name + "': a parametric record's explicit body is a braced record of "
                     + "'" + WireForm.RECORD + "' bindings (§5.10)");
         }
-        checkTemplateBindings(name, WireForm.RECORD, vocabulary, bindings);
-        ParameterTypes.checkSlots(template.typeParams(), payload, vocabularyDefinitions::definition);
-        refuseLiteralOnParameter(payload, template.typeParams());
+        checkParametricBindings(name, WireForm.RECORD, vocabulary, bindings);
+        ParameterTypes.checkSlots(instance.typeParams(), payload, vocabularyDefinitions::definition);
+        refuseLiteralOnParameter(payload, instance.typeParams());
         List<RecordValue.Field> withParameters = new ArrayList<>(
                 ((RecordValue) rewrite.inPlace(payload, false).coreValue()).fields());
         withParameters.add(new RecordValue.Field(WireForm.PARAMETERS, WireForm.plain(new ArrayValue(
-                template.typeParams().stream().map(parameter -> WireForm.plain(new RecordValue(List.of(
+                instance.typeParams().stream().map(parameter -> WireForm.plain(new RecordValue(List.of(
                         WireForm.nameField(WireForm.NAME, parameter))))).toList()))));
         Top built = bindAtomInstance(name, new DataValue(payload.annotations(), Optional.of(WireForm.RECORD),
                 new RecordValue(withParameters)), WireForm.RECORD);
-        if (!(built instanceof RecordBody record) || !record.isOpen()) {
+        if (!(built instanceof RecordBody record) || !record.isParametric()) {
             throw new IllegalStateException("'" + name + "': '!" + WireForm.RECORD + " { ... }' with parameters bound to "
                     + "something other than a parametric record");
         }
@@ -1031,18 +1031,18 @@ final class DefinitionResolver {
      * field's name (a group member's included) or the record's name type -- the record's own field names are read by
      * that, at the declaration -- and a selector and a literal each need a closed type.
      */
-    private static RecordBody checked(RecordBody open) {
-        for (String field : open.fields().keySet()) {
-            if (open.parameterNames().contains(field)) {
+    private static RecordBody checked(RecordBody record) {
+        for (String field : record.fields().keySet()) {
+            if (record.parameterNames().contains(field)) {
                 throw ParameterTypes.at(field, "a key of " + WireForm.RECORD + "." + WireForm.FIELDS);
             }
         }
-        open.nameType().filter(open.parameterNames()::contains).ifPresent(parameter -> {
+        record.nameType().filter(record.parameterNames()::contains).ifPresent(parameter -> {
             throw ParameterTypes.at(parameter, WireForm.RECORD + "." + WireForm.NAME_TYPE);
         });
-        refuseParameterTypedSelector(open);
-        refuseLiteralOnOpenType(open);
-        return open;
+        refuseParameterTypedSelector(record);
+        refuseLiteralOnParameterType(record);
+        return record;
     }
 
     /**
@@ -1051,8 +1051,8 @@ final class DefinitionResolver {
      * box<T> ~ 5}) or at a slot in place ({@code w?: [T] ~ []}), has a different type in every application. Such a
      * field takes no value, in the parametric record and in every record written in place inside it.
      */
-    private static void refuseLiteralOnOpenType(RecordBody open) {
-        literalsOnOpenTypes(open);
+    private static void refuseLiteralOnParameterType(RecordBody record) {
+        literalsOnParameterTypes(record);
         io.ltr8.tson.schema.meta.TypeSlots.Rewrite inPlace = new io.ltr8.tson.schema.meta.TypeSlots.Rewrite() {
             @Override
             public io.ltr8.tson.schema.meta.TypeRef atName(io.ltr8.tson.schema.meta.TypeRef reference) {
@@ -1061,26 +1061,26 @@ final class DefinitionResolver {
 
             @Override
             public Type inPlace(Type body) {
-                if (body instanceof RecordBody record) {
-                    literalsOnOpenTypes(record);
+                if (body instanceof RecordBody nested) {
+                    literalsOnParameterTypes(nested);
                 }
                 return body;
             }
         };
-        open.fields().values().forEach(field -> io.ltr8.tson.schema.meta.TypeSlots.map(field.type(), inPlace));
+        record.fields().values().forEach(field -> io.ltr8.tson.schema.meta.TypeSlots.map(field.type(), inPlace));
     }
 
-    private static void literalsOnOpenTypes(RecordBody record) {
+    private static void literalsOnParameterTypes(RecordBody record) {
         record.fields().forEach((name, field) -> {
-            Optional<String> parameter = OpenEntry.parameterIn(field.type());
+            Optional<String> parameter = ParametricEntry.parameterIn(field.type());
             if (parameter.isPresent() && field.value().isPresent()) {
-                throw literalOnOpenType(name, parameter.get(), field.value().get().text());
+                throw literalOnParameterType(name, parameter.get(), field.value().get().text());
             }
         });
     }
 
     /**
-     * {@link #refuseLiteralOnOpenType}'s rule over the payload not yet bound, for a field whose whole type is a
+     * {@link #refuseLiteralOnParameterType}'s rule over the payload not yet bound, for a field whose whole type is a
      * parameter: read against {@code record_field} its literal {@code value}, typed {@code type!}, would be read against
      * a type nothing declares. So it is refused for where it stands before the reader is asked, as {@link
      * ParameterTypes#checkSlots} refuses a parameter at a value.
@@ -1097,7 +1097,7 @@ final class DefinitionResolver {
                         Optional<String> parameter = tokenAt(field, WireForm.TYPE).filter(parameters::contains);
                         Optional<String> literal = tokenAt(field, WireForm.VALUE);
                         if (parameter.isPresent() && literal.isPresent()) {
-                            throw literalOnOpenType(name.text(), parameter.get(), literal.get());
+                            throw literalOnParameterType(name.text(), parameter.get(), literal.get());
                         }
                     }
                 });
@@ -1112,7 +1112,7 @@ final class DefinitionResolver {
                 .map(field -> ((TokenValue) field.value().coreValue()).text());
     }
 
-    private static SchemaValidationException literalOnOpenType(String field, String parameter, String literal) {
+    private static SchemaValidationException literalOnParameterType(String field, String parameter, String literal) {
         return new SchemaValidationException("field '" + field + "' is typed by the parameter '" + parameter
                 + "' and carries the literal value '" + literal + "' -- a literal needs a closed type, and this "
                 + "field's type differs in every application. Write no value here, and state it where the "
@@ -1125,10 +1125,10 @@ final class DefinitionResolver {
      * members pin it in the declarations composing the application, so a selector whose type varies per application
      * is no selector a family can be written against (§5.2, §5.10).
      */
-    private static void refuseParameterTypedSelector(RecordBody open) {
-        for (String name : open.discriminators()) {
-            RecordField field = open.fields().get(name);
-            Optional<String> parameter = field == null ? Optional.empty() : OpenEntry.parameterIn(field.type());
+    private static void refuseParameterTypedSelector(RecordBody record) {
+        for (String name : record.discriminators()) {
+            RecordField field = record.fields().get(name);
+            Optional<String> parameter = field == null ? Optional.empty() : ParametricEntry.parameterIn(field.type());
             if (parameter.isPresent()) {
                 String typed = field.type() instanceof io.ltr8.tson.schema.meta.ParamRef
                         ? "typed by the type parameter '" : "typed by an application of the parameter '";
@@ -1145,8 +1145,11 @@ final class DefinitionResolver {
         return parameters.stream().map(Param::new).toList();
     }
 
-    /** §5.10's two declaration-time questions about a parametric record's explicit payload -- see {@link #openRecord}. */
-    private static void checkTemplateBindings(String name, String target, RecordBody vocabulary,
+    /**
+     * §5.10's two declaration-time questions about a parametric record's explicit payload -- see {@link
+     * #parametricRecord}.
+     */
+    private static void checkParametricBindings(String name, String target, RecordBody vocabulary,
             RecordValue bindings) {
         Set<String> bound = new LinkedHashSet<>();
         for (RecordValue.Field binding : bindings.fields()) {
@@ -1244,7 +1247,7 @@ final class DefinitionResolver {
                                     + "constructor application ('!" + sourceName + " { ... }')?"
                             : source instanceof RecordBody record
                                     ? "a record, which takes no '^' -- its fields are restated in a composition, '"
-                                            + sourceName + (record.isOpen() ? "<...>" : "") + " & { ... }' (§5.8)"
+                                            + sourceName + (record.isParametric() ? "<...>" : "") + " & { ... }' (§5.8)"
                                     : "a '!" + tagOf(sourceName, source) + "' value, which is finished and takes "
                                             + "no refinement"));
         }
@@ -1780,17 +1783,17 @@ final class DefinitionResolver {
      * facts. §8.2 makes a declared entry's identity its name, and a declaration that <em>constructs</em> a type keeps
      * it ({@code text_list => [text]} is the entry), so one that <em>denotes</em> a type obeys the same rule.
      */
-    private Top resolveTemplateApplication(String name, ApplicationRef generic) {
+    private Top resolveApplication(String name, ApplicationRef generic) {
         Optional<DataValue> constructed = rewrite.body(generic);
         if (constructed.isPresent()) {
             return resolveInstance(name, new Instance(constructed.get()), true);
         }
         if (!ConstructionRewrite.namesOnly(generic)) {
             // Which parametric record is applied, and to how many arguments, is judged before what the arguments are.
-            Top definition = namespaceDefinitions.definition(Ancestry.templateHead(generic.name(),
+            Top definition = namespaceDefinitions.definition(Ancestry.parametricHead(generic.name(),
                     namespaceDefinitions));
-            if (!OpenEntry.isOpen(definition)
-                    || OpenEntry.parameterNames(definition).size() != generic.args().size()) {
+            if (!ParametricEntry.isParametric(definition)
+                    || ParametricEntry.parameterNames(definition).size() != generic.args().size()) {
                 throw unclosed(name, generic.name(), generic.args().size());
             }
             throw ConstructionRewrite.argumentNotAName(generic);
@@ -1813,7 +1816,7 @@ final class DefinitionResolver {
      * in that case, so the verdict is given here rather than left to a later phase.
      */
     private SchemaValidationException unclosed(String name, String head, int supplied) {
-        Top definition = namespaceDefinitions.definition(Ancestry.templateHead(head, namespaceDefinitions));
+        Top definition = namespaceDefinitions.definition(Ancestry.parametricHead(head, namespaceDefinitions));
         if (definition == null) {
             return new SchemaValidationException("'" + name + "' has an unresolved reference '" + head + "'");
         }
@@ -1822,7 +1825,7 @@ final class DefinitionResolver {
             return Externs.sealed("'" + name + "'", "'" + head + "<...>' applies", head,
                     AliasChain.terminal(head, namespaceDefinitions::definition), extern.get());
         }
-        List<String> parameters = OpenEntry.parameterNames(definition);
+        List<String> parameters = ParametricEntry.parameterNames(definition);
         if (parameters.isEmpty()) {
             return new SchemaValidationException("'" + head + "' declares no type parameters, so '" + head
                     + "<...>' applies arguments to something that takes none (§5.10); drop the argument list");
@@ -1876,7 +1879,7 @@ final class DefinitionResolver {
                 // denotes no entry of its own, whether its arguments are this declaration's parameters or
                 // concrete. A parametric record is a macro here -- it contributes its fields and its own ancestors,
                 // and the type the composition produces is *this* declaration.
-                OpenOperand operand = openOperand(name, generic, parameters, "supertype");
+                ParametricOperand operand = parametricOperand(name, generic, parameters, "supertype");
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
                 }
@@ -1944,7 +1947,7 @@ final class DefinitionResolver {
             // shape does, and how the author spelled it is no part of the question (§8.2: what is
             // canonicalised is identity, not provenance). Any other body fails this same test on its own: an
             // array, a map or a choice has no fields to contribute (§4.3).
-            refuseUnappliedTemplate(name, supertypeName, terminalSupertype, "supertype");
+            refuseUnappliedParametricRecord(name, supertypeName, terminalSupertype, "supertype");
             refuseIncomplete(name, supertypeName, terminalSupertype, "supertype");
             if (terminalSupertype instanceof Extern extern) {
                 throw Externs.sealed("'" + name + "'", "'&' and '-' compose", supertypeName, supertypeTerminal,
@@ -2159,8 +2162,8 @@ final class DefinitionResolver {
      * record's are its applications', each with its parameters bound (§5.8, §5.10). A parametric record is no type, so
      * nothing names one bare, an operand included.
      */
-    private static void refuseUnappliedTemplate(String name, String operand, Top definition, String position) {
-        if (OpenEntry.isOpen(definition)) {
+    private static void refuseUnappliedParametricRecord(String name, String operand, Top definition, String position) {
+        if (ParametricEntry.isParametric(definition)) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' is a parametric "
                     + "record and is applied to no arguments -- '&' takes the fields of a record, and a "
                     + "parametric record is not a type: it has fields once its parameters are bound. Write '" + operand
@@ -2233,12 +2236,13 @@ final class DefinitionResolver {
      * {@code box} would hold of {@code box&lt;int32&gt;} as much as of {@code box&lt;text&gt;}, and only one
      * of those admits a {@code vip&lt;text&gt;}.
      */
-    private OpenOperand openOperand(String name, ApplicationRef application, List<String> typeParams, String position) {
+    private ParametricOperand parametricOperand(String name, ApplicationRef application, List<String> typeParams,
+            String position) {
         String head = application.name();
         // An alias of a parametric record is the parametric record under another name (§8.3), and is applied as it is.
-        String templateHead = Ancestry.templateHead(head, namespaceDefinitions);
-        Top template = namespaceDefinitions.definition(templateHead);
-        if (template == null) {
+        String parametricHead = Ancestry.parametricHead(head, namespaceDefinitions);
+        Top definition = namespaceDefinitions.definition(parametricHead);
+        if (definition == null) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' names no type this schema declares or imports");
         }
@@ -2251,16 +2255,16 @@ final class DefinitionResolver {
                     + "<...>' has no fields to contribute -- it constructs a '!" + head + "', a binding record, not a "
                     + "vocabulary, so there is nothing to compose with (§5.8)");
         }
-        if (!OpenEntry.isOpen(template)) {
+        if (!ParametricEntry.isParametric(definition)) {
             // Applied to this declaration's own parameter, so the author wrote arguments; the head takes none.
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' declares no type parameters, so it cannot be applied to '"
                     + String.join(", ", typeParams) + "' (§5.10)");
         }
-        List<String> templateParameters = OpenEntry.parameterNames(template);
-        if (templateParameters.size() != application.args().size()) {
+        List<String> headParameters = ParametricEntry.parameterNames(definition);
+        if (headParameters.size() != application.args().size()) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head + "' declares "
-                    + templateParameters.size() + " type parameter(s) and is applied to "
+                    + headParameters.size() + " type parameter(s) and is applied to "
                     + application.args().size() + " (§5.10)");
         }
         // An argument that is itself an application needs no special case: substitution writes a bound reference
@@ -2269,19 +2273,19 @@ final class DefinitionResolver {
         List<io.ltr8.tson.schema.meta.TypeRef> arguments = typeArguments(name, application);
         // §5.10's bound check, which an operand absorbed by value would otherwise never get.
         if (applicationCloser != null) {
-            applicationCloser.checkArguments(templateHead, template, arguments);
+            applicationCloser.checkArguments(parametricHead, definition, arguments);
         }
         Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings = new LinkedHashMap<>();
-        for (int i = 0; i < templateParameters.size(); i++) {
-            bindings.put(templateParameters.get(i), arguments.get(i));
+        for (int i = 0; i < headParameters.size(); i++) {
+            bindings.put(headParameters.get(i), arguments.get(i));
         }
-        RecordBody record = (RecordBody) template;
+        RecordBody record = (RecordBody) definition;
         // The operand's own parameters are replaced by what this declaration writes, which may be its own parameters;
         // every other name stays.
         SequencedMap<String, BuiltField> fields = new LinkedHashMap<>();
         Substitution.fields(record, bindings).forEach((field, substituted) -> fields.put(field,
                 BuiltField.of(substituted)));
-        return new OpenOperand(Ancestry.ofTemplate(templateHead, namespaceDefinitions), fields, record.groups(),
+        return new ParametricOperand(Ancestry.ofApplication(parametricHead, namespaceDefinitions), fields, record.groups(),
                 record.nameType(), arguments);
     }
 
@@ -2289,7 +2293,7 @@ final class DefinitionResolver {
      * What an operand hands its absorber: the ancestors it can still be indexed under, its fields, and its
      * arguments, which a closed operand keeps in the chain as written until {@code SchemaResolver} folds it.
      */
-    private record OpenOperand(List<String> ancestors, SequencedMap<String, BuiltField> fields,
+    private record ParametricOperand(List<String> ancestors, SequencedMap<String, BuiltField> fields,
                                List<FieldGroup> groups, Optional<String> nameType,
                                List<io.ltr8.tson.schema.meta.TypeRef> arguments) {
     }

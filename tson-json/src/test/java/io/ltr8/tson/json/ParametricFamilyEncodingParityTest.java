@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * is not a type however much it reads like one, and the base's own name selects nothing -- the two cases that
  * look like they should work and must not.
  */
-class TemplateFamilyEncodingParityTest {
+class ParametricFamilyEncodingParityTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"

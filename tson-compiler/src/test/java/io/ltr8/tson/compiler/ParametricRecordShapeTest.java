@@ -10,8 +10,8 @@ import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.TypeInline;
-import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Token;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * record's shape, where it must not be mistaken for a closed record, and the bodies that are refused for being no
  * record.
  */
-class OpenRecordShapeTest {
+class ParametricRecordShapeTest {
 
     private static final String ID = "https://example.test/open-record-shape.tn";
 
@@ -61,19 +61,19 @@ class OpenRecordShapeTest {
         return List.copyOf(problems.diagnostics());
     }
 
-    private static RecordBody open(TsonCompiledSchema compiled, String name) {
+    private static RecordBody parametricRecord(TsonCompiledSchema compiled, String name) {
         RecordBody record = assertInstanceOf(RecordBody.class, compiled.schema().entries().get(name));
-        assertTrue(record.isOpen(), name + " is a parametric record");
+        assertTrue(record.isParametric(), name + " is a parametric record");
         return record;
     }
 
     /** A record body with parameters is a parametric record, a {@code meta.record} carrying them. */
     @Test
     void aParametricRecordIsARecordCarryingParameters() {
-        RecordBody box = open(compile("  box => <T> { v: T }"), "box");
+        RecordBody box = parametricRecord(compile("  box => <T> { v: T }"), "box");
 
         assertEquals(List.of("T"), box.parameterNames());
-        assertTrue(OpenEntry.isOpen(box));
+        assertTrue(ParametricEntry.isParametric(box));
         assertEquals(ParamRef.of("T"), box.fields().get("v").type());
     }
 
@@ -84,7 +84,8 @@ class OpenRecordShapeTest {
      */
     @Test
     void aParameterIsAReferenceWholeOrAtASlotInPlace() {
-        RecordBody pair = open(compile("  pair => <T> { a: T  b: [T]  c: {text => T}  d?: text ~ \"x\" }"), "pair");
+        RecordBody pair = parametricRecord(compile("  pair => <T> { a: T  b: [T]  c: {text => T}  d?: text ~ \"x\" }"),
+                "pair");
 
         assertEquals(ParamRef.of("T"), pair.fields().get("a").type());
         assertEquals(new TypeInline(ArrayBody.of(ParamRef.of("T"))), pair.fields().get("b").type());
@@ -202,7 +203,7 @@ class OpenRecordShapeTest {
                   fam  => <T> base & { v: T }
                 """);
 
-        RecordBody fam = open(compiled, "fam");
+        RecordBody fam = parametricRecord(compiled, "fam");
         assertEquals(Optional.of("T"), fam.fields().get("kind").value().map(Token::text));
         assertEquals(ParamRef.of("T"), fam.fields().get("v").type());
     }
@@ -236,10 +237,10 @@ class OpenRecordShapeTest {
                   swapped => swap<int32, text>
                 """);
 
-        RecordBody swap = open(compiled, "swap");
+        RecordBody swap = parametricRecord(compiled, "swap");
         assertEquals(ParamRef.of("B"), swap.fields().get("first").type());
         assertEquals(ParamRef.of("A"), swap.fields().get("second").type());
-        assertEquals(TypeRef.of("text"), open(compiled, "wrap").fields().get("second").type());
+        assertEquals(TypeRef.of("text"), parametricRecord(compiled, "wrap").fields().get("second").type());
 
         RecordBody swapped = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("swapped"));
         assertEquals(TypeRef.of("text"), swapped.fields().get("first").type());
@@ -277,7 +278,7 @@ class OpenRecordShapeTest {
                 """);
 
         assertEquals(new ApplyBody(TypeRef.of("two"), List.of(ParamRef.of("X"), TypeRef.of("text"))).inPlace(),
-                open(compiled, "t4").fields().get("z").type());
+                parametricRecord(compiled, "t4").fields().get("z").type());
         RecordBody u4 = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("u4"));
         assertEquals(TypeRef.of("int32"), u4.fields().get("x").type());
         assertEquals(List.of(), read(compiled, "u4", "{ z: { a: 1  b: \"t\" }  x: 2 }"));
@@ -324,10 +325,10 @@ class OpenRecordShapeTest {
                   held  => box<int32>
                 """);
 
-        RecordBody box = open(compiled, "box");
+        RecordBody box = parametricRecord(compiled, "box");
         assertEquals(ParamRef.of("T"), box.fields().get("item").type());
-        assertEquals(box.fields(), open(compiled, "spelt").fields());
-        assertEquals(box.fields(), open(compiled, "sugar").fields());
+        assertEquals(box.fields(), parametricRecord(compiled, "spelt").fields());
+        assertEquals(box.fields(), parametricRecord(compiled, "sugar").fields());
         RecordBody held = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("held"));
         assertEquals(TypeRef.of("int32"), held.fields().get("item").type());
     }
@@ -377,7 +378,7 @@ class OpenRecordShapeTest {
      * value pinned {@code "dog"} reads as {@code dogs}.
      */
     @Test
-    void anOpenSubtypeIsNoMemberOfTheFamilyItComposes() {
+    void aParametricSubtypeIsNoMemberOfTheFamilyItComposes() {
         TsonCompiledSchema compiled = compile("""
                   pet    => abstract { type: text =?  name: text }
                   dog_of => <T> pet & { type: text = "dog"  tricks: T }

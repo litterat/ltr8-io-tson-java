@@ -61,7 +61,7 @@ public final class ConstructionSugar {
      * constructed, whatever its chain reaches (§5.10).
      */
     public static boolean constructs(String name, Top definition) {
-        return definition instanceof RecordBody record && !record.isOpen()
+        return definition instanceof RecordBody record && !record.isParametric()
                 && (TYPE.equals(name) || TypeChain.supertypesOf(record).contains(TYPE));
     }
 

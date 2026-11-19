@@ -8,7 +8,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.IncompleteEntry;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.ValueEntry;
@@ -75,7 +75,7 @@ final class ExternHops {
     Optional<Boolean> membership(String name, String of) {
         return landing(name).map(end -> {
             Top definition = end.definition();
-            if (OpenEntry.isOpen(definition) || definition instanceof ValueEntry
+            if (ParametricEntry.isParametric(definition) || definition instanceof ValueEntry
                     || definition instanceof IncompleteEntry) {
                 return false;
             }

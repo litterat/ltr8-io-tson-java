@@ -51,13 +51,13 @@ public final class FamilySelectors {
 
     /** The {@code extension} a base states -- empty for anything but a closed record, an open one being no type. */
     public static Optional<RecordExtensionType> extensionOf(Top definition) {
-        return definition instanceof RecordBody record && !record.isOpen() ? Optional.of(record.extension())
+        return definition instanceof RecordBody record && !record.isParametric() ? Optional.of(record.extension())
                 : Optional.empty();
     }
 
     /** The names a base states -- empty where it dispatches by tag or not at all, or is no closed record. */
     public static List<String> namesOf(Top definition) {
-        return definition instanceof RecordBody record && !record.isOpen() ? record.discriminators() : List.of();
+        return definition instanceof RecordBody record && !record.isParametric() ? record.discriminators() : List.of();
     }
 
     /**

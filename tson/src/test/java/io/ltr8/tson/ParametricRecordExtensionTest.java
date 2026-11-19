@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * application closes to carries the parametric record's {@code extension} and {@code discriminators}, a selector making the
  * parametric record ABSTRACT as it makes a record so.
  */
-class TemplateExtensionTest {
+class ParametricRecordExtensionTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
@@ -50,9 +50,9 @@ class TemplateExtensionTest {
                   pet  => <V> { type: text =?  value: V }
                   arr  => <T> { items: [T] }
                 """);
-        for (String template : List.of("box", "abox", "pet", "arr")) {
-            assertEquals(Optional.empty(), FamilySelectors.extensionOf(entries.get(template)), template);
-            assertEquals(List.of(), FamilySelectors.namesOf(entries.get(template)), template);
+        for (String record : List.of("box", "abox", "pet", "arr")) {
+            assertEquals(Optional.empty(), FamilySelectors.extensionOf(entries.get(record)), record);
+            assertEquals(List.of(), FamilySelectors.namesOf(entries.get(record)), record);
         }
     }
 

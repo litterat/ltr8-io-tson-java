@@ -7,7 +7,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
@@ -231,7 +231,7 @@ class ContainerSugarEndToEndTest {
 
         Top entry = compiled.schema().entries().get("tag_list");
         assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class, entry, "a construction of `array`");
-        assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
+        assertEquals(List.of(), ParametricEntry.parameterNames(entry), "closed -- §5.10");
         assertEquals(List.of(), TypeChain.supertypesOf(entry),
                 "empty: this is a construction of `array`, and a constructor is not a supertype");
         assertEquals(Optional.of("meta.array"), compiled.schema().constructorOf("tag_list"),

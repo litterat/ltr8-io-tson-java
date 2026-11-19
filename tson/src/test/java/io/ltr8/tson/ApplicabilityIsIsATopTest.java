@@ -56,11 +56,12 @@ class ApplicabilityIsIsATopTest {
     @Test
     void aliasAppliesClosedAndRefusesParameters() {
         assertEquals(List.of(), problems("  r => !meta.alias { target: int32 }"));
-        List<Diagnostic> open = problems("""
+        List<Diagnostic> parametric = problems("""
                   r => <T> !meta.alias { target: T }
                 """);
-        assertEquals(1, open.size(), open::toString);
-        assertTrue(open.getFirst().message().contains("a parametric record's body is a record body"), open::toString);
+        assertEquals(1, parametric.size(), parametric::toString);
+        assertTrue(parametric.getFirst().message().contains("a parametric record's body is a record body"),
+                parametric::toString);
     }
 
     /**
