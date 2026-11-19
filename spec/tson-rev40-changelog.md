@@ -1182,6 +1182,14 @@ the closure closes it), and the example's import at `/2026/40/`. This revision c
     JSON value" excepts the object holding one, written wrapped, and read as an annotation
     object where it leads with one. A wrapper with no `$type`, `{ "$value": { … } }`, read
     by class, was the alternative: a wire form for a case a name already covers.
+18. **§3.3** — sorting does not always put the annotation members first. §3.3 argued that
+    code-point sorting produces the leading order, `$` preceding every character an
+    identifier can begin with. A record's name type may admit `$ref`, `$id` and `$defs`
+    (§1.6 item 15), which sort ahead of `$type`, so sorted output of a tagged value of such
+    a record is refused as a misplaced `$type`. The sentence is held to records of
+    `meta.identifier` names and says what an encoder does for the others. Reading the
+    annotation members anywhere in an object's leading run of `$`-named members is not
+    taken in this revision: at a choice or a declared position no record bounds the run.
 
 Part 3 defines no type-system rule, so each is a spelling of a rule §3.2 owns.
 

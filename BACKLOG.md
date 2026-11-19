@@ -304,14 +304,14 @@ encodings ([TSON-JSON] §6.1.1).
   `TsonObjectWriter.describing(linked, root)`, writing each `$type` in the scope it is read in, the boundary's by
   the enclosing scope's name (`tson-schema`'s `ExternAdmission` says which), and one per value, a subtype by its
   own name and never inside a wrapper's `$value` ([TSON-JSON] §3.3).
-- [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 40.** §3.3 requires `$type` (after any `$import`)
-  to lead its object and argues that code-point sorting preserves that; with `meta.record.name_type` admitting `$ref`,
-  `$id` and `$defs` as field names, those sort first, so RFC 8785 canonical output of a tagged value —
-  `{"$ref": "#/a", "$type": "sub", …}` — is refused as a misplaced `$type`. Decided: the reader admits the annotation
-  members anywhere within the object's leading run of `$`-named members, a run bounded by the record's declared `$`
-  fields so the lookahead stays fixed by the schema. Implement it in the JSON readers (`RecordPlan`,
-  `DispatchChoiceReader`, `DispatchDeclaredReader`) and edit §3.3 with it, for Revision 40; Revision 39 keeps
-  the strict lead.
+- [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 41.** §3.3 requires `$type` (after any `$import`)
+  to lead its object; with `meta.record.name_type` admitting `$ref`, `$id` and `$defs` as field names, those sort
+  first, so RFC 8785 canonical output of a tagged value — `{"$ref": "#/a", "$type": "sub", …}` — is refused as a
+  misplaced `$type`, which §3.3 states. The reader would admit the annotation members anywhere within the object's
+  leading run of `$`-named members. Open, and why it waits for the sum types: at a choice or a declared position no
+  record bounds the run, a subtype may declare `$` fields the position's type does not, and a map variant's
+  `{"$ref": 1, "$type": 2}` is a map today (§8.3.1). The readers are `RecordPlan`, `DispatchChoiceReader` and
+  `DispatchDeclaredReader`.
 
 - [ ] **A JSON document has no in-band way to name its schemas — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
