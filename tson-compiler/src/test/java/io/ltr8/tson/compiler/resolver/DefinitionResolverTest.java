@@ -2416,19 +2416,15 @@ class DefinitionResolverTest {
     }
 
     /**
-     * The declaration's mark is its statement of {@code extension}, so the pair is judged after it: {@code abstract}
-     * beside the kernel's form completes it, and {@code final} contradicts a stated ABSTRACT.
+     * The mark is sugar for the record's {@code extension}, and the kernel's form states the field itself, so no mark
+     * stands before it (§5.2, §12.1): whether the stated field agrees or contradicts, the mark is a parse error.
      */
     @Test
-    void theKernelsFormIsJudgedAfterTheDeclarationsMark() {
-        RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
-                "pet => abstract !meta.record { " + KIND + "  discriminators: [kind] }"));
-        assertEquals(RecordExtensionType.ABSTRACT, body.extension());
-
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("pet => final !meta.record { " + KIND
-                        + "  extension: ABSTRACT  discriminators: [kind] }"));
-        assertTrue(thrown.getMessage().contains("beside 'extension: FINAL'"), thrown.getMessage());
+    void theKernelsFormTakesNoMark() {
+        for (String declaration : List.of("pet => abstract !meta.record { " + KIND + "  discriminators: [kind] }",
+                "pet => final !meta.record { " + KIND + "  extension: ABSTRACT  discriminators: [kind] }")) {
+            assertThrows(ParseException.class, () -> resolveSnippetsAgainstMetaKernel(declaration));
+        }
     }
 
     /** The source's {@code =?} still implies ABSTRACT with no mark written. */
@@ -2438,26 +2434,6 @@ class DefinitionResolverTest {
                 resolveSnippetsAgainstMetaKernel("pet => { kind: text =?  name: text }"));
         assertEquals(RecordExtensionType.ABSTRACT, body.extension());
         assertEquals(List.of("kind"), body.discriminators());
-    }
-
-    /** Only a record has an extension fact to state; the mark has nowhere to land on anything else. */
-    @Test
-    void aDefinitionMarkOnANonRecordIsRefused() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => abstract !enum [A B]"));
-        assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
-                thrown.getMessage());
-    }
-
-    /**
-     * And there is no <em>open</em> non-record for a mark to land on: a parametric record's body is a record body, so a
-     * parameter list before {@code !meta.array} is refused first.
-     */
-    @Test
-    void aMarkedParametricRecordOverAConstructorIsRefusedAsNoRecord() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("x => abstract <T> !meta.array { element_type: T }"));
-        assertTrue(thrown.getMessage().contains("a parametric record's body is a record body"), thrown.getMessage());
     }
 
     private static String readFixture(String file) throws IOException {

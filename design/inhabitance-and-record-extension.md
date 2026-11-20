@@ -79,9 +79,9 @@ usable and its members pin them distinctly, and every member is declared.
 - **Why the linker and not the resolver.** Every rule needs a namespace the declaration does not have. FINAL
   constrains whoever composes onto it, which may be another schema; the family rules range over `subtypes`, which
   nothing populates until linking; and a selector's type has to be followed to the end of its alias chain. What is
-  local (two definition marks on one declaration, a mark carrying a value, a mark on a non-record) the resolver
-  already refused while lowering. It runs on the merged map, not the annotated one: the marks are consumed into the
-  body, so no annotation is left to consult.
+  local is settled before: two marks on one declaration, or a mark before anything but a record definition, is a
+  parse error (§12.1). It runs on the merged map, not the annotated one: the marks are consumed into the body, so no
+  annotation is left to consult.
 - **The FINAL check reads the entry's chain**, a parametric record's as a closed type's: a parametric record composing a
   final record is refused at its own declaration, whether or not anything applies it, since every application IS-A
   what the parametric record's written parents reach. §5.9's subtraction leaves the chain empty, adding no IS-A edge, which

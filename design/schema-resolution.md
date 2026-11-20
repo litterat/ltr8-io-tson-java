@@ -154,15 +154,16 @@ one is the ordinary unknown-annotation error.
 
 **The mark is applied once, in `withExtension`.** A fresh record and a composition each build their own
 `RecordBody`, and a mark read in each is a mark they can disagree about. Applying it there is also
-why extensibility is never inherited: a composition's body arrives OPEN from its operands. A mark on a non-record
-is the author's error.
+why extensibility is never inherited: a composition's body arrives OPEN from its operands. The mark is a
+`StructuralTypeDef`'s alone (§12.1), and that always resolves to a record, so no definition that is no record has one
+to refuse.
 
 **A selector is `=?`** (`FieldModifiers.discriminates`), and the record it is written in is the family base: the
 field stays required and unpinned (a pin may not change, §5.8, so a base cannot pin what each member pins
 differently) and its name goes into `record.discriminators`. ABSTRACT is derived from it — the members pin the
 selector, so the base has no values of its own; `abstract` beside it is admitted, `final` refused. **Only the
 source's `=?` derives it.** The kernel's form states both facts, so a `!meta.record` whose `discriminators` stand
-beside any `extension` but ABSTRACT — the default OPEN of a missing one included, judged after the declaration's mark —
+beside any `extension` but ABSTRACT — the default OPEN of a missing one included, no mark standing before it (§12.1) —
 is refused, at a declaration (`withExtension`) and in place (`TypeInline.refusal`, as the record is read). Deriving
 over it lost: it made a stated `extension: FINAL` mean ABSTRACT. Member
 dispatch is ABSTRACT plus non-empty `discriminators`, read where needed (`FamilySelectors.dispatchesOnMembers`)
@@ -179,7 +180,8 @@ value is never a parameter (§5.10), so no pin is derived from one. A selector w
 or ABSTRACT derived from a selector as on a record, sets the parametric record's own `extension`, and closing carries it and
 `discriminators` to the record each application denotes (`ParametricMaterialiser.closeParametricRecord`). `final` is
 refused because a parametric record is applied to be composed, each member of a family composing an application, and the mark
-would forbid that of every application; a final type is a declaration of the application, marked as itself.
+would forbid that of every application; a final type over it is a record composing its application, `final h<a> & {}`,
+a declared application taking no mark.
 
 ## Parametric records: no type
 

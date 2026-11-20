@@ -128,6 +128,27 @@ class AbstractParametricFamilyTest {
                 TypeChain.subtypesOf(registry.get(ID).schema().entries().get(target(registry, "result_int"))));
     }
 
+    // ── One application marked ──────────────────────────────────────────────
+
+    /**
+     * A declared application is its head's substituted record, its {@code extension} the head's (§5.10), so no mark
+     * stands before it (§12.1): one application marked alone is a record composing it, which states its own.
+     */
+    @Test
+    void oneApplicationIsMarkedByARecordComposingIt() {
+        TsonCompiledSchemaRegistry registry = compile(FAMILY + """
+                      box          => <T> { v: T }
+                      abstract_box => abstract box<text> & { }
+                      final_box    => final box<text> & { }
+                      final_result => final result<text> & { }
+                """);
+
+        assertEquals(RecordExtensionType.ABSTRACT, bodyOf(registry, "abstract_box").extension());
+        assertEquals(RecordExtensionType.FINAL, bodyOf(registry, "final_box").extension());
+        assertEquals(RecordExtensionType.FINAL, bodyOf(registry, "final_result").extension(),
+                "extensibility is never inherited, from an abstract parametric record's application either");
+    }
+
     // ── Reading against it ──────────────────────────────────────────────────
 
     /**
