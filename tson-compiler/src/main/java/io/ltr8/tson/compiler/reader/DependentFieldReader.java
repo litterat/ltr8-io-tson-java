@@ -29,7 +29,7 @@ import java.util.function.Function;
  *
  * <p><b>The sibling's value is a type a value can be read against</b>, or the value is not read. A name is read
  * through its entry's reader, and a type written in place ({@code { of: !meta.ref { of: method } }}) through its own;
- * a dependent type names a field and no type, a parametric record is no type until it is applied and reading never starts a
+ * a dependent type names a field and no type, no position names a parametric record bare and reading never starts a
  * materialisation, and an application names no entry. Each is refused naming the sibling,
  * since that is the value the author has to change; the dependent value is skipped unjudged. The rule is {@link
  * #typeNamed}, which a value's qualified name going on through a dependent field is judged by too ({@code

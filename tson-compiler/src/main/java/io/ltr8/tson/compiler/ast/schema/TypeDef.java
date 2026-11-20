@@ -7,13 +7,13 @@ package io.ltr8.tson.compiler.ast.schema;
  * one variant per top-level ABNF alternative:
  *
  * <ul>
- *   <li>{@link AtomRefinement} -- {@code "!" qualified-name ws "^" ws record-def} (§5.5)</li>
+ *   <li>{@link AtomRefinement} -- {@code "!" qualified-name ws "^" ws ( record / empty-brace )} (§5.5, §5.7)</li>
  *   <li>{@link Instance} -- {@code [type-params] "!" qualified-name ws core-value} (§5.5, constructor
  *       application; a parameter list is admitted only before {@code !meta.record}, a parametric record -- see
  *       {@link Instance}'s own Javadoc)</li>
- *   <li>{@link StructuralTypeDef} -- {@code [type-params] ["~"] structural-def} (§5.7-§5.9)</li>
- *   <li>{@link TypeExprDef} -- {@code [type-params] type-ref} (§8.3): a plain reference, or any
- *       container form, since a declaration-level container reaches this through {@code type-ref} like
+ *   <li>{@link StructuralTypeDef} -- {@code [type-params] structural-def} (§5.2, §5.8, §5.9)</li>
+ *   <li>{@link TypeExprDef} -- {@code [type-params] type-expr} (§8.3): a plain reference, or any
+ *       container form, since a declaration-level container reaches this through {@code type-expr} like
  *       every other position</li>
  *   <li>{@link SchemaMapDef} -- {@code "!schema" ws schema-map}: a schema map nested as an entry, whose members
  *       are declarations of the document under their paths</li>
@@ -21,7 +21,7 @@ package io.ltr8.tson.compiler.ast.schema;
  *
  * <p>Every variant has an ABNF alternative behind it and is parsed. §5.3's sized sugar is no exception:
  * {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its bindings denote -- the
- * sugar names {@code array} and binds its fields directly, with no size parametric record in between.
+ * sugar names {@code array} and binds its fields directly.
  */
 public sealed interface TypeDef
         permits AtomRefinement, Instance, StructuralTypeDef, TypeExprDef, SchemaMapDef {

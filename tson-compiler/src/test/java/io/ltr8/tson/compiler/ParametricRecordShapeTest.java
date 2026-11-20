@@ -373,9 +373,9 @@ class ParametricRecordShapeTest {
     }
 
     /**
-     * A parametric record that composes a member-dispatched base may pin the selector itself, and is no member: a parametric
-     * record is no type. Its declared application is, reaching the base through the parametric record's written parent, so a
-     * value pinned {@code "dog"} reads as {@code dogs}.
+     * A parametric record that composes a member-dispatched base may pin the selector itself, and is no member, no position
+     * naming a parametric record bare. Its declared application is one, reaching the base through the parametric record's
+     * written parent, so a value pinned {@code "dog"} reads as {@code dogs}.
      */
     @Test
     void aParametricSubtypeIsNoMemberOfTheFamilyItComposes() {

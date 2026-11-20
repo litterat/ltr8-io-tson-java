@@ -115,7 +115,7 @@ namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an ali
   record being the answer there. `AliasChainWalkTest` pins all four stops.
 - **Three positions walk a chain where a declared entry might stand.** An application through an alias of a parametric record
   applies the parametric record (`ParametricMaterialiser.parametricHead`, `checkArity`), its identity the parametric
-  record's, so over `ref_of => meta.ref` the applications `ref_of<order>` and `meta.ref<order>` close to one entry; an alias
+  record's, so over `bx => box` the applications `bx<text>` and `box<text>` are one application; an alias
   naming a parametric record bare is no use of the parametric record without arguments (`validateBody`'s `Alias` arm). An
   atom refinement's source written as an alias refines the instance at the end of the chain, and its chain names that
   instance (`resolveAtomRefinement`: `!count ^ { … }` over `count => integer` IS-A `integer`). An annotation is identified by

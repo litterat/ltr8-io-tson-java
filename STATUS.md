@@ -6,7 +6,7 @@ Built against TSON Part 1 (lexer + data format), a working draft: https://tson.i
 and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/39/tson-part2-schema.md
 
 This is the spec's first implementation. Issues and ambiguities found in the spec while implementing are
-tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
+recorded in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md), whose entries Revision 40 answers.
 
 **Implemented:**
 
@@ -46,7 +46,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       reference its text spells, each segment a name of the family of what it enters (Part 2 §5.12), so
       `"main.public api.ping"` reaches a field named `public api`; no record's `name_type` or namespace's `key_type`
       admits `.`
-- [x] A dependent field's type is a sum written in place (Part 2 §5.2, `SPEC-FEEDBACK.md` #6) —
+- [x] A dependent field's type is a sum written in place (Part 2 §5.2) —
       `{ of: !meta.dependent { on: kind } }` at a record field's type, `kind!` in schema-grammar sugar, which parses at
       a field's or group member's type and nowhere else; a `meta.dependent` declared or at any other slot is refused at
       link. `kind!` is no data form in either encoding
@@ -61,8 +61,8 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       refused where it is read without it), its pin or default no parametric record; the dependent field never voidable,
       carrying no value, restated only as itself. A pinned sibling gives the field a fixed reader, a discriminator a
       member's, and a free sibling is written before its dependent field. A value's qualified name going on through one takes
-      the type its sibling names in that value (Part 2 §5.12). The kernel's `record_field.value` and
-      `record_template_field.value` are `type!`. A value entry's dependent value, of any form, is held as written and
+      the type its sibling names in that value (Part 2 §5.12). The kernel's `record_field.value` is `type!`. A value
+      entry's dependent value, of any form, is held as written and
       judged when the schema links against the type its sibling names in the schema's own namespace
 - [x] Every `!schema` value declares (Part 2 §4.1) — `geo => !schema { address => { … }
       }` is a schema map nested as an entry, its members declarations that resolve, link and compile as root
@@ -113,10 +113,10 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `io.ltr8:<module>`, with sources and javadoc, usable on the class path or the module path (see
       the README's [Use it from another project](README.md#use-it-from-another-project))
 - [x] Part 2 schema grammar — full schema document parsing into a faithful AST (records, compositions,
-      atom refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against
+      atom refinements, applications and container sugar, field groups, and more), verified end-to-end against
       the spec's own real `meta.tn`/`numeric.tn`/`temporal.tn`/`net.tn`/`core.tn` fixtures
-- [x] Part 2 schema resolution — composition (`&`) including a restated field's tightening, bare and
-      generic type references, field modifiers/defaults/fixed values, type parameters, array sugar,
+- [x] Part 2 schema resolution — composition (`&`) including a restated field's tightening, names and
+      applications, field modifiers/defaults/fixed values, type parameters, array sugar,
       and generalized constructor-application/atom-refinement resolution (`!C value`), every declaration
       made ready in wait order whatever order it is written in, so a constructor, a type or an annotation
       type may be used in the document that declares it; every declaration in `meta.tn`, `numeric.tn`,
@@ -133,11 +133,11 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       is a value of it, no type and in no kind, named by a reference over its type and walked by key and field;
       bound through the one bind context, or held as a tree where no class binds its type, so the schema loads and
       validates
-- [x] Incomplete entries (Part 2 §5.5, proposed for Revision 40) — `!C ^ { … }` over a constructor of types with a
+- [x] Incomplete entries (Part 2 §5.5) — `!C ^ { … }` over a constructor of types with a
       required field absent, refined by fields it has not written and completed by `!X { … }`, `!X value` or `X<…>`
       into the plain construction; refused wherever a type is named, imported like any entry, and left out of the
       resolved form. An array, a map or a namespace type refines by its facets' kinds, `!tags ^ { min_items: 2 }` (§5.7)
-- [x] Externs (Part 2 §5.13, §7.9, proposed for Revision 40) — `order_v1 => !meta.extern { schema: … type: order }`
+- [x] Externs (Part 2 §5.13, §7.9) — `order_v1 => !meta.extern { schema: … type: order }`
       names one entry of another schema, whose schema loads with the imports and none of whose names enter the
       namespace; judged through the hop by the foreign entry's identity, and sealed. A value through one is read in
       TSON text, in tree mode, by the foreign schema's own compiled reader: the tag and the annotations in front of it

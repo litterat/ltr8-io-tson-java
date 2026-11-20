@@ -51,10 +51,10 @@ import java.util.function.Function;
  * but rejects this particular entry. Every constructor the kernel and the three libraries declare has a factory,
  * so the first case is a constructor a schema declared itself that this library has never seen.
  *
- * <p><b>An entry declaring type parameters never reaches a factory at all.</b> A parametric record is not a type (§5.10)
- * and compiles to a {@link ParametricRecordReader}, which reports against the data and skips the value: only a
- * <em>data</em> type-ref can reach one -- a schema naming a parametric record without applying it is refused when it links
- * -- and that is the author's error, not a gap.
+ * <p><b>An entry declaring type parameters never reaches a factory at all.</b> No position names a parametric record
+ * bare (§5.10), and one compiles to a {@link ParametricRecordReader}, which reports against the data and skips the value:
+ * only a <em>data</em> type-ref can reach one -- a schema naming a parametric record without applying it is refused when it
+ * links -- and that is the author's error, not a gap.
  *
  * <p>A compile dispatches each body's constructor name to a factory through one factory set ({@link
  * #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}), with no scoping: linking already established that every
@@ -426,8 +426,8 @@ public final class TsonSchemaCompiler {
 
         private TsonTypeReader<?> build(String name, Top definition) {
             if (ParametricEntry.isParametric(definition)) {
-                // A parametric record is not a type ([TSON-SCHEMA] §5.10). See ParametricRecordReader for why the refusal is
-                // the entry's own reader rather than a check at the root.
+                // No position names a parametric record bare ([TSON-SCHEMA] §5.10). See ParametricRecordReader for why
+                // the refusal is the entry's own reader rather than a check at the root.
                 return new ParametricRecordReader(name, ParametricEntry.parameterNames(definition),
                         new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
             }

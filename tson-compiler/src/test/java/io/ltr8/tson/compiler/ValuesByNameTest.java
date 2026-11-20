@@ -468,7 +468,7 @@ class ValuesByNameTest {
     }
 
     /**
-     * The read path's rule: a parametric record is no type a value can be read against, so the walk has none to go on with.
+     * The read path's rule: no value is read against a parametric record, so the walk has none to go on with.
      */
     @Test
     void aSiblingNamingNoTypeIsRefusedAtTheName() {

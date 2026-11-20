@@ -9,7 +9,7 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import java.util.List;
 
 /**
- * The reader every parametric record compiles to, a parametric record being no type ([TSON-SCHEMA]
+ * The reader every parametric record compiles to, no position naming a parametric record bare ([TSON-SCHEMA]
  * §5.10). Reports the author's mistake and skips the value, exactly like any
  * other reader that finds the data isn't what the schema admits.
  *
@@ -58,8 +58,9 @@ public final class ParametricRecordReader implements TsonTypeReader<Object> {
      */
     private String message() {
         return "'" + name + "' is a parametric record taking " + parameters.size() + " type argument"
-                + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", and a parametric record is not a type "
-                + "(§5.10) -- a data type-ref carries no arguments, so name the "
-                + "application in the schema ('my_type => " + name + "<...>') and write '!my_type' here";
+                + (parameters.size() == 1 ? "" : "s") + " " + parameters
+                + ", and no position names a parametric record bare (§5.10) -- a data type-ref carries no "
+                + "arguments, so name the application in the schema ('my_type => " + name + "<...>') and write "
+                + "'!my_type' here";
     }
 }

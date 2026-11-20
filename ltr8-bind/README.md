@@ -165,7 +165,7 @@ The library is currently under heavy development so expect some rough edges. Thi
    `EnumStringBridge`'s shape -- `toData`/`toObject` via `Pattern.pattern()`/`Pattern.compile(...)`) now exists and is
    unit-tested (`PatternStringBridgeTest`), usable via `context.registerAtom(Pattern.class, new PatternStringBridge())` the
    same explicit-opt-in way `UUIDBridge` works for `UUID`. **`ltr8-io-tson-java`'s own case ended up not needing it**,
-   though: `regex_type` composes with `text_type` (Part 2 §5.7) -- a `regex` value IS-A piece of text -- so
+   though: `regex_type` composes with `text_type` (Part 2 §5.8) -- a `regex` value IS-A piece of text -- so
    `TextType.pattern`/`UriType.pattern` moved to `Optional<String>` (the pattern's own source text) instead, which binds
    natively with no bridge at all. `PatternStringBridge` is provided as a general library capability regardless, for a caller
    who does want to keep `Pattern` as their own Java-side field type.

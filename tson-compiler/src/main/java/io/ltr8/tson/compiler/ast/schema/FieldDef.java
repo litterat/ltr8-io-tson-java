@@ -13,8 +13,8 @@ import java.util.Optional;
  * FieldType#voidable}) admits a written {@code _}. The modifier names the schema's value. Exactly one of
  * {@code type}/{@code modifier} may be absent, never both: a bare {@code field:} with neither a type-ref nor
  * a modifier is not a grammar production. Where {@code type} is absent, the type is elided and inherited
- * from a composition's supertype (§5.7's "elided type-refs") -- legal only there; the compiler is
- * responsible for rejecting an elided type-ref in a fresh record definition (§5.2).
+ * from a composition's supertype (§5.8's "Elided type expressions") -- legal only there; the compiler is
+ * responsible for rejecting an elided type-ref in a fresh record definition (§5.8).
  */
 public record FieldDef(List<Annotation> annotations, String name, boolean omittable, Optional<FieldType> type,
                         Optional<Modifier> modifier) implements RecordEntry {
@@ -58,8 +58,8 @@ public record FieldDef(List<Annotation> annotations, String name, boolean omitta
 
             /**
              * {@code =?} -- pinned, but not here: this field is a **discriminator**, and each member of the
-             * family pins it (§5.2). The field itself stays REQUIRED and carries no value, §5.7's identity
-             * diagonal forbidding a base from pinning what its subtypes each pin differently; the name
+             * family pins it (§5.2). The field itself stays REQUIRED and carries no value, a restatement
+             * never changing a pin (§5.8), so a base cannot pin what its subtypes each pin differently; the name
              * lowers into the enclosing {@code record.discriminators}.
              */
             record Deferred() implements Value {

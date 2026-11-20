@@ -35,7 +35,7 @@ class ParametricRecordAtATypePositionTest {
         return diagnostics.stream().map(Diagnostic::message).reduce("", (a, b) -> a + "\n" + b);
     }
 
-    private static final String REMEDY = "a parametric record is not a type -- write";
+    private static final String REMEDY = "no position names a parametric record bare -- write";
 
     @Test
     void aParametricRecordIsRefusedAtAFieldPosition() {

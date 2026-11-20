@@ -126,7 +126,7 @@ class ParametricRegularityTest {
     //    unchecked: three are one arity rule, and the fourth is the converse of the closed-entry rule.
 
     /**
-     * <b>A parametric record is not a type.</b> Naming one without arguments is refused where the schema links, a
+     * <b>No position names a parametric record bare.</b> Naming one without arguments is refused where the schema links, a
      * parametric record and a held one alike (§5.10), rather than failing at <em>read</em> time against a document with
      * nothing wrong with it. {@code ParametricRecordAtATypePositionTest} carries the positions.
      */
@@ -137,13 +137,13 @@ class ParametricRegularityTest {
                   use  => { u: tmpl }""");
 
         assertTrue(message.contains("is a parametric record taking 1 type argument [T]"), message);
-        assertTrue(message.contains("a parametric record is not a type"), message);
+        assertTrue(message.contains("no position names a parametric record bare"), message);
     }
 
     /**
      * A recursive <b>bare</b> reference inside a parametric record is refused at the parametric record's own declaration,
-     * applied or not: a parametric record is no type (§5.10), so {@code tail: chain} names nothing a value could be. The
-     * recursion is written {@code chain<T>}. {@code head: T} is not decoration: without it the parameter's only use
+     * applied or not: no position names a parametric record bare (§5.10), so {@code tail: chain} names nothing a value could
+     * be. The recursion is written {@code chain<T>}. {@code head: T} is not decoration: without it the parameter's only use
      * would have been the missing argument list, and the unused-parameter rule fires first.
      */
     @Test

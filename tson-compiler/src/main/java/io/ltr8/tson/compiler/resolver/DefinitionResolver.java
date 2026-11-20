@@ -91,12 +91,12 @@ import java.util.stream.Stream;
  *   {@link #resolveField}, and field groups (§5.11).</li>
  *   <li><b>Composition</b> ({@code A & B & { ... }}, §5.8, {@link #resolveComposition}) -- each supertype's
  *   fields and groups absorbed left to right, a body entry naming an inherited field being a
- *   <em>tightening</em> entry (§5.7, {@link #resolveTighteningField}) that replaces it in place, checked
- *   against §5.7's transition table ({@link #refines}), with an elided type-ref inheriting
+ *   <em>tightening</em> entry (§5.8, {@link #resolveTighteningField}) that replaces it in place, checked
+ *   against §5.8's three orders ({@link #refines}), with an elided type-ref inheriting
  *   the source field's type. A supertype may be an application of a parametric record, absorbed by value whether its
  *   arguments are concrete or the declaration's own parameters ({@link #parametricOperand}). A body group naming an
  *   inherited group restates it ({@link #restatesInheritedGroup}).</li>
- *   <li><b>An alias</b> ({@code name => other_name}, §8.3) -- an {@code ALIAS}-kind entry whatever the
+ *   <li><b>An alias</b> ({@code name => other_name}, §8.3) -- a {@code meta.alias} entry whatever the
  *   name resolves to, carried unverified; the linker validates it. <b>An application</b>
  *   ({@code bx => box<text>}, {@link #resolveApplication}) is the same declaration carrying
  *   arguments: over a constructor it is the construction it spells, a constructor's application among its arguments
@@ -147,8 +147,8 @@ import java.util.stream.Stream;
  *   ({@link #sourceSerializedFields}). The value was bound by this library, so failing to write it back is
  *   no verdict on the schema.</li>
  * </ul>
- * What §5.7 leaves unchecked is not reported at all: a restated FIXED field
- * MUST NOT change its pinned value, and {@link #resolveTighteningField} does not compare the two.
+ * One rule is not checked at all: a restated FIXED field MUST NOT change its pinned value (§5.8), and {@link
+ * #resolveTighteningField} does not compare the two.
  *
  * <p>Declarations resolve in one namespace per schema (§3.3, §3.3.1): the schema's own entries and its
  * import closure. It reaches this class as two getters over that one
@@ -733,7 +733,7 @@ final class DefinitionResolver {
      *
      * <p>{@code value} is bound via {@link #bindAtomInstance} directly -- {@code instance.value().typeRef()}
      * already names {@code C} (per {@code Instance}'s own reshape, matching §12.1's {@code instance = "!"
-     * type-name ws core-value}); positional form (§5.6) and schema-composed defaults (§5.2/§5.7) are handled
+     * type-name ws core-value}); positional form (§5.6) and schema-composed defaults (§5.2/§5.8) are handled
      * uniformly by the compiled {@code Record*Reader} itself (see {@code RecordAbstractReader}'s own
      * Javadoc), not by a separate normalization step here. Construction grants no IS-A (§5.5): no
      * supertypes, no parameters, {@code constructor: false} on the result -- except for an
@@ -787,8 +787,7 @@ final class DefinitionResolver {
         Top body = asWritten(bindAtomInstance(name, readAs(payload, head.name())), instance.value());
         if (body instanceof io.ltr8.tson.schema.meta.Alias) {
             // `!meta.alias { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
-            // denotes the same entry: `kind: ALIAS` (§4.1 -- a meta.type_ref, not one the supertype chain
-            // could give). Dispatched on the *body* rather than on the head's name because this path has
+            // denotes the same entry. Dispatched on the *body* rather than on the head's name because this path has
             // already read it.
             return body;
         }
@@ -1193,13 +1192,12 @@ final class DefinitionResolver {
      * #mergeWithSource}) -- required for a *chained* refinement to behave correctly: given {@code
      * int8 => !integer ^ { size: {...} } }, {@code big => !int8 ^ { min: -500 } } MUST still carry
      * {@code int8}'s own {@code size}, since {@code big} is declared as a refinement -- a narrowing --
-     * of {@code int8}, and §5.7's own "Body materialisation" rule for the structurally analogous
-     * record-refinement case is explicit that inherited fields survive a refinement that doesn't
-     * mention them. A field named in the new refinement's own {@code values} overrides {@code I}'s
-     * own value for it; any field {@code I} itself bound that {@code values} doesn't mention keeps
-     * {@code I}'s own value.
+     * of {@code int8}, and §5.8's "Body materialisation" rule for the analogous record case, a
+     * composition, is explicit that inherited fields survive a body that doesn't mention them. A field named in
+     * the new refinement's own {@code values} overrides {@code I}'s own value for it; any field {@code I} itself bound that
+     * {@code values} doesn't mention keeps {@code I}'s own value.
      *
-     * <p>Per §5.5's own text (not the general composition/refinement induction of §5.7/§5.8): the value's
+     * <p>Per §5.5's own text (not composition's chain induction, §5.8): the value's
      * constructor is {@code I}'s own (e.g. {@code numeric.integer_type} for {@code I = integer}), and its chain is
      * the literal single-element {@code [I]} -- not transitively chained with {@code I}'s own supertypes (empty for
      * every fresh {@code Instance}). {@code I} written as an alias names the instance at the end of its chain.
@@ -1530,7 +1528,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * §5.7's "Body materialisation" rule, applied to atom refinement (§5.6's chained-refinement merge):
+     * §5.8's "Body materialisation" rule, applied to atom refinement (§5.6's chained-refinement merge):
      * {@code newBindings} merged *over* {@code sourceBody}'s own
      * already-bound fields, not replacing them. {@code sourceBody} is re-serialized back to plain
      * record wire form via {@code DataClassObjectWriter.toTson} (writing a {@code Top}-typed value by its
@@ -1845,7 +1843,7 @@ final class DefinitionResolver {
      * checked for name overlap across supertypes; the trailing body's own entries are then resolved
      * against {@code inheritedFieldIndex} (name -&gt; position in {@code fields}, populated by the
      * supertype loop above) -- a body field naming an inherited field is a *tightening* entry
-     * (§5.7, via {@link #resolveTighteningField}) and replaces that field in place; a body field
+     * (§5.8, via {@link #resolveTighteningField}) and replaces that field in place; a body field
      * naming nothing inherited is genuinely new and is appended, same as before (§5.8's "new fields
      * are permitted; existing fields may be tightened" and "tightening entries replace inherited
      * fields in place; new fields are appended after all inherited fields"). The chain accumulates by induction: each
@@ -1884,8 +1882,8 @@ final class DefinitionResolver {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
                 }
                 // The application itself goes into the chain, arguments and all. It names no entry, and an
-                // applied parent reaches the entry its arguments name, never its head (§5.8, §5.10: a parametric record is
-                // no type, so nothing is IS-A one): a parametric record keeps it in
+                // applied parent reaches the entry its arguments name, never its head (§5.8, §5.10: no application is
+                // IS-A its head): a parametric record keeps it in
                 // `parents`, substituted when each application closes, and a closed declaration's is folded by
                 // SchemaResolver into the edge to the entry `result<text>` denotes.
                 // A removal revokes IS-A for every parent (§5.9), so nothing is kept.
@@ -2159,14 +2157,14 @@ final class DefinitionResolver {
 
     /**
      * A parametric record named at an operand with no arguments: {@code &} reads the operand's fields, and a parametric
-     * record's are its applications', each with its parameters bound (§5.8, §5.10). A parametric record is no type, so
-     * nothing names one bare, an operand included.
+     * record's are its applications', each with its parameters bound (§5.8, §5.10). No position names a parametric
+     * record bare, an operand included.
      */
     private static void refuseUnappliedParametricRecord(String name, String operand, Top definition, String position) {
         if (ParametricEntry.isParametric(definition)) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' is a parametric "
-                    + "record and is applied to no arguments -- '&' takes the fields of a record, and a "
-                    + "parametric record is not a type: it has fields once its parameters are bound. Write '" + operand
+                    + "record and is applied to no arguments -- '&' takes the fields of a record, and no position "
+                    + "names a parametric record bare: it has fields once its parameters are bound. Write '" + operand
                     + "<...>' with its arguments, or name the record its applications compose (§5.8, §5.10)");
         }
     }
@@ -2208,7 +2206,7 @@ final class DefinitionResolver {
 
     /**
      * What an applied operand contributes to the declaration absorbing it: a field set, its groups and name type,
-     * and the operand's own supertypes. Never an edge to the operand's head -- a parametric record is no type (§5.10), and
+     * and the operand's own supertypes. Never an edge to the operand's head -- no application is IS-A its head (§5.10), and
      * an applied parent reaches the entry its arguments name (§5.8). Its <em>ancestors</em> are types, and the fields
      * arriving here came with them, so a declaration composing {@code box&lt;T&gt;} stands where {@code box}'s own
      * {@code base} is expected: {@code dog => pet_of<dog_type> & { … }} over {@code pet_of => <T> pet & { … }} IS-A
@@ -2358,7 +2356,7 @@ final class DefinitionResolver {
      * {@code declarationName} is only used to word error messages -- {@code null} for a fresh
      * record, where {@code inheritedFields} is always empty (no supertype means no field could
      * ever be inherited, so every entry is either genuinely new or a duplicate declaration). A {@link
-     * FieldDef} whose name is in {@code inheritedFields} is a *tightening* entry (§5.7): it's resolved
+     * FieldDef} whose name is in {@code inheritedFields} is a *tightening* entry (§5.8): it's resolved
      * against, and replaces in place, the already-inherited field of that name, rather than being appended.
      */
     private void resolveEntry(String declarationName, RecordEntry entry, List<String> parameters,
@@ -2391,15 +2389,15 @@ final class DefinitionResolver {
     }
 
     /**
-     * §5.7's refinement/tightening rules, applied to one composition-body field that names an
+     * §5.8's rules for a restated field, applied to one composition-body field that names an
      * already-inherited field: resolved the same way as any field ({@link #resolveField}), except
      * an elided type-ref (a modifier-only entry, {@code field: = value}) inherits {@code
      * inherited.type()} and its voidability rather than failing, and the result MUST refine the inherited
      * field ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern?: meta.product_access_type =
      * INDEX} pins {@code product}'s required field, which refines it. Whether a restated type narrows the inherited
      * one is an IS-A question over names not yet ready here, so the link asks it ({@code
-     * TsonSchemaLinker.checkRestatedFieldTypes}). The identity-diagonal rule (a FIXED
-     * restatement MUST NOT change the pinned value) is not checked here: the two values are never compared.
+     * TsonSchemaLinker.checkRestatedFieldTypes}). §5.8's rule that a restatement MUST NOT change a pin is not
+     * checked here: the two values are never compared.
      *
      * <p><b>A restated group member stays a member</b> (§5.11). Its presence is the group's, so the name takes
      * no {@code ?} and the member stays optional whatever the restatement writes; a default is refused, being
@@ -2423,12 +2421,11 @@ final class DefinitionResolver {
             tightened = tightened.withFacts(true, tightened.voidable(), tightened.role());
         }
         if (!refines(inherited, tightened)) {
-            // §5.7's table is a rule about schemas, not a coverage boundary: "refinement can only restrict,
-            // never expand -- FIXED states are terminal, and loosening a required field to optional is a
-            // resolver error".
+            // §5.8's orders are a rule about schemas, not a coverage boundary: a restatement refines its
+            // source exactly when no question moves backwards.
             throw new SchemaValidationException("'" + declarationName + "': tightening '" + fieldDef.name()
                     + "' from " + inherited.describe() + " to " + tightened.describe() + " is not a permitted "
-                    + "state transition -- a refinement can only restrict, never expand (§5.7)");
+                    + "state transition -- a refinement can only restrict, never expand (§5.8)");
         }
         return tightened;
     }
@@ -2465,13 +2462,9 @@ final class DefinitionResolver {
     }
 
     /**
-     * §5.7's refinement of one field, as three orders -- one per question a field answers, each running from
-     * least to most determined -- and a restatement refines its source exactly when no question moves
-     * backwards. What omission yields runs absent → missing-field error → injected; whether {@code _} is
-     * admitted runs voidable → not; the value's role runs FREE → DEFAULT → FIXED.
-     *
-     * <p>That reproduces §5.7's transition table cell for cell: a plain required field may take a default or
-     * a pin, an optional one may become anything, a default may be pinned, and a pin is terminal.
+     * §5.8's three orders for a restated field, one per question a field answers: what omission yields runs
+     * absent → missing-field error → injected; whether {@code _} is admitted runs voidable → not; the value's
+     * role runs FREE → DEFAULT → FIXED.
      */
     private static boolean refines(BuiltField from, BuiltField to) {
         return omission(to) >= omission(from) && (from.voidable() || !to.voidable())
@@ -2537,16 +2530,16 @@ final class DefinitionResolver {
      *
      * <p>{@code inherited}, supplied only from {@link #resolveTighteningField}, is the field this entry
      * tightens. Two things are read off it: its <b>type</b>, when {@code field.type()} is elided ({@code
-     * field: = value}, a modifier-only entry, §5.7's "Elided type-refs"), and with the type its
+     * field: = value}, a modifier-only entry, §5.8's "Elided type expressions"), and with the type its
      * <b>voidability</b>, the type's {@code ?} living in the slot the entry elides. The name's {@code ?} is
      * always the entry's own and is never inherited. A fresh (non-tightening)
      * field always passes {@code Optional.empty()}, and an elided type with nothing to inherit from is the
-     * <b>author's</b> error, not a gap -- §5.7 requires the resolver to reject a modifier-only entry both in a
+     * <b>author's</b> error, not a gap -- §5.8 requires the resolver to reject a modifier-only entry both in a
      * fresh record (no source to elide toward) and in a composition body naming no inherited field, so it
      * raises {@link io.ltr8.tson.base.SchemaValidationException}.
      *
      * <p><b>A restatement's annotations merge over the inherited ones</b> ({@link #merged}), rather than
-     * replacing them: a tightening entry states what it tightens, and §5.7's modifier-only spelling ({@code
+     * replacing them: a tightening entry states what it tightens, and §5.8's modifier-only spelling ({@code
      * extra: ?}) has no annotation position at all, so an entry that mentions nothing must not be able to
      * erase what it does not mention.
      */
@@ -2601,15 +2594,15 @@ final class DefinitionResolver {
     private BuiltField resolveFieldEntry(FieldDef field, Optional<BuiltField> inherited,
                                                   List<String> parameters) {
         if (field.type().isEmpty() && inherited.isEmpty()) {
-            // §5.7: "a modifier-only entry is always a tightening -- it names no type, so it cannot declare a
+            // §5.8: "a modifier-only entry is always a tightening -- it names no type, so it cannot declare a
             // new field". Reaching here means there was nothing to elide toward: either a fresh record body
-            // ("every field MUST have an explicit type-ref, and the resolver MUST reject modifier-only entries
+            // ("every field MUST have an explicit type expression, and the resolver MUST reject modifier-only entries
             // there") or a composition body entry naming no inherited field. Both are the author's error, not
             // a gap in this resolver -- a tightening entry, where elision *is* legal, has an inherited field.
             throw new SchemaValidationException("field '" + field.name() + "' states only a modifier and no "
                     + "type-ref, but names no inherited field to take a type from -- a modifier-only entry is "
                     + "always a tightening, so it is only meaningful in a composition body, against a field a "
-                    + "supertype declares (§5.7, §5.8)");
+                    + "supertype declares (§5.8)");
         }
         // The type's `?` sits in the type slot, so an entry that elides the type -- a modifier-only
         // tightening, `min: = 0` -- inherits the voidability of the field it tightens with the type itself.

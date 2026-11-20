@@ -414,7 +414,7 @@ class DefinitionResolverTest {
     }
 
     // ── Bare type references (§8.3): meta.type_name, meta.param_name, and
-    //    the annotation markers -- all resolve to an ALIAS-kind entry
+    //    the annotation markers -- all resolve to an alias entry
     //    regardless of what the referenced name itself resolves to.
 
     @Test
@@ -489,7 +489,7 @@ class DefinitionResolverTest {
         assertEquals(List.of(), ParametricEntry.parameterNames(frame));
         assertEquals(List.of(), TypeChain.supertypesOf(frame));
         assertEquals(Optional.of("meta.array"), snippetFacts.get("frame").constructor(),
-                "the constructor the application closes at, not the template it was spelled through");
+                "the constructor the sized sugar constructs");
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, frame);
         assertEquals(TypeRef.of("text"), body.elementType());
@@ -533,7 +533,7 @@ class DefinitionResolverTest {
     /**
      * A parametric record is a record: {@code { first: A  second: B }} with its parameters stated, each field typed by
      * the parameter that stands there. Its own {@code extension} is each application's, OPEN unless marked, and it is
-     * no family base: a parametric record is no type (§5.10).
+     * no family base: no position names it bare (§5.10).
      */
     @Test
     void resolvesAFreshParametricRecordAsARecordWithParameters() {
@@ -561,7 +561,7 @@ class DefinitionResolverTest {
 
     /**
      * A <b>composition</b> with parameters is the <em>flattened</em> parametric record, its parameters stated -- resolved
-     * against its supertypes first, since §5.8's absorption and §5.7's tightening both need a namespace. Its
+     * against its supertypes first, since §5.8's absorption and restatement both need a namespace. Its
      * chain keeps the parents as written beside the closed entries they reach.
      */
     @Test
@@ -622,7 +622,7 @@ class DefinitionResolverTest {
 
     /**
      * The flattening is the point, so it is pinned against a supertype that actually contributes: {@code id}
-     * is absorbed from {@code base} and stands in the parametric record beside its own field -- a §5.7
+     * is absorbed from {@code base} and stands in the parametric record beside its own field -- a §5.8
      * tightening entry states a modifier and no type-ref, and is not a {@code meta.record_field} until the
      * inherited field gives it one.
      */
@@ -709,7 +709,7 @@ class DefinitionResolverTest {
                 defaulted.getMessage());
     }
 
-    // ── Tightening (§5.7), via composition bodies: array, map ─────────────
+    // ── Tightening (§5.8), via composition bodies: array, map ─────────────
     //    array/map both compose with "product" and re-declare its access_pattern/size_type
     //    fields with fixed values -- a genuine tightening entry, replacing the inherited
     //    field in place rather than being rejected as a duplicate name.
@@ -779,8 +779,7 @@ class DefinitionResolverTest {
 
     @Test
     void tighteningRejectsAnInvalidStateTransition() {
-        // "count" is inherited REQUIRED; tightening it to OPTIONAL is not a permitted transition
-        // (§5.7's table: REQUIRED -> OPTIONAL is an error).
+        // "count" is inherited REQUIRED; tightening it to OPTIONAL moves omission backwards (§5.8).
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
@@ -797,7 +796,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesAnElidedTypeRefInATighteningEntryByInheritingTheSourcesType() throws DataBindException {
         // "field: = value" with no type-ref restated inherits the source declaration's type
-        // (§5.7's "Elided type-refs"), tightening only the value/state.
+        // (§5.8's "Elided type expressions"), tightening only the value/state.
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
@@ -817,9 +816,9 @@ class DefinitionResolverTest {
     }
 
     /**
-     * §5.7 makes the three places a modifier-only entry cannot stand <b>the author's</b> error, not a coverage
+     * §5.8 makes the three places a modifier-only entry cannot stand <b>the author's</b> error, not a coverage
      * gap: "a modifier-only entry whose name matches no inherited field is a resolver error", and in a fresh
-     * record "every field MUST have an explicit type-ref, and the resolver MUST reject modifier-only entries
+     * record "every field MUST have an explicit type expression, and the resolver MUST reject modifier-only entries
      * there". So each is a {@link SchemaValidationException} -- an {@code UnsupportedOperationException}
      * would tell an author their correct-but-rejected schema is this library's fault.
      */
@@ -829,7 +828,7 @@ class DefinitionResolverTest {
         SchemaValidationException fresh = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("config => { host: = \"localhost\" }"));
         assertTrue(fresh.getMessage().contains("'host'"), fresh.getMessage());
-        assertTrue(fresh.getMessage().contains("§5.7"), fresh.getMessage());
+        assertTrue(fresh.getMessage().contains("§5.8"), fresh.getMessage());
         // the AST's own toString never reaches an author-facing message
         assertFalse(fresh.getMessage().contains("FieldDef["), fresh.getMessage());
 
@@ -1109,7 +1108,7 @@ class DefinitionResolverTest {
     }
 
     /**
-     * §5.7's "Body materialisation" rule, applied to atom refinement (§5.6's chained-refinement merge):
+     * §5.8's "Body materialisation" rule, applied to atom refinement (§5.6's chained-refinement merge):
      * a chained refinement (refining an already-refined instance -- not
      * exercised by any real fixture declaration, but not left ambiguous by the spec either -- §5.5's
      * own worked example says an atom refinement's result "can be refined further") MUST merge with
@@ -1942,7 +1941,7 @@ class DefinitionResolverTest {
         assertEquals("optional", noB.fields().values().iterator().next().describe());
     }
 
-    // ── Composition rejections (§5.7, §5.8, §5.11) ──────────────────────
+    // ── Composition rejections (§5.8, §5.11) ──────────────────────
     //    Every one is the author's error under a MUST in the spec, so each is a
     //    SchemaValidationException. What varies is only which rule was broken,
     //    and the message has to say which -- that is what decides the author's fix.
@@ -2294,7 +2293,7 @@ class DefinitionResolverTest {
     }
 
     /**
-     * <b>A restatement pins the selector and carries no mark.</b> The annotation-merge rule (§5.7) is about
+     * <b>A restatement pins the selector and carries no mark.</b> The annotation-merge rule (§5.8) is about
      * what an entry inherits when it mentions nothing -- and there is no annotation here to inherit: the mark
      * was <em>consumed</em> at the base, becoming {@code record.discriminators} on the base's own declaration.
      * What the mark says is which field a family dispatches on, which is the base's statement to make; a

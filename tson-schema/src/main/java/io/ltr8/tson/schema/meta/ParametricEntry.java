@@ -12,7 +12,7 @@ import java.util.Set;
  * and what its body writes. An open entry is a parametric record, a {@link RecordBody} whose {@code parameters} is not
  * empty -- the one shape a parametric record has -- so each answer is a question of that record, asked of any entry.
  *
- * <p><b>A parametric record is no type</b> (§5.10): no position names one bare, and only an application of one is a
+ * <p><b>No position names a parametric record bare</b> (§5.10), and only an application of one is a
  * type. Code that builds a reader or a writer from a {@link RecordBody} asks {@link #isParametric} first.
  */
 public final class ParametricEntry {

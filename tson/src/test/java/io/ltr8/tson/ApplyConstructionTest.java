@@ -136,7 +136,7 @@ class ApplyConstructionTest {
     /** A parametric record is named only as an application's head. */
     @Test
     void aParametricRecordIsNamedOnlyAsAHead() {
-        refused("  r => { f: box }", "a parametric record is not a type");
+        refused("  r => { f: box }", "no position names a parametric record bare");
         refused("  r => { f: meta.ref<box> }", "box");
     }
 

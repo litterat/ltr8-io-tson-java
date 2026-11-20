@@ -326,9 +326,9 @@ final class SchemaDesugarer {
                     throw refuseParametricBody(reference.ref());
             case TypeExprDef reference -> {
                 // **A declaration's own body is the construction** (§5.3): the form becomes the instance
-                // directly, which keeps `score_list => [integer; 1..]` a PRODUCT entry with a real body and
-                // `contact => (email | phone)` a SUM entry with a real ChoiceBody. Every sugar form takes this
-                // path -- the bracket forms reach it through `type-ref` like the rest, since there is no separate
+                // directly, which keeps `score_list => [integer; 1..]` an array with a real body and
+                // `contact => (email | phone)` a choice with a real ChoiceBody. Every sugar form takes this
+                // path -- the bracket forms reach it through `type-expr` like the rest, since there is no separate
                 // declaration-level tier.
                 Optional<Binding> binding = binding(reference.ref());
                 if (binding.isPresent()) {
@@ -458,7 +458,7 @@ final class SchemaDesugarer {
         return switch (entry) {
             case FieldDef field -> {
                 if (field.type().isEmpty()) {
-                    yield field; // modifier-only entry (a tightening body restating state, §5.7)
+                    yield field; // modifier-only entry (a tightening body restating state, §5.8)
                 }
                 FieldDef.FieldType fieldType = field.type().orElseThrow();
                 TypeExpr ref = fieldType(fieldType.typeRef());

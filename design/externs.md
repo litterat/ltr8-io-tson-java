@@ -22,9 +22,7 @@ and a value read, bound and written through it in both encodings.
   `TsonLinkedSchema.externs` maps each extern to its `ExternTarget`, merged through imports as `entryOrigins` is. A
   refused extern stays unattached and lands nowhere, so a use of it reports nothing further.
 - **Every judgement through the hop compares the landing by identity** (`ExternHops`): the declaring schema and path
-  at the end of alias hops and further externs. A choice's distinct variants, IS-A, a reference's membership, the
-  disjointness class (classified in the namespace holding the entry), whether a variant is a choice not disjoint and
-  a value name's type all go through it.
+  at the end of alias hops and further externs, a disjointness class classified in the namespace holding the entry.
   `KindMembers` alone treats an extern as no member, since its own construction is `meta.extern`, IS-A `meta.top`:
   only a caller holding the link can judge it.
 - **A foreign schema importing nothing writes the processor's kernel's forms** (§3.3.1), so a constructor its closure
@@ -33,9 +31,8 @@ and a value read, bound and written through it in both encodings.
 **Reading through an extern** (`ExternReader`, built in `TsonSchemaCompiler.Compilation.boundary`)
 
 - **The body is read by a foreign schema's own compiled reader**, so nothing re-resolves a name per scope. Each
-  foreign schema compiles once per identity and mode, through the read registry's cache (in JSON,
-  `JsonCompiledSchemaRegistry`'s) or, for a checkpoint, the core's cache for that mode (`ForeignSchemas`). A miss
-  compiles outside any lock and `putIfAbsent`s: the compile reaches the cache again, which `computeIfAbsent` cannot.
+  foreign schema compiles once per identity and mode, cached (`ForeignSchemas`). A miss compiles outside any lock and
+  `putIfAbsent`s: the compile reaches the cache again, which `computeIfAbsent` cannot.
 - **The boundary consumes the tag and the annotations in front of the value, in the enclosing scope, and hands a
   foreign reader the value untagged**, read as the entry the tag reached. Handing it a foreign name instead refuses
   what the boundary admitted wherever the target takes no tag of its own name: a choice, a member-dispatched base.
@@ -43,8 +40,7 @@ and a value read, bound and written through it in both encodings.
   encodings' boundaries and the writer's tags read): any name of the enclosing scope, extern or not, reaching past its
   aliases and externs the target, an entry IS-A it, or, where it is a choice, a variant or an entry IS-A exactly one.
   A choice with an extern variant tallies that variant's names from the same admission, in one place for both
-  encodings (`ChoiceSelection`): reaching the target names the variant, IS-A it is a subtype, and selecting a variant
-  of a choice target is neither, IS-A being no relation to a choice (§5.4). A name reaching an entry no extern
+  encodings (`ChoiceSelection`). A name reaching an entry no extern
   reaches is read where the position's foreign schema reads it, if that namespace holds the entry, else in the schema
   declaring it. An abstract target naming no selectors is refused at the boundary, so the message names the subtypes
   this scope can write rather than the foreign schema's.
@@ -55,7 +51,7 @@ and a value read, bound and written through it in both encodings.
 - **A tree value at the boundary carries the outer name** (the tag written, else the extern), so the writer writes
   back a tag the enclosing scope admits.
 - **Bind mode needs nothing of its own inside**: every class is asked of the binder by its entry's identity
-  (`ValueReaderContext.namespaceOf`), so two schemas' `card` bind apart (`DataNameBinder.byNamespace`). An annotation
+  (`ValueReaderContext.namespaceOf`). An annotation
   through an extern in a schema document binds where the foreign classes are bound and is a tree where not.
 - **The annotations in front of the boundary reach a bound record through its carrier** (`ExternReader.carrying`),
   rebuilt once where some were written; a class with no carrier drops them, the boundary having checked them.
@@ -64,9 +60,8 @@ and a value read, bound and written through it in both encodings.
 
 - **One object carries both scopes, so the boundary takes its `$type` off it.** The inline form crosses with its
   leading `$type` consumed and its opening put back (`JsonReadContext.CROSSING`), the foreign reader reading the rest
-  untagged; the wrapper's `$value` crosses as it stands. The value has one type name, the boundary's ([TSON-JSON]
-  §3.3): a `$type` leading `$value` is refused in the enclosing document before anything crosses, whichever scope
-  its name belongs to, so a foreign subtype is named only by an admitted name of the enclosing scope, as in text.
+  untagged; the wrapper's `$value` crosses as it stands. A `$type` leading `$value` is refused before anything
+  crosses ([TSON-JSON] §3.3).
 - **A dispatcher that matched an extern's name hands it the whole annotation object** (`ExactReader.takesWrapper`):
   handed the `$value`, the boundary would never see the tag, which is what names a subtype or a variant there.
 - **A question about a type's shape follows the extern** (`AliasChain.landed`): a choice's class table, a map key's
@@ -83,7 +78,7 @@ and a value read, bound and written through it in both encodings.
 
 **Decisions that lost**
 
-- **Admission stated in each encoding**: two copies of a judgement made of the link alone, which names no reader.
+- **Admission stated in each encoding**: two copies of a judgement made of the link alone.
 - **Teaching the foreign record reader to skip an outer `$type`**: it would have to know which scope it is in.
 - **A namespace on `@Typename` naming a class's entry when writing**: a second authority beside the binder, which the read
   cannot consult (no index runs from an annotation to its class).

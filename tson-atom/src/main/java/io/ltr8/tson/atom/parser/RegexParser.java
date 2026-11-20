@@ -19,7 +19,7 @@ import io.ltr8.tson.schema.unicode.RegexType;
  * registered in {@link BuiltinTypeVocabulary}.
  *
  * <p><b>Returns the regex's own source text ({@link String}), not a parsed matcher.</b> {@code regex_type}
- * composes with {@code text_type} (§5.7) -- a {@code regex} value IS-A piece of text, the same relationship
+ * composes with {@code text_type} (Part 2 §5.8) -- a {@code regex} value IS-A piece of text, the same relationship
  * every other {@code AtomType} here honors by returning its atom's own natural host representation (see
  * {@code TextType.pattern()}'s own Javadoc for why {@code text_type}/{@code uri_type}'s own {@code pattern}
  * constraint field is {@code String} for the identical reason).

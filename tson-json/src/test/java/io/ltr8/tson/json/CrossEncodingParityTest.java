@@ -543,8 +543,8 @@ class CrossEncodingParityTest {
     }
 
     // ── A family declared through a parametric record ──────────────────────────────
-    //    A parametric record is no type (§5.10), so `crate => { b: boxed }` names the abstract record `box` composes, and
-    //    each declared application of `box` is a member through that written parent. The base states no
+    //    No position names a parametric record bare (§5.10), so `crate => { b: boxed }` names the abstract record `box`
+    // composes, and each declared application of `box` is a member through that written parent. The base states no
     //    selector, so the tag is the selector in both encodings.
 
     /** A declared application reads at the base's position, in both encodings. */
@@ -763,7 +763,8 @@ class CrossEncodingParityTest {
                 {"kind": "tmpl", "v": {"item": 5}}""");
         assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/v")),
                 tson("cell", "{ v: 5  kind: int32 }"));
-        // A parametric record is no type (§5.10), so the reference over types refuses it before the dependent field is read.
+        // No reference names a parametric record bare (§5.10), so the reference over types refuses it before the dependent
+        // field is read.
         assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/kind")),
                 tson("cell", "{ kind: tmpl  v: { item: 5 } }"));
     }

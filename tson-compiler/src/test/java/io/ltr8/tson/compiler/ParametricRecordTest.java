@@ -378,7 +378,7 @@ class ParametricRecordTest {
                 compiled.schema().entries().get("ids"), "the construction in place");
     }
 
-    // ── The field-absorbing position (§5.7, §5.8) ───────────────────────
+    // ── The field-absorbing position (§5.8) ───────────────────────
     //    A composition supertype copies its *fields*, so an application
     //    there has to be closed during resolution rather than carried and closed by the later pass --
     //    an open application has no field set to copy.
@@ -432,7 +432,7 @@ class ParametricRecordTest {
      * body is held, so its field set is known while the application is open, and substituting its parameters
      * with the arguments as written leaves the absorbed field carrying {@code T}. {@code
      * OpenOperandCompositionTest} carries the rest, including what such an operand does <em>not</em>
-     * contribute -- its own name, a parametric record being no type.
+     * contribute -- its own name, no application being IS-A its head.
      */
     @Test
     void composingWithAnApplicationThatIsStillOpenAbsorbsItsFieldsAndKeepsTheParameter() {
@@ -539,7 +539,7 @@ class ParametricRecordTest {
     }
 
     // ── A parametric record named as a data value's own type ──────────────────────
-    //    A parametric record is not a type (§5.10), so naming one in data is refused by
+    //    No position names a parametric record bare (§5.10), so naming one in data is refused by
     //    ParametricRecordReader, whose message names the route: declare the application and name that. It is the
     //    author's error and an ordinary data diagnostic, never a gap in this library.
 
@@ -562,8 +562,8 @@ class ParametricRecordTest {
         assertNull(value);
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
         Diagnostic problem = problems.diagnostics().get(0);
-        // The name resolves -- to a parametric record, which is no type, so the message names the route: declare the
-        // application and write that name.
+        // The name resolves -- to a parametric record, which no position names bare, so the message names the route: declare
+        // the application and write that name.
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
         assertTrue(problem.message().contains("'paged' is a parametric record"), problem.message());
         assertTrue(problem.message().contains("'my_type => paged<...>'"),
@@ -607,7 +607,7 @@ class ParametricRecordTest {
         ReadException thrown = assertThrows(ReadException.class,
                 () -> compiled.get("box").read(TestDocuments.document("!box { v: 1 }")));
 
-        assertTrue(thrown.getMessage().contains("a parametric record is not a type"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("no position names a parametric record bare"), thrown.getMessage());
     }
 
     /** Every diagnostic one document collects at {@code rootType}. */

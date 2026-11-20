@@ -77,9 +77,8 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * An entry's body with every {@code ALIAS} hop followed. How many hops an alias costs is this
-     * resolver's own bookkeeping (§8.3 flattens uses, not entries), so a fixture asserting on the body a name
-     * denotes should not also be asserting on the length of the chain to it.
+     * An entry's body with every alias hop followed: a fixture asserting on the body a name denotes should not
+     * also be asserting on the length of the chain to it.
      */
     private static Top bodyOf(TsonCompiledSchema compiled, String name) {
         Top body = compiled.schema().entries().get(name);
@@ -200,7 +199,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * {@code set} and {@code array} share a body shape, so the only thing distinguishing them is the defaults
-     * {@code set}'s own vocabulary tightens (§5.7). Binding {@code !set_type { element_type: text }} through the
+     * {@code set}'s own vocabulary tightens (§5.8). Binding {@code !set_type { element_type: text }} through the
      * compiled reader applies those schema-composed defaults, so this needs no {@code set}-specific handling
      * anywhere -- worth pinning precisely because nothing names {@code set}.
      */

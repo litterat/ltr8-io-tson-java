@@ -1987,22 +1987,10 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * §8.2's materialisation-time coherence check, over <b>every</b> family: "Materialisation also runs the
-     * value-level checks that open bindings deferred: family coherence rules whose operands were parameters
-     * -- {@code min_items <= max_items} (§5.3) <b>and their kin</b> -- ... are verified once concrete, and a
-     * violation is a resolver error reported at the materialising application."
-     *
-     * <p><b>"And their kin" needs no enumeration, which is why this is one line.</b> Each family already owns
-     * its own coherence rule ({@link Atom#coherenceCheck}, {@link Product#coherenceCheck}) for the body an
-     * author writes literally; the rule an application closes onto is the same rule over the same facets, so
-     * asking every body here covers the named case and its kin together. Anything §5.5 adds to a family later
-     * arrives here for free.
-     *
-     * <p><b>It runs on every entry</b>, because this phase is the one place that sees them all exactly once
-     * however they were produced. A declared body was already asked at
-     * resolution, beside its own constructor's vocabulary check -- and one that failed there is replaced by a
-     * placeholder and never reaches this, so nothing is reported twice. What is left for this to catch is
-     * exactly the set resolution never produced: the forms an application closes to.
+     * Each family's own coherence rule ({@link Atom#coherenceCheck}, {@link Product#coherenceCheck}), asked of
+     * <b>every</b> entry, because this phase is the one place that sees them all exactly once however they were
+     * produced. A body the resolver bound was already asked there, a completion's among them ([TSON-SCHEMA] §5.5),
+     * and one that failed is replaced by a placeholder and never reaches this, so nothing is reported twice.
      */
     private static void checkCoherent(Top body) {
         List<String> violations = switch (body) {
@@ -2016,10 +2004,6 @@ public final class TsonSchemaLinker {
             case IncompleteEntry ignored -> List.of(); // judged where it is completed
         };
         if (!violations.isEmpty()) {
-            // No name leads this one, deliberately. Only a form an application closed to can reach here -- a
-            // declared body failed the same check one phase earlier, under its own declaration's name -- and the
-            // location already names the declaration that wrote the application; what is left to say is what the
-            // application closed onto.
             throw new SchemaValidationException("the constraints this application closes onto contradict "
                     + "each other: " + String.join("; ", violations) + " -- no value can satisfy them, so "
                     + "nothing could ever be a valid instance of the type it denotes");
@@ -2046,14 +2030,13 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * [TSON-SCHEMA] §5.7's rule for a restated field's type, which §5.8 applies to a composition's tightening
-     * entries: a restatement only restricts, so a field a record restates is typed by its source's type or a type IS-A
-     * it, §7.2's IS-A asked as {@link #checkReferenceNarrows} asks it, past alias hops on both sides, and nothing
-     * structural beside it (§5.7): {@code [int8]} restating {@code [int32]} is no narrowing. §5.7's
-     * one other narrowing is {@code void} at a voidable position, whose value set {@code {_}} is inside every voidable
-     * position's; the voidable order itself is the resolver's ({@code DefinitionResolver.refines}). The resolver binds
-     * the restatement before the names it holds need be ready, so the IS-A is asked here, over the one namespace both
-     * resolve in.
+     * [TSON-SCHEMA] §5.8's rule for a restated field's type: a restatement only restricts, so a field a record
+     * restates is typed by its source's type or a type IS-A it, §7.2's IS-A asked as {@link #checkReferenceNarrows}
+     * asks it, past alias hops on both sides, and nothing structural beside it: {@code [int8]} restating
+     * {@code [int32]} is no narrowing. §5.8's one other narrowing is {@code void} at a voidable position, whose value
+     * set {@code {_}} is inside every voidable position's; the voidable order itself is the resolver's ({@code
+     * DefinitionResolver.refines}). The resolver binds the restatement before the names it holds need be ready, so the IS-A
+     * is asked here, over the one namespace both resolve in.
      *
      * <p><b>Judged against the nearest closed record on the chain.</b> A supertype another supertype lists was judged
      * when that one linked, so only the minimal ones are asked, and the diagnostic names the source the author wrote.
@@ -2093,7 +2076,7 @@ public final class TsonSchemaLinker {
             }
             if (!violations.isEmpty()) {
                 throw new SchemaValidationException("'" + entryName + "': not a valid restatement of '"
-                        + shown.apply(supertype) + "''s fields (§5.7): " + String.join("; ", violations));
+                        + shown.apply(supertype) + "''s fields (§5.8): " + String.join("; ", violations));
             }
         }
     }
@@ -2497,8 +2480,9 @@ public final class TsonSchemaLinker {
         if (supplied == 0) {
             throw new SchemaValidationException(context + ": '" + name + "' is a parametric record taking "
                     + declared + " type argument" + (declared == 1 ? "" : "s") + " " + parameters
-                    + ", and a parametric record is not a type -- write '" + name + "<...>' with its arguments, or, "
-                    + "for any member of a family, name the abstract record its applications compose (§5.10)");
+                    + ", and no position names a parametric record bare -- write '" + name + "<...>' with its "
+                    + "arguments, or, for any member of a family, name the abstract record its applications compose "
+                    + "(§5.10)");
         }
         throw new SchemaValidationException(context + ": '" + name + "' takes " + declared
                 + " type argument" + (declared == 1 ? "" : "s") + " " + parameters + ", but "

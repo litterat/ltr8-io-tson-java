@@ -85,8 +85,8 @@ final class TypeInhabitance {
     /**
      * Whether one definition is satisfied by the entries marked so far.
      *
-     * <p><b>A parametric record counts as inhabited, unjudged.</b> It is not a type and no document ever has one; its
-     * closures are judged where they stand, a declared application as an entry in this map and one closed in place
+     * <p><b>A parametric record counts as inhabited, unjudged.</b> No position names it bare and no document ever has one;
+     * its closures are judged where they stand, a declared application as an entry in this map and one closed in place
      * at the slot holding it.
      */
     private static boolean isInhabited(Top definition, Map<String, Top> namespace,

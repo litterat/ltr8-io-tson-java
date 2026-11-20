@@ -67,11 +67,8 @@ class ApplicabilityIsIsATopTest {
     /**
      * <b>The closed spelling denotes the same entry the bare alias does.</b> Admitting it is only half the
      * job: {@code !alias { target: X }} is the explicit form of {@code name => X} (§8.3), so it must
-     * resolve to {@code kind: ALIAS} with {@code X} as source and body — not to the head's own kind with
-     * {@code alias} as source, which is what a construction of any other head yields.
-     *
-     * <p>The distinction was unreachable while the closed form was refused, which is why it is asserted here
-     * against both spellings at once rather than left to the one that already worked.
+     * resolve to an alias whose target is {@code X}, not to a construction of {@code alias}, which is what a
+     * construction of any other head yields.
      */
     @Test
     void everySpellingOfAnAliasDenotesTheSameEntry() {
@@ -96,11 +93,11 @@ class ApplicabilityIsIsATopTest {
     /**
      * <b>An alias is a hop, not a rewrite (§8.3), so applicability follows the chain.</b> An alias to a
      * constructor is applicable, because the entry at the end of the chain is — and so is an alias to that
-     * alias. Everything the head is asked (is it a parametric record, is it applicable, what kind does construction
-     * transfer, whose vocabulary reads the payload) is a question about the terminal entry.
+     * alias. Everything the head is asked (is it a parametric record, is it applicable, whose vocabulary reads
+     * the payload) is a question about the terminal entry.
      *
-     * <p>Asking the alias instead would answer every one of them from an empty supertype chain and a {@code
-     * ALIAS} kind, which is what a hop looks like rather than what it points at.
+     * <p>Asking the alias instead would answer every one of them from an empty supertype chain and an alias
+     * body, which is what a hop looks like rather than what it points at.
      */
     @Test
     void applicationFollowsAnAliasToItsTarget() {

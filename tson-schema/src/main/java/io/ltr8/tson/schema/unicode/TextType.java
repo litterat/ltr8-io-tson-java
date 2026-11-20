@@ -29,7 +29,7 @@ import java.util.stream.Stream;
  * <p><b>{@code pattern} is the regex's own source text ({@link String}), not a compiled {@link
  * java.util.regex.Pattern}</b> -- kept a pure, hashable/equatable value the same as every other
  * field here, and consistent with the kernel's own modeling: {@code regex_type} composes with
- * {@code text_type} (§5.7), i.e. a {@code regex} value IS-A piece of text, so the natural
+ * {@code text_type} (§5.8), i.e. a {@code regex} value IS-A piece of text, so the natural
  * representation of a pattern constraint is text too, not a pre-compiled host object. {@code
  * TextParser}/{@code UriParser} compile it at validation time instead of storing the compiled
  * form.

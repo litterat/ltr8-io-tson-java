@@ -112,7 +112,7 @@ public final class Subsumption {
     }
 
     /**
-     * Each of {@code names} with every {@code ALIAS} entry whose chain ends at it. §7.2 compares "after
+     * Each of {@code names} with every alias entry whose chain ends at it. §7.2 compares "after
      * following both alias chains to their terminal entries", and an alias and its target are one type
      * -- so over {@code pct => small}, {@code !pct} at a {@code small}-typed position names the position's own
      * type even though the reader running there is {@code small}'s, and a tag naming an alias of a subtype

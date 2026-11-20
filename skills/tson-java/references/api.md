@@ -610,8 +610,8 @@ application an entry is the instantiation of is the derived `@meta.application` 
 arguments: [box_text int32] }`); and what is not part of the value — where it was declared, its value annotations, its
 constructor tag — is in `TsonSchema.facts`. The host values the atoms read to are not
 here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`, `Alias`,
-`TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a map of them,
-a namespace type (`operations => !meta.namespace { key_type: meta.identifier  value_type: operation }`, a
+`Extern`, `ValueEntry` and `IncompleteEntry`. A schema's own vocabulary is a record it declares and, where it wants a
+map of them, a namespace type (`operations => !meta.namespace { key_type: meta.identifier  value_type: operation }`, a
 `NamespaceBody`). An entry whose tag names such a type rather than a constructor, `api => !operations { search => { …
 } }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a member of
 no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind context binds one
@@ -810,6 +810,3 @@ read) and is **not a verdict**. [TSON-SCHEMA] §11.5's **wait depth** is enforce
 next being ready. Token length and document size are not bounded yet; a deployment reading
 untrusted documents caps bytes before handing them to a reader. `LimitsPolicy`'s Javadoc and `BACKLOG.md`
 carry what is left.
-
-(The schema-side materialiser of parametric records carries its own depth backstop, at 64 nested instantiations — a
-resolver guard against non-regular recursion, not a document limit.)

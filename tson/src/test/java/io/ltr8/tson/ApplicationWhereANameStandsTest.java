@@ -72,7 +72,7 @@ class ApplicationWhereANameStandsTest {
         refused("  r => { f: wrap<meta.array<text>> }", "r", "'meta.array<text>' is passed as an argument");
     }
 
-    /** A parametric record named bare as an argument is no type, and is refused before the gap of closing in place. */
+    /** A parametric record named bare as an argument is refused before the gap of closing in place. */
     @Test
     void aParametricRecordNamedBareAsAnArgumentIsRefused() {
         refused("  r => { f: wrap<box> }", "r", "'box', passed as an argument of 'wrap<box>', is a parametric record");

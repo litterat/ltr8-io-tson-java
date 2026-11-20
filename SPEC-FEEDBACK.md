@@ -1,49 +1,28 @@
-# Spec feedback
+# Spec feedback against Revision 39
 
-Issues, ambiguities, and inconsistencies found in the TSON spec while building this implementation. See `CLAUDE.md`
-for why this file exists and when to add to it. Spec quotes below are from 2026 Revision 39 — Part 1 and Part 2,
-the working copies in `spec/`, which publish at https://tson.io/raw/2026/39/tson-part1-data.md and
-https://tson.io/raw/2026/39/tson-part2-schema.md — unless noted otherwise.
+This is the register of issues the first implementation of TSON raised against 2026 Revision 39 of Part 1
+([TSON-DATA], https://tson.io/raw/2026/39/tson-part1-data.md) and Part 2 ([TSON-SCHEMA],
+https://tson.io/raw/2026/39/tson-part2-schema.md). Revision 40 answers every entry. Each entry gives the sections
+concerned, what was wrong or unclear in Revision 39's text, the interpretation the implementation took, what it runs,
+and the resolution it proposed. The **Revision 40** line under each heading gives the disposition. Spec quotes are
+Revision 39's, and section numbers are the same in both revisions.
 
-Format per entry: spec section, the problem, the interpretation this implementation chose, and a suggested
-resolution where there is one.
+The answers are recorded in the Revision 40 change log: its §2, *Disposition summary*, gives each entry's verdict, its
+§3 items give each section's rule before and after, and its §5 lists the readings the spec author ruled on and what
+is still open. Where an entry proposes a design, it states the design as the implementation runs it, so a reviewer
+needs nothing beside it. Where the evidence comes from a consumer of the library, an HTTP layer built on it, the entry
+says so.
 
-**This register holds what is open against the current revision, and it renumbers from #1 each time a revision
-closes.** It is an input to the next revision's adjudication, so its numbering is the numbering that revision's
-change log will answer against — a stable index of the open set, not an archive of everything ever raised.
-
-**Revision 39 closed every entry open against Revision 38; the entries below are open against Revision 39.** The
-closed entries are gone, and the change log in `spec/` keeps them under their numbers: the spec now carries their
-rules — one namespace per schema, one `!!import` directive and the root's `!schema` tag saying the kind; resolution
-order within a schema; the roots holding the common vocabulary and every `!schema` value declaring from the root; `!`
-marking an instance and `^` refining any value; value entries as ordinary values and `namespace` building map types;
-the alias body; one reference atom, a reference in data as grammar and an application as a reference value; a count as
-a 64-bit range; a facet typed by its family's instance; a restated field narrowing by IS-A; a record template as its
-own constructor; an applied parent's edges; dependent fields; the `type-expr` and `type-ref` productions; a float's
-ordered bounds; and the two identities. What the implementation still has to build for them is in `BACKLOG.md`. **This
-file is the as-built record**, not a pointer to one: where an entry proposes a design this implementation has built,
-the entry states the design, what is running, and what is not, so that a reviewer editing the spec needs nothing
-beside it. **Where the evidence is a consumer of this library rather than this library** — the HTTP layer in
-`ltr8-io-tson-java-http` is one, and this register is the collection point for all of it — the entry says so and
-states what is running there on the same terms.
-
-**Part 3 is edited, not registered.** [TSON-JSON] is an early draft this implementation exists to validate, and
-`spec/tson-part3-json.md` is edited **directly** as findings arise — so a Part 3 finding becomes a spec change in
-the same session, with git history as its record, rather than an entry waiting for adjudication. A Part 3 entry
-appears here only where the finding is a choice between the text and the code that the author has to make, and it
-closes by the edit or the code change. What stays here otherwise is Parts 1 and 2, whose current revision is
-published and whose changes this implementation proposes rather than makes. An entry spanning both stays, and says
-which half is which. **Numbers are not reused and gaps are left** while a
-revision is open — the register renumbers only when one closes, so a citation written against the open set stays
-valid until then.
-
-**Cite the spec, not the argument that got it there:** `design/` and the Javadoc name the section that requires a
-behaviour, and a `SPEC-FEEDBACK.md #N` citation is for an entry below, where there is no section to point at yet.
-When an entry closes, its citations become spec citations and the entry is deleted — nothing here is an archive.
+Part 3 ([TSON-JSON]) is drafted alongside the implementation and edited directly as findings arise, so a Part 3
+finding is a change to its text rather than an entry here. An entry spanning Part 2 and Part 3 says which half is
+which.
 
 ---
 
 ## 1. [TSON-DATA] §2.1 — the worked example says untagged tokens resolve by §4's base rules under an imported schema
+
+**Revision 40:** accepted as proposed. Part 1 §2.1's paragraph is rewritten for a document under a schema, and no rule
+changes (change log §3.1 item 20).
 
 **Problem.** §2.1's example document imports `order.tn` (`!!import`), and the paragraph after it says type
 annotations "invoke the built-in vocabulary — `!uuid`, `!date`, and `!number` parse their tokens by atom contract
@@ -59,12 +38,19 @@ document names comes from the one namespace its imports bind — so the sentence
 and a token is read by its declared type, so `!uuid` in the example works because `order.tn`'s closure (through
 `core.tn`) declares `uuid`, not because the built-in vocabulary applies.
 
-**Resolution to decide.** Rewrite the sentence for a document under a schema: the tags name types of the imported
+**Resolution proposed.** Rewrite the sentence for a document under a schema: the tags name types of the imported
 namespace (`order.tn`'s closure supplies `uuid`, `date` and `number`), and each untagged token is read by the type
 its position declares — `1042` as the field's integer type, `GOLD` as an enum member — with a pointer to §4 and §5.1
 for what the same tokens would mean in a document with no `!!import`. Nothing in the normative rules changes.
 
 ## 2. [TSON-DATA] §2.4, §7.4, [TSON-SCHEMA] §5.3 — whether a quoted token at a reference-typed position is a reference
+
+**Revision 40:** accepted by the spec author's ruling, the other way from the entry's proposal. At a position typed by
+a reference, in data and in a body a schema document reads as data, a quoted token is the reference its text spells.
+Each segment is a name of the family of what it enters, and no family a segment is matched against admits `.`. A tag,
+an annotation name and every type position of the schema grammar stay unquoted, and an argument is schema grammar.
+Part 1 §2.4, §7.1, §7.4, §7.7; Part 2 §1.3, §4.2, §5.2, §5.12, §12.1; Part 3 §5.6 (change log §3.1 item 22, §3.2
+items 117–118, §3.4 item 14).
 
 **Problem.** Two rules answer this oppositely, and neither names the case.
 
@@ -84,28 +70,31 @@ open whether a quoted token whose text matches `qualified-name` is that token. T
 says only that "at a tag and an annotation the spelling is an unquoted token", which reads as if other positions
 might differ.
 
-**What is running.** The two paths of this implementation answer differently, which is the evidence that the text
-does not decide it.
+**What is running.** While the entry was open the implementation's two paths answered differently, which was the
+evidence that the text did not decide it: a schema document refused the quoted form at every reference position it
+read, a constructor body's reference-typed slot included (`!meta.array { element_type: "text" }`), and a data
+document accepted it at a field typed by a reference (`!s { t: "int32" }` under `s => { t: meta.type_ref }`). It now
+runs Revision 40's rule: the quoted token is the reference in data and in a construction's payload, so
+`!meta.array { element_type: "text" }` constructs `[text]`, and `{ b: "text" }` at a field's type is still refused,
+a type position being schema grammar.
 
-- *A schema document refuses the quoted form* at every reference position it reads: a field type (`{ b: "text" }`,
-  "expected a type reference, found the quoted token 'text'"), a template argument (`box<"text">`, "'text' is no type
-  argument: an argument is a type, written as a reference"), and a constructor body's reference-typed slot
-  (`!meta.array { element_type: "text" }`). On the Revision 40 proposal branch an argument is a name (#3), so
-  [TSON-SCHEMA] §5.3's quoted value argument is gone, and the data grammar has no argument list at all.
-- *A data document accepts it* at a field typed by a reference: with `s => { t: meta.type_ref }`, `!s { t: "int32" }`
-  is valid, and with `s => { t: meta.ref<meta.record> }` and `r => { x: text }`, `!s { t: "r" }` is valid and
-  `!s { t: "no_such" }` is refused as not a member — the token's text is resolved as a name.
+**Resolution proposed.** A reference is an **unquoted** token at every position, in data and in schema documents
+alike: state in §7.4 that a quoted token is never a reference wherever a reference is read, and add a reference
+position to §2.4's list of the places where form is consulted. The alternative — form is not meaning here either, so
+`"int32"` is the reference — should then be stated in §7.4 and [TSON-SCHEMA] §5.3, since both read against it.
+Revision 40 takes the alternative, which reaches names outside the token profile (`"main.public api.ping"`).
 
-**Resolution to decide.** The proposal is that a reference is an **unquoted** token at every position, in data and
-in schema documents alike: state in §7.4 that a quoted token is never a reference wherever a reference is read (not
-only inside an argument list), and add a reference position to §2.4's list of the places where form is consulted —
-it decides whether the token can be a name at all. That keeps one spelling per reference, matches what a schema
-document already does, and keeps a quoted token's meaning (text) the same at every position. The alternative — form
-is not meaning here either, so `"int32"` is the reference — should then be stated in §7.4 and [TSON-SCHEMA] §5.3,
-since both currently read against it, and the schema-document refusals above become errors in this implementation.
-Until it closes, the implementation keeps the split described above.
+## 3. [TSON-SCHEMA] §4.2, §5.3, §5.10 — parametric records as records with parameters: a proposal for Revision 40
 
-## 3. [TSON-SCHEMA] §4.2, §5.3, §5.10 — templates as open records: a proposal for Revision 40, and what of it runs
+**Revision 40:** accepted as proposed, every step as this entry states what runs. Part 2 §5.10, now *Parametric
+Records*, is rewritten around the three rules below, and §1.3, §1.6, §3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3,
+§5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow; Part 1 §2.3, §3.2, §4.1 and
+§7.4 take the argument list out of the data grammar; Part 3 §1.6, §3.3, §3.4 and §5.6 follow (change log §3.2 items
+2–30, 77–96, 102, 130 and 131; §3.1 items 2–5 and 14–19; §3.4 items 1–5 and 9). The change log's §5 records three
+editorial readings. **Still open in the implementation:** a parametric record is judged where it is applied
+and not at its declaration, so while nothing applies it three errors go unreported: a name in it that resolves to
+nothing, a recursion that can never close (§5.10.1), and a selector on a type no token denotes (§5.2) (change log §5,
+"#3 (remainder)").
 
 **Problem.** §5.10 gives a template two representations and a parameter two kinds. A record template is its own
 constructor and a family base; every other open entry is held as text, because a value parameter can stand wherever
@@ -117,167 +106,73 @@ record, or a template named bare at a position.
 
 **The proposal**, in three sentences.
 
-1. A template is an open record: `meta.record` carries `parameters`, each a type standing at a field's type or as an
-   argument of an application there or in a parent, and nowhere else. A reference names an open record only as the
-   head of an application.
+1. A parametric record is a record with parameters: `meta.record` carries `parameters`, each a type standing at a
+   field's type or as an argument of an application there or in a parent, and nowhere else. A reference names a
+   parametric record only as the head of an application.
 2. `C<args>` over a constructor is construction sugar: `!C { f1: a1 … }` over its required fields typed by a
    reference naming types, in declaration order, as `[T]` and `{K => V}` already are.
 3. At a type slot of schema source `H<args>` is an application, the construction `meta.apply` in place, substituting
-   where `H` is an open record and constructing where it is a constructor. A reference is a name.
+   where `H` is a parametric record and constructing where it is a constructor. A reference is a name.
 
-What follows from them: no value parameters, no derived bounds, no template named as a type, no template over a body
-that is not a record, and no `meta.template` or `meta.record_template`.
+What follows from them: no value parameters, no derived bounds, no parametric record named as a type, none over a
+body that is not a record, and no `meta.template` or `meta.record_template`.
 
-**What is running** on the Revision 40 proposal branch, step by step; every step of the proposal runs.
+**What is running.** Every step of the proposal.
 
-- *§5.10, value parameters: gone.* A parameter is a type. It stands at a slot typed `meta.type_ref` or a refinement
-  of it, or as an argument of an application; anywhere else is a resolver error at the declaration, naming the slot:
-  a facet, a field's default or fixed value (a pin on a reference-typed field included), an enum member, a size
-  bound, a field name, a modifier. An argument is a name: a number or a quoted token in an argument list is a
-  grammar error in a schema document (`maxint<10>`, `box<"x">`), and data has no argument list at all.
-  `meta.template_param` is `{ name, bound? }` and `meta.record_template_field` has no `value_param`. A value that
-  differs per application is written where the application is declared,
-  `created => response<order> & { status?: = 201 }`. A parameter spelled like a name an absorbed field's type
-  writes is refused by the shadowing rule alone, every such name being an entry, and has no rule of its own.
-- *§5.10, bounds: written, never inherited.* A parameter's bound is what its declaration writes, `<T: text>`, and is
-  otherwise absent; nothing about a parameter is inferred from its uses, so a parameter is known in full at its
-  declaration and no fixed point runs across templates. A parameter passed as an argument to a bounded parameter of
-  another template is written with a bound that IS-A that one, wherever it is an argument: a field type, an application
-  nested in one or inside a type written in place (`[boxed<T>]`), an applied parent. With `boxed => <T: text> { v: T }`,
-  `rebox => <T: text> { b: boxed<T> }` and `<T: non_empty_text>` resolve, `rebox => <T> { b: boxed<T> }` is a resolver
-  error at `rebox` naming `boxed`'s `T: text`, and `<T: int32>` stays refused. An imported template's recorded bound
-  binds the same way, being the one its author wrote. A parameter passed to a constructor's slot (`<K> { m: {K => text}
-  }`) needs no bound: the slot judges the argument that arrives when the record is applied. A closed argument is judged
-  against the written bound as before; one in an application closed while declarations are still being made ready is
-  judged once every declaration is, since an argument is a name at a type position and orders nothing (§3.4.1), and is
-  reported at the declaration that wrote it.
-- *§4.2, an application in a data document: running.* In a data document a value at a reference-typed slot is a name,
-  and an argument list is no part of the data grammar ([TSON-DATA] §7.2.5): `set<text>` in a value is a parse error at
-  its `<`, whether or not the schema's closure closed that application: the grammar's ordinary error for a character
-  it reserves, as `kind!` gets the ordinary one, the grammar not knowing the form. Data names the entry the schema
-  declares for the application. JSON has no unquoted form, so the string `"set<text>"` reaches the reference and fails
-  its grammar, a resolver error, as the quoted text token does. In a schema document too, a construction's payload
-  being data, an argument list in a value is that parse error. An application is the construction `meta.apply` written
-  in place, `{ of: !meta.apply { head: box  arguments: [T] } }`, which `box<T>` at a type slot of schema source is,
-  and which resolved output holds only inside an open record over one of its parameters, `@meta.application` holding
-  the same record. The lookup of an application in data against the closure's applications is gone, and a refusal's
-  list of admitted names leaves out minted entries. [TSON-JSON] §1.6, §5 and §5.6 are edited to match. Left as it was:
-  data may still write a minted entry's internal name.
-- *§5.3, construction sugar: running.* At a type position of a schema document, `C<a1 … an>` where `C` resolves
-  through aliases to a constructor, a closed record IS-A `meta.type`, is the construction `!C { f1: a1 … fn: an }`
-  over `C`'s required fields typed by a reference naming types, in declaration order. `meta.array<text>` is the entry
-  `[text]` is, and `meta.map<text int32>` the entry `{text => int32}` is. A declared `x => meta.array<text>` is that
-  construction and carries no `@meta.application`. An incomplete entry applied, `nonempty<uuid>` over
-  `nonempty => !meta.array ^ { min_items: 1 }`, is its completion, the entry `[uuid; 1..]` is (§5.5). A
-  wrong argument count, an argument the field's `of` refuses (`meta.namespace<int32 text>`) and a construction left
-  incomplete (`meta.enum_type<meta.identifier>`, with `members` unwritten) are refused. Three points the rule leaves
-  open are settled as built: a field with a default is no argument slot; a use-site construction names its
-  content-keyed entry and never a declaration of the same construction; and an argument is not followed through an
-  alias, which is the sugar forms' identity. An open record is applied by substitution and never constructed,
-  whatever its chain reaches.
-- *§5.10, a template as a type: gone.* No position names a template bare: not a field, element, map key or value,
-  tuple position, choice variant or argument, not a slot typed by a reference over types, and not an operand of `&`
-  or `^`. A template named inside its own record body is refused too. Each is a resolver error at the declaration
-  that wrote it, naming the application or the abstract record a family's applications compose as the remedy; a data
-  tag naming a template is a validation error. An application's IS-A edges are its template's written parents': each
-  closed parent, and the entry an applied parent denotes where one exists. The template's own name is never among
-  them, a template is in no `subtypes` index, and no reference holds one. `abstract` and the selectors on a template
-  are each application's, so `result => abstract <T> { ok: boolean =? }` makes `result<text>` an abstract record
-  dispatching over the declarations composing it; a selector makes a template's applications abstract as it makes a
-  record so. `final` on a template is a resolver error. A family is declared with records: an abstract base, a
-  template composing it, and members composing an application that pin the selector. A use-site application whose
-  template composes a declared type is still refused as an unnameable member.
-- *§5.10, a template is an open record: running.* `meta.record` carries `parameters?: [meta.param; 1..]`, each
-  `{ name, bound? }`; a record with parameters is open, a template, and the kernel declares no other template
-  constructor and no template: `template`, `template_param`, `record_template`, `record_template_field`,
-  `record_template_field_map`, `tuple1` and `voidable_tuple1` are gone, `meta.ref` is the one reference constructor,
-  `meta.reference_type` gone, and the root's `set` an alias of `meta.set_type`, so
-  `meta.ref<X>` and `set<text>` are constructions and carry no `@meta.application`. An open record is read at its
-  declaration against `record`'s own vocabulary: a parameter is a reference value, written as its name and looked up
-  in the record's `parameters` before the namespace, standing at a field's `type` or among an application's
-  arguments there or in a parent, and a field's value, a field's name and the record's `name_type` take none. Its
-  resolved form is `!meta.record { parameters: [ !meta.param { name: T } ] … type: T … }`; an application substitutes
-  the parameters away, computes the chain from the substituted parents and closes to a `!meta.record` without
-  `parameters`. A template's body is a record body -- braces, a composition or a refinement, the explicit
-  `<T> !meta.record { … }` among them -- and a parameter list before anything else is a resolver error at the
-  declaration naming the remedy: before a container constructor or container sugar (`<T> !meta.array { … }`, `<T> [T]`),
-  the application at the use site or a construction left open and completed there; before a choice or a tuple, a
-  discriminated record family or a field group; before a value (`<T> !api { … }`), one value per instantiation;
-  before a bare reference (`<B> pair<uuid, B>`, `<T> T`), no alias template. Inside an open record a form over a parameter is
-  written in place like any other, the parameter a name at its slot at any depth -- `[T; 1..]`, `[T?]`, `{K => V;
-  ..10}`, a tuple, a choice and a record written in place over a parameter among them -- and a constructor's
-  application over a parameter is its construction in place, `meta.array<T>` the form `[T]` is. Each is substituted
-  when the record is applied and judged as the type written with the argument in place, a choice's distinctness and
-  disjointness where each application closes. A size bound naming a parameter, an application at a slot that holds
-  only a name, and a sugar form as an argument stay resolver errors at the declaration. Nothing is lifted for a form
-  over a parameter, so there are no open synthetic entries. Writing `parameters`
-  as a binding of a construction of `record` is a resolver error: parameters are the list before the body. The
-  kernel measures 81 entries, one wait cycle of 25 holding `meta.record`, a closure of 69 with `meta.param` and
-  `meta.param_name` in it, and six synthetic entries.
+- *Value parameters: gone.* A parameter is a type, standing at a field's type, at a slot of a type written in place
+  there at any depth, or as an argument of an application at either or in a parent. Anywhere else — a facet, a
+  field's default or fixed value, an enum member, a size bound, a field name, a modifier — is a resolver error at the
+  declaration, naming the slot. An argument is a name: a number or a quoted token in an argument list is a parse
+  error in a schema document (`maxint<10>`, `box<"x">`). A value that differs per application is written where the
+  application is declared, `created => response<order> & { status?: = 201 }`.
+- *Bounds: written, never inherited.* A parameter's bound is what its declaration writes, `<T: text>`, and is
+  otherwise absent; nothing is inferred from its uses, so no fixed point runs across parametric records. A parameter
+  passed as an argument to a bounded parameter is written with a bound that IS-A it, wherever it is that argument.
+  With `boxed => <T: text> { v: T }`, `rebox => <T: text> { b: boxed<T> }` resolves and `rebox => <T> { b: boxed<T> }`
+  is a resolver error at `rebox` naming `boxed`'s `T: text`. A parameter passed to a constructor's slot
+  (`<K> { m: {K => text} }`) needs no bound: the slot judges the argument that arrives when the record is applied.
+- *An application in a data document: a parse error.* In a data document a reference is a name and an argument list
+  is no data grammar ([TSON-DATA] §7.2.5): `set<text>` in a value is a parse error at its `<`, whether or not the
+  schema declares the application, and data names the entry a declaration gives it. A construction's payload in a
+  schema document is data and takes the same error. In JSON the string `"set<text>"` is outside a reference's grammar
+  and refused. The lookup of an application in data against the closure's applications is gone.
+- *Construction sugar.* At a type position of a schema document, `C<a1 … an>`, `C` resolving through aliases to a
+  constructor, is the construction `!C { f1: a1 … fn: an }` over `C`'s required fields typed by a reference naming
+  types or by the type-slot choice (#5), in declaration order: `meta.array<text>` is the form `[text]` is, and
+  `meta.map<text int32>` the form `{text => int32}` is. An incomplete entry applied, `nonempty<uuid>` over
+  `nonempty => !meta.array ^ { min_items: 1 }`, is its completion. A wrong argument count, an argument the field's
+  `of` refuses (`meta.namespace<int32 text>`) and a construction left incomplete are refused. Settled as built: a
+  field with a default is no argument slot, an argument is not followed through an alias, and a parametric record is
+  applied by substitution and never constructed.
+- *No parametric record is a type a position names.* Not a field, element, map key or value, tuple position, choice
+  variant or argument, not a slot typed by a reference, not an operand of `&` or the source of `^`, and not its own
+  body. Each is a resolver error at the declaration that wrote it, naming the application or the abstract record a
+  family's applications compose; a data tag naming a parametric record is a validation error. An application's IS-A
+  edges are its head's written parents': each closed parent, and the entry a declaration gives an applied parent.
+  The head's own name is never among them, and no `subtypes` index or reference holds one. `abstract` and the
+  selectors on a parametric record are each application's; `final` on one is a resolver error. A family is an
+  abstract base, a parametric record composing it, and members composing an application and pinning the selectors.
+- *`parameters` on `record`, and the kernel.* `meta.record` carries `parameters?: [meta.param; 1..]`, each
+  `{ name, bound? }`, and the kernel declares no other parametric form: Revision 39's `template`, `template_param`,
+  `record_template`, `record_template_field`, `record_template_field_map`, `tuple1` and `voidable_tuple1` are gone.
+  `meta.ref` is the one reference constructor, and the root's `set` names the incomplete entry `meta.set_type`, so
+  `meta.ref<X>` is a construction and `set<text>` a completion, neither carrying `@meta.application`. A parametric
+  record is read at its declaration against `record`'s own vocabulary, a parameter looked up in its `parameters`
+  before the namespace. Its body is a record body: a parameter list before anything else is a resolver error naming
+  the remedy, and there is no parametric alias. Inside one, a form over a parameter is written in place like any
+  other, and a constructor's application over a parameter is its construction in place. Writing `parameters` as a
+  binding of a construction of `record` is a resolver error.
 
-**Resolution proposed.** In §4.2, replace "and in a data document an application at a reference-typed slot names the
-entry the closure closed it to … a schema closing every application it holds before it loads" with "and in a data
-document a reference is a name: an application is a parse error, an argument list being no data grammar". To §5.3's
-sugar table add "`C<a1 … an>`, `C` a constructor: `!C { f1: a1 … fn: an }`, its required fields typed by a reference
-naming types and not pinned by its chain, in declaration order", saying whether a field with a default is one of them;
-in §5.6 say the positional, braced and applied spellings of one construction are one entry; and in §8.2 scope the
-clause comparing an application's arguments past their aliases to substitutions. For value parameters: replace §5.10's
-"A parameter's type is derived …" through its narrowing rules with "**Parameters are types.** Every parameter stands
-for a type: an argument for it is a reference, a name or an application, and a parameter stands only at a field's
-type, or as an argument of an application there or in a parent. A parameter anywhere else is a resolver error at the
-declaration, naming the slot"; replace §5.7's "Open modifiers" with the rule that a value differing per application is
-written where the application is declared; delete §8.2's "Value arguments compare as values"; end §5.3's size bound at
-a decimal integer; make §12.1's and [TSON-DATA] §7.4's `type-arg` a reference; and rewrite §1.6's worked example,
-whose `flagged<status, 2>` carries a value argument. For bounds: replace §5.10's "A bound is inherited" paragraph with
-"**A bound is written.** A parameter passed as an argument to a parameter that has a bound MUST be written with a
-bound that IS-A it: `rebox => <T: text> boxed<T>`. `rebox => <T> boxed<T>` is a resolver error at `rebox`. No bound is
-inferred, so a parameter is known in full at its declaration", and delete the paragraph on an argument to another
-template settling by a fixed point and the "derived, never required of the author" framing of the parameter paragraph.
-For a template as a type: replace ¶999 with "**A template is not a type.** No position names a template bare — a
-field, element, variant or argument position or an operand of `&` or `^` — and an application of one is a type: the
-declaration naming it where one does, its expansion otherwise (§8.2). A family is declared by records: an abstract
-base states the selectors and the fields its members share, a template composes the base, and each member composes an
-application and pins the selectors. An application's IS-A edges are its template's written parents' — each closed
-parent, and for an applied parent the entry its application denotes — and never the template's own name. `abstract`
-and the selectors on a template are each application's `extension` and `discriminators`, a selector making the
-application abstract as it makes a record so; `final` on a template is a resolver error", and delete the
-family/abbreviation split in ¶952, ¶1001's "a family base is reached by a position", the record-template half of ¶1003
-and of §8.1 ¶1457, and §4.2's `kind<record_template>`.
-
-For a template as an open record, replace ¶954, ¶958 and ¶1003 with: "**An open record is a record with parameters.**
-`<T, U: bound>` before a record body -- braces, a composition or a refinement -- declares its parameters, each a name
-standing at a field's type, or as an argument of an application there or in a parent, and nowhere else: a field's
-value is never a parameter. There a parameter is a reference value: inside an open record a reference is a name, an
-application or one of the record's parameters, looked up before the namespace (the shadowing rule). The slot judges
-the argument that arrives there when the record is applied. So the body is read at the declaration against `record`'s
-own vocabulary. A reference names an open record only as the head of an application (§5.10, "A template is not a
-type"); only `record` carries parameters. **At a type slot of schema source, `H<args>` is an application, the
-construction `meta.apply` written in place.** Resolving it substitutes where `H` is an open record -- binding the
-names it writes and filling the slots they mark -- and constructs where `H` is a constructor (§5.3). It supplies every
-argument, so there is no partial application, and `void` is an argument like any type. In a data document a reference
-is a name, and an application is a parse error ([TSON-DATA] §7.2.5, §4.2). With every argument closed it resolves at
-once, to the declaration that names it or its expansion (§8.2); with a parameter among its arguments, an open record's
-is the construction `meta.apply` written in place until the open record holding it is applied, and a constructor's is
-its construction in place. The result is a value of the body's constructor and a type. Its IS-A edges are a
-substituted record's parents, or none for a construction; the head is never one. An argument is judged against the
-parameter's written bound, or for a constructor's field against the slot's `of`. **A form over a parameter is written
-in place.** Inside an open record a parameter stands at any slot naming a type of a type written in place, at any
-depth, and is replaced when the record is applied: `[T; 1..]`, `[T?]`, `[T, text]`, `( T | error )` and `{ cursor: T
-}` are each the construction their sugar denotes, and a constructor's application over a parameter is its construction
-in place. A choice over a parameter is judged where each application closes (§5.4)." Replace ¶1017-1024 with: "**No
-alias templates.** A template's body is a record body; a body that is a bare reference -- `<B> pair<uuid, B>`, `<T> T`
--- is a resolver error. A use site writes the application it means." Then delete ¶986 ("Declaration-time checking
-splits …") with its stand-in-value prohibition, most of ¶988 ("Where a deferred diagnostic lands"), the example block
-at ¶994-997, §8.2 ¶1535's "parsed held body" and its identity clause for open synthetic entries, §5.3's open half of
-the lift rule, every mention of `meta.template` in §8.1, and narrow §12.1's `type-def` alternative `[type-params]
-type-expr` to a record body; and in §13.1 and the kernel's companion text replace `template`, `template_param`,
-`record_template`, `record_template_field`, `record_template_field_map`, `tuple1` and `voidable_tuple1` with
-`record.parameters` and `param`, `meta.ref` with the one reference constructor and the root's `set` with an alias of
-`meta.set_type`. The spec's own examples that need a record body move to one: `result => <T> ( T | error )` becomes a
-discriminated family (`result_of => <T> result & { value?: T }`), and §5.10.1's and §8.2's `nested => <T> ( T |
-[nested<T>] )` becomes a record, `nested => <T> { value?: T  more?: [nested<T>] }`.
+**Resolution.** The entry proposed edits to Revision 39's §1.6, §4.2, §5.3, §5.6, §5.7, §5.10, §8.1, §8.2, §12.1,
+§13.1 and [TSON-DATA] §7.4. Revision 40's §5.10 is the result, and the change log items above record each section
+before and after.
 
 ## 4. [TSON-SCHEMA] §5.4, §5.2 — a tag at a choice names a variant; a choice with an abstract variant has no values
+
+**Revision 40:** accepted, the entry's first resolution, on the spec author's ruling. A tag at a choice names a
+variant, or a type that IS-A exactly one variant, and the value is read at that variant as at a position typed by it.
+A tag whose type IS-A two variants and names neither selects none, a validation error at the data, and the choice
+loads. Part 2 §5.4, §7.2; Part 3 §3.3, §8.1 (change log §3.2 item 119, §3.4 item 15).
 
 **Problem.** §5.4's tagging rule says a value at a choice "carries a type annotation (`!variant`) selecting the
 variant", and §5.2's ABSTRACT rule refuses a tag naming an abstract record itself: a value at a position typed by it
@@ -299,18 +194,12 @@ admits a value of a subtype, and a choice over that type does not.
 The same gap covers a concrete variant with subtypes: at `( text | base )`, a value tagged with a subtype of `base`
 is refused, where a field typed `base` admits it.
 
-**What is running.** The tag is matched against the variant names exactly. With the schema above, `!circle { … }`
-at `item` is reported "'circle' is not a declared variant of 'item'", and `!shape { … }` "a tag naming 'shape'
-selects nothing -- it is abstract and has no direct instances. Name the member this value is, one of (circle)" — the
-second message recommends the tag the first refuses. Separately, and a gap of this library, not of the text: an
-untagged value at a disjoint choice is recovered for scalar-class variants only, so an untagged record or list at a
-disjoint choice is refused for want of a tag, where §5.4 counts "the brace/bracket delimiter" as recovering it.
+**What is running.** While the entry was open the tag was matched against the variant names exactly: `!circle { … }`
+at `item` was refused as no declared variant, and `!shape { … }` as abstract with a message recommending `circle`,
+the tag the first refusal refused. The implementation now runs Revision 40's rule, in both encodings: `!circle` at
+`item` selects `shape` and is validated as a `circle`.
 
-**Why it matters now.** The inline-types proposal for Revision 40 types a type slot as a choice of a reference and
-an abstract family, `( meta.type_ref | meta.type_inline )`, whose values are tagged by their constructor
-(`!meta.array { … }`). That is this case in the kernel.
-
-**Resolution to decide.** In §5.4: a tag selects the variant it names, or the one variant its type IS-A (§7.2), and
+**Resolution proposed.** In §5.4: a tag selects the variant it names, or the one variant its type IS-A (§7.2), and
 the value is then read at that variant as it would be at a position typed by it. Two points the rule has to state:
 
 - **A tag that IS-A two variants.** With composition a type can reach two variants. Either the tag is refused at
@@ -320,13 +209,22 @@ the value is then read at that variant as it would be at a position typed by it.
   variant's class.
 
 The alternative is to keep the tag exact and refuse an abstract variant at the declaration, since it can hold no
-value. That keeps one rule for a tag and rules out the kernel shape above.
+value. That keeps one rule for a tag and gives up "text or any shape" as an open family.
 
 ## 5. [TSON-SCHEMA] §4.2, §5.3, §5.10, §8.2 — inline types: a type slot holds a name or a type written in place
 
+**Revision 40:** accepted as proposed. Part 2 §1.3, §1.6, §2.2.3, §3.3.3, §3.4.1, §4.1, §4.2, §4.3, §5.2, §5.3,
+§5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12, §6, §7.2, §8.1, §8.2 (retitled *Instantiation and Identity*), §8.3,
+§9, §10.1, §11.5, §12.1 and §12.2; Part 3 §3.3 (change log §3.2 items 33–57 and 70–76, §3.4 item 6). Four points the
+design left open were ruled as built: an application at a composition operand is absorbed by value; a value modifier
+is admitted on a reference written in place and refused on a container, tuple or choice written in place; a choice
+that is not disjoint names every variant; and a name and a type written in place are never the same type, even where
+the name's construction is identical (change log §5). **Still open in the implementation:** a tree read reports a
+dependent value whose sibling holds a type written in place as not implemented.
+
 **Problem.** One sentence of §4.2 — every slot that names the type of a value holds a bare name in a closed entry —
 is paid for across the series. A container, tuple, choice or reference written at a use site, and every application
-of an open record no declaration names, lifts to a resolver-materialised entry named by its content. That brings
+of a template no declaration names, lifts to a resolver-materialised entry named by its content. That brings
 `@meta.synthetic` and its recompute-on-ingest rule, internal names and a freshness rule for them, a merge of equal
 lifted forms within a document and of equal expansions across imports, a self-reaching instantiation entry for a
 recursive expansion, resolved forms compared "up to renaming of internal entries", a minted name a data document may
@@ -338,107 +236,67 @@ of it describes a value: two schemas that differ only in how their resolvers nam
 types every type slot, a record field's included (#6). `tags: [text]` resolves to
 `type: { of: !meta.array { element_type: text } }`; a construction carries its constructor's tag (`!meta.ref`), and a
 completion its constructor's (`set<text>` under `!meta.array`). The slots are a record field's `type`,
-`array.element_type`, `map.value_type`, `tuple_element.element_type` and each of `choice.variants`. What may be written
-in place is a container, a tuple, a
-choice or a reference, or a construction of a constructor composed from one, or a record: a record body written at the
-slot or the record an application of an open record closes to, one form. An enum and every other atom are declared
-and named, as §5.2 already requires. A map's key is a name. A type written in place is no entry: structural
-identity (same constructor, same fields, names as the leaves, annotations taking no part), no chain, a member of no
-kind, named by no tag.
-Nothing is lifted, minted or merged, and `@meta.application` stays on a declared application's key alone. An
-application of an open record is the substituted record under a declaration's name, absorbed by value at a
-composition operand, where an applied parent's edge is the one lookup of a declaration by its
-application, and closed in place at a type slot, never looked up; recursion ties to the declaration being closed,
-and a recursive application with none to tie to is refused. An argument of an open record's application is a name or
-a parameter; a slot typed `meta.type_ref` holds a name and refuses an application. Three rules widen: a dependent
-field's sibling may be typed by the type-slot choice, a constructor's argument slots include fields typed by it, and
-the positional form of a one-field record admits a field typed by it.
+`array.element_type`, `map.value_type`, `tuple_element.element_type` and each of `choice.variants`. What may be
+written in place is a container, a tuple, a choice or a reference, a completion of an incomplete entry of one, or a
+record: a record body written at the slot or the record an application of a parametric record closes to, one form.
+An enum, every other atom and a namespace type are declared and named. A map's key is a name. A type written in place
+is no entry: structural identity (same constructor, same fields, names as the leaves, annotations taking no part), no
+chain, a member of no kind, named by no tag. Nothing is lifted, minted or merged, and `@meta.application` stays on a
+declared application's key alone. An application of a parametric record is the substituted record under a
+declaration's name, absorbed by value at a composition operand, and closed in place at a type slot, never looked up;
+recursion ties to the declaration being closed, and a recursive application with none to tie to is refused. An
+argument of a parametric record's application is a name or a parameter; a slot typed `meta.type_ref` holds a name and
+refuses an application. Three rules widen: a dependent field's sibling may be typed by the type-slot choice, a
+constructor's argument slots include fields typed by it, and the positional form of a one-field record admits a field
+typed by it.
 
-**What is running** on the inline-types branch off the Revision 40 proposal branch, against the hand-written kernel
-and resolved fixtures (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`, `net-resolved.tn`).
+**What is running**, against the kernel and the resolved fixtures.
 
 - *The kernel and the slots.* `meta.type_inline` and `meta.type_expr` are declared and the five slots retyped;
-  `map.key_type` stays `meta.type_ref`. `@meta.synthetic` is gone. The bundled schemas resolve, link and compile, and
-  `ResolvedFixtureTest` passes against the hand-written fixtures. The kernel's hand-built wait cycle is 31 entries:
-  `meta.type_expr`, and through `of: meta.type` every constructor's record, `meta.record_extension_type` and `void`.
+  `map.key_type` stays `meta.type_ref`. `@meta.synthetic` is gone. The bundled schemas resolve, link and compile.
 - *Sugar in place.* `[T; n..]`, `{K => V}`, `[A, B]`, `( A | B )`, `set<T>` and `meta.ref<T>` at a slot desugar to
-  `{ of: !C { … } }`, nested forms nested, each construction carrying its constructor's tag. Nothing is lifted or
-  merged, no name is derived from content, and no code that derived one remains. A user schema with inline forms reads
-  data in tree and bind mode and through the JSON stack; the reader recovers an untagged value at a disjoint choice
-  whose variant is a reference or a `{ of: … }` record.
+  `{ of: !C { … } }`, nested forms nested. Nothing is lifted or merged and no name is derived from content. A schema
+  with inline forms reads data in tree and bind mode and through the JSON stack.
 - *Identity.* A type written in place compares by its constructor and fields, and a name and a construction are
-  never one type: a restated field's narrowing refuses `text_list` restated as `[text]` and the reverse, and a choice's
-  variant distinctness counts `text_list` and `[text]` as two variants. Nothing follows a name to its construction.
+  never one type: a restated field refuses `text_list` restated as `[text]` and the reverse, and a choice counts
+  `text_list` and `[text]` as two variants.
 - *Values and choices.* A value modifier on an inline reference (`handler?: meta.ref<method> ~ orders.place_order`)
-  is admitted and judged at link as a declared reference's is; one on any other type written in place is refused at
-  the declaration. A dependent value whose sibling holds a type written in place is read against it in bind mode and
-  judged at link in a schema document. A choice that is not disjoint with a variant written in place
-  (`( [text] | [int32] )`) is refused, a tag naming a variant by its name.
+  is judged at link as a declared reference's is; one on any other type written in place is refused. A choice that
+  is not disjoint with a variant written in place (`( [text] | [int32] )`) is refused.
 - *Applications.* A declared application is its substituted record under its name, `@meta.application` on its key.
-  An application at a composition operand is absorbed by value, an applied parent's edge
-  naming the declared entry where there is one. At a type slot an application closes in place: `f: page<order>` holds
-  `{ of: !meta.record { … } }`, the substituted record with no name, no chain and nothing recording it, never looked
-  up to a declaration, and so does a nested application a closing leaves at a slot (`cursor: box<T>` once `page =>
-  <T> { cursor: box<T> }` is applied). Two records in place are one type when their bodies are equal, whichever open
-  records produced them; `f: page<order>` and `f: page_order` are two types of one shape, so restating one as the other
-  is refused. An abstract open record applied in place closes to an abstract record nothing is a member of.
-  Inside an open record a constructor's application over a parameter is its construction in place at the declaration,
-  one nested in another constructor's arguments included (`meta.map<text meta.array<T>>`), and an open record's is
-  `meta.apply` written in place, at a field's type, at a slot of a type written there or among `chain.parents`, until
-  the record is applied.
-- *Recursion.* A recursive application closing a declaration ties to it: `node_text => node<text>` over `node => <T>
-  { value: T  next?: node<T> }` holds `next: node_text`. Mutual recursion through records in place ties the same way:
-  closing `a_text => a<text>` over `a => <T> { b: b<T> }` and `b => <T> { a?: a<T> }` closes `b` in place, whose
-  `a<text>` names `a_text`. Recursion is judged by closing: an application reached again inside its own closing in
-  place, with no declaration closing it, is refused (`f: b<text>`, with or without `a_text` declared). An open record
-  holding an application of a recursive open record it is not on a cycle of (`wrap => <T> { n: node<T> }`) could never
-  close, and is refused at its own declaration, applied or not, judged over the open records' held heads once every
-  declaration is ready; its appliers report nothing.
-- *Records in place, read and bound.* A record in place reads in tree and bind mode and through the JSON stack, by a
-  reader built from its body: the open record's field states, defaults, pins, groups, name type and dependent fields,
-  each diagnostic located by its field path and naming the application as written. A value there carries no tag and
-  admits none (a `$type` included). In bind mode it binds to the record class the component holding it declares -- at
-  a field, an element, a map's value or a tuple's position -- no binding map being able to name it; a component that is
-  no record class is a bind mismatch.
-- *Arguments and names.* A sugar form, an applied constructor or an application of an open record passed as an
-  argument of an open record's application is refused, at a closed record and, inside an open record, at its own
-  declaration, naming the declaration to write (`text_box => box<text>`); an application as an argument of a
-  constructor's application (`meta.array<box<T>>`) closes at its slot, and a sugar form there (`meta.array<[T]>`) is
-  refused as at any argument. An application at a slot typed
-  `meta.type_ref` — a map's key, a reference's `of`, a parameter's bound, an alias's target — is refused the same way.
-- *Refused.* An application whose record in place would be IS-A a declared type (`k: dog_of<text>`, §5.2) is a
-  resolver error at the declaration that wrote it or, held in an open record, at the declaration whose application
-  closed it, judged before the record is closed. A recursive application with no declaration closing it (`f:
-  node<text>`, §5.10.1) is one at the closed record that wrote it; held in an open record, the open record is refused
-  at its declaration (*Recursion*, above).
-- *A record body at a slot.* `at: { x: int32 }` parses at a field's type, a group member's, an array's element, a
-  map's value, a tuple's element and a choice's variant, by the brace dispatch a declaration's body uses, `{}` the
-  empty record, and desugars to `{ of: !meta.record { fields: { … } } }`, nested records innermost first. It holds
-  what a declared body holds -- marks, modifiers, groups, dependent fields, annotations resolved in the schema's
-  namespace -- and answers a declared record's checks at the declaration, its field names under its own name type and
-  as a name-hygiene scope of their own; a selector makes it abstract, and so empty.
-  It is the same type as an application closing to equal fields. It reads untagged in tree and bind mode and through
-  the JSON stack, each diagnostic at its field path and its field's source line. A map's key, an argument and a
-  parameter's bound refuse it; `at: point & { z: int32 }`, `^` and `-` at a slot are parse errors naming the
-  declaration to write.
-- *The three widened rules.* A dependent field's sibling typed by the type-slot choice, a constructor's argument
-  slot typed by it (`meta.array<text>` constructs), and the positional `fields: { p => text }` all run.
-- *Kinds.* A construction in place is a member of no kind: a kind's members are declared entries.
+  At a type slot an application closes in place: `f: page<order>` holds `{ of: !meta.record { … } }`, never looked up
+  to a declaration, so `f: page<order>` and `f: page_order` are two types of one shape. Inside a parametric record a
+  parametric record's application over a parameter is `meta.apply` written in place until the record is applied.
+- *Recursion.* A recursive application closing a declaration ties to it: `node_text => node<text>` over
+  `node => <T> { value: T  next?: node<T> }` holds `next: node_text`, and mutual recursion ties the same way. A
+  recursive application with no declaration closing it (`f: node<text>`) is refused at the declaration that wrote
+  it, and a parametric record holding an application of a recursive one it is not on a cycle of
+  (`wrap => <T> { n: node<T> }`) is refused at its own declaration (change log §3.2 item 56).
+- *Records in place, read and bound.* A record in place reads in tree and bind mode and through the JSON stack, each
+  diagnostic located by its field path. A value there carries no tag and admits none. In bind mode it binds to the
+  record class the component holding it declares.
+- *Arguments.* A sugar form, an applied constructor or an application of a parametric record passed as an argument of
+  a parametric record's application is refused, naming the declaration to write (`text_box => box<text>`). An
+  application at a slot typed `meta.type_ref` — a map's key, a reference's `of`, a parameter's bound, an alias's
+  target — is refused the same way.
+- *A record body at a slot.* `at: { x: int32 }` parses at every type slot and desugars to
+  `{ of: !meta.record { fields: { … } } }`. It holds and is judged as a declared body is, and is the same type as an
+  application closing to equal fields; `at: point & { z: int32 }` and `^` or `-` at a slot are parse errors.
+- *The three widened rules* all run.
 
 **What is not yet running.** A tree read reports a dependent value whose sibling holds a type written in place as not
-implemented, holding the sibling as the record it is written as rather than as the type.
-
-**Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 2 §1.3, §1.6, §2.2.3,
-§3.3.3, §3.4.1, §4.1, §4.2 (the type-slot choice), §4.3, §5.2, §5.3, §5.4, §5.6, §5.7, §5.8, §5.10, §5.10.1, §5.12,
-§6, §7.2, §8.1, §8.2 (rewritten as *Instantiation and Identity*), §8.3, §9, §10.1, §11.5, §12.1 and §12.2, and Part 3
-§3.3; `spec/tson-rev40-changelog.md` records each section's rule before and after. Four points the
-design left open are settled there as ruled: an application at an operand is absorbed by value; a
-value modifier on a field typed by a reference written in place is admitted and read against it, and refused on a
-container, tuple or choice written in place; a choice that is not disjoint names every variant, a variant written in
-place there being a resolver error; and a name and a type written in place are never the same type, even where the
-name's construction is identical.
+implemented, holding the sibling as the record it is written as rather than as the type (outstanding work in the
+implementation).
 
 ## 6. [TSON-DATA] §7.4, [TSON-SCHEMA] §4.2, §5.2, §12.1, [TSON-JSON] §5.6 — a dependent field's type is a sum in place
+
+**Revision 40:** accepted as proposed. Part 1 §1.3, §1.5, §2.3, §2.5, §2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4,
+§7.5, §7.7 and §8.1; Part 2 §1.4, §4.2, §5.2, §5.3, §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9, §12.1,
+§12.2 and §12.3; Part 3 §1.6 and §5.6 (change log §3.1 items 6–13, §3.2 items 58–69 and 90, §3.4 items 7–8). Of the
+four points ruled, `kind!` in data takes the separator rule's parse error, `on` names a field by its declared spelling,
+and a declared sum is never written in place; the fourth, `meta.ref` kept as an empty refinement, is superseded by
+`meta.ref` as the one reference constructor (§3.2 items 97–100). The point this entry left open against the text is
+settled by §3.2 item 122.
 
 **Problem.** A dependent field's type, `kind!`, is a reference value in Revision 39, and it is no name: it names a
 field of the record instance, bound at each read, and is never replaced by an entry's name. Holding it in
@@ -451,68 +309,45 @@ node and a JSON string form, that no data document but a resolved schema may hol
 names the type, as `meta.declared` is the sum in which a value's tag does:
 
 ```
-dependent => meta.sum & { on: text }
+dependent => final meta.sum & { on: text }
 payload   => !meta.record_field { type: { of: !meta.dependent { on: kind } } }      -- payload: kind!
 ```
 
-`kind!` is schema-grammar sugar for it, admitted only as a record field's type. A reference is a name, an
-application or a parameter.
+`kind!` is schema-grammar sugar for it, admitted only as a record field's type. A reference is a name or, inside a
+parametric record, a parameter.
 
-**What is running** on a branch off the Revision 40 proposal branch, against the hand-written kernel and resolved
-fixture (`spec/m/meta.tn`, `spec/fixtures/meta-resolved.tn`).
+**What is running**, against the kernel and the resolved fixture.
 
-- *The kernel.* `allow_sibling`, `meta.field_type_ref` and `meta.field_type_expr` are gone; `meta.dependent` is added;
-  `record_field.type` is a `meta.type_expr`, as every type slot is; `meta.type_ref` is `!meta.ref { of: meta.type }`;
-  and `meta.ref` is the one reference constructor, `meta.atom & { of: meta.type_ref }`, so `meta.ref<T>` keeps its
-  spelling and `meta.reference_type` is gone. The kernel's own `record_field.value` is typed `type!`. `on` is `text`
-  and names a declared field by its declared spelling, as a `discriminators` entry does.
+- *The kernel.* `allow_sibling`, `meta.field_type_ref` and `meta.field_type_expr` are gone; `meta.dependent` is added,
+  final; `record_field.type` is a `meta.type_expr`, as every type slot is; `meta.type_ref` is
+  `!meta.ref { of: meta.type }`; and `meta.ref` is the one reference constructor, `meta.atom & { of: meta.type_ref }`,
+  so `meta.ref<T>` keeps its spelling. The kernel's own `record_field.value` is typed `type!`. `on` is `text` and
+  names a declared field by its declared spelling, as a `discriminators` entry does.
 - *The data grammar* ([TSON-DATA] §7.4, §7.5). `sibling-ref` and its adjacency row are gone, and with the argument
-  list gone too (#3) so is `reference`; no tree node or writer case holds either form. A data document writing `kind!`
-  — or a schema document writing it inside a construction's payload, which is data — gets the separation rule's syntax
-  error at the `!` ("adjacent values must be separated by whitespace, a comma, or both"), the token `kind` before it
-  read as the position reads any token. No targeted message names the mark, which would put the form back in this
-  grammar.
+  list gone too (#3) so is `reference`. A data document writing `kind!` — or a schema document writing it inside a
+  construction's payload, which is data — gets the separation rule's syntax error at the `!`, the token `kind` before
+  it read as the position reads any token. No targeted message names the mark, which would put the form back in the
+  data grammar.
 - *The schema grammar* ([TSON-SCHEMA] §12.1, §5.3's sugar table). `kind!` parses only as a record field's type or a
-  field group member's, a member being a field: `field-type = type-expr ["?"] / dependent-type`, `dependent-type =
-  unquoted-token "!"`, `group-member = *annotation field-name ["?"] ws ":" ws field-type`, with `sibling-ref` gone
-  from `type-expr`, `supertype-ref`, `map-key` and the imported productions. The token is one
-  identifier and the `!` is followed by whitespace (§12.3), so `kind!?` is a parse error and a dependent field is
-  never voidable by grammar. An adjacent `!` after a name at any other position — inside a field's type, a
-  declaration's body, a composition operand, a map key, a parameter's type, an argument, a
-  field's value — is a parse error: "'kind!' is a dependent field's type, and stands only as a record field's type, a
-  field group member's included -- never inside a type, nor at any other position". The desugar step writes `kind!`
-  as `{ of: !meta.dependent { on: kind } }` in place, and resolved output writes that.
+  field group member's: `field-type = type-expr ["?"] / dependent-type`, `dependent-type = unquoted-token "!"`. The
+  `!` is followed by whitespace (§12.3), so `kind!?` is a parse error and a dependent field is never voidable by
+  grammar. An adjacent `!` after a name at any other position is a parse error. The desugar step writes `kind!` as
+  `{ of: !meta.dependent { on: kind } }` in place, and resolved output writes that.
 - *The link rule* ([TSON-SCHEMA] §4.2, §5.2). A `meta.dependent` is admitted in place only, and only directly at a
-  record field's type: declared (`x => !meta.dependent { on: kind }`), or in place at an element type, a map's value
-  type, a tuple element or a choice variant, it is a resolver error at link, nothing else binding `on`. Two records
-  each holding `{ of: !meta.dependent { on: kind } }` hold equal values and two types; a dependent field is read
-  through its record's reader, never through a reader shared by a type in place's structural identity. §5.2's rules
-  on the sibling and the dependent field are unchanged, and hold for the sugar and the canonical form alike.
+  record field's type: declared, or in place at any other slot, it is a resolver error, nothing else binding `on`.
+  Two records each holding `{ of: !meta.dependent { on: kind } }` hold equal values and two types.
 - *The JSON encoding* ([TSON-JSON] §5.6). The string form of a sibling reference is gone: `"kind!"` at a kind's
-  position spells no reference and is refused as a malformed value (`ATOM_FORM_INVALID`).
+  position spells no reference and is refused as a malformed value.
 
-**Open against the text.**
-
-- *A kernel-typed data document can write what the list refuses.* `meta.type_inline.of` is typed `meta.type`, and
-  §4.2's list is a resolver rule, so a data document typed by the kernel (`!meta.array { element_type: { of:
-  !meta.dependent { on: kind } } }`) reads with no diagnostic. This predates `meta.dependent`, which only adds an entry
-  to the list; it is not solved here.
-- *A declared sum in place is refused with the wrong diagnostic.* The text now says a declared sum
-  (`meta.declared_type`) is never written in place (§4.2, §5.2). The implementation refuses it at resolution, where the
-  model's type for a type in place admits only what the list names, so the diagnostic reads as the schema and the
-  bound class disagreeing rather than naming the rule.
-
-**Resolution proposed.** The Revision 40 proposal text carries it, edited in place: Part 1 §1.3, §1.5, §2.3, §2.5,
-§2.8, §4.1, §7.2, §7.2.4, §7.2.5, §7.3, §7.4, §7.5, §7.7 and §8.1; Part 2's header, §1.4, §4.2 (the reference
-listing, the sibling bullet, the type-slot choice, and the list of what `of` holds, which gains `meta.dependent` at a
-record field's type alone and states that a declared sum is never written in place), §5.2 (the opening and the
-position rule), §5.3 (the sugar table), §5.5, §5.6, §5.7, §5.10, §5.11, §7.4, §8.1, §8.2, §9, §12.1, §12.2 and §12.3;
-Part 3 §1.6 (items 16 and 21) and §5.6; `spec/tson-rev40-changelog.md` records each section's rule before and after.
-Four points the design left open are settled there as ruled: `kind!` in data takes the separator rule's parse error
-and no targeted one; `meta.ref` stays as an empty refinement; `on` names a field by its declared spelling; and a
-declared sum is named, as a namespace type is.
+**Open against the text, now settled.** A data document typed by the kernel could write a type in place that
+§4.2's list refuses (`!meta.array { element_type: { of: !meta.dependent { on: kind } } }`), `meta.type_inline.of`
+being typed `meta.type`. Revision 40 states that such a value is held to the kernel's shape alone and declares
+nothing (§4.2).
 
 ## 7. [TSON-SCHEMA] §5.2, §11 — a free sibling hands the choice of a dependent field's type to the document's author
+
+**Revision 40:** accepted as proposed. Part 2 §11.1 gains the paragraph *A free sibling gives the document's author
+the choice of a type*, and §5.2's rules are unchanged (change log §3.2 item 110).
 
 **Problem.** §5.2 reads a dependent field against the type its sibling's value names, and admits as a sibling a
 reference naming types (`meta.type_ref`, `meta.ref<C>` over a constructor, a refinement of one) or the type-slot
@@ -532,26 +367,30 @@ One limit of the narrowing is worth stating beside it: a reference narrows by co
 is every record of the closure, the kernel's included), never to the subtypes of one record. A family with a
 discriminator is the spelling for that set.
 
-**What is running.** In this implementation a tree read reads the value against whatever type the sibling names. A
-bind read does the same where a class is bound for that type, and throws `MissingBindingException` during the read
-where none is: the receiver's wiring, found only when a document names the type. `BACKLOG.md` holds the work that
-moves that check to the bind-mode load. In the HTTP layer (`ltr8-io-tson-java-http`) the exception is a 500 any
-client can produce, so `TsonApiDescription` refuses at startup a bound request record whose dependent field lets a
-sender name a type no class binds, or one of the kernel's vocabulary (`ChosenTypes`), pinned by
-`UpstreamGapsTest.aDependentFieldsSiblingNamingATypeNothingBindsIsAMissingBinding`.
+**What is running.** A tree read reads the value against whatever type the sibling names. A bind read does the same
+where a class is bound for that type, and throws `MissingBindingException` during the read where none is: the
+receiver's wiring, found only when a document names the type. Moving that check to the bind-mode load is outstanding
+work in the implementation. In an HTTP layer built on this library the exception is a server error any client can
+produce, so that layer refuses at startup a bound request record whose dependent field lets a sender name a type no
+class binds, or one of the kernel's vocabulary.
 
 **Resolution proposed.** One paragraph in §11, and no change to §5.2's rules: a free sibling typed `meta.type_ref` or
 `meta.type_expr` gives the document's author the choice of the type a value is read against, the kernel's vocabulary
 included and, for `meta.type_expr`, a type the author writes; a schema for untrusted input SHOULD pin the sibling,
 make it a discriminator, or narrow the reference.
 
-Two sentences the consumer's report suggested are not proposed. *That a receiver may hold a sender to fewer types
+Two sentences the HTTP layer's report suggested are not proposed. *That a receiver may hold a sender to fewer types
 than the reference admits*: the set is the schema's, and a receiver accepting less is using another schema without
 naming it. *That a chosen type the receiver cannot read is the document's fault*: the document is valid under the
 schema and a tree read accepts it; whether a host has a class for a type is a fact about one receiver, which the
 type system does not see.
 
 ## 8. [TSON-SCHEMA] §5.12, §6, §3.3.3 — a name inside an annotation's value: that it is judged, where, and when
+
+**Revision 40:** accepted as proposed, and no rule changes. Part 2 §5.12 gains *The rule reaches an annotation's
+value*, and §6's `@T:value` bullet points at it (change log §3.2 item 111). **Still open in the implementation:** a
+name in a schema document's annotation value is checked for shape but not judged at link (change log §5, "#8
+(remainder)").
 
 **Problem.** §6 says an annotation's value is "a single data-value conforming to `T`", validated against `T`'s
 contract, and §5.12 judges a name at a `meta.ref<T>` slot by what it reaches, in a schema document and in a data
@@ -573,10 +412,8 @@ Two facts are unstated:
 meta.ref<order>` and `typed => @meta.annotation meta.type_ref`, `@about:nope` is refused as naming no entry and
 `@typed:nope` as no member, each `ATOM_CONSTRAINT_VIOLATION`, and `@about:o1` naming a value of `order` reads clean.
 A schema document's is not: `@binds:[no_such]` under `binds => @meta.annotation [meta.ref<protocol>]` loads, the
-value's shape checked and the name held undelivered. That is a gap of this library, held in `BACKLOG.md`, and no
-reading of the text. In the HTTP layer (`ltr8-io-tson-java-http`) `@binds` and an exemption's `exchange` keep their
-`meta.ref<…>` typing and `TsonApiDescription` checks the names itself, pinned by
-`UpstreamGapsTest.aReferenceInsideAnAnnotationValueIsNotJudged`.
+value's shape checked and the name held unjudged. That is a gap of this implementation, and no reading of the text.
+An HTTP layer built on this library keeps its annotations' `meta.ref<…>` typing and checks the names itself.
 
 **Resolution proposed.** One sentence in §5.12's "Where the rule stands", naming an annotation's value among the
 slots the rule reaches, with the namespace and the time above; and in §6, beside "conforming to `T`", a pointer to
@@ -584,6 +421,9 @@ it. No rule changes: §6's "an annotation never changes whether a value is valid
 an annotation whose own value does not conform is already an error.
 
 ## 9. [TSON-SCHEMA] §5.5, §9, [TSON-DATA] §5.5 — `net.uuid_type.version` has no stated meaning
+
+**Revision 40:** accepted as proposed. Part 2 §5.5 states the meaning and §5.7 lists `version` among the
+settable-once facets (change log §3.2 item 112), which is what runs.
 
 **Problem.** net.tn declares `uuid_type => meta.atom & atom.specification & { spec?: = "…/rfc9562"  version?:
 numeric.count }`. Nothing says what `version` constrains: §5.5's per-family list has no entry for `uuid`, §5.7's

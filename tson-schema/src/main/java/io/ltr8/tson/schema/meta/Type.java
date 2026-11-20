@@ -12,8 +12,9 @@ import java.util.List;
  * type exactly when it is an {@code instanceof Type}, and every type body carries its chain ({@link TypeChain}).
  *
  * <p><b>Every question about what an entry IS-A asks this.</b> A parametric record carries a chain too, recording what its
- * written parents reach, which each application inherits; the parametric record itself is no type (§5.10) and is in no
- * {@code subtypes} index. {@link Namespace} and {@link Alias} carry no chain: a value and a hop have no IS-A.
+ * written parents reach, which each application inherits; no application is IS-A the parametric record itself
+ * (§5.10), and it is in no {@code subtypes} index. {@link Namespace} and {@link Alias} carry no chain: a value and a hop
+ * have no IS-A.
  *
  * <p>Every body record carries {@code chain} as its first component, mirroring the constructor's flattened
  * shape, where {@code type}'s field comes first.

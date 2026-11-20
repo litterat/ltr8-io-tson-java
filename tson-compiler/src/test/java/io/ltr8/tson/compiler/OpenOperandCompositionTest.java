@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * arguments as written yields a held record still carrying them, and absorbing that is an ordinary flattened
  * record that mentions {@code T}.
  *
- * <p><b>The IS-A edge is the half that has to wait.</b> A parametric record is not a type (§5.10), so the chain an
+ * <p><b>The IS-A edge is the half that has to wait.</b> No application is IS-A its head (§5.10), so the chain an
  * application of the open declaration closes to names {@code customer} and {@code box}'s own ancestors and
  * never {@code box} -- there is no instantiation of it yet to be IS-A. What the declaration <em>can</em> do is
  * keep the application: {@code supertypes} is a reference channel, so {@code box<T>} is written into the held
@@ -54,8 +54,8 @@ class OpenOperandCompositionTest {
      * is a macro at both ends: it contributes its fields and its own ancestors, and the type the composition
      * produces is the composing declaration (§5.8).
      *
-     * <p><b>Neither {@code box<text>} nor {@code box} is a type to be IS-A here.</b> A parametric record is no type (§5.10),
-     * so no edge runs to it; no declaration names {@code box<text>}, so there is no entry for an edge to reach
+     * <p><b>Neither {@code box<text>} nor {@code box} is a type to be IS-A here.</b> No application is IS-A its head
+     * (§5.10), so no edge runs to it; no declaration names {@code box<text>}, so there is no entry for an edge to reach
      * either. What {@code c} IS-A is what {@code box}'s written parents reach: {@code base}.
      */
     @Test
@@ -138,7 +138,7 @@ class OpenOperandCompositionTest {
 
     /**
      * The open operand contributes its ancestors and not itself. {@code base} is a type and its fields
-     * arrived, so the IS-A edge is real; {@code box} is a parametric record, and §5.10 makes a parametric record no type.
+     * arrived, so the IS-A edge is real; {@code box} is a parametric record, and §5.10 makes no application IS-A its head.
      * The parametric record's chain says so: its parents as written, and the closed entries they reach.
      */
     @Test
@@ -150,7 +150,7 @@ class OpenOperandCompositionTest {
         assertEquals(List.of("base", "customer"), TypeChain.supertypesOf(vip),
                 () -> "customer directly, base through the open operand: " + TypeChain.supertypesOf(vip));
         assertFalse(TypeChain.supertypesOf(vip).contains("box"),
-                () -> "a parametric record is not a type, so nothing is IS-A one: " + TypeChain.supertypesOf(vip));
+                () -> "no application is IS-A its head: " + TypeChain.supertypesOf(vip));
         assertEquals(List.of("customer", "box<T>"), TypeChain.parentsOf(vip).stream()
                 .map(io.ltr8.tson.schema.meta.TypeExpr::text).toList(), "and it keeps its parents as written");
     }
@@ -200,7 +200,7 @@ class OpenOperandCompositionTest {
                 () -> intBox + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(intBox)));
     }
 
-    /** A body that only restates absorbed fields (§5.7): the same absorption, and the same two omissions. */
+    /** A body that only restates absorbed fields (§5.8): the same absorption, and the same two omissions. */
     @Test
     void aRestatementTightensAFieldSetAbsorbedFromAnOpenOperand() {
         TsonCompiledSchema compiled = compile("""

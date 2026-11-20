@@ -162,7 +162,7 @@ does narrow, such as a media type that must parse, is a type of its own.
   same-named `*Parser` in
   the unexported `atom.parser` that holds one and does the `read`/`write`/validate work.
 - **`RegexParser` returns `String`, and `TextType.pattern`/`UriType.pattern` are `Optional<String>`, not `Pattern`**:
-  `regex` IS-A piece of text (§5.7), and a plain equatable `String` binds generically with no `DataBridge`. The text is
+  `regex` IS-A piece of text (§5.8), and a plain equatable `String` binds generically with no `DataBridge`. The text is
   validated by `IRegex.parse` (`unicode.regex_type`'s `spec` is fixed to RFC 9485; `java.util.regex`'s grammar is a superset)
   and matched by `IRegex.matches`, linear-time and ReDoS-safe.
 - **`void` and `meta.identifier` each have a constructor**, and are read by it: `meta.void_type` by `VoidReader` (the

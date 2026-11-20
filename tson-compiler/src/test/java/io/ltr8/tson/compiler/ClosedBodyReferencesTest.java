@@ -82,7 +82,7 @@ class ClosedBodyReferencesTest {
     /**
      * {@code value_type: box<text>} closes in place to the record {@code box<text>} closes to, as a map type's does
      * (§5.10), so a value of the namespace type reads against it. Unclosed, the value at {@code a} would be judged
-     * against the parametric record {@code box}, which is no type.
+     * against the parametric record {@code box}, which no position names bare.
      */
     @Test
     void aNamespaceTypesValueTypeClosesItsApplication() {

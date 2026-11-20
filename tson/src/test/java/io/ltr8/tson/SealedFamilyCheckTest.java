@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * What each {@code record.extension} member obliges of the rest of a closure, through the front door
- * ([TSON-SCHEMA] §5.2, §5.7, §5.9). {@code RecordExtension} is the pass;
+ * ([TSON-SCHEMA] §5.2, §5.8, §5.9). {@code RecordExtension} is the pass;
  * this is the evidence it is reachable from a schema an author could write.
  *
  * <p><b>Written against the real pipeline rather than hand-built entries</b>, because half of what is under
