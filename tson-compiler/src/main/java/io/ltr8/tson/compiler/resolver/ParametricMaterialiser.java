@@ -140,9 +140,16 @@ final class ParametricMaterialiser {
                                       ApplyBody written) {
     }
 
+    /** Where each application closed is recorded as part of the entry holding it ({@link Restatements}). */
+    private final Restatements restatements;
+
+    /** The entry {@link #materialise} is closing applications in, or {@code null} outside that pass. */
+    private String materialising;
+
     ParametricMaterialiser(DefinitionGetter namespace, Function<String, Top> importedTypes, Supplier<String> resolving,
                            Map<String, TsonSchema.EntryFacts> facts, Map<String, ApplyBody> applications,
-                           Predicate<String> kernel, HeldRecursion heldRecursion) {
+                           Predicate<String> kernel, HeldRecursion heldRecursion, Restatements restatements) {
+        this.restatements = Objects.requireNonNull(restatements, "restatements");
         this.heldRecursion = Objects.requireNonNull(heldRecursion, "heldRecursion");
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
@@ -190,6 +197,7 @@ final class ParametricMaterialiser {
     void materialise(Map<String, Top> entries, MaterialisationFailureReporter reporter) {
         TypeSlots.Rewrite rewrite = slotRewrite();
         for (Map.Entry<String, Top> entry : entries.entrySet()) {
+            materialising = entry.getKey();
             try {
                 entry.setValue(entry.getValue() instanceof RecordBody record && record.isParametric()
                         ? TypeSlots.mapBody(record, parametricRewrite())
@@ -204,6 +212,7 @@ final class ParametricMaterialiser {
                 reporter.reportFailedApplication(entry.getKey(), e);
             }
         }
+        materialising = null;
     }
 
     /**
@@ -268,7 +277,9 @@ final class ParametricMaterialiser {
         }
         try {
             note(declaredName, RECORD);
-            Top closed = closeParametricRecord((RecordBody) record, bind(parameters, arguments));
+            Map<String, TypeRef> bindings = bind(parameters, arguments);
+            restatements.absorbs(declaredName, head, bindings);
+            Top closed = closeParametricRecord((RecordBody) record, bindings);
             return instantiation(declaredName, closed, canonical, application);
         } finally {
             closingInto.remove(canonical);
@@ -343,6 +354,15 @@ final class ParametricMaterialiser {
         return closed == null ? application.withArguments(arguments).inPlace() : closed;
     }
 
+    /**
+     * {@code type} with each application in it closed in place, as {@link #materialise} closes a closed body's: what
+     * a restatement's two types are compared in, so the link judges them as it judges an entry's own fields ({@link
+     * Restatements#settled}).
+     */
+    TypeExpr closedInPlace(TypeExpr type) {
+        return TypeSlots.map(type, slotRewrite());
+    }
+
     /** What {@link #materialise} applies to a closed body: each application written in place closed where it stands. */
     private TypeSlots.Rewrite slotRewrite() {
         return (Closing) this::closeApplicationOfRecord;
@@ -370,7 +390,8 @@ final class ParametricMaterialiser {
     /**
      * What a fully-bound application of a parametric record at a type slot closes to ([TSON-SCHEMA] §5.10): the
      * declaration closing this very application, where one is (a recursion, §5.10.1), and otherwise the substituted
-     * record in place, with no name, no chain and nothing recorded. {@code null} where the head names nothing in
+     * record in place, with no name, no chain and no application recorded, its restatements the holding entry's
+     * ({@link Restatements}). {@code null} where the head names nothing in
      * scope -- that is {@code TsonSchemaLinker}'s verdict to give as an unresolved reference, not this pass's to
      * guess at.
      *
@@ -421,6 +442,7 @@ final class ParametricMaterialiser {
                     + "') and write that name where it is used");
         }
         closingInPlace.put(canonical, written);
+        restatements.absorbs(resolving.get() != null ? resolving.get() : materialising, head, bindings);
         try {
             RecordBody closed = closeParametricRecord((RecordBody) record, bindings);
             return TypeInline.closing(written, closed.withChain(TypeChain.EMPTY));

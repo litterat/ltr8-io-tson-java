@@ -276,20 +276,28 @@ final class DefinitionResolver {
     private final List<Deferred> deferred = new ArrayList<>();
 
     /**
+     * Where a composition records the fields it restates over a source its chain will not reach, and the applied
+     * operands whose own restatements become its ({@link Restatements}). {@code null} where nothing links what this
+     * resolves (the kernel bootstrap, and unit tests).
+     */
+    private final Restatements restatements;
+
+    /**
      * No annotation reader: an annotation's name is kept, its value is out of reach, and no name is checked
      * against the imported entries. See {@link AnnotationValueReader}.
      */
     DefinitionResolver(ConstructionReader constructionReader, DefinitionGetter vocabularyDefinitions,
                        DefinitionGetter namespaceDefinitions) {
         this(constructionReader, null, vocabularyDefinitions, namespaceDefinitions, null,
-                SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true);
+                SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true, null);
     }
 
     DefinitionResolver(ConstructionReader constructionReader, AnnotationValueReader annotationValueReader,
                        DefinitionGetter vocabularyDefinitions, DefinitionGetter namespaceDefinitions,
                        ApplicationCloser applicationCloser, SchemaPositions positions,
                        Map<String, TsonSchema.EntryFacts> facts, Predicate<String> kernel,
-                       Predicate<String> vocabularyKernel) {
+                       Predicate<String> vocabularyKernel, Restatements restatements) {
+        this.restatements = restatements;
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.vocabularyKernel = Objects.requireNonNull(vocabularyKernel, "vocabularyKernel");
         this.positions = Objects.requireNonNull(positions, "positions");
@@ -1865,6 +1873,11 @@ final class DefinitionResolver {
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
         Set<String> inheritedFields = new HashSet<>();
+        // Each inherited field whose source the closed chain will not reach, with that source: an applied operand's
+        // fields, and under a removal every operand's (§5.8, §5.9 rule 4). A body entry naming one is judged at link
+        // through Restatements, the chain holding no record that has it.
+        Map<String, io.ltr8.tson.schema.meta.TypeExpr> offTheChain = new LinkedHashMap<>();
+        boolean subtracts = construction.removal().isPresent();
 
         for (TypeExpr supertypeRef : construction.supertypes()) {
             if (supertypeRef instanceof ApplicationRef generic) {
@@ -1882,14 +1895,22 @@ final class DefinitionResolver {
                 // `parents`, substituted when each application closes, and a closed declaration's is folded by
                 // SchemaResolver into the edge to the entry `result<text>` denotes.
                 // A removal revokes IS-A for every parent (§5.9), so nothing is kept.
-                if (construction.removal().isEmpty()) {
-                    // Closed: the arguments go in as the operand read them, since this channel is validated.
-                    // Open: they stay as written, the argument being this declaration's own parameter, substituted
-                    // when an application closes.
-                    directSupertypes.add(new ApplyBody(io.ltr8.tson.schema.meta.TypeRef.of(generic.name()),
-                            namesOwnParameter(generic, parameters)
-                                    ? typeArguments(name, generic)
-                                    : operand.arguments()).inPlace());
+                // Closed: the arguments go in as the operand read them, since this channel is validated.
+                // Open: they stay as written, the argument being this declaration's own parameter, substituted
+                // when an application closes.
+                io.ltr8.tson.schema.meta.TypeInline applied = new ApplyBody(
+                        io.ltr8.tson.schema.meta.TypeRef.of(generic.name()), namesOwnParameter(generic, parameters)
+                                ? typeArguments(name, generic)
+                                : operand.arguments()).inPlace();
+                if (!subtracts) {
+                    directSupertypes.add(applied);
+                }
+                operand.fields().keySet().forEach(field -> offTheChain.put(field, applied));
+                if (restatements != null) {
+                    Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings = new LinkedHashMap<>();
+                    operand.bindings().forEach((parameter, argument) -> bindings.put(parameter,
+                            (io.ltr8.tson.schema.meta.TypeRef) asParameters(argument, parameters)));
+                    restatements.absorbs(name, operand.head(), bindings);
                 }
                 absorb(name, operand.fields(), operand.groups(), fields, groups, seenFieldNames, inheritedFields);
                 // An applied operand states its head's name type, which every application keeps (§5.2).
@@ -1966,6 +1987,10 @@ final class DefinitionResolver {
                 addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
             }
 
+            if (subtracts) {
+                supertypeBody.fields().keySet().forEach(field -> offTheChain.put(field,
+                        io.ltr8.tson.schema.meta.TypeRef.of(supertypeName)));
+            }
             absorb(name, closedFields(supertypeBody), supertypeBody.groups(), fields, groups, seenFieldNames,
                     inheritedFields);
             if (nameTypeFrom == null) {
@@ -1984,9 +2009,11 @@ final class DefinitionResolver {
 
         if (construction.body().isPresent()) {
             refuseDeclaredChain(name, construction.body().get().entries(), transitiveSupertypes);
+            Map<String, BuiltField> inherited = new LinkedHashMap<>(fields);
             for (RecordEntry entry : construction.body().get().entries()) {
                 resolveEntry(name, entry, parameters, fields, groups, seenFieldNames, inheritedFields);
             }
+            recordRestatements(name, bodyNames(construction), offTheChain, inherited, fields, parameters);
         }
 
         if (construction.removal().isPresent()) {
@@ -2027,6 +2054,46 @@ final class DefinitionResolver {
             }
         }
         return names;
+    }
+
+    /**
+     * Each field the body names that restates one inherited from {@code offTheChain}'s sources, as inherited and as
+     * restated, for the link to judge by §5.8's rule ({@link Restatements}). Inside a parametric record the
+     * parameters stand as such, substituted wherever it is applied.
+     */
+    private void recordRestatements(String name, Set<String> bodyNames,
+                                    Map<String, io.ltr8.tson.schema.meta.TypeExpr> offTheChain,
+                                    Map<String, BuiltField> inherited, SequencedMap<String, BuiltField> fields,
+                                    List<String> parameters) {
+        if (restatements == null) {
+            return;
+        }
+        for (String field : bodyNames) {
+            io.ltr8.tson.schema.meta.TypeExpr source = offTheChain.get(field);
+            if (source != null && inherited.containsKey(field) && fields.containsKey(field)) {
+                restatements.restates(name, new TsonSchema.Restatement(asParameters(source, parameters), field,
+                        asParameters(inherited.get(field).field(), parameters),
+                        asParameters(fields.get(field).field(), parameters)));
+            }
+        }
+    }
+
+    private static RecordField asParameters(RecordField field, List<String> parameters) {
+        return field.withType(asParameters(field.type(), parameters));
+    }
+
+    /**
+     * {@code type} with each name {@code parameters} declares as the {@code ParamRef} it is, as the parametric record
+     * holds it ({@link RecordBody}), so substituting it later finds the parameter.
+     */
+    private static io.ltr8.tson.schema.meta.TypeExpr asParameters(io.ltr8.tson.schema.meta.TypeExpr type,
+                                                                 List<String> parameters) {
+        if (parameters.isEmpty()) {
+            return type;
+        }
+        return io.ltr8.tson.schema.meta.TypeSlots.map(type, reference ->
+                reference instanceof io.ltr8.tson.schema.meta.NameRef named && parameters.contains(named.name())
+                        ? new io.ltr8.tson.schema.meta.ParamRef(named.name(), named.annotations()) : reference);
     }
 
     /**
@@ -2279,16 +2346,19 @@ final class DefinitionResolver {
         Substitution.fields(record, bindings).forEach((field, substituted) -> fields.put(field,
                 BuiltField.of(substituted)));
         return new ParametricOperand(Ancestry.ofApplication(parametricHead, namespaceDefinitions), fields, record.groups(),
-                record.nameType(), arguments);
+                record.nameType(), arguments, parametricHead, bindings);
     }
 
     /**
      * What an operand hands its absorber: the ancestors it can still be indexed under, its fields, and its
-     * arguments, which a closed operand keeps in the chain as written until {@code SchemaResolver} folds it.
+     * arguments, which a closed operand keeps in the chain as written until {@code SchemaResolver} folds it; and the
+     * parametric record it applies with the binding of each of its parameters, under which its own restatements are
+     * the absorber's ({@link Restatements}).
      */
     private record ParametricOperand(List<String> ancestors, SequencedMap<String, BuiltField> fields,
                                List<FieldGroup> groups, Optional<String> nameType,
-                               List<io.ltr8.tson.schema.meta.TypeRef> arguments) {
+                               List<io.ltr8.tson.schema.meta.TypeRef> arguments, String head,
+                               Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings) {
     }
 
     /**

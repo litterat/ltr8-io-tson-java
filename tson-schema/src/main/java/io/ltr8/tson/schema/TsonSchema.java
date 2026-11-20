@@ -88,10 +88,16 @@ import java.util.Optional;
  * <p><b>{@link #heldValues()}</b> -- for each value entry, the dependent fields' values it holds as written
  * ([TSON-SCHEMA] §5.2), which the linker judges against the type each one's sibling names in this schema's namespace
  * ({@link HeldValue}). A fact the resolver hands the linker, as {@link #valuesByName()} is.
+ *
+ * <p><b>{@link #restatements()}</b> -- for each entry, the fields restated over a source its closed chain does not
+ * reach ({@link Restatement}), judged by the linker as a restatement over a supertype is. An import's travel with its
+ * entries, so a parametric record's reach each schema that applies it. A fact the resolver hands the linker, as
+ * {@link #valuesByName()} is.
  */
 public record TsonSchema(String id, List<String> imports, Namespace<Top> entries,
                           boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
-                          Map<String, List<HeldValue>> heldValues, Map<String, EntryFacts> facts) {
+                          Map<String, List<HeldValue>> heldValues, Map<String, List<Restatement>> restatements,
+                          Map<String, EntryFacts> facts) {
 
     /**
      * An entry's facts beyond its value ({@link TsonSchema}'s own Javadoc). {@code position} is where the
@@ -181,6 +187,25 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     }
 
     /**
+     * A field a record restates over a source no record on its closed chain is ([TSON-SCHEMA] §5.8): an application
+     * at a composition operand, which gives no edge to its head (§5.10), or an operand of a subtraction, which leaves
+     * the chain empty (§5.9). {@code source} is the operand, an application written in place or a name; {@code
+     * inherited} and {@code restated} are the field before and after the restatement. Inside a parametric record each
+     * may hold its parameters, substituted wherever the record is applied or absorbed.
+     */
+    public record Restatement(io.ltr8.tson.schema.meta.TypeExpr source, String field,
+                              io.ltr8.tson.schema.meta.RecordField inherited,
+                              io.ltr8.tson.schema.meta.RecordField restated) {
+
+        public Restatement {
+            Objects.requireNonNull(source, "source");
+            Objects.requireNonNull(field, "field");
+            Objects.requireNonNull(inherited, "inherited");
+            Objects.requireNonNull(restated, "restated");
+        }
+    }
+
+    /**
      * The declared type of a slot holding a reference by name, in the namespace of the schema declaring the slot's
      * record, which the reading schema's closure contains: what the reader of that slot was built from, so the linker
      * judges the name without walking the path back through the declarations. {@code of} is the slot's reference's
@@ -230,6 +255,9 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
         Map<String, List<HeldValue>> asWritten = new LinkedHashMap<>();
         heldValues.forEach((name, values) -> asWritten.put(name, List.copyOf(values)));
         heldValues = Collections.unmodifiableMap(asWritten);
+        Map<String, List<Restatement>> restated = new LinkedHashMap<>();
+        restatements.forEach((name, fields) -> restated.put(name, List.copyOf(fields)));
+        restatements = Collections.unmodifiableMap(restated);
         Map<String, EntryFacts> kept = new LinkedHashMap<>();
         facts.forEach((name, fact) -> {
             if (!fact.isEmpty()) {
@@ -259,7 +287,15 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     public TsonSchema(String id, List<String> imports, AnnotatedMap<String, Top> entries,
                        boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
                        Map<String, List<HeldValue>> heldValues, Map<String, EntryFacts> facts) {
-        this(id, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, heldValues, facts);
+        this(id, imports, entries, bootstrap, valuesByName, heldValues, Map.of(), facts);
+    }
+
+    /** The same, with the fields each entry restates over a source its chain does not reach ({@link #restatements()}). */
+    public TsonSchema(String id, List<String> imports, AnnotatedMap<String, Top> entries,
+                       boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
+                       Map<String, List<HeldValue>> heldValues, Map<String, List<Restatement>> restatements,
+                       Map<String, EntryFacts> facts) {
+        this(id, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, heldValues, restatements, facts);
     }
 
     /**
@@ -281,7 +317,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     /** This schema with {@code name}'s own annotations recorded -- everything else unchanged. */
     public TsonSchema withNameAnnotations(String name, Annotations annotations) {
         return new TsonSchema(id, imports, entries.withAnnotations(name, annotations), bootstrap, valuesByName,
-                heldValues, facts);
+                heldValues, restatements, facts);
     }
 
     /**

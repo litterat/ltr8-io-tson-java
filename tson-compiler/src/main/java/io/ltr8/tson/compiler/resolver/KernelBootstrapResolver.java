@@ -232,7 +232,7 @@ public final class KernelBootstrapResolver {
                 }
             };
             this.resolver = new DefinitionResolver(reader, null, order, order, null, positions, facts,
-                    name -> true, name -> true);
+                    name -> true, name -> true, null);
         }
 
         /** Every entry, ready, in the order the kernel declares them. */

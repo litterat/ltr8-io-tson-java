@@ -264,7 +264,9 @@ public final class SchemaResolver {
         // Which schema declared each imported entry: two schemas declaring one name collide, and a checkpoint's
         // readers are compiled over this document's own entries beside the imports.
         Map<String, String> origins = new LinkedHashMap<>();
-        Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts, kernelNames, origins);
+        Map<String, List<TsonSchema.Restatement>> importedRestatements = new LinkedHashMap<>();
+        Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts, kernelNames, origins,
+                importedRestatements);
         nameAnnotations.forEach((name, annotations) -> TsonSchema.applicationOf(annotations)
                 .ifPresent(application -> applications.put(name, application)));
         // The kernel's own entries are the kernel's, kinds and constructors judged by origin, and its resolution reads
@@ -398,8 +400,9 @@ public final class SchemaResolver {
             Top visible = waitOrder.definition(name);
             return visible != null ? visible : heads.definition(name);
         }, declarations::containsKey);
+        Restatements restatements = new Restatements(importedRestatements);
         ParametricMaterialiser materialiser = new ParametricMaterialiser(waitOrder, heads::definition, waitOrder::current,
-                facts, applications, kernel, heldRecursion);
+                facts, applications, kernel, heldRecursion, restatements);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
@@ -425,7 +428,7 @@ public final class SchemaResolver {
                     public Top closeApplicationInto(String declaredName, ApplyBody application) {
                         return materialiser.closeApplicationInto(declaredName, application);
                     }
-                }, positions, facts, kernel, kernel);
+                }, positions, facts, kernel, kernel, restatements);
         onDemand.resolveWith(resolver);
 
         waitOrder.readyAll(name -> false);
@@ -573,7 +576,11 @@ public final class SchemaResolver {
                 localFacts.put(name, known);
             }
         });
-        return new TsonSchema(id, document.imports(), localOnly, false, valuesByName, heldValues, localFacts);
+        // A declaration that failed has its verdict, and its restatements were made of what it could not finish.
+        Map<String, List<TsonSchema.Restatement>> restated = restatements.settled(materialiser::closedInPlace);
+        restated.keySet().removeIf(onDemand::failed);
+        return new TsonSchema(id, document.imports(), localOnly, false, valuesByName, heldValues, restated,
+                localFacts);
     }
 
     /**
@@ -730,22 +737,42 @@ public final class SchemaResolver {
      * every member's own supertypes. The application stays in {@code parents} until {@link #closeChains}, so a
      * later round still finds it when the owner's chain has grown. {@code definition} itself where nothing
      * grew.
+     *
+     * <p><b>An applied parent reaches what its head's applied parents reach, substituted</b> (§5.8: an application
+     * takes its head's written parents' edges). {@code y => wrap<text> & {}} over {@code wrap => <T> box<T> & { … }}
+     * is IS-A {@code tb => box<text>} as {@code x => wrap<text>} is, though {@code y}'s own parents hold only
+     * {@code wrap<text>}; the walk goes on through each head to any depth, the application nobody declares adding
+     * no edge of its own. A composition cycle is refused at resolution, and {@code seen} ends a walk anyway.
      */
     private static Top completed(Top definition, Map<ApplyBody, String> byApplication, Map<String, Top> namespace) {
         if (!(definition instanceof Type type)) {
             return definition;
         }
         Set<String> chain = new LinkedHashSet<>(type.supertypes());
-        for (io.ltr8.tson.schema.meta.TypeExpr parent : type.parents()) {
-            if (!(parent instanceof io.ltr8.tson.schema.meta.TypeInline inline)
+        List<io.ltr8.tson.schema.meta.TypeExpr> parents = new ArrayList<>(type.parents());
+        Set<ApplyBody> seen = new LinkedHashSet<>();
+        while (!parents.isEmpty()) {
+            if (!(parents.removeFirst() instanceof io.ltr8.tson.schema.meta.TypeInline inline)
                     || !(inline.of() instanceof ApplyBody application)) {
                 continue;
             }
             // A parent written through an alias of a parametric record is that parametric record's application (§8.3).
             String head = Ancestry.parametricHead(application.head().name(), namespace::get);
-            String owner = byApplication.get(CanonicalApplication.of(head, application.arguments()));
+            ApplyBody canonical = CanonicalApplication.of(head, application.arguments());
+            if (!seen.add(canonical)) {
+                continue;
+            }
+            String owner = byApplication.get(canonical);
             if (owner != null) {
                 chain.add(owner);
+            }
+            if (namespace.get(head) instanceof RecordBody record && record.isParametric()
+                    && record.parameters().size() == application.arguments().size()) {
+                Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings = new LinkedHashMap<>();
+                for (int i = 0; i < record.parameters().size(); i++) {
+                    bindings.put(record.parameterNames().get(i), application.arguments().get(i));
+                }
+                parents.addAll(Substitution.parents(record, bindings));
             }
         }
         for (String member : List.copyOf(chain)) {
@@ -1170,7 +1197,8 @@ public final class SchemaResolver {
      */
     private Map<String, Top> mergeImports(SchemaDocument document,
             Map<String, Annotations> importedNameAnnotations, Map<String, TsonSchema.EntryFacts> facts,
-            Set<String> kernelNames, Map<String, String> origins) {
+            Set<String> kernelNames, Map<String, String> origins,
+            Map<String, List<TsonSchema.Restatement>> restatements) {
         Map<String, Top> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : namespaceSources(document)) {
@@ -1201,6 +1229,8 @@ public final class SchemaResolver {
                 }
                 merged.put(name, entry.getValue());
                 facts.put(name, imported.schema().factsOf(name));
+                Optional.ofNullable(imported.schema().restatements().get(name))
+                        .ifPresent(restated -> restatements.put(name, restated));
                 if (imported.isKernel(name)) {
                     kernelNames.add(name);
                 }

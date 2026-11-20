@@ -271,4 +271,76 @@ class OpenOperandCompositionTest {
         assertTrue(thrown.getMessage().contains("declares 2 type parameter(s) and is applied to 1"),
                 thrown.getMessage());
     }
+
+    /**
+     * An application at an operand takes its head's written parents' edges (§5.8), an applied parent reaching the
+     * entry a declaration gives it: {@code y} absorbs {@code wrap<text>}, whose head's parent {@code box<T>} is
+     * {@code box<text>} there, which {@code tb} declares -- the edge {@code x => wrap<text>} has.
+     */
+    @Test
+    void anOperandTakesTheEdgeItsHeadsAppliedParentReaches() {
+        String heads = """
+                  box  => <T> { v: T }
+                  tb   => box<text>
+                  wrap => <T> box<T> & { w: int32 }
+                """;
+
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(heads + "  y => wrap<text> & {}\n").schema().entries().get("y")));
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(heads + "  x => wrap<text>\n").schema().entries().get("x")));
+    }
+
+    /** The walk goes on through each head's applied parents, to any depth, in both forms. */
+    @Test
+    void anAppliedParentsHeadsAppliedParentReachesItsDeclarationToo() {
+        String heads = """
+                  box    => <T> { v: T }
+                  tb     => box<text>
+                  wrap   => <T> box<T> & { w: int32 }
+                  rewrap => <T> wrap<T> & { r: int32 }
+                """;
+
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(heads + "  y => rewrap<text> & {}\n").schema().entries().get("y")));
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(heads + "  x => rewrap<text>\n").schema().entries().get("x")));
+    }
+
+    /** No edge runs to a head's own name, and an application no declaration names adds none (§5.10). */
+    @Test
+    void anAppliedParentNobodyDeclaresAddsNoEdge() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: T }
+                  tb     => box<int32>
+                  wrap   => <T> box<T> & { w: int32 }
+                  rewrap => <T> wrap<T> & { r: int32 }
+                  y      => rewrap<text> & {}
+                """);
+
+        assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get("y")),
+                "box<text> and wrap<text> are declared nowhere, tb is box<int32>, and no head is a type");
+    }
+
+    /**
+     * Joining a family through a head's applied parent brings its obligation (§5.8): {@code tb} is an abstract base,
+     * so {@code y} must pin its selector, as the declared {@code x => wrap<text>} must.
+     */
+    @Test
+    void aMemberThroughAHeadsAppliedParentMustPinTheFamilysSelector() {
+        String family = """
+                  box  => abstract <T> { kind: text =?  v: T }
+                  tb   => box<text>
+                  wrap => <T> box<T> & { w: int32 }
+                """;
+        String composed = assertThrows(SchemaValidationException.class,
+                () -> compile(family + "  y => wrap<text> & {}\n")).getMessage();
+        String declared = assertThrows(SchemaValidationException.class,
+                () -> compile(family + "  y => wrap<text>\n")).getMessage();
+
+        assertEquals(declared, composed);
+        assertTrue(composed.contains("'y'"), composed);
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(family + "  y => wrap<text> & { kind?: = \"y\" }\n").schema().entries().get("y")));
+    }
 }

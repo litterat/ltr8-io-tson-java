@@ -1071,6 +1071,25 @@ it.
      value differing for one application is a restatement where it is declared. Admitting
      the mark before `!meta.record` where `extension` is unwritten or agrees, and refusing a
      contradiction, was the alternative: two cases where the grammar needs none.
+137. **§5.8** — a body entry naming a field absorbed from an application at an operand
+     restates it, under §5.8's rules, whether or not a declaration names the application:
+     `dog => pet_of<dog_type> & { pet: cat_type }` over `pet_of => <T> pet & { pet: T }` is a
+     resolver error, as composing a record holding `pet: dog_type` with `{ pet: cat_type }` is,
+     and `pet: puppy_type`, a subtype of `dog_type`, narrows. In a parametric record the
+     restatement is judged with each application's arguments wherever the application closes
+     or is absorbed, so `wrap => <T> box<T> & { v: int32 }` admits `wrap<int32>` and refuses
+     `wrap<text>`. The text said an operand is absorbed by value and that a body entry naming
+     an inherited field restates it, and not that an absorbed field is an inherited one, so
+     the verdict could be read as turning on whether a declaration names the application, the
+     one place a chain edge reaches a record holding the field. §5.9 rule 4's
+     tightening entries are judged on the same terms, a subtraction's chain being empty.
+     Reading the body entry as a new field that replaces the absorbed one was the alternative,
+     and made the verdict on one declaration turn on whether another exists.
+138. **§5.8, §5.10** — an application at an operand reaches the entry a declaration gives the
+     application itself, where one exists, beside its head's written parents' edges:
+     `dog => pet_of<dog_type> & { kind?: = "dog" }` is IS-A `dog_pet` where `dog_pet =>
+     pet_of<dog_type>` is declared. §8.1 and §8.2 stated the edge and the running behaviour
+     gives it, while §5.8 and §5.10 listed only the head's parents. Stated, not changed.
 
 ### 3.3 Companion artifacts
 
@@ -1601,7 +1620,7 @@ carries no open questions.
 | Items 77–83 (ruled) | A choice over a parameter, `( T \| int32 )`, is disjoint for some arguments and not others. Refusing it at the declaration, or requiring disjointness for every argument, were the alternatives; it loads at the parametric record, and each application is judged where it closes. | **[settled]** — the spec author's ruling. |
 | #8 (remainder) | A name in a schema document's annotation value is judged at link (Part 2 §5.12). The first implementation checks the value's shape and delivers the name unjudged; a data document's is judged at the read. | Open — outstanding work in the implementation; the text states the rule. |
 | #5 (remainder) | A dependent field whose sibling holds a type written in place is read against that type (Part 2 §5.2). The first implementation does so in bind mode; a tree read, in either encoding, reports the value as not implemented. | Open — outstanding work in the implementation; the text states the rule. |
-| #11 (remainder) | Three points on deriving a record with `&` (Part 2 §5.8). A restatement that changes a pin loads, where the text says it MUST NOT. A constructor composed with `&`, `minlist => meta.array & { min_items?: = 1 }`, loads and cannot be applied: `minlist<text>` reports not implemented. A body field naming a field absorbed from an applied operand is judged as a restatement only where a declaration names the application. | Open — outstanding work in the implementation; the text states the first two, and for the third §5.8 owes the sentence that an absorbed field is restated. |
+| #11 (remainder) | Two points on deriving a record with `&` (Part 2 §5.8). A restatement that changes a pin loads, where the text says it MUST NOT. A constructor composed with `&`, `minlist => meta.array & { min_items?: = 1 }`, loads and cannot be applied: `minlist<text>` reports not implemented. | Open — outstanding work in the implementation; the text states the rule. |
 | #13 (remainder) | Five points on the extern (Part 2 §5.13, §7.9, §11.5; Part 3 §8.6). In TSON text a root typed by an extern, and an extern reached through an alias of a container, write no boundary tag. A tag naming an extern at a position no extern types is refused in both encodings. A map key typed by an extern reports outside the foreign scope in JSON. No JSON writer writes a `$type`, a boundary's included. Nothing counts the import closure limit, externs included. | Open — outstanding work in the implementation; the text states the rule. |
 | #12, item 120 (ruled) | A type built by a constructor composed from `meta.array` or `meta.map`, a namespace type, takes `^` under the collection's rules: §5.7's source of `^` is a type built by `meta.array`, by `meta.map` or by a constructor that IS-A either. Keeping the source to the two constructors, so that a namespace type is bounded only where it is constructed, was the alternative. | **[settled]** — the spec author's ruling, the general rule, with no case for a namespace. |
 | #10, items 106–107 (ruled) | Over an incomplete entry nothing is replaced: a field written again is refused, whatever the value, and to narrow, the entry is completed and the type refined. One rule covers required fields: `^` writes any unwritten field and leaves one required field absent. An alias of an incomplete entry is allowed and not written. An incomplete entry is imported like any entry. | **[settled]** — the spec author's ruling. |

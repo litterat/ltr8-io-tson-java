@@ -215,7 +215,11 @@ them:
   `ok => <T> result<T> & { note: text }`, `ok<text>`'s chain keeps `result<text>` in `parents` until
   `appliedParentEdges` folds it into the edge to the declaration naming that application, where one exists
   (`design/parametric-materialisation.md`); the linker inverts it, so `result<text>`'s `subtypes` holds `ok<text>` and
-  not `ok<int32>` (`ParametricSubtypeFamilyTest`, `OpenOperandCompositionTest`).
+  not `ok<int32>` (`ParametricSubtypeFamilyTest`, `OpenOperandCompositionTest`). The fold walks on through each
+  application's head's applied parents, substituted, to any depth, so `y => wrap<text> & {}` over `wrap => <T> box<T>
+  & { … }` reaches `tb => box<text>` as `x => wrap<text>` does. The walk is the fold's and not the resolver's: copying
+  a head's parents into the composing record's `parents` would change a parametric record's resolved form, which
+  states its parents as written.
 
 A use-site application whose record in place would be IS-A a declared type is refused (`refuseMembership`, §5.2),
 so every family member is declared.
@@ -284,9 +288,15 @@ restatement before the names it holds need be ready, so the IS-A is asked at lin
 kernel's `meta.namespace` narrowing `meta.map`'s `key_type: meta.type_ref` to `meta.identifier_ref` passes by
 `meta.identifier_ref`'s refinement of `meta.type_ref`. The relation is nominal and nothing more (§5.8): `[int8]`
 restating `[int32]` and a variant restating its choice are refused, no IS-A edge joining either pair.
-Each record is judged against the nearest closed records on its chain, so an applied operand is judged through the
-entry its application denotes. One denoting none is judged against the closed parents its head writes, and a
-subtraction's tightening entry is not judged, its chain being empty (`BACKLOG.md`).
+Each record is judged against the nearest closed records on its chain, and every restatement no record there holds
+(over an applied operand, or under a subtraction, whose chain is empty) is carried to link beside its entry
+(`TsonSchema.restatements`, collected by `Restatements`) and judged by the same rule: the verdict never turns on
+whether a declaration names the application. A parametric record's restatements hold its parameters and become,
+substituted, those of every entry an application of it is part of: absorbed at an operand, closed into a
+declaration, or closed in place, where the holding entry answers for them, a record in place being no entry. The
+transfers settle to a fixed point after materialisation, a parametric record gaining restatements from applications
+closed inside it after another entry absorbed it. Judging at the parametric record's declaration was the
+alternative; it refuses `wrap => <T> box<T> & { v: int32 }`, whose `wrap<int32>` is sound.
 
 **A restated field's annotations are the restatement's, in source order, then the inherited field's** (`merged`,
 §5.8). Concatenation, because [TSON-DATA] §3.1 makes an annotation name
