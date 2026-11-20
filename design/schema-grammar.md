@@ -31,7 +31,9 @@ history lives in git.
   parse errors naming the declaration to write (`inPlace`). A composition operand is read by `parseTypeRef`, which
   does not ask.
 - `abstract` and `final` are marks at the type-def head and ordinary identifiers everywhere else — the parser decides
-  on the word alone, never on what follows it.
+  on the word alone, never on what follows it. What may follow is a record body, a composition or a subtraction;
+  anything else is a parse error at the mark. The mark is `StructuralTypeDef`'s, so no `!C { … }` entry, and so no
+  resolved form, carries one.
 - A mismatch names the construct the position admits, in the author's voice, not the token class.
 
 Related: `design/schema-grammar-and-desugaring.md` (the desugaring phase that runs next),
@@ -131,6 +133,11 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **`[definition-mark]` at the type-def head** (§12.1) — `abstract` or `final`, the words that say how the type may
   be realised, read by `parseDefinitionMarkOpt` before the parameter list and lowered by the resolver into
   `record.extension`. An unmarked declaration is OPEN, so the slot is optional and OPEN has no spelling.
+  - **Sugar for a record definition's `extension`, and nothing else's.** `!meta.record { … }` states the field
+    itself, so a mark before `!` is no production rather than a rule over the two statements. Lost: admitting the
+    mark where `extension` is unwritten or agrees and refusing a contradiction — two cases the grammar needs none of.
+    A declared application is its head's substitution, its `extension` the head's (§5.10), so it takes none either;
+    one application marked alone is a composition, `abstract box<text> & {}`.
   - **One slot, not two flags.** The three ways a record may be realised are alternatives, so `x => abstract final
     { … }` is ungrammatical rather than a rule the resolver has to state and diagnose.
   - **The words are marks here unconditionally, and that is the whole of the reservation.** They stay ordinary

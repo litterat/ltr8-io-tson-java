@@ -42,8 +42,8 @@ import java.util.Set;
  * <p><b>Why here and not at resolution.</b> Every rule below needs a namespace the declaration does not have.
  * FINAL constrains whoever composes onto it, which may be another schema; the family rules range over {@code
  * subtypes}, which nothing populates until linking; and a discriminator field's type has to be followed to the
- * end of its alias chain. What <em>is</em> local -- two definition marks on one declaration, a mark
- * carrying a value, a mark on a non-record -- the resolver already refused while lowering.
+ * end of its alias chain. What <em>is</em> local is settled before: two marks on one declaration, or a mark before
+ * anything but a record definition, is a parse error (§12.1).
  *
  * <p><b>A selector implies {@code abstract}, and states the dispatch by itself.</b> A field written
  * {@code =?} says its members pin it, so the record is the base they are selected from and has no values of

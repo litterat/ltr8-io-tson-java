@@ -323,11 +323,16 @@ public final class TsonSchemaParser extends TsonDataParser {
         declarationPrefix = name + ".";
         expect(TokenType.MAP_ARROW, "a declaration's '=>'");
         List<Annotation> typeDefAnnotations = parseAnnotationList();
+        Position markPosition = peek().start();
         Optional<DefinitionMark> mark = parseDefinitionMarkOpt();
         parameterTypes = new LinkedHashMap<>();
         TypeDef typeDef = parseTypeDef(mark);
+        if (mark.isPresent() && !(typeDef instanceof StructuralTypeDef)) {
+            throw new ParseException("'" + mark.get().word() + "' marks a record definition -- a record body, a"
+                    + " composition or a subtraction -- and none follows it (§5.2, §12.1)", markPosition);
+        }
         SchemaMap.Declaration declaration = new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations,
-                mark, typeDef, parameterTypes);
+                typeDef, parameterTypes);
         declarationPositions.put(declaration, namePosition);
         declarationInProgress = "";
         return declaration;
@@ -337,8 +342,9 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     /**
      * {@code [definition-mark ws]} at the head of a type definition (§12.1) -- {@code abstract} or {@code
-     * final}, the words that say how the type may be realised. Empty where the declaration writes neither,
-     * which is OPEN and has no spelling.
+     * final}, the words that say how a record may be realised. Empty where the declaration writes neither,
+     * which is OPEN and has no spelling. That a record definition follows is checked once the type definition is
+     * read, since only a brace's dispatch or the tokens after a name tell one from a map, an alias or an application.
      *
      * <p><b>The words are marks here unconditionally, and that is the whole of the reservation.</b> They are
      * ordinary identifiers at every other position -- a declaration name, a field name, a field's type, an
@@ -408,7 +414,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
 
         if (check(TokenType.LBRACE)) {
-            return braceTypeDef(typeParams);
+            return braceTypeDef(mark, typeParams);
         }
         if (check(TokenType.LPAREN)) {
             return new TypeExprDef(typeParams, parseTypeRef());
@@ -427,7 +433,7 @@ public final class TsonSchemaParser extends TsonDataParser {
                     + "a record's fields are restated in a composition, '" + written + " & { ... }' (§5.8)");
         }
         if (check(TokenType.AMPERSAND) || check(TokenType.MINUS)) {
-            return new StructuralTypeDef(typeParams, parseConstructionDefContinuation(head));
+            return new StructuralTypeDef(mark, typeParams, parseConstructionDefContinuation(head));
         }
         if (check(TokenType.LBRACE)) {
             throw parseError("expected '&' (composition) after a bare type-ref, found '{'");
@@ -436,9 +442,9 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /** A brace at a type-def position: a record body is the declaration's structural-def, a map its type-expr. */
-    private TypeDef braceTypeDef(List<String> typeParams) {
+    private TypeDef braceTypeDef(Optional<DefinitionMark> mark, List<String> typeParams) {
         TypeExpr form = parseBraceType();
-        return form instanceof RecordExpr record ? new StructuralTypeDef(typeParams, record.body())
+        return form instanceof RecordExpr record ? new StructuralTypeDef(mark, typeParams, record.body())
                 : new TypeExprDef(typeParams, form);
     }
 

@@ -4,10 +4,9 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * {@code definition-mark} (Part 2 §12.1) -- the word a declaration writes between {@code =>} and its type
- * definition to say how the type may be realised: {@code abstract} (no instances of its own) or {@code final}
- * (instances, and no subtype). An unmarked declaration is OPEN, which is why the slot is optional and OPEN has
- * no spelling.
+ * {@code definition-mark} (Part 2 §12.1) -- the word written before a record definition ({@link StructuralTypeDef}) to
+ * say how the record may be realised: {@code abstract} (no instances of its own) or {@code final} (instances, and no
+ * subtype). An unmarked record is OPEN, which is why the slot is optional and OPEN has no spelling.
  *
  * <p><b>One slot, not two flags.</b> The three ways a record may be realised are alternatives, so writing two
  * of them is ungrammatical rather than a rule the resolver has to state and diagnose.

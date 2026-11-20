@@ -1040,6 +1040,22 @@ it.
      parametric record, while §8.3 followed an application's head through an alias.
      Refusing `bx => box` was the alternative, a rule for one target of an alias where a
      constructor and an incomplete entry have none.
+136. **§5.2, §5.10, §12.1** — a definition mark stands before a record definition alone.
+     §12.1 read the mark before any `type-def` and the resolver refused it on a definition
+     that was no record, so before the kernel's form it was admitted and overrode a stated
+     field: `abstract !meta.record { … extension: FINAL }` loaded as an abstract record, and
+     `final` before a stated `extension: ABSTRACT` was refused as though FINAL were written.
+     The mark is sugar for a record definition's `extension`, `!meta.record { … }` what it
+     lowers to, and the grammar has it in that alternative alone, `[ definition-mark ws ]
+     [type-params] structural-def`: before `!`, a name, a declared application, a sugar form
+     or a choice it is a parse error at the mark, and a resolved form, whose entries are
+     constructions, holds none. A declared application is substitution and nothing more, its
+     `extension` its head's, so `f: x` and `f: box<text>` stay two types of one shape
+     (§5.10); every application abstract is the parametric record marked, and one
+     application marked alone is a record composing it, `x => abstract box<text> & {}`, as a
+     value differing for one application is a restatement where it is declared. Admitting
+     the mark before `!meta.record` where `extension` is unwritten or agrees, and refusing a
+     contradiction, was the alternative: two cases where the grammar needs none.
 
 ### 3.3 Companion artifacts
 
@@ -1191,6 +1207,10 @@ rewrites, and §4.11 what is lost.
   row of §12.3 (items 89, 95). `type-params` parses before any body, the resolver admitting
   it before a record body alone (item 30). `!C ^ { values }` over a constructor is a form
   (item 106). The comments and §12.2's dispatch follow (items 55, 69, 109).
+- **A definition mark stands before a record definition alone**: `type-def`'s `[
+  definition-mark ws ] [type-params] structural-def`, `schema-map-entry` writing none of its
+  own; before `!`, a type expression or a declared application it is a parse error (item
+  136).
 
 ### 4.3 The kernel (`meta.tn`)
 
@@ -1484,6 +1504,11 @@ note.
 - *`meta.field_name`* is `meta.identifier`, or an alias of the schema's own (item 123).
 - *`discriminators` in the kernel's form*: `!meta.record { … discriminators: [kind] }` states
   `extension: ABSTRACT` beside it (item 133).
+- *A mark before the kernel's form*: `abstract !meta.record { … }` is `!meta.record { …
+  extension: ABSTRACT }`, and `final` likewise `extension: FINAL` (item 136).
+- *A mark before a declared application*: `x => abstract box<text>` is the parametric record
+  marked, `box => abstract <T> { … }`, where every application is to be abstract, or
+  `x => abstract box<text> & {}`, a record composing the application (item 136).
 - *A record field or a namespace key holding `.`*: the name is changed, or the vocabulary is
   a map keyed by text, which no reference enters (item 118).
 - *A choice holding a choice that is not disjoint*: `( text | either )` over `either => ( a |
@@ -1520,6 +1545,11 @@ note.
 - **An alias naming a partial application**: the application written at each use (§5.10).
 - **A family base named bare**: an abstract base beside the parametric record (§5.10).
 - **A non-disjoint choice as a variant**: its variants listed in the outer choice (item 126).
+- **A mark on one declared application**: `x => abstract box<text>` made that declaration's
+  record ABSTRACT, or FINAL, in place of the head's `extension`. The replacement, `x =>
+  abstract box<text> & {}`, is a new record composing the application, not the application's
+  declaration: its key carries no `@meta.application`, and where the application is declared
+  elsewhere it is a subtype of that declaration (item 136; [TSON-SCHEMA] §5.8, §5.10).
 
 ---
 
@@ -1571,6 +1601,7 @@ carries no open questions.
 | §3.4 item 17 (ruled) | A map holding an annotation member's name as a key, at a choice whose map variant is written in place, had no encoding. The variant is named; a wrapper with no `$type`, read by class, was the alternative. | **[settled]** — the spec author's ruling. |
 | §5.12 (ruled) | A qualified name's segment selecting a dependent field. The walk stands, taking the type the sibling names, the one §5.2 judges the held value by at link; refusing the segment was the alternative, and left a value inside a dependent field unnameable. | **[settled]** — the spec author's ruling; no text changes. |
 | Item 133 (ruled) | `discriminators` on a `!meta.record` whose `extension` is not `ABSTRACT`: refused, a missing `extension` being `OPEN`. Deriving ABSTRACT was the alternative. | **[settled]** — the spec author's ruling. |
+| Item 136 (ruled) | A definition mark stands before a record definition alone — braces, a composition or a subtraction — and before anything else, `!C { … }` and a declared application included, is a parse error. Admitting it before `!meta.record` where `extension` is unwritten or agrees, and refusing a contradiction, was the alternative: two cases where the grammar needs none. A mark on one declared application is written as a composition. | **[settled]** — the spec author's ruling. |
 | Items 114–116 (considered) | An open sum over a foreign schema, the place deciding the mapping; a namespace entry reached by a prefix, with or without a list of admitted types; an extern admitted at reference slots alone; a `!!schema` directive in the value; a type carried in the data; a versioned layout in place of any form. | **Not taken** — a sum gives a place where the schema layer takes names, and whoever declares the place would have to know the foreign schema; a prefix written in data gives one value two spellings; the layout reaches only schemas whose authors can still choose their names, and stays as guidance in Part 2 §3.5. |
 | #3 (considered) | A `template` constructor wrapping a body; named construction slots; a construction spelling of its own; a label for a parameter on `record_field`; arguments read as the elements of a list field; parameters on any constructor but `record`. | **Not taken** — the proposal's §9 records each. |
 | #3 (lost) | Abstracting over a facet value or a size; a parametric record over a value (one value per instantiation instead); the inline one-position tuple; an alias naming a partial application; a family base named bare. | Recorded — each has a stated replacement in Part 2 §5.10. |

@@ -520,6 +520,33 @@ class TsonSchemaParserTest {
         assertTrue(thrown.getMessage().contains("'my_type => base & { ... }'"), thrown.getMessage());
     }
 
+    // ── Where a definition mark stands (§5.2, §12.1) ─────────────────────
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abstract { }", "abstract <T> { v: T }", "abstract a & { }", "final a & b",
+            "abstract a - { f }", "abstract <T> box<T> & { }", "abstract box<text> & { }",
+            "@doc:\"d\" abstract { }"})
+    void aMarkStandsBeforeARecordDefinition(String definition) {
+        StructuralTypeDef marked = assertInstanceOf(StructuralTypeDef.class, declOf("x => " + definition).typeDef());
+        assertTrue(marked.mark().isPresent());
+    }
+
+    /**
+     * Before any other definition the mark is a parse error at the mark: the grammar has no mark there, so the
+     * kernel's record form, whose {@code extension} is a field it writes, never carries one.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"abstract !meta.record { fields: {} }", "abstract <T> !meta.record { fields: {} }",
+            "final !enum [A B]", "abstract !meta.array ^ { min_items: 1 }", "abstract !schema { a => {} }",
+            "abstract text", "abstract meta.top", "abstract [text]", "abstract [text, int32]", "abstract {text => int32}",
+            "abstract (text | int32)", "abstract <T> box<T>", "abstract box<text>", "final box<text>"})
+    void aMarkBeforeAnyOtherDefinitionIsAParseErrorAtTheMark(String definition) {
+        ParseException thrown = assertThrows(ParseException.class, () -> declOf("x => " + definition));
+        Position at = (Position) thrown.position();
+        assertEquals(2, at.line(), thrown.getMessage());
+        assertEquals("!schema { x => ".length() + 1, at.column(), thrown.getMessage());
+    }
+
     /** A name followed by a brace at a slot, a definition mark included, is refused naming the bare body. */
     @Test
     void aNameBeforeABraceAtASlotIsRefused() {

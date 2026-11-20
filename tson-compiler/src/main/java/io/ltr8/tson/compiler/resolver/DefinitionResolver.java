@@ -376,7 +376,7 @@ final class DefinitionResolver {
      *
      * <p><b>Derived from the source's {@code =?} alone.</b> A record written as {@code !meta.record { … }} states its
      * {@code extension}, or takes the field's default, and a stated field means what it says: {@code discriminators}
-     * beside anything but ABSTRACT, after the mark, is refused rather than overridden (§5.2).
+     * beside anything but ABSTRACT is refused rather than overridden (§5.2). No mark stands before it (§12.1).
      *
      * <p><b>Applied here rather than where the body is built</b>, because every route to a record body reaches
      * this method and none of them owns the mark: a fresh record, a composition and a refinement each build
@@ -389,29 +389,32 @@ final class DefinitionResolver {
      * denotes, so {@code result => abstract <T> { ok: boolean =? }} makes {@code result<text>} an abstract base over
      * the declarations composing it, and a selector makes a parametric record ABSTRACT as it makes a record so. {@code
      * final} is refused on a parametric record: a parametric record is applied to be composed, each member of a family
-     * composing an application of it, and the mark would forbid that of every application. A final type is a declaration of
-     * the application, marked as itself.
+     * composing an application of it, and the mark would forbid that of every application. A final type over it is a
+     * record composing its application, marked as itself, a declared application taking no mark (§12.1).
      *
-     * <p>A mark on anything but a record is the author's error.
+     * <p>A mark stands before a record definition alone (§12.1), which resolves to a record, so a definition that is
+     * no record has neither a mark nor a selector to lower.
      */
     private Top withExtension(SchemaMap.Declaration declaration, Top resolved) {
-        Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.mark());
-        boolean parametric = ParametricEntry.isParametric(resolved);
-        if (parametric && extension.orElse(null) == RecordExtensionType.FINAL) {
+        if (!(resolved instanceof RecordBody record)) {
+            return resolved;
+        }
+        Optional<RecordExtensionType> extension = declaration.typeDef() instanceof StructuralTypeDef structural
+                ? DefinitionMarks.extension(structural.mark()) : Optional.empty();
+        if (record.isParametric() && extension.orElse(null) == RecordExtensionType.FINAL) {
             throw new SchemaValidationException("'" + declaration.name() + "': 'final' is refused on a parametric record"
                     + " -- a parametric record is applied to be composed, each member of a family composing an application"
-                    + " of it, and the mark would forbid that of every application. Declare the application and mark"
-                    + " that declaration instead ([TSON-SCHEMA] §5.2, §5.10)");
+                    + " of it, and the mark would forbid that of every application. Declare a record composing the"
+                    + " application and mark it instead, 'x => final " + declaration.name() + "<...> & { }'"
+                    + " ([TSON-SCHEMA] §5.2, §5.10)");
         }
         boolean written = declaration.typeDef() instanceof Instance;
-        if (written && resolved instanceof RecordBody stated) {
-            RecordBody marked = extension.map(stated::withExtension).orElse(stated);
-            marked.discriminatorsRefusal("'" + declaration.name() + "'").ifPresent(why -> {
+        if (written) {
+            record.discriminatorsRefusal("'" + declaration.name() + "'").ifPresent(why -> {
                 throw new SchemaValidationException(why + " ([TSON-SCHEMA] §5.2)");
             });
         }
-        boolean selectors = !written && resolved instanceof RecordBody body && !body.discriminators().isEmpty();
-        if (selectors) {
+        if (!written && !record.discriminators().isEmpty()) {
             // A selector says the members pin it, so the record is the base they are selected from and has
             // no values of its own -- ABSTRACT, derived. `abstract` beside it asserts what the body already
             // says and is admitted; `final` claims the opposite and is refused.
@@ -422,15 +425,7 @@ final class DefinitionResolver {
             }
             extension = Optional.of(RecordExtensionType.ABSTRACT);
         }
-        if (extension.isEmpty()) {
-            return resolved;
-        }
-        if (!(resolved instanceof RecordBody record)) {
-            throw new SchemaValidationException("'" + declaration.name()
-                    + "': only a record states how it may be realised -- this entry's body is "
-                    + resolved.getClass().getSimpleName() + " ([TSON-SCHEMA] §5.2)");
-        }
-        return record.withExtension(extension.get());
+        return extension.map(record::withExtension).orElse(record);
     }
 
     /**

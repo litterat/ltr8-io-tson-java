@@ -182,7 +182,7 @@ final class SchemaDesugarer {
      * {@code DefinitionResolver} resolves it, so {@code ParametricMaterialiser} closes it by the one process.
      */
     private static TypeDef absorbed(SchemaMap.Declaration declaration) {
-        return new StructuralTypeDef(typeParams(declaration.typeDef()), new RecordDef(List.of()));
+        return new StructuralTypeDef(Optional.empty(), typeParams(declaration.typeDef()), new RecordDef(List.of()));
     }
 
     /** This document's own declarations, for {@link #checkApplication} -- set before the walk starts. */
@@ -318,7 +318,7 @@ final class SchemaDesugarer {
             case StructuralTypeDef structural -> {
                 StructuralDef body = structuralDef(structural.body());
                 yield body == structural.body() ? structural
-                        : new StructuralTypeDef(structural.typeParams(), body);
+                        : new StructuralTypeDef(structural.mark(), structural.typeParams(), body);
             }
             // A declaration's own body reference names what this declaration *is*; only its arguments are
             // expandable, so the head stays put and its own handling is unchanged.
