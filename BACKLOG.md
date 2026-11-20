@@ -47,6 +47,19 @@ spec-required case:
   dependent type no reader is needed: §5.2 refuses it as naming no type a value can be read against, and a tree read
   reports `NOT_IMPLEMENTED` there too (`!meta.record_field { type: { of: !meta.dependent { on: kind } }  role: DEFAULT
   value: 5 }` read as data).
+- [ ] **A value entry is not read against a field typed by an application written in place** ([TSON-SCHEMA] §4.1,
+  §5.10). With `box => <T> { v: T }` and `holder => { b: box<text> }`, `h1 => !holder { b: { v: "x" } }` is refused as
+  `NOT_IMPLEMENTED` (`UnclosedApplicationReader`): the application closes in place once every declaration is ready, and
+  the value entry is read before then. Inside a container written in place, `holder => { b: [box<text>] }`, the entry
+  is refused even for `b: []` ("no ValueReaderFactory registered for constructor 'meta.apply'"), and the same holds
+  inside a namespace value. A data document and a JSON document read both types. Read a value entry after the
+  applications its type holds have closed, or hold it as a dependent value is held until link. Add `schema/valid`
+  vectors for the field and the container form.
+- [ ] **A record-typed annotation on a declaration needs a host class** ([TSON-SCHEMA] §6). With `note =>
+  @meta.annotation { b: text }`, `page => @note:{ b: "x" } { title: text }` fails `tson compile` with `BIND_MISMATCH`
+  ("no bound Java class for 'note'", exit 78), on a declaration or a field; an atom, enum or array annotation type
+  loads. `SchemaResolver`'s annotation read falls back to a tree for a foreign annotation alone, where a value entry's
+  payload always falls back. Read a local annotation's value as a tree where no class binds its type.
 - [ ] **A record written in place carries its fields' annotations beside its payload** ([TSON-SCHEMA] §3.3.3).
   The desugarer keeps the annotations on a field of `r => { at: { @note:"hi" a: int32 } }` off the `meta.record_field`
   payload it writes, in `SchemaPositions.WrittenField`, for `DefinitionResolver` to resolve in the schema's namespace;
@@ -268,6 +281,13 @@ A value through an extern ([TSON-SCHEMA] §7.9) is read, bound and written in TS
   [TSON-SCHEMA] §8.3 follows an extern where it follows an alias, subsumption included. The readers that judge a tag
   at an ordinary position (`VariantSchemaReader`, JSON's `DispatchTagReader`) follow the alias chain and stop at the
   extern.
+- [ ] **A dependent value in a value entry is not read across an extern into a third schema** ([TSON-SCHEMA] §5.2,
+  §7.9). `f.tn` declares `order`; `g.tn` imports it and declares `rush => order & { fast: boolean }`; a schema
+  importing `g.tn` with `o_ext => !meta.extern { schema: "…/f.tn"  type: order }`, `later => { o: o_ext }` and
+  `setting => { kind: meta.type_ref  v?: kind! }` refuses `s1 => !setting { kind: later  v: { o: !rush { … } } }` as
+  `NOT_IMPLEMENTED` ("a compile with no registry cannot read in its own schema's scope"): `HeldValues` compiles the
+  sibling's type with no registry, so the foreign scope has no schemas to read in. The same value reads as a plain
+  value entry, as data and as JSON. Give the held read the registry the link has.
 - [ ] **A map key typed by an extern, in JSON, reports outside the foreign scope.** The key is parsed by the
   target's parser, and a diagnostic on it carries neither the foreign schema nor the scope suffix
   ([TSON-SCHEMA] §7.9, "Diagnostics").
