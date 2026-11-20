@@ -166,16 +166,6 @@ spec-required case:
   ("has no usable compiled reader"), and so does a JSON root read at `nonempty`: `JsonSchemaCompiler.constructorOf`
   throws `IllegalStateException` for an `IncompleteEntry`, which the compile loop turns into an `ErrorReader`. Give the
   JSON stack `IncompleteEntryReader`'s refusal and a `CrossEncodingParityTest` case.
-- [ ] **§5.8: a field restated where no closed record is on the chain is not judged for its type.** The link judges a
-  restated type against the nearest closed records on the chain (`TsonSchemaLinker.checkRestatedFieldTypes`). An
-  applied operand gives no edge to its head (§5.10), so `dog => pet_of<dog_type> & { pet: cat_type }` over `pet_of =>
-  <T> { pet: T }`, where no entry names `pet_of<dog_type>`, has no record on its chain holding `pet`, and links; so
-  does `wrap<text>` from `wrap => <T> box<T> & { v: int32 }` where nothing declares `box<text>`. A subtraction's
-  tightening entries, which §5.9's rule 4 puts under §5.8's rules, are not judged either: its chain is empty. The
-  resolver holds the inherited field (`resolveTighteningField`'s `inherited`, substituted) but not the IS-A; a
-  deferred judgement there, or the inherited fields carried to link, would close all three without reporting a case
-  the link already judges twice.
-
 - [ ] **A dependent field whose sibling names an unbound type fails each read, not the bind-mode compile.** With
   `payload: kind!` and `kind` admitting a type no class binds, a document naming that type throws
   `MissingBindingException` from `RecordBindReader.descriptorFor` during the read. A consumer turns that into a server

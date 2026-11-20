@@ -758,7 +758,7 @@ public final class TsonSchemaLinker {
                 // source position records.
                 validateEntry(displayName(entry.getKey(), merged, facts, applications), entry.getValue(),
                         merged, constructors, other -> displayName(other, namespace, facts, applications), byName,
-                        hops);
+                        hops, schema.restatements().getOrDefault(entry.getKey(), List.of()));
             } catch (UnsupportedOperationException gap) {
                 // A field's value naming a value through a step this library does not yet follow: the gap it is.
                 if (receiver == null) {
@@ -799,8 +799,8 @@ public final class TsonSchemaLinker {
         reached.set(new ValuesByName(schema, annotated, facts, origins, values, hops));
 
         TsonLinkedSchema linked = new TsonLinkedSchema(new TsonSchema(schema.id(), schema.imports(), annotated,
-                schema.bootstrap(), schema.valuesByName(), schema.heldValues(), facts), origins, enumForms, nameTypes,
-                externs);
+                schema.bootstrap(), schema.valuesByName(), schema.heldValues(), schema.restatements(), facts), origins,
+                enumForms, nameTypes, externs);
         if (pending.isEmpty() && (counted == null || !counted.reported()) && HeldValues.anyHeld(schema, localNames)) {
             checkHeldValues(linked, merged, facts, origins, localNames, identifiers, values, hops, receiver);
         }
@@ -1559,7 +1559,8 @@ public final class TsonSchemaLinker {
 
     private static void validateEntry(String name, Top def, Map<String, Top> namespace,
                                        Function<String, Optional<String>> constructors,
-                                       Function<String, String> shown, ValuesByName byName, ExternHops hops) {
+                                       Function<String, String> shown, ValuesByName byName, ExternHops hops,
+                                       List<TsonSchema.Restatement> restatements) {
         checkParametricRecordUsesEveryParameter(name, def);
         // Every name on a chain is in the one namespace, the defining schema's closure being inside the
         // importer's (§2.2.3).
@@ -1574,6 +1575,9 @@ public final class TsonSchemaLinker {
             }
         }
         validateBody(name, def, namespace, constructors, shown, byName, hops);
+        if (!ParametricEntry.isParametric(def)) {
+            checkRestatementsOffTheChain(name, restatements, namespace, shown, hops);
+        }
     }
 
     private static void validateBody(String entryName, Top body, Map<String, Top> namespace,
@@ -2040,8 +2044,9 @@ public final class TsonSchemaLinker {
      *
      * <p><b>Judged against the nearest closed record on the chain.</b> A supertype another supertype lists was judged
      * when that one linked, so only the minimal ones are asked, and the diagnostic names the source the author wrote.
-     * An applied operand is judged through the closed entry its application denotes, where one exists. A field typed
-     * by an application not yet closed, or by a name no entry holds, is the reference checks' to report.
+     * An applied operand is judged through the closed entry its application denotes, where one exists, and through
+     * {@link #checkRestatementsOffTheChain} wherever it is. A field typed by an application not yet closed, or by a
+     * name no entry holds, is the reference checks' to report.
      */
     private static void checkRestatedFieldTypes(String entryName, RecordBody record, Map<String, Top> namespace,
                                                 Function<String, String> shown, ExternHops hops) {
@@ -2055,30 +2060,54 @@ public final class TsonSchemaLinker {
             List<String> violations = new ArrayList<>();
             for (Map.Entry<String, RecordField> inherited : source.fields().entrySet()) {
                 RecordField restated = record.fields().get(inherited.getKey());
-                if (restated == null) {
-                    continue;
-                }
-                Optional<String> dependent = DependentFields.restates(inherited.getKey(), inherited.getValue(),
-                        restated);
-                if (dependent.isPresent()) {
-                    violations.add(dependent.get());
-                } else if (restated.sibling().isEmpty() && !narrows(inherited.getValue(), restated,
-                        namespace, hops)) {
-                    boolean oneIsANameOneInPlace = restated.typeExpr() instanceof TypeInline
-                            != inherited.getValue().typeExpr() instanceof TypeInline;
-                    violations.add("field '" + inherited.getKey() + "' is typed '"
-                            + shownType(restated.typeExpr(), shown) + "', which is not '"
-                            + shownType(inherited.getValue().typeExpr(), shown) + "' or IS-A it"
-                            + (oneIsANameOneInPlace ? " -- a name and a type written in place are never one type "
-                                    + "(§8.2), so write '" + shownType(inherited.getValue().typeExpr(), shown)
-                                    + "' as it is inherited" : ""));
+                if (restated != null) {
+                    restatementViolation(inherited.getKey(), inherited.getValue(), restated, namespace, shown, hops)
+                            .ifPresent(violations::add);
                 }
             }
-            if (!violations.isEmpty()) {
-                throw new SchemaValidationException("'" + entryName + "': not a valid restatement of '"
-                        + shown.apply(supertype) + "''s fields (§5.8): " + String.join("; ", violations));
-            }
+            refuseRestatement(entryName, shown.apply(supertype), violations);
         }
+    }
+
+    /**
+     * §5.8's rule over the restatements no record on the entry's closed chain holds ({@link
+     * TsonSchema#restatements()}): over an application at an operand, which reaches no edge to its head and none at
+     * all where no declaration names it, and over a subtraction's operands, which reach none. The verdict is the one
+     * {@link #checkRestatedFieldTypes} gives a supertype, whether or not a declaration names the application.
+     */
+    private static void checkRestatementsOffTheChain(String entryName, List<TsonSchema.Restatement> restatements,
+                                                     Map<String, Top> namespace, Function<String, String> shown,
+                                                     ExternHops hops) {
+        Map<TypeExpr, List<String>> violations = new LinkedHashMap<>();
+        for (TsonSchema.Restatement restatement : restatements) {
+            restatementViolation(restatement.field(), restatement.inherited(), restatement.restated(), namespace,
+                    shown, hops).ifPresent(violation -> violations.computeIfAbsent(restatement.source(),
+                    source -> new ArrayList<>()).add(violation));
+        }
+        violations.forEach((source, found) -> refuseRestatement(entryName, shownType(source, shown), found));
+    }
+
+    private static void refuseRestatement(String entryName, String source, List<String> violations) {
+        if (!violations.isEmpty()) {
+            throw new SchemaValidationException("'" + entryName + "': not a valid restatement of '" + source
+                    + "''s fields (§5.8): " + String.join("; ", violations));
+        }
+    }
+
+    /** Why {@code restated} is no restatement of {@code inherited}, the field {@code field}; empty where it is one. */
+    private static Optional<String> restatementViolation(String field, RecordField inherited, RecordField restated,
+                                                         Map<String, Top> namespace, Function<String, String> shown,
+                                                         ExternHops hops) {
+        Optional<String> dependent = DependentFields.restates(field, inherited, restated);
+        if (dependent.isPresent() || restated.sibling().isPresent() || narrows(inherited, restated, namespace, hops)) {
+            return dependent;
+        }
+        boolean oneIsANameOneInPlace = restated.typeExpr() instanceof TypeInline
+                != inherited.typeExpr() instanceof TypeInline;
+        return Optional.of("field '" + field + "' is typed '" + shownType(restated.typeExpr(), shown)
+                + "', which is not '" + shownType(inherited.typeExpr(), shown) + "' or IS-A it"
+                + (oneIsANameOneInPlace ? " -- a name and a type written in place are never one type (§8.2), so "
+                        + "write '" + shownType(inherited.typeExpr(), shown) + "' as it is inherited" : ""));
     }
 
     /** What a slot holds as a message names it: a name as {@code shown} renders it, an inline type as written. */

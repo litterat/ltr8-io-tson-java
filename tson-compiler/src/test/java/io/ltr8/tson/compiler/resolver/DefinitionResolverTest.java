@@ -157,7 +157,7 @@ class DefinitionResolverTest {
             }
         };
         return new DefinitionResolver(reader, null, vocabulary.schema().entries()::get, definitionGetter, null,
-                SchemaPositions.none(), facts, n -> true, vocabulary.compiledSchema()::isKernel);
+                SchemaPositions.none(), facts, n -> true, vocabulary.compiledSchema()::isKernel, null);
     }
 
     /** The facts {@link #resolveSnippet} and {@link #resolveSnippetsAgainstMetaKernel} recorded. */
