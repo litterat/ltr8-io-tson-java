@@ -626,8 +626,8 @@ the one way to derive a record, and so the one way to declare a constructor. `re
 same. A restated field's rules, unchanged, stand in §5.8 with the composition body that writes one, and §5.7 states
 refinement alone. The kernel's `meta.namespace` is a composition, `meta.map & { … }`. Part 2 header, §1, §4.1–§4.3,
 §5.1, §5.2, §5.5, §5.7–§5.11, §8.1, §8.2, §12.1–§12.3 and [TSON-JSON] §6.1.5 (change log §3.2 items 105, 108, 109 and
-127). **Still open in the implementation:** a restatement under `&` that changes a pin loads; a restated field's type
-is not judged where no closed record is on the chain; and a constructor declared with `&` cannot be instantiated.
+127). **Still open in the implementation:** a restatement under `&` that changes a pin loads; and a constructor declared
+with `&` that adds a field cannot be instantiated.
 
 **Problem.** Revision 39 gave `^` one meaning at every level — "`^` always means *refine, preserving IS-A*, at every
 level — record types (`config ^ { ... }`), constructors (`meta.array ^ { ... }`, a constructor being a record, §4.1),
@@ -686,8 +686,8 @@ section named for one operator carried the other's rules.
 
 **What is not.** Two gaps on the form that is now the only one, each outstanding work in the implementation. A
 restatement that changes a pin loads (`dog => base & { pet_type: = "dog" }` over `pet_type: text = "pet"`), where
-§5.8 says it MUST NOT. A restated field's type is not judged where no closed record on the chain holds the field, as
-over an applied operand nothing declares.
+§5.8 says it MUST NOT. An instance of a constructor composed with a field added, or composed over `meta.record`, is
+reported as not implemented.
 
 **Considered, and why it lost.**
 

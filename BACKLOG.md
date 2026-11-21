@@ -654,16 +654,13 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   stream does not keep, where depth was a counter it already had, and the aggregate (total values) needs its own
   counter since §9.1 is explicit that the total is not bounded by the parts.
 
-- [ ] **A schema nested too deep fails as a host fault, not a limit refusal** ([TSON-DATA] §9.1; [TSON-SCHEMA] §11.5,
-  §5.2). §9.1 wants a refusal naming the limit and its threshold "rather than … a stack overflow", and §11.5 applies
-  its counters to a schema document as written. A schema nesting brackets, braces or a choice's parentheses past 64
-  (`deep => [[…[text]…]]`, `{ a: { a: … } }`, `( int32 | ( int32 | … ) )`) throws `LimitExceededException` out of
-  `Tson.validateSchema` rather than returning `LIMIT_EXCEEDED`; `tson compile` prints "internal error … nested deeper
-  than this processor reads (64)" and exits 70. The schema parser reads at the default limits whatever is configured
-  (`new TsonSchemaParser(schemaText)` in `Tson`), so `compile --max-depth 100000` refuses at 64 too. An argument
-  list opens no container, so nothing counts it: `meta.array<…<text>…>` 1,000 deep compiles, `set<…>` 1,000 deep
-  overflows the stack where the resolver reads the construction (`TypeInlineReader` through `RecordBindReader`), and
-  either at 5,000 overflows in `TsonSchemaParser.parseTypeArgs`; the `StackOverflowError` escapes the CLI, which
-  exits 1, the code for a rejected document. Report the stream's refusal through the receiver, hand the parser the
+- [ ] **The schema parser reads at the default limits, and an argument list's depth is unbounded** ([TSON-DATA] §9.1;
+  [TSON-SCHEMA] §11.5, §5.2). §9.1 wants a refusal naming the limit and its threshold "rather than … a stack
+  overflow", and §11.5 applies its counters to a schema document as written. The schema parser reads at the default
+  limits whatever is configured (`new TsonSchemaParser(schemaText)` in `Tson`), so `compile --max-depth 100000`
+  refuses at 64. An argument list opens no container, so nothing counts it: `meta.array<…<text>…>` 1,000 deep
+  compiles, `set<…>` 1,000 deep overflows the stack where the resolver reads the construction (`TypeInlineReader`
+  through `RecordBindReader`), and either at 5,000 overflows in `TsonSchemaParser.parseTypeArgs`; the
+  `StackOverflowError` escapes the CLI, which exits 1, the code for a rejected document. Hand the parser the
   configured `LimitsPolicy`, and bound an argument list's depth (§5.2's nesting limit on inline forms) so that no
   schema reaches a host fault.
