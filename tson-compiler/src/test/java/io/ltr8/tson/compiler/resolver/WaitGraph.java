@@ -40,9 +40,9 @@ import java.util.TreeSet;
  *       {@code meta.identifier_ref}, any {@code !reference} instance)
  *       waits on the slot's own type and what reading that reaches, never on the entry the name names. This falls
  *       out of the walk: a kind is an atom, so reading against one reaches nothing further.</li>
- *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only, a dependent
- *       field's value ({@code record_field.value: type!}), held as written in a schema document, on nothing, and a
- *       template's body text on {@code text} only -- again by the walk, both being atoms.</li>
+ *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only -- again by the
+ *       walk, {@code value} being an atom -- and a dependent field's value ({@code record_field.value: type!}), held
+ *       as written in a schema document, on nothing.</li>
  *   <li>A tagged value read at a position typed {@code P} waits on {@code P} and on its tag. An untagged value at a
  *       choice, or at an abstract record (a dispatch over its {@code subtypes}), waits on the one variant its form
  *       admits; where the form admits more than one, it waits on all of them, and {@link #overapproximations()}
@@ -78,7 +78,7 @@ final class WaitGraph {
     record Overapproximation(String entry, String path, String type, List<String> variants) {
     }
 
-    private enum Form { RECORD, ABSTRACT, NAMESPACE, ARRAY, MAP, TUPLE, CHOICE, DECLARED, ATOM, TEMPLATE }
+    private enum Form { RECORD, ABSTRACT, NAMESPACE, ARRAY, MAP, TUPLE, CHOICE, DECLARED, ATOM }
 
     private record Shape(String terminal, DataValue declaration, Form form) {
     }
@@ -399,8 +399,6 @@ final class WaitGraph {
                         problems.add(entry + ": a " + kind(core) + " at atom " + type + " (" + path + ")");
                     }
                 }
-                case TEMPLATE -> problems.add(entry + ": a value read against the open template " + type
-                        + " (" + path + ")");
             }
         }
 
@@ -475,7 +473,6 @@ final class WaitGraph {
             case NAMESPACE, MAP -> core instanceof MapValue || core instanceof EmptyBrace;
             case ARRAY, TUPLE -> core instanceof ArrayValue;
             case CHOICE, ABSTRACT, DECLARED -> true;
-            case TEMPLATE -> false;
         };
     }
 
@@ -517,8 +514,6 @@ final class WaitGraph {
             form = Form.TUPLE;
         } else if (constructor.equals("meta.choice")) {
             form = Form.CHOICE;
-        } else if (constructor.equals("meta.template")) {
-            form = Form.TEMPLATE;
         } else if (constructorSupertypes.contains("meta.atom")) {
             form = Form.ATOM;
         } else {

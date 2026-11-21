@@ -61,6 +61,10 @@ class ChoiceSubtypeTagTest {
               tag     => { word: text }
               figure  => ( shape | tag )
               hb => { i: figure  s: shape }
+              mark    => abstract {}
+              seal    => shape & mark & { rim: int32 }
+              marked  => ( text | mark )
+              hm => { m: marked  f: figure }
             }
             """;
 
@@ -222,7 +226,7 @@ class ChoiceSubtypeTagTest {
     public sealed interface Figure permits Shape, Tag {
     }
 
-    public sealed interface Shape extends Figure permits Round, Circle, Square {
+    public sealed interface Shape extends Figure permits Round, Circle, Square, Seal {
     }
 
     @Typename(name = "tag")
@@ -247,10 +251,21 @@ class ChoiceSubtypeTagTest {
     public record Hb(Figure i, Shape s) {
     }
 
+    public sealed interface Mark permits Seal {
+    }
+
+    @Typename(name = "seal")
+    public record Seal(String name, int rim) implements Shape, Mark {
+    }
+
+    public record Hm(Mark m, Figure f) {
+    }
+
     static Tson bound() {
-        Map<String, Class<?>> names = Map.of("figure", Figure.class, "tag", Tag.class, "shape", Shape.class,
-                "round", Round.class, "disc", Disc.class, "circle", Circle.class, "square", Square.class,
-                "hb", Hb.class);
+        Map<String, Class<?>> names = Map.ofEntries(Map.entry("figure", Figure.class), Map.entry("tag", Tag.class),
+                Map.entry("shape", Shape.class), Map.entry("round", Round.class), Map.entry("disc", Disc.class),
+                Map.entry("circle", Circle.class), Map.entry("square", Square.class), Map.entry("hb", Hb.class),
+                Map.entry("mark", Mark.class), Map.entry("seal", Seal.class), Map.entry("hm", Hm.class));
         DataNameBinder binder = DataNameBinder.ofMap(names).orElse(SchemaModelNameBinder.INSTANCE);
         return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
@@ -269,5 +284,19 @@ class ChoiceSubtypeTagTest {
         assertEquals(new Disc("a", 1, true), read.i());
         assertEquals(read.s(), read.i());
         assertEquals(new Tag("w"), bind("{ i: !tag { word: \"w\" }  s: !circle { name: \"c\"  r: 2 } }").i());
+    }
+
+    /** {@code seal} IS-A a variant of each choice, and its class implements the sealed interface of each. */
+    @Test
+    void aClassUnderTwoSealedInterfacesBindsAndWritesAtAChoiceOfEach() {
+        Tson tson = bound();
+        String header = "!!import:\"" + ID + "\"\n!hm ";
+        Hm read = tson.objectReader().read(
+                header + "{ m: !seal { name: \"a\"  rim: 1 }  f: !seal { name: \"a\"  rim: 1 } }", Hm.class);
+
+        assertEquals(new Hm(new Seal("a", 1), new Seal("a", 1)), read);
+        String written = tson.objectWriter().toTson(read);
+        assertEquals("{ m: !seal { name: \"a\" rim: 1 } f: !seal { name: \"a\" rim: 1 } }", written);
+        assertEquals(read, tson.objectReader().read(header + written, Hm.class));
     }
 }
