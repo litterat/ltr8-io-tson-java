@@ -2452,8 +2452,7 @@ final class DefinitionResolver {
      * field ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern?: meta.product_access_type =
      * INDEX} pins {@code product}'s required field, which refines it. Whether a restated type narrows the inherited
      * one is an IS-A question over names not yet ready here, so the link asks it ({@code
-     * TsonSchemaLinker.checkRestatedFieldTypes}). §5.8's rule that a restatement MUST NOT change a pin is not
-     * checked here: the two values are never compared.
+     * TsonSchemaLinker.checkRestatedFieldTypes}), and with it whether a pin changed, a value read at a type.
      *
      * <p><b>A restated group member stays a member</b> (§5.11). Its presence is the group's, so the name takes
      * no {@code ?} and the member stays optional whatever the restatement writes; a default is refused, being

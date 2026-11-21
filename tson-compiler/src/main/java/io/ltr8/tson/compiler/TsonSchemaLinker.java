@@ -12,6 +12,7 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.atom.IdentifierGrammar;
 import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.unicode.Normalization;
+import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.ConstructionSugar;
 import io.ltr8.tson.compiler.resolver.IncompleteEntries;
 import io.ltr8.tson.compiler.resolver.KindMembers;
@@ -1576,7 +1577,7 @@ public final class TsonSchemaLinker {
         }
         validateBody(name, def, namespace, constructors, shown, byName, hops);
         if (!ParametricEntry.isParametric(def)) {
-            checkRestatementsOffTheChain(name, restatements, namespace, shown, hops);
+            checkRestatementsOffTheChain(name, restatements, namespace, constructors, shown, hops);
         }
     }
 
@@ -1617,7 +1618,7 @@ public final class TsonSchemaLinker {
                         }
                     }
                 }
-                checkRestatedFieldTypes(entryName, r, namespace, shown, hops);
+                checkRestatedFieldTypes(entryName, r, namespace, constructors, shown, hops);
             }
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
             // An alias naming a parametric record bare names the parametric record under another name (`ref_of => ref`),
@@ -2040,7 +2041,8 @@ public final class TsonSchemaLinker {
      * {@code [int32]} is no narrowing. §5.8's one other narrowing is {@code void} at a voidable position, whose value
      * set {@code {_}} is inside every voidable position's; the voidable order itself is the resolver's ({@code
      * DefinitionResolver.refines}). The resolver binds the restatement before the names it holds need be ready, so the IS-A
-     * is asked here, over the one namespace both resolve in.
+     * is asked here, over the one namespace both resolve in, and so is whether a pin changed ({@link #changedPin}),
+     * a value read at a type those names reach.
      *
      * <p><b>Judged against the nearest closed record on the chain.</b> A supertype another supertype lists was judged
      * when that one linked, so only the minimal ones are asked, and the diagnostic names the source the author wrote.
@@ -2049,6 +2051,7 @@ public final class TsonSchemaLinker {
      * name no entry holds, is the reference checks' to report.
      */
     private static void checkRestatedFieldTypes(String entryName, RecordBody record, Map<String, Top> namespace,
+                                                Function<String, Optional<String>> constructors,
                                                 Function<String, String> shown, ExternHops hops) {
         List<String> supertypes = TypeChain.supertypesOf(record);
         for (String supertype : supertypes) {
@@ -2061,8 +2064,8 @@ public final class TsonSchemaLinker {
             for (Map.Entry<String, RecordField> inherited : source.fields().entrySet()) {
                 RecordField restated = record.fields().get(inherited.getKey());
                 if (restated != null) {
-                    restatementViolation(inherited.getKey(), inherited.getValue(), restated, namespace, shown, hops)
-                            .ifPresent(violations::add);
+                    restatementViolation(inherited.getKey(), inherited.getValue(), restated, namespace, constructors,
+                            shown, hops).ifPresent(violations::add);
                 }
             }
             refuseRestatement(entryName, shown.apply(supertype), violations);
@@ -2076,12 +2079,13 @@ public final class TsonSchemaLinker {
      * {@link #checkRestatedFieldTypes} gives a supertype, whether or not a declaration names the application.
      */
     private static void checkRestatementsOffTheChain(String entryName, List<TsonSchema.Restatement> restatements,
-                                                     Map<String, Top> namespace, Function<String, String> shown,
-                                                     ExternHops hops) {
+                                                     Map<String, Top> namespace,
+                                                     Function<String, Optional<String>> constructors,
+                                                     Function<String, String> shown, ExternHops hops) {
         Map<TypeExpr, List<String>> violations = new LinkedHashMap<>();
         for (TsonSchema.Restatement restatement : restatements) {
             restatementViolation(restatement.field(), restatement.inherited(), restatement.restated(), namespace,
-                    shown, hops).ifPresent(violation -> violations.computeIfAbsent(restatement.source(),
+                    constructors, shown, hops).ifPresent(violation -> violations.computeIfAbsent(restatement.source(),
                     source -> new ArrayList<>()).add(violation));
         }
         violations.forEach((source, found) -> refuseRestatement(entryName, shownType(source, shown), found));
@@ -2096,11 +2100,15 @@ public final class TsonSchemaLinker {
 
     /** Why {@code restated} is no restatement of {@code inherited}, the field {@code field}; empty where it is one. */
     private static Optional<String> restatementViolation(String field, RecordField inherited, RecordField restated,
-                                                         Map<String, Top> namespace, Function<String, String> shown,
-                                                         ExternHops hops) {
+                                                         Map<String, Top> namespace,
+                                                         Function<String, Optional<String>> constructors,
+                                                         Function<String, String> shown, ExternHops hops) {
         Optional<String> dependent = DependentFields.restates(field, inherited, restated);
-        if (dependent.isPresent() || restated.sibling().isPresent() || narrows(inherited, restated, namespace, hops)) {
+        if (dependent.isPresent()) {
             return dependent;
+        }
+        if (restated.sibling().isPresent() || narrows(inherited, restated, namespace, hops)) {
+            return changedPin(field, inherited, restated, namespace, constructors, hops);
         }
         boolean oneIsANameOneInPlace = restated.typeExpr() instanceof TypeInline
                 != inherited.typeExpr() instanceof TypeInline;
@@ -2108,6 +2116,79 @@ public final class TsonSchemaLinker {
                 + "', which is not '" + shownType(inherited.typeExpr(), shown) + "' or IS-A it"
                 + (oneIsANameOneInPlace ? " -- a name and a type written in place are never one type (§8.2), so "
                         + "write '" + shownType(inherited.typeExpr(), shown) + "' as it is inherited" : ""));
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.8: a restatement MUST NOT change a pin. The two values are compared as values of the inherited
+     * field's type, where the pin was set, by the equality a written value meets a FIXED one with (§5.5, {@link
+     * ValueIdentity}), so {@code = 255} restates {@code = 0xFF}; a reference to types compares the types its names
+     * denote, past their hops (§8.2). A value its type refuses is {@link #checkFieldValue}'s to report.
+     */
+    private static Optional<String> changedPin(String field, RecordField inherited, RecordField restated,
+                                               Map<String, Top> namespace,
+                                               Function<String, Optional<String>> constructors, ExternHops hops) {
+        if (inherited.role() != FieldRole.FIXED || inherited.value().isEmpty() || restated.value().isEmpty()
+                || inherited.value().equals(restated.value())) {
+            return Optional.empty();
+        }
+        Token pin = inherited.value().get();
+        Token restatedPin = restated.value().get();
+        Optional<Top> target = valueBody(inherited.typeExpr(), namespace);
+        if (target.isPresent() && target.get() instanceof RefBody reference
+                && KindMembers.namesTypes(reference.of().name(), namespace::get)) {
+            if (hops.identity(pin.text()).equals(hops.identity(restatedPin.text()))) {
+                return Optional.empty();
+            }
+        } else {
+            Optional<AtomType<?>> parser = valueParser(inherited.typeExpr(), namespace, constructors);
+            if (parser.isEmpty()) {
+                return Optional.empty();
+            }
+            try {
+                if (ValueIdentity.of(parser.get().read(pin.text()))
+                        .equals(ValueIdentity.of(parser.get().read(restatedPin.text())))) {
+                    return Optional.empty();
+                }
+            } catch (AtomTypeException notAValue) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of("field '" + field + "' is pinned to " + asWritten(pin) + " and restated as "
+                + asWritten(restatedPin) + " -- a restatement may change a default and never a pin, so restate it as "
+                + asWritten(pin) + " or leave it out");
+    }
+
+    /**
+     * The body a field's {@code ~}/{@code =} value is read against, at the end of its type's alias chain: empty where
+     * the name is unresolved, or names a parametric record, an application not yet closed, or an alias the walk
+     * stopped on, none of which has one body to read against.
+     */
+    private static Optional<Top> valueBody(TypeExpr type, Map<String, Top> namespace) {
+        Top target = switch (type) {
+            case TypeRef reference -> namespace.get(AliasChain.terminal(reference.name(), namespace));
+            case TypeInline inline -> inline.of();
+        };
+        return target == null || ParametricEntry.isParametric(target) || target instanceof ApplyBody
+                || target instanceof Alias ? Optional.empty() : Optional.of(target);
+    }
+
+    /**
+     * The parser a field's {@code ~}/{@code =} value is read by, an enum in its label form; empty where no token is a
+     * value of the type. A type written in place has no entry a label form is recorded under.
+     */
+    private static Optional<AtomType<?>> valueParser(TypeExpr type, Map<String, Top> namespace,
+                                                     Function<String, Optional<String>> constructors) {
+        Optional<Top> target = valueBody(type, namespace);
+        if (target.isEmpty()) {
+            return Optional.empty();
+        }
+        if (target.get() instanceof RefBody) {
+            return AtomParsers.inSchemaDocument(target.get());
+        }
+        Optional<String> constructor = type instanceof TypeRef reference
+                ? constructors.apply(AliasChain.terminal(reference.name(), namespace)) : Optional.empty();
+        return AtomParsers.forType(target.get(), EnumLabels.labelForm(target.get(), constructor, namespace,
+                namespace::get));
     }
 
     /** What a slot holds as a message names it: a name as {@code shown} renders it, an inline type as written. */
@@ -2196,21 +2277,13 @@ public final class TsonSchemaLinker {
         }
         // The chain end is what has to be checked, not the hop: a field typed by an alias
         // (`a => text`, `f: a = hello`) states a value of whatever the alias names. Resolved output states
-        // the chain rather than rewriting the use site past it, so the walk happens here.
-        // A type written in place is its own body, and has no entry an enum's label form is recorded under.
-        String terminal = switch (field.typeExpr()) {
-            case TypeRef reference -> AliasChain.terminal(reference.name(), namespace);
-            case TypeInline inline -> null;
-        };
-        Top target = field.typeExpr() instanceof TypeInline inline ? inline.of() : namespace.get(terminal);
-        // An unresolved reference is already reported by validateTypeRef; a target that is still open (or an
-        // application of one) has no single body to check against until materialisation closes it. A body
-        // still an Alias means the walk stopped on a cycle or an argument-bearing target, neither of
-        // which has one either.
-        if (target == null || ParametricEntry.isParametric(target) || target instanceof ApplyBody
-                || target instanceof Alias) {
+        // the chain rather than rewriting the use site past it, so the walk happens here. An unresolved
+        // reference is already reported by validateTypeRef, and an open target is judged once it closes.
+        Optional<Top> body = valueBody(field.typeExpr(), namespace);
+        if (body.isEmpty()) {
             return;
         }
+        Top target = body.get();
         Token value = field.value().get();
         if (target instanceof RefBody reference && KindMembers.namesTypes(reference.of().name(), namespace::get)) {
             checkKindValue(entryName, fieldName, field, value, reference, namespace, constructors, hops);
@@ -2223,8 +2296,7 @@ public final class TsonSchemaLinker {
                     TypeRef.of(value.text()), reference.of().name());
             return;
         }
-        Optional<AtomType<?>> parser = AtomParsers.forType(target, EnumLabels.labelForm(target,
-                terminal == null ? Optional.empty() : constructors.apply(terminal), namespace, namespace::get));
+        Optional<AtomType<?>> parser = valueParser(field.typeExpr(), namespace, constructors);
         if (parser.isEmpty()) {
             throw notAScalarType(entryName, fieldName, field, value, target);
         }

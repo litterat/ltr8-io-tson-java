@@ -219,13 +219,6 @@ spec-required case:
   `link/valid` one. A consumer pins today's behaviour (`ltr8-io-tson-java-http`,
   `UpstreamGapsTest.aReferenceInsideAnAnnotationValueIsNotJudged`).
 
-
-- [ ] **A restatement that changes a pin is accepted** ([TSON-SCHEMA] §5.8, §5.2). With `base => { pet_type: text =
-  "pet"  name: text }`, `dog => base & { pet_type: = "dog" }` loads; §5.8's restatement "MUST NOT change a pin", and a
-  discriminated family's arrangement (§5.2) rests on it — a subtype of a member that could re-pin its parent's
-  selector would break the family's one-level dispatch. Refuse a FIXED restatement whose value differs, under the
-  field type's own equality (§5.5, so `= 255` over `= 0xFF` is the identity case), at the restating declaration. Add
-  a `schema/invalid` vector and a `schema/valid` one for the identity restatement.
 - [ ] **A record written as `!meta.record` is not judged against the `meta.record_field` invariants**
   ([TSON-SCHEMA] §8.1). The field syntax cannot write a field that breaks them; the construction can, and each of
   these loads in `r => !meta.record { fields: { a => { … } } }`: `{ type: text  optional: true  role: DEFAULT }` and
