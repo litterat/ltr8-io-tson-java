@@ -132,13 +132,10 @@ spec-required case:
   load, and `!my_ns { key_type: meta.identifier  value_type: op }` reports it as `!my_map { … }` does, the instance
   then refinable by `^` as its source constructor's are (§5.7). An instance of a constructor composing `atom`,
   `product` or `sum` directly stays refused: it is a type of a new form, which a processor backs with readers and
-  writers of its own.
-- [ ] **An instance of a constructor composed with `&` that adds no field is refused** ([TSON-SCHEMA] §5.8).
-  `my_list => meta.array & { min_items?: = 1 }` is a constructor, and `my_list<text>` and `!my_list { element_type:
-  text }` are refused as `NOT_IMPLEMENTED` ("this library models the body of a type built only by the bundled schemas'
-  constructors"): no class binds `my_list`, and nothing falls back to its parent's. Derive it from the entry, so a
-  resolved form read back needs no recorded fact: a constructor whose single direct parent is a constructor with the
-  same field names binds as that parent. Add `schema/valid` vectors, applied and constructed.
+  writers of its own. A composition of `record` adding no field (`strict => meta.record & { extension?: = FINAL }`)
+  is refused the same way: `TsonLinkedSchema.composedOver` leaves `meta.record` out, since `refuseWrittenParameters`
+  and `parametricInstance` ask their questions of a `!meta.record` head by name, and `!strict { parameters: … }`
+  would skip them.
 - [ ] **A field of an incomplete entry typed by a type written in place is read only where the entry is completed**
   ([TSON-SCHEMA] §5.5). §5.5 reads each written field by its own type where it is written and judges the names it
   holds at link. A constructor's field whose type is written in place (`meta.choice.variants`, a `[meta.type_expr]`;

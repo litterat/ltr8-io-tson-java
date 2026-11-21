@@ -680,11 +680,14 @@ section named for one operator carried the other's rules.
 - The kernel's `meta.namespace` moved with no code change and no fixture change, §5.8 already admitting a restatement
   in a composition body. The resolver's record-refinement path is deleted.
 
-**What is not.** Three gaps on the form that is now the only one, each outstanding work in the implementation. A
+- `minlist => meta.array & { min_items?: = 1 }` loads, and `minlist<text>` is `!minlist { element_type: text }`, its
+  pin in force: an instance of a constructor composed over a constructor of types with no field added binds as its
+  one direct parent, `meta.record` excepted.
+
+**What is not.** Two gaps on the form that is now the only one, each outstanding work in the implementation. A
 restatement that changes a pin loads (`dog => base & { pet_type: = "dog" }` over `pet_type: text = "pet"`), where
 §5.8 says it MUST NOT. A restated field's type is not judged where no closed record on the chain holds the field, as
-over an applied operand nothing declares. And a constructor composed with `&` cannot be instantiated:
-`minlist => meta.array & { min_items?: = 1 }` loads, and `minlist<text>` reports a gap, no class binding `minlist`.
+over an applied operand nothing declares.
 
 **Considered, and why it lost.**
 
