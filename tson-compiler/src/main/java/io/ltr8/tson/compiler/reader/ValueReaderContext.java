@@ -150,7 +150,8 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
 
     /**
      * The names a bind lookup for entry {@code name} tries, in order: the names an author wrote for it, then the
-     * entry's own.
+     * entry's own, then, for a constructor composed over another with no field added, its parent's ({@link
+     * TsonLinkedSchema#composedOver}).
      *
      * <p><b>A binding map is written in the names the author wrote.</b> Only an entry with no source position --
      * one the kernel's bootstrap builds, or one read from a resolved form -- is also looked up under the names
@@ -166,6 +167,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
                 ? List.of() : referrers.getOrDefault(name, List.of());
         List<String> candidates = new ArrayList<>(written);
         candidates.add(name);
+        linked.composedOver(name).ifPresent(parent -> candidates.addAll(bindingNamesFor(parent)));
         return List.copyOf(candidates);
     }
 }

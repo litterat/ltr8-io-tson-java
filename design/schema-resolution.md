@@ -391,7 +391,8 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
 
 - **One schema construct reaches `NOT_IMPLEMENTED`: an instance of a user constructor of types**
   (`SchemaResolver.unmodelledType`). A constructor composing the kernel's `meta.type` builds types, and a type's body is
-  one of the schema model's, built only by the bundled constructors (meta.tn's, numeric.tn's, temporal.tn's and net.tn's).
+  one of the schema model's, built only by the bundled constructors (meta.tn's, numeric.tn's, temporal.tn's and net.tn's)
+  or by one composed over them that adds no field and binds as its parent (`TsonLinkedSchema.composedOver`).
   Composing `meta.atom`, `meta.product` or `meta.sum` directly (`c => meta.product & { … }`) makes a new form, which a
   processor backs with readers and writers of its own; this library backs none beyond the bundled ones, so the refusal is a
   capability verdict, and stays one. Composing an existing constructor (`c => meta.record & { extra: text }`) makes no new

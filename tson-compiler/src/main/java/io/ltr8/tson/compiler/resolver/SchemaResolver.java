@@ -364,13 +364,14 @@ public final class SchemaResolver {
             }
 
             /**
-             * An instance of the constructor {@code type}: the schema model's body where the head is the kernel's
-             * or net.tn's, whose names always bind to it. Any other constructor's instance builds no body this
-             * library models, so it is held as the value it is, as a value entry's payload is ([TSON-SCHEMA] §4.1):
-             * as the object the bind context binds the head to, or, where none does, as a tree, so the schema loads
-             * and validates without host classes and a schema obtained to bind refuses it. A constructor whose
-             * instances are types is the exception: a type's body is one of the kernel's, and an instance of a
-             * constructor of types no factory backs is a gap.
+             * An instance of the constructor {@code type}: the schema model's body where the head is a bundled
+             * schema's, whose names always bind to it, or composed over one with no field added, which binds as its
+             * parent ({@link io.ltr8.tson.schema.TsonLinkedSchema#composedOver}). Any other constructor's instance
+             * builds no body this library models, so it is held as the value it is, as a value entry's payload is
+             * ([TSON-SCHEMA] §4.1): as the object the bind context binds the head to, or, where none does, as a tree,
+             * so the schema loads and validates without host classes and a schema obtained to bind refuses it. A
+             * constructor whose instances are types is the exception: a type's body is one of the kernel's, and an
+             * instance of a constructor of types no factory backs is a gap.
              */
             private Top constructed(String type, Top head, io.ltr8.tson.compiler.ast.DataValue value) {
                 Object body;
@@ -897,14 +898,15 @@ public final class SchemaResolver {
     }
 
     /**
-     * An instance of {@code type}, a constructor of types the kernel and the bundled libraries do not declare: an entry
-     * it builds is a type, a type's body is one of the kernel's, and this library has no factory for the bodies it
-     * describes.
+     * An instance of {@code type}, a constructor of types no bundled schema declares and none it composes binds as
+     * ({@link io.ltr8.tson.schema.TsonLinkedSchema#composedOver}): an entry it builds is a type, a type's body is one
+     * of the kernel's, and this library has no factory for the bodies it describes.
      */
     private static UnsupportedOperationException unmodelledType(String type, RuntimeException cause) {
         return new UnsupportedOperationException("'!" + type + "' builds types, and this library models the body of "
-                + "a type built only by the bundled schemas' constructors -- an instance of a constructor of "
-                + "types no reader factory backs cannot be held as a type", cause);
+                + "a type built only by the bundled schemas' constructors, or by one composed over one of them with no "
+                + "field added -- an instance of a constructor of types no reader factory backs cannot be held as a "
+                + "type", cause);
     }
 
     /**

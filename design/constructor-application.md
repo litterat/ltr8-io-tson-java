@@ -13,8 +13,11 @@ What `!C { … }` builds, how its head resolves, and why a parametric record is 
 - A head declared in the same document is made ready before its instance is read, in wait order (`WaitOrder`,
   `design/schema-resolution.md`), whichever is written first. Every body, under a local head or an imported one, is read at
   a checkpoint of the document writing it (`design/resolver-vocabulary-and-bootstrap.md`).
-- An instance of a constructor meta.tn, numeric.tn, temporal.tn or net.tn declares is the schema model's body. An instance of
-  any other constructor is held as a `ValueEntry` where the head composes `meta.top` and not `meta.type` (its instances are
+- An instance of a constructor meta.tn, numeric.tn, temporal.tn or net.tn declares is the schema model's body, and so is
+  an instance of a constructor composed over one of those constructors of types with no field added, which binds as its
+  one direct parent (`TsonLinkedSchema.composedOver`): derived from the entries, so a resolved form read back binds alike,
+  and never over `meta.record`, whose construction's checks are asked of `!meta.record` by name. An instance of any
+  other constructor is held as a `ValueEntry` where the head composes `meta.top` and not `meta.type` (its instances are
   no types), and refused as `NOT_IMPLEMENTED` where it composes `meta.type` (`SchemaResolver.constructed`).
 - `!C { … }` applies a constructor exactly when `C` IS-A `meta.top` (§4.1) — there is no constructor marker — and
   `TsonCompiledVocabulary.buildConstructors` filters on the same predicate, so every constructor head has a reader. With `C`
@@ -120,8 +123,9 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   which is why an instance is not itself a constructor. `ApplicabilityIsIsATopTest` and `ConstructorLevelDisciplineTest` pin
   both halves; §3.3.1 and §4.2 are the spec side.
 - **What an instance of a schema's own constructor holds** (`SchemaResolver.constructed`). The constructors meta.tn,
-  numeric.tn, temporal.tn and net.tn declare bind to the schema model, so their instances are `Top` bodies. Any other
-  constructor's instance builds no body this library models. Where its head composes `meta.top` and not the kernel's
+  numeric.tn, temporal.tn and net.tn declare bind to the schema model, so their instances are `Top` bodies, as are a
+  composed constructor's that binds as its parent (above). Any other constructor's instance builds no body this library
+  models. Where its head composes `meta.top` and not the kernel's
   `meta.type` (`s => !step { … }` over `step => meta.top & { … }`), the instance is no type, so it is held as the value it
   is, the way a value entry's payload is: `ValueEntry(step, object)` where the bind context binds `step` to a class,
   `ValueEntry(step, tree)` where none does, so the schema loads and validates without host classes, and a schema obtained to
@@ -154,9 +158,9 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
 - **The kernel applies its own constructors this way**, `meta.ref<method>` being `!meta.ref { of: method }`, and
   completes its own incomplete entries the way a schema does: `set<text>` through the root's alias `set` is
   `!meta.array { element_type: text  ordered: false  unique_items: true }`, `!enum [A B]` is `!meta.enum_type { … }`.
-  **A body is bound by its constructor's own class and nothing else**, so an instance of a constructor a schema
-  composes (`!x { … }` over `x => meta.array & { … }`) has no class and is a gap; a set and an enum are incomplete
-  entries and need none, a completion being the plain construction.
+  **A body is bound by its constructor's class, or its parent's where the constructor adds no field**
+  (`!x { … }` over `x => meta.array & { min_items?: = 1 }`); one adding a field has no class and is a gap. A set and an
+  enum are incomplete entries and need none, a completion being the plain construction.
 - **Where an application is first met, it is rewritten.** A declaration's body (`x => meta.array<text>`) becomes
   `!C { … }` tagged by the head as written and goes through `resolveInstance`, so it gets every check and fact the
   braced form does and records no application. A field's or group member's type (`f: meta.array<text>`) becomes the

@@ -7,14 +7,17 @@ import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.unicode.Normalization;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The result of {@code TsonSchemaLinker.link} ({@code tson-compiler}) -- proof, at the type level, that a
@@ -244,4 +247,55 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
         return TypeChain.isConstructor(name, value, this::isKernel);
     }
 
+    /**
+     * The constructor {@code name}'s instances bind as where nothing binds {@code name}: its one direct parent, where
+     * {@code name} is a constructor composed over a constructor of types that has instances and has the same field
+     * names ([TSON-SCHEMA] §5.8). A composition adding no field only pins or defaults the parent's fields, so the
+     * parent's body holds every value an instance writes, and its pins take effect where the instance is read.
+     * Derived from the entries alone, so a resolved form read back binds as its source did. A field added, two
+     * parents, or an abstract parent (a base kind, {@code meta.type}) leaves no body to bind as.
+     *
+     * <p><b>Only a constructor of types, and never {@code meta.record}.</b> What some constructions may write is
+     * checked of the kernel's head by name -- a written {@code parameters} of {@code !meta.record} (§5.10), an
+     * alias's or an extern's body by what it denotes -- so an instance built under another head would skip it. An
+     * instance of a constructor composing {@code meta.top} alone is held as the value it is, and composing {@code
+     * record} is open work of its own.
+     */
+    public Optional<String> composedOver(String name) {
+        if (!(schema.entries().get(name) instanceof RecordBody record) || record.isParametric()
+                || !isConstructor(name, record)) {
+            return Optional.empty();
+        }
+        Set<String> supertypes = terminals(TypeChain.supertypesOf(record));
+        List<String> direct = supertypes.stream()
+                .filter(supertype -> supertypes.stream().noneMatch(other -> !other.equals(supertype)
+                        && terminals(TypeChain.supertypesOf(schema.entries().get(other))).contains(supertype)))
+                .toList();
+        if (direct.size() != 1) {
+            return Optional.empty();
+        }
+        String parentName = direct.getFirst();
+        if (!(schema.entries().get(parentName) instanceof RecordBody parent)
+                || parent.extension() == RecordExtensionType.ABSTRACT
+                || !TypeChain.supertypesOf(parent).contains(KernelNames.of("type")) || !isKernel(KernelNames.of("type"))
+                || parentName.equals(KernelNames.of("record")) && isKernel(parentName)
+                || !parent.fields().keySet().equals(record.fields().keySet())) {
+            return Optional.empty();
+        }
+        return Optional.of(parentName);
+    }
+
+    /** The entries {@code names} denote past their alias hops, each once. */
+    private Set<String> terminals(List<String> names) {
+        Set<String> terminals = new LinkedHashSet<>();
+        for (String name : names) {
+            String terminal = name;
+            for (int hops = 0; schema.entries().get(terminal) instanceof Alias alias
+                    && hops < schema.entries().size(); hops++) {
+                terminal = alias.target().name();
+            }
+            terminals.add(terminal);
+        }
+        return terminals;
+    }
 }

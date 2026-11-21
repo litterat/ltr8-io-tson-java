@@ -297,11 +297,16 @@ final class BindRecordBuilder implements RecordBuilder {
         return context.linked().declaringIdentity(name);
     }
 
-    /** The names a bind lookup for entry {@code name} tries, in order: the aliases an author wrote, then its own. */
+    /**
+     * The names a bind lookup for entry {@code name} tries, in order: the aliases an author wrote, then its own, then,
+     * for a constructor composed over another with no field added, its parent's ({@link
+     * io.ltr8.tson.schema.TsonLinkedSchema#composedOver}).
+     */
     private static List<String> bindingNames(String name, ValueReaderContext context) {
         List<String> candidates = new ArrayList<>(context.admitting(List.of(name)));
         candidates.remove(name);
         candidates.add(name);
+        context.linked().composedOver(name).ifPresent(parent -> candidates.addAll(bindingNames(parent, context)));
         return candidates;
     }
 
