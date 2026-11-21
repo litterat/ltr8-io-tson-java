@@ -178,8 +178,8 @@ does.*
   code rides on the codes alone (`TsonCli.exitCodeFor`); a gap that escapes some other way still exits 70 through
   `TsonCli.notImplemented`.
 - **A bind mismatch is neither an author error nor a gap.** `DefinitionResolver.bindAtomInstance` and
-  `bindAnnotationValue` keep it clear of their catch-alls; relabelled `UnsupportedOperationException`, a missing line
-  of wiring would read as *this library cannot do that*. The reachable case is a value entry of a type the consumer
+  `bindAnnotationValue` restate it as itself; relabelled `UnsupportedOperationException`, a missing line of wiring
+  would read as *this library cannot do that*. The reachable case is a value entry of a type the consumer
   bound no class for (`pings => !notifications { ping => … }` with none for `notification`): the resolver holds it as
   a tree, so the schema loads and validates, and the bind registry reports it at the entry (`/pings`) where the
   schema is obtained to bind (`design/compiled-registries.md`). `BindMismatchClassificationTest` pins it beside an

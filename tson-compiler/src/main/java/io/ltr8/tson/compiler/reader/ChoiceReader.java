@@ -53,7 +53,7 @@ final class ChoiceReader {
      */
     static final ValueReaderFactory FACTORY = (name, typeDefinition, context) -> {
         if (!(typeDefinition instanceof ChoiceBody body)) {
-            throw new IllegalArgumentException("'" + name + "' is not choice-shaped: " + typeDefinition);
+            throw new IllegalStateException("'" + name + "' is not choice-shaped: " + typeDefinition);
         }
         if (body.variants().isEmpty()) {
             throw new IllegalStateException("'" + name + "' declares no variants -- nothing compilable here");

@@ -97,7 +97,7 @@ record MapPlan(String displayName, JsonSchemaLocation schemaLocation, boolean vo
         AliasChain.Landed terminal = AliasChain.landed(linked, keyTypeName).orElseThrow(() ->
                 new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
         return terminal.definition() instanceof Atom atom
-                ? AtomParsers.forType(atom, terminal.in().enumForm(terminal.name()))
+                ? AtomParsers.forRead(atom, terminal.in().enumForm(terminal.name()))
                 : Optional.empty();
     }
 }

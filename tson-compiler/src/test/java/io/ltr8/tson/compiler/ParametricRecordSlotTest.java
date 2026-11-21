@@ -92,12 +92,54 @@ class ParametricRecordSlotTest {
         }
     }
 
+    /**
+     * A completion of an incomplete entry written in place is the construction of the entry's constructor
+     * ([TSON-SCHEMA] §5.5), so a parameter at one of its type slots stands there too, the kernel's {@code set_type}
+     * and a schema's own incomplete entry alike, braced or positional: the explicit spelling and the sugar close to
+     * one type.
+     */
+    @Test
+    void aParameterInsideACompletionWrittenInPlaceIsSubstituted() {
+        String nonempty = "  nonempty => !meta.array ^ { min_items: 1 }\n";
+        Map<String, String> explicitToSugar = Map.of(
+                "  arr => <T> !meta.record { fields: { v => { type: { of: !meta.set_type { element_type: T } } } } }",
+                "  arr => <T> { v: meta.set_type<T> }",
+                nonempty + "  arr => <T> !meta.record { fields: { v => { type: { of: !nonempty { element_type: T } } } } }",
+                nonempty + "  arr => <T> { v: nonempty<T> }",
+                nonempty + "  arr => <T> !meta.record { fields: { v => { type: { of: !nonempty T } } } }",
+                nonempty + "  arr => <T> { v: nonempty<T> }");
+        explicitToSugar.forEach((explicitSpelling, sugar) -> {
+            TypeInline explicit = (TypeInline) ((RecordBody) compile(explicitSpelling + "\n  a => arr<int32>")
+                    .schema().entries().get("a")).fields().get("v").type();
+            TypeInline written = (TypeInline) ((RecordBody) compile(sugar + "\n  a => arr<int32>")
+                    .schema().entries().get("a")).fields().get("v").type();
+            assertEquals(written, explicit, explicitSpelling);
+        });
+    }
+
     /** A parameter at a slot that holds no type is the author's error inside a type written in place as outside it. */
     @Test
     void aParameterAtAScalarSlotInsideATypeWrittenInPlaceIsRefused() {
         String message = rejected("  sized => <N> !meta.record { fields: { v => { type: { of: !meta.array { "
                 + "element_type: text  min_items: N } } } } }");
         assertTrue(message.contains("parameter 'N' stands at meta.array.min_items"), message);
+        String completed = rejected("  nonempty => !meta.array ^ { min_items: 1 }\n  sized => <N> !meta.record { "
+                + "fields: { v => { type: { of: !nonempty { element_type: text  max_items: N } } } } }");
+        assertTrue(completed.contains("parameter 'N' stands at meta.array.max_items"), completed);
+    }
+
+    /**
+     * A type written in place whose head names no constructor is the author's error whatever its slots hold, and a
+     * parameter among them changes nothing.
+     */
+    @Test
+    void aParameterInsideAConstructionOfNoConstructorIsRefusedForTheHead() {
+        String withParameter = rejected("  arr => <T> !meta.record { fields: { v => { type: { of: !nope { "
+                + "element_type: T } } } } }");
+        String without = rejected("  arr => <T> !meta.record { fields: { v => { type: { of: !nope { "
+                + "element_type: text } } } } }");
+        assertEquals(without, withParameter);
+        assertTrue(withParameter.contains("'nope' is not admissible"), withParameter);
     }
 
     /** The two places, each applied so the closing runs as well as the declaration. */

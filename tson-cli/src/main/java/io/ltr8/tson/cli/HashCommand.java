@@ -32,8 +32,8 @@ final class HashCommand {
         int contentStart;
         try {
             contentStart = TsonContentHash.contentStart(document);
-        } catch (RuntimeException e) {
-            System.err.println(file + ": " + e.getMessage());
+        } catch (IllegalArgumentException noTerminator) {
+            System.err.println(file + ": " + noTerminator.getMessage());
             return 1;
         }
 

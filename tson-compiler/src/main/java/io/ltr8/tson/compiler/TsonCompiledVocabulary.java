@@ -30,9 +30,8 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
 
     /**
      * Compiles {@code linked} through {@code resolver}'s factories as vocabulary. Every body is dispatched to the
-     * factory for its constructor; a constructor this library has no factory for -- one a schema declared, composing
-     * {@code atom} or {@code top} -- stands in as an {@link ErrorReader} naming the gap ({@link #unbuildable}), so the
-     * schema compiles and only reading a value against that entry fails.
+     * factory for its class's constructor; a body no factory backs stands in as an {@link ErrorReader} ({@link
+     * #unbuildable}), so the schema compiles and only reading a value against that entry fails.
      */
     static TsonCompiledVocabulary compile(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver) {
         return compileWith(linked, resolver, Set.of(), false, null);
@@ -54,7 +53,7 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
             try {
                 return resolver.resolve(name);
             } catch (RuntimeException noFactory) {
-                return unbuildable(linked.originOf(name), name, noFactory);
+                return unbuildable(name, noFactory);
             }
         }, pending, checkpoint, foreign, TsonSchemaCompiler.bindingOf(resolver)));
     }
@@ -106,16 +105,15 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
     }
 
     /**
-     * The stand-in factory for a constructor this library cannot build a reader for. It names the constructor, the
-     * schema that declares it and the entry that tried to use it, so the message identifies the gap rather than the
-     * document that ran into it. Kept rather than dropped: an entry built with an unbacked constructor still
-     * compiles, and the verdict lands where the gap is, on reading a value against it.
+     * The stand-in factory for a body no factory backs. Dispatch is by the body's class, and an instance of a schema's
+     * own constructor never becomes one of the schema model's bodies (it is refused, or held as a value), so what
+     * reaches this is an application a checkpoint compiles before materialisation closes it ({@code meta.apply});
+     * the finished schema holds none.
      */
-    private static ValueReaderFactory unbuildable(String declaredBy, String constructorName, RuntimeException cause) {
+    private static ValueReaderFactory unbuildable(String constructorName, RuntimeException cause) {
         return (entryName, definition, context) -> new ErrorReader(entryName,
-                new UnsupportedOperationException("'" + entryName + "' is built with '" + constructorName
-                        + "', a constructor declared by '" + declaredBy + "' that this library has "
-                        + "no reader for: " + cause.getMessage(), cause));
+                new UnsupportedOperationException("'" + entryName + "' holds a '" + constructorName + "' body, which "
+                        + "no reader factory backs: " + cause.getMessage(), cause));
     }
 
     /**

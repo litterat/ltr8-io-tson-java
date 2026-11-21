@@ -23,11 +23,12 @@ interface ConstructionReader {
 
     /**
      * Reads a value entry's payload, {@code name => !T { ... }} with {@code T} no constructor, against the type
-     * {@code type}: the value it is, bound where a class binds the type and held as a tree where none does. A reader
-     * over vocabulary with no value entries (the kernel's bootstrap) has none to read.
+     * {@code type}: the value it is, bound where a class binds the type and held as a tree where none does. Both
+     * resolutions' readers ({@link SchemaResolver}'s, {@link KernelBootstrapResolver}'s) read one, so the default is a
+     * reader built for a resolution that never reaches a value.
      */
     default Object readValue(String type, DataValue value) {
-        throw new UnsupportedOperationException("'!" + type + " { ... }' is a value of the type '" + type
-                + "', and this resolution reads no value entries");
+        throw new IllegalStateException("'!" + type + " { ... }' reached a construction reader that reads no "
+                + "values -- every resolution's reader reads one");
     }
 }

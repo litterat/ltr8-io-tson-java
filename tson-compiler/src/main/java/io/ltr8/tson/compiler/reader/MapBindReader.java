@@ -143,7 +143,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition instanceof MapBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition);
+                throw new IllegalStateException("'" + name + "' is not map-shaped: " + typeDefinition);
             }
             Type keyType = resolveType(body.keyType().name(), context);
             // A value written in place has no bound class of its own: its host type is its constructor's shape.

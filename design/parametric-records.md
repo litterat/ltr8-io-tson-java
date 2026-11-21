@@ -96,9 +96,10 @@ parametric record, and the bodies refused), `design/schema-resolution.md` (`para
 - **The explicit spelling** `<T> !meta.record { … }` is read through `record`'s own reader (`parametricRecord`): first the
   author's terms -- a binding `record` does not declare (`checkParametricBindings`), a parameter at a slot that names no
   type (`ParameterTypes.checkSlots`, the one walk left over a payload; a positional field `item => T` is its
-  `record_field`'s type; a `{ of: !C { … } }` wrapper is walked against `C`'s vocabulary, where a parameter at a slot
-  holding a type or a name stands as at a field's type, and one at a scalar slot is refused as anywhere else; only a
-  wrapper whose constructor cannot be read yet leaves the slots untold, a gap), a literal beside a parameter-typed
+  `record_field`'s type; a `{ of: !C { … } }` wrapper is walked against `C`'s vocabulary, or, `C` being incomplete,
+  its constructor's, where a parameter at a slot holding a type or a name stands as at a field's type, and one at a
+  scalar slot is refused as anywhere else; every head is ready before the walk (`WaitOrder`), so a `C` that is
+  neither names no constructor and is left to the construction's read, which refuses it), a literal beside a parameter-typed
   field (`refuseLiteralOnParameter`) -- then the
   declaration's parameters are added as `parameters` and the payload bound. A construction writing `parameters`
   itself is refused (`refuseWrittenParameters`): the list before the body is what puts them in scope and what every
