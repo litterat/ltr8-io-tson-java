@@ -297,6 +297,9 @@ declaration, or closed in place, where the holding entry answers for them, a rec
 transfers settle to a fixed point after materialisation, a parametric record gaining restatements from applications
 closed inside it after another entry absorbed it. Judging at the parametric record's declaration was the
 alternative; it refuses `wrap => <T> box<T> & { v: int32 }`, whose `wrap<int32>` is sound.
+A changed pin is judged on the same path (`changedPin`), so a chain and an application are covered alike: the two
+values are read at the inherited field's type and compared by `ValueIdentity`, the equality a written value meets a
+pin with, so `= 255` restates `= 0xFF`. The resolver cannot: reading a value needs its type's body ready.
 
 **A restated field's annotations are the restatement's, in source order, then the inherited field's** (`merged`,
 §5.8). Concatenation, because [TSON-DATA] §3.1 makes an annotation name
@@ -450,8 +453,3 @@ so the schema model's classes bind only through a context that carries them (`Re
 Resolved values serialise through `TsonObjectWriter.toTson` with no hand-written writer, which is the proof the
 model is idiomatic Java; the textual differences from the `*-resolved.tn` fixtures are listed in
 `DefinitionResolverTest`'s Javadoc.
-
-## Deferred
-
-A restated FIXED field MUST NOT change its pinned value (§5.8); this is unchecked: `resolveTighteningField` does not
-compare the two values.
