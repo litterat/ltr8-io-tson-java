@@ -357,10 +357,10 @@ final class ParameterTypes {
         }
 
         /**
-         * A type written in place, {@code { of: !C { … } }}, walked as the construction of {@code C} it holds. Where
-         * {@code C} is not yet a record this namespace can show -- a constructor of this schema still resolving -- no
-         * slot can be told from another, so a parameter anywhere inside is a gap: substitution reaches type slots
-         * alone, and one at a scalar slot would be read as its spelling.
+         * A type written in place, {@code { of: !C { … } }}, walked as the construction of {@code C} it holds, or of
+         * the constructor an incomplete {@code C} completes. Every head declared in the schema is ready before this
+         * walk ({@code WaitOrder}), so a {@code C} that is neither names no constructor, and the construction's own
+         * read refuses it whatever its slots hold.
          */
         private void wrapped(RecordValue wrapper) {
             for (RecordValue.Field field : wrapper.fields()) {
@@ -370,34 +370,30 @@ final class ParameterTypes {
                 DataValue construction = field.value();
                 String constructor = construction.typeRef().orElse(null);
                 Walk inside = new Walk(parameters, meta, true);
-                if (constructor != null && inside.resolve(constructor) instanceof RecordBody vocabulary) {
+                Top head = constructor == null ? null : inside.resolve(constructor);
+                if (head instanceof RecordBody vocabulary) {
                     inside.payload(construction.coreValue(), constructor, vocabulary);
-                } else {
-                    inside.anyParameter(construction.coreValue());
+                } else if (head instanceof IncompleteEntry incomplete
+                        && inside.resolve(incomplete.constructor()) instanceof RecordBody vocabulary) {
+                    inside.completion(construction.coreValue(), incomplete, vocabulary);
                 }
             }
         }
 
-        /** Refuses, as the gap it is, a parameter anywhere in {@code written}. */
-        private void anyParameter(CoreValue written) {
-            switch (written) {
-                case TokenValue token when declares(token.text()) -> throw inPlace(token.text(), "a type written in place");
-                case ArrayValue array -> array.elements().forEach(element -> anyParameter(element.coreValue()));
-                case MapValue map -> map.entries().forEach(entry -> {
-                    anyParameter(entry.key().coreValue());
-                    anyParameter(entry.value().coreValue());
-                });
-                case RecordValue record -> record.fields().forEach(field -> anyParameter(field.value().coreValue()));
-                default -> {
-                }
+        /**
+         * A completion of an incomplete entry, {@code !nonempty { element_type: T }}: the construction of the entry's
+         * constructor, so its slots are that constructor's ([TSON-SCHEMA] §5.5). A payload that is no braced record is
+         * the value of the one field the entry leaves absent, §5.6's positional form as a completion reads it.
+         */
+        private void completion(CoreValue payload, IncompleteEntry incomplete, RecordBody vocabulary) {
+            String constructor = incomplete.constructor();
+            if (payload instanceof RecordValue wire) {
+                record(wire, constructor, vocabulary);
+            } else if (incomplete.absent().size() == 1) {
+                String absent = incomplete.absent().getFirst();
+                Optional.ofNullable(vocabulary.fields().get(absent)).flatMap(RecordField::ownType)
+                        .ifPresent(type -> value(payload, type, constructor + "." + absent));
             }
-        }
-
-        /** A parameter inside a construction whose constructor cannot be read yet ({@link #wrapped}). */
-        private static UnsupportedOperationException inPlace(String parameter, String slot) {
-            return new UnsupportedOperationException("parameter '" + parameter + "' stands at " + slot + ", inside "
-                    + "a construction whose constructor is not yet resolved, so which of its slots hold a type cannot "
-                    + "be told -- write the type in place with a kernel constructor, or declare the constructor first");
         }
 
         /**

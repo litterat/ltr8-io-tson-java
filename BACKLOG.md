@@ -176,6 +176,25 @@ spec-required case:
   ("has no usable compiled reader"), and so does a JSON root read at `nonempty`: `JsonSchemaCompiler.constructorOf`
   throws `IllegalStateException` for an `IncompleteEntry`, which the compile loop turns into an `ErrorReader`. Give the
   JSON stack `IncompleteEntryReader`'s refusal and a `CrossEncodingParityTest` case.
+- [ ] **JSON bind fails every read under the schema-model bind context.** With
+  `SchemaModelNameBinder.defaultContext()` a JSON bind read of any type, `names => [text]` as a `List` included,
+  throws at compile: "'net.iri_type' and … IriType do not agree: field 'allow_relative' states 'true', which boolean
+  cannot hold". `tson-json`'s `BindRecordBuilder.statedValue` asks the atom for the component's class, and
+  `BooleanParser.boundTo` answers for `Boolean` and not the primitive. The TSON stack reads the same configuration.
+  Bind a stated value to a primitive component through its box, with a `CrossEncodingParityTest` case.
+- [ ] **A host class of the wrong shape is a deferred gap in TSON and a bind mismatch in JSON.** A record type bound
+  to a class that is not record-shaped throws `IllegalArgumentException` from `RecordBindReader`, which
+  `TsonSchemaCompiler`'s compile loop turns into an `ErrorReader`, so the read reports `NOT_IMPLEMENTED`; JSON's
+  `BindRecordBuilder` throws `BindMismatchException` at compile. `ArrayBindReader`, `MapBindReader` and
+  `TupleBindReader` check their hosts the same way. The wiring is the deployment's: throw `BindMismatchException`
+  in the TSON readers, with a parity case. `CheckpointCompileTest` binds a record to a sealed interface on a
+  checkpoint path and needs the same verdict there.
+- [ ] **The compile loops turn any failure to build a reader into a deferred gap.** `TsonSchemaCompiler` and
+  `JsonSchemaCompiler` each catch `RuntimeException` around a factory and stand an `ErrorReader` in, which a read
+  reports as `NOT_IMPLEMENTED`. A checkpoint compile relies on it (an application not yet closed, an entry not yet
+  present), and `JsonSchemaCompiler` uses it for a value entry and an incomplete entry; in a finished compile a
+  fault in a factory reads as a gap. Stand the `ErrorReader` in for the cases that are gaps and let the rest
+  propagate.
 - [ ] **A dependent field whose sibling names an unbound type fails each read, not the bind-mode compile.** With
   `payload: kind!` and `kind` admitting a type no class binds, a document naming that type throws
   `MissingBindingException` from `RecordBindReader.descriptorFor` during the read. A consumer turns that into a server

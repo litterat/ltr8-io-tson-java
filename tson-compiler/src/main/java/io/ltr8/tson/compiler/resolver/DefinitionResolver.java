@@ -136,17 +136,12 @@ import java.util.stream.Stream;
  * ({@link #bodyIsNotValidData}).
  *
  * <p><b>No construct of the schema grammar is a gap.</b> Every {@code UnsupportedOperationException} this
- * class throws is one of:
- * <ul>
- *   <li><b>A {@code RuntimeException} from the compiled vocabulary reader that is none of the classified ones</b>
- *   -- binding a constructor's payload ({@link #bindAtomInstance}) or an annotation's value
- *   ({@link #bindAnnotationValue}). A {@code ReadException} or {@code SchemaValidationException} there is
- *   the author's and a {@code BindMismatchException} the deployment's, each rethrown as itself; what is left
- *   is unexplained, and a gap is the classification that claims least.</li>
-  *   <li><b>A failed write round-trip</b> -- re-serialising an atom refinement's source
- *   ({@link #sourceSerializedFields}). The value was bound by this library, so failing to write it back is
- *   no verdict on the schema.</li>
- * </ul>
+ * class throws relays one from a read it made: a gap the compiled vocabulary reader reached while binding a
+ * constructor's payload ({@link #bindAtomInstance}) or an annotation's value ({@link #bindAnnotationValue}) -- an
+ * instance of a constructor of types no factory backs -- or a payload read that reported {@code NOT_IMPLEMENTED}.
+ * Around those reads a {@code ReadException} or {@code SchemaValidationException} is the author's and a {@code
+ * BindMismatchException} the deployment's, each rethrown as itself; anything else is a fault, and propagates as
+ * one.
  * One rule is not checked at all: a restated FIXED field MUST NOT change its pinned value (§5.8), and {@link
  * #resolveTighteningField} does not compare the two.
  *
@@ -507,18 +502,12 @@ final class DefinitionResolver {
                     "'" + declaration + "': the value of annotation '@" + annotationName + "' is not valid data "
                             + "for the type '" + annotationName + "' names -- " + e.getMessage(), e);
         } catch (BindMismatchException e) {
-            // The same arm {@link #bindAtomInstance} carries, for the same reason and it is not a stylistic
-            // echo: an annotation naming a type the consumer never bound is their configuration, and
-            // `MissingBindingException` exists precisely so that a missing line of wiring does not read as "this
-            // library cannot do that", which is what the catch-all below would make of it.
+            // The same arm bindAtomInstance carries: an annotation naming a type the consumer never bound is their
+            // configuration, restated against the declaration and still saying which of the two it is.
             String where = "'" + declaration + "': " + e.getMessage();
             throw e instanceof MissingBindingException ? new MissingBindingException(where)
                     : new BindMismatchException(where);
-        } catch (SchemaValidationException e) {
-            // A verdict reached while the value was read -- the annotation's type waiting on an entry that waits
-            // back, a wait chain past the limit -- is the schema's, whatever read reached it.
-            throw e;
-        } catch (RuntimeException e) {
+        } catch (UnsupportedOperationException e) {
             throw new UnsupportedOperationException("'" + declaration + "': failed to bind the value of "
                     + "annotation '@" + annotationName + "' via the compiled vocabulary reader: "
                     + e.getMessage(), e);
@@ -1369,10 +1358,10 @@ final class DefinitionResolver {
             case ArrayBody array -> CollectionFacets.narrowing(array, (ArrayBody) body);
             case MapBody map -> CollectionFacets.narrowing(map, (MapBody) body);
             case NamespaceBody namespace -> CollectionFacets.narrowing(namespace, (NamespaceBody) body);
-            // A schema's own composition of a collection constructor builds no type in this library (BACKLOG.md),
-            // so nothing it built reaches this.
-            default -> throw new UnsupportedOperationException("'" + name + "': refining '" + sourceName
-                    + "', built by '" + constructorName + "', is not implemented");
+            // Every type meta.array, meta.map or a constructor composing either builds is one of the three: an
+            // instance of a schema's own constructor of types is refused before it is a type (unmodelledType).
+            default -> throw new IllegalStateException("'" + name + "': refining '" + sourceName + "', built by '"
+                    + constructorName + "', which is no array, map or namespace type");
         };
         if (!violations.isEmpty()) {
             throw new SchemaValidationException("'" + name + "': not a valid refinement of '!" + sourceName
@@ -1587,7 +1576,8 @@ final class DefinitionResolver {
             String sourceText = writer.toTson(sourceBody);
             return new TsonDataParser(sourceText).parseDocument().root().coreValue();
         } catch (WriteException e) {
-            throw new UnsupportedOperationException(
+            // The source was bound by this vocabulary's readers, so the same vocabulary writes it back.
+            throw new IllegalStateException(
                     "'" + name + "': failed to re-serialize the refinement source: " + e.getMessage(), e);
         }
     }
@@ -1688,10 +1678,11 @@ final class DefinitionResolver {
             // A constructor's own record refusing the values it was handed. `decimal_type`'s member set is the
             // case: `members` is typed `set<value>`, so the wire admits anything and the family itself is what
             // says a member must be a number the atom reads. The author's error either way -- the verdict on
-            // `members: ["abc"]` does not change when this library improves -- so it keeps its classification
-            // rather than being relabelled a gap by the catch-all below.
+            // `members: ["abc"]` does not change when this library improves -- so it keeps its classification.
             throw new SchemaValidationException("'" + name + "': " + e.getMessage(), e);
-        } catch (RuntimeException e) {
+        } catch (UnsupportedOperationException e) {
+            // A gap the read reached stays one, named against this declaration; anything else is a fault, and
+            // propagates as one.
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to bind '" + constructorName + "' via the compiled vocabulary reader: "
                             + e.getMessage(), e);

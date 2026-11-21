@@ -124,13 +124,9 @@ public final class DataClassObjectReader {
                 EventSkip.value(ctx, first);
                 yield null;
             }
-            default -> {
-                ctx.report(Diagnostic.Code.NOT_IMPLEMENTED,
-                        "no rule for reading " + target.getClass().getSimpleName(),
-                        "a shape this reader binds", target.getClass().getSimpleName());
-                EventSkip.value(ctx, first);
-                yield null;
-            }
+            // Only DataBindContext builds a descriptor, and it builds none beside the seven above.
+            default -> throw new IllegalStateException("no rule for reading a "
+                    + target.getClass().getSimpleName() + " descriptor of " + target.typeClass().getName());
         };
     }
 

@@ -168,6 +168,7 @@ class CrossEncodingParityTest {
               c1          => !customer { name: Ada }
               order_ref   => meta.ref<order>
               order_pick  => { which: order_ref  also?: meta.ref<order> ~ o1 }
+              order_index => { m: { order_ref => int32 } }
               reach_word  => !unicode.identifier_type { medial: " " }
               reach_api   => !meta.namespace { key_type: meta.identifier  value_type: text }
               reach_base  => !meta.record { name_type: reach_word  fields: {}  extension: ABSTRACT }
@@ -685,6 +686,23 @@ class CrossEncodingParityTest {
         }
         sameVerdict("order_pick", "{ which: o1  also: c1 }", """
                 {"which": "o1", "also": "c1"}""");
+    }
+
+    /**
+     * A reference naming values is an atom, so a map keyed by one takes the object form ([TSON-JSON] §6.4) and each
+     * member name is judged as the same string at a field is: a key reaching a value of the type is admitted, and one
+     * reaching nothing, a value of another type or a type is refused by both, on the same code at the same pointer.
+     */
+    @Test
+    void aMapKeyedByAValueReferenceIsJudgedByWhatEachKeyReachesInBoth() {
+        bothAccept("order_index", "{ m: { o1 => 1 } }", """
+                {"m": {"o1": 1}}""");
+        for (String refused : List.of("nope", "c1", "order")) {
+            sameVerdict("order_index", "{ m: { " + refused + " => 1 } }", """
+                    {"m": {"%s": 1}}""".formatted(refused));
+            assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/m/" + refused)),
+                    tson("order_index", "{ m: { " + refused + " => 1 } }"), refused);
+        }
     }
 
     /**

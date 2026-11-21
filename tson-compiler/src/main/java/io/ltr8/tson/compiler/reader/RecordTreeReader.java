@@ -59,7 +59,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition instanceof RecordBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition);
+                throw new IllegalStateException("'" + name + "' is not record-shaped: " + typeDefinition);
             }
             RecordTreeReader ownParser = new RecordTreeReader(name, context.displayName(name, typeDefinition),
                     body, resolver, context, context.locationOf(name),

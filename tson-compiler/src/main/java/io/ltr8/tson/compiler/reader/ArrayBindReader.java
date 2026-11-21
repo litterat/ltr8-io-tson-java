@@ -183,7 +183,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition instanceof ArrayBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition);
+                throw new IllegalStateException("'" + name + "' is not array-shaped: " + typeDefinition);
             }
             // A type written in place has no bound class of its own: its host type is its constructor's shape.
             Type elementType = BindTargets.hostType(body.elementType(),

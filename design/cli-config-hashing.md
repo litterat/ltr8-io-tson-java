@@ -105,7 +105,10 @@ the obvious concatenation renders `cannot read x: x`.
 
 The read loop catches only `IOException` (an unreadable file *is* that file's verdict). A `RuntimeException`, which
 `Tson.validate` raises only for a library fault (`TsonDiagnostics.ofBaseSyntaxError` rethrows anything not a
-base-syntax failure), reaches `TsonCli`'s own handler and exit 70 rather than being folded into "invalid".
+base-syntax failure), reaches `TsonCli`'s own handler and exit 70 rather than being folded into "invalid". Loading a
+schema file is held to the same rule: only what is the file's own — unreadable, not well-formed, no `!!id`
+(`ValidateCommand.unloadable`) — is a run-level `SCHEMA_ERROR` and exit 2, and a bound schema that does not load
+reports its own diagnostics, so a gap in it is exit 70 and not a bad schema.
 `UsageException` exists for the same reason one layer up: a bare `IllegalArgumentException` catch would relabel a
 library fault as a bad command line, so only this CLI's argument parsing throws the type that means that.
 

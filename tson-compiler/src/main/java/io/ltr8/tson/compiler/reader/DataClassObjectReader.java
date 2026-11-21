@@ -212,11 +212,9 @@ public final class DataClassObjectReader {
             case DataClassMap map -> bindMap(ctx, map);
             case DataClassTuple tuple -> bindTuple(ctx, tuple);
             case DataClassUnion union -> bindUnion(ctx, union);
-            default -> {
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "unsupported target type " + dataClass.typeClass(),
-                        "a bindable type", String.valueOf(dataClass));
-                yield null;
-            }
+            // Only DataBindContext builds a descriptor, and it builds none beside the seven above.
+            default -> throw new IllegalStateException("no rule for binding a "
+                    + dataClass.getClass().getSimpleName() + " descriptor of " + dataClass.typeClass().getName());
         };
         if (result != null && dataClass.bridge().isPresent()) {
             try {

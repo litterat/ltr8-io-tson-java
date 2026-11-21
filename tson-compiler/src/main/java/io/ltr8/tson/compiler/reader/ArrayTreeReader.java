@@ -43,7 +43,7 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition instanceof ArrayBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition);
+                throw new IllegalStateException("'" + name + "' is not array-shaped: " + typeDefinition);
             }
             return new ArrayTreeReader(name, context.authoredName(name, typeDefinition), body, resolver,
                     context.locationOf(name),

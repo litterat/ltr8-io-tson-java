@@ -153,7 +153,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition instanceof TupleBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition);
+                throw new IllegalStateException("'" + name + "' is not tuple-shaped: " + typeDefinition);
             }
             String displayName = context.displayName(name, typeDefinition);
             DataClass dataClass;

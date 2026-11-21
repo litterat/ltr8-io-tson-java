@@ -198,6 +198,30 @@ class JsonValidateTest {
         assertEquals("OK", out.strip());
     }
 
+    /**
+     * A bound schema that does not load for a gap in this library is no verdict on the schema: the run reports the
+     * gap as one and exits 70, as a gap anywhere else in a run does.
+     */
+    @Test
+    void aBoundSchemaWithAGapIsExitSeventy(@TempDir Path dir) throws IOException {
+        Path schema = write(dir, "gap.tn", """
+                !!id:"https://example.test/cli-gap.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  c => meta.product & { extra: text }
+                  x => !c { extra: "hello" }
+                  person => { name: text }
+                }
+                """);
+        Path json = write(dir, "good.json", """
+                {"name": "Ada"}""");
+        String out = captureStdout(() -> assertEquals(70, TsonCli.run(new String[] {
+                "validate", "--schema", schema.toString(), "--type", "person", json.toString()})));
+        assertTrue(out.contains("NOT_IMPLEMENTED"), out);
+        assertFalse(out.contains("SCHEMA_ERROR"), out);
+    }
+
     /** Named by {@code --schema} and listed as well, it is one schema and loads once. */
     @Test
     void aSchemaFileMayAlsoBeListed(@TempDir Path dir) throws IOException {

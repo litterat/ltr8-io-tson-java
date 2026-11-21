@@ -69,6 +69,7 @@ import java.util.Map;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1469,6 +1470,42 @@ class DefinitionResolverTest {
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
                 () -> gapResolver.resolve(schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("failed to bind 'numeric.integer_type'"), thrown.getMessage());
+    }
+
+    /**
+     * A failure of the construction reader that is no verdict, no bind mismatch and no gap is a fault: it propagates
+     * as itself, and relabelled a gap it would read as a construct this library has yet to implement.
+     */
+    @Test
+    void aConstructionReaderFaultPropagatesAsItself() {
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !schema { bad => !integer ^ { min: 1 } }""").parseSchemaDocument().body();
+        Map<String, Top> namespace = new LinkedHashMap<>(compiledKernel().schema().entries().entries());
+        IllegalStateException fault = new IllegalStateException("an invariant broke");
+        DefinitionResolver faulty = new DefinitionResolver((type, value) -> {
+            throw fault;
+        }, namespace::get, namespace::get);
+
+        assertSame(fault, assertThrows(IllegalStateException.class,
+                () -> faulty.resolve(schemaMap.declarations().get("bad"))));
+    }
+
+    /** The same of the reader an annotation's value is bound through. */
+    @Test
+    void anAnnotationValueReaderFaultPropagatesAsItself() {
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !schema { noted => @integer:1 { x: integer } }""").parseSchemaDocument().body();
+        Map<String, Top> namespace = new LinkedHashMap<>(compiledKernel().schema().entries().entries());
+        IllegalStateException fault = new IllegalStateException("an invariant broke");
+        DefinitionResolver faulty = new DefinitionResolver(NEVER_CALLED, (type, value, foreign) -> {
+            throw fault;
+        }, namespace::get, namespace::get, null, SchemaPositions.none(), new LinkedHashMap<>(), name -> true,
+                name -> true, null);
+
+        assertSame(fault, assertThrows(IllegalStateException.class,
+                () -> faulty.resolve(schemaMap.declarations().get("noted"))));
     }
 
     @Test

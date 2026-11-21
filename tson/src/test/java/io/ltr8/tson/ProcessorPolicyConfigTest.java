@@ -110,4 +110,20 @@ class ProcessorPolicyConfigTest {
         assertEquals(List.of(Diagnostic.Code.LIMIT_EXCEEDED),
                 tson.validate("[[[[1]]]]").stream().map(Diagnostic::code).toList());
     }
+
+    @Test
+    void aSchemaDocumentPastTheDepthLimitIsDeclinedNotAFault() {
+        int levels = LimitsPolicy.defaults().maxDepth() + 6;
+        String schema = """
+                !!id:"https://example.test/deep.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  t => %stext%s
+                }
+                """.formatted("{ a: ".repeat(levels), " }".repeat(levels));
+
+        assertEquals(List.of(Diagnostic.Code.LIMIT_EXCEEDED),
+                Tson.standard().validateSchema(schema).stream().map(Diagnostic::code).toList());
+    }
 }

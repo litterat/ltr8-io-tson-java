@@ -398,10 +398,12 @@ fix and lifts the CLI to exit 70. All three kinds are collected per declaration,
   capability verdict, and stays one. Composing an existing constructor (`c => meta.record & { extra: text }`) makes no new
   form, and is refused the same way today only because no body in the schema model holds the added facet (`BACKLOG.md`). An
   instance of a constructor composing `top` alone is no type, and is held as a `ValueEntry` — the bound object, or a tree
-  where no class binds the head — as a value entry's payload is (`design/namespace-types-and-value-entries.md`). The other
-  `UnsupportedOperationException` sites are the catch-alls around the compiled reader (an exception none of the classified
-  ones), a failed re-serialisation of an atom refinement's source, a closed application with no `ApplicationCloser` (a
-  resolver built standalone), and the bootstrap's closed switch over the kernel's own declarations.
+  where no class binds the head — as a value entry's payload is (`design/namespace-types-and-value-entries.md`). Every
+  other `UnsupportedOperationException` the resolver throws relays one from a read it made: that gap reached through the
+  compiled reader, or a payload read reporting `NOT_IMPLEMENTED`. **Around the compiled reader nothing is a catch-all**:
+  a `ReadException` or `SchemaValidationException` is the author's, a `BindMismatchException` the deployment's, an
+  `UnsupportedOperationException` the gap, and anything else propagates as the fault it is — relabelled a gap, a broken
+  invariant would tell the author to wait for a release.
 - **A body the constructor's vocabulary rejects** arrives as a `ReadException` and is restated as a schema error
   (`bodyIsNotValidData`, `payloadFailure`). The read `Diagnostic` is dropped: it was produced against a
   `DataValueEvents` replay whose positions are placeholders and whose path points into a synthetic body. The real
