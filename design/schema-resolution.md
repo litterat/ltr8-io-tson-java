@@ -299,7 +299,10 @@ closed inside it after another entry absorbed it. Judging at the parametric reco
 alternative; it refuses `wrap => <T> box<T> & { v: int32 }`, whose `wrap<int32>` is sound.
 A changed pin is judged on the same path (`changedPin`), so a chain and an application are covered alike: the two
 values are read at the inherited field's type and compared by `ValueIdentity`, the equality a written value meets a
-pin with, so `= 255` restates `= 0xFF`. The resolver cannot: reading a value needs its type's body ready.
+pin with, so `= 255` restates `= 0xFF`. The resolver cannot: reading a value needs its type's body ready. A pin under
+a type naming no parameter is every application's, so a parametric record's changed pin is judged at its declaration,
+applied or not, over a closed parent and an applied one alike; only the pin moves there, the narrowing staying with
+the application for the reason above.
 
 **A restated field's annotations are the restatement's, in source order, then the inherited field's** (`merged`,
 §5.8). Concatenation, because [TSON-DATA] §3.1 makes an annotation name
@@ -349,8 +352,8 @@ as written at the read and judged against that type when the schema links (`Held
 **A literal in a parametric record is judged on the closed type it needs.** A field typed by a parameter, whole or as an
 argument, takes no literal (`refuseLiteralOnParameterType`; in the explicit spelling `refuseLiteralOnParameter` refuses one
 beside `type: T` before the payload is bound, so the author reads §5.10's reason and not the reader's). A literal on a
-closed type is judged when the parametric record closes, against the closed field's type (`checkFieldValue`), its §8.2
-hygiene on the parametric record (`TsonSchemaLinker.checkFieldValues`).
+closed type is judged at the parametric record's declaration, applied or not, against that type (`checkFieldValue`), its
+§8.2 hygiene on the parametric record (`TsonSchemaLinker.checkFieldValues`).
 
 ## Field groups
 

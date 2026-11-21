@@ -87,7 +87,8 @@ final class RecordExtension {
         for (String name : localNames) {
             Top def = merged.get(name);
             if (def instanceof RecordBody record) {
-                checkDeclaration(name, def, record, merged, facts, violations);
+                checkDeclaration(name, def, record, merged, facts, appliesParametric(name, merged, applications),
+                        violations);
             }
         }
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
@@ -103,14 +104,16 @@ final class RecordExtension {
 
     private static void checkDeclaration(String name, Top def, RecordBody record,
                                           Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                                  List<Violation> violations) {
+                                          boolean appliesParametric, List<Violation> violations) {
         checkNothingComposesOntoFinal(name, def, merged, facts, violations);
 
         // The *names* this declaration states, never fields resolved from its members: which fields a family
         // dispatches on is the base's own statement (§5.2). It needs no inherited-selector exemption either: a
-        // member states no discriminators of its own.
-        List<String> declared = FamilySelectors.namesOf(def);
-        if (declared.isEmpty() || record.extension() != RecordExtensionType.ABSTRACT) {
+        // member states no discriminators of its own. A parametric record's are judged at its declaration (§5.10):
+        // a selector's type names no parameter, so every application states the same selectors, and an application
+        // declared under a name repeats its head's verdict.
+        List<String> declared = record.discriminators();
+        if (declared.isEmpty() || record.extension() != RecordExtensionType.ABSTRACT || appliesParametric) {
             return;
         }
         SequencedMap<String, RecordField> selectors = FamilySelectors.of(def);
@@ -120,6 +123,14 @@ final class RecordExtension {
                 checkDiscriminatorField(name, selector, field, record.groups(), merged, facts, violations);
             }
         }
+    }
+
+    /** Whether {@code name} is a declared application of a parametric record, past its head's alias hops. */
+    private static boolean appliesParametric(String name, Map<String, Top> merged,
+                                             Map<String, ApplyBody> applications) {
+        ApplyBody application = applications.get(name);
+        return application != null && ParametricEntry.isParametric(
+                merged.get(AliasChain.terminal(application.head().name(), merged)));
     }
 
     /**

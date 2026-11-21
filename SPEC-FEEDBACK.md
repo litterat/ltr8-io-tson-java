@@ -101,10 +101,7 @@ Records*, is rewritten around the three rules below, and §1.3, §1.6, §3.3, §
 §5.6, §5.7, §5.8, §5.10.1, §6, §7.2, §7.4, §8.1, §8.2, §8.3, §9, §11.5 and §12 follow; Part 1 §2.3, §3.2, §4.1 and
 §7.4 take the argument list out of the data grammar; Part 3 §1.6, §3.3, §3.4 and §5.6 follow (change log §3.2 items
 2–30, 77–96, 102, 130 and 131; §3.1 items 2–5 and 14–19; §3.4 items 1–5 and 9). The change log's §5 records three
-editorial readings. **Still open in the implementation:** a parametric record is judged where it is applied
-and not at its declaration, so while nothing applies it three errors go unreported: a name in it that resolves to
-nothing, a recursion that can never close (§5.10.1), and a selector on a type no token denotes (§5.2) (change log §5,
-"#3 (remainder)").
+editorial readings.
 
 **Problem.** §5.10 gives a template two representations and a parameter two kinds. A record template is its own
 constructor and a family base; every other open entry is held as text, because a value parameter can stand wherever

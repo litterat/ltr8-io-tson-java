@@ -87,6 +87,7 @@ import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.net.UuidType;
 import io.ltr8.tson.schema.meta.TypeChain;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -125,8 +126,9 @@ import java.util.function.Predicate;
  * covers every shape generically; the resolver's {@code ParametricMaterialiser} closes every application, in place or
  * into the declaration naming it. What survives into an entry the linker sees is therefore a name or a type written
  * in place in every position except one: a parametric record's own fields and parents, which legitimately reference its own
- * parameters ({@code box<T>}) and are checked only for what no argument changes -- the arity of the references it
- * writes ({@link #checkParametricArity}) -- never resolved against the schema. A
+ * parameters ({@code box<T>}). A parametric record is judged at its declaration for what no argument changes -- the
+ * arity of the references it writes ({@link #checkParametricArity}), every name that is no parameter, and its literal
+ * values -- a parameter standing for a type assumed to exist. A
  * closed entry holds no parameter, so every name it holds resolves in the schema's own namespace or is unresolved.
  *
  * <p><b>One namespace per schema (Part 2 §2.2.3, §3.3).</b> The namespace a schema is checked
@@ -516,10 +518,10 @@ public final class TsonSchemaLinker {
     /**
      * A reference resolving to nothing, carried in <b>parts</b> rather than as a finished sentence.
      *
-     * <p>A parametric record defers every question about what its references resolve to, so an unresolved one
-     * surfaces inside a record an application closes to in place -- {@code box<int32>} -- when the name was written
-     * in the parametric record's own text. The two statements of that one fact differ in the subject alone, so the subject
-     * is supplied at the point the fact is stated rather than baked in at the point it is discovered.
+     * <p>A name a parametric record writes surfaces again inside each record an application closes to in place --
+     * {@code box<int32>} -- though it is the parametric record's own text. The two statements of that one fact differ
+     * in the subject alone, so the subject is supplied at the point the fact is stated rather than baked in at the
+     * point it is discovered.
      *
      * <p><b>Linker-internal, and never escapes.</b> It is caught in the one place it is thrown from and
      * re-stated as a {@link SchemaValidationException}, whose classification this shares: an unresolved
@@ -587,29 +589,31 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * The declaration a <b>deferred</b> defect belongs to: the parametric record whose body wrote the name, when the
-     * failure surfaced inside a record an application closed to in place.
+     * The declaration a defect surfacing inside a record in place belongs to: the parametric record whose body wrote
+     * the name.
      *
-     * <p><b>Deferral is what makes this necessary.</b> A closed declaration's references are checked where the
-     * author wrote them. A parametric record's are judged where it is applied, so {@code box => <T> { v: T  w:
-     * no_such_type }} gets its verdict inside each record {@code box<…>} closes to in place, against a line that is
-     * not wrong and does not contain the name. The author is sent to the line they can edit instead.
+     * <p>A parametric record is judged at its declaration, and its text surfaces again inside each record {@code
+     * box<…>} closes to in place, against a line that is not wrong and does not contain the name. Sent to the
+     * parametric record, the second statement is the first one again, and reported once.
      *
      * <p><b>The offending name is the evidence.</b> Asking which parametric record <em>mentions the name</em>, a type it
      * holds in place included, reaches the parametric record directly, and reaches nothing at all when the name came from an
      * argument the applier wrote -- {@code box<some_typo>} keeps its verdict at the application, which is where that
-     * mistake is.
+     * mistake is. A parametric record's own failure is its own text, so it is its own author where it writes the name.
      *
      * <p><b>Both filters are load-bearing.</b> Only a failure inside a record in place is retargeted, or a closed
      * declaration's own typo would be blamed on any parametric record that happens to name it; and only a parametric record
-     * is a candidate, since a defect no parametric record deferred is already located correctly.
+     * is a candidate, since a defect no parametric record wrote is already located correctly.
      *
      * @return the declaration to blame, or {@code null} to leave the failure where it surfaced
      */
-    private static String heldDeclarationNaming(UnresolvedReference failure, Map<String, Top> entries,
-                                                 Map<String, TsonSchema.EntryFacts> facts) {
+    private static String heldDeclarationNaming(UnresolvedReference failure, String surfacedIn,
+                                                 Map<String, Top> entries, Map<String, TsonSchema.EntryFacts> facts) {
         if (!failure.inPlace()) {
             return null; // the author's own text: it already names the line they wrote
+        }
+        if (ParametricEntry.isParametric(entries.get(surfacedIn)) && writes(entries.get(surfacedIn), failure.name())) {
+            return surfacedIn;
         }
         for (Map.Entry<String, Top> candidate : entries.entrySet()) {
             if (at(facts, candidate.getKey()).isPresent() && ParametricEntry.isParametric(candidate.getValue())
@@ -618,6 +622,16 @@ public final class TsonSchemaLinker {
             }
         }
         return null;
+    }
+
+    /** The parametric record a declared application applies, past its head's alias hops ([TSON-SCHEMA] §8.3). */
+    private static String appliedHead(String name, Map<String, Top> entries, Map<String, ApplyBody> applications) {
+        ApplyBody application = applications.get(name);
+        if (application == null) {
+            return null;
+        }
+        String head = AliasChain.terminal(application.head().name(), entries);
+        return ParametricEntry.isParametric(entries.get(head)) ? head : null;
     }
 
     /**
@@ -750,41 +764,82 @@ public final class TsonSchemaLinker {
         Map<String, Top> namespace = merged;
         Function<String, Optional<String>> constructors = name -> constructorOf(name, namespace.get(name), facts);
         ValuesByName byName = new ValuesByName(schema, merged, facts, origins, values, hops);
+        // Named by what the author wrote: its declared name, or the form or application an entry with no source
+        // position records.
+        Function<Map.Entry<String, Top>, RuntimeException> judged = entry -> {
+            try {
+                validateEntry(displayName(entry.getKey(), namespace, facts, applications), entry.getValue(),
+                        namespace, constructors, other -> displayName(other, namespace, facts, applications), byName,
+                        hops, schema.restatements().getOrDefault(entry.getKey(), List.of()));
+                return null;
+            } catch (UnsupportedOperationException | UnresolvedReference | SchemaValidationException failure) {
+                return failure;
+            }
+        };
+        // A parametric record's own text is judged at its declaration (§5.10), so its verdict is known before any
+        // application of it is judged, and is still reported where the parametric record stands.
+        // A gap or a name not yet ready is held too, to be reported in its place, and refuses nothing.
+        Map<String, RuntimeException> parametricFailures = new HashMap<>();
+        Set<String> parametricVerdicts = new HashSet<>();
+        for (Map.Entry<String, Top> entry : merged.entrySet()) {
+            if (ParametricEntry.isParametric(entry.getValue())) {
+                RuntimeException failure = judged.apply(entry);
+                if (failure != null) {
+                    parametricFailures.put(entry.getKey(), failure);
+                }
+                if (failure instanceof SchemaValidationException
+                        || failure instanceof UnresolvedReference e && !pending.contains(e.name())) {
+                    parametricVerdicts.add(entry.getKey());
+                }
+            }
+        }
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             if (entry.getValue() instanceof IncompleteEntry && !localNames.contains(entry.getKey())) {
                 continue; // its names were judged when its own schema linked, in a closure inside this one
             }
-            try {
-                // Named by what the author wrote: its declared name, or the form or application an entry with no
-                // source position records.
-                validateEntry(displayName(entry.getKey(), merged, facts, applications), entry.getValue(),
-                        merged, constructors, other -> displayName(other, namespace, facts, applications), byName,
-                        hops, schema.restatements().getOrDefault(entry.getKey(), List.of()));
-            } catch (UnsupportedOperationException gap) {
+            if (parametricVerdicts.contains(appliedHead(entry.getKey(), merged, applications))) {
+                // A declared application is its head's body substituted, so the head's verdict would be repeated
+                // here; an application of a refused parametric record reports nothing further, as one of a
+                // condemned one closes against its placeholder.
+                continue;
+            }
+            boolean parametric = ParametricEntry.isParametric(entry.getValue());
+            RuntimeException failure = parametric ? parametricFailures.get(entry.getKey()) : judged.apply(entry);
+            switch (failure) {
+                case null -> {
+                }
                 // A field's value naming a value through a step this library does not yet follow: the gap it is.
-                if (receiver == null) {
-                    throw gap;
+                case UnsupportedOperationException gap -> {
+                    if (receiver == null) {
+                        throw gap;
+                    }
+                    receiver.report(TsonDiagnostics.ofSchemaGap(localIdentity(schema), entry.getKey(),
+                            gap.getMessage(), at(facts, entry.getKey())));
                 }
-                receiver.report(TsonDiagnostics.ofSchemaGap(localIdentity(schema), entry.getKey(), gap.getMessage(),
-                        at(facts, entry.getKey())));
-            } catch (UnresolvedReference e) {
-                if (pending.contains(e.name())) {
-                    continue; // a declaration not yet ready: judged when the whole schema links
+                // A declaration not yet ready: judged when the whole schema links.
+                case UnresolvedReference e when pending.contains(e.name()) -> {
                 }
-                String author = heldDeclarationNaming(e, merged, facts);
-                if (author == null) { // the applier's own text, or a name no parametric record wrote: blame the entry
-                    reportOrThrow(receiver, schema, entry.getKey(), facts, e.getMessage(), e);
-                    continue;
+                case UnresolvedReference e -> {
+                    String author = heldDeclarationNaming(e, entry.getKey(), merged, facts);
+                    if (author == null && parametric) {
+                        author = entry.getKey();
+                    }
+                    if (author == null) { // the applier's own text, or a name no parametric record wrote
+                        reportOrThrow(receiver, schema, entry.getKey(), facts, e.getMessage(), e);
+                        continue;
+                    }
+                    // One mistake in a parametric record is one mistake however many declarations apply it: each
+                    // application closes to its own record in place and fails on the same name, the form around it
+                    // spelled with the argument, so the verdict naming the parametric record is keyed on the name,
+                    // and is its own where it judged that name itself.
+                    boolean itsOwn = !author.equals(entry.getKey())
+                            && parametricFailures.get(author) instanceof UnresolvedReference own
+                            && own.name().equals(e.name());
+                    if (!itsOwn && blamedOnce.add(author + "\u0000" + e.name())) {
+                        reportOrThrow(receiver, schema, author, facts, e.against(author), e);
+                    }
                 }
-                // One mistake in a parametric record is one mistake however many declarations apply it: each
-                // application closes to its own record in place and each fails identically, so the verdict that
-                // names the parametric record would otherwise be repeated once per applier.
-                String message = e.against(author);
-                if (blamedOnce.add(author + "\u0000" + message)) {
-                    reportOrThrow(receiver, schema, author, facts, message, e);
-                }
-            } catch (SchemaValidationException e) {
-                reportOrThrow(receiver, schema, entry.getKey(), facts, e.getMessage(), e);
+                default -> reportOrThrow(receiver, schema, entry.getKey(), facts, failure.getMessage(), failure);
             }
         }
 
@@ -976,7 +1031,10 @@ public final class TsonSchemaLinker {
                                                     Set<String> localNames, DiagnosticsReceiver receiver) {
         Set<String> inhabited = TypeInhabitance.derive(merged);
         for (String name : localNames) {
-            if (inhabited.contains(name)) {
+            String head = appliedHead(name, merged, applications);
+            // A parametric record is judged with its parameters assumed inhabited, so an application of an
+            // uninhabited one is uninhabited for the head's reason, reported at the head.
+            if (inhabited.contains(name) || head != null && !inhabited.contains(head)) {
                 continue;
             }
             // Rendered the way a read renders it: an entry with no source position by the form or application
@@ -1575,25 +1633,47 @@ public final class TsonSchemaLinker {
                 throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
-        validateBody(name, def, namespace, constructors, shown, byName, hops);
-        if (!ParametricEntry.isParametric(def)) {
-            checkRestatementsOffTheChain(name, restatements, namespace, constructors, shown, hops);
+        validateBody(name, def, namespace, constructors, shown, byName, hops, Scope.CLOSED);
+        boolean parametric = ParametricEntry.isParametric(def);
+        if (parametric) {
+            checkRestatedFieldTypes(name, (RecordBody) def, namespace, constructors, shown, hops, true);
+        }
+        checkRestatementsOffTheChain(name, restatements, namespace, constructors, shown, hops, parametric);
+    }
+
+    /**
+     * What a body is judged in: the parameters of the parametric record holding it, each a type assumed to exist, and
+     * whether the literal values it holds are its own to judge -- a record an application closes to in place holds
+     * its head's, judged where the head is declared.
+     */
+    private record Scope(List<String> parameters, boolean ownValues) {
+
+        static final Scope CLOSED = new Scope(List.of(), true);
+
+        Scope closing() {
+            return new Scope(parameters, false);
+        }
+
+        boolean stands(TypeRef reference) {
+            return reference instanceof ParamRef && parameters.contains(reference.name());
+        }
+
+        boolean names(TypeExpr type) {
+            return ParametricEntry.parameterIn(type).filter(parameters::contains).isPresent();
         }
     }
 
     private static void validateBody(String entryName, Top body, Map<String, Top> namespace,
                                       Function<String, Optional<String>> constructors, Function<String, String> shown,
-                                      ValuesByName byName, ExternHops hops) {
+                                      ValuesByName byName, ExternHops hops, Scope scope) {
         if (ParametricEntry.isParametric(body)) {
-            // A parametric record's references are judged by what they resolve to once substitution supplies the
-            // arguments, so type-kind validation and inhabitance apply to its applications instead, where the whole
-            // record resolves at once. Checking it here by substituting stand-in arguments would report errors on
-            // parametric records that are correct for every argument anyone passes.
-            //
-            // Arity is the exception, and it is decidable: it asks how many parameters the *referenced*
-            // entry declares, which no argument changes. See checkParametricArity for why that has to be asked
-            // here rather than left to an application that may never happen.
-            checkParametricArity(entryName, (RecordBody) body, namespace, ParametricEntry.parameterNames(body));
+            // Read at its declaration (§5.10): whatever no argument changes is judged here, applied or not -- the
+            // arity of what it names, every name that is no parameter, and every literal, which stands only under a
+            // type naming none. What a reference resolves to once an argument arrives is its applications'.
+            List<String> parameters = ParametricEntry.parameterNames(body);
+            checkParametricArity(entryName, (RecordBody) body, namespace, parameters);
+            validateFields(entryName, (RecordBody) body, namespace, constructors, shown, byName, hops,
+                    new Scope(parameters, true));
             return;
         }
         checkCoherent(body);
@@ -1602,14 +1682,7 @@ public final class TsonSchemaLinker {
                 // The chain is checked by validateEntry, its every member a bare name in a closed body. A dependent
                 // field names a sibling, judged with its sibling by §5.2's rules, and carries no value.
                 DependentFields.check(entryName, r, namespace);
-                for (Map.Entry<String, RecordField> field : r.fields().entrySet()) {
-                    if (field.getValue().ownType().isPresent()) {
-                        validateSlot(field.getValue().ownType().get(), namespace, constructors, entryName,
-                                " field '" + field.getKey() + "'", shown, byName, hops);
-                        checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors,
-                                byName, hops);
-                    }
-                }
+                validateFields(entryName, r, namespace, constructors, shown, byName, hops, scope);
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.memberNames()) {
                         if (!r.fields().containsKey(member)) {
@@ -1618,7 +1691,7 @@ public final class TsonSchemaLinker {
                         }
                     }
                 }
-                checkRestatedFieldTypes(entryName, r, namespace, constructors, shown, hops);
+                checkRestatedFieldTypes(entryName, r, namespace, constructors, shown, hops, false);
             }
             // An alias may name a constructor (§3.3.1 applies it as its target), so no kind judges the target.
             // An alias naming a parametric record bare names the parametric record under another name (`ref_of => ref`),
@@ -1630,21 +1703,21 @@ public final class TsonSchemaLinker {
                 }
             }
             case Alias ref -> validateTypeRef(ref.target(), namespace, null,
-                    entryName, "", hops);
+                    entryName, "", hops, scope);
             // What it names was judged where it was attached, in the namespace holding it (attachExterns).
             case Extern ignored -> {
             }
             case MapBody m -> {
                 validateTypeRef(m.keyType(), namespace, constructors, entryName,
-                        " key_type", hops);
+                        " key_type", hops, scope);
                 validateSlot(m.valueType(), namespace, constructors, entryName, " value_type", shown, byName,
-                        hops);
+                        hops, scope);
             }
             case NamespaceBody n -> {
                 TypeRef key = n.keyType();
-                validateTypeRef(key, namespace, constructors, entryName, " key_type", hops);
+                validateTypeRef(key, namespace, constructors, entryName, " key_type", hops, scope);
                 // A namespace's keys are names: `key_type` is typed meta.identifier_ref (§4.1, §7.4).
-                if (constructors != null && namespace.containsKey(IDENTIFIER_TYPE)
+                if (constructors != null && !scope.stands(key) && namespace.containsKey(IDENTIFIER_TYPE)
                         && !isMember(key.name(), IDENTIFIER_TYPE, namespace, constructors, hops)) {
                     throw new SchemaValidationException("'" + entryName + "' key_type names '" + key.name()
                             + "', which is no identifier family -- a namespace's keys are names, so its key type "
@@ -1658,15 +1731,15 @@ public final class TsonSchemaLinker {
                     });
                 }
                 validateSlot(n.valueType(), namespace, constructors, entryName, " value_type", shown, byName,
-                        hops);
+                        hops, scope);
             }
             case ArrayBody a -> validateSlot(a.elementType(), namespace, constructors, entryName, " element_type",
-                    shown, byName, hops);
+                    shown, byName, hops, scope);
             case TupleBody t -> {
                 int index = 0;
                 for (TupleElement element : t.elements()) {
                     validateSlot(element.elementType(), namespace, constructors, entryName,
-                            " element[" + index + "]", shown, byName, hops);
+                            " element[" + index + "]", shown, byName, hops, scope);
                     index++;
                 }
             }
@@ -1674,11 +1747,17 @@ public final class TsonSchemaLinker {
                 int index = 0;
                 for (TypeExpr variant : c.variants()) {
                     validateSlot(variant, namespace, constructors, entryName, " variant[" + index + "]", shown,
-                            byName, hops);
+                            byName, hops, scope);
                     index++;
                 }
-                checkVariantsAreDistinct(entryName, c, namespace, hops);
-                checkVariantsAreNotVoid(entryName, c, namespace);
+                // Over a parameter, distinct variants are each application's to judge where it closes (§5.4, §5.10).
+                if (c.variants().stream().noneMatch(scope::names)) {
+                    checkVariantsAreDistinct(entryName, c, namespace, hops);
+                    checkVariantsAreNotVoid(entryName, c, namespace);
+                }
+            }
+            // A parameter's members are its argument's, judged where the application closes.
+            case RefBody reference when scope.stands(reference.of()) -> {
             }
             // `of` resolves in the schema's one namespace and names any type or constructor ([TSON-SCHEMA] §4.2,
             // §5.12): what it admits is the names whose entries' values are of it, which is the slot's judgement
@@ -1758,8 +1837,18 @@ public final class TsonSchemaLinker {
                     + dependent.text() + "' stands only directly at a record field's type, written in place: it names "
                     + "a field of that record, '" + dependent.on() + "', and a declaration or any other slot has none "
                     + "(§5.2)");
-            // Every application closes where it is written but one inside a parametric record over its parameters, and a
-            // parametric record is validated as its applications, so one here is no closing left undone: it was written so.
+            // Inside a parametric record, over its parameters: the head and the names among the arguments are the
+            // parametric record's own text, and where it may stand is checkParametricArity's.
+            case ApplyBody apply when !scope.parameters().isEmpty() -> {
+                if (!namespace.containsKey(apply.head().name())) {
+                    throw new UnresolvedReference(entryName, "", apply.head().name());
+                }
+                for (TypeRef argument : apply.arguments()) {
+                    validateTypeRef(argument, namespace, null, entryName, "", hops, scope);
+                }
+            }
+            // Every application closes where it is written but one inside a parametric record over its parameters, so
+            // one here is no closing left undone: it was written so.
             case ApplyBody apply -> {
                 String head = apply.head().name();
                 if (!namespace.containsKey(head)) {
@@ -1777,6 +1866,21 @@ public final class TsonSchemaLinker {
             }
             case IncompleteEntry incomplete -> validateHeld(entryName, incomplete, namespace, constructors, shown,
                     byName, hops);
+        }
+    }
+
+    private static void validateFields(String entryName, RecordBody record, Map<String, Top> namespace,
+                                       Function<String, Optional<String>> constructors, Function<String, String> shown,
+                                       ValuesByName byName, ExternHops hops, Scope scope) {
+        for (Map.Entry<String, RecordField> field : record.fields().entrySet()) {
+            if (field.getValue().ownType().isPresent()) {
+                validateSlot(field.getValue().ownType().get(), namespace, constructors, entryName,
+                        " field '" + field.getKey() + "'", shown, byName, hops, scope);
+                if (scope.ownValues()) {
+                    checkFieldValue(entryName, field.getKey(), field.getValue(), namespace, constructors, byName,
+                            hops);
+                }
+            }
         }
     }
 
@@ -1801,9 +1905,9 @@ public final class TsonSchemaLinker {
             String trail = " " + field;
             switch (read) {
                 case TypeInline inline -> validateSlot(inline, namespace, constructors, entryName, trail, shown,
-                        byName, hops);
+                        byName, hops, Scope.CLOSED);
                 case TypeRef name -> {
-                    validateTypeRef(name, namespace, constructors, entryName, trail, hops);
+                    validateTypeRef(name, namespace, constructors, entryName, trail, hops, Scope.CLOSED);
                     Optional<String> kind = ConstructionSugar.kindOf(declared.name(), namespace::get);
                     if (constructors != null && kind.isPresent() && !TYPE.equals(kind.get())
                             && !isMember(name.name(), kind.get(), namespace, constructors, hops)) {
@@ -2052,7 +2156,8 @@ public final class TsonSchemaLinker {
      */
     private static void checkRestatedFieldTypes(String entryName, RecordBody record, Map<String, Top> namespace,
                                                 Function<String, Optional<String>> constructors,
-                                                Function<String, String> shown, ExternHops hops) {
+                                                Function<String, String> shown, ExternHops hops,
+                                                boolean pinsOnly) {
         List<String> supertypes = TypeChain.supertypesOf(record);
         for (String supertype : supertypes) {
             boolean nearest = supertypes.stream().noneMatch(other -> !other.equals(supertype)
@@ -2065,7 +2170,7 @@ public final class TsonSchemaLinker {
                 RecordField restated = record.fields().get(inherited.getKey());
                 if (restated != null) {
                     restatementViolation(inherited.getKey(), inherited.getValue(), restated, namespace, constructors,
-                            shown, hops).ifPresent(violations::add);
+                            shown, hops, pinsOnly).ifPresent(violations::add);
                 }
             }
             refuseRestatement(entryName, shown.apply(supertype), violations);
@@ -2081,12 +2186,13 @@ public final class TsonSchemaLinker {
     private static void checkRestatementsOffTheChain(String entryName, List<TsonSchema.Restatement> restatements,
                                                      Map<String, Top> namespace,
                                                      Function<String, Optional<String>> constructors,
-                                                     Function<String, String> shown, ExternHops hops) {
+                                                     Function<String, String> shown, ExternHops hops,
+                                                     boolean pinsOnly) {
         Map<TypeExpr, List<String>> violations = new LinkedHashMap<>();
         for (TsonSchema.Restatement restatement : restatements) {
             restatementViolation(restatement.field(), restatement.inherited(), restatement.restated(), namespace,
-                    constructors, shown, hops).ifPresent(violation -> violations.computeIfAbsent(restatement.source(),
-                    source -> new ArrayList<>()).add(violation));
+                    constructors, shown, hops, pinsOnly).ifPresent(violation -> violations.computeIfAbsent(
+                    restatement.source(), source -> new ArrayList<>()).add(violation));
         }
         violations.forEach((source, found) -> refuseRestatement(entryName, shownType(source, shown), found));
     }
@@ -2098,11 +2204,22 @@ public final class TsonSchemaLinker {
         }
     }
 
-    /** Why {@code restated} is no restatement of {@code inherited}, the field {@code field}; empty where it is one. */
+    /**
+     * Why {@code restated} is no restatement of {@code inherited}, the field {@code field}; empty where it is one. At a
+     * parametric record's declaration ({@code pinsOnly}) only a changed pin under a type naming no parameter is judged,
+     * its verdict being every application's (§5.8, §5.10); whether the restated type narrows waits for the
+     * application, a parameter's argument deciding it ({@code wrap => <T> box<T> & { v: int32 }} is sound for {@code
+     * wrap<int32>}).
+     */
     private static Optional<String> restatementViolation(String field, RecordField inherited, RecordField restated,
                                                          Map<String, Top> namespace,
                                                          Function<String, Optional<String>> constructors,
-                                                         Function<String, String> shown, ExternHops hops) {
+                                                         Function<String, String> shown, ExternHops hops,
+                                                         boolean pinsOnly) {
+        if (pinsOnly) {
+            return ParametricEntry.parameterIn(inherited.typeExpr()).isPresent() ? Optional.empty()
+                    : changedPin(field, inherited, restated, namespace, constructors, hops);
+        }
         Optional<String> dependent = DependentFields.restates(field, inherited, restated);
         if (dependent.isPresent()) {
             return dependent;
@@ -2252,8 +2369,8 @@ public final class TsonSchemaLinker {
      * against one declaration is already reported with the declaration's own name and line.
      *
      * <p><b>Atoms and enums only, and the rest is refused.</b> A field typed by a record, container or choice
-     * carries no value ({@link #notAScalarType}). Only a closed record reaches here: a parametric record's member is
-     * checked once materialisation has substituted its arguments, against the argument it was closed with.
+     * carries no value ({@link #notAScalarType}). A parametric record's field reaches here at its declaration: a
+     * literal stands only under a type naming no parameter (§5.10), so no argument changes its verdict.
      *
      * <p><b>A reference's value is a name.</b> At a reference over a constructor it is judged a member ({@link
      * #checkKindValue}); at one over any other type it is a value's qualified name, judged by what it reaches as a
@@ -2394,12 +2511,14 @@ public final class TsonSchemaLinker {
      */
     private static void validateSlot(TypeExpr type, Map<String, Top> namespace,
                                      Function<String, Optional<String>> constructors, String subject, String trail,
-                                     Function<String, String> shown, ValuesByName byName, ExternHops hops) {
+                                     Function<String, String> shown, ValuesByName byName, ExternHops hops,
+                                     Scope scope) {
         switch (type) {
-            case TypeRef reference -> validateTypeRef(reference, namespace, constructors, subject, trail, hops);
+            case TypeRef reference -> validateTypeRef(reference, namespace, constructors, subject, trail, hops, scope);
             case TypeInline inline -> {
                 try {
-                    validateBody(inline.text(), inline.of(), namespace, constructors, shown, byName, hops);
+                    validateBody(inline.text(), inline.of(), namespace, constructors, shown, byName, hops,
+                            inline.closes().isPresent() ? scope.closing() : scope);
                 } catch (UnresolvedReference e) {
                     throw inline.of() instanceof RecordBody ? e.heldInPlace() : e.namedByForm();
                 }
@@ -2422,9 +2541,12 @@ public final class TsonSchemaLinker {
      */
     private static void validateTypeRef(TypeRef ref, Map<String, Top> namespace,
                                          Function<String, Optional<String>> constructors,
-                                         String subject, String trail, ExternHops hops) {
+                                         String subject, String trail, ExternHops hops, Scope scope) {
         String context = "'" + subject + "'" + trail;
         if (ref instanceof ParamRef) {
+            if (scope.stands(ref)) {
+                return;
+            }
             // A closed body holds no parameter, so one here would resolve only as a parameter (§8.1), and is judged
             // by the name it is, never by an entry that happens to share it.
             throw new UnresolvedReference(subject, trail, ref.name());

@@ -77,17 +77,44 @@ class RestatedPinTest {
                 + "'tag' is pinned to \"box\" and restated as \"other\""), message);
     }
 
+    /** A pin under a type naming no parameter is every application's, so it is judged at the declaration (§5.10). */
     @Test
-    void aParametricRecordsChangedPinIsRefusedWhereItIsApplied() {
-        String message = refused("""
-                {
+    void aParametricRecordsChangedPinIsRefusedAtItsDeclarationAppliedOrNot() {
+        String records = """
                   base  => { tag: text = "base" }
                   boxed => <T> base & { v: T  tag: = "boxed" }
-                  b     => boxed<int32>
+                """;
+        for (String applier : new String[] {"", "  b     => boxed<int32>\n"}) {
+            String message = refused("{\n" + records + applier + "}\n");
+
+            assertTrue(message.contains("'boxed': not a valid restatement of 'base''s fields (§5.8): field 'tag' is "
+                    + "pinned to \"base\" and restated as \"boxed\""), message);
+        }
+    }
+
+    @Test
+    void aPinChangedOverAnApplicationOverAParameterIsRefusedAtTheDeclaration() {
+        String message = refused("""
+                {
+                  box  => <T> { v: T  tag: text = "box" }
+                  wrap => <T> box<T> & { tag: = "x" }
                 }
                 """);
 
-        assertTrue(message.contains("field 'tag' is pinned to \"base\" and restated as \"boxed\""), message);
+        assertTrue(message.contains("'wrap': not a valid restatement of 'box<T>''s fields (§5.8): field 'tag' is "
+                + "pinned to \"box\" and restated as \"x\""), message);
+    }
+
+    /** Whether a restated type narrows can turn on the argument, so it stays judged where the application closes. */
+    @Test
+    void aRestatedTypeOverAParameterIsNotJudgedAtTheDeclaration() {
+        assertDoesNotThrow(() -> link("""
+                {
+                  box  => <T> { v: T }
+                  wrap => <T> box<T> & { v: int32 }
+                  ok   => wrap<int32>
+                }
+                """));
     }
 
     @Test

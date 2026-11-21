@@ -69,11 +69,13 @@ parametric record, and the bodies refused), `design/schema-resolution.md` (`para
   for the discriminators member dispatch reads. A family is declared with records -- an abstract base with the
   selectors, a parametric record composing it, and members composing an application and pinning them -- and no
   application is IS-A its head (§5.10).
-- **Read at its declaration, as any record is.** A parametric record is a value of `record`'s own vocabulary, so it is
-  checked where it is written: its field names, groups, marks and literal values; the references it holds are judged
-  for arity at link (`TsonSchemaLinker.checkParametricArity`). What waits for an application is what a reference resolves
-  to once its parameter is supplied -- an argument a slot refuses (`meta.namespace<int32 text>`), a recursion that
-  never terminates (`TypeInhabitance`).
+- **Read at its declaration, as any record is, applied or not.** A parametric record is a value of `record`'s own
+  vocabulary, so it is checked where it is written: its field names, groups, marks and literal values, and at link
+  every name it holds that is no parameter, its productivity with its parameters assumed inhabited, its selectors,
+  and a pin it changes under a type naming no parameter. What waits for an application is what a parameter decides
+  once its argument is supplied -- an argument a slot refuses (`meta.namespace<int32 text>`), a choice's distinct
+  variants, whether a restated type narrows. A verdict given at the declaration is not repeated where the parametric
+  record is applied.
 - **A literal needs a closed type, and a selector one closed in every application.** `checked` refuses a literal
   `value` on a field whose type names a parameter, whole, as an argument or at a slot in place, the parametric record's own
   or one of a record written in place inside it (`refuseLiteralOnParameterType`), and a selector

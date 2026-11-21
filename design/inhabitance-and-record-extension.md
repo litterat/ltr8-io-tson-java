@@ -10,9 +10,9 @@ check (`TypeInhabitance`, §5.10.1's productivity rule) and what `record.extensi
 - Inhabitance is a least fixed point over the entry graph: exact, total and two-valued, with no third answer.
 - Every local entry is judged, referenced or not; imported entries are skipped, having been judged when their own
   schema linked.
-- A parametric record (a `RecordBody` with `parameters`) is inhabited by fiat; the declarations closing its
-  applications are judged like any other entry, so a parametric record nobody applies is judged nowhere, short of
-  §5.10.1, which judges it with its parameters assumed inhabited (`BACKLOG.md`).
+- A parametric record is walked at its declaration, applied or not, with its parameters assumed inhabited
+  (§5.10.1); an application it holds is inhabited where its head is. A declared application of an uninhabited
+  parametric record is not reported again: it is uninhabited for its head's reason.
 - An unresolved reference is inhabited by fiat, and the check runs after `validateEntry`, so one defect is reported
   once.
 - A kind is inhabited exactly when it has a member; a value entry and every atom are inhabited here. An atom whose
@@ -58,10 +58,12 @@ the schema, at a line the data's author does not control. The diagnostic spells 
 - **Every local entry is judged, referenced or not**, on the footing of a declared type parameter the body never uses
   (§5.10). So an uninhabited *variant* is rejected even where the choice around it still works. Repeating the verdict
   for imported entries would report one defect once per importer.
-- **A parametric record is not walked.** Its parameters mean nothing until an application supplies them, so it is inhabited
-  here, and a declaration closing one of its applications is an ordinary entry in the map by the time linking runs,
-  judged like any other. §8's own `tree` fixture is caught the moment anything applies it, and a parametric record nobody
-  applies is judged nowhere. `TypeInhabitanceTest` pins both halves.
+- **A parametric record is walked with its parameters assumed inhabited**, so a recursion that never terminates is
+  refused at its declaration whether or not anything applies it. Assuming them inhabited is the most any argument can
+  give, so nothing refused here has an inhabited application. An application it holds, `next: node<T>`, is inhabited
+  where its head is: regularity passes every parameter through unchanged, so the cycle the walk follows is the one
+  every application repeats. A name among its arguments is assumed inhabited too, which leaves an argument's own
+  emptiness to the record the application closes to.
 - **An unresolved reference is inhabited by fiat.** `validateEntry` has already reported it against this entry;
   calling it uninhabited too would report one defect twice, the second time naming a different problem.
 - **Scope is structural.** An atom whose facets admit nothing (`!int8 ^ { min: 300 }`) is uninhabited too, but that is
@@ -92,9 +94,9 @@ usable and its members pin them distinctly, and every member is declared.
   readers dispatch on, so the check and the read cannot disagree about which fields select a member. A member states
   no discriminators of its own, so an inherited selector needs no exemption. Only a record is a base: a parametric record
   is no type, and the record an abstract parametric record's application closes to carries the parametric record's
-  `extension`, `discriminators` and groups, so its selectors are checked as a hand-written base's are, wherever the
-  application is closed. A parametric record nobody applies is judged nowhere, short of §5.10, which judges its marks
-  at its declaration (`BACKLOG.md`).
+  `extension`, `discriminators` and groups, and its family is judged as a hand-written base's is. Its selectors are
+  judged at the parametric record's declaration, applied or not (§5.10): a selector's type names no parameter, so the
+  verdict is every application's, and a declared application does not repeat it.
 - **Every family in the closure is judged**, not only one with a part declared here. §3.3.4 makes `subtypes` open
   across schemas, so an importer can add a member that collides with an imported one, and two imports that each link
   cleanly can each add a member that collides with the other's. The second is the merge's own fault and is reported
