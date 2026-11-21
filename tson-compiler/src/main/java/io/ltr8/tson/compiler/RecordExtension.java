@@ -88,10 +88,6 @@ final class RecordExtension {
             Top def = merged.get(name);
             if (def instanceof RecordBody record) {
                 checkDeclaration(name, def, record, merged, facts, violations);
-            } else if (ParametricEntry.isParametric(def)) {
-                // Every application of a parametric record IS-A what its written parents reach, so a parametric record
-                // composing a final record is refused at its own declaration, whether or not anything applies it.
-                checkNothingComposesOntoFinal(name, def, merged, facts, violations);
             }
         }
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
