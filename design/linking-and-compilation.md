@@ -1,7 +1,7 @@
 # Linking and registration
 
 Design notes for canonical identity, the schema registry, and `TsonSchemaLinker`'s pass 2: import merging, the order
-of the link, reference validation, the two §5.10 rules for a parametric record, the facts linking records on
+of the link, reference validation, the §5.10 rules for a parametric record, the facts linking records on
 `TsonLinkedSchema`, namespace types and values by name. Current form only; history lives in git.
 
 The linker's other checks have notes of their own: kinds and name types in `design/kinds-and-name-types.md`, the
@@ -44,9 +44,14 @@ disjointness in `design/choice-disjointness.md`, and §8.2's name hygiene in `de
   and each is merged through imports.
 - A namespace type resolves to a `NamespaceBody`, and a value of it is read as the map `NamespaceBody.read()` states:
   both compilers hand that map to the `map` factory, so neither factory table has a `namespace` entry.
-- `checkParametricArity` is the one place an entry's own parameters are in scope: it reads a parametric record's
-  references, a `ParamRef` among them, and judges arity alone. A closed entry holds no parameter, so `validateTypeRef` and
-  `checkFieldValue` resolve every name in the schema's namespace.
+- A parametric record's own parameters are in scope only while it is judged at its declaration (`validateBody`'s
+  `Scope`): a `ParamRef` it declares stands for a type assumed to exist, and is never looked up. A closed entry holds no
+  parameter, so `validateTypeRef` and `checkFieldValue` resolve every name in the schema's namespace.
+- **A parametric record's verdict is known before any closed entry is judged, and reported once, where it
+  stands**, so diagnostics keep declaration order. Its text surfaces again in each record an application closes to;
+  an unresolved name there is sent to the parametric record and keyed on the name (`heldDeclarationNaming`), and a
+  declared application of a parametric record that was refused is not judged again, as one of a condemned
+  parametric record closes against its placeholder.
 - `TsonSchemaRegistry` never overwrites an identity and exposes no way to remove or enumerate one: that *is* the
   "locked" guarantee.
 - Everything that asks what an entry IS-A asks its `TypeChain`: `computeSubtypes` credits every closed type and no
@@ -170,9 +175,9 @@ neither runs there; `design/schema-resolution.md` has the field rule.
 to; a declared body was already asked at resolution, and one refused there never reaches
 the linker (`design/atom-refinement-and-coherence.md`).
 
-## The two §5.10 rules for a parametric record
+## The §5.10 rules for a parametric record
 
-Both are decidable at link and neither depends on anyone applying a parametric record.
+Each is decidable at link and none depends on anyone applying a parametric record.
 
 - **Arity, over every reference** (`checkArity`): a reference supplies exactly as many arguments as the entry it names
   declares parameters. Too many, too few, and **none at all**: a parametric record named bare otherwise links and compiles
@@ -187,9 +192,15 @@ Both are decidable at link and neither depends on anyone applying a parametric r
 - **A parametric record answers arity for every reference it holds** (`checkParametricArity`), bare ones included: its field
   types and parents are references of the model, so a parametric record named bare inside a parametric record is
   refused at the latter's own declaration, and a field named `box` beside a parametric record of that name is told apart, a
-  field name being no reference. What a reference *resolves to* waits for an application, so type-kind validation and
-  inhabitance run on the record an application closes to; arity counts the parameters the referenced entry declares and does
-  not. Nothing ever closes `chain => <T> { tail: chain<T, T>? }`, so deferring it would ship the mistake.
+  field name being no reference. Nothing ever closes `chain => <T> { tail: chain<T, T>? }`, so deferring it would ship
+  the mistake.
+- **Whatever no argument changes is judged at the declaration** (§5.10, §5.10.1), applied or not: every name that is no
+  parameter resolves, every literal is a value of its type (a literal stands only under a type naming no parameter),
+  productivity with the parameters assumed inhabited (`TypeInhabitance`), the selectors (`RecordExtension`), and a
+  changed pin under a type naming no parameter (§5.8).
+  What depends on a parameter -- a choice's distinct variants, a reference's `of`, a slot's kind -- is judged on the
+  record an application closes to. Judging those at the declaration with stand-in arguments would refuse parametric
+  records correct for every argument anyone passes.
 
 ## The facts linking records (`TsonLinkedSchema`)
 

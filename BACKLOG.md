@@ -77,17 +77,6 @@ spec-required case:
   adjacency and separator errors under `parser`. The validate vectors that state `parser` (an argument list in data)
   are checked by the subject failing a Class 1 parse instead (`Class2ConformanceSuiteTest.checkValidateVector`). Give
   the read a code the runner maps to `parser`, and check those vectors by it.
-- [ ] **A literal under a closed type in a parametric record is judged only when the parametric record closes**
-  ([TSON-SCHEMA] §5.10). `t => <T> { a: T  n?: int8 ~ 500 }` loads, the default held until an application closes the
-  field; the type is closed, so its verdict cannot vary by application and §5.10 judges it at the declaration, as
-  §5.2 judges any default or pin. Judge a literal whose field type mentions no parameter when the parametric record
-  is declared, and add a `schema/invalid` vector for the out-of-range default.
-- [ ] **A parametric record's own references are judged only where it is applied** ([TSON-SCHEMA] §5.10, §3.3). A
-  parametric record is read at its declaration, and a name its fields or parents write that is neither one of its parameters
-  nor an entry is an unresolved reference there; the linker checks only arity over a parametric record
-  (`TsonSchemaLinker.checkParametricArity`), so `box => <T> { v: T  w: no_such_type }` gets its verdict at each application,
-  retargeted to `box` (`heldDeclarationNaming`), and none while nothing applies it. Judge the references that are no
-  `ParamRef` with `validateTypeRef` at the declaration, and add a `schema/invalid` vector for the unapplied case.
 - [ ] **An application through an alias of a parametric record is pinned at a composition operand alone** ([TSON-SCHEMA]
   §8.3). It applies the parametric record (`ParametricMaterialiser.parametricHead`: `bx<text>` over `bx => box` closes to the
   record `box<text>` closes to), and the corpus holds that at an operand, `box_of<text> & { … }`. Add a
@@ -242,12 +231,6 @@ spec-required case:
   can be left out"); §3.4.1 says a loop of aliases is not a wait cycle and §8.3 refuses it as an alias chain with no
   terminal. The verdict is right; report the chain (`'a' is an alias of 'b', an alias of 'a', which names no type`)
   once, at the first entry, before the productivity check sees it.
-- [ ] **A parametric record nobody applies is not judged for productivity or its selectors** ([TSON-SCHEMA] §5.10,
-  §5.10.1). `bad => <T> { v: T  inner: bad<T> }` links: `TypeInhabitance` counts a parametric record inhabited and
-  judges only the declarations closing its applications, where §5.10.1 judges every entry, a parametric record with
-  its parameters assumed inhabited. `p => <T> { k: base =?  v: T }` over a record `base` links too, where the same
-  selector on a closed record is refused; §5.10 judges a parametric record's marks at its declaration. Walk the first
-  with a `ParamRef` inhabited, run `RecordExtension`'s selector check on the second, and add `schema/invalid` vectors.
 - [ ] **A tag that names nothing is a mismatch below the root, not an unresolved name** ([TSON-DATA] §8.1;
   [TSON-SCHEMA] §3.3, §7.2). Under `outer => { inner: inner }` and `inner => { a: text }`, `!outer { inner: !nosuch {
   a: "x" } }` reports `TYPE_MISMATCH` ("'nosuch' is not admissible at a 'inner' position"), as does the tag at an atom

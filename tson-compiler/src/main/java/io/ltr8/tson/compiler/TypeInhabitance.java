@@ -1,9 +1,10 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.resolver.AliasChain;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.ParametricEntry;
+import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.Sum;
@@ -85,17 +86,13 @@ final class TypeInhabitance {
     /**
      * Whether one definition is satisfied by the entries marked so far.
      *
-     * <p><b>A parametric record counts as inhabited, unjudged.</b> No position names it bare and no document ever has one;
-     * its closures are judged where they stand, a declared application as an entry in this map and one closed in place
-     * at the slot holding it.
+     * <p><b>A parametric record is walked as a record, its parameters assumed inhabited</b> (§5.10.1). An application
+     * it holds, over its parameters, is inhabited where its head is: regularity passes every parameter through
+     * unchanged, so the recursion the walk follows is the one every application of it repeats, and an argument
+     * that is a name is assumed inhabited too, which leaves only what no argument can change to be judged here.
      */
     private static boolean isInhabited(Top definition, Map<String, Top> namespace,
             Set<String> inhabited) {
-        // A parametric record is not walked: its parameters mean nothing until substitution supplies the arguments,
-        // so a parametric record is inhabited here and each closure, which does supply them, is judged on its own.
-        if (ParametricEntry.isParametric(definition)) {
-            return true;
-        }
         return switch (definition) {
             case RecordBody record -> recordInhabited(record, namespace, inhabited);
             case ArrayBody array -> array.voidable()
@@ -122,8 +119,8 @@ final class TypeInhabitance {
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
             case io.ltr8.tson.schema.meta.DependentBody ignored -> true; // as a declared type, chosen by its sibling
-            // Only inside a parametric record, which is not walked; one anywhere else is the linker's refusal.
-            case io.ltr8.tson.schema.meta.ApplyBody ignored -> true;
+            // Only inside a parametric record; one anywhere else is the linker's refusal.
+            case ApplyBody application -> refInhabited(application.head(), namespace, inhabited);
             case ValueEntry ignored -> true; // a value, which nothing is typed by
             case io.ltr8.tson.schema.meta.IncompleteEntry ignored -> true; // no type, which nothing is typed by
         };
@@ -264,11 +261,12 @@ final class TypeInhabitance {
     /**
      * A name this namespace does not hold counts as inhabited. The reference is unresolved, which {@code
      * TsonSchemaLinker.validateEntry} has already reported against this very entry -- calling it uninhabited
-     * too would report the same defect twice, in words that name a different problem.
+     * too would report the same defect twice, in words that name a different problem. A parameter is assumed
+     * inhabited (§5.10.1).
      */
     private static boolean refInhabited(TypeRef ref, Map<String, Top> namespace,
             Set<String> inhabited) {
-        return !namespace.containsKey(ref.name()) || inhabited.contains(ref.name());
+        return ref instanceof ParamRef || !namespace.containsKey(ref.name()) || inhabited.contains(ref.name());
     }
 
     /**
@@ -327,8 +325,8 @@ final class TypeInhabitance {
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */
     private static String firstUnsatisfiedDependency(Top definition,
             Map<String, Top> namespace, Set<String> inhabited) {
-        if (definition == null || ParametricEntry.isParametric(definition)) {
-            return null; // a parametric record is inhabited, as isInhabited says
+        if (definition == null) {
+            return null;
         }
         return switch (definition) {
             case RecordBody record -> recordDependency(record, namespace, inhabited);
@@ -337,7 +335,8 @@ final class TypeInhabitance {
             case MapBody map -> slotInhabited(map.valueType(), namespace, inhabited)
                     ? null : slotDependency(map.valueType(), namespace, inhabited);
             case io.ltr8.tson.schema.meta.NamespaceBody ignored -> null;
-            case io.ltr8.tson.schema.meta.ApplyBody ignored -> null;
+            case ApplyBody application -> refInhabited(application.head(), namespace, inhabited)
+                    ? null : application.head().name();
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .filter(element -> !positionInhabited(element, namespace, inhabited))
                     .map(element -> slotDependency(element.elementType(), namespace, inhabited))

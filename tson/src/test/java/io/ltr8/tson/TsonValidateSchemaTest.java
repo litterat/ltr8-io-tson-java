@@ -95,16 +95,13 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * <b>A defect a held body deferred belongs to the declaration whose text wrote it, not to whoever applied
-     * the parametric record.</b> Nothing checks {@code box}'s own references at its declaration -- a parametric record's
-     * references cannot be settled until an application supplies arguments -- so the verdict arrives where
-     * {@code box<text>} closes, in place at {@code holder}'s field. That line is not wrong and does not contain
-     * the name. Deferred checking is what holding buys, and it is
-     * survivable only if the author is sent to the line they can edit.
+     * <b>A defect in a parametric record's text belongs to the parametric record, not to whoever applied it.</b>
+     * {@code box} is judged at its declaration, and its text surfaces again where {@code box<text>} closes, in place
+     * at {@code holder}'s field, a line that is not wrong and does not contain the name. That second statement is
+     * the first one, and is not reported again.
      *
-     * <p><b>The subject moves with the location</b>, which the two halves of this assert together: naming
-     * {@code 'box<text>'} states the mistake against an application that is itself correct, and would name a
-     * different one for every applier.
+     * <p><b>The subject moves with the location</b>: naming {@code 'box<text>'} would state the mistake against an
+     * application that is itself correct, and name a different one for every applier.
      */
     @Test
     void aDefectInsideAParametricRecordIsReportedAgainstTheParametricRecord() {
@@ -180,6 +177,72 @@ class TsonValidateSchemaTest {
 
         assertEquals(1, problems.size(), problems::toString);
         assertEquals(Optional.of("/box"), problems.getFirst().schemaPointer());
+    }
+
+    /**
+     * A parametric record is judged at its declaration for what no argument changes (§5.10, §5.10.1): a name that is
+     * neither a parameter nor an entry, an unguarded recursion, a selector no token denotes and a literal out of its
+     * closed type's range are each reported once, against the parametric record, whether nothing applies it, a
+     * declaration applies it or a record holds an application of it in place.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "box => <T> { v: T  w: no_such_type }",
+            "box => <T> { v: T  w: [{ x: no_such_type }] }",
+            "box => <T> { v: T  w: no_such_head<T> }",
+            "box => <T> { v: T  next: box<T> }",
+            "box => <T> { k: selector =?  v: T }",
+            "box => <T> { v: T  n?: int8 ~ 500 }"})
+    void aParametricRecordIsJudgedOnceAtItsDeclaration(String declaration) {
+        String selector = "\n  selector => { k: text }";
+        for (String applier : List.of("", "\n  b => box<text>", "\n  holder => { f: box<text> }",
+                "\n  b => box<text>\n  holder => { f: box<int32> }")) {
+            // At a slot, a recursion with no declaration to tie to (§5.10.1) and an abstract record in place (§4.2)
+            // are the holder's own faults.
+            if ((declaration.contains("next: box<T>") || declaration.contains("=?")) && applier.contains("holder")) {
+                continue;
+            }
+            List<Diagnostic> problems = check("{\n  " + declaration + selector + applier + "\n}");
+
+            assertEquals(List.of("/box"), problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList(),
+                    () -> declaration + applier + ": " + problems);
+        }
+    }
+
+    /** The diagnostics, word for word, of the three cases a parametric record nobody applies is now judged for. */
+    @Test
+    void anUnappliedParametricRecordIsJudgedForItsOwnText() {
+        assertEquals(List.of("'box' field 'w' has an unresolved reference 'no_such_type'"),
+                check("{ box => <T> { v: T  w: no_such_type } }").stream().map(Diagnostic::message).toList());
+        assertTrue(check("{ loop => <T> { v: T  next: loop<T> } }").getFirst().message()
+                .startsWith("'loop' can never be satisfied by any document: loop needs loop"));
+        assertTrue(check("{ base => { k: text }  p => <T> { k: base =?  v: T } }").getFirst().message()
+                .startsWith("'p': discriminator field 'k' is declared 'base', which is not an atom or an enum"));
+        assertTrue(check("{ t => <T> { a: T  n?: int8 ~ 500 } }").getFirst().message()
+                .startsWith("'t': field 'n' is declared 'int8', but its default 500 is not a value of that type"));
+    }
+
+    /** A parametric record's verdict is known before its applications are judged, and reported where it stands. */
+    @Test
+    void referenceVerdictsAreReportedInDeclarationOrder() {
+        List<Diagnostic> problems = check("""
+                {
+                  first => { x: nope }
+                  box => <T> { v: T  w: no_such_type }
+                  last => { y: nada }
+                }""");
+
+        assertEquals(List.of("/first", "/box", "/last"),
+                problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList(), problems::toString);
+    }
+
+    /** What depends on a parameter keeps its verdict where the application closes. */
+    @Test
+    void whatAParameterDecidesIsStillJudgedWhereTheApplicationCloses() {
+        assertEquals(List.of(), check("{ pair => <A, B> { v: (A | B) } }"));
+        List<Diagnostic> problems = check("{ pair => <A, B> { v: (A | B) }  p => pair<text, text> }");
+        assertEquals(List.of("/p"), problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList(),
+                problems::toString);
     }
 
     /** The same rule for a name that is a name: {@code some_typo} is the applier's typo, not the parametric record's. */

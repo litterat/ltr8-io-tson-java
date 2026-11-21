@@ -238,14 +238,20 @@ class ParametricRecordTest {
         assertNotNull(compile(records));
     }
 
-    /** A mutual recursion every step of which is required describes no finite value, and is refused (§5.10.1). */
+    /**
+     * A mutual recursion every step of which is required describes no finite value, and is refused at the parametric
+     * records' declarations, applied or not (§5.10.1).
+     */
     @Test
     void anUnguardedMutualRecursionThroughARecordInPlaceIsUnproductive() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
+        String records = """
                   a      => <T> { v: T  b: b<T> }
-                  b      => <T> { a: a<T> }
-                  a_text => a<text>"""));
-        assertTrue(thrown.getMessage().contains("a_text"), thrown.getMessage());
+                  b      => <T> { a: a<T> }""";
+        for (String schema : List.of(records, records + "\n  a_text => a<text>")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile(schema));
+            assertTrue(thrown.getMessage().contains("'a' can never be satisfied by any document: a needs b needs a"),
+                    thrown.getMessage());
+        }
     }
 
     /**

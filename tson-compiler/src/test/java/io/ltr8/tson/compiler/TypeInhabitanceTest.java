@@ -125,43 +125,61 @@ class TypeInhabitanceTest {
     }
 
     /**
-     * A parametric record is judged when it closes, not where it is written: the element types this rule reads stand over
-     * parameters until an application supplies the arguments. The closure is an ordinary entry by the time linking
-     * runs, so §8's {@code tree} fixture, its recursive position non-empty through an incomplete entry's completion,
-     * is caught the moment anything applies it -- and a parametric record nobody applies is judged nowhere.
+     * A parametric record is judged at its declaration, its parameters assumed inhabited (§5.10.1): §8's {@code tree}
+     * fixture, its recursive position non-empty through an incomplete entry's completion, has no finite value whatever
+     * {@code T} is, so it is refused whether or not anything applies it, and the verdict names it rather than an applier.
      */
     @Test
-    void anUninhabitedParametricRecordIsRejectedWhereItCloses() {
-        rejection("""
+    void anUninhabitedParametricRecordIsRejectedAtItsDeclarationAppliedOrNot() {
+        String tree = """
                   nonempty => !meta.array ^ { min_items: 1 }
-                  tree => <T> { value: T  children: nonempty<tree<T>> }
-                  use  => tree<text>""");
+                  tree => <T> { value: T  children: nonempty<tree<T>> }""";
+
+        assertTrue(rejection(tree).startsWith("'tree' can never be satisfied"), rejection(tree));
+        String applied = rejection(tree + "\n  use  => tree<text>");
+        assertTrue(applied.startsWith("'tree' can never be satisfied"), applied);
     }
 
     /**
-     * The chain names what the author wrote, at every link -- the rule {@code EntryDisplayName} applies on the
-     * read side, which is where this borrows its rendering from. {@code use} <em>is</em> the instantiation of
-     * {@code tree<text>} rather than a reference to it (§8.2), and the recursive {@code tree<text>} inside it ties
-     * to that declaration, so there is no hop to render between the author's name and the recursion it names.
+     * The chain runs through the application the parametric record holds: the construction {@code
+     * nonempty<tree<T>>} closes to is written in place at {@code children}, no link of its own, and the application
+     * inside it is inhabited where its head is.
      */
     @Test
-    void theChainIsSpelledTheWayTheAuthorWroteIt() {
+    void theChainRunsThroughTheApplicationTheParametricRecordHolds() {
         String message = rejection("""
                   nonempty => !meta.array ^ { min_items: 1 }
-                  tree => <T> { value: T  children: nonempty<tree<T>> }
-                  use  => tree<text>""");
+                  tree => <T> { value: T  children: nonempty<tree<T>> }""");
 
-        // The construction `nonempty<tree<text>>` closes to is written in place at `children`, no link of its own:
-        // the chain runs through the name inside it.
-        assertTrue(message.contains("use needs use"), message);
+        assertTrue(message.contains("tree needs tree"), message);
     }
 
-    /** The other half of the same rule: unapplied, it is not judged, and that is not a warning either. */
     @Test
-    void aParametricRecordNobodyAppliesGetsNoVerdict() {
-        accepted("""
-                  nonempty => !meta.array ^ { min_items: 1 }
-                  tree => <T> { value: T  children: nonempty<tree<T>> }""");
+    void anUnguardedSelfRecursionInAParametricRecordNobodyAppliesIsRejected() {
+        assertTrue(rejection("  loop => <T> { v: T  next: loop<T> }").contains("loop needs loop"));
+    }
+
+    /** A guarded recursion is productive at the declaration whether or not anything applies it. */
+    @Test
+    void aGuardedParametricRecordIsAcceptedAppliedOrNot() {
+        String records = """
+                  linked_list => <T> { value: T  next?: linked_list<T> }
+                  tree        => <T> { value: T  children?: [tree<T>] }
+                  a           => <T> { v: T  b?: b<T> }
+                  b           => <T> { w: T  a: a<T> }""";
+
+        accepted(records);
+        accepted(records + """
+
+                  ll => linked_list<text>
+                  tr => tree<int32>
+                  ab => a<text>""");
+    }
+
+    /** A parameter is assumed inhabited, so a required field typed by one demands nothing the declaration can refuse. */
+    @Test
+    void aRequiredParameterTypedFieldIsAssumedInhabited() {
+        accepted("  box => <T> { v: T  w: [T; 1..]  p: (T | text) }");
     }
 
     /** An uninhabited variant is a mistake even where the choice around it still works. */
