@@ -1,9 +1,11 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -77,17 +79,15 @@ public final class IncompleteEntries {
     }
 
     /**
-     * Refuses a field of {@code written} that {@code constructor} does not declare, or fixes: a pinned field is the
-     * constructor's, supplied by its reader.
+     * Refuses {@code written}, read at {@code constructorName}'s pinned {@code field}, where it is not {@code
+     * pinned}, the pin read the same way: [TSON-SCHEMA] §5.2, by the equality the constructor's reader meets a
+     * written value with ({@link ValueIdentity}). A construction left open is judged where it is declared, since
+     * nothing need complete it.
      */
-    static void requireWritable(String name, String constructorName, RecordBody constructor,
-                                SequencedMap<String, DataValue> written) {
-        requireDeclared(name, constructorName, constructor, written);
-        for (String field : written.keySet()) {
-            if (constructor.fields().get(field).role() == FieldRole.FIXED) {
-                throw new SchemaValidationException("'" + name + "': '" + field + "' is fixed by '" + constructorName
-                        + "', and no construction writes it (§5.5)");
-            }
+    static void requirePinned(String name, String constructorName, String field, Object written, Object pinned) {
+        if (written == null || !ValueIdentity.of(written).equals(ValueIdentity.of(pinned))) {
+            throw new SchemaValidationException("'" + name + "': " + new RecordDiagnostics(constructorName, "")
+                    .fixedFieldContradicted(field, "", "").message());
         }
     }
 
@@ -145,7 +145,7 @@ public final class IncompleteEntries {
                                DataValue payload) {
         SequencedMap<String, DataValue> written = braced(payload).orElseGet(() -> positional(name, baseName, base,
                 payload));
-        requireWritable(name, base.constructor(), constructor, written);
+        requireDeclared(name, base.constructor(), constructor, written);
         requireWrittenOnce(name, baseName, base, written);
         List<String> missing = base.absent().stream().filter(field -> !written.containsKey(field)).toList();
         if (!missing.isEmpty()) {

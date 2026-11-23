@@ -55,7 +55,9 @@ What `!C { … }` builds, how its head resolves, and why a parametric record is 
 - A tag or an annotation's value naming an incomplete entry is refused: only a construction's payload is rewritten
   (`ConstructionRewrite`), an annotation's value being data, so `@slot:{ of: !rows { … } }` over an incomplete
   `rows` is no completion.
-- Each field of an incomplete entry is read against its declared type where it is written (`readEachField`);
+- Each field of an incomplete entry is read against its declared type where it is written (`readEachField`), and a
+  pinned one against its pin (§5.2), by the equality the constructor's reader uses: a pin's own value is written
+  like any field's, once, and another value is refused at that declaration, since nothing need complete it;
   required fields, defaults and coherence wait for the completion, which reads the whole. What each field read is
   kept on the entry (`IncompleteEntry.read`), and the names it holds are judged when its own schema links
   (`TsonSchemaLinker.validateHeld`), never again by an importer's. Reading only at the completion lost: an entry no

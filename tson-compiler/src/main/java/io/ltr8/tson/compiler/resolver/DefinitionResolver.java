@@ -1270,7 +1270,7 @@ final class DefinitionResolver {
         DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
         refuseWrittenParameters(name, new ConstructorHead(constructorName, constructor), payload);
         SequencedMap<String, DataValue> written = braced(name, target, payload);
-        IncompleteEntries.requireWritable(name, constructorName, constructor, written);
+        IncompleteEntries.requireDeclared(name, constructorName, constructor, written);
         List<String> absent = IncompleteEntries.required(constructor).stream()
                 .filter(field -> !written.containsKey(field)).toList();
         if (absent.isEmpty()) {
@@ -1295,7 +1295,7 @@ final class DefinitionResolver {
         DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
         refuseWrittenParameters(name, new ConstructorHead(base.constructor(), constructor), payload);
         SequencedMap<String, DataValue> written = braced(name, target, payload);
-        IncompleteEntries.requireWritable(name, base.constructor(), constructor, written);
+        IncompleteEntries.requireDeclared(name, base.constructor(), constructor, written);
         IncompleteEntries.requireWrittenOnce(name, target, base, written);
         Map<String, Object> read = readEachField(name, base.constructor(), constructor, written);
         constructedBy(name, base.constructor());
@@ -1457,21 +1457,20 @@ final class DefinitionResolver {
 
     /**
      * Each field of {@code written} read against the type {@code constructor} declares it with, where it is written,
-     * and what each read. A field typed by a type written in place names no type to read against, and is read where
-     * the entry is completed.
+     * and what each read; a field {@code constructor} pins is the pin's value or refused here (§5.2). A field typed
+     * by a type written in place names no type to read against, and is read where the entry is completed.
      */
     private Map<String, Object> readEachField(String name, String constructorName, RecordBody constructor,
                                               SequencedMap<String, DataValue> written) {
         Map<String, Object> read = new LinkedHashMap<>();
         written.forEach((field, value) -> {
-            if (!(constructor.fields().get(field).type() instanceof io.ltr8.tson.schema.meta.TypeRef type)) {
+            RecordField declared = constructor.fields().get(field);
+            if (!(declared.type() instanceof io.ltr8.tson.schema.meta.TypeRef type)) {
                 return;
             }
+            Object bound;
             try {
-                Object bound = constructionReader.readValue(type.name(), value);
-                if (bound != null) {
-                    read.put(field, bound);
-                }
+                bound = constructionReader.readValue(type.name(), value);
             } catch (ReadException e) {
                 if (e.diagnostic().code() == Diagnostic.Code.NOT_IMPLEMENTED) {
                     throw new UnsupportedOperationException("'" + name + "': '" + field + "' cannot yet be read "
@@ -1485,8 +1484,27 @@ final class DefinitionResolver {
                 throw e instanceof MissingBindingException ? new MissingBindingException(where)
                         : new BindMismatchException(where);
             }
+            if (declared.role() == FieldRole.FIXED) {
+                IncompleteEntries.requirePinned(name, constructorName, field, bound,
+                        readPin(name, constructorName, field, type.name(), declared.value().orElseThrow()));
+            }
+            if (bound != null) {
+                read.put(field, bound);
+            }
         });
         return read;
+    }
+
+    /** {@code field}'s pin in {@code constructorName}, read as a value written there is ({@link #readEachField}). */
+    private Object readPin(String name, String constructorName, String field, String type, Token pin) {
+        try {
+            return constructionReader.readValue(type, new DataValue(List.of(), Optional.empty(),
+                    new TokenValue(pin.text(), TokenForm.valueOf(pin.form().name()))));
+        } catch (ReadException e) {
+            throw new IllegalStateException("'" + name + "': '" + constructorName + "' pins '" + field + "' to "
+                    + pin.text() + ", judged a value of '" + type + "' when its schema linked, and its reader refuses "
+                    + "it -- " + e.getMessage(), e);
+        }
     }
 
     /**

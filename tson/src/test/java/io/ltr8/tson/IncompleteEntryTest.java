@@ -316,7 +316,84 @@ class IncompleteEntryTest {
     void eachFieldIsReadAgainstItsOwnTypeWhereItIsWritten() {
         refused("counted => !meta.array ^ { min_items: \"ten\" }", "is no value of 'numeric.count'");
         refused("counted => !meta.array ^ { min_itemz: 1 }", "is no field of the constructor");
-        refused("indexed => !meta.array ^ { access_pattern: INDEX }", "is fixed by 'meta.array'");
+    }
+
+    // ── A fixed field (§5.2) ──────────────────────────────────────────────────
+
+    private static final String CONTRADICTED = "is fixed on 'meta.array' and cannot be given another value";
+
+    @Test
+    void aConstructionLeftOpenMayWriteAPinsOwnValueInAnySpelling() {
+        TsonLinkedSchema linked = resolved("""
+                indexed => !meta.array ^ { access_pattern: INDEX }
+                quoted  => !meta.array ^ { access_pattern: "INDEX" }
+                one     => meta.array & { min_items?: = 1 }
+                hex     => !one ^ { min_items: 0x1 }
+                """);
+
+        for (String name : List.of("indexed", "quoted", "hex")) {
+            IncompleteEntry entry = assertInstanceOf(IncompleteEntry.class, linked.schema().entries().get(name));
+            assertEquals(List.of("element_type"), entry.absent(), name);
+        }
+    }
+
+    @Test
+    void anotherValueAtAPinIsRefusedWhereTheConstructionIsLeftOpen() {
+        refused("named => !meta.array ^ { access_pattern: NAMED }", "'named': 'access_pattern' " + CONTRADICTED);
+        refused("""
+                nonempty => !meta.array ^ { min_items: 1 }
+                named    => !nonempty ^ { access_pattern: NAMED }
+                """, "'named': 'access_pattern' " + CONTRADICTED);
+        refused("""
+                one => meta.array & { min_items?: = 1 }
+                two => !one ^ { min_items: 2 }
+                """, "'two': 'min_items' is fixed on 'one' and cannot be given another value");
+    }
+
+    @Test
+    void aWrittenPinIsWrittenOnceAndTheCompletionIsThePlainConstruction() {
+        refused("""
+                indexed => !meta.array ^ { access_pattern: INDEX }
+                again   => !indexed ^ { access_pattern: INDEX }
+                """, "[access_pattern] is written by 'indexed' already");
+        refused("""
+                indexed => !meta.array ^ { access_pattern: INDEX }
+                again   => !indexed { access_pattern: INDEX  element_type: text }
+                """, "[access_pattern] is written by 'indexed' already");
+        Namespace<Top> entries = resolved("""
+                indexed => !meta.array ^ { access_pattern: INDEX }
+                braced  => !indexed { element_type: text }
+                applied => indexed<text>
+                written => !meta.array { access_pattern: INDEX  element_type: text }
+                bare    => !meta.array { element_type: text }
+                """).schema().entries();
+
+        for (String name : List.of("braced", "applied", "written")) {
+            assertEquals(entries.get("bare"), entries.get(name), name);
+        }
+    }
+
+    @Test
+    void aCompletionMayWriteAPinItsEntryLeftUnwritten() {
+        Namespace<Top> entries = resolved("""
+                nonempty => !meta.array ^ { min_items: 1 }
+                braced   => !nonempty { access_pattern: INDEX  element_type: text }
+                refined  => !nonempty ^ { access_pattern: INDEX }
+                applied  => refined<text>
+                bare     => !meta.array { element_type: text  min_items: 1 }
+                """).schema().entries();
+
+        assertEquals(entries.get("bare"), entries.get("braced"));
+        assertEquals(entries.get("bare"), entries.get("applied"));
+        refused("""
+                nonempty => !meta.array ^ { min_items: 1 }
+                named    => !nonempty { access_pattern: NAMED  element_type: text }
+                """, "'access_pattern' " + CONTRADICTED);
+    }
+
+    @Test
+    void aPinIsNoRequiredFieldOfAConstructionLeftOpen() {
+        refused("done => !meta.array ^ { access_pattern: INDEX  element_type: text }", "nothing is left open");
     }
 
     // ── An incomplete entry is no type ────────────────────────────────────────
