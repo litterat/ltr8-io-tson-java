@@ -1,7 +1,7 @@
 ---
 title: "TSON 2026 Revision 40 — Change Log"
 against: "TSON 2026 Revision 39 (Working Draft)"
-status: "Proposed, not adjudicated. The six normative artifacts and five resolved fixtures are at `/2026/40/` identities, each pin verified over the shipped bytes and listed in Part 2 §13.2 (§6). Parts 1, 2 and 3 are revised against them (§3.1, §3.2, §3.4); the Developer Guide is not revised and keeps its `/2026/39/` reference. A verification pass over the examples and the build is recorded in §7."
+status: "Proposed, not adjudicated. The six normative artifacts and five resolved fixtures are at `/2026/40/` identities, each pin verified over the shipped bytes and listed in Part 2 §13.2 (§6). Parts 1, 2 and 3 are revised against them (§3.1, §3.2, §3.4); the Developer Guide is revised with them and referenced at `/2026/40/`. A verification pass over the examples and the build is recorded in §7."
 inputs:
   - "SPEC-FEEDBACK.md, the register against Revision 39, published with this revision as its close-out record (§2): entries #1–#9 registered before the revision answered them, and #10–#21 written up at its close for the design changes made in its text without a register entry"
   - "Revised companion artifacts at /2026/40/ identities: the six bundled schemas and five resolved fixtures (§1)"
@@ -181,8 +181,8 @@ Open questions are recorded here and are NOT reflected as open text in the speci
    declaration gives its application (`names => set<text>`).
 4. **§9.1** — the schema limits it names lose "template materialisation depth", the limit
    being gone (§11.5).
-5. **§10.2** — `TSON-SCHEMA` and `TSON-JSON` at `/2026/40/`; `TSON-GUIDE` stays at
-   `/2026/39/`, the Developer Guide not being revised.
+5. **§10.2** — `TSON-SCHEMA`, `TSON-JSON` and `TSON-GUIDE` at `/2026/40/`, the Developer Guide
+   being revised with the series.
 
 Items 6–13 carry #6, a dependent field's type in place. Each names the rule before and after.
 
@@ -283,6 +283,10 @@ One name follows the section's own. No rule changes.
     comma "in a reference's argument list", and a reference's key identity as "its parsed
     form, head and arguments". A reference in data is a token (items 14–19), compared as
     any token is. No rule changes.
+26. **§2.8, §7.1, §9.1** — three more such clauses go: a field name's dispatch said "a
+    reference carrying arguments is no token"; the quoting procedure called `box<T>` "text
+    spelled like a reference", where it is text holding a character outside the profile;
+    and the limits counted "a reference's arguments" toward the total. No rule changes.
 
 ### 3.2 Part 2 — Type System and Schema
 
@@ -363,8 +367,8 @@ One name follows the section's own. No rule changes.
     admits a parameter list before a record body alone; the `type-params` note loses the
     family-base exception. **§12.2** — the dispatch comments follow.
 31. **§10.3** — the canonical-identity examples at `/2026/40/`.
-32. **§13.2** — `TSON-DATA` and `TSON-JSON` at `/2026/40/`, `TSON-GUIDE` left at
-    `/2026/39/`; the six artifact rows carry the Revision 40 pins (§6).
+32. **§13.2** — `TSON-DATA`, `TSON-JSON` and `TSON-GUIDE` at `/2026/40/`; the six artifact
+    rows carry the Revision 40 pins (§6).
 
 Items 33–57 carry #5, inline types. Each names the rule before and after.
 
@@ -1090,6 +1094,14 @@ it.
      `dog => pet_of<dog_type> & { kind?: = "dog" }` is IS-A `dog_pet` where `dog_pet =>
      pet_of<dog_type>` is declared. §8.1 and §8.2 stated the edge and the running behaviour
      gives it, while §5.8 and §5.10 listed only the head's parents. Stated, not changed.
+139. **§12.1** — `construction-def`'s first alternative wrote the body after two or more
+     parents as `[ws record-def]`, so it derived `a & b { … }` and not `a & b & { … }`, the
+     form §5.8 writes throughout and the one that parses. It is `[ws "&" ws record-def]`.
+     The defect is Revision 39's. No rule changes.
+140. **§1.6, §8.1, §8.3, §12.1** — wording. §1.6's data document is titled for this
+     revision; §8.1's "alias-kind entries" is "an alias", an entry having no derived kind
+     (item 132), and the kernel's resolved fixture's note follows; a verb in §8.3 and an
+     article in §12.1's `type-arg` comment are corrected. No rule changes.
 
 ### 3.3 Companion artifacts
 
@@ -1111,14 +1123,13 @@ a member's type name with no application, and the example imports at `/2026/40/`
 
 1. **Header and status** — Revision 40, the fifth published revision of Part 3, written
    against Revision 40 of [TSON-DATA] and [TSON-SCHEMA].
-2. **§1.6** — the item list names item 23 as Revision 40's; item 16's sentence on an
+2. **§1.6** — the item list names items 23 and 24 as Revision 40's; item 16's sentence on an
    application in data moves to the new **item 23**, *a parametric record is a record with parameters, and a
    reference in data is a name*, which names the sections consuming it.
 3. **§3.3** — a `$type` naming a parametric record is a validation error.
 4. **§3.4** — a root type supplied out of band naming a parametric record is refused on the same
    terms.
-5. **§11.2** — `TSON-DATA` and `TSON-SCHEMA` at `/2026/40/`; `TSON-GUIDE` stays at
-   `/2026/39/`.
+5. **§11.2** — `TSON-DATA`, `TSON-SCHEMA` and `TSON-GUIDE` at `/2026/40/`.
 
 6. **§3.3** (#5) — "an entry a resolver *minted* for an application no declaration names
    also has a name … It is not refused" becomes: a type written in place has no name, no
@@ -1153,7 +1164,8 @@ a member's type name with no application, and the example imports at `/2026/40/`
     extern, the selecting `$type` is the boundary's and its wrapper's `$value` the foreign
     value; a position whose extern's target is a map is a map-typed position. §6.4's key
     form and §8.2's class follow an extern to its target. §3.3's rule for where `$type`
-    resolves, §9.2's encoder obligation and §1.6's item 24 follow.
+    resolves, §9.2's encoder obligation, §1.6's item 24 and §8's opening, which names §8.6,
+    follow.
 14. **§5.6** (§3.2 item 117) — a reference naming values read its string as "segments between
     dots, each an identifier"; each is a name of the family of what it enters. JSON has one
     string form, so nothing else moves.
@@ -1245,6 +1257,9 @@ rewrites, and §4.11 what is lost.
   definition-mark ws ] [type-params] structural-def`, `schema-map-entry` writing none of its
   own; before `!`, a type expression or a declared application it is a parse error (item
   136).
+- **`construction-def` writes `&` before its body after two or more parents**, `a & b &
+  { … }`, where the production derived `a & b { … }`; the form that parses is unchanged
+  (item 139).
 
 ### 4.3 The kernel (`meta.tn`)
 
@@ -1462,7 +1477,7 @@ names each one entry, as §6 counts them; the cycle and its closure are measured
 
 ### 4.9 Conformance and artifacts
 
-- Every identity is at `/2026/40/`, `TSON-GUIDE` staying at `/2026/39/` (§3.1 items 2, 5;
+- Every identity is at `/2026/40/`, `TSON-GUIDE`'s included (§3.1 items 2, 5;
   items 1, 5, 21, 31, 32; §3.4 item 5).
 - The six pins and the five resolved fixtures are §6's (items 32, 55, 92, 100, 104); the
   examples and the build are verified as §7 records.

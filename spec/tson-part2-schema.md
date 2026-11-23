@@ -139,7 +139,7 @@ A schema document declaring four types, importing `core.tn`:
 !!import:"https://example.com/task.tn"
 !task {
   id:       550e8400-e29b-41d4-a716-446655440000
-  title:    "Ship revision 39"
+  title:    "Ship revision 40"
   priority: 3
   status:   OPEN
   due:      2026-08-01
@@ -1479,7 +1479,7 @@ The resolver's output for a schema is a value of the kernel's `meta.schema` — 
 
 ### 8.1 Output Records
 
-**An entry is its value.** A schema map's entry resolves to the value its declaration denotes, with no wrapper around it: `person => !meta.record { fields: { … } }`, `integer => !numeric.integer_type {}`, `age => !numeric.integer_type { chain: { supertypes: [integer] }  min: 0 }`, `meta.type_name => !meta.alias { target: meta.identifier }`, `box => !meta.record { parameters: [ … ] … }`, a value entry `orders => !api { … }`, and a nested map `geo => !meta.schema { … }`. Values are annotated with the structurally appropriate constructor: `!meta.record` for vocabulary bodies (constructors, §4.2) and for every record, a parametric record or closed; a binding record headed by the applied constructor for every other non-alias definition (§5.6); `!meta.alias { target: T }` for alias-kind entries; an ordinary type's tag for a value entry (§4.1); and `!meta.schema` for a nested map. `meta.schema`'s `value_type` is `meta.declared`, and every entry names its type by its tag (§7.8); a constructor's path is written as the document that declared it declares it (`!meta.record`, `!numeric.decimal_type`, `!net.uuid_type`, `!meta.enum_type`), and a name at every slot as the described schema writes it.
+**An entry is its value.** A schema map's entry resolves to the value its declaration denotes, with no wrapper around it: `person => !meta.record { fields: { … } }`, `integer => !numeric.integer_type {}`, `age => !numeric.integer_type { chain: { supertypes: [integer] }  min: 0 }`, `meta.type_name => !meta.alias { target: meta.identifier }`, `box => !meta.record { parameters: [ … ] … }`, a value entry `orders => !api { … }`, and a nested map `geo => !meta.schema { … }`. Values are annotated with the structurally appropriate constructor: `!meta.record` for vocabulary bodies (constructors, §4.2) and for every record, a parametric record or closed; a binding record headed by the applied constructor for every other non-alias definition (§5.6); `!meta.alias { target: T }` for an alias; an ordinary type's tag for a value entry (§4.1); and `!meta.schema` for a nested map. `meta.schema`'s `value_type` is `meta.declared`, and every entry names its type by its tag (§7.8); a constructor's path is written as the document that declared it declares it (`!meta.record`, `!numeric.decimal_type`, `!net.uuid_type`, `!meta.enum_type`), and a name at every slot as the described schema writes it.
 
 **A resolved form's header is its source's**, and its root is `!schema`: it carries the source's `!!id` (under a fixture identity where one is published) and the source's `!!import`s, so that the namespace in which its names resolve is the one the source resolved in; nothing in the document marks it resolved, and a processor reads it as a resolved form because its caller says so (§10.1). The kernel's own resolved form carries its `!!id` alone and is read under the pre-loaded kernel. Nothing is supplied beside the document.
 
@@ -1580,7 +1580,7 @@ The correction is worth its sentence: an earlier revision filed a declared appli
 
 **Where a chain is followed, and where it is not.** Identity of a parametric record's application follows its arguments' chains to their terminal entries, because an alias is the same type under another name, and a construction's does not (§8.2); subsumption at a typed position follows both chains (§7.2); the source of a refinement or composition, a choice variant judged for `void`, a discrimination class, a reference's membership and a qualified name's first segment are all read after following the chain (§4.2, §4.3, §5.4, §5.7, §5.12). What the chain *never* does is carry meaning of its own: nothing that changes how a value reads may live on an alias, and no bundled document declares an annotation that does — a fact that decides reading, such as an alphabet, lives in the type (§5.5), where every position already names it. That is what makes a rename safe to see through.
 
-**Aliases are not supertypes.** An alias carries no chain and do not contribute to the `supertypes`/`subtypes` graph: `uuid.subtypes` does not list `id`; `id` has no `supertypes`. The three ways to name a type after another, and what each buys, are tabled in §5.7.
+**Aliases are not supertypes.** An alias carries no chain and does not contribute to the `supertypes`/`subtypes` graph: `uuid.subtypes` does not list `id`; `id` has no `supertypes`. The three ways to name a type after another, and what each buys, are tabled in §5.7.
 
 **Declared instantiations are not aliases.** A declared instantiation (§8.2) is a record, its value a `!meta.record` and not a `!meta.alias`; an alias may *point at* one by name (`alias => text_pair`), and the instantiation itself is a closed, concrete definition. No `!meta.alias` entry carries `@meta.application`.
 
@@ -1800,7 +1800,7 @@ structural-def = construction-def
                ; after a bare type-ref it is a parse error (§5.7)
 
 construction-def = supertype-ref 1*(ws "&" ws supertype-ref)
-                   [ws record-def] [ws removal-set]
+                   [ws "&" ws record-def] [ws removal-set]
                  / supertype-ref ws "&" ws record-def [ws removal-set]
                  / supertype-ref ws removal-set
 
@@ -1951,7 +1951,7 @@ type-arg   = type-expr
            ; argument is a name or a parameter, and a sugar form
            ; or a record body parses and the resolver refuses
            ; it, the form being declared first or, of a
-           ; constructor's application, written in place; of an
+           ; constructor's application, written in place; of a
            ; parametric record's, an application is refused too, and of
            ; a constructor's it closes at the slot it fills
            ; (§5.3); a number or a quoted string is no
@@ -2203,7 +2203,7 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 |-----------|-------|-----|
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/40/tson-part1-data |
 | TSON-JSON | TSON Part 3: JSON Encoding | https://tson.io/2026/40/tson-part3-json |
-| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/39/tson-guide |
+| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/40/tson-guide |
 | meta.tn | TSON Kernel (companion artifact, pre-loaded) | https://tson.io/2026/40/m/meta.tn?sha256=291ddaf37566f9f084515d09626f1855d05f2cfb9413e3ce0073323f4933ddcd |
 | numeric.tn | TSON Numeric Library (companion artifact) | https://tson.io/2026/40/m/numeric.tn?sha256=0337c18854a0e689ce53d9cae47e1cfd32bd54026acd6a3bac9abae358cb86f7 |
 | temporal.tn | TSON Temporal Library (companion artifact) | https://tson.io/2026/40/m/temporal.tn?sha256=3d516776324209f0406523dac4cc7bac85af0d530599de85a55cdc0b3ef77b20 |

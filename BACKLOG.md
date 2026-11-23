@@ -240,6 +240,19 @@ spec-required case:
   root's `address` or fails to resolve" (§3.3). §8.1 makes an unresolved type name a resolver error: `UNKNOWN_TYPE_REF`,
   as the same tag already gets at a `meta.declared` position. Resolve the tag before judging admissibility at every
   typed position, in both encodings, and add `class2/validate` vectors for both names.
+- [ ] **`meta.declared` as a choice's variant loads, and no value reaches it** ([TSON-SCHEMA] §5.4, §7.8;
+  [TSON-JSON] §3.3). Deferred past Revision 40 by the spec author. Under `c => ( int32 | meta.declared )` and `r =>
+  { v: c }`, `!r { v: !text hello }` is refused ("'text' is not a declared variant of 'c'") and `!r { v: !c !int32
+  5 }` is a parse error, a value carrying one tag. §7.8 says such a value "carries the choice's tag and its own",
+  which no value can in either encoding. Refuse the choice at its declaration, as §5.4 refuses a nested choice that
+  is not disjoint, the tag being spent naming the variant; or rule that a tag naming no variant selects the declared
+  one. Then state the rule in §7.8 and add `schema/invalid` or `validate` vectors for it.
+- [ ] **The order of a chain's `supertypes` and `subtypes` is stated three ways** ([TSON-SCHEMA] §4.1, §7.5, §8.1,
+  §8.3). Deferred past Revision 40 by the spec author. Both are `meta.set_type<meta.type_ref>`. §4.1 and §8.1 say
+  `supertypes` is written sorted and give `subtypes` no order; §7.5 says a set is written in source declaration
+  order with no canonicalisation step, and a chain has no source; `meta-resolved.tn`'s note says both are sorted
+  and that comparison tools canonicalise them. State one rule in §8.1 for both, sorted being what the fixtures
+  write, except a derived set in §7.5, and bring the fixture notes into line.
 
 ## Checked annotations
 

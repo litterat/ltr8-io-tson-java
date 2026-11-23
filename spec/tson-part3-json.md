@@ -90,7 +90,7 @@ An implementation MAY be encode-only or decode-only; each side's obligations sta
 
 ### 1.6 The Type-System Changes This Document Consumes
 
-This document was drafted against four type-system changes: three landed in Revision 35 and the fourth, item 3, in Revision 36, which also brought items 5 and 6. Items 7 to 14 are Revision 37's, items 15 to 19 are Revision 38's, items 20 to 22 are Revision 39's, and item 23 is Revision 40's, each listed against the sections it changes. Each is listed with where it now lives and what this document consumes; the owning documents define them, and nothing here restates a rule they carry.
+This document was drafted against four type-system changes: three landed in Revision 35 and the fourth, item 3, in Revision 36, which also brought items 5 and 6. Items 7 to 14 are Revision 37's, items 15 to 19 are Revision 38's, items 20 to 22 are Revision 39's, and items 23 and 24 are Revision 40's, each listed against the sections it changes. Each is listed with where it now lives and what this document consumes; the owning documents define them, and nothing here restates a rule they carry.
 
 1. **No `null` value in the notation** ([TSON-DATA] §2.9, §4.4, §6; [TSON-SCHEMA] §4.2, §7.3). Base type resolution is boolean → number → string and applies only at a position nothing types — Revision 36 restates its applicability over the position rather than the header ([TSON-DATA] §4.1), which is the reading §4.1 here already took; `void` admits `_` alone. Consumed by: the whole of §7 — this document reads JSON `null` as the void sentinel's spelling, which is coherent only in a model that holds no null value — and by [TSON-DATA] §6, which names this document as the JSON reader.
 
@@ -529,7 +529,7 @@ JSON has one gap-shaped token, and so does the model ([TSON-DATA] §2.9): the vo
 
 ## 8. Sums and Discrimination
 
-This section is the encoding's discrimination predicate — the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived `disjoint` fact — together with the wire forms of the tag. It governs choice-typed positions; declared positions, the open sum, follow in §8.5.
+This section is the encoding's discrimination predicate — the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived `disjoint` fact — together with the wire forms of the tag. It governs choice-typed positions; declared positions, the open sum, follow in §8.5, and extern positions in §8.6.
 
 
 ### 8.1 The Tag and Where It Lives
@@ -720,7 +720,7 @@ The atom parsing contracts this document reaches through §5.1 carry their own n
 |-----------|-------|-----|
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/40/tson-part1-data |
 | TSON-SCHEMA | TSON Part 2: Type System and Schema | https://tson.io/2026/40/tson-part2-schema |
-| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/39/tson-guide |
+| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/40/tson-guide |
 
 ### 11.3 Informative References
 

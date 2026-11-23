@@ -49,7 +49,7 @@
     verbatim, and these fixtures, which exist to be compared, leave
     entry docs out and substitute this conventions note for the
     document-level one.
-  - Alias-kind names at type positions are stated as written: an
+  - An alias's name at a type position is stated as written: an
     alias is a hop, not a rewrite, so a use site naming an alias
     names the alias. A processor collapses the chain when it compiles
     readers, after linking, not in resolved output.
