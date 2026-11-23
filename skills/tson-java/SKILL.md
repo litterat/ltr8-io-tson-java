@@ -604,7 +604,7 @@ java --module-path tson/build/modules --add-modules io.ltr8.tson examples/Object
 (Java 25, no external runtime dependencies), the module dependency direction, the pipeline phase by
 phase, the exception-classification policy, and the traps that look like cleanup targets; each module has
 its own `CLAUDE.md` beside it. The `design/` notes carry the per-area design detail, `BACKLOG.md` the
-outstanding work, `SPEC-FEEDBACK.md` the spec issues raised against Parts 1 and 2 and how Revision 40 answers them, and
+outstanding work, `SPEC-FEEDBACK.md` the spec issues open against Parts 1 and 2, and
 `STATUS.md` the implemented checklist.
 `references/` here documents the API as it stands, not how to extend it.
 

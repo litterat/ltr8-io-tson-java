@@ -76,7 +76,10 @@ spec-required case:
   `VALIDATION_ERROR` ("expected well-formed TSON"), which the conformance runner maps to `validation`; §8.1 files
   adjacency and separator errors under `parser`. The validate vectors that state `parser` (an argument list in data)
   are checked by the subject failing a Class 1 parse instead (`Class2ConformanceSuiteTest.checkValidateVector`). Give
-  the read a code the runner maps to `parser`, and check those vectors by it.
+  the read a code the runner maps to `parser`, and check those vectors by it. The token before the error is judged
+  first, so the report leads with a diagnostic of another category: `t: box<text>` at a `meta.type_ref` field reports
+  `ATOM_CONSTRAINT_VIOLATION` for `box`, and `v: kind!` at an `int32` reports `ATOM_FORM_INVALID` for `kind`, each
+  ahead of the separation error. Report the syntax error as the document's verdict, in a collecting read too.
 - [ ] **An application through an alias of a parametric record is pinned at a composition operand alone** ([TSON-SCHEMA]
   §8.3). It applies the parametric record (`ParametricMaterialiser.parametricHead`: `bx<text>` over `bx => box` closes to the
   record `box<text>` closes to), and the corpus holds that at an operand, `box_of<text> & { … }`. Add a
@@ -239,7 +242,11 @@ spec-required case:
   { shipping: geo.address }`, `!order { shipping: !address { … } }` is a mismatch, though a bare name "names the
   root's `address` or fails to resolve" (§3.3). §8.1 makes an unresolved type name a resolver error: `UNKNOWN_TYPE_REF`,
   as the same tag already gets at a `meta.declared` position. Resolve the tag before judging admissibility at every
-  typed position, in both encodings, and add `class2/validate` vectors for both names.
+  typed position, in both encodings, and add `class2/validate` vectors for both names. A member-dispatched base
+  judges the tag later still: under `pet => abstract { kind: text =?  name: text }`, `pet: !nosuch { kind: dog … }`
+  reports "the discriminator of 'pet' selects 'dog', but this value is tagged 'nosuch'". The same step settles a
+  tag naming a parametric record or an incomplete entry, which is a validation error in the right category today
+  and is told what it names only at the root and at a `meta.declared` position (§5.5, §5.10).
 - [ ] **`meta.declared` as a choice's variant loads, and no value reaches it** ([TSON-SCHEMA] §5.4, §7.8;
   [TSON-JSON] §3.3). Deferred past Revision 40 by the spec author. Under `c => ( int32 | meta.declared )` and `r =>
   { v: c }`, `!r { v: !text hello }` is refused ("'text' is not a declared variant of 'c'") and `!r { v: !c !int32
@@ -523,6 +530,14 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   and type-reference bind readers resolve an annotation (`AnnotationCapture.bound`); every other bind reader skips
   it unread. Judge the name and the value at each of them as the tree readers do, discarding what no component
   receives, add a `CrossEncodingParityTest`-style case per position, and check `tson-json`'s bind path for the same.
+- [ ] **A name carrying an annotation is admitted at a reference over values** ([TSON-SCHEMA] §5.12). §5.12 refuses a
+  framed name, "a name's type is its referent's, and an annotation on it would have nowhere to go". Under `call =>
+  { m: meta.ref<method> }`, `!call { m: @doc:"x" orders.place_order }` reads with no diagnostic, in a data document
+  and in a value entry; an undeclared annotation there is refused, and a tag is refused as inadmissible at the
+  position. Refuse the annotated name in both encodings, with `class2/validate` and `schema/invalid` vectors. An
+  annotation on a type's name at a type slot is kept and written back (`TypeRefAnnotationTest`), and §8.1 preserves
+  author-written annotations at value positions, so settle first whether §5.12's sentence reaches a name at a type
+  slot; if the text does not say, that is an entry for `SPEC-FEEDBACK.md`.
 - [ ] **A choice's variant bound through a bridge delivers its wire value** ([TSON-SCHEMA] §7.4). With `color =>
   !enum [RED GREEN]` bound to a Java enum `Color implements Shade`, `size => { n: int32 }` to a record `Size implements
   Shade`, `shade => ( color | size )` and `holder => { s: shade }` to `Holder(Shade s)`, `!holder { s: RED }`, tagged or

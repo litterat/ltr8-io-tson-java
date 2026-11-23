@@ -6,7 +6,7 @@ Built against TSON Part 1 (lexer + data format), a working draft: https://tson.i
 and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/39/tson-part2-schema.md
 
 This is the spec's first implementation. Issues and ambiguities found in the spec while implementing are
-recorded in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md), whose entries Revision 40 answers.
+recorded in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md); Revision 40 answered every entry raised against Revision 39.
 
 **Implemented:**
 
