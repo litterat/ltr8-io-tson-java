@@ -61,6 +61,11 @@ subprojects {
     tasks.withType<Test> {
         useJUnitPlatform()
 
+        // Test classes are spread over forked JVMs, up to one per core; Gradle's worker limit caps the total
+        // across the modules testing at once. A class still has its JVM to itself while it runs, so
+        // process-wide state it restores (System.out) is safe. A fixed port or a fixed path is not.
+        maxParallelForks = Runtime.getRuntime().availableProcessors()
+
         // CI sets this so a missing conformance corpus fails the build instead of aborting through
         // Assumptions. An abort reads green, which is how CI ran none of the shared corpus for as
         // long as it did -- see SuiteCheckout. Passed through explicitly rather than left to

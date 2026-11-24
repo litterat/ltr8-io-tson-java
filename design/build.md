@@ -6,6 +6,9 @@ only; history lives in git.
 **Invariants**
 
 - No system Gradle — always the wrapper. `build` runs javadoc, so doclint failures are build failures.
+- Modules build side by side and test classes run in parallel forked JVMs, so a test owns no fixed port and no
+  fixed path, and a task reaches another module only through a declared dependency. Either breaks as a flake, not
+  a failure.
 - Retention across reads is a flat 0 bytes per read; transient-byte ceilings are loose on purpose — the shape is the
   signal, not the number.
 - Per-value cost is measured as a difference between two document sizes, never as a whole-read total.
