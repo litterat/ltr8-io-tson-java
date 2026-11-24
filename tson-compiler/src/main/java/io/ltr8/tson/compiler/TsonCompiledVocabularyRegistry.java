@@ -4,9 +4,11 @@ import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.resolver.KernelBootstrapResolver;
@@ -19,7 +21,9 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -293,24 +297,58 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
     }
 
     /**
-     * Loads this library's six bundled schema documents into this registry in dependency order, so any
-     * schema importing them resolves. Each is fetched straight from {@link TsonBundledSchemas} (never the
-     * configured {@code source}) and registered; its own {@code !!import} targets are cache hits
-     * by the time they're needed (the kernel is resolved ordinarily against its pre-loaded stand-in and registered
-     * explicitly -- see {@link #loadVocabulary}).
+     * Registers this library's six bundled schema documents, so any schema importing them resolves. Nothing is
+     * compiled here.
      */
     private void loadStandardLibrary() {
-        for (String id : TsonBundledSchemas.IDS) {
-            registerBundled(id);
+        StandardLibrary library = StandardLibrary.loaded();
+        library.schemas().forEach(schemaRegistry::register);
+        contentHashes.putAll(library.contentHashes());
+    }
+
+    /**
+     * The six bundled schemas, linked once and registered in every registry {@link #withStandardLibrary} builds.
+     *
+     * <p><b>Shared because no configuration reaches them.</b> They resolve under the default limits, link under the
+     * default identifier policy and bind through the schema model's own context, so they are a function of the
+     * packaged bytes alone, and a linked form is immutable. A registry still compiles the kernel's vocabulary itself,
+     * against its own bind context.
+     */
+    private record StandardLibrary(List<TsonLinkedSchema> schemas, Map<String, String> contentHashes) {
+
+        /** Unsynchronized: two threads meeting here load equal libraries, and either may be the one kept. */
+        private static volatile StandardLibrary loaded;
+
+        static StandardLibrary loaded() {
+            StandardLibrary library = loaded;
+            if (library == null) {
+                library = load();
+                loaded = library;
+            }
+            return library;
+        }
+
+        /**
+         * Each document in dependency order, its own {@code !!import} targets registered by the time they are needed;
+         * the kernel is resolved against its pre-loaded stand-in ({@link #loadVocabulary}).
+         */
+        private static StandardLibrary load() {
+            TsonCompiledVocabularyRegistry loader = new TsonCompiledVocabularyRegistry(
+                    SchemaModelNameBinder.over(AtomContext.defaultContext()));
+            List<TsonLinkedSchema> schemas = new ArrayList<>();
+            for (String id : TsonBundledSchemas.IDS) {
+                schemas.add(loader.registerBundled(id));
+            }
+            return new StandardLibrary(List.copyOf(schemas), Map.copyOf(loader.contentHashes));
         }
     }
 
     /**
-     * Fetches one bundled schema's own source straight from {@link TsonBundledSchemas}, records its content
-     * hash (so a later hash-pinned reference to it is verified), resolves it against this registry (its
-     * {@code !!import} targets already loaded) and registers it. Nothing is compiled here.
+     * Fetches one bundled schema's own source straight from {@link TsonBundledSchemas} (never the configured
+     * {@code source}), records its content hash (so a later hash-pinned reference to it is verified), resolves it
+     * against this registry and registers it.
      */
-    private void registerBundled(String id) {
+    private TsonLinkedSchema registerBundled(String id) {
         String sourceText = TsonBundledSchemas.fetch(id);
         recordAndVerify(sourceText, id, CanonicalIdentity.canonicalize(id));
         TsonSchemaParser parser = new TsonSchemaParser(sourceText);
@@ -319,7 +357,8 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
         // identifier policy: a deployment's configuration should not be able to break the standard library.
         TsonSchema resolved = new SchemaResolver(this, LimitsPolicy.defaults())
                 .resolveSchema(document, parser.schemaPositions());
-        schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry, IdentifierPolicy.defaults(), context));
+        return schemaRegistry.register(
+                TsonSchemaLinker.link(resolved, schemaRegistry, IdentifierPolicy.defaults(), context));
     }
 
     /**

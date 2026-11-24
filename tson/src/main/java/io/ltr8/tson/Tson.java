@@ -28,8 +28,8 @@ import java.util.Optional;
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
  * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #of(ProcessorConfig)}, or
- * {@link #standard()} for the defaults, which bootstraps the six bundled schemas (meta, numeric, temporal,
- * net, core, policy) into a fresh, governed environment:
+ * {@link #standard()} for the defaults, which registers the six bundled schemas (meta, numeric, temporal,
+ * net, core, policy) in a fresh, governed environment:
  *
  * <pre>{@code
  * Tson tson = Tson.standard();
@@ -39,7 +39,7 @@ import java.util.Optional;
  *
  * <p><b>Build one and share it.</b> An instance is immutable and <b>safe to read through from any number of
  * threads</b> -- which is the point of building one, since a schema compiles once per instance and a
- * per-request {@code Tson} re-bootstraps the standard library and recompiles every schema. Everything a read
+ * per-request {@code Tson} recompiles every schema. Everything a read
  * touches is either immutable or per-read: the compiled readers hold no mutable state, a {@code Lexer} and
  * its stream are built per read and shared with nothing, and the two caches a read passes through are
  * concurrent maps whose hits take no lock. Even the first concurrent use of a schema this instance has not
@@ -116,18 +116,16 @@ public final class Tson {
     }
 
     /**
-     * Bootstraps the bundled schemas under {@code config} and returns the governed environment.
+     * The governed environment for {@code config}, the bundled schemas registered in it.
      *
      * <p>The configuration is a value and lives in {@code tson-base}, so the same one configures every
      * encoding; what cannot live there is this method, which names the compiler's own registry. That split
      * is the whole of why construction is here and settings are there.
      */
     public static Tson of(ProcessorConfig config) {
-        // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
-        // bundled schemas, and the access's source is consulted only for other URIs. It
-        // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
-        // can't resolve the !enum/!integer instances a meta-schema declares). One context serves the core
-        // and the object readers: the configured one, the kernel's names composed under its binder.
+        // The resolution core is both the store and the on-demand loader; the access's source is consulted
+        // only for URIs outside the bundled schemas. One context serves the core and the object readers: the
+        // configured one, the kernel's names composed under its binder.
         DataBindContext context = SchemaModelNameBinder.over(config.dataBindContext());
         SchemaSource source = config.schemaAccess().source();
         TsonCompiledVocabularyRegistry core = TsonCompiledVocabularyRegistry.withStandardLibrary(

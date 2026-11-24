@@ -8,6 +8,9 @@ form only; history lives in git.
 
 - The core compiles a schema as vocabulary only when a resolution reads through it, lazily and once per identity;
   data reads compile per mode in a read registry.
+- The six bundled schemas are linked once per process and every core registers the same linked forms. No
+  configuration reaches them, the bind context included: one that did would make them a function of the first core
+  built. Each core still compiles the kernel's vocabulary against its own context.
 - The read mode is which registry you hold, not a compile parameter; resolution is always bind-anchored and delegated to
   the core.
 - An import cycle is caught by a per-thread in-flight set, not a cache lookup and not a registry-wide set; it throws even
@@ -39,10 +42,10 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   **compiled vocabulary**. Only the kernel's is cached: its pre-loaded stand-in, which the kernel's own resolution reads
   every head through, and its registered compile once something asks for it. No resolution compiles anything into the
   core.
-  `withStandardLibrary(context, source)` builds a core with the six bundled schemas resolved and registered, in
-  `TsonBundledSchemas.IDS` order (the kernel meta.tn, then numeric, temporal, net, core, policy); an overload takes the
-  identifier policy and the `LimitsPolicy` user schemas resolve under (`limits()`, whose wait depth `SchemaResolver` counts),
-  and the bundled schemas resolve under the defaults whatever is configured, so a deployment cannot break them. The kernel,
+  `withStandardLibrary(context, source)` builds a core with the six bundled schemas registered; an overload takes the
+  identifier policy and the `LimitsPolicy` user schemas resolve under (`limits()`, whose wait depth `SchemaResolver` counts).
+  The bundled schemas resolve under the defaults and bind through the schema model's own context whatever is configured,
+  so a deployment cannot break them, and that is what lets one linked library serve every core. The kernel,
   meta.tn, is always read from `TsonBundledSchemas`, whatever the `SchemaSource`: it is the revision the library was built
   for.
 - **`TsonCompiledSchemaRegistry`** is a **per-mode registry of compiled user schemas** over a core, built
