@@ -70,10 +70,16 @@ public final class AnnotatedMap<K, V> extends AbstractMap<K, V> {
         this.immutable = immutable;
     }
 
-    /** An immutable copy -- {@code entries}' own key annotations included when it has any. */
+    /**
+     * An immutable map of {@code entries}, their own key annotations included when they have any. An immutable
+     * {@code AnnotatedMap} is returned as it is, as {@link Map#copyOf} returns an unmodifiable map.
+     */
     public static <K, V> AnnotatedMap<K, V> copyOf(Map<K, V> entries) {
         Map<K, Annotations> annotations = new LinkedHashMap<>();
         if (entries instanceof AnnotatedMap<K, V> annotated) {
+            if (annotated.immutable) {
+                return annotated;
+            }
             annotations.putAll(annotated.annotations);
         }
         return new AnnotatedMap<>(new LinkedHashMap<>(entries), annotations, true);
@@ -87,13 +93,13 @@ public final class AnnotatedMap<K, V> extends AbstractMap<K, V> {
     /** This map, with {@code key}'s own annotations replaced -- a fresh immutable map, this one untouched. */
     public AnnotatedMap<K, V> withAnnotations(K key, Annotations forKey) {
         Objects.requireNonNull(key, "key");
-        AnnotatedMap<K, V> copy = copyOf(this);
+        Map<K, Annotations> changed = new LinkedHashMap<>(annotations);
         if (forKey.isEmpty()) {
-            copy.annotations.remove(key);
+            changed.remove(key);
         } else {
-            copy.annotations.put(key, forKey);
+            changed.put(key, forKey);
         }
-        return copy;
+        return new AnnotatedMap<>(new LinkedHashMap<>(values), changed, true);
     }
 
     /** The annotations written at {@code key}'s own position -- empty when it carries none. */
