@@ -142,8 +142,9 @@ import java.util.stream.Stream;
  * Around those reads a {@code ReadException} or {@code SchemaValidationException} is the author's and a {@code
  * BindMismatchException} the deployment's, each rethrown as itself; anything else is a fault, and propagates as
  * one.
- * One rule is not checked at all: a restated FIXED field MUST NOT change its pinned value (§5.8), and {@link
- * #resolveTighteningField} does not compare the two.
+ * One rule is not judged here: a restated FIXED field MUST NOT change its pinned value (§5.8), and {@link
+ * #resolveTighteningField} binds the restatement before the names its pin's type reaches need be ready, so
+ * {@code TsonSchemaLinker} compares the two.
  *
  * <p>Declarations resolve in one namespace per schema (§3.3, §3.3.1): the schema's own entries and its
  * import closure. It reaches this class as two getters over that one
