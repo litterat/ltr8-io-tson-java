@@ -18,8 +18,11 @@ registry and identity, `design/namespace-types-and-value-entries.md` for `Namesp
 - An atom body's components mirror its constructor's *resolved*, flattened shape — one component per schema field name.
   A nested or missing component binds `null` silently.
 - A bind target with more than one public constructor needs `@Record` on the canonical one.
-- A `TypeRef` is a name or, inside a parametric record, a `ParamRef`; an application is an `ApplyBody` written in place.
-  `RecordBody`'s constructor turns the names its `parameters` declare into `ParamRef`s and refuses a `ParamRef` they do
+- A `TypeRef` is a name or, inside a parametric record, a `ParamRef`, never an application: an application is an
+  `ApplyBody` written in place, whose arguments are names, compared by head and arguments.
+- A type slot holds a `TypeExpr`: a `TypeRef`, or a `TypeInline` wrapping a body with its constructor. A `TypeInline`
+  is no entry, so nothing looks one up by name, and a name and a `TypeInline` are never the same type.
+- `RecordBody`'s constructor turns the names its `parameters` declare into `ParamRef`s and refuses a `ParamRef` they do
   not declare. `RecordField.position` is `@Unbound`; an entry's position, annotations and constructor tag live beside
   the map in `TsonSchema`'s per-entry facts, never in a body.
 - The registry never overwrites an identity. Bundled schema text comes from `spec/m/` at build time and is verified

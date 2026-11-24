@@ -32,6 +32,19 @@ Rules that bite here:
   that builds a reader or a writer from a `RecordBody`, or treats one as a type, asks `isParametric()` first. There is one
   opinion about a binding's wire form, and it is `WireForm`'s.
 - The grammar is checked where a name is read; §8.2 hygiene runs once per layer over scopes, never at a reading position.
-- The resolver names engines (`writer.DataClassObjectWriter`), never facades.
 - Lexer/parser/resolver behaviour changes get conformance vectors in the same session (`design/conformance-suite.md`).
-- The Traps list in the root `CLAUDE.md` is mostly about classes in this module.
+
+Traps, one line each; the class Javadoc and the note carry the why:
+
+- A constructor's application is no `ApplyBody`: it is rewritten to its construction before anything reads it
+  (`ConstructionRewrite`).
+- `SchemaDesugarer` returns un-rewritten nodes **by identity** — positions live in an `IdentityHashMap`.
+- A desugar-reported declaration is replaced with an absorbing stand-in that **keeps its type parameters**.
+- The resolver names engines, never facades: atom refinement merges through `writer.DataClassObjectWriter` on the wire
+  record before binding — never through `TsonObjectWriter`, and there is no cheaper substitute.
+- `requireDocumentEnd`: the pull past the root value is the point, not the assertion after it.
+- Lexer multi-line close detection strips leading whitespace *before* comparing against `"""`.
+- `Position` must keep the record's default `toString()` — the `tson` module's `ResolvedForm` normalises positions by
+  regex over it.
+- `CompiledReaders` is rebound exactly once, from the `Compilation` to the finished `TsonCompiledSchema`.
+- `verifyFixed` compares with the pre-rebind parser (`FixedCheck`).

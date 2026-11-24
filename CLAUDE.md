@@ -4,13 +4,14 @@ Orientation for Claude Code sessions in this repo: what the project is, the rule
 the detail lives. It describes the code **as it stands** — present tense; history is in git.
 
 **This file is an index, and it stays short.** Design detail lives in `design/` (map below), in class Javadoc, and in
-the `CLAUDE.md` inside each module directory, which loads when you touch that module. **Before working in an area, read
+the `CLAUDE.md` inside each module directory and `spec/`, which loads when you touch that directory and holds its
+traps. **Before working in an area, read
 its `design/` note** — each opens with the invariants that are easy to break silently, then the why. Read the one or two
 notes the task touches, not all of them. Trust but verify: the code is the source of truth if a note has drifted.
 
 **When you learn something, put it in the area's note, not here.** A paragraph added to this file is read by every
-session on every task; one added to a note is read by the sessions that need it. This file grows only when a rule
-applies to all work in the repo.
+session on every task; one added to a note is read by the sessions that need it. A trap in one class goes in its
+module's `CLAUDE.md`. This file grows only when a rule applies to all work in the repo.
 
 ## Design notes (`design/`)
 
@@ -20,7 +21,7 @@ Forty-odd notes, each opening with its invariants. Pick by the class you are abo
 |---|---|
 | **Lexing and data parsing** | `lexer-and-data-parsing.md` (lexer, Tier 2 stream, Tier 3 AST) · `base-types-and-atom-vocabulary.md` (§4 resolution, `tson-atom`) |
 | **Schema grammar, desugaring** | `schema-grammar.md` (`TsonSchemaParser`) · `schema-grammar-and-desugaring.md` (`SchemaDesugarer`, sugar table, forms written in place) · `desugaring-forms-over-parameters.md` (forms over a parameter, a parametric record's body refused) |
-| **Resolution** | `references.md` (the forms a name takes, an application's argument list; which slot is typed `meta.type_ref` or a key) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`TypeSlots`/`CanonicalApplication`, alias hops, meta-kernel bootstrap) |
+| **Resolution** | `references.md` (the forms a name takes, a reference's store and judgement, what an application is) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`TypeSlots`/`CanonicalApplication`, alias hops, meta-kernel bootstrap) |
 | **Parametric records (§5.10)** | `parametric-records.md` (a parametric record, `Param`, `ParamRef`, bounds) · `parametric-materialisation.md` (`ParametricMaterialiser`, where an application closes, regularity) |
 | **Linking** | `linking-and-compilation.md` (registry, identity, import merge, link order, values by name) · `kinds-and-name-types.md` (`KindMembers`, `name_type`) · `inhabitance-and-record-extension.md` · `choice-disjointness.md` · `namespace-types-and-value-entries.md` (namespace types, value entries, `ValueEntry`) · `externs.md` (`!meta.extern`, `ExternHops`, loading with the imports) · `name-hygiene.md` (`checkNames`) |
 | **Compilation** | `class2-compilation.md` (`TsonSchemaCompiler`, `CompiledReaders`, `ErrorReader`, untagged choices) · `compiled-registries.md` (the two registries, concurrency) |
@@ -30,7 +31,7 @@ Forty-odd notes, each opening with its invariants. Pick by the class you are abo
 | **JSON encoding** | `json-encoding.md` (rationale: why a separate stack) · `json-lexer-stream-tree.md` · `json-schema-directed-reading.md` · `json-facades-binding-writing.md` · `json-unicode-policies.md` |
 | **Modules** | `modules.md` (every boundary and why) · `tson-base.md` (the shared vocabulary, package by package) |
 | **CLI, bundled schemas, hashing** | `cli-config-hashing.md` |
-| **Conformance, build, process** | `conformance-suite.md` (runner contract, §8.2 scope walks) · `build.md` (commands, allocation harness, publishing) · `process.md` (branches, spec-feedback register, backlog and identity rules at full length) |
+| **Conformance, build, process** | `conformance-suite.md` (runner contract, §8.2 scope walks) · `build.md` (commands, allocation harness, publishing) · `process.md` (branches, the register, restamping, a bundled schema's `@doc`, project-owned identities) |
 
 Other root documents: `BACKLOG.md` (outstanding work), `SPEC-FEEDBACK.md` (open spec issues against Parts 1 and 2),
 `STRUCTURED-OUTPUT.md` (the target use case: LLM structured-output validation, JSON compatibility), and the
@@ -49,20 +50,16 @@ A from-scratch Java implementation of TSON (Typed Schema Object Notation), built
 The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
 and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 40, not
 edited here) with **two exceptions that are live**: `spec/m/{meta,numeric,temporal,net,core,policy}.tn` are packaged
-from here at build time, and `spec/tson-part3-json.md` is edited in place.
-
-**Editing a bundled schema means re-stamping.** The library verifies the packaged bytes against
-`TsonBundledSchemas`' digests on every load, so one stale constant fails `Tson.standard()` and most of the suite.
-`scripts/restamp-bundled-schemas.sh` re-pins everything in dependency order (`--check` reports only); Part 2 §13.2's
-table in `spec/` is the one pin it does not write. Keep `spec/fixtures/*-resolved.tn` in step — `ResolvedFixtureTest`
-checks them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
+from here at build time, and `spec/tson-part3-json.md` is edited in place. **Editing a bundled schema means
+re-stamping** (`scripts/restamp-bundled-schemas.sh`), or `Tson.standard()` fails and most of the suite with it.
+`spec/CLAUDE.md` has the rules for each.
 
 **Branches.** `main` is the reference implementation of the *published* revision (40): identities `/2026/40/m/`,
-version `0.40.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`,
-`r2026-38`, `r2026-39`), each added when the next revision merges. **No proposal branch is open.** Work the published
-spec cannot carry opens `r2026-41-proposal`, with a corpus branch of the same name, carrying Revision 41 identities and
-version `0.41.0-SNAPSHOT`; it merges when the spec lands and not before. Proposal work branches off it and PRs into it;
-work the published revision can carry still goes to `main`. Check the branch before quoting identities or the version.
+version `0.40.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, then `r2026-34` to `r2026-39`), each added when
+the next revision merges. **No proposal branch is open, so work goes to `main`.** Work the published spec cannot carry
+opens `r2026-41-proposal`, with a corpus branch of the same name, carrying Revision 41 identities and version
+`0.41.0-SNAPSHOT`; it merges when the spec lands and not before. **While a proposal branch is open, all work branches
+off it and PRs into it**, a fix `main` could carry included. Check the branch before quoting identities or the version.
 `design/process.md` has the procedure.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version
@@ -108,13 +105,10 @@ Being first makes this the real test of whether the spec's prose resolves to one
 record it — never silently pick an interpretation.
 
 - **Parts 1 and 2 → `SPEC-FEEDBACK.md`**: section, concrete description, the interpretation chosen and why, suggested
-  resolution. The register holds only what is open against the current revision and renumbers from #1 when a revision
-  closes; resolved entries are deleted. It is self-contained and is the as-built record that goes to the spec reviewer:
-  an entry proposing a design states what is *running*, and says so where a recommendation is a proposal instead.
+  resolution. The register holds only what is open against the current revision and is self-contained: an entry
+  proposing a design states what is *running*, and says so where a recommendation is a proposal instead.
 - **Part 3 → edit `spec/tson-part3-json.md` directly**, in the same session, and say so in the commit; it has no
-  published revision to propose against. State the rule in the prose (and, where the choice was open, why the
-  alternative lost). The document never mentions this codebase. Keep edits to what implementation forced a decision
-  about; a section you build against and leave unedited is one you are asserting is right.
+  published revision to propose against. `spec/CLAUDE.md` has the rules for the edit.
 - **Cite the spec, not the argument.** Prose and Javadoc name the current section that requires a rule. A
   `SPEC-FEEDBACK.md #N` citation is only for an entry still open; when it closes, the citation becomes the section.
 
@@ -158,37 +152,12 @@ says so. `UnsupportedOperationException`: this library has not implemented that 
 internal invariant broke. The test: *a schema error's verdict doesn't change when this library improves; a gap's does.*
 A gap travels as `Diagnostic.Code.NOT_IMPLEMENTED`, and the CLI's exit 1 vs 70 rides on that code.
 
-**Project-owned schema `!!id`:** `https://tson.io/2026/40/io/ltr8/<group>/<name>.tn`. Between releases the schema is
-edited in place; a release fixes the document under its identity (§10). Use `.tn`, never `.tn1`.
-
 **Line wrapping:** 125 characters, comments and code. Count characters, not bytes (`scripts/check-line-length.sh`).
 
 **Never put literal BOM/NEL/LS/PS characters in source or tests** — use `\uXXXX` escapes.
 
 **Add conformance vectors in the same session as lexer/parser/resolver work.** The corpus is the sibling repo
 `ltr8-io-tson-test-suite`; it moves first, then `SUITE_PIN`. `design/conformance-suite.md` has the runner contract.
-
-## Traps
-
-One line each; the class Javadoc and the note carry the why. Read before touching the class involved.
-
-- A `TypeRef` is a name, never an application: an application is an `ApplyBody` written in place, whose arguments are
-  names, compared by head and arguments. A constructor's application is no `ApplyBody`: it is rewritten to its
-  construction before anything reads it (`ConstructionRewrite`).
-- `SchemaDesugarer` returns un-rewritten nodes **by identity** — positions live in an `IdentityHashMap`.
-- A desugar-reported declaration is replaced with an absorbing stand-in that **keeps its type parameters**.
-- A type slot holds a `TypeExpr`: a `TypeRef`, or a `TypeInline` wrapping a body with its constructor. A `TypeInline`
-  is no entry, so nothing looks one up by name, and a name and a `TypeInline` are never the same type.
-- `requireDocumentEnd`: the pull past the root value is the point, not the assertion after it.
-- Lexer multi-line close detection strips leading whitespace *before* comparing against `"""`.
-- `Position` must keep the record's default `toString()` — `ResolvedForm` normalises positions by regex over it.
-- `CompiledReaders` is rebound exactly once, from the `Compilation` to the finished `TsonCompiledSchema`.
-- `verifyFixed` compares with the pre-rebind parser (`FixedCheck`).
-- A schema-model bind target with more than one public constructor needs `@Record` on the canonical one.
-- An atom body's components mirror its constructor's *resolved* (flattened) shape, one component per schema field name —
-  a nested or missing one binds `null` silently.
-- Atom refinement merges through `writer.DataClassObjectWriter` on the wire record before binding — never through the
-  `TsonObjectWriter` facade, and there is no cheaper substitute.
 
 ## Build and test
 
@@ -210,8 +179,8 @@ scripts/restamp-bundled-schemas.sh --check
 `.references/` (`scripts/fetch-references.sh`); absent, the vectors abort through `Assumptions` unless
 `TSON_REQUIRE_TEST_SUITE` is set, as CI does. Check the run actually executed vectors before calling it a pass.
 
-**Allocation is measured, not assumed** (`AllocationHarnessTest`, `JsonAllocationHarnessTest`): retention is a flat 0
-bytes per read, transient bytes have a loose ceiling. Treat the shape as the signal. `design/build.md`.
+**Allocation is measured, not assumed** (`AllocationHarnessTest`, `JsonAllocationHarnessTest`); `design/build.md` says
+what the numbers mean.
 
 **Shipping a change** follows the `/ship` skill: issue → branch off `main` → PR → CI green *for the HEAD
 commit* → merge commit. A fix's test is shown to fail without the fix.
