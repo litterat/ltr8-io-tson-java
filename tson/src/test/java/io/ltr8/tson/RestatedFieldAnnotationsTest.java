@@ -15,14 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-SCHEMA] §5.7/§5.8: what happens to a field's annotations when a refinement or composition body
- * restates it.
+ * [TSON-SCHEMA] §5.8: what happens to a field's annotations when a composition body restates it.
  *
  * <p><b>They merge over, restatement first.</b> An inherited field is absorbed whole and keeps everything;
- * a restated one keeps its own annotations and the inherited ones after them. The rule is one rule for both
- * bodies, since one resolver path serves them.
+ * a restated one keeps its own annotations and the inherited ones after them.
  *
- * <p>The spelling that makes the rule necessary is §5.7's modifier-only entry: {@code legacy_id?: ~ "none"}
+ * <p>The spelling that makes the rule necessary is §5.8's modifier-only entry: {@code legacy_id?: ~ "none"}
  * names no type, tightens the value and nothing else, and has no annotation position at all -- so an entry that
  * mentions nothing must not be able to erase what it does not mention.
  *
@@ -42,8 +40,8 @@ class RestatedFieldAnnotationsTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               account => {
                 @doc:"Pre-2020 registry identifier."
@@ -67,7 +65,7 @@ class RestatedFieldAnnotationsTest {
                 legacy_id?: ~ "none"
               }
 
-              refined_account => account ^ {
+              restating_account => account & {
                 legacy_id?: ~ "none"
               }
             }
@@ -123,16 +121,16 @@ class RestatedFieldAnnotationsTest {
                 field("documented_account", "legacy_id").annotations().value("doc", String.class));
     }
 
-    /** One rule for both bodies: §5.7's refinement gets the same answer as §5.8's composition. */
+    /** A body that only restates gets the same answer as one that adds a field beside it. */
     @Test
-    void refinementMergesTheSameWayComposalDoes() {
-        assertEquals(List.of("doc", "deprecated"), names("refined_account", "legacy_id"));
+    void aBodyOnlyRestatingMergesTheSameWay() {
+        assertEquals(List.of("doc", "deprecated"), names("restating_account", "legacy_id"));
     }
 
     /** Nothing is removable: every inherited annotation survives every restatement above. */
     @Test
     void noRestatementDropsAnInheritedAnnotation() {
-        for (String subtype : List.of("premium_account", "archived_account", "documented_account", "refined_account")) {
+        for (String subtype : List.of("premium_account", "archived_account", "documented_account", "restating_account")) {
             List<String> annotations = names(subtype, "legacy_id");
             assertTrue(annotations.contains("doc"), subtype + " lost @doc");
             assertTrue(annotations.contains("deprecated"), subtype + " lost @deprecated");

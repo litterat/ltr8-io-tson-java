@@ -4,6 +4,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -28,7 +29,8 @@ class TypeRefAnnotationTest {
     }
 
     private static TypeRef fieldType(Top definition) {
-        return assertInstanceOf(RecordBody.class, definition).fields().values().iterator().next().typeRef();
+        return assertInstanceOf(TypeRef.class,
+                assertInstanceOf(RecordBody.class, definition).fields().values().iterator().next().typeExpr());
     }
 
     /** An annotation written on the reference itself, read off a document. */
@@ -41,6 +43,16 @@ class TypeRefAnnotationTest {
 
         assertEquals("text", type.name());
         assertEquals("the token itself", type.annotations().get("doc").orElseThrow().value().orElseThrow());
+    }
+
+    /** At a slot typed {@code meta.type_ref} itself, not the {@code meta.type_expr} choice a field's type is. */
+    @Test
+    void anAnnotationOnATypeRefAtAKindSlotIsKept() {
+        Alias alias = assertInstanceOf(Alias.class, read("!meta.alias { target: @doc:\"the target itself\" text }"));
+
+        assertEquals("text", alias.target().name());
+        assertEquals("the target itself",
+                alias.target().annotations().get("doc").orElseThrow().value().orElseThrow());
     }
 
     /** A reference with nothing written on it carries an empty carrier, not null. */

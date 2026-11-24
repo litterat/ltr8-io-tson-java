@@ -21,10 +21,8 @@ import java.util.Set;
  * nothing asks whether a record is final and no reader carries a check for it.
  *
  * <p><b>Both dispatchers compare a written tag against flattened names</b> ({@link Subsumption#admitting}),
- * §7.2 comparing "after alias flattening of both". It is not a nicety here: a family whose base is a
- * template has minted entries for every member, and §8.2 makes a minted name non-normative -- so an alias is
- * the only name a document has for {@code ok<text>}, and a dispatcher matching raw subtype names would refuse
- * every value in such a family.
+ * §7.2 comparing "after alias flattening of both": a tag naming an alias of the base or of a member names that
+ * type, and a dispatcher matching raw names would refuse it.
  */
 final class RecordDispatch {
 
@@ -38,7 +36,9 @@ final class RecordDispatch {
                 return concrete.create(name, definition, context);
             }
             String displayName = EntryDisplayName.of(name, context.schema());
-            Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
+            // A record written in place has no name, so no tag names it ([TSON-SCHEMA] §7.2).
+            Set<String> selfNames = context.tagOf(name).isPresent()
+                    ? Subsumption.admitting(List.of(name), context.namesMeaning()) : Set.of();
             return switch (body.extension()) {
                 // ABSTRACT says the record has no values of its own; whether its members are placed by the
                 // tag or by reading their pins is the body's own `discriminators` and never a second member
@@ -46,7 +46,7 @@ final class RecordDispatch {
                 // member, so an alias is not a second member. Where it compares a written tag it admits
                 // aliases (`deeper`).
                 case ABSTRACT -> FamilySelectors.dispatchesOnMembers(definition)
-                        ? new RecordMemberDispatchReader(selfNames, displayName,
+                        ? new RecordMemberDispatchReader(name, selfNames, displayName,
                                 FamilySelectors.of(definition),
                                 Set.copyOf(context.subtypesOf(name, definition)), context, context.readers())
                         : tagDispatch(selfNames, displayName,

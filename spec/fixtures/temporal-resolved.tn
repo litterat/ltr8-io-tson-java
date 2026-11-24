@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/39/m/temporal-resolved.tn"
-!!import:"https://tson.io/2026/39/m/meta.tn"
+!!id:"https://tson.io/2026/40/m/temporal-resolved.tn"
+!!import:"https://tson.io/2026/40/m/meta.tn"
 @doc:"""
-  Resolver-output fixture for temporal.tn (2026 Revision 39 draft).
+  Resolver-output fixture for temporal.tn (2026 Revision 40 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
   Conventions as in meta-resolved.tn, and the header note in
   numeric-resolved.tn applies here: temporal.tn imports meta.tn alone, its
@@ -24,13 +24,13 @@
     ] }
 
     time_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
-      chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      spec          => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
-      min           => !meta.record_field { type: time  optional: true }
-      exclusive_min => !meta.record_field { type: time  optional: true }
-      max           => !meta.record_field { type: time  optional: true }
-      exclusive_max => !meta.record_field { type: time  optional: true }
-      precision     => !meta.record_field { type: numeric.count  optional: true }
+      chain           => !meta.record_field { type: meta.type_chain  optional: true }
+      spec            => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
+      min             => !meta.record_field { type: time  optional: true }
+      exclusive_min   => !meta.record_field { type: time  optional: true }
+      max             => !meta.record_field { type: time  optional: true }
+      exclusive_max   => !meta.record_field { type: time  optional: true }
+      fraction_digits => !meta.record_field { type: numeric.count  optional: true }
     }
     groups: [
       !meta.field_group { members: [[min] [exclusive_min]]  optional: true }
@@ -38,13 +38,13 @@
     ] }
 
     datetime_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
-      chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      spec          => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
-      min           => !meta.record_field { type: datetime  optional: true }
-      exclusive_min => !meta.record_field { type: datetime  optional: true }
-      max           => !meta.record_field { type: datetime  optional: true }
-      exclusive_max => !meta.record_field { type: datetime  optional: true }
-      precision     => !meta.record_field { type: numeric.count  optional: true }
+      chain           => !meta.record_field { type: meta.type_chain  optional: true }
+      spec            => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
+      min             => !meta.record_field { type: datetime  optional: true }
+      exclusive_min   => !meta.record_field { type: datetime  optional: true }
+      max             => !meta.record_field { type: datetime  optional: true }
+      exclusive_max   => !meta.record_field { type: datetime  optional: true }
+      fraction_digits => !meta.record_field { type: numeric.count  optional: true }
     }
     groups: [
       !meta.field_group { members: [[min] [exclusive_min]]  optional: true }
@@ -52,14 +52,14 @@
     ] }
 
     duration_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
-      chain         => !meta.record_field { type: meta.type_chain  optional: true }
-      spec          => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
-      min           => !meta.record_field { type: duration  optional: true }
-      exclusive_min => !meta.record_field { type: duration  optional: true }
-      max           => !meta.record_field { type: duration  optional: true }
-      exclusive_max => !meta.record_field { type: duration  optional: true }
-      precision     => !meta.record_field { type: numeric.count  optional: true }
-      multiple_of   => !meta.record_field { type: duration  optional: true }
+      chain           => !meta.record_field { type: meta.type_chain  optional: true }
+      spec            => !meta.record_field { type: iri  optional: true  role: FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
+      min             => !meta.record_field { type: duration  optional: true }
+      exclusive_min   => !meta.record_field { type: duration  optional: true }
+      max             => !meta.record_field { type: duration  optional: true }
+      exclusive_max   => !meta.record_field { type: duration  optional: true }
+      fraction_digits => !meta.record_field { type: numeric.count  optional: true }
+      multiple_of     => !meta.record_field { type: duration  optional: true }
     }
     groups: [
       !meta.field_group { members: [[min] [exclusive_min]]  optional: true }

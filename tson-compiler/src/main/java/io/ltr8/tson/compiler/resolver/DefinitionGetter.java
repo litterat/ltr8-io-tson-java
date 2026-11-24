@@ -1,13 +1,14 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Top;
 
 /**
  * A single-name entry lookup -- the value a name maps to -- {@code null} if {@code name} isn't resolved (yet or
  * at all), matching {@code Map.get}'s own contract -- {@link DefinitionResolver} holds two of these over the
  * schema's one namespace: {@code namespaceDefinitions}, the whole of it, which {@link
- * DefinitionResolver#resolveComposition}/{@link DefinitionResolver#resolveRefinement}/{@link
- * DefinitionResolver#resolveAtomRefinement} look a supertype/refinement-source/atom-refinement-source up in, and
+ * DefinitionResolver#resolveComposition}/{@link DefinitionResolver#resolveAtomRefinement} look a
+ * supertype/atom-refinement-source up in, and
  * {@code vocabularyDefinitions}, where {@link DefinitionResolver#resolveConstructorTarget} looks a constructor-application
  * target up and an annotation's type is found -- the whole namespace too, but for the kernel's own resolution, which
  * reads every head through its pre-loaded stand-in.
@@ -23,4 +24,13 @@ import io.ltr8.tson.schema.meta.Top;
 interface DefinitionGetter {
 
     Top definition(String name);
+
+    /**
+     * Whether {@code name}, past its alias hops, is a parametric record. An application of one orders nothing (a name at a
+     * type position, [TSON-SCHEMA] §3.4.1), so an implementation that makes entries ready answers without waiting on
+     * the declaration.
+     */
+    default boolean opens(String name) {
+        return ParametricEntry.isParametric(definition(AliasChain.terminal(name, this::definition)));
+    }
 }

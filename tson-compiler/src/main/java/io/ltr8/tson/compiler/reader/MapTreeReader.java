@@ -4,7 +4,6 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -24,10 +23,15 @@ import java.util.Optional;
 final class MapTreeReader extends MapAbstractReader<TsonValue> {
 
     public MapTreeReader(String name, String displayName, MapBody body, TsonTypeReaderResolver resolver,
-                         SchemaLocation schemaLocation, AnnotationTypes annotationTypes, boolean keysAreNames) {
+                         SchemaLocation schemaLocation, AnnotationTypes annotationTypes, boolean keysAreNames,
+                         Optional<String> tag) {
         super(name, displayName, body, resolver, schemaLocation, keysAreNames);
         this.annotationTypes = annotationTypes;
+        this.tag = tag;
     }
+
+    /** The tag the value carries: the entry's name, none for a type written in place ({@code tagOf}). */
+    private final Optional<String> tag;
 
     /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */
     private final AnnotationTypes annotationTypes;
@@ -38,11 +42,11 @@ final class MapTreeReader extends MapAbstractReader<TsonValue> {
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition instanceof MapBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition);
+                throw new IllegalStateException("'" + name + "' is not map-shaped: " + typeDefinition);
             }
             return new MapTreeReader(name, context.displayName(name, typeDefinition), body, resolver,
                     context.locationOf(name), AnnotationTypes.of(context),
-                    keysAreNames(body, context));
+                    keysAreNames(body, context), context.tagOf(name));
         }
     }
 
@@ -62,7 +66,7 @@ final class MapTreeReader extends MapAbstractReader<TsonValue> {
         if (ConstructionGuard.abandoned(ctx, mark)) {
             return null;
         }
-        return new TsonMap(entries, Optional.of(name), annotations);
+        return new TsonMap(entries, tag, annotations);
     }
 
     private static TsonValue node(Object decoded) {

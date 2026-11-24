@@ -30,9 +30,13 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
         return linked.schema();
     }
 
-    /** Each of {@code names} with every alias that means it -- what a written {@code $type} is matched against. */
+    /**
+     * Each of {@code names} with every alias that means it -- what a written {@code $type} is matched against. A name
+     * no entry holds is the form of a type written in place, which no tag names ([TSON-SCHEMA] §7.2), and admits
+     * nothing.
+     */
     public Set<String> admitting(Collection<String> names) {
-        return AliasChain.admitting(names, namesMeaning);
+        return AliasChain.admitting(names.stream().filter(schema().entries()::containsKey).toList(), namesMeaning);
     }
 
     /**
@@ -45,8 +49,8 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
     }
 
     /**
-     * The entries IS-A {@code name}, whose value is {@code definition}: its chain's {@code subtypes} -- a type's,
-     * and a family base template's, whose subtypes are its members.
+     * The entries IS-A {@code name}, whose value is {@code definition}: its chain's {@code subtypes}, each a type, a
+     * parametric record being in no index.
      */
     public List<String> subtypesOf(String name, Top definition) {
         return TypeChain.subtypesOf(definition);
@@ -54,19 +58,16 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
 
     /**
      * The entries IS-A {@code name} that have instances of their own -- {@link #subtypesOf}, less every abstract
-     * record and every family-base template, neither of which a value can be directly. What a refusal at an
-     * abstract position names as satisfying it: naming an abstract subtype would only refuse in turn.
+     * record, which a value can never be directly. What a refusal at an abstract position names as satisfying it:
+     * naming an abstract subtype would only refuse in turn.
      */
     public List<String> instantiableSubtypesOf(String name, Top definition) {
         return subtypesOf(name, definition).stream()
                 .filter(subtype -> {
                     io.ltr8.tson.schema.meta.Top entry = schema().entries().get(subtype);
-                    // A record template is ABSTRACT by construction, and a held template is no type.
                     return switch (entry) {
                         case io.ltr8.tson.schema.meta.RecordBody record ->
                                 record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
-                        case io.ltr8.tson.schema.meta.RecordTemplateBody ignored -> false;
-                        case io.ltr8.tson.schema.meta.TemplateBody ignored -> false;
                         case null -> false;
                         default -> true;
                     };

@@ -24,8 +24,8 @@ class TsonSealedFamilyReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/pets.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               pet => abstract { pet_type: text =?  name: text }
               dog => pet & { pet_type?: = "dog"  breed: text }
@@ -69,6 +69,20 @@ class TsonSealedFamilyReadTest {
     @Test
     void theOtherPinSelectsTheOtherMember() {
         assertEquals(List.of(), problems("!holder { p: { pet_type: cat  name: Tom  indoor: true } }"));
+    }
+
+    /** The tree writer states every atom's tag, so a family member written back carries one on its selector. */
+    @Test
+    void aSelectorWrittenWithItsOwnTagStillSelects() {
+        assertEquals(List.of(), problems("!holder { p: { pet_type: !text dog  name: Rex  breed: corgi } }"));
+    }
+
+    @Test
+    void aTreeReadOfAFamilyMemberWritesBackToTextThatReadsBack() {
+        Tson tson = tson();
+        String text = "!!import:\"%s\"\n!holder { p: { pet_type: dog  name: Rex  breed: corgi } }".formatted(ID);
+        String written = tson.treeWriter().toTson(tson.treeReader().readDocument(text));
+        assertEquals(List.of(), tson.validate(written), written);
     }
 
     /**

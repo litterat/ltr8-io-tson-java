@@ -29,15 +29,15 @@ import io.ltr8.tson.schema.unicode.TextType;
 import java.util.List;
 
 /**
- * The kernel's {@code atom => type & {}} base kind (Part 2 §4.1) -- every ATOM-kind {@link
+ * The kernel's {@code atom => type & {}} base kind (Part 2 §4.1) -- every atom {@link
  * Top} variant IS-A this. {@link VoidType} backs {@code void}, the atom with no constraint vocabulary; {@link
  * EnumBody} backs {@code boolean} and the kernel's other
- * internal enumerations, a listed set of names; {@link ReferenceBody} backs {@code reference}, a computed one -- the
+ * internal enumerations, a listed set of names; {@link RefBody} backs {@code reference}, a computed one -- the
  * names of the entries whose values are of one type; the remaining variants are the atom constraint-vocabulary
- * families, one per {@code *_type} constructor. {@link DeclaredType} is the sibling SUM-kind case -- see {@link
+ * families, one per {@code *_type} constructor. {@link DeclaredType} is the sibling sum case -- see {@link
  * Sum}, not here.
  */
-public sealed interface Atom extends Type permits VoidType, EnumBody, ReferenceBody, IntegerType,
+public sealed interface Atom extends Type permits VoidType, EnumBody, RefBody, IntegerType,
         TextType,
         IdentifierType,
         UriType, IriType, RegexType,

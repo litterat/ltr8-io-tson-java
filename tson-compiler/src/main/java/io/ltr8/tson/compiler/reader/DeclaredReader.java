@@ -35,7 +35,7 @@ final class DeclaredReader implements TsonTypeReader<Object> {
     /** One factory for every mode: the reader selects and builds nothing of its own. */
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         if (!(definition instanceof DeclaredType)) {
-            throw new IllegalArgumentException("'" + name + "' is not declared_type-shaped: " + definition);
+            throw new IllegalStateException("'" + name + "' is not declared_type-shaped: " + definition);
         }
         Set<String> namespaces = new HashSet<>();
         context.schema().entries().forEach((entry, value) -> {

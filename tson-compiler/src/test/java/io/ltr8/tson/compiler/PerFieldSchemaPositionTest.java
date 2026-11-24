@@ -40,8 +40,8 @@ class PerFieldSchemaPositionTest {
     private static List<Diagnostic> read(String declarations, String data) {
         String schema = """
                 !!id:"https://example.test/pos.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s
                 }
@@ -106,11 +106,8 @@ class PerFieldSchemaPositionTest {
     }
 
     /**
-     * <b>And one rewritten by §8.3's use-site flattening.</b> Every field's type-ref is rewritten there --
-     * that is what puts {@code @alias} on it -- so the walk rebuilds every {@code RecordField} in the schema.
-     * A rebuild naming components positionally drops the ones it does not mention, and no test comparing
-     * resolved values can catch that, since position is excluded from equality. {@code RecordField.withType}
-     * exists so the rebuild cannot forget.
+     * <b>And one at a position naming an alias</b>, whose reader is its target's: no test comparing resolved
+     * values can catch a lost position, since position is excluded from equality.
      */
     @Test
     void aFieldRewrittenByAliasFlatteningKeepsItsPosition() {

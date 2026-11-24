@@ -28,7 +28,7 @@ import java.util.Set;
  * The rule is unconditional, so the enforcement is -- applied only where a record has a non-empty
  * {@code subtypes()}, a stray or wrong annotation is silently discarded everywhere else.
  *
- * <p><b>The guard follows the body, not the declared kind</b>, and only {@code Atom} and {@code Product}
+ * <p><b>The guard follows the body</b>, and only {@code Atom} and {@code Product}
  * bodies take it. §7.2 excludes the others by name: a choice discriminates "by variant membership (§5.4)"
  * and a {@code declared} position by the governing closure (§7.8), each its own relation with its own
  * dispatcher, and subsumption would refuse the very variant tags those positions exist to take. An
@@ -112,18 +112,15 @@ public final class Subsumption {
     }
 
     /**
-     * Each of {@code names} with every {@code ALIAS} entry whose chain ends at it. §7.2 compares "after
+     * Each of {@code names} with every alias entry whose chain ends at it. §7.2 compares "after
      * following both alias chains to their terminal entries", and an alias and its target are one type
-     * -- so {@code !created} at a {@code created}-typed position names the position's own type even though
-     * the reader running there belongs to the instantiation {@code created} aliases, and
-     * {@code !ok_of_text} at a {@code result<text>} position names a subtype even though the entry it
-     * aliases is one the resolver minted.
+     * -- so over {@code pct => small}, {@code !pct} at a {@code small}-typed position names the position's own
+     * type even though the reader running there is {@code small}'s, and a tag naming an alias of a subtype
+     * names that subtype.
      *
      * <p><b>Both ends of the comparison need it, which is why this is one function and not two.</b> The
      * position's own type and each of its subtypes are matched against a written name by the same rule, and
-     * an implementation applying it to only one of them refuses an alias in exactly the places an author has
-     * no other name to write: a materialised entry's own name is implementation-chosen (§8.2), so an alias is
-     * how a template instantiation is named at all.
+     * an implementation applying it to only one of them refuses at one end an alias it admits at the other.
      *
      * <p><b>The alias is kept rather than reduced to its target.</b> An alias entry compiles to its
      * target's reader named for the entry doing the referring ({@code UseSite.named}), so dispatching on the

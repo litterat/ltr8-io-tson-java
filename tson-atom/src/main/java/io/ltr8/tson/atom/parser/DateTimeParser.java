@@ -2,7 +2,6 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
-import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.schema.temporal.DateTimeType;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -21,8 +20,8 @@ import java.util.regex.Pattern;
  * is not an instant on the UTC timeline core's {@code datetime} is. Holds a {@link DateTimeType} -- the pure
  * constraint values, unchanged by this split -- rather than declaring those fields itself.
  *
- * <p>{@code precision} constrains the value, not the spelling (§5.5), through {@link FractionalSeconds}, as
- * for {@link TimeParser}.
+ * <p>{@code fraction_digits} constrains the value, not the spelling (§5.5), through {@link FractionalSeconds},
+ * as for {@link TimeParser}.
  */
 public record DateTimeParser(DateTimeType constraints) implements AtomTypeParser<OffsetDateTime> {
 
@@ -64,17 +63,9 @@ public record DateTimeParser(DateTimeType constraints) implements AtomTypeParser
     }
 
     private void validate(OffsetDateTime value, String text) {
-        FractionalSeconds.check(constraints.precision(), value.getNano(), text, "datetime");
-        constraints.min().ifPresent(m -> {
-            if (value.isBefore(m)) {
-                throw new AtomValidationException("'" + text + "' is before the minimum " + m, ">= " + m);
-            }
-        });
-        constraints.max().ifPresent(m -> {
-            if (value.isAfter(m)) {
-                throw new AtomValidationException("'" + text + "' is after the maximum " + m, "<= " + m);
-            }
-        });
+        FractionalSeconds.check(constraints.fractionDigits(), value.getNano(), text, "datetime");
+        Bounds.check(value, text, DateTimeType.INSTANT_ORDER, Bounds.CHRONOLOGICAL, constraints.min(),
+                constraints.exclusiveMin(), constraints.max(), constraints.exclusiveMax());
     }
 
     /**

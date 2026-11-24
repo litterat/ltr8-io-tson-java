@@ -40,9 +40,9 @@ import java.util.TreeSet;
  *       {@code meta.identifier_ref}, any {@code !reference} instance)
  *       waits on the slot's own type and what reading that reaches, never on the entry the name names. This falls
  *       out of the walk: a kind is an atom, so reading against one reaches nothing further.</li>
- *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only, a dependent
- *       field's value ({@code record_field.value: type!}), held as written in a schema document, on nothing, and a
- *       template's body text on {@code text} only -- again by the walk, both being atoms.</li>
+ *   <li><b>A held value orders nothing.</b> A slot typed {@code value} waits on {@code value} only -- again by the
+ *       walk, {@code value} being an atom -- and a dependent field's value ({@code record_field.value: type!}), held
+ *       as written in a schema document, on nothing.</li>
  *   <li>A tagged value read at a position typed {@code P} waits on {@code P} and on its tag. An untagged value at a
  *       choice, or at an abstract record (a dispatch over its {@code subtypes}), waits on the one variant its form
  *       admits; where the form admits more than one, it waits on all of them, and {@link #overapproximations()}
@@ -58,7 +58,7 @@ import java.util.TreeSet;
  *
  * <p><b>Where the rule as written is silent</b>, this implements: an entry's value is read against its head tag,
  * not against the enclosing schema's {@code value_type} (the document read waits on that, see
- * {@link #documentWaits()}); a schema-map key's annotations ({@code @meta.synthetic}) belong to the schema map, so
+ * {@link #documentWaits()}); a schema-map key's annotations ({@code @meta.application}) belong to the schema map, so
  * they too are waits of the document read and not of the entry they mark; a bare token at a record position is
  * that record's shorthand for its one required field; a namespace type stating no
  * {@code key_type} has its keys read by their spelling, as {@code text}, the host judging them later.
@@ -78,7 +78,7 @@ final class WaitGraph {
     record Overapproximation(String entry, String path, String type, List<String> variants) {
     }
 
-    private enum Form { RECORD, ABSTRACT, NAMESPACE, ARRAY, MAP, TUPLE, CHOICE, DECLARED, ATOM, TEMPLATE }
+    private enum Form { RECORD, ABSTRACT, NAMESPACE, ARRAY, MAP, TUPLE, CHOICE, DECLARED, ATOM }
 
     private record Shape(String terminal, DataValue declaration, Form form) {
     }
@@ -92,6 +92,13 @@ final class WaitGraph {
     private final Map<String, Wait> documentWaits = new LinkedHashMap<>();
     private final List<Overapproximation> overapproximations = new ArrayList<>();
     private final List<String> problems = new ArrayList<>();
+
+    /**
+     * Each type written in place a slot holds, {@code { of: !C { … } }}, under a key no entry can have: it is no
+     * entry, so reading against one waits on no entry for the type itself, only on what reading its body reaches,
+     * its constructor's form read off the construction ({@link #shape}).
+     */
+    private final Map<String, DataValue> inline = new LinkedHashMap<>();
 
     private WaitGraph() {
     }
@@ -300,6 +307,9 @@ final class WaitGraph {
         }
 
         void waitOn(String target, String rule, String path) {
+            if (inline.containsKey(target)) {
+                return; // a type written in place is no entry, and waits on none of its own
+            }
             if (!declarations.containsKey(target)) {
                 problems.add(entry + ": waits on " + target + ", which no entry declares (" + rule + " at " + path + ")");
             }
@@ -346,7 +356,7 @@ final class WaitGraph {
                     }
                 }
                 case ARRAY -> {
-                    String element = token(field(shape.declaration(), "element_type"));
+                    String element = slot(field(shape.declaration(), "element_type"));
                     if (core instanceof ArrayValue array) {
                         for (int i = 0; i < array.elements().size(); i++) {
                             read(array.elements().get(i), element, "element", path + "[" + i + "]");
@@ -356,8 +366,8 @@ final class WaitGraph {
                     }
                 }
                 case MAP -> {
-                    String keyType = token(field(shape.declaration(), "key_type"));
-                    String valueType = token(field(shape.declaration(), "value_type"));
+                    String keyType = slot(field(shape.declaration(), "key_type"));
+                    String valueType = slot(field(shape.declaration(), "value_type"));
                     if (core instanceof MapValue map) {
                         for (MapValue.MapEntry entry : map.entries()) {
                             String key = text(entry.key().coreValue());
@@ -372,25 +382,23 @@ final class WaitGraph {
                     List<DataValue> elements = elements(field(shape.declaration(), "elements"));
                     if (core instanceof ArrayValue array && array.elements().size() <= elements.size()) {
                         for (int i = 0; i < array.elements().size(); i++) {
-                            String element = token(field(elements.get(i), "element_type"));
+                            String element = slot(field(elements.get(i), "element_type"));
                             read(array.elements().get(i), element, "element", path + "[" + i + "]");
                         }
                     } else {
                         problems.add(entry + ": a " + kind(core) + " at tuple " + type + " (" + path + ")");
                     }
                 }
-                case CHOICE -> dispatch(core, type, tokens(field(shape.declaration(), "variants")), path);
+                case CHOICE -> dispatch(core, type, elements(field(shape.declaration(), "variants")).stream()
+                        .map(WaitGraph.this::slot).toList(), path);
                 // A tagged value is read against its tag (`read`), so what reaches here is untagged, and names no type.
                 case DECLARED -> problems.add(entry + ": an untagged value at the declared " + type + " (" + path + ")");
                 case ABSTRACT -> dispatch(core, type, subtypes(shape.declaration()), path);
                 case ATOM -> {
-                    if (!(core instanceof TokenValue) && !(core instanceof VoidValue)
-                            && !(core instanceof io.ltr8.tson.compiler.ast.ReferenceValue)) {
+                    if (!(core instanceof TokenValue) && !(core instanceof VoidValue)) {
                         problems.add(entry + ": a " + kind(core) + " at atom " + type + " (" + path + ")");
                     }
                 }
-                case TEMPLATE -> problems.add(entry + ": a value read against the open template " + type
-                        + " (" + path + ")");
             }
         }
 
@@ -405,15 +413,15 @@ final class WaitGraph {
                                     + " (" + path + ")");
                             continue;
                         }
-                        if (field(declared, "type") != null && field(declared, "type").coreValue()
-                                instanceof io.ltr8.tson.compiler.ast.ReferenceValue(
-                                        io.ltr8.tson.schema.meta.SiblingRef ignored)) {
+                        DataValue type = field(declared, "type");
+                        DataValue of = type == null ? null : field(type, "of");
+                        if (of != null && of.typeRef().filter("meta.dependent"::equals).isPresent()) {
                             // A dependent field's value in a schema document is held as written, and so waits on
                             // nothing.
                             annotations(field.value().annotations(), path + "." + field.name());
                             continue;
                         }
-                        read(field.value(), token(field(declared, "type")), "field",
+                        read(field.value(), slot(field(declared, "type")), "field",
                                 path + "." + field.name());
                     }
                 }
@@ -430,7 +438,7 @@ final class WaitGraph {
                         return;
                     }
                     String name = required.getFirst();
-                    read(new DataValue(List.of(), Optional.empty(), token), token(field(fields.get(name), "type")),
+                    read(new DataValue(List.of(), Optional.empty(), token), slot(field(fields.get(name), "type")),
                             "record shorthand", path + "(." + name + ")");
                 }
                 default -> problems.add(entry + ": a " + kind(core) + " at record " + shape.terminal()
@@ -460,13 +468,11 @@ final class WaitGraph {
 
     private static boolean admits(Form form, CoreValue core) {
         return switch (form) {
-            case ATOM -> core instanceof TokenValue || core instanceof VoidValue
-                    || core instanceof io.ltr8.tson.compiler.ast.ReferenceValue;
+            case ATOM -> core instanceof TokenValue || core instanceof VoidValue;
             case RECORD -> core instanceof RecordValue || core instanceof EmptyBrace;
             case NAMESPACE, MAP -> core instanceof MapValue || core instanceof EmptyBrace;
             case ARRAY, TUPLE -> core instanceof ArrayValue;
             case CHOICE, ABSTRACT, DECLARED -> true;
-            case TEMPLATE -> false;
         };
     }
 
@@ -474,14 +480,15 @@ final class WaitGraph {
 
     /** {@code type}'s terminal declaration, through any aliases, and the form its constructor reads. */
     private Shape shape(String type, Read read, String path) {
-        String terminal = terminal(type);
+        DataValue written = inline.get(type);
+        String terminal = written != null ? type : terminal(type);
         if (terminal == null) {
             if (read != null) {
                 problems.add(read.entry + ": " + type + " has no terminal declaration (" + path + ")");
             }
             return null;
         }
-        DataValue declaration = declarations.get(terminal);
+        DataValue declaration = written != null ? written : declarations.get(terminal);
         String constructor = terminal(declaration.typeRef().orElse(""));
         if (constructor == null) {
             problems.add(terminal + ": its head " + declaration.typeRef() + " has no declaration");
@@ -507,8 +514,6 @@ final class WaitGraph {
             form = Form.TUPLE;
         } else if (constructor.equals("meta.choice")) {
             form = Form.CHOICE;
-        } else if (constructor.equals("meta.template")) {
-            form = Form.TEMPLATE;
         } else if (constructorSupertypes.contains("meta.atom")) {
             form = Form.ATOM;
         } else {
@@ -540,7 +545,7 @@ final class WaitGraph {
      * by spelling, as {@code text}.
      */
     private Optional<String> namespaceType(Shape shape, String slot, Read read, String path) {
-        String type = token(field(shape.declaration(), slot));
+        String type = slot(field(shape.declaration(), slot));
         if (type == null && slot.equals("key_type")) {
             return Optional.of("text");
         }
@@ -579,6 +584,20 @@ final class WaitGraph {
     }
 
     // ── AST access ───────────────────────────────────────────────────────
+
+    /**
+     * What a type slot holds, as the name a read is made against: a name as written, or a type written in place, the
+     * construction its wrapper holds registered under a key of its own ({@link #inline}); {@code null} for neither.
+     */
+    private String slot(DataValue value) {
+        DataValue of = field(value, "of");
+        if (of == null || of.typeRef().isEmpty()) {
+            return token(value);
+        }
+        String key = "<inline " + inline.size() + ": !" + of.typeRef().get() + ">";
+        inline.put(key, of);
+        return key;
+    }
 
     private static DataValue field(DataValue value, String name) {
         if (value != null && value.coreValue() instanceof RecordValue record) {

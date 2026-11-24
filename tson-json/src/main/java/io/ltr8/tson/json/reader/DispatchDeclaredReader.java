@@ -33,7 +33,7 @@ final class DispatchDeclaredReader implements JsonTypeReader<Object> {
     /** One factory for every mode: the reader builds nothing of its own. */
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         if (!(definition instanceof DeclaredType)) {
-            throw new IllegalArgumentException("'" + name + "' is not declared_type-shaped: " + definition);
+            throw new IllegalStateException("'" + name + "' is not declared_type-shaped: " + definition);
         }
         return new DispatchDeclaredReader(EntryDisplayName.of(name, context.schema()), context,
                 context.locationOf(name));
@@ -55,7 +55,7 @@ final class DispatchDeclaredReader implements JsonTypeReader<Object> {
         this.schemaLocation = schemaLocation;
         Map<String, Route> routes = new LinkedHashMap<>();
         for (String entry : context.schema().entries().keySet()) {
-            routes.put(entry, Route.to(context.readers().resolve(entry)));
+            routes.put(entry, Route.to(context, entry));
         }
         this.closure = Map.copyOf(routes);
     }

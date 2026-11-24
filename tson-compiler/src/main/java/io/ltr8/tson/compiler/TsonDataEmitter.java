@@ -7,6 +7,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.atom.ReferenceGrammar;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -302,59 +303,17 @@ public final class TsonDataEmitter {
     }
 
     /**
-     * Writes {@code reference} unquoted ([TSON-DATA] §7.4): its qualified name, and where it
-     * carries arguments an adjacent {@code <}, each argument separated by one space, and {@code >} -- the canonical
-     * text, {@code map<text list<int32>>}. A value argument keeps its token form, a quoted one escaped as {@link
-     * #quotedString} escapes. The caller is responsible for the head and every reference argument being qualified
-     * names, which is what a {@code TypeRef} read from either grammar holds.
+     * Writes a reference's name: unquoted where every segment is an identifier, so the name is one unquoted token,
+     * and quoted otherwise ([TSON-DATA] §7.1), the form carrying nothing at a reference ([TSON-SCHEMA] §5.12).
      */
-    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.TypeRef reference) {
+    public TsonDataEmitter reference(String name) {
         startCoreValue();
-        emitReference(reference);
-        return this;
-    }
-
-    /**
-     * Writes {@code sibling} unquoted: its field's name and the sibling mark, {@code kind!}. Whatever follows is
-     * whitespace, as [TSON-DATA] §7.5 requires after the mark: this writer separates every element, a map's arrow and
-     * a scope's closing delimiter by a space, and ends an annotation's value with one.
-     */
-    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.SiblingRef sibling) {
-        startCoreValue();
-        emit(sibling.text());
-        return this;
-    }
-
-    /** Writes {@code reference} as its variant is written -- {@link #reference(io.ltr8.tson.schema.meta.TypeRef)}. */
-    public TsonDataEmitter reference(io.ltr8.tson.schema.meta.Reference reference) {
-        return switch (reference) {
-            case io.ltr8.tson.schema.meta.TypeRef named -> reference(named);
-            case io.ltr8.tson.schema.meta.SiblingRef sibling -> reference(sibling);
-        };
-    }
-
-    private void emitReference(io.ltr8.tson.schema.meta.TypeRef reference) {
-        emit(reference.name());
-        if (reference.arguments().isEmpty()) {
-            return;
+        if (ReferenceGrammar.isQualifiedName(name)) {
+            emit(name);
+        } else {
+            emitQuoted(name);
         }
-        emit('<');
-        for (int i = 0; i < reference.arguments().size(); i++) {
-            if (i > 0) {
-                emit(' ');
-            }
-            switch (reference.arguments().get(i)) {
-                case io.ltr8.tson.schema.meta.TypeArgument.Ref nested -> emitReference(nested.ref());
-                case io.ltr8.tson.schema.meta.TypeArgument.Value value -> {
-                    if (value.value().form() == io.ltr8.tson.schema.meta.Token.Form.UNQUOTED) {
-                        emit(value.value().text());
-                    } else {
-                        emitQuoted(value.value().text());
-                    }
-                }
-            }
-        }
-        emit('>');
+        return this;
     }
 
     /**

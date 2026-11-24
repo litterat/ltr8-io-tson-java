@@ -4,22 +4,21 @@ import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.RecordHead;
+
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.unicode.IdentifierType;
-import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
 import io.ltr8.tson.schema.unicode.TextFamily;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeInline;
+import io.ltr8.tson.schema.meta.TypeRef;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -27,10 +26,9 @@ import java.util.stream.Stream;
  * Where an entry's {@code name_type} resolves, and whether what it resolves to may stand there: an enum's, which its
  * members are values of ([TSON-SCHEMA] §7.4), and a record's, which its field names are values of ([TSON-SCHEMA] §5.2).
  * A value the entry's constructor wrote resolves where that constructor is declared, whose closure is in the schema's
- * -- so {@code !enum [A B]} names the kernel's {@code meta.identifier}, and a record that says nothing the kernel's {@code
- * meta.field_name}, names no schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own
- * namespace first. Shared by the linker's enum and field name checks and by materialisation, which checks a template's
- * value argument of an enum type before linking has run.
+ * -- so {@code !enum [A B]} names the kernel's {@code meta.identifier}, as does a record that says nothing, a name no
+ * schema reaching the kernel may redeclare; one an author wrote resolves in the schema's own namespace first. Shared
+ * by the linker's enum and field name checks.
  *
  * <p><b>What may stand there is the slot's kind's to say</b> ([TSON-SCHEMA] §4.2). The kernel types both slots
  * {@code meta.identifier_ref}, the names of the types built with {@code identifier_type}, and {@link #admits} reads that
@@ -57,15 +55,15 @@ public final class NameType {
     /**
      * {@code entry}'s name type, given the constructor its value applies (an enum's decides whether its {@code
      * name_type} is the constructor's pin), and two lookups, the schema's own namespace and the one holding the
-     * constructor -- the same namespace, from the linker. Empty for a body that is neither an enum nor a record or
-     * record template, and for a {@code name_type} that resolves in neither namespace.
+     * constructor -- the same namespace, from the linker. Empty for a body that is neither an enum nor a record, open
+     * or closed, and for a {@code name_type} that resolves in neither namespace.
      */
     public static Optional<Resolved> of(Top entry, Optional<String> constructor, Function<String, Top> local,
                                         Function<String, Top> structure) {
         if (entry instanceof EnumBody body) {
             return ofEnum(constructor, body, local, structure);
         }
-        return RecordHead.of(entry).flatMap(head -> ofRecord(head.nameType(), local, structure));
+        return entry instanceof RecordBody record ? ofRecord(record.nameType(), local, structure) : Optional.empty();
     }
 
     /**
@@ -100,35 +98,31 @@ public final class NameType {
 
     /**
      * The kind {@code entry}'s {@code name_type} slot is typed by: the {@code name_type} field of the constructor
-     * {@code entry}'s value applies -- through a constructor template's held body to the constructor it applies
-     * -- read in {@code structure} first, then {@code local}; the linker hands both the schema's one namespace.
-     * Empty where no such constructor or kind is in reach.
+     * {@code entry}'s value applies -- read in {@code structure} first, then {@code local}; the linker hands both the
+     * schema's one namespace. Empty where no such constructor or kind is in reach.
      */
-    private static Optional<ReferenceBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
-                                               Function<String, Top> structure) {
+    private static Optional<RefBody> slotKind(Top entry, Optional<String> constructor, Function<String, Top> local,
+                                              Function<String, Top> structure) {
         Function<String, Top> constructors = fallingBackTo(structure, local);
         Optional<String> head = constructor.or(() -> Optional.of(TsonSchema.constructorOf(entry)));
-        Set<String> seen = new HashSet<>();
-        while (head.isPresent() && seen.add(head.get())) {
-            Top found = constructors.apply(AliasChain.terminal(head.get(), constructors));
-            if (found instanceof TemplateBody held) {
-                head = HeldBody.of(held).application().typeRef();
-                continue;
-            }
-            return slotKindOf(found, constructors);
-        }
-        return Optional.empty();
+        return head.flatMap(name -> slotKindOf(constructors.apply(AliasChain.terminal(name, constructors)),
+                constructors));
     }
 
-    private static Optional<ReferenceBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
+    private static Optional<RefBody> slotKindOf(Top constructor, Function<String, Top> constructors) {
         if (!(constructor instanceof RecordBody record)) {
             return Optional.empty();
         }
         return Optional.ofNullable(record.fields().get(NAME_TYPE))
-                .flatMap(RecordField::namedType)
-                .map(type -> constructors.apply(AliasChain.terminal(type.name(), constructors)))
-                .filter(ReferenceBody.class::isInstance)
-                .map(ReferenceBody.class::cast);
+                .flatMap(RecordField::ownType)
+                .<Top>flatMap(type -> switch (type) {
+                    case TypeRef name -> Optional.ofNullable(
+                            constructors.apply(AliasChain.terminal(name.name(), constructors)));
+                    // A reference written in place, `meta.ref<…>`, is the kind itself.
+                    case TypeInline inline -> Optional.of(inline.of());
+                })
+                .filter(RefBody.class::isInstance)
+                .map(RefBody.class::cast);
     }
 
     /**
@@ -149,9 +143,8 @@ public final class NameType {
     }
 
     /**
-     * Whether {@code type} is the kernel's {@code meta.identifier} -- an enum's default, and through
-     * {@code meta.field_name} a record's -- whose names a refusal calls identifiers, where it names any other type, the
-     * author's own.
+     * Whether {@code type} is the kernel's {@code meta.identifier} -- an enum's default and a record's -- whose names
+     * a refusal calls identifiers, where it names any other type, the author's own.
      */
     public static boolean isIdentifier(Resolved type, Function<String, Top> structure) {
         return type.definition() != null
@@ -176,6 +169,17 @@ public final class NameType {
                     + "('start: ASCII  continue: ASCII')");
             case NFC, NFKC, NFKC_CASEFOLD -> Optional.empty();
         };
+    }
+
+    /**
+     * Why {@code type} cannot type the names a qualified name's segments are matched against -- a record's field
+     * names, a namespace's keys -- or empty when it can: the segments are split at {@code .} before any family is
+     * consulted ([TSON-SCHEMA] §5.12), so a family admitting U+002E holds names no segment can spell.
+     */
+    public static Optional<String> dotRefusal(IdentifierType type) {
+        return type.profile().admits('.') ? Optional.of("its profile admits '.' (U+002E), which joins the segments "
+                + "of a qualified name, so a name holding one could not be reached by a reference ([TSON-SCHEMA] "
+                + "§5.12)") : Optional.empty();
     }
 
     private static boolean asciiOnly(IdentifierType type) {
@@ -204,11 +208,11 @@ public final class NameType {
 
     /**
      * A name type the record states was written by its author, so it resolves in the schema's own namespace first,
-     * as an enum's does; the absent default is the kernel's {@code meta.field_name}, resolved in the structure first.
+     * as an enum's does; the absent default is the kernel's {@code meta.identifier}, resolved in the structure first.
      */
     private static Optional<Resolved> ofRecord(Optional<String> nameType, Function<String, Top> local,
                                                Function<String, Top> structure) {
-        String name = nameType.orElse(RecordBody.FIELD_NAME);
+        String name = nameType.orElse(RecordBody.DEFAULT_NAME_TYPE);
         Function<String, Top> first = nameType.isEmpty() ? structure : local;
         Function<String, Top> second = first == structure ? local : structure;
         for (Function<String, Top> namespace : List.of(first, second)) {
@@ -222,25 +226,14 @@ public final class NameType {
     }
 
     /**
-     * Whether {@code name_type} is the value the enum's {@code constructor} pins -- through a template's held body
-     * to the constructor it applies, where the name given is a template's.
+     * Whether {@code name_type} is the value the enum's {@code constructor} pins.
      */
     private static boolean pinned(Optional<String> constructor, EnumBody body, Function<String, Top> lookup) {
-        Optional<String> head = constructor;
-        Set<String> seen = new HashSet<>();
-        while (head.isPresent() && seen.add(head.get())) {
-            Top applied = lookup.apply(head.get());
-            if (applied instanceof TemplateBody held) {
-                head = HeldBody.of(held).application().typeRef();
-                continue;
-            }
-            return applied instanceof RecordBody record
-                    && Optional.ofNullable(record.fields().get(NAME_TYPE))
-                            .filter(field -> field.role() == FieldRole.FIXED)
-                            .flatMap(RecordField::value)
-                            .filter(value -> value.text().equals(body.nameType())).isPresent();
-        }
-        return false;
+        return constructor.map(lookup).filter(RecordBody.class::isInstance).map(RecordBody.class::cast)
+                .flatMap(record -> Optional.ofNullable(record.fields().get(NAME_TYPE)))
+                .filter(field -> field.role() == FieldRole.FIXED)
+                .flatMap(RecordField::value)
+                .filter(value -> value.text().equals(body.nameType())).isPresent();
     }
 
     private static Function<String, Top> fallingBackTo(Function<String, Top> primary,

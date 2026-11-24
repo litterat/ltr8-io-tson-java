@@ -59,7 +59,7 @@ being silently retained, since §2.2.1 admits only hash-algorithm parameters. "C
   idempotent: the hashed bytes never change, so the pin stays valid.
 - **`tson strip [--keep-docs] <schema>`** prints a schema's reading form (`TsonSchemaStripper`) for a model to read, never to
   load. The `!!id`, header pins and `@doc` go; a header reference to meta, numeric, temporal, net or core shortens to its
-  revision and name, `"39/numeric"`; each directive and declaration gets one line. `--keep-docs` (`stripKeepingDocs`) keeps
+  revision and name, `"40/numeric"`; each directive and declaration gets one line. `--keep-docs` (`stripKeepingDocs`) keeps
   `@doc`, for a model that should read the documentation. It never re-pins and never rewrites the file: the output claims no
   identity, because its bytes are not the published document's. **Whitespace collapses to one space and is never removed**,
   so tokens that touched still touch and adjacency (§7.2) reads the same. The output is re-lexed against the intended tokens
@@ -105,7 +105,10 @@ the obvious concatenation renders `cannot read x: x`.
 
 The read loop catches only `IOException` (an unreadable file *is* that file's verdict). A `RuntimeException`, which
 `Tson.validate` raises only for a library fault (`TsonDiagnostics.ofBaseSyntaxError` rethrows anything not a
-base-syntax failure), reaches `TsonCli`'s own handler and exit 70 rather than being folded into "invalid".
+base-syntax failure), reaches `TsonCli`'s own handler and exit 70 rather than being folded into "invalid". Loading a
+schema file is held to the same rule: only what is the file's own — unreadable, not well-formed, no `!!id`
+(`ValidateCommand.unloadable`) — is a run-level `SCHEMA_ERROR` and exit 2, and a bound schema that does not load
+reports its own diagnostics, so a gap in it is exit 70 and not a bad schema.
 `UsageException` exists for the same reason one layer up: a bare `IllegalArgumentException` catch would relabel a
 library fault as a bad command line, so only this CLI's argument parsing throws the type that means that.
 
@@ -195,7 +198,7 @@ name the way to write the thing today, and a trace and a bug-report banner would
 **What §8.2 requires a refusal to name rides on the envelope**, as `policy` on both `validation_run` and
 `validation_report`: `CliPolicy`, the shape of `policy.tn`'s `policy.processor` — `identifier_policy` (level, `per_segment`,
 `skeleton_distinctness`, `permitting` combinations with each script by its UAX #24 alias), `token_policy` (level,
-`permitting`), `unicode_data_version`, and `limits` (all seventeen of §9.1's and §11.5's, `max_depth` and
+`permitting`), `unicode_data_version`, and `limits` (all sixteen of §9.1's and §11.5's, `max_depth` and
 `max_wait_depth` among them, each a `long`, as `policy.limit` is an `int64`: a report states the limits its producer ran
 under, which this processor's own `LimitsPolicy` need not hold). It is on the envelope rather than each
 diagnostic because it is a fact about the processor: constant for the run, and needed by a sender *before* it writes
@@ -224,7 +227,7 @@ document and leave them unable to change it.
 the one `tson policy` prints (`HIGHLY_RESTRICTIVE`); `--identifier-per-segment` the unit;
 `--identifier-allow-look-alikes` drops skeleton distinctness; and `--identifier-scripts`/`--token-scripts` a
 `Latin+Cyrillic` combination, repeatable. Allow-look-alikes is no relaxation of the level, so it is valid under every
-level. There is no `--token-per-segment`: a token policy is a `ScriptPolicy`, which has no unit.
+level. There is no `--token-per-segment`: a token policy is a `TokenPolicy`, which has no unit.
 
 **Three rules keep a flag from meaning nothing.** `--token-scripts` alone raises the token level from its
 `UNRESTRICTED` default to `SINGLE_SCRIPT`, because `permitting(…)` is consulted only by a level that scans, and Single
@@ -264,7 +267,7 @@ list**, distinct because a `DataNameBinder` is fixed when a `DataBindContext` is
   `registerAtoms(AtomContext.hostTypes())` adds the same list to any builder, so it lives in one place.
 - `SchemaModelNameBinder.defaultContext()` — the same atoms plus `ResolverBindContext.registerDefaults`' three registrations
   for the schema model (`schema.meta.Token`, one token on the wire; `SourcePosition`, whose `SourcePositionStringBridge`
-  names `tson-compiler`'s `Position`; `schema.meta.Ref` through `RefNameBridge`), plus a `DataNameBinder` over
+  names `tson-compiler`'s `Position`; `schema.meta.Ref` through `ValueRefNameBridge`), plus a `DataNameBinder` over
   `io.ltr8.tson.schema` that answers only for every entry of meta.tn (its root names and its members of its six maps)
   and each library's members under its map (`numeric`, `temporal`, `net`), each bound by its path, a sub-package per
   segment before the last (`numeric.integer_type` to `numeric.IntegerType`). The context of the

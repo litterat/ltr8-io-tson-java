@@ -8,7 +8,6 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.tree.TsonRecord;
@@ -38,14 +37,14 @@ class ValueEntryTest {
 
     private static final Map<String, String> DOCUMENTS = Map.of(LIB, """
             !!id:"https://example.test/ops.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               operation => { path: text  request: meta.ref<meta.record>  response: meta.type_ref }
             }
             """, API, """
             !!id:"https://example.test/ops-api.tn"
             !!import:"https://example.test/ops.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               order        => { sku: text }
               create_order => !operation { path: "/orders"  request: order  response: order }
@@ -72,7 +71,6 @@ class ValueEntryTest {
         ValueEntry entry = assertInstanceOf(ValueEntry.class, linked.schema().entries().get("create_order"));
         assertEquals("operation", entry.type());
         assertEquals(new Op("/orders", TypeRef.of("order"), TypeRef.of("order")), entry.value());
-        assertEquals(EntryKind.VALUE, linked.kindOf("create_order"));
         assertEquals(Optional.of("operation"), linked.schema().constructorOf("create_order"));
     }
 

@@ -4,11 +4,8 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.base.atom.Rational;
-import io.ltr8.tson.schema.meta.ApplicationRef;
 import io.ltr8.tson.schema.meta.NameRef;
-import io.ltr8.tson.schema.meta.Ref;
-import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.SiblingRef;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -16,10 +13,9 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * {@link AtomContext}'s vocabulary plus the registrations that cannot live beside it -- what binding
  * <b>this library's own resolved schema model</b> needs on top of what a consumer's classes need.
  *
- * <p>None could travel. {@link Token}, {@link Ref} and {@link TypeRef} are {@code tson-schema}'s, a reference's
- * text read by {@code tson-atom}'s grammar ({@link TypeRefTextBridge}, registered for {@link Reference}, {@link
- * NameRef}, {@link ApplicationRef} and {@link SiblingRef} as well, since a record field's type is a {@code Reference}
- * and a value written by its own class is described by its variant), and {@link
+ * <p>None could travel. {@link Token}, {@link ValueRef} and {@link TypeRef} are {@code tson-schema}'s, a reference's
+ * text read by {@code tson-atom}'s grammar ({@link TypeRefNameBridge}, registered for {@link NameRef} as well, since a
+ * value written by its own class is described by its variant), and {@link
  * SourcePosition}'s bridge names this module's own {@code Position}, the only concrete implementation there is.
  * {@link Rational}, the {@code rational} reader's host value, is a record, which {@code ltr8-bind} would otherwise
  * bind structurally;
@@ -53,12 +49,9 @@ public final class ResolverBindContext {
                 .registerAtom(Token.class)
                 .registerAtom(Rational.class)
                 .registerAtom(SourcePosition.class, new SourcePositionStringBridge())
-                .registerAtom(Ref.class, new RefNameBridge())
-                .registerAtom(TypeRef.class, new TypeRefTextBridge())
-                .registerAtom(NameRef.class, new TypeRefTextBridge.ForName())
-                .registerAtom(ApplicationRef.class, new TypeRefTextBridge.ForApplication())
-                .registerAtom(Reference.class, new TypeRefTextBridge.ForReference())
-                .registerAtom(SiblingRef.class, new TypeRefTextBridge.ForSibling())
+                .registerAtom(ValueRef.class, new ValueRefNameBridge())
+                .registerAtom(TypeRef.class, new TypeRefNameBridge())
+                .registerAtom(NameRef.class, new TypeRefNameBridge.ForName())
                 .registerAtom(Object.class);
     }
 
@@ -81,13 +74,10 @@ public final class ResolverBindContext {
         if (!builder.registersAtom(SourcePosition.class)) {
             builder.registerAtom(SourcePosition.class, new SourcePositionStringBridge());
         }
-        if (!builder.registersAtom(Ref.class)) {
-            builder.registerAtom(Ref.class, new RefNameBridge())
-                .registerAtom(TypeRef.class, new TypeRefTextBridge())
-                .registerAtom(NameRef.class, new TypeRefTextBridge.ForName())
-                .registerAtom(ApplicationRef.class, new TypeRefTextBridge.ForApplication())
-                .registerAtom(Reference.class, new TypeRefTextBridge.ForReference())
-                .registerAtom(SiblingRef.class, new TypeRefTextBridge.ForSibling());
+        if (!builder.registersAtom(ValueRef.class)) {
+            builder.registerAtom(ValueRef.class, new ValueRefNameBridge())
+                .registerAtom(TypeRef.class, new TypeRefNameBridge())
+                .registerAtom(NameRef.class, new TypeRefNameBridge.ForName());
         }
         return builder;
     }

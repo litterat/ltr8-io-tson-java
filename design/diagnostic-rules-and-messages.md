@@ -55,9 +55,8 @@ document stated something and is not missing it, and the message reports the rul
 broke. Sharing the prose is what keeps the two readers from choosing different rules for one document.
 
 **Five families state their rules here**: records, arrays and sets (one class, a set being an array that
-refuses a repeat), tuples, and maps. Choices and declared positions do not: `tson-compiler` states its dispatch
-diagnostics parameterised over a "candidate noun" so one class serves a choice *and* a declared position, while
-`tson-json` words each in its own dispatcher (`BACKLOG.md`).
+refuses a repeat), tuples, and maps. Choices and declared positions do not: each stack words them in its own
+dispatchers (`BACKLOG.md`).
 
 **Two boundary calls are finer than "the schema's nouns":**
 
@@ -70,12 +69,10 @@ diagnostics parameterised over a "candidate noun" so one class serves a choice *
   `Rendered.value` answers from the host value.
 
 **A type names itself by what the author wrote, in both encodings.** `EntryDisplayName` lives in
-`schema.meta` — beside the model it renders, and depending on nothing else — so both stacks reach it. A
-resolver-minted entry shows as the sugar or application that produced it (`[text]`, `box<text>`), told apart
-from an authored one by having no source position. Kept in `tson-compiler`, it would leave a JSON diagnostic
-naming the synthetic entry by its content-derived hash — `'array_text_4cc4a482'`, a name in neither the
-author's schema nor the sender's document. The record reader carries the display name *beside* its own
-name rather than instead of it, because a `$type` resolves against the entry while a message names the
+`schema.meta` — beside the model it renders, and depending on nothing else — so both stacks reach it. An entry
+is named by its author's name, and a type written in place by its form as written (`TypeInline.text()`: `[text]`,
+`set<text>`, `pair_of<int32>`), never by a name the author did not write. The record reader carries the display name
+*beside* its own name rather than instead of it, because a `$type` resolves against the entry while a message names the
 author's spelling — one place the two genuinely differ.
 
 **What is deliberately not shared** is any rule one encoding has and the other has not: JSON's annotation
@@ -105,7 +102,7 @@ encoding: the `of*` factories each switch on an exception an *encoding* declares
 would make the base depend on the vocabulary, while a copy per reader is how two encodings come to disagree
 about one token — a target that cannot represent a family's value being a bind problem on one path and a
 type mismatch on the other, with nothing saying which is right. Four readers go
-through it — `AtomTypeReader`, `TypeRefCheck`, `DataClassObjectReader` and the JSON stack's
+through it — `AtomTypeReader`, `TypeTagCheck`, `DataClassObjectReader` and the JSON stack's
 `JsonAtoms` — and `AtomTypeException` is sealed to exactly two subtypes, so the switch is exhaustive rather
 than a guess. Per-field schema positions are a separate matter
 (`design/reader-naming-and-schema-location.md`). (Message synthesis from code + params
@@ -125,7 +122,7 @@ watching every differing document get rejected.
 
 **`expected` carries the constraint that failed, never the type's name.** `AtomTypeException` holds an
 `expected` alongside its message, filled at each throw site from the facet that rejected the value, and all
-three atom report sites (`AtomTypeReader`, `TypeRefCheck.violation`, `DataClassObjectReader.bindBuiltin`)
+three atom report sites (`AtomTypeReader`, `TypeTagCheck.violation`, `DataClassObjectReader.bindBuiltin`)
 pass it straight through. Naming the type there — `a value satisfying quantity_t` against a message
 reading `'99999' is greater than the maximum 100` — would make the structured half carry strictly *less* than
 the prose, so a consumer wanting the bound would have to regex the sentence. That exception's own Javadoc fixes the

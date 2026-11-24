@@ -15,7 +15,7 @@ rules are walked. Current form only; history lives in git.
 - A record a fixture's value entries hold is bound to a host class of the runner's own (`SuiteBindings`, one record
   per fixture record in `io.ltr8.tson.suite.data`), the same binding in both runners and in `SidecarSchemasTest`.
 
-Related: `design/name-hygiene-and-minted-names.md`, `design/name-hygiene-read-path.md`, `design/json-unicode-policies.md`.
+Related: `design/name-hygiene.md`, `design/name-hygiene-read-path.md`, `design/json-unicode-policies.md`.
 
 Separate from the fine-grained unit tests, these run every vector in the sibling
 [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite) repo as JUnit 5 dynamic
@@ -56,7 +56,7 @@ implementation does not carry is `RUNNER.md` rule 5's fourth legitimate skip —
 the vector rather than the conformance class. It has two homes: `class1/reader/refused/` for Part 1's one
 scope, and `class2/schema/refused/` for §11.4's, where the enum-member and group-member-label vectors are
 the ones that catch a processor checking each name where it is *read* rather than where a scope is
-*walked* — the failure this implementation had. Template parameters stay out of the corpus: §11.4 and §5.10
+*walked* — the failure this implementation had. The parameters of a parametric record stay out of the corpus: §11.4 and §5.10
 both decline to list them as a scope, so a vector asserting the look-alike refusal would fail a conforming
 implementation, and `ConfusableNameScopesTest` carries those cases instead. Only that rule diverges —
 mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.2).
@@ -77,7 +77,7 @@ single-script name is refused with nothing mixed):
 
 | Layer | Walk | Scopes |
 |---|---|---|
-| Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (§11.4 declines the scope) |
+| Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a parametric record's parameters (§11.4 declines the scope) |
 | Data (TSON) | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
 | Data (JSON), schemaless | `reader.DataClassObjectReader.checkNameHygiene` | one record's member names — the two per-name rules only |
 | Data (JSON), schema-directed | `reader.NameHygiene`, from the record and choice readers | an **unmatched** member name; a `$type` naming nothing — the two per-name rules only |
@@ -101,16 +101,6 @@ encoding applies it to data is TSON's schemaless tree read, where the grammar ha
 are fields. In JSON the attack and a legitimate map of look-alike keys are spelled identically, so it must
 be accepted — a deployment that will not accept it raises the **token** policy, which reaches every token
 including a key. `design/json-unicode-policies.md` has the worked comparison.
-
-**A minted name is judged by the same walk, and is built so it can be.** A derived name splices
-author-written content into its readable half, so `InternalName` restricts that half to **ASCII**: what §7.7
-admits is spliced, other ASCII keeps its admitted characters and gains a hash (`"/x"` → `x_h00000f2f`), and
-anything else is the hash alone. That satisfies §8.2's freshness MUST — an internal name is a valid
-`meta.identifier` — and, because an ASCII name is single-script and inside the identifier profile, it also passes
-all three hygiene rules at every level. Admitting `XID_Continue` instead would keep the name legal while
-letting a document's own text shape a namespace name, and would refuse any schema written outside Latin
-script; exempting minted names from the walk would answer that by leaving the hole open.
-`design/name-hygiene-and-minted-names.md` has the detail.
 
 **One place is the point, not a tidiness.** Run at the reading positions instead — spread over the schema
 parser, the definition resolver and the atom vocabulary — the restricted-character rule would have holes at
@@ -171,16 +161,18 @@ cannot fail on `{ a: 1  a: 2 }`; the parser accepts it by design. An error vecto
 `category: resolver` and its subject must parse, which `checkReaderVector` asserts before asking the reader
 for a verdict.
 
-**The `class2/` layers are the three answers a Class 2 processor gives.** `schema/` needs no invented expectation format:
-§1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a valid vector's subject is a schema
-document and its expected side is that document's resolved output in §8's own form, read back through `ResolvedForm` (shared
-with `ResolvedFixtureTest`, which asks the same question of `spec/fixtures/*-resolved.tn`) and compared entry for entry,
-`@meta.synthetic` key markers included. A nested schema map is walked into: `ResolvedForm.entries` keys each member under its
-path, `readResolved` adds the path keys a schema holds (`SchemaPaths.withPaths`), and the nested map's own entry compares as
-its member names. `link/` states individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived
-disjointness, §8.2's `subtypes` index, a kind's derived `members` (compared as a set, minted names normalised). `validate/`
-is a data document against a schema that loaded, where the expected side of a failure is §8.1's category plus the RFC 6901
-pointer into the data and nothing else.
+**The `class2/` layers are the three answers a Class 2 processor gives.** `schema/` needs no invented expectation
+format: §1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a valid vector's subject
+is a schema document and its expected side is that document's resolved output in §8's own form, read back through
+`ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question of `spec/fixtures/*-resolved.tn`) and
+compared entry for entry, `@meta.application` and `@meta.completion` key annotations included, incomplete entries
+left out on both sides. Names are compared as written: every entry is
+declared. A nested schema map is walked into: `ResolvedForm.entries` keys each member under its path, `readResolved`
+adds the path keys a schema holds (`SchemaPaths.withPaths`), and the nested map's own entry compares as its member
+names. `link/` states individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived
+disjointness, §8.2's `subtypes` index, a kind's derived `members` (compared as a set). `validate/` is a data document
+against a schema that loaded, where the expected side of a failure is §8.1's category plus the RFC 6901 pointer into the
+data and nothing else.
 
 **At the schema and link layers the category is the phase's, not the diagnostic code's.** §8.1 says every
 error that makes a schema fail to load or ingest is a resolver error "however value-like the violated rule",
@@ -189,14 +181,12 @@ record-shaped code and is still a resolver error. What is checked per diagnostic
 a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch codes say the vector could not be judged, and
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
 
-**No `class2/schema/` subject declares a template yet, and nothing stops one now.** An open entry's body is
-the kernel's `meta.template` constructor carrying the application as text (`schema.meta.TemplateBody`), so it is a
-schema-map value like any other and reads back as ordinary data — where §8.1's older shape wrote the
-application as though it were a value of the constructor's own vocabulary, which no reader could apply
-(§8.1). `ResolvedForm` compares an open entry's body by its *parsed* form, §5.10's one
-spelling being about the application and not the whitespace, so the layer needs no expectation format of its
-own. Templates are covered at the `link/` layer meanwhile, over the entries they mint; `BACKLOG.md` carries
-the vectors that are owed.
+**A parametric record's expected resolved form is a record.** A parametric record is a `!meta.record` carrying `parameters`,
+its parameters written where they stand as their names (`type: T`, `element_type: T` in place, `parents: [result<T>]`), so it
+is a schema-map value like any other, read back through `record`'s own reader with the record's `parameters`
+consulted before the namespace, and compared by `ResolvedForm` as every other entry is. An application of one is a
+closed `!meta.record` carrying `@meta.application` at its key; a construction (`meta.ref<X>`) is an instance of its
+constructor and carries none, and a declared completion (`set<text>`) carries `@meta.completion`.
 
 **Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
 with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, so a Part 1

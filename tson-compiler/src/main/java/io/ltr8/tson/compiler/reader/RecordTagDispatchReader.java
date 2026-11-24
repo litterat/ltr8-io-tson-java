@@ -73,7 +73,7 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
             // The base itself is not admissible, which is the whole of what ABSTRACT means -- so a tag naming
             // it is refused here where a concrete position takes one as a redundant restatement (§8.1). It
             // gets its own wording because the remedy differs: the tag is not wrong about the position.
-            ctx.report(selfNames.contains(tag.get()) ? extension.tagNamesTheBase(TAG)
+            ctx.report(selfNames.contains(tag.get()) ? extension.tagNamesTheBase(TAG, false)
                     : extension.notASubtype(TAG, tag.get()));
             EventSkip.dataValue(ctx);
             return null;

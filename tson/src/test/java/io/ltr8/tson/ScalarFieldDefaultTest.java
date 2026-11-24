@@ -20,8 +20,8 @@ class ScalarFieldDefaultTest {
     void aPeriodTypedFieldMayCarryADefault() {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/period-default.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   plan => { term?: period ~ P1Y }
                 }
@@ -32,8 +32,8 @@ class ScalarFieldDefaultTest {
     void aDurationTypedFieldMayToo() {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/duration-default.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   plan => { gap?: duration ~ PT30M }
                 }

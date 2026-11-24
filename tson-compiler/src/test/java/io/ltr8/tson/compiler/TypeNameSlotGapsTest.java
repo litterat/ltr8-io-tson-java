@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * by its slot's declared type.
  *
  * <ol>
- *   <li>An application at a type-name slot of a value body is refused with the alias spelling named: nothing lifts
- *       or mints in a value body, so an application there would have no entry to be the name of.
+ *   <li>An application at a type-name slot of a value body is refused, naming the declaration to write: the slot
+ *       holds a name, and an application is none.
  *   <li>A slot that only the subtype the value's tag selected declares, below a record family base, is judged by
  *       its declared type ({@code SubtypeBehindFieldTest} has the same one record field further down).
  *   <li>A slot's pointer writes the key for a map key that carries annotations.
@@ -41,7 +41,7 @@ class TypeNameSlotGapsTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/gap-meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   gap_status        => !numeric.integer_type { min: 100  max: 599 }
                   gap_reply         => { status: gap_status  body: meta.type_ref }
@@ -71,13 +71,13 @@ class TypeNameSlotGapsTest {
         return TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.contextExtendedWith(HOSTS), SOURCE);
     }
 
-    /** A schema under the meta above declaring {@code order}, the record template {@code box}, and {@code more}. */
+    /** A schema under the meta above declaring {@code order}, the parametric record {@code box}, and {@code more}. */
     private static String schema(String label, String more) {
         String id = "https://example.test/gap-" + label + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!import:"https://example.test/gap-meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order => { sku: text }
                   box   => <T> { v: T }
@@ -114,28 +114,32 @@ class TypeNameSlotGapsTest {
     }
 
     /**
-     * A value body is never lifted or minted, so an application at a kind-typed slot has no entry to be the name
-     * of: it is refused, sound or not, and the alias spelling named ({@code order_box => box<order>}).
+     * A kind-typed slot holds the name of a type, and a value carries no argument list ([TSON-DATA] §7.2.5): an
+     * application is a syntax error, sound or not.
      */
     @Test
-    void anApplicationAtAKindSlotIsRefusedNamingTheAlias() {
+    void anApplicationAtAKindSlotDoesNotParse() {
         for (String application : List.of("box<order>", "box<no_such>", "no_box<order>", "box<order order>",
                 "box< other >")) {
-            refused(schema("applied-" + application.hashCode(),
-                            "op => !gap_operations { o => { request: " + application + " } }"),
-                    "a position typed by a kind holds the name of a type", "declare an alias");
+            doesNotParse(schema("applied-" + application.hashCode(),
+                    "op => !gap_operations { o => { request: " + application + " } }"));
         }
     }
 
     /** The same one level down, in a record value inside the body. */
     @Test
-    void anApplicationInANestedRecordIsRefused() {
-        refused(schema("nested", """
+    void anApplicationInANestedRecordDoesNotParse() {
+        doesNotParse(schema("nested", """
                 op => !gap_operations { o => {
                   request: order
                   replies: [ { status: 200  body: box<no_such> } ]
-                } }"""),
-                "a position typed by a kind holds the name of a type");
+                } }"""));
+    }
+
+    private static void doesNotParse(String id) {
+        List<Diagnostic> problems = problems(id);
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code(), problems.toString());
     }
 
     /** The alias gives the application an entry, and the bare name then names it and is judged. */

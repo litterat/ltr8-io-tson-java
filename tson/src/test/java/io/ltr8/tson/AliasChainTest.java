@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * [TSON-SCHEMA] §8.3: an alias is a hop, not a rewrite.
  *
- * <p>Resolved output states the chain as the author wrote it. A type position naming an {@code ALIAS}
+ * <p>Resolved output states the chain as the author wrote it. A type position naming an alias
  * entry keeps that name, no annotation records where it "really" points, and the chain stays walkable end to
  * end — which it had to anyway, since {@code alias.target} was never flattened and the entries never
  * left the namespace.
@@ -36,9 +36,9 @@ class AliasChainTest {
     }
 
     private static TypeRef fieldType(Top definition, String field) {
-        return assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
+        return assertInstanceOf(TypeRef.class, assertInstanceOf(RecordBody.class, definition).fields().entrySet().stream()
                 .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeRef();
+                .typeExpr());
     }
 
     private static Top kernelEntry(String name) {
@@ -46,10 +46,10 @@ class AliasChainTest {
                 .resolveLinked(TsonBundledSchemas.META_ID).schema().entries().get(name);
     }
 
-    /** The kernel's own case: {@code meta.template_param.name} is declared {@code meta.param_name} and stays it. */
+    /** The kernel's own case: {@code meta.param.name} is declared {@code meta.param_name} and stays it. */
     @Test
     void aKernelAliasAtAFieldTypeNamesWhatWasWritten() {
-        TypeRef name = fieldType(kernelEntry("meta.template_param"), "name");
+        TypeRef name = fieldType(kernelEntry("meta.param"), "name");
         assertEquals("meta.param_name", name.name());
         assertTrue(name.annotations().isEmpty(), "nothing is attached to record where it points");
     }
@@ -57,7 +57,7 @@ class AliasChainTest {
     /** A position naming something that is not an alias is unaffected, as it always was. */
     @Test
     void aNonAliasIsUnaffected() {
-        assertEquals("meta.field_type_ref", fieldType(kernelEntry("meta.record_field"), "type").name());
+        assertEquals("meta.type_expr", fieldType(kernelEntry("meta.record_field"), "type").name());
     }
 
     private static final String CHAIN = """
@@ -79,8 +79,8 @@ class AliasChainTest {
     private static String schema(String body) {
         return """
                 !!id:"https://example.test/chain.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { %s }
                 """.formatted(body);
     }
@@ -94,19 +94,19 @@ class AliasChainTest {
         assertInstanceOf(io.ltr8.tson.schema.unicode.TextType.class, resolve(CHAIN, "a"));
     }
 
-    /** An argument list is no different -- a lifted synthetic's element type names what was written too. */
+    /** A construction written in place is no different -- its element type names what was written too. */
     @Test
     void aNestedArgumentNamesWhatWasWritten() {
         Top holder = resolve("  a => text\n  holder => { f: [a] }", "holder");
-        Top injected = resolve("  a => text\n  holder => { f: [a] }",
-                fieldType(holder, "f").name());
+        io.ltr8.tson.schema.meta.TypeInline inline = assertInstanceOf(io.ltr8.tson.schema.meta.TypeInline.class,
+                assertInstanceOf(RecordBody.class, holder).fields().get("f").type());
         assertEquals("a", assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class,
-                injected).elementType().name());
+                inline.of()).elementType().text());
     }
 
     /**
      * The behavioural half, and the reason none of the above costs anything: a read still reaches the end of
-     * the chain, because the reader for an {@code ALIAS} entry <em>is</em> its target's reader. The
+     * the chain, because the reader for an alias entry <em>is</em> its target's reader. The
      * constraint at the end of the chain applies at a position two hops in front of it.
      */
     @Test

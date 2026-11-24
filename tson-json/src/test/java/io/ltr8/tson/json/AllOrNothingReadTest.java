@@ -8,7 +8,7 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import org.junit.jupiter.api.Test;
@@ -32,8 +32,8 @@ class AllOrNothingReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/all-or-nothing-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               point  => { x: int32  y: int32 }
               route  => { name: text  stops: [point] }
@@ -117,7 +117,7 @@ class AllOrNothingReadTest {
     @Test
     void aTokenRefusalLeavesNothingInEveryModeAndBothEncodings() {
         String text = "p\u0430ssword";
-        ScriptPolicy ascii = ScriptPolicy.asciiOnly();
+        TokenPolicy ascii = TokenPolicy.asciiOnly();
 
         Map<String, Object> read = new LinkedHashMap<>();
         DiagnosticsCollector tsonTree = new DiagnosticsCollector();

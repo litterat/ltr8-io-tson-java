@@ -25,8 +25,8 @@ class TypedFacetTest {
     private static String schemaDeclaring(String declarations) {
         return """
                 !!id:"https://example.test/facet-%d.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { %s }
                 """.formatted(NEXT.incrementAndGet(), declarations);
     }
@@ -153,6 +153,23 @@ class TypedFacetTest {
                   wider => !narrow ^ { min: PT30M }""");
         assertEquals(1, reported.size(), reported.toString());
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, reported.getFirst().code());
+    }
+
+    @Test
+    void fractionDigitsAboveNineIsRefusedAtLoadOnEveryTemporalFamily() {
+        for (String declaration : List.of(
+                "t => !time ^ { fraction_digits: 10 }",
+                "t => !datetime ^ { fraction_digits: 10 }",
+                "t => !duration ^ { fraction_digits: 10 }",
+                "t => !temporal.time_type { fraction_digits: 10 }",
+                "t => !temporal.datetime_type { fraction_digits: 10 }")) {
+            List<Diagnostic> reported = loading(declaration);
+            assertEquals(1, reported.size(), declaration + ": " + reported);
+            assertEquals(Diagnostic.Code.SCHEMA_ERROR, reported.getFirst().code(), declaration);
+            assertTrue(reported.getFirst().message().contains("fraction_digits 10"), reported.getFirst().message());
+        }
+        assertEquals(List.of(), loading("t => !time ^ { fraction_digits: 9 }"));
+        assertEquals(List.of(), loading("t => !datetime ^ { fraction_digits: 9 }"));
     }
 
     @Test

@@ -16,10 +16,9 @@ form only; history lives in git.
 - NFC normalization applies to *unquoted* tokens only; `Pattern_White_Space` is the spec's fixed 11-character set,
   hardcoded.
 - `TsonDataStream` is the only thing that walks source text; `TsonDataParser` holds no grammar logic of its own.
-- A reference that is no bare name (§7.4) is one `ReferenceEvent`, one `ReferenceValue`, holding a `Reference`
-  assembled by the stream: an application, its `<` adjacent to an unquoted name, or a sibling reference, `kind!`, its
-  `!` adjacent to one unquoted identifier and followed by whitespace or the end of the document. A quoted token is
-  never a reference, and the lexer knows nothing of either.
+- An argument list is no data form (§7.2.5): `<` and `>` lex as special tokens for the schema grammar, and in a data
+  value either is a parse error. A name in a value is a `TokenEvent` like any token, and the lexer knows nothing of
+  names.
 - `_id` lexes as the void sentinel then `id`, and the lexer never refuses it: the failure is a parse error at whichever
   half the grammar trips on, which `TsonDataStream.mismatch`/`parseError` extend with "quote it" (`underscored`).
   Refusing in the lexer would move a parser-category error into the lexer's.
@@ -155,12 +154,12 @@ grammar, split by role, not duplicated:
 
 - **`TsonDataStream` (Tier 2)** is the only thing that walks source text: a lazy, pull-based
   `TsonEventSource` (`stream` package — `hasNext()`/`next()`/`peek()` over a sealed `TsonEvent` hierarchy:
-  `RecordStart`/`MapArrow`/`ArrayStart`/`TypeRef`/`TokenEvent`/`ReferenceEvent`/`VoidEvent`/... each carrying
+  `RecordStart`/`MapArrow`/`ArrayStart`/`TypeRef`/`TokenEvent`/`VoidEvent`/... each carrying
   its own `Position`). Driven off `Lexer.nextToken()` with an explicit frame stack (memory is proportional
   to open-container depth, never document size) and at most two tokens of lookahead (only to disambiguate
   `{}` record-vs-map).
 - **`TsonDataParser` (Tier 3)** builds the full AST — the sealed `CoreValue` hierarchy in `ast`
-  (`RecordValue`/`MapValue`/`ArrayValue`/`EmptyBrace`/`VoidValue`/`TokenValue`/`ReferenceValue`) — by reducing
+  (`RecordValue`/`MapValue`/`ArrayValue`/`EmptyBrace`/`VoidValue`/`TokenValue`) — by reducing
   the flat event sequence back into a tree. It holds no grammar logic of its own.
 
 Key points:
@@ -182,41 +181,15 @@ Key points:
   rejects `_` as a map key (§2.9), resolves `EmptyBrace` to a record/typed container (§2.8), or interprets
   `TokenValue` text as boolean/number/string (base type resolution,
   `design/base-types-and-atom-vocabulary.md`). These are intentional gaps, not omissions.
-- **A reference is data grammar** ([TSON-DATA] §7.4): `reference = qualified-name "<" ws
-  type-args ws ">"`, each `type-arg` a reference or a token, a qualified name being a reference and any other token,
-  a number or a quoted token, a value argument. The lexer is unchanged, `<` and `>` lexing as single-character
-  special tokens, so `map<text list<int32>>` arrives as eight tokens and `>>` is two. `TsonDataStream` assembles one
-  whole (`opensArguments`, `referenceArguments`) into a single `ReferenceEvent` holding the parsed `TypeRef`, the
-  arguments classified as the grammar reads them, and `TsonDataParser` reduces it to a `ReferenceValue`; a qualified
-  name with no argument list stays a `TokenEvent`.
-  - **One event, not a container.** An argument is a reference or a token, never a structure, so a reference is
-    small; delivering it whole keeps every reader, skip (`EventSkip`, a leaf) and replay treating it as the one value
-    it is. A reader at a reference-typed position rolls a `ReferenceEvent` or a name token into one `TypeRef`; at any
-    other typed position a `ReferenceEvent` is a type mismatch.
-  - **The `<` is adjacent to the name (§7.5)**, and only an unquoted token takes one: `box <text>` and `"box"<text>`
-    are parse errors naming the rule, so **a quoted token is never a reference**, and `"box<text>"` is text. Inside the
-    list whitespace and commas are free, separated as an array's elements are; `box<>` is refused, as is a head that
-    is no qualified name (`requireQualifiedName`, each `.`-separated segment a §7.7 identifier). A qualified head
-    parses (`geo.address<T>`); what it names is the reader's or the resolver's to judge.
-  - **Where it stands**: anywhere a core value does, a map key included, the stream looking one token past a
-    `{`'s first key for an adjacent `<` or `!` to frame the map. A `!` tag is a qualified name with no arguments,
-    below.
-- **A sibling reference is data grammar too** ([TSON-DATA] §7.4): `sibling-ref =
-  unquoted-token "!"`. The lexer is unchanged, so `kind!` is an unquoted token and an adjacent `!`, and adjacency
-  tells it from a prefix `!`, which is adjacent to the token after it. `TsonDataStream` assembles it (`marksSibling`,
-  `siblingReference`) into a `ReferenceEvent` holding a `SiblingRef`, one value like an application.
-  - **The `!` is followed by whitespace or the end of the document (§7.5).** That is what leaves nothing to decide:
-    `a!b` (a sibling or a tag on `b`), `kind!}`, `kind!]`, `kind!,` and `kind!?` are parse errors naming the rule.
-    The writers always separate what follows a value by a space, so they never write one of these.
-  - **The token is one unquoted identifier, a single segment** (`ReferenceGrammar.isSiblingField`): `a.b!` would be a
-    chained projection, and `"kind"!` is refused because a quoted token is never a reference. A multi-line token's
-    end is past its closing line's terminator, so a `!` opening the next line is a prefix and never marks it.
-  - **Never an argument, never a tag.** `box<kind! >` is refused by the position rule (a sibling stands only at a
-    record field's type, [TSON-SCHEMA] §5.2) as the argument list is read, `TypeArgument.Ref` holding a type
-    reference; `!int32!` is refused by `parseTypeRefName`, a tag naming a type. Anywhere else a core value stands the
-    grammar admits one, and where it may stand is the reader's to judge: a slot reader whose component is a
-    `TypeRef` refuses it, and the reference atom's parser refuses it at a field typed by a type reference.
-  - **A schemaless read keeps it** as a `TsonSiblingReference`, the field and the mark (`design/tree-model.md`).
+- **An argument list is no data form** ([TSON-DATA] §7.2.5). The lexer still emits `<` and `>` as single-character
+  special tokens, for the schema grammar, so `map<text list<int32>>` arrives as eight tokens and `>>` is two. The
+  grammar does not know the form, so `box<text>` in a value gets the ordinary error for a reserved character, as
+  `kind!` gets the ordinary one: the separation rule's after a token, and "has no role in a data value" where a
+  value stands (`notAValue`). A reader at a reference-typed position reads a
+  name token's text as a qualified name (`ReferenceGrammar`).
+- **`kind!` is no data form.** It is schema-grammar sugar at a record field's type ([TSON-SCHEMA] §12.1), so the
+  stream reads `kind` as a token and the `!` after it as an adjacent token, and the separation rule refuses it. No
+  message here names the mark: one would put the form back in this grammar.
 - **§3.2's three type-expression forms are refused by name, not by the separation rule.** Array brackets,
   type arguments and the `?` suffix "exist only within the [TSON-SCHEMA] type-definition grammar, and their
   appearance after `!` in a data value is a parse error" — so `parseTypeRefName` checks for each and says

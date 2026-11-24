@@ -7,6 +7,7 @@ import io.ltr8.tson.json.Json;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.compiler.TsonDocumentPeek;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -119,7 +120,7 @@ final class ValidateCommand {
                 binding = new JsonBinding(register(schemaFile, schemas, declaredIds), binding.rootType());
             } catch (RuntimeException e) {
                 System.out.println(format.render(ValidationRun.failed(policy,
-                        Diagnostic.Code.SCHEMA_ERROR, schemaFile + ": " + e.getMessage())));
+                        Diagnostic.Code.SCHEMA_ERROR, schemaFile + ": " + unloadable(e))));
                 return 2;
             }
         }
@@ -150,7 +151,7 @@ final class ValidateCommand {
                     register(file, schemas, declaredIds);
                 } catch (RuntimeException e) {
                     System.out.println(format.render(ValidationRun.failed(policy,
-                            Diagnostic.Code.SCHEMA_ERROR, file + ": " + e.getMessage())));
+                            Diagnostic.Code.SCHEMA_ERROR, file + ": " + unloadable(e))));
                     return 2;
                 }
             } else {
@@ -293,14 +294,15 @@ final class ValidateCommand {
                             + "that !!id" + supplied(declaredIds))));
             return 2;
         }
-        try {
-            if (tson.schemaRegistry().getByCanonicalIdentity(identity).isEmpty()) {
-                tson.resolve(text);
-            }
-        } catch (RuntimeException e) {
-            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_ERROR,
-                    binding.schema() + ": " + e.getMessage())));
-            return 2;
+        List<Diagnostic> problems = tson.schemaRegistry().getByCanonicalIdentity(identity).isPresent() ? List.of()
+                : tson.validateSchema(text);
+        if (!problems.isEmpty()) {
+            // The bound schema does not load: its own account is the run's, and a gap in it is the library's (70)
+            // rather than the binding's.
+            System.out.println(format.render(ValidationRun.failed(policy,
+                    problems.stream().map(CliDiagnostic::from).toList())));
+            int exit = TsonCli.exitCodeFor(problems.stream().map(Diagnostic::code).toList());
+            return exit == 70 || exit == 78 ? exit : 2;
         }
         List<Diagnostic> named = json.validate("", binding.schema(), binding.rootType());
         if (named.stream().anyMatch(d -> d.code() == Diagnostic.Code.UNKNOWN_TYPE)) {
@@ -331,6 +333,19 @@ final class ValidateCommand {
         return "cannot read " + input.name() + ": " + reason;
     }
 
+    /**
+     * Why a schema file does not load, where that is the file's own: unreadable, not well-formed, past a limit, or
+     * carrying no {@code !!id} it can be registered under. Anything else rethrows, so a gap or a fault reaches
+     * {@link TsonCli}'s handler and exit 70 rather than reading as a bad schema.
+     */
+    private static String unloadable(RuntimeException e) {
+        return switch (e) {
+            case SchemaValidationException invalid -> invalid.getMessage();
+            case UncheckedIOException unreadable -> unreadable.getMessage();
+            default -> TsonDiagnostics.ofSchemaSyntaxError("", e).message();
+        };
+    }
+
     /** The bundled standard-library identities, which {@code ProcessorConfig} always serves from its own resources. */
     private static boolean isBundledId(String id) {
         return TsonBundledSchemas.IDS.contains(id);
@@ -343,7 +358,7 @@ final class ValidateCommand {
     private static String register(Path file, Map<String, String> schemas, List<String> declaredIds) {
         String text = Io.readFile(file);
         String id = new TsonSchemaParser(text).parseSchemaDocument().id().orElseThrow(() ->
-                new IllegalArgumentException("schema " + file + " has no !!id"));
+                new SchemaValidationException("schema " + file + " has no !!id"));
         if (isBundledId(id)) {
             System.err.println("note: " + file + " declares the built-in schema id \"" + id
                     + "\" -- overriding a bundled schema (meta, core, net, policy) is not supported; ignoring this file");

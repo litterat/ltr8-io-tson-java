@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class OneDirectiveTest {
 
-    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
+    private static final String CORE = "https://tson.io/2026/40/m/core.tn";
     private static final String MONEY = "https://example.test/money.tn";
     private static final String ORDERS = "https://example.test/orders.tn";
     private static final String OTHER_MONEY = "https://example.test/other-money.tn";
@@ -32,15 +32,15 @@ class OneDirectiveTest {
     private static final Map<String, String> DOCUMENTS = Map.of(
             MONEY, """
                     !!id:"https://example.test/money.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
                     !schema { money => { amount: number  currency: text } }""",
             ORDERS, """
                     !!id:"https://example.test/orders.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
                     !schema { order => { sku: text  quantity: int32 } }""",
             OTHER_MONEY, """
                     !!id:"https://example.test/other-money.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
                     !schema { money => { cents: int64 } }""",
             NOT_A_SCHEMA, """
                     !!id:"https://example.test/a-value.tn"
@@ -113,7 +113,7 @@ class OneDirectiveTest {
     @Test
     void aSchemaRootIsNotData() {
         List<Diagnostic> problems = tson().validate("""
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 @doc:"orders"
                 !schema { order => { sku: text } }""");
 

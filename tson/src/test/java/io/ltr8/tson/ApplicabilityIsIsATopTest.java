@@ -4,7 +4,6 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Alias;
 
@@ -14,6 +13,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>Asking whether {@code C} is a constructor was both too narrow and inconsistent.</b> Too narrow:
  * {@code alias} is deliberately unmarked in the kernel (it describes no value) and the language needs it
- * applicable, so it took a by-name exception in the template path and none in the closed one — leaving
+ * applicable, so it took a by-name exception in the parametric record path and none in the closed one — leaving
  * {@code <T> !alias { target: T }} legal and {@code !alias { target: int32 }} refused, one
  * construction with two answers. Inconsistent, because nothing about the marker said which.
  *
@@ -40,8 +40,8 @@ class ApplicabilityIsIsATopTest {
     private static List<Diagnostic> problems(String declarations) {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s }
                 """.formatted(declarations);
@@ -50,68 +50,60 @@ class ApplicabilityIsIsATopTest {
     }
 
     /**
-     * Both spellings apply {@code alias}: a closed application and an open one resolve by the same
-     * applicability rule, {@code alias} being IS-A {@code top}.
+     * A construction applies {@code alias}, {@code alias} being IS-A {@code top}; a parameter list before it is
+     * refused, a parametric record's body being a record (§5.10).
      */
     @Test
-    void aliasAppliesClosedAndOpenAlike() {
+    void aliasAppliesClosedAndRefusesParameters() {
         assertEquals(List.of(), problems("  r => !meta.alias { target: int32 }"));
-        assertEquals(List.of(), problems("""
+        List<Diagnostic> parametric = problems("""
                   r => <T> !meta.alias { target: T }
-                  c => r<int32>
-                """));
+                """);
+        assertEquals(1, parametric.size(), parametric::toString);
+        assertTrue(parametric.getFirst().message().contains("a parametric record's body is a record body"),
+                parametric::toString);
     }
 
     /**
      * <b>The closed spelling denotes the same entry the bare alias does.</b> Admitting it is only half the
      * job: {@code !alias { target: X }} is the explicit form of {@code name => X} (§8.3), so it must
-     * resolve to {@code kind: ALIAS} with {@code X} as source and body — not to the head's own kind with
-     * {@code alias} as source, which is what a construction of any other head yields.
-     *
-     * <p>The distinction was unreachable while the closed form was refused, which is why it is asserted here
-     * against all three spellings at once rather than left to the one that already worked.
+     * resolve to an alias whose target is {@code X}, not to a construction of {@code alias}, which is what a
+     * construction of any other head yields.
      */
     @Test
     void everySpellingOfAnAliasDenotesTheSameEntry() {
         String source = """
                 !!id:"https://example.test/u.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   bare    => int32
                   closed  => !meta.alias { target: int32 }
-                  open    => <T> !meta.alias { target: T }
-                  applied => open<int32>
                 }
                 """;
         var entries = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
                 .resolve(source).schema().entries();
 
-        for (String name : List.of("bare", "closed", "applied")) {
+        for (String name : List.of("bare", "closed")) {
             Top definition = entries.get(name);
-            assertEquals(EntryKind.ALIAS, EntryKind.of(definition, n -> true), name);
-            assertEquals("int32", ((Alias) definition).target().name(), name);
+            assertEquals("int32", assertInstanceOf(Alias.class, definition, name).target().name(), name);
         }
-        // The open one is a template until it closes, and its kind says so: a template is not a type
-        // (§5.10), so it is TEMPLATE rather than the ALIAS its closure produces. `applied` above is
-        // where the ALIAS appears -- the entry closing it mints.
-        assertEquals(EntryKind.TEMPLATE, EntryKind.of(entries.get("open"), n -> true));
     }
 
     /**
      * <b>An alias is a hop, not a rewrite (§8.3), so applicability follows the chain.</b> An alias to a
      * constructor is applicable, because the entry at the end of the chain is — and so is an alias to that
-     * alias. Everything the head is asked (is it a template, is it applicable, what kind does construction
-     * transfer, whose vocabulary reads the payload) is a question about the terminal entry.
+     * alias. Everything the head is asked (is it a parametric record, is it applicable, whose vocabulary reads
+     * the payload) is a question about the terminal entry.
      *
-     * <p>Asking the alias instead would answer every one of them from an empty supertype chain and a {@code
-     * ALIAS} kind, which is what a hop looks like rather than what it points at.
+     * <p>Asking the alias instead would answer every one of them from an empty supertype chain and an alias
+     * body, which is what a hop looks like rather than what it points at.
      */
     @Test
     void applicationFollowsAnAliasToItsTarget() {
         String meta = """
                 !!id:"https://example.test/m.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   alias_array => meta.array
                   two_hops    => alias_array
@@ -121,7 +113,7 @@ class ApplicabilityIsIsATopTest {
             String user = """
                     !!id:"https://example.test/u.tn"
                     !!import:"https://example.test/m.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
                     !schema { tags => !%s { element_type: text } }
                     """.formatted(head);
             List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
@@ -169,7 +161,7 @@ class ApplicabilityIsIsATopTest {
         assertEquals(1, problems.size(), problems::toString);
         assertTrue(problems.getFirst().message().contains("'!meta.product' names an abstract entry"), problems::toString);
         assertTrue(problems.getFirst().message().contains(
-                "(meta.record | meta.array | meta.set_type | meta.map | meta.namespace | meta.tuple)"), problems::toString);
+                "(meta.record | meta.array | meta.map | meta.namespace | meta.tuple)"), problems::toString);
         assertFalse(problems.getFirst().message().contains("constraint vocabulary"),
                 "one sentence, not the applicability clause beside the abstract one: " + problems);
     }
@@ -195,7 +187,7 @@ class ApplicabilityIsIsATopTest {
     void anAbstractConstructorWithNothingComposingItSaysSo() {
         String vocabulary = """
                 !!id:"https://example.test/marker-meta.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   marker => abstract meta.top & {}
                 }

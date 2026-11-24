@@ -40,8 +40,8 @@ class FieldNameTypeTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/%s.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema
             """;
 
@@ -260,15 +260,15 @@ class FieldNameTypeTest {
                     """)));
     }
 
-    /** A composition absorbs its supertypes' names, so it takes their name_type; a refinement keeps its own. */
+    /** A composition absorbs its supertypes' names, so it takes their name_type, whether it adds or restates. */
     @Test
-    void aCompositionAndARefinementInheritTheFieldNameType() {
+    void aCompositionInheritsTheFieldNameType() {
         var schema = Tson.standard().resolve(schema("inherit", """
               json_name => !unicode.identifier_type { start_add: "@$" }
               node => !meta.record { name_type: json_name  fields: {
                 "@id" => { type: text }  "$ref" => { type: text  optional: true } } }
               labelled => node & { label: text }
-              tightened => node ^ { "$ref": text }
+              tightened => node & { "$ref": text }
             """));
         assertEquals("json_name", ((io.ltr8.tson.schema.meta.RecordBody) schema.schema().entries().get("labelled"))
                 .nameTypeName());
@@ -294,13 +294,13 @@ class FieldNameTypeTest {
     }
 
     /**
-     * A template's held body is text, and a declared name that is no identifier is written quoted in it, so a
-     * template composing a translation's base, a plain template declaring one, and an explicit one over a words
-     * type all hold and close; a plain one applied gives the identifier verdict its hand-written record would.
+     * A parametric record's held body is text, and a declared name that is no identifier is written quoted in it, so a
+     * parametric record composing a translation's base, a plain parametric record declaring one, and an explicit one over a
+     * words type all hold and close; a plain one applied gives the identifier verdict its hand-written record would.
      */
     @Test
-    void aTemplateHoldsAndClosesNamesThatAreNoIdentifiers() {
-        String templates = schema("templates", """
+    void aParametricRecordHoldsAndClosesNamesThatAreNoIdentifiers() {
+        String records = schema("templates", """
                   json_name => !unicode.identifier_type { start_add: "@" }
                   json_record => !meta.record { name_type: json_name  extension: ABSTRACT  fields: {} }
                   page => <T> json_record & { "@id": T  "@type"?: text }
@@ -309,8 +309,8 @@ class FieldNameTypeTest {
                   row => <T> !meta.record { name_type: words  fields: { "first name" => { type: T } } }
                   r => row<text>
                 """);
-        assertEquals(List.of(), read(templates, "templates", "!p { \"@id\": \"x\" }"));
-        assertEquals(List.of(), read(templates, "templates", "!r { \"first name\": \"Ada\" }"));
+        assertEquals(List.of(), read(records, "templates", "!p { \"@id\": \"x\" }"));
+        assertEquals(List.of(), read(records, "templates", "!r { \"first name\": \"Ada\" }"));
         var thrown = org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> Tson.standard().resolve(schema("plain-template", """
                       box => <T> { "@id": T }
@@ -320,12 +320,12 @@ class FieldNameTypeTest {
     }
 
     /**
-     * A template composing a base closes to the record its hand-written spelling is, the base's name type
+     * A parametric record composing a base closes to the record its hand-written spelling is, the base's name type
      * included; and the chain is the resolver's, so the explicit {@code !record} cannot state one
      * ([TSON-SCHEMA] §4.1) -- a record takes a name type from supertypes only through {@code &}.
      */
     @Test
-    void aClosedTemplateTakesItsBasesNameTypeAndADeclarationWritesNoChain() {
+    void aParametricRecordClosesToItsBasesNameTypeAndADeclarationWritesNoChain() {
         String explicit = schema("explicit", """
                   folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }
                   fbase => !meta.record { name_type: folded  extension: ABSTRACT  fields: {} }
@@ -362,8 +362,8 @@ class FieldNameTypeTest {
 
     /**
      * Two name types are one when their alias chains end at one entry, not when they are spelled alike: an
-     * alias of {@code json_name} composes with it, and so does the kernel's {@code meta.identifier} with the default
-     * {@code meta.field_name}, an alias of it.
+     * alias of {@code json_name} composes with it, and a record stating the kernel's {@code meta.identifier} with one
+     * stating none, that being the type a record has where none is stated.
      */
     @Test
     void nameTypesAreOneByTheEntryTheyResolveTo() {
@@ -380,7 +380,24 @@ class FieldNameTypeTest {
     }
 
     /**
-     * A schema's own references to its fields -- a group's members, a refinement's restated field -- match the
+     * A record's default name type is the kernel's {@code meta.identifier} itself, and the kernel declares no other
+     * name for it ([TSON-SCHEMA] §5.2): {@code meta.field_name}, as a name type or as a field's type, names nothing.
+     */
+    @Test
+    void theKernelDeclaresNoFieldNameRole() {
+        assertEquals(List.of("'r': its name_type 'meta.field_name' names nothing in scope"),
+                messages("r => !meta.record { name_type: meta.field_name  fields: { x => { type: text } } }"));
+        assertEquals(List.of("'r' field 'label' has an unresolved reference 'meta.field_name'"),
+                messages("r => { label: meta.field_name }"));
+    }
+
+    private static List<String> messages(String body) {
+        return Tson.standard().validateSchema(schema("no-field-name", body)).stream().map(Diagnostic::message)
+                .toList();
+    }
+
+    /**
+     * A schema's own references to its fields -- a group's members, a composition's restated field -- match the
      * declared names exactly, under a folding name type too: the schema is one author's text, and only a
      * document's spelling is matched in the type's form.
      */
@@ -391,7 +408,7 @@ class FieldNameTypeTest {
                         + "  email => { type: text  optional: true } }\n"
                         + "  groups: [ { members: [ [NAME] [email] ] } ] }",
                 "row => !meta.record { name_type: folded  fields: { name => { type: text } } }\n"
-                        + "tight => row ^ { NAME: text }"}) {
+                        + "tight => row & { NAME: text }"}) {
             org.junit.jupiter.api.Assertions.assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                     () -> Tson.standard().resolve(schema("exact",
                             "folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }\n" + body)), body);
@@ -413,7 +430,7 @@ class FieldNameTypeTest {
 
     /**
      * A name type a record states is the one it gets, a schema's own family ({@code at_name}) as readily as the
-     * kernel's; a record stating none has the kernel's {@code meta.field_name}.
+     * kernel's; a record stating none has the kernel's {@code meta.identifier}.
      */
     @Test
     void aStatedNameTypeIsTheOneTheRecordGets() {
@@ -444,8 +461,8 @@ class FieldNameTypeTest {
     }
 
     /**
-     * The default is a name type like any other: a plain record's names are {@code meta.field_name}'s, set where it is
-     * declared, so a translation's record cannot compose it -- its names were never declared as the other type's.
+     * The default is a name type like any other: a plain record's names are {@code meta.identifier}'s, set where it
+     * is declared, so a translation's record cannot compose it -- its names were never declared as the other type's.
      * The record to compose is one declared over the translation's type.
      */
     @Test
@@ -457,7 +474,7 @@ class FieldNameTypeTest {
                       address => { city: text }
                       node => json_record & address & { "@id": text }
                     """)));
-        assertTrue(thrown.getMessage().contains("'json_name' and 'meta.field_name'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'json_name' and 'meta.identifier'"), thrown.getMessage());
 
         String declared = schema("declared", """
                   json_name => !unicode.identifier_type { start_add: "@$" }
@@ -518,15 +535,19 @@ class FieldNameTypeTest {
                 "!holder { p: { KIND: \"dog\"  name: \"Rex\"  Breed: \"corgi\" } }"));
     }
 
-    /** A record template base's selector is found in its name form too, which its members take from it. */
+    /**
+     * A selector is found in its name form at a base that is a parametric record's application too, which takes the
+     * parametric record's name type, as its members do.
+     */
     @Test
-    void aSelectorIsMatchedInATemplateBasesNameForm() {
+    void aSelectorIsMatchedInTheNameFormOfAParametricRecordsApplication() {
         String family = schema("folded-template-family", """
                   folded => !unicode.identifier_type { normalization: NFKC_CASEFOLD }
                   base => !meta.record { name_type: folded  extension: ABSTRACT  fields: {} }
                   pet => <B> base & { kind: text =?  name: text  extra?: B }
+                  pet_text => pet<text>
                   dog => pet<text> & { kind?: = "dog" }
-                  holder => { p: pet }
+                  holder => { p: pet_text }
                 """);
         assertEquals(List.of(), read(family, "folded-template-family", "!holder { p: { KIND: \"dog\"  name: \"Rex\" } }"));
     }

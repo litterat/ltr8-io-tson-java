@@ -1,0 +1,226 @@
+package io.ltr8.tson.compiler;
+
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
+
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * A family of <b>subtype parametric records</b> over one base parametric record -- {@code result<T>} with {@code ok<T>} and
+ * {@code err<T>} composing it -- closed at an argument. The edge each instantiation gets is to the base
+ * <em>at the same argument</em>, which is the whole claim: {@code ok<text>} is IS-A {@code result<text>} and
+ * has nothing to do with {@code result<int32>}.
+ *
+ * <p><b>The edge cannot be stated where the author writes it.</b> At {@code ok}'s declaration {@code
+ * result<T>} denotes no entry -- no application is IS-A its head (§5.10) -- so there is nothing to name in a chain.
+ * What the held body keeps is the application itself as a written parent, {@code parents} being a
+ * {@code [meta.type_ref]} slot whose reference may carry arguments, and materialisation substitutes and closes it
+ * with the rest of the held body.
+ *
+ * <p><b>Why a reference and not the head name.</b> §5.8 describes {@code supertypes} as recording head names
+ * only, with substitutability then a two-part check against the bodies. A head name cannot work here: no
+ * position is ever typed {@code result}, so the edge would point at something nothing is declared as, and it
+ * would hold for every instantiation at once -- {@code ok<int32>} at a {@code result<text>} position included.
+ * Carrying the arguments makes the index answer on its own, which is what every reader already consults.
+ */
+class ParametricSubtypeFamilyTest {
+
+    private static final String ID = "https://example.test/subtype-template.tn";
+
+    private static TsonCompiledSchema compile(String declarations) {
+        String schema = """
+                !!id:"https://example.test/subtype-template.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                %s
+                }
+                """.formatted(declarations);
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
+                return schema;
+            }
+            throw new IllegalStateException("unexpected fetch: " + uri);
+        };
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
+        return TsonCompiledSchemaRegistry.tree(core).get(ID);
+    }
+
+    /**
+     * The entry {@code alias} denotes, past one alias hop: a {@code name => head<args>} declaration is itself the
+     * record its application closes to (§8.2).
+     */
+    private static String target(TsonCompiledSchema compiled, String alias) {
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
+                ? ref.target().name() : alias;
+    }
+
+    private static final String FAMILY = """
+              result    => <T> { payload: T }
+              ok        => <T> result<T> & { note: text }
+              err       => <T> result<T> & { reason: text }
+              result_of => result<text>
+              ok_of     => ok<text>
+              err_of    => err<text>
+            """;
+
+    @Test
+    void bothSubtypeInstantiationsAreIndexedUnderTheBaseAtTheSameArgument() {
+        TsonCompiledSchema compiled = compile(FAMILY);
+        String base = target(compiled, "result_of");
+
+        assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "err_of")),
+                TypeChain.subtypesOf(compiled.schema().entries().get(base)),
+                () -> base + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(base)));
+        // Neither is IS-A a parametric record (§5.10): each is IS-A the entry its applied parent denotes, and nothing else.
+        assertEquals(List.of(base),
+                TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))));
+        assertEquals(List.of(base),
+                TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "err_of"))));
+    }
+
+    /**
+     * <b>An applied parent reaches the entry its arguments name, never its head</b> ([TSON-SCHEMA] §5.8's
+     * "Parameterized references", §8.1's derived indexes: "{@code ok<text>} indexes {@code result<text>}, never a
+     * head name"). So the parametric record {@code ok} is IS-A nothing of {@code result}'s, and {@code ok<text>} reaches
+     * {@code result<text>} only where an entry for that application exists: with none, it is IS-A nothing, and no
+     * parametric record is IS-A or indexes anything (§5.10).
+     */
+    @Test
+    void anAppliedParentReachesTheEntryItsArgumentsNameAndNeverTheHead() {
+        TsonCompiledSchema compiled = compile("""
+                  result    => <T> { payload: T }
+                  ok        => <T> result<T> & { note: text }
+                  ok_of     => ok<text>
+                """);
+
+        assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get("ok")),
+                "the parametric record is IS-A no head name");
+        assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
+                "nothing names result<text>, and no application is IS-A its head, so ok_of is IS-A nothing");
+        assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get("result")));
+    }
+
+    /**
+     * <b>A parametric record's applications are IS-A its written parents</b> ([TSON-SCHEMA] §5.8, §5.10). A parametric
+     * record carries a chain, holding {@code base} as written and as reached, and every application closing from it
+     * completes the same parents into a chain naming {@code base}. The parametric record itself is in no index.
+     */
+    @Test
+    void aParametricRecordsApplicationsAreIndexedUnderItsParent() {
+        TsonCompiledSchema compiled = compile("""
+                  base     => { x: int32 }
+                  box      => <V> base & { item: V }
+                  box_text => box<text>
+                """);
+        Top baseEntry = compiled.schema().entries().get("base");
+
+        assertTrue(TypeChain.subtypesOf(baseEntry).contains(target(compiled, "box_text")),
+                () -> "the instantiation is indexed: " + TypeChain.subtypesOf(baseEntry));
+        assertFalse(TypeChain.subtypesOf(baseEntry).contains("box"),
+                () -> "the parametric record is in no index: " + TypeChain.subtypesOf(baseEntry));
+        assertEquals(List.of(TypeRef.of("base")), TypeChain.parentsOf(compiled.schema().entries().get("box")),
+                "the parametric record keeps its parent as written, which closing completes");
+    }
+
+    /**
+     * Two arguments, two families. Nothing in {@code result<int32>}'s family came from {@code text}'s, which
+     * is the fact a name-level edge to {@code result} could not have carried.
+     */
+    @Test
+    void anotherArgumentIsAnotherFamilyEntirely() {
+        TsonCompiledSchema compiled = compile(FAMILY + """
+                      result_int => result<int32>
+                      ok_int     => ok<int32>
+                """);
+        String textBase = target(compiled, "result_of");
+        String intBase = target(compiled, "result_int");
+
+        assertFalse(textBase.equals(intBase), "two instantiations, two entries");
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get(intBase)).contains(target(compiled, "ok_int")));
+        assertFalse(TypeChain.subtypesOf(compiled.schema().entries().get(intBase)).contains(target(compiled, "ok_of")),
+                () -> intBase + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(intBase)));
+        assertFalse(TypeChain.subtypesOf(compiled.schema().entries().get(textBase)).contains(target(compiled, "ok_int")),
+                () -> textBase + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(textBase)));
+    }
+
+    /** Three levels deep, each hop derived as its own instantiation closes -- the chain is transitive. */
+    @Test
+    void aChainOfSubtypeParametricRecordsAccumulatesTheWholeContract() {
+        TsonCompiledSchema compiled = compile("""
+                  result   => <T> { payload: T }
+                  ok       => <T> result<T> & { note: text }
+                  great    => <T> ok<T> & { stars: int32 }
+                  result_of => result<text>
+                  ok_of     => ok<text>
+                  great_of  => great<text>
+                """);
+
+        assertEquals(List.of(target(compiled, "ok_of"), target(compiled, "result_of")),
+                TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "great_of"))),
+                "the direct parent, then the chain it already carried, complete");
+        assertTrue(TypeChain.subtypesOf(compiled.schema().entries().get(target(compiled, "result_of")))
+                .contains(target(compiled, "great_of")), "and the base indexes the grandchild");
+    }
+
+    /** The base's own concrete ancestors still come through, alongside the closed application. */
+    @Test
+    void aConcreteAncestorOfTheBaseIsCarriedBesideTheClosedApplication() {
+        TsonCompiledSchema compiled = compile("""
+                  tagged    => { tag: text }
+                  result    => <T> tagged & { payload: T }
+                  ok        => <T> result<T> & { note: text }
+                  result_of => result<text>
+                  ok_of     => ok<text>
+                """);
+
+        assertEquals(List.of(target(compiled, "result_of"), "tagged"),
+                TypeChain.supertypesOf(compiled.schema().entries().get(target(compiled, "ok_of"))),
+                "tagged arrives with the parametric record's own chain, beside the entry the applied parent denotes");
+    }
+
+    /**
+     * §5.9 against a subtype parametric record. Subtraction revokes IS-A for every parent, so the closed entry gets no
+     * edge to it -- and the application is not kept either: a subtracted record is a record with an empty chain,
+     * and an application kept would close into a live edge one pass later.
+     */
+    @Test
+    void subtractionRevokesTheEdgeAnApplicationWouldOtherwiseMint() {
+        TsonCompiledSchema compiled = compile("""
+                  result    => <T> { payload: T  scratch: text }
+                  thin      => <T> result<T> - { scratch }
+                  result_of => result<text>
+                  thin_of   => thin<text>
+                """);
+        String thin = target(compiled, "thin_of");
+
+        assertEquals(List.of("payload"), ((RecordBody) compiled.schema().entries().get(thin)).fields()
+                .keySet().stream().toList(), "the subtraction really ran");
+        // Not IS-A result<text>, and not IS-A thin either, no application being IS-A its head (§5.10).
+        assertEquals(List.of(), ((RecordBody) compiled.schema().entries().get(thin)).supertypes(),
+                "contract: broken, and no application left in the chain to close into an edge");
+        assertEquals(List.of(), TypeChain.subtypesOf(compiled.schema().entries().get(target(compiled, "result_of"))));
+    }
+
+    /** The parametric record itself is untouched: it has no instantiation of its parent to be IS-A. */
+    @Test
+    void theParametricRecordNamesNoParentInItsOwnContractIndex() {
+        TsonCompiledSchema compiled = compile(FAMILY);
+
+        Top ok = compiled.schema().entries().get("ok");
+        assertEquals(List.of(), TypeChain.supertypesOf(ok),
+                () -> "result is a parametric record and nothing is IS-A one: " + TypeChain.supertypesOf(ok));
+    }
+}

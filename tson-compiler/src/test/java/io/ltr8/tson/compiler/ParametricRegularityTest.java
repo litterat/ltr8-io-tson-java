@@ -1,0 +1,196 @@
+package io.ltr8.tson.compiler;
+
+import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * §5.10's regularity boundary ({@code ParametricRegularity}): within a parametric record's body, a recursive application
+ * -- direct or mutual -- must pass each parameter through unchanged.
+ *
+ * <p>Checked where the parametric record is <b>declared</b>, which is the point of the rule. A parametric record that grows
+ * its argument every level has no finite set of types to build, and catching it only while materialising
+ * costs a depth counter -- a non-portable limit, and the retrofit C++ reached for after shipping parametric records
+ * without a regularity restriction. Every fixture here declares the offending parametric record and never applies it.
+ */
+class ParametricRegularityTest {
+
+    private static final String ID = "https://example.test/regularity.tn";
+
+    private static TsonCompiledSchema compile(String declarations) {
+        String schema = """
+                !!id:"https://example.test/regularity.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  box => <T> { v: T }
+                %s
+                }
+                """.formatted(declarations);
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
+                return schema;
+            }
+            throw new IllegalStateException("unexpected fetch: " + uri);
+        };
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
+        return TsonCompiledSchemaRegistry.tree(core).get(ID);
+    }
+
+    private static String rejected(String declarations) {
+        return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
+    }
+
+    /**
+     * A growing argument is unwritable: an argument of a parametric record's application is a name or a parameter (§5.3),
+     * refused at the declaration, with nothing applying it, before regularity is asked.
+     */
+    @Test
+    void aGrowingArgumentIsRefusedAsNoNameEvenWhenTheParametricRecordIsNeverApplied() {
+        String message = rejected("  weird => <T> { next: weird<box<T>>? }");
+
+        assertTrue(message.contains("'box<T>' is passed as an argument of 'weird<box<T>>'"), message);
+        assertTrue(message.contains("is a name or a parameter (§5.3)"), message);
+    }
+
+    /** A growing argument held in a constructor's application is refused as any argument is. */
+    @Test
+    void aGrowingArgumentInsideAConstructionIsRefusedAsNoName() {
+        String message = rejected(
+                "  weird => <T> { m: meta.namespace<meta.identifier weird<box<T>>>  t: T }");
+
+        assertTrue(message.contains("'box<T>' is passed as an argument of 'weird<box<T>>'"), message);
+    }
+
+    /** A recursive application passing a name where its parameter stands is irregular, at the declaration. */
+    @Test
+    void aNameForTheParameterIsIrregular() {
+        String message = rejected("  c => <T> { v: T  next?: c<text> }");
+
+        assertTrue(message.contains("'c' applies 'c' recursively but does not pass 'T' through unchanged"), message);
+        assertTrue(message.contains("argument 1 is 'text'"), message);
+    }
+
+    /** A recursive application duplicating a parameter is irregular, though its applications are finitely many. */
+    @Test
+    void duplicatingAParameterIsIrregular() {
+        assertTrue(rejected("  dup => <A, B> { a: A  b: B  x?: dup<A, A> }")
+                .contains("'dup' applies 'dup' recursively but does not pass 'B' through unchanged"));
+    }
+
+    @Test
+    void passingTheParameterThroughUnchangedIsRegular() {
+        assertNotNull(compile("  chain => <T> { head: T  tail: chain<T>? }"));
+    }
+
+    /** An application nested inside another's arguments is no name, the innermost refused first (§5.3). */
+    @Test
+    void aGrowingArgumentNestedInsideAnotherApplicationIsRefusedAsNoName() {
+        String message = rejected("  deep => <T> { x: box<deep<box<T>>>? }");
+        assertTrue(message.contains("'box<T>' is passed as an argument of 'deep<box<T>>'"), message);
+    }
+
+    /** Mutual recursion needs reachability, not a self-edge: neither parametric record applies itself. */
+    @Test
+    void mutualRecursionIsCheckedAcrossTheCycle() {
+        assertNotNull(compile("""
+                  ma => <T> { b?: mb<T>? }
+                  mb => <U> { a?: ma<U>? }"""), "regular across the cycle");
+
+        String message = rejected("""
+                  na => <T> { b?: nb<T>? }
+                  nb => <U> { a?: na<text>? }""");
+        assertTrue(message.contains("'nb' applies 'na' recursively"), message);
+    }
+
+    /**
+     * An application that is not on a cycle back to its own declaration is left alone. A parametric record's argument is
+     * a name or a parameter (§5.3), so an argument grows only through a constructor's application.
+     */
+    @Test
+    void aNonRecursiveApplicationMayGrowItsArgumentFreely() {
+        assertNotNull(compile("""
+                  holder => <T> { b?: meta.array<meta.array<box<T>>> }"""));
+    }
+
+    // ── The other §5.10 declaration-time rules ───────────────────────────
+    //    All four are rules a parametric record must satisfy whether or not anyone applies it, and all four were
+    //    unchecked: three are one arity rule, and the fourth is the converse of the closed-entry rule.
+
+    /**
+     * <b>No position names a parametric record bare.</b> Naming one without arguments is refused where the schema links, a
+     * parametric record and a held one alike (§5.10), rather than failing at <em>read</em> time against a document with
+     * nothing wrong with it. {@code ParametricRecordAtATypePositionTest} carries the positions.
+     */
+    @Test
+    void namingAParametricRecordWithoutArgumentsIsRejected() {
+        String message = rejected("""
+                  tmpl => <T> { a: [T] }
+                  use  => { u: tmpl }""");
+
+        assertTrue(message.contains("is a parametric record taking 1 type argument [T]"), message);
+        assertTrue(message.contains("no position names a parametric record bare"), message);
+    }
+
+    /**
+     * A recursive <b>bare</b> reference inside a parametric record is refused at the parametric record's own declaration,
+     * applied or not: no position names a parametric record bare (§5.10), so {@code tail: chain} names nothing a value could
+     * be. The recursion is written {@code chain<T>}. {@code head: T} is not decoration: without it the parameter's only use
+     * would have been the missing argument list, and the unused-parameter rule fires first.
+     */
+    @Test
+    void aRecursiveBareReferenceIsRefused() {
+        assertTrue(rejected("  chain => <T> { head: T  tail: chain? }")
+                .contains("'chain' is a parametric record taking 1 type argument [T]"));
+        assertNotNull(compile("""
+                  chain      => <T> { head: T  tail?: chain<T>? }
+                  text_chain => chain<text>
+                  use        => { c: text_chain }"""),
+                "the recursion written as an application closes into the declaration closing it");
+    }
+
+    /**
+     * A recursive application's arity is decidable where it is written. {@code ParametricRegularity} cannot
+     * report it -- comparing parameters positionally needs the positions to line up -- so it passed through
+     * to a materialisation that may never happen.
+     */
+    @Test
+    void aRecursiveApplicationWithTheWrongArityIsRejected() {
+        assertTrue(rejected("  chain => <T> { tail: chain<T, T>? }")
+                .contains("takes 1 type argument [T], but 2 were applied"));
+    }
+
+    /**
+     * The converse of §5.10's closed-entry rule: a parametric record references every parameter it declares.
+     * {@code <T> { v: text }} declares `T` and never uses it, so every application would denote the same
+     * type. Deciding this also settles what an open form with no parameter-bearing binding would mean:
+     * nothing, because it cannot exist.
+     */
+    @Test
+    void aDeclaredParameterTheBodyNeverReferencesIsRejected() {
+        assertTrue(rejected("  tmpl => <T> { v: text }").contains("never references it"));
+        assertTrue(rejected("  tmpl => <T, U> { v: T }").contains("parameter 'U'"));
+        assertNotNull(compile("  tmpl => <A, B> { x: A  y: B }"), "both used");
+    }
+
+    /**
+     * <b>Deliberately stricter than termination requires.</b> Permuting the parameters still reaches
+     * finitely many instantiations -- arguments are only ever copied, never constructed -- so
+     * {@code swap<B, A>} would terminate. Positional identity is what §5.10's cited precedent uses (ML
+     * restricts polymorphic recursion the same way) and an over-restriction that is simple to state can be
+     * loosened later, where the reverse cannot. Pinned so the choice is visible rather than incidental.
+     */
+    @Test
+    void permutingParametersIsRejectedThoughItWouldTerminate() {
+        assertTrue(rejected("  swap => <A, B> { x: swap<B, A>? }")
+                .contains("does not pass 'A' through unchanged"));
+    }
+}

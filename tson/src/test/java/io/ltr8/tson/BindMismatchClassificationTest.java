@@ -41,7 +41,7 @@ class BindMismatchClassificationTest {
     /** A vocabulary schema declaring a record held in a namespace type of its own -- and no Java class for it. */
     private static final String META_SCHEMA = """
             !!id:"https://example.test/meta-bindmismatch.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               notification  => { path: text }
               notifications => !meta.namespace { key_type: meta.identifier  value_type: notification }
@@ -51,14 +51,14 @@ class BindMismatchClassificationTest {
     private static final String IMPORTING_HEADER = """
             !!id:"https://example.test/api-bindmismatch.tn"
             !!import:"https://example.test/meta-bindmismatch.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema
             """;
 
     private static final String ORDINARY_HEADER = """
             !!id:"https://example.test/bindmismatch.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema
             """;
 

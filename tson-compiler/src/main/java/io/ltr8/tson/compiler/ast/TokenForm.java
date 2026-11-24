@@ -1,9 +1,8 @@
 package io.ltr8.tson.compiler.ast;
 
 /**
- * The three token forms of §2.4: "text plus form". Form is consulted only by base type
- * resolution (§4, not yet implemented) and is otherwise not meaning — kept here purely so a
- * later layer can tell {@code 42} (unquoted) from {@code "42"} (quoted).
+ * The three token forms of [TSON-DATA] §2.4, a token being "text plus form": {@code 42} and {@code "42"} are one text
+ * in two forms, which base type resolution (§4) reads as a number and a string.
  */
 public enum TokenForm {
     UNQUOTED,

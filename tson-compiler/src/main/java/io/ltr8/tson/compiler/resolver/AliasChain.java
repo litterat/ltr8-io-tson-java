@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * Following a chain of {@code ALIAS} entries to the type at the end of it -- [TSON-SCHEMA] §8.3's walk,
+ * Following a chain of alias entries to the type at the end of it -- [TSON-SCHEMA] §8.3's walk,
  * stated once.
  *
  * <p><b>Why this is a shared class rather than a loop each caller writes.</b> Resolved output states the
@@ -24,8 +24,9 @@ import java.util.function.Function;
  * <p><b>The walk stops at three things</b>, and the second is the one worth knowing:
  * <ul>
  *   <li>an entry whose body is not an {@link Alias} -- the type at the end;
- *   <li>an <b>argument-bearing</b> target, which is an application rather than a hop to another entry:
- *       there is no entry at the end of one until materialisation mints it;
+ *   <li>an <b>argument-bearing</b> target, which is an application rather than a hop to another entry: a
+ *       declaration naming an application is that entry itself, so a target still carrying arguments is one that
+ *       did not close, and there is no entry at the end of it;
  *   <li>a name the namespace does not declare, and a cycle. {@link #terminal} answers both with the name it
  *       stopped at, since an undeclared name is a type parameter to its caller and a cycle's answer depends
  *       on where the walk began -- so no false equality follows. {@link #terminalDefinition} answers both
@@ -34,7 +35,7 @@ import java.util.function.Function;
  *
  * <p><b>Not every walk over references is this one.</b> {@code ParameterTypes} follows a chain to reach a
  * slot's declared body and deliberately does <em>not</em> stop at an argument-bearing target -- it is after
- * the constructor's own vocabulary, where the template is the answer. It keeps its own loop, and the
+ * the constructor's own vocabulary, where the parametric record is the answer. It keeps its own loop, and the
  * difference is the reason to say so here rather than let a future reader assume the four were five.
  */
 public final class AliasChain {
@@ -68,7 +69,7 @@ public final class AliasChain {
             if (current.equals(target)) {
                 return true;
             }
-            if (entries.get(current) instanceof Alias alias && alias.target().arguments().isEmpty()) {
+            if (entries.get(current) instanceof Alias alias) {
                 current = alias.target().name();
                 continue;
             }
@@ -79,7 +80,7 @@ public final class AliasChain {
 
     /**
      * The same walk over a namespace still being built, which has a lookup rather than a finished map --
-     * {@code TemplateMaterialiser} normalises an application's arguments through this while resolution runs.
+     * {@code ParametricMaterialiser} normalises an application's arguments through this while resolution runs.
      */
     public static String terminal(String name, Function<String, ? extends Top> entries) {
         return walk(name, entries).name();
@@ -116,7 +117,7 @@ public final class AliasChain {
             if (definition == null) {
                 return new Stop(current, false);
             }
-            if (definition instanceof Alias alias && alias.target().arguments().isEmpty()) {
+            if (definition instanceof Alias alias) {
                 current = alias.target().name();
                 continue;
             }

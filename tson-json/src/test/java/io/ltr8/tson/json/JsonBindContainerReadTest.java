@@ -45,8 +45,8 @@ class JsonBindContainerReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/bind-containers-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               address => { street: text  city: text }
               names   => [text]
@@ -223,7 +223,7 @@ class JsonBindContainerReadTest {
     // ── Tuples ───────────────────────────────────────────────────────────
 
     /**
-     * An inline tuple has a minted entry name no binding map can hold, so it binds by the component that holds it:
+     * A tuple written in place has no name a binding map could hold, so it binds by the component that holds it:
      * an {@code @Tuple} class, each position bound to its element -- the {@code int32} into a {@code long}.
      */
     @Test

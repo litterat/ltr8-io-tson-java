@@ -33,8 +33,9 @@ Run these and report the results; fix what fails.
    not this change's to fix.
 5. **`scripts/restamp-bundled-schemas.sh --check`** if anything under `spec/m/` moved; Part 2 §13.2's table is the one
    pin the script does not write.
-6. **Javadoc of every edited class is current-form** — no history, no dates; stale narrative removed.
-7. **The area's `design/` note says what the code now does.** Same session, not a follow-up.
+6. **Comments in every edited class say why, never what** — the ones the edit made untrue or unnecessary are
+   deleted, and none was added to describe the change (`CLAUDE.md`, Conventions).
+7. **The area's `design/` note is updated only if an invariant or a decision changed.** Same session when it did.
 8. **Sweep `BACKLOG.md`.** Re-read the relevant section and ask of *each* entry "does this branch make it false?" —
    not only the entry the work started from. Remove settled entries whole, and a heading left empty with them. Watch
    for an entry this branch itself wrote earlier.

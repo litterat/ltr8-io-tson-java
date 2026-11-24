@@ -17,8 +17,8 @@ import io.ltr8.tson.schema.meta.Token;
  * is the text encoding's and no atom of the shared vocabulary: [TSON-JSON] has no token forms.
  *
  * <p><b>Keeping the spelling is what §8.2 asks for, and it does not cost identity.</b> Two spellings of one number are
- * compared as the value the token denotes under §4, by {@code NumericIdentity}, not this class; this one only declines
- * to decode.
+ * compared as the value the token denotes under §4, by the reader of the type they are read against, not this class;
+ * this one only declines to decode.
  *
  * <p>Selected per slot rather than per type, by the bound component's own Java type -- see {@code
  * GroupUnionBindReader} and {@code RecordBindReader.tokenAware}.

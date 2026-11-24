@@ -1,0 +1,631 @@
+package io.ltr8.tson.compiler.resolver;
+
+import io.ltr8.tson.schema.KernelNames;
+import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.ParametricEntry;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Param;
+import io.ltr8.tson.schema.meta.ParamRef;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeSlots;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+
+/**
+ * §5.10 materialisation: closes the applications a resolved schema holds, over the resolved form, not the AST. An
+ * application reaches here as an {@code ApplyBody} written in place, so closing is a walk over {@code schema.meta}
+ * values ({@link TypeSlots}).
+ *
+ * <p><b>Every application here applies a parametric record</b> ([TSON-SCHEMA] §5.10, §5.3), or a head nothing names: a
+ * constructor's application is its construction before anything reads it ({@link ConstructionRewrite}), so {@code
+ * meta.array<text>} arrives as the construction {@code [text]} is. {@code page<order>} substitutes: the record's
+ * parameters are replaced by the arguments on the model and each application at a slot of a field's type closed in
+ * turn ({@link #closeParametricRecord}). An application held inside a parametric record, {@code box<T>} at a field or
+ * in {@code [box<T>]}, closes the same way once the record holding it is applied and its parameter substituted.
+ *
+ * <p><b>Nothing is minted.</b> A declaration naming an application of a parametric record, {@code page_order =>
+ * page<order>}, is the record under that name with the application recorded ({@link #closeApplicationInto}, {@code
+ * @meta.application}, §8.2). At a type slot -- of a closed record, or left by substitution in another record's body --
+ * an application closes in place to the substituted record, {@code { of: !meta.record { … } }} ({@link TypeInline}):
+ * no name, no chain, nothing recorded, and never looked up to a declaration ({@link #instantiate}). The one nested
+ * application that names a declaration is the one a declaration is closing itself: {@code next: node<text>} inside
+ * {@code node_text => node<text>} names {@code node_text}, so a recursion, direct or through records in place, ties to
+ * the declaration it closes (§5.10.1). Two applications are refused: one that would put in place a member of a
+ * declared type ({@code k: dog_of<text>} over {@code dog_of => <T> pet & { … }}, §5.2), and a recursive one with no
+ * declaration closing it ({@code f: node<text>}, §5.10.1).
+ *
+ * <p><b>Where a name is required</b> -- an argument of an application, a map's key, a reference's {@code of}, an alias's
+ * target -- an application closes nowhere: a construction and an application of a parametric record
+ * are each refused there, and declared under a name first ([TSON-SCHEMA] §4.2, §5.3).
+ */
+final class ParametricMaterialiser {
+
+    /**
+     * Every entry visible to this schema -- local declarations and merged {@code !!import}s alike. A
+     * <em>getter</em> rather than a fixed map, because an application closed on demand during resolution
+     * (a declaration naming one) may name a head that has not been resolved yet; the getter is
+     * {@code SchemaResolver}'s own memo, so asking for it resolves it, with the circular-composition guard
+     * still in front.
+     */
+    private final DefinitionGetter namespace;
+
+    /** The constructor a parametric record's applications are built with. */
+    private static final String RECORD = KernelNames.of("record");
+
+    /**
+     * The application each declaration this pass closes an application into records, by entry name (§8.2) -- shared
+     * with {@code SchemaResolver}, which keys the applied-parent fold on it and writes it on the entry's key.
+     */
+    private final Map<String, ApplyBody> applications;
+
+    /**
+     * The facts of every entry this pass closes into a declaration -- the constructor its value applies and the
+     * application it closes. {@code SchemaResolver}'s own map, shared.
+     */
+    private final Map<String, TsonSchema.EntryFacts> facts;
+
+    /**
+     * The declaration each application being closed into one is closing into, keyed on §8.2's canonical
+     * application, for as long as the closing runs: a recursive application reached while substituting names the
+     * declaration instead of closing again ({@link #closeApplicationInto}).
+     */
+    private final Map<ApplyBody, String> closingInto = new LinkedHashMap<>();
+
+    /**
+     * Each application closing in place, keyed on its canonical application, against the application as written,
+     * for as long as it closes: one reached again inside its own closing is a recursion no declaration ties, and is
+     * refused (§5.10.1) rather than expanded without end. A stack, so two sibling slots closing one application are
+     * not a recursion.
+     */
+    private final Map<ApplyBody, ApplyBody> closingInPlace = new LinkedHashMap<>();
+
+    /**
+     * The application each declaration naming one closes into it, as written: what {@code @meta.application} states on
+     * the entry's key, so a reader and a message see the reference the author wrote.
+     */
+    private final Map<String, ApplyBody> writtenApplications = new LinkedHashMap<>();
+
+    /** Which parametric records are refused at their own declaration for a recursion they hold (§5.10.1). */
+    private final HeldRecursion heldRecursion;
+
+    /** Whether a name is the kernel's own, for telling a constructor from a family member. */
+    private final Predicate<String> kernel;
+
+    /** The imported entries, where an argument's or a bound's name is read when the schema does not hold it. */
+    private final Function<String, Top> importedTypes;
+
+    /** The local declaration being made ready, or {@code null} once every one is -- who a deferred check answers to. */
+    private final Supplier<String> resolving;
+
+    /**
+     * The argument checks {@link #checkArguments} deferred while declarations were being made ready, run by
+     * {@link #checkDeferred} once every one is. An application closed during resolution -- a declaration naming
+     * it, a composition operand, or an argument nested in one -- is judged by its arguments' chains, and an
+     * argument is a name at a type position, which orders nothing ([TSON-SCHEMA] §3.4.1): judging it then would
+     * make the declaration wait on its argument.
+     */
+    private final Set<DeferredCheck> deferred = new LinkedHashSet<>();
+
+    private record DeferredCheck(String declaration, String head, List<TypeRef> arguments) {
+    }
+
+    /**
+     * The applied-parent half of {@link #refuseMembership} for each record put in place while declarations were being
+     * made ready, run by {@link #checkDeferred} once every one is: whether an applied parent is a declared application
+     * is known only once every declaration has closed, and asking earlier would make the verdict depend on the order
+     * the declarations stand in.
+     */
+    private final List<DeferredMembership> deferredMemberships = new ArrayList<>();
+
+    private record DeferredMembership(String declaration, RecordBody head, Map<String, TypeRef> bindings,
+                                      ApplyBody written) {
+    }
+
+    /** Where each application closed is recorded as part of the entry holding it ({@link Restatements}). */
+    private final Restatements restatements;
+
+    /** The entry {@link #materialise} is closing applications in, or {@code null} outside that pass. */
+    private String materialising;
+
+    ParametricMaterialiser(DefinitionGetter namespace, Function<String, Top> importedTypes, Supplier<String> resolving,
+                           Map<String, TsonSchema.EntryFacts> facts, Map<String, ApplyBody> applications,
+                           Predicate<String> kernel, HeldRecursion heldRecursion, Restatements restatements) {
+        this.restatements = Objects.requireNonNull(restatements, "restatements");
+        this.heldRecursion = Objects.requireNonNull(heldRecursion, "heldRecursion");
+        this.kernel = Objects.requireNonNull(kernel, "kernel");
+        this.namespace = Objects.requireNonNull(namespace, "namespace");
+        this.facts = Objects.requireNonNull(facts, "facts");
+        this.applications = Objects.requireNonNull(applications, "applications");
+        this.importedTypes = Objects.requireNonNull(importedTypes, "importedTypes");
+        this.resolving = Objects.requireNonNull(resolving, "resolving");
+    }
+
+    /**
+     * Runs every argument check deferred while declarations were being made ready, reporting a failure against the
+     * declaration whose resolution closed the application. One verdict per declaration, as resolution itself gives.
+     */
+    void checkDeferred(BiConsumer<String, SchemaValidationException> reporter) {
+        Set<String> refused = new LinkedHashSet<>();
+        for (DeferredMembership check : deferredMemberships) {
+            try {
+                refuseAppliedMembership(check.head(), check.bindings(), check.written());
+            } catch (SchemaValidationException e) {
+                if (refused.add(check.declaration())) {
+                    reporter.accept(check.declaration(), e);
+                }
+            }
+        }
+        deferredMemberships.clear();
+        for (DeferredCheck check : deferred) {
+            Top record = namespace.definition(check.head());
+            if (refused.contains(check.declaration()) || !ParametricEntry.isParametric(record)) {
+                continue;
+            }
+            try {
+                checkBounds(check.head(), record, check.arguments());
+            } catch (SchemaValidationException e) {
+                refused.add(check.declaration());
+                reporter.accept(check.declaration(), e);
+            }
+        }
+        deferred.clear();
+    }
+
+    /**
+     * Closes every application reachable from {@code entries}, rewritten in place, and reports one this pass cannot
+     * close against the entry that wrote it, which is left as it was.
+     */
+    void materialise(Map<String, Top> entries, MaterialisationFailureReporter reporter) {
+        TypeSlots.Rewrite rewrite = slotRewrite();
+        for (Map.Entry<String, Top> entry : entries.entrySet()) {
+            materialising = entry.getKey();
+            try {
+                entry.setValue(entry.getValue() instanceof RecordBody record && record.isParametric()
+                        ? TypeSlots.mapBody(record, parametricRewrite())
+                        : TypeSlots.mapBody(entry.getValue(), rewrite));
+            } catch (SchemaValidationException | UnsupportedOperationException e) {
+                if (reporter == null) {
+                    throw e;
+                }
+                // Reported against the entry that wrote the application, and left as it was: an entry still
+                // naming a parametric record is one the linker reports again, but that second complaint is
+                // about the same line and does not invent a new problem.
+                reporter.reportFailedApplication(entry.getKey(), e);
+            }
+        }
+        materialising = null;
+    }
+
+    /**
+     * What {@link #materialise} applies inside a parametric record. An application naming none of its parameters means the
+     * same thing in every application, so it is closed now and every application holds the one type, which is what
+     * {@code FamilySelectors} reads a selector's type from. One over a parameter stays the application written in
+     * place, which substitution closes.
+     */
+    private TypeSlots.Rewrite parametricRewrite() {
+        return (Closing) application -> ParametricEntry.parameterIn(application.inPlace()).isEmpty()
+                ? closeApplicationOfRecord(application) : application.inPlace();
+    }
+
+    /** A walk that closes each application written in place where it stands. */
+    @FunctionalInterface
+    private interface Closing extends TypeSlots.Rewrite {
+
+        @Override
+        default TypeRef atName(TypeRef reference) {
+            return reference;
+        }
+
+        @Override
+        default TypeExpr atInPlace(TypeInline inline) {
+            return inline.of() instanceof ApplyBody application ? close(application) : inline;
+        }
+
+        /** What {@code application} closes to. */
+        TypeExpr close(ApplyBody application);
+    }
+
+    /** Where an application this pass cannot close is reported, entry by entry. */
+    @FunctionalInterface
+    interface MaterialisationFailureReporter {
+        void reportFailedApplication(String entryName, RuntimeException error);
+    }
+
+    /**
+     * The entry a declaration naming a fully-bound application <b>is</b> -- see {@link
+     * ApplicationCloser#closeApplicationInto}. Closes the application into {@code declaredName} and hands the
+     * definition back for the caller to own. A parametric record's closure is a record ({@link #closeParametricRecord}). An
+     * unresolvable or mis-applied head returns {@code null} for the caller to handle.
+     */
+    Top closeApplicationInto(String declaredName, ApplyBody application) {
+        String head = parametricHead(application.head().name());
+        Top record = closable(head, namespace.definition(head));
+        if (!ParametricEntry.isParametric(record)) {
+            return null; // unresolved, or a head taking no parameters -- reported through the ordinary path
+        }
+        List<String> parameters = ParametricEntry.parameterNames(record);
+        if (parameters.size() != application.arguments().size()) {
+            return null; // arity is `instantiate`'s to report, in its own words
+        }
+        // §8.2 keys an instantiation on the *canonical* application -- "arguments compared after following
+        // alias chains" -- so an argument naming a pure rename is replaced by the entry at the end of it
+        // before anything is derived from the list.
+        List<TypeRef> arguments = arguments(application);
+        checkArguments(head, record, arguments);
+        ApplyBody canonical = CanonicalApplication.of(head, arguments);
+        if (closingInto.putIfAbsent(canonical, declaredName) != null) {
+            return null; // a second declaration of one application inside the first's closing: the ordinary path
+        }
+        try {
+            note(declaredName, RECORD);
+            Map<String, TypeRef> bindings = bind(parameters, arguments);
+            restatements.absorbs(declaredName, head, bindings);
+            Top closed = closeParametricRecord((RecordBody) record, bindings);
+            return instantiation(declaredName, closed, canonical, application);
+        } finally {
+            closingInto.remove(canonical);
+        }
+    }
+
+    /**
+     * The arguments of a parametric record's {@code application} past their alias hops. A name naming a parametric record is
+     * refused, as no position names one bare.
+     */
+    private List<TypeRef> arguments(ApplyBody application) {
+        List<TypeRef> arguments = new ArrayList<>();
+        for (TypeRef name : application.arguments()) {
+            if (appliesAParametricRecord(name.name())) {
+                // No position names a parametric record bare, an argument included (§5.10).
+                throw new SchemaValidationException("'" + name.name() + "', passed as an argument of '"
+                        + application.text() + "', is a parametric record, and no position names a parametric "
+                        + "record bare -- write it with its arguments, declared under a name, and pass that name (§5.10)");
+            }
+            arguments.add(dereferenced(name));
+        }
+        return arguments;
+    }
+
+    /** Whether {@code head}, past its alias hops, is a parametric record. */
+    private boolean appliesAParametricRecord(String head) {
+        return ParametricEntry.isParametric(lookup(AliasChain.terminal(head, this::lookup)));
+    }
+
+    /**
+     * The refusal of an application, spelled {@code written}, where only a name may stand -- a map's key, a
+     * reference's {@code of}, a parameter's bound, an alias's target ([TSON-SCHEMA] §4.2) --
+     * naming the declaration to write instead, {@code suggested => written}.
+     */
+    static SchemaValidationException nameRequired(String written, String suggested) {
+        return new SchemaValidationException("'" + written + "' is an application, and it stands where only a "
+                + "name may stand -- a map's key, a reference's 'of', a parameter's bound or an alias's target -- where "
+                + "an application closes nowhere (§4.2): declare it ('" + suggested + " => " + written
+                + "') and write that name");
+    }
+
+    /**
+     * The refusal of an application or a construction, spelled {@code argument}, passed as an argument of {@code
+     * application} over a parametric record ([TSON-SCHEMA] §5.3), naming the declaration to write instead, {@code suggested
+     * => argument}.
+     */
+    static SchemaValidationException argumentNotAName(String argument, String suggested, String application) {
+        return new SchemaValidationException("'" + argument + "' is passed as an argument of '" + application
+                + "', and an argument of a parametric record's application is a name or a parameter (§5.3): declare it ('"
+                + suggested + " => " + argument + "') and pass that name");
+    }
+
+    /**
+     * A name for a declaration of {@code application}, for a message: the head, then each argument, as [TSON-SCHEMA]
+     * §5.10.1 writes {@code node_text => node<text>}.
+     */
+    static String suggestedName(ApplyBody application) {
+        StringBuilder name = new StringBuilder(application.head().segments().getLast());
+        for (TypeRef argument : application.arguments()) {
+            name.append('_').append(argument.segments().getLast());
+        }
+        return name.toString();
+    }
+
+    /**
+     * An application of a parametric record at a slot, which stays written in place where its head names nothing this pass
+     * can close: the list is the evidence the author supplied arguments, and the linker reports on what it is handed.
+     */
+    private TypeExpr closeApplicationOfRecord(ApplyBody application) {
+        List<TypeRef> arguments = arguments(application);
+        TypeExpr closed = instantiate(parametricHead(application.head().name()), arguments, application);
+        return closed == null ? application.withArguments(arguments).inPlace() : closed;
+    }
+
+    /**
+     * {@code type} with each application in it closed in place, as {@link #materialise} closes a closed body's: what
+     * a restatement's two types are compared in, so the link judges them as it judges an entry's own fields ({@link
+     * Restatements#settled}).
+     */
+    TypeExpr closedInPlace(TypeExpr type) {
+        return TypeSlots.map(type, slotRewrite());
+    }
+
+    /** What {@link #materialise} applies to a closed body: each application written in place closed where it stands. */
+    private TypeSlots.Rewrite slotRewrite() {
+        return (Closing) this::closeApplicationOfRecord;
+    }
+
+    /** The parametric record an application's head names, past its alias hops ({@link Ancestry#parametricHead}). */
+    private String parametricHead(String head) {
+        return Ancestry.parametricHead(head, namespace);
+    }
+
+    /**
+     * A type argument named by its own type rather than by a name for it: a bare reference is replaced with
+     * the entry at the end of its chain. A reference is a pure rename ({@code user_id => uuid}), so an
+     * application of one denotes the same type (§7.2 compares "after alias flattening of both"); a refinement or a
+     * fresh type is an entry of its own and is not dereferenced.
+     */
+    private TypeRef dereferenced(TypeRef ref) {
+        if (ref instanceof ParamRef) {
+            return ref;
+        }
+        String terminal = AliasChain.terminal(ref.name(), namespace::definition);
+        return terminal.equals(ref.name()) ? ref : TypeRef.of(terminal);
+    }
+
+    /**
+     * What a fully-bound application of a parametric record at a type slot closes to ([TSON-SCHEMA] §5.10): the
+     * declaration closing this very application, where one is (a recursion, §5.10.1), and otherwise the substituted
+     * record in place, with no name, no chain and no application recorded, its restatements the holding entry's
+     * ({@link Restatements}). {@code null} where the head names nothing in
+     * scope -- that is {@code TsonSchemaLinker}'s verdict to give as an unresolved reference, not this pass's to
+     * guess at.
+     *
+     * <p>Two applications are refused first, being what a record in place may not be: one that would be a member of a
+     * declared type (§5.2), and one that reaches itself while it closes in place, with no declaration to tie to
+     * (§5.10.1). Every recursion through records in place ends at a declaration being closed or is refused: an argument
+     * is a name, so the applications a closing reaches are finitely many, and a cycle repeats one.
+     */
+    private TypeExpr instantiate(String head, List<TypeRef> arguments, ApplyBody written) {
+        Top record = closable(head, namespace.definition(head));
+        if (record == null) {
+            return null; // unresolved head -- the linker's verdict, not this pass's
+        }
+        List<String> parameters = ParametricEntry.parameterNames(record);
+        Optional<io.ltr8.tson.schema.meta.Extern> extern = Externs.terminal(head, namespace::definition);
+        if (parameters.isEmpty() && extern.isPresent()) {
+            throw Externs.sealed("'" + written.text() + "'", "'" + head + "<...>' applies", head,
+                    AliasChain.terminal(head, namespace::definition), extern.get());
+        }
+        if (parameters.isEmpty()) {
+            throw new SchemaValidationException("'" + head + "' declares no type parameters, so '"
+                    + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
+                    + "argument list");
+        }
+        if (parameters.size() != arguments.size()) {
+            throw new SchemaValidationException("'" + head + "' takes " + parameters.size()
+                    + " type argument" + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but "
+                    + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
+        }
+        if (arguments.stream().anyMatch(ParamRef.class::isInstance)) {
+            return null; // over a parameter: substitution closes it, when the parametric record holding it is applied
+        }
+        checkArguments(head, record, arguments);
+        ApplyBody canonical = CanonicalApplication.of(head, arguments);
+        String owner = closingInto.get(canonical);
+        if (owner != null) {
+            // The declaration closing this application reached it again while substituting: the recursion names
+            // the declaration, so the record closes into it.
+            return TypeRef.of(owner);
+        }
+        Map<String, TypeRef> bindings = bind(parameters, arguments);
+        refuseMembership(head, (RecordBody) record, bindings, written);
+        ApplyBody repeated = closingInPlace.get(canonical);
+        if (repeated != null) {
+            throw new SchemaValidationException("'" + repeated.text() + "' applies the recursive parametric record '"
+                    + head + "' where no declaration is closing it, so its recursion has nothing to tie to "
+                    + "(§5.10.1): declare it ('" + suggestedName(repeated) + " => " + repeated.text()
+                    + "') and write that name where it is used");
+        }
+        closingInPlace.put(canonical, written);
+        restatements.absorbs(resolving.get() != null ? resolving.get() : materialising, head, bindings);
+        try {
+            RecordBody closed = closeParametricRecord((RecordBody) record, bindings);
+            return TypeInline.closing(written, closed.withChain(TypeChain.EMPTY));
+        } finally {
+            closingInPlace.remove(canonical);
+        }
+    }
+
+    /**
+     * {@code record}, or its placeholder where the parametric record is refused at its own declaration for a recursion it
+     * holds: the refusal is reported there once, and closing an application of it would only report it again against
+     * the applier, whose remedy it is not (§5.10.1).
+     */
+    private Top closable(String head, Top record) {
+        return ParametricEntry.isParametric(record) && heldRecursion.refusedLocally(head)
+                ? SchemaResolver.unresolved(ParametricEntry.parameterNames(record)) : record;
+    }
+
+    /**
+     * Refuses an application of the parametric record {@code head} that would close in place to a member of a declared type
+     * ([TSON-SCHEMA] §5.2): one whose head reaches a declared type through its written parents, or whose applied
+     * parent, substituted, is an application a declaration names. A member is read, tagged and bound by name, so it is
+     * declared. The second is judged once every declaration has closed ({@link #checkDeferred}) where this runs while
+     * declarations are being made ready.
+     */
+    private void refuseMembership(String head, RecordBody record, Map<String, TypeRef> bindings, ApplyBody written) {
+        TypeChain.supertypesOf(record).stream().findFirst().ifPresent(member -> {
+            throw notAMember(written, member);
+        });
+        String declaration = resolving.get();
+        if (declaration != null) {
+            deferredMemberships.add(new DeferredMembership(declaration, record, Map.copyOf(bindings), written));
+            return;
+        }
+        refuseAppliedMembership(record, bindings, written);
+    }
+
+    /** The applied-parent half of {@link #refuseMembership}. */
+    private void refuseAppliedMembership(RecordBody record, Map<String, TypeRef> bindings, ApplyBody written) {
+        for (TypeExpr parent : Substitution.parents(record, bindings)) {
+            if (!(parent instanceof TypeInline inline) || !(inline.of() instanceof ApplyBody applied)) {
+                continue;
+            }
+            ApplyBody canonical = CanonicalApplication.of(parametricHead(applied.head().name()),
+                    applied.arguments().stream().map(this::dereferenced).toList());
+            Optional<String> member = applications.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(canonical)).map(Map.Entry::getKey).findFirst();
+            if (member.isPresent()) {
+                throw notAMember(written, member.get());
+            }
+        }
+    }
+
+    private static SchemaValidationException notAMember(ApplyBody written, String member) {
+        return new SchemaValidationException("'" + written.text() + "' would close in place to a record IS-A '"
+                + member + "', a member of a declared type that no declaration names, and a member is read, tagged "
+                + "and bound by its name (§5.2): declare it ('" + suggestedName(written) + " => " + written.text()
+                + "') and write that name where it is used");
+    }
+
+    /** Each parameter of the applied signature against the argument applied for it, in order. */
+    private static Map<String, TypeRef> bind(List<String> parameters, List<TypeRef> arguments) {
+        Map<String, TypeRef> bindings = new LinkedHashMap<>();
+        for (int i = 0; i < parameters.size(); i++) {
+            bindings.put(parameters.get(i), arguments.get(i));
+        }
+        return bindings;
+    }
+
+    // ── Closing a parametric record (§5.10) ───────────────────────────────────────────────────────────
+
+    /**
+     * A parametric record applied: its fields and parents substituted on the model ({@link Substitution}), each field's type
+     * closed -- every application at a slot of it, at any depth of types written in place ({@code box<T>} in {@code
+     * [box<T>]} or in <code>{ cursor: box&lt;T&gt; }</code>), closed now that the parameter is bound -- and the
+     * record's own facts kept as they are written: its {@code extension} and its {@code discriminators}, so an
+     * abstract parametric record's application is an abstract record (§5.10). The chain is computed
+     * after substitution, from the parents as written ({@link Ancestry#chainOf}): a parent applied to the record's own
+     * parameter stays in {@code parents} for {@code SchemaResolver}'s fold to turn into the edge to the entry the
+     * closed application denotes. Parents are substituted and not closed: an operand denotes no entry (§8.2). The
+     * result is a record without {@code parameters}, with no subtypes ({@code subtypes} is linking's), and its fields
+     * carry no source position.
+     */
+    private RecordBody closeParametricRecord(RecordBody record, Map<String, TypeRef> bindings) {
+        AnnotatedMap<String, RecordField> substituted = Substitution.fields(record, bindings);
+        AnnotatedMap<String, RecordField> fields = new AnnotatedMap<>();
+        TypeSlots.Rewrite close = slotRewrite();
+        substituted.forEach((name, field) -> fields.put(name,
+                field.withType(TypeSlots.map(field.type(), close)).withPosition(Optional.empty()),
+                substituted.getAnnotations(name)));
+        return new RecordBody(Ancestry.chainOf(Substitution.parents(record, bindings), namespace),
+                AnnotatedMap.copyOf(fields), record.groups(), record.extension(), record.discriminators(),
+                record.nameType());
+    }
+
+    /** Records the constructor {@code name}'s value applies -- the tag resolved output writes. */
+    private void note(String name, String constructor) {
+        TsonSchema.EntryFacts known = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
+        facts.put(name, known.withConstructor(Optional.of(constructor)));
+    }
+
+    /**
+     * {@code value} as the instantiation of {@code application} (§8.2): the closed record of a parametric record's
+     * application under a declared name. Recorded in {@link #applications}, with {@code written}, the application as
+     * written, which {@code SchemaResolver} writes onto the entry's key as {@code @meta.application}.
+     */
+    private Top instantiation(String name, Top value, ApplyBody application, ApplyBody written) {
+        applications.put(name, application);
+        writtenApplications.put(name, asWritten(written));
+        return value;
+    }
+
+    /**
+     * {@code application} as {@code @meta.application} states it: its head as written, and each argument a name
+     * followed through its alias chain, since §8.2 compares arguments after alias flattening.
+     */
+    private ApplyBody asWritten(ApplyBody application) {
+        return new ApplyBody(TypeRef.of(application.head().name()),
+                application.arguments().stream().map(this::dereferenced).toList());
+    }
+
+    /** The application {@code name}'s entry closes, as written, where it is a declared application. */
+    Optional<ApplyBody> writtenApplication(String name) {
+        return Optional.ofNullable(writtenApplications.get(name));
+    }
+
+    /**
+     * §5.10's call-site check: each argument must name a type that IS-A the bound of the parameter it binds
+     * ({@link #checkBounds}), a verdict at the application rather than inside the substituted body.
+     *
+     * <p>A check asked for while a declaration is being made ready -- an application closed during resolution -- is
+     * deferred to {@link #checkDeferred}, so judging an argument never makes the declaration wait on it.
+     *
+     * <p><b>Shared with the operand path</b>, through {@link ApplicationCloser#checkArguments}: a composition operand
+     * absorbs by value and closes nothing, so it never reaches this pass.
+     */
+    void checkArguments(String head, Top record, List<TypeRef> arguments) {
+        String declaration = resolving.get();
+        if (declaration != null) {
+            deferred.add(new DeferredCheck(declaration, head, List.copyOf(arguments)));
+            return;
+        }
+        checkBounds(head, record, arguments);
+    }
+
+    /**
+     * Each argument against the bound of the parameter it binds ({@code meta.param}, [TSON-SCHEMA] §5.10).
+     * A name nothing declares is left for the linker to refuse.
+     */
+    private void checkBounds(String head, Top record, List<TypeRef> arguments) {
+        List<Param> parameters = ParametricEntry.parameters(record);
+        if (!ParametricEntry.isParametric(record) || parameters.size() != arguments.size()) {
+            return;
+        }
+        for (int i = 0; i < arguments.size(); i++) {
+            Param parameter = parameters.get(i);
+            TypeRef argument = arguments.get(i);
+            if (parameter.bound().isPresent() && !(argument instanceof ParamRef)) {
+                checkBound(head, parameter, argument.name(), parameter.bound().get().name());
+            }
+        }
+    }
+
+    private void checkBound(String head, Param parameter, String argument, String bound) {
+        String terminal = AliasChain.terminal(argument, this::lookup);
+        Top target = lookup(terminal);
+        if (target == null) {
+            return; // an unresolved argument -- the linker's verdict
+        }
+        // By name, so a core type and the kernel original it copies are one bound, as they are at the declaration.
+        String boundTerminal = AliasChain.terminal(bound, this::lookup);
+        List<String> chain = TypeChain.supertypesOf(target);
+        boolean admitted = terminal.equals(boundTerminal) || chain.contains(boundTerminal) || chain.contains(bound);
+        if (!admitted) {
+            throw new SchemaValidationException("'" + head + "<...>' binds '" + parameter.name() + "' to '"
+                    + argument + "', which is not a type that IS-A " + bound + " -- '" + head + "' declares '"
+                    + parameter.name() + ": " + bound + "' (§5.10)");
+        }
+    }
+
+    /** A name in the schema's own namespace first, then among its imported entries. */
+    private Top lookup(String name) {
+        Top local = namespace.definition(name);
+        return local != null ? local : importedTypes.apply(name);
+    }
+}

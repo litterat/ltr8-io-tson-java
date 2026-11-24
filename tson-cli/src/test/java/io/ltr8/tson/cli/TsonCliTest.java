@@ -5,7 +5,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -82,8 +82,8 @@ class TsonCliTest {
     /** A schema that loads clean. */
     private static final String PLAIN_SCHEMA = """
             !!id:"https://example.test/cli-plain.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               plain => { n: int32 }
             }
@@ -214,8 +214,8 @@ class TsonCliTest {
         for (String body : List.of("!schema { widens => !uint8 ^ { min: -10 } }", "!schema { narrow => !uint8 ^ 5 }")) {
             Path schema = writeFile(dir, "authorerror.tn", """
                     !!id:"https://example.test/cli-author-error.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
                     %s
                     """.formatted(body));
 
@@ -230,21 +230,19 @@ class TsonCliTest {
     }
 
     /**
-     * Naming a template as a data document's own type is the author's error, and gets an author's answer:
+     * Naming a parametric record as a data document's own type is the author's error, and gets an author's answer:
      * exit 1 and a diagnostic naming the route. It used to reach an ErrorReader and exit 70 under "this is a
      * bug in tson", the worst answer in the whole surface for one of the likeliest mistakes.
      *
-     * <p><b>The exit code is what this pins.</b> A record-bodied template is a family base
-     * (§5.10), so the message is the one an abstract base gives -- name the member --
-     * rather than "a template is not a type". Either wording is a verdict on the document, which is the
-     * distinction the code rides on.
+     * <p><b>The exit code is what this pins</b>, and the message names the route: no position names a parametric record
+     * bare (§5.10), so the document names the declaration of its application.
      */
     @Test
-    void dataNamingATemplateIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
+    void dataNamingAParametricRecordIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "paged.tn", """
                 !!id:"https://example.test/cli-paged.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order => { id: text }
                   paged => <T> { items: [T] }
@@ -259,8 +257,8 @@ class TsonCliTest {
         String out = captureStdout(() ->
                 assertEquals(1, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
 
-        assertTrue(out.contains("'paged' selects nothing"), out);
-        assertTrue(out.contains("orders_page"), out);
+        assertTrue(out.contains("'paged' is a parametric record"), out);
+        assertTrue(out.contains("no position names a parametric record bare"), out);
     }
 
     @Test
@@ -461,7 +459,7 @@ class TsonCliTest {
     void aSchemaPastTheWaitDepthIsRefused(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "chain.tn", """
                 !!id:"https://example.test/chain.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   w0 => w1 & { a: text }
                   w1 => w2 & { b: text }
@@ -496,8 +494,8 @@ class TsonCliTest {
         // when schema files are also present. A plain, well-formed value is valid.
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-arg-test.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");
@@ -512,8 +510,8 @@ class TsonCliTest {
     void validateEndToEndThroughMainDispatchExitsZeroForValidData(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-arg-test-2.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", """
@@ -532,8 +530,8 @@ class TsonCliTest {
     void dashReadsOneDataDocumentFromStandardInput(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn", """
                 !!id:"https://example.test/cli-stdin.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { my_int => int32 }
                 """);
         String data = "!!import:\"https://example.test/cli-stdin.tn\"\n!my_int 42\n";

@@ -8,7 +8,7 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 - The token policy is the stream's, not the context's: a context rewinds, a stream produces each token exactly once.
 - The per-name rules run in `DefaultTsonReadContext`, only on a freshly pulled event — never on a replayed one. A
   field name a lookahead pulls is the one deferral: it is judged when a reader reads it, under that reader's rule.
-- A record reader pulls its own names through `nextFieldName(rule)`, its name type (`FieldNameRule.FIELD_NAME` where
+- A record reader pulls its own names through `nextFieldName(rule)`, its name type (`FieldNameRule.DEFAULT_NAME_TYPE` where
   it states none, never `null`); every other pull of a field name — schemaless readers, `EventSkip` — judges it as a
   schemaless record's, an identifier or `ATOM_FORM_INVALID`, except a root value a read abandons, which
   `discardUnjudged` skips with no name rule at all, the value of a field its record does not declare, which
@@ -32,7 +32,7 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
 `design/processor-policy.md`, `design/schema-side-diagnostics.md`. The schema-side walk is
-`design/name-hygiene-and-minted-names.md`.
+`design/name-hygiene.md`.
 
 ## Name hygiene on the read path ([TSON-DATA] §8.2)
 
@@ -77,14 +77,12 @@ the pair reads coherently where the suppressed one contradicted it.
 *set*, asked of a record's field names after the record is read, so there is no `next()` to checkpoint
 around — and it produces no comparable misinstruction.
 
-A Class 1 document carries two names — a type-ref name and an annotation name, the positions §7.4 marks
-`meta.identifier` — and §8.2's restricted-character and restricted-script rules apply to both, **on by default**. They
-run in
-`DefaultTsonReadContext` as the name's event is first pulled, that being the first point on the read path
-holding the read's diagnostics receiver for names: what `TsonDataStream` raises of its own is a thrown
-`ParseException`, so a name check there could only say
-"invalid", which is the one thing a refusal is not. What stays in the stream is §7.7's grammar, where a
-failure really is a parse error.
+Beside its field names a Class 1 document carries two names, a tag's and an annotation's, each a qualified name whose
+segments are identifiers (§7.4, §7.7), and §8.2's restricted-character and restricted-script rules apply to both, **on
+by default**. They run in `DefaultTsonReadContext` as the name's event is first pulled, that being the first point on
+the read path holding the read's diagnostics receiver for names: what `TsonDataStream` raises of its own is a thrown
+`ParseException`, so a name check there could only say "invalid", which is the one thing a refusal is not. What stays
+in the stream is §7.7's grammar, where a failure really is a parse error.
 
 **Only on a freshly pulled event.** `lookingAhead` rewinds what it consumed and a reader replays it, and
 `AnnotationCapture` builds a probe context over events already seen — so checking every event would report

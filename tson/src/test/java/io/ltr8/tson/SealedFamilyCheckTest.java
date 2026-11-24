@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * What each {@code record.extension} member obliges of the rest of a closure, through the front door
- * ([TSON-SCHEMA] §5.2, §5.7, §5.9). {@code RecordExtension} is the pass;
+ * ([TSON-SCHEMA] §5.2, §5.8, §5.9). {@code RecordExtension} is the pass;
  * this is the evidence it is reachable from a schema an author could write.
  *
  * <p><b>Written against the real pipeline rather than hand-built entries</b>, because half of what is under
@@ -164,17 +164,17 @@ class SealedFamilyCheckTest {
     }
 
     @Test
-    void refiningAFinalRecordIsRefused() {
-        assertTrue(problems(Tson.standard(), "refine", """
+    void aCompositionOnlyRestatingAFinalRecordsFieldIsRefused() {
+        assertTrue(problems(Tson.standard(), "restate", """
                 {
                   base => final { x: int32 }
-                  sub  => base ^ { x?: int32 = 1 }
+                  sub  => base & { x?: int32 = 1 }
                 }""").contains("is final and admits none"));
     }
 
     /**
-     * §5.9 leaves a subtracted record's chain empty and mints no IS-A edge, which is the only thing FINAL
-     * constrains -- so subtracting from a final record is admissible where composing and refining are not.
+     * §5.9 leaves a subtracted record's chain empty and adds no IS-A edge, which is the only thing FINAL
+     * constrains -- so subtracting from a final record is admissible where composing is not.
      */
     @Test
     void subtractingFromAFinalRecordIsAdmissible() {
@@ -253,29 +253,24 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * <b>A colliding member is named the way the author wrote it.</b> Both members here are declared
-     * applications, so each declaration <em>is</em> its instantiation (§8.2) and the
-     * names that collide are {@code a} and {@code b} -- names an author can open and edit.
-     *
-     * <p>The rule the message applies is unchanged; what changed is that there is no derived name left to
-     * render for this shape. While the declaration was a hop, the collision was between two content-named
-     * entries and the message depended on {@code EntryDisplayName} rendering each as the application that
-     * produced it. The negative assertion stays either way: no content-derived name reaches the author.
+     * <b>A colliding member is named the way the author wrote it.</b> Both members here compose a parametric record's
+     * application, and each is the author's own declaration (§8.2), so the names that collide are {@code a} and
+     * {@code b} -- names an author can open and edit.
      */
     @Test
     void collidingMembersAreNamedByTheDeclarationsThatCollide() {
         String refusal = problems(Tson.standard(), "displayed", """
                 {
                   pet => abstract { pet_type: text =? }
-                  pet_of => <T, V> pet & { pet_type?: = T  pet: V }
-                  a => pet_of<"cat", text>
-                  b => pet_of<"cat", int32>
+                  pet_of => <V> pet & { pet: V }
+                  a => pet_of<text> & { pet_type?: = "cat" }
+                  b => pet_of<int32> & { pet_type?: = "cat" }
                 }""");
 
         assertTrue(refusal.contains("'a'"), refusal);
         assertTrue(refusal.contains("'b'"), refusal);
         assertFalse(refusal.matches("(?s).*pet_of_cat_[a-z0-9]+_[0-9a-f]{8}.*"),
-                "no content-derived entry name reaches the author: " + refusal);
+                "the refusal names no entry the author did not write: " + refusal);
     }
 
     /**
@@ -307,60 +302,64 @@ class SealedFamilyCheckTest {
 
     // ── A member is declared ─────────────────────────────────────────────
 
-    private static final String MEMBER_TEMPLATE = """
+    private static final String MEMBER_PARAMETRIC = """
               pet    => abstract { pet_type: text =?  name: text }
               dog_of => <T> pet & { pet_type?: = "dog"  breed: T }
             """;
 
     /**
-     * An application at a use site that composes onto a family would add a member nothing can name: a read
-     * reports the member it selects, a tag names it and a binding maps it, and a minted name is none of
-     * those (§3.3.4, §8.2). It is reported at the declaration that wrote it, naming the application.
+     * An application at a use site that composes onto a family would close in place to a member nothing can name: a
+     * read reports the member it selects, a tag names it and a binding maps it, and a record in place has no name for
+     * any of those (§5.2). It is reported at the declaration that wrote it, naming the application and the fix.
      */
     @Test
     void aMemberAppliedAtAUseSiteIsRefused() {
-        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("use-site", "{\n" + MEMBER_TEMPLATE + """
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("use-site", "{\n" + MEMBER_PARAMETRIC + """
                   kennel => { k: dog_of<text> }
                 }"""));
 
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         Diagnostic refusal = diagnostics.getFirst();
-        assertTrue(refusal.message().contains("'dog_of<text>' composes onto 'pet'"), refusal.message());
-        assertTrue(refusal.message().contains("'my_name => dog_of<text>'"), refusal.message());
+        assertTrue(refusal.message().contains("'dog_of<text>' would close in place to a record IS-A 'pet'"),
+                refusal.message());
+        assertTrue(refusal.message().contains("declare it ('dog_of_text => dog_of<text>')"), refusal.message());
         assertEquals("/kennel", refusal.schemaPointer().orElse(""), refusal.toString());
     }
 
-    /** A template body applying a member mints one at each application, and is reported at the application. */
+    /**
+     * A parametric record's body applying a member would put one in place at each application, and is reported at the
+     * declaration whose application closed it.
+     */
     @Test
-    void aMemberAppliedInsideATemplateIsRefusedAtItsApplication() {
-        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_TEMPLATE
+    void aMemberAppliedInsideAParametricRecordIsRefusedAtItsApplication() {
+        List<Diagnostic> diagnostics = Tson.standard().validateSchema(schema("in-template", "{\n" + MEMBER_PARAMETRIC
                 + """
                   kennel_of => <T> { d: dog_of<T> }
                   kt        => kennel_of<text>
                 }"""));
 
         assertEquals(1, diagnostics.size(), diagnostics.toString());
-        assertTrue(diagnostics.getFirst().message().contains("composes onto 'pet'"), diagnostics.toString());
+        assertTrue(diagnostics.getFirst().message().contains("IS-A 'pet'"), diagnostics.toString());
         assertEquals("/kt", diagnostics.getFirst().schemaPointer().orElse(""), diagnostics.toString());
     }
 
     /** The declared spelling of the same member loads, and a use site writes its name. */
     @Test
     void aDeclaredMemberLoads() {
-        isClean(Tson.standard(), "declared", "{\n" + MEMBER_TEMPLATE + """
+        isClean(Tson.standard(), "declared", "{\n" + MEMBER_PARAMETRIC + """
                   dogs   => dog_of<text>
                   kennel => { k: dogs }
                 }""");
     }
 
-    /** A minted entry that joins no family is untouched -- an application of a family's base included. */
+    /** A record in place that joins no family loads -- an application of a family's base included. */
     @Test
     void anApplicationThatJoinsNoFamilyLoadsAtAUseSite() {
         isClean(Tson.standard(), "no-family", """
                 {
                   outcome => abstract <T> { code: T }
                   box     => <T> { v: T }
-                  ledger  => { o: outcome<text>  b: box<text>  s: set<text> }
+                  ledger  => { o?: outcome<text>  b: box<text>  s: set<text> }
                 }""");
     }
 

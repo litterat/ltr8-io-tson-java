@@ -24,8 +24,8 @@ class TsonValidateTest {
     private static final String POINT_ID = "https://example.test/point-1.tn";
     private static final String POINT_SCHEMA = """
             !!id:"https://example.test/point-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema { point => { x: int32  y: int32 } }
             """;
 
@@ -225,8 +225,8 @@ class TsonValidateTest {
         // no reference may pin -- not one that fails to load. Hashing every schema on load must therefore
         // record the absence rather than refuse the document, and refuse the pin when one arrives.
         String oneLine = "!!id:\"https://example.test/one-1.tn\" "
-                + "!!import:\"https://tson.io/2026/39/m/meta.tn\" "
-                + "!!import:\"https://tson.io/2026/39/m/core.tn\" !schema { point => { x: int32 } }";
+                + "!!import:\"https://tson.io/2026/40/m/meta.tn\" "
+                + "!!import:\"https://tson.io/2026/40/m/core.tn\" !schema { point => { x: int32 } }";
         Tson tson = Tson.standard();
         tson.resolve(oneLine);
 
@@ -340,8 +340,8 @@ class TsonValidateTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/nested-1.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   person => { home: address }
 
@@ -372,22 +372,20 @@ class TsonValidateTest {
 
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
         assertEquals(Optional.of("/int32"), problem.schemaPointer());
-        assertEquals("tson.io/2026/39/m/numeric.tn", problem.schemaId(), "where int32 is actually declared");
+        assertEquals("tson.io/2026/40/m/numeric.tn", problem.schemaId(), "where int32 is actually declared");
     }
 
     /**
-     * A desugar-injected entry ({@code [text]}'s own {@code array_text_…}) is never what a diagnostic points
-     * at: the author wrote {@code tags: [text]}, so {@code /tagged/tags} is the location, and the injected
-     * name survives only in {@code message}. The enclosing record supplies the position, which the injected
-     * entry itself has none of.
+     * A form written in place is located by the field that wrote it: the author wrote {@code tags: [text]}, so
+     * {@code /tagged/tags} is the location, and the enclosing record supplies the position.
      */
     @Test
-    void anInjectedEntryIsLocatedByTheFieldThatDesugaredIntoIt() {
+    void aFormInPlaceIsLocatedByTheFieldThatWroteIt() {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/tags-1.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { tagged => { tags: [text] } }
                 """);
 
@@ -446,8 +444,8 @@ class TsonValidateTest {
         String schemaId = "https://example.test/pct-1.tn";
         String schema = """
                 !!id:"https://example.test/pct-1.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   my_percentage => !integer ^ { min: 1  max: 100 }
                   reading => { pct: my_percentage }
@@ -501,8 +499,8 @@ class TsonValidateTest {
         String schemaId = "https://example.test/facets-1.tn";
         String schema = """
                 !!id:"https://example.test/facets-1.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   status => !enum [PENDING SHIPPED DELIVERED]
                   label  => !text ^ { max_length: 4 }
@@ -547,7 +545,7 @@ class TsonValidateTest {
     /**
      * The shape word, not the event. Every container reader reported {@code found
      * ArrayStart[position=Position[line=2, column=8, byteOffset=50]]} and put the same in {@code actual};
-     * one {@code TypeRefCheck.describe} now serves all of them.
+     * one {@code TypeTagCheck.describe} now serves all of them.
      */
     @Test
     void aContainerShapeMismatchNamesTheShapeNotTheEvent() {

@@ -35,7 +35,7 @@ class NestedSchemaMapTest {
 
     private static final String GEO = """
             !!id:"https://example.test/geo.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               geo => !schema {
                 address  => { street: text }

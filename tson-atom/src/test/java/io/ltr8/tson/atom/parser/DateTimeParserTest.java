@@ -72,19 +72,51 @@ class DateTimeParserTest {
     }
 
     @Test
+    void exclusiveMinRefusesItsOwnInstantAndEveryEarlierOne() {
+        DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(),
+                Optional.of(OffsetDateTime.parse("2025-01-01T00:00:00Z")), Optional.empty(), Optional.empty(),
+                Optional.empty()));
+        AtomValidationException at = assertThrows(AtomValidationException.class,
+                () -> type.read("2025-01-01T00:00:00Z"));
+        assertEquals("> 2025-01-01T00:00Z", at.expected());
+        assertEquals(OffsetDateTime.parse("2025-01-01T00:00:01Z"), type.read("2025-01-01T00:00:01Z"));
+        assertThrows(AtomValidationException.class, () -> type.read("2024-12-31T23:59:59Z"));
+    }
+
+    @Test
+    void exclusiveMaxRefusesItsOwnInstantAndEveryLaterOne() {
+        DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.of(OffsetDateTime.parse("2025-01-01T00:00:00Z")), Optional.empty()));
+        AtomValidationException at = assertThrows(AtomValidationException.class,
+                () -> type.read("2025-01-01T00:00:00Z"));
+        assertEquals("< 2025-01-01T00:00Z", at.expected());
+        assertEquals(OffsetDateTime.parse("2024-12-31T23:59:59Z"), type.read("2024-12-31T23:59:59Z"));
+        assertThrows(AtomValidationException.class, () -> type.read("2025-01-01T00:00:01Z"));
+    }
+
+    /** The offset is a spelling (§5.5): the bound's own instant written in another offset is still the bound. */
+    @Test
+    void anExclusiveBoundExcludesItsInstantInAnyOffset() {
+        DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.of(OffsetDateTime.parse("2025-01-01T00:00:00Z")), Optional.empty()));
+        assertThrows(AtomValidationException.class, () -> type.read("2025-01-01T01:00:00+01:00"));
+        assertEquals(OffsetDateTime.parse("2025-01-01T00:59:59+01:00"), type.read("2025-01-01T00:59:59+01:00"));
+    }
+
+    @Test
     void writeRoundTripsThroughRead() {
         assertEquals("2025-03-13T10:15:30Z",
                 DateTimeParser.UNCONSTRAINED.write(DateTimeParser.UNCONSTRAINED.read(token("2025-03-13T10:15:30Z"))));
     }
 
     /**
-     * <b>{@code precision} constrains the value, not the spelling</b> (§5.5) -- the same rule {@code
+     * <b>{@code fraction_digits} constrains the value, not the spelling</b> (§5.5) -- the same rule {@code
      * TimeParser} applies, inherited from the same {@code full-time} production: an instant that is a whole
      * number of 10⁻ᴺ seconds, however many digits an encoding spelled it with. Exact either way; an instant
      * off the grid is refused rather than rounded onto it.
      */
     @Test
-    void precisionConstrainsTheValueNotTheSpelling() {
+    void fractionDigitsConstrainsTheValueNotTheSpelling() {
         DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
                 Optional.of(3L)));
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), type.read(token("2025-03-13T10:15:30Z")));
@@ -108,9 +140,9 @@ class DateTimeParserTest {
         assertEquals("at most 9 fractional-second digits", refused.expected());
     }
 
-    /** {@code precision: 0} admits no fractional part at all (§5.5). */
+    /** {@code fraction_digits: 0} admits no fractional part at all (§5.5). */
     @Test
-    void precisionZeroAdmitsNoFraction() {
+    void fractionDigitsZeroAdmitsNoFraction() {
         DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
                 Optional.of(0L)));
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), type.read(token("2025-03-13T10:15:30Z")));

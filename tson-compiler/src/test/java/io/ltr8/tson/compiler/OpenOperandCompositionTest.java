@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Composing and refining against a template application that is <b>still open</b> -- one applied to the
+ * Composing against an application of a parametric record that is <b>still open</b> -- one applied to the
  * absorbing declaration's own parameter, so it denotes no entry: {@code vip => <T> customer & box<T>}.
  *
  * <p><b>The fields need no materialisation, which is why absorption happens here.</b> The operand's body is
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * arguments as written yields a held record still carrying them, and absorbing that is an ordinary flattened
  * record that mentions {@code T}.
  *
- * <p><b>The IS-A edge is the half that has to wait.</b> A template is not a type (§5.10), so the chain an
+ * <p><b>The IS-A edge is the half that has to wait.</b> No application is IS-A its head (§5.10), so the chain an
  * application of the open declaration closes to names {@code customer} and {@code box}'s own ancestors and
  * never {@code box} -- there is no instantiation of it yet to be IS-A. What the declaration <em>can</em> do is
  * keep the application: {@code supertypes} is a reference channel, so {@code box<T>} is written into the held
@@ -50,23 +50,16 @@ class OpenOperandCompositionTest {
     private static final String ID = "https://example.test/open-operand.tn";
 
     /**
-     * <b>A closed application at an operand takes the same route, and mints nothing either.</b> The template
+     * <b>A closed application at an operand takes the same route: it is absorbed by value.</b> The parametric record
      * is a macro at both ends: it contributes its fields and its own ancestors, and the type the composition
-     * produces is the composing declaration. What minting gave instead was an entry nothing else named --
-     * one subtype, no referent, no reader -- standing in this declaration's chain in place of the ancestors
-     * that are really there. An application some other position names is still minted by that
-     * position, §8.2 keying identity on the application, so both land on one entry.
+     * produces is the composing declaration (§5.8).
      *
-     * <p><b>{@code box<text>} is still no type to be IS-A; {@code box} is.</b> A record-bodied template is a
-     * family base (§5.10), deriving ABSTRACT where no discriminator survives, so a
-     * value can stand at it and be a value of one of its members. The edge therefore runs from the member to
-     * the base itself -- which is what indexes {@code c} under {@code box.subtypes} and lets a position typed
-     * {@code box} dispatch to it. The application in between still never becomes an entry, and a declaration
-     * taking parameters of its own states no such edge here: it is held, and each instantiation mints its own
-     * as it closes.
+     * <p><b>Neither {@code box<text>} nor {@code box} is a type to be IS-A here.</b> No application is IS-A its head
+     * (§5.10), so no edge runs to it; no declaration names {@code box<text>}, so there is no entry for an edge to reach
+     * either. What {@code c} IS-A is what {@code box}'s written parents reach: {@code base}.
      */
     @Test
-    void aClosedApplicationAtAnOperandMintsNothing() {
+    void aClosedApplicationAtAnOperandIsAbsorbedByValue() {
         TsonCompiledSchema compiled = compile("""
                   base => { tag: text }
                   box  => <V> base & { item: V }
@@ -74,12 +67,12 @@ class OpenOperandCompositionTest {
                 """);
 
         assertTrue(compiled.schema().entries().keySet().stream().noneMatch(n -> n.startsWith("box_")),
-                () -> "nothing names box<text>, so no entry is minted for it: "
+                () -> "no declaration names box<text>, so there is no entry for it: "
                         + compiled.schema().entries().keySet());
 
         Top c = compiled.schema().entries().get("c");
-        assertEquals(List.of("base", "box"), TypeChain.supertypesOf(c),
-                "the ancestors arrive by value, and the edge runs to the family base the operand applies");
+        assertEquals(List.of("base"), TypeChain.supertypesOf(c),
+                "the ancestors arrive by value, and no edge runs to the parametric record the operand applies");
         assertEquals(List.of("tag", "item", "extra"),
                 ((RecordBody) c).fields().keySet().stream().toList(),
                 "the operand's fields flatten in, left to right, with the body's own appended");
@@ -90,8 +83,8 @@ class OpenOperandCompositionTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/open-operand.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s
                 }
@@ -118,9 +111,8 @@ class OpenOperandCompositionTest {
             """;
 
     private static String aliasTarget(TsonCompiledSchema compiled, String alias) {
-        // A `name => head<args>` declaration *is* the instantiation entry (§8.2), so
-        // the entry every use site reaches is the declaration itself -- or, where an earlier declaration
-        // already named the same application, the one it aliases.
+        // A `name => head<args>` declaration is the record its application closes to (§8.2), so the entry
+        // every use site reaches is the declaration itself; an alias is followed one hop.
         return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
                 ? ref.target().name() : alias;
     }
@@ -139,15 +131,15 @@ class OpenOperandCompositionTest {
                 .get(aliasTarget(compiled, "use"));
         assertEquals(List.of("id", "tag", "value"), closed.fields().keySet().stream().toList(),
                 "customer's field, then box's flattened field set, in composition order");
-        assertEquals("text", closed.fields().values().stream().toList().get(2).typeRef().name(),
+        assertEquals("text", closed.fields().values().stream().toList().get(2).typeExpr().text(),
                 () -> "the parameter absorbed from box<T> closes with vip: "
                         + closed.fields().values().stream().toList().get(2));
     }
 
     /**
      * The open operand contributes its ancestors and not itself. {@code base} is a type and its fields
-     * arrived, so the IS-A edge is real; {@code box} is a template, and §5.10 makes a template no type. The
-     * template's chain says so: its parents as written, and the closed entries they reach.
+     * arrived, so the IS-A edge is real; {@code box} is a parametric record, and §5.10 makes no application IS-A its head.
+     * The parametric record's chain says so: its parents as written, and the closed entries they reach.
      */
     @Test
     void anOpenOperandContributesItsOwnSupertypesButNotItsOwnName() {
@@ -158,9 +150,9 @@ class OpenOperandCompositionTest {
         assertEquals(List.of("base", "customer"), TypeChain.supertypesOf(vip),
                 () -> "customer directly, base through the open operand: " + TypeChain.supertypesOf(vip));
         assertFalse(TypeChain.supertypesOf(vip).contains("box"),
-                () -> "a template is not a type, so nothing is IS-A one: " + TypeChain.supertypesOf(vip));
-        assertEquals(List.of("customer", "box"), TypeChain.parentsOf(vip).stream().map(TypeRef::name).toList(),
-                "and it keeps its parents as written");
+                () -> "no application is IS-A its head: " + TypeChain.supertypesOf(vip));
+        assertEquals(List.of("customer", "box<T>"), TypeChain.parentsOf(vip).stream()
+                .map(io.ltr8.tson.schema.meta.TypeExpr::text).toList(), "and it keeps its parents as written");
     }
 
     /** Rows one and two of the membership table, read off the index a schema-driven read actually consults. */
@@ -177,9 +169,9 @@ class OpenOperandCompositionTest {
 
     /**
      * Row three, and the one that needs both sides closed. The hand-written {@code customer & box<text>}
-     * gets this edge at its declaration; here it is minted when {@code vip<text>} closes, off the
-     * application the held body kept -- and it lands on the same entry, which is what makes the two
-     * spellings one type rather than two that happen to have equal fields.
+     * gets this edge at its declaration; here it is derived when {@code vip<text>} closes, off the
+     * application the held body kept, to the declaration naming that application -- the same entry, which is
+     * what makes the two spellings one type rather than two that happen to have equal fields.
      */
     @Test
     void aClosedApplicationOfTheCompositionIsIndexedUnderTheClosedOperand() {
@@ -208,13 +200,13 @@ class OpenOperandCompositionTest {
                 () -> intBox + ": " + TypeChain.subtypesOf(compiled.schema().entries().get(intBox)));
     }
 
-    /** §5.7 against an open source: the same absorption, and the same two omissions. */
+    /** A body that only restates absorbed fields (§5.8): the same absorption, and the same two omissions. */
     @Test
-    void aRefinementTightensAFieldSetAbsorbedFromAnOpenSource() {
+    void aRestatementTightensAFieldSetAbsorbedFromAnOpenOperand() {
         TsonCompiledSchema compiled = compile("""
                   base => { tag: text  note: text }
                   box  => <T> base & { value: T }
-                  vip  => <T> box<T> ^ { note?: text = "fixed" }
+                  vip  => <T> box<T> & { note?: text = "fixed" }
                   use  => vip<text>
                 """);
 
@@ -228,43 +220,14 @@ class OpenOperandCompositionTest {
         RecordBody closed = (RecordBody) compiled.schema().entries()
                 .get(aliasTarget(compiled, "use"));
         assertEquals(List.of("tag", "note", "value"), closed.fields().keySet().stream().toList());
-        assertEquals("text", closed.fields().values().stream().toList().get(2).typeRef().name(),
-                "the parameter survived the refinement");
-    }
-
-    /**
-     * One template applied to another, at an absorbing position and still open. Substitution writes a bound
-     * reference through {@code WireForm.refValue}, which spells one carrying arguments as the data grammar's
-     * reference rather than as its head name, so {@code inner<T>} survives whole and the absorbing declaration's own
-     * materialisation closes it. Writing the head name alone would drop the argument list with no diagnostic.
-     */
-    @Test
-    void anArgumentThatIsItselfAnApplicationSurvivesSubstitutionWhole() {
-        TsonCompiledSchema compiled = compile("""
-                  plain => { n: int32 }
-                  inner => <U> { u: U }
-                  box   => <T> { v: T }
-                  vip   => <T> plain & box<inner<T>>
-                  use   => vip<text>
-                """);
-
-        RecordBody closed = (RecordBody) compiled.schema().entries()
-                .get(aliasTarget(compiled, "use"));
-        String v = closed.fields().entrySet().stream().filter(f -> f.getKey().equals("v"))
-                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeRef().name();
-
-        RecordBody held = (RecordBody) compiled.schema().entries().get(v);
-        assertEquals(List.of("u"), held.fields().keySet().stream().toList(),
-                () -> "'v' should name the inner<text> instantiation, not bare 'inner': " + v);
-        assertEquals("text", held.fields().values().stream().toList().get(0).typeRef().name(),
-                "the argument list survived, so U closed to text");
+        assertEquals("text", closed.fields().values().stream().toList().get(2).typeExpr().text(),
+                "the parameter survived the restatement");
     }
 
     /**
      * The one position a bound reference cannot be written into: a reference's own head, which is a
      * {@code meta.type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
-     * at the template's declaration, before substitution has anything to say about it.
+     * at the parametric record's declaration, before substitution has anything to say about it.
      */
     @Test
     void aParameterAppliedAsAHeadIsRefusedAtTheDeclarationThatWritesIt() {
@@ -279,7 +242,7 @@ class OpenOperandCompositionTest {
     }
 
     /**
-     * An open operand with elements rather than fields gets the verdict its closed spelling gets, one phase
+     * A constructor applied to a parameter at an operand gets the verdict its closed spelling gets, one phase
      * earlier: there is nothing for {@code &} to compose with.
      */
     @Test
@@ -287,8 +250,7 @@ class OpenOperandCompositionTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           customer => { id: text }
-                          list     => <T> [T]
-                          vip      => <T> customer & list<T>
+                          vip      => <T> customer & meta.array<T>
                           use      => vip<text>
                         """));
 
@@ -308,5 +270,77 @@ class OpenOperandCompositionTest {
 
         assertTrue(thrown.getMessage().contains("declares 2 type parameter(s) and is applied to 1"),
                 thrown.getMessage());
+    }
+
+    /**
+     * An application at an operand takes its head's written parents' edges (§5.8), an applied parent reaching the
+     * entry a declaration gives it: {@code y} absorbs {@code wrap<text>}, whose head's parent {@code box<T>} is
+     * {@code box<text>} there, which {@code tb} declares -- the edge {@code x => wrap<text>} has.
+     */
+    @Test
+    void anOperandTakesTheEdgeItsHeadsAppliedParentReaches() {
+        String heads = """
+                  box  => <T> { v: T }
+                  tb   => box<text>
+                  wrap => <T> box<T> & { w: int32 }
+                """;
+
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(heads + "  y => wrap<text> & {}\n").schema().entries().get("y")));
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(heads + "  x => wrap<text>\n").schema().entries().get("x")));
+    }
+
+    /** The walk goes on through each head's applied parents, to any depth, in both forms. */
+    @Test
+    void anAppliedParentsHeadsAppliedParentReachesItsDeclarationToo() {
+        String heads = """
+                  box    => <T> { v: T }
+                  tb     => box<text>
+                  wrap   => <T> box<T> & { w: int32 }
+                  rewrap => <T> wrap<T> & { r: int32 }
+                """;
+
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(heads + "  y => rewrap<text> & {}\n").schema().entries().get("y")));
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(heads + "  x => rewrap<text>\n").schema().entries().get("x")));
+    }
+
+    /** No edge runs to a head's own name, and an application no declaration names adds none (§5.10). */
+    @Test
+    void anAppliedParentNobodyDeclaresAddsNoEdge() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: T }
+                  tb     => box<int32>
+                  wrap   => <T> box<T> & { w: int32 }
+                  rewrap => <T> wrap<T> & { r: int32 }
+                  y      => rewrap<text> & {}
+                """);
+
+        assertEquals(List.of(), TypeChain.supertypesOf(compiled.schema().entries().get("y")),
+                "box<text> and wrap<text> are declared nowhere, tb is box<int32>, and no head is a type");
+    }
+
+    /**
+     * Joining a family through a head's applied parent brings its obligation (§5.8): {@code tb} is an abstract base,
+     * so {@code y} must pin its selector, as the declared {@code x => wrap<text>} must.
+     */
+    @Test
+    void aMemberThroughAHeadsAppliedParentMustPinTheFamilysSelector() {
+        String family = """
+                  box  => abstract <T> { kind: text =?  v: T }
+                  tb   => box<text>
+                  wrap => <T> box<T> & { w: int32 }
+                """;
+        String composed = assertThrows(SchemaValidationException.class,
+                () -> compile(family + "  y => wrap<text> & {}\n")).getMessage();
+        String declared = assertThrows(SchemaValidationException.class,
+                () -> compile(family + "  y => wrap<text>\n")).getMessage();
+
+        assertEquals(declared, composed);
+        assertTrue(composed.contains("'y'"), composed);
+        assertEquals(List.of("tb"), TypeChain.supertypesOf(
+                compile(family + "  y => wrap<text> & { kind?: = \"y\" }\n").schema().entries().get("y")));
     }
 }

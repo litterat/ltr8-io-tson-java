@@ -29,9 +29,9 @@ class NetSchemaTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
-            !!import:"https://tson.io/2026/39/m/net.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/net.tn"
             !schema {
               listener => { host: host  port: uint16 }
               site => { name: hostname }
@@ -115,9 +115,9 @@ class NetSchemaTest {
     void allowIdnIsWithdrawnButNeverGrantedBack() {
         assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                 !!id:"https://example.test/regrant.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
-                !!import:"https://tson.io/2026/39/m/net.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/net.tn"
                 !schema {
                   ascii => !hostname ^ { allow_idn: false }
                   again => !ascii ^ { allow_idn: true }
@@ -131,8 +131,8 @@ class NetSchemaTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/own-mac.tn"
-                !!import:"https://tson.io/2026/39/m/numeric.tn"
-                !!import:"https://tson.io/2026/39/m/temporal.tn"
+                !!import:"https://tson.io/2026/40/m/numeric.tn"
+                !!import:"https://tson.io/2026/40/m/temporal.tn"
                 !schema {
                   mac => { vendor: text  model: text }
                   hostname => text
@@ -148,8 +148,8 @@ class NetSchemaTest {
     void aSchemaImportingTheOtherLibrariesDoesNotSeeTheNetworkTypes() {
         assertThrows(SchemaValidationException.class, () -> Tson.standard().resolve("""
                 !!id:"https://example.test/no-net.tn"
-                !!import:"https://tson.io/2026/39/m/numeric.tn"
-                !!import:"https://tson.io/2026/39/m/temporal.tn"
+                !!import:"https://tson.io/2026/40/m/numeric.tn"
+                !!import:"https://tson.io/2026/40/m/temporal.tn"
                 !schema { server => { address: ipv4 } }
                 """));
     }

@@ -12,16 +12,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A schema compiled in object-binding mode as <b>vocabulary</b>: what a schema importing it reads its construction
- * heads and annotation values through. One namespace per schema ([TSON-SCHEMA] §3.3, §3.3.1) puts
- * every constructor of the import closure in reach, and the resolver reads {@code !C value} through the compiled form
- * of the schema that declared {@code C} ({@code SchemaResolver}'s vocabulary), which is one of these. Any schema
- * compiles to one -- meta.tn, numeric.tn, temporal.tn, net.tn, a library declaring constructors of its own -- and
- * {@link TsonCompiledVocabularyRegistry#loadVocabulary} caches each by identity.
- *
- * <p>Holds, beside the compiled entries, the reader for an <em>instance</em> of each constructor it declares or
- * imports ({@link #reader}): every entry IS-A {@code top}, keyed by its own name. The factory that builds a reader for
- * an entry whose body <em>is</em> such a construction is the library's global set, consulted by {@link #compile}.
+ * A schema compiled in object-binding mode as <b>vocabulary</b>: its entries, and the reader for an <em>instance</em>
+ * of each constructor it declares or imports ({@link #reader}). The kernel's pre-loaded stand-in is one, which the
+ * kernel's own resolution reads every head through ([TSON-SCHEMA] §3.4); a resolution's checkpoints are others
+ * ({@link TsonCompiledVocabularyRegistry#compileReady}). Every entry IS-A {@code top}, keyed by its own name. The
+ * factory that builds a reader for an entry whose body <em>is</em> such a construction is the library's global set,
+ * consulted by {@link #compile}.
  */
 public final class TsonCompiledVocabulary extends TsonCompiledSchema {
 
@@ -34,27 +30,32 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
 
     /**
      * Compiles {@code linked} through {@code resolver}'s factories as vocabulary. Every body is dispatched to the
-     * factory for its constructor; a constructor this library has no factory for -- one a schema declared, composing
-     * {@code atom} or {@code top} -- stands in as an {@link ErrorReader} naming the gap ({@link #unbuildable}), so the
-     * schema compiles and only reading a value against that entry fails.
+     * factory for its class's constructor; a body no factory backs stands in as an {@link ErrorReader} ({@link
+     * #unbuildable}), so the schema compiles and only reading a value against that entry fails.
      */
     static TsonCompiledVocabulary compile(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver) {
-        return compileReady(linked, resolver, Set.of());
+        return compileWith(linked, resolver, Set.of(), false, null);
     }
 
     /**
      * {@link #compile} of a schema whose resolution is in progress, {@code pending} naming its declarations not yet
-     * ready ({@link TsonSchemaCompiler#compileReady}).
+     * ready ({@link TsonSchemaCompiler#compileReady}), a schema an extern names compiled by {@code foreign}.
      */
     static TsonCompiledVocabulary compileReady(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver,
-                                               Set<String> pending) {
-        return new TsonCompiledVocabulary(TsonSchemaCompiler.compileReady(linked, name -> {
+                                               Set<String> pending, TsonSchemaCompiler.ForeignSchemas foreign) {
+        return compileWith(linked, resolver, pending, true, foreign);
+    }
+
+    private static TsonCompiledVocabulary compileWith(TsonLinkedSchema linked, ValueReaderFactoryResolver resolver,
+                                                      Set<String> pending, boolean checkpoint,
+                                                      TsonSchemaCompiler.ForeignSchemas foreign) {
+        return new TsonCompiledVocabulary(TsonSchemaCompiler.compileWith(linked, name -> {
             try {
                 return resolver.resolve(name);
             } catch (RuntimeException noFactory) {
-                return unbuildable(linked.originOf(name), name, noFactory);
+                return unbuildable(name, noFactory);
             }
-        }, pending));
+        }, pending, checkpoint, foreign, TsonSchemaCompiler.bindingOf(resolver)));
     }
 
     /**
@@ -84,7 +85,7 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
      * Every entry IS-A {@code top} ([TSON-SCHEMA] §4.1), with the reader for an instance of it -- the same predicate
      * {@code DefinitionResolver}'s own gate asks, so a head that gate admits has a reader here, and one it refuses
      * never reaches this table. Wider than {@code constructor}, by the base kinds and {@code alias}; narrower than the
-     * whole namespace, by every component record ({@code meta.record_field}, {@code meta.template_param}, …), which is
+     * whole namespace, by every component record ({@code meta.record_field}, {@code meta.param}, …), which is
      * a part of a type and not one.
      */
     private static Map<String, TsonTypeReader<?>> buildConstructors(TsonCompiledSchema compiledSchema) {
@@ -104,16 +105,15 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
     }
 
     /**
-     * The stand-in factory for a constructor this library cannot build a reader for. It names the constructor, the
-     * schema that declares it and the entry that tried to use it, so the message identifies the gap rather than the
-     * document that ran into it. Kept rather than dropped: an entry built with an unbacked constructor still
-     * compiles, and the verdict lands where the gap is, on reading a value against it.
+     * The stand-in factory for a body no factory backs. Dispatch is by the body's class, and an instance of a schema's
+     * own constructor never becomes one of the schema model's bodies (it is refused, or held as a value), so what
+     * reaches this is an application a checkpoint compiles before materialisation closes it ({@code meta.apply});
+     * the finished schema holds none.
      */
-    private static ValueReaderFactory unbuildable(String declaredBy, String constructorName, RuntimeException cause) {
+    private static ValueReaderFactory unbuildable(String constructorName, RuntimeException cause) {
         return (entryName, definition, context) -> new ErrorReader(entryName,
-                new UnsupportedOperationException("'" + entryName + "' is built with '" + constructorName
-                        + "', a constructor declared by '" + declaredBy + "' that this library has "
-                        + "no reader for: " + cause.getMessage(), cause));
+                new UnsupportedOperationException("'" + entryName + "' holds a '" + constructorName + "' body, which "
+                        + "no reader factory backs: " + cause.getMessage(), cause));
     }
 
     /**

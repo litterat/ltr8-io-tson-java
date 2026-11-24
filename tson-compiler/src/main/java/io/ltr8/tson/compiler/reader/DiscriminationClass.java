@@ -3,13 +3,14 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Sum;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
 import io.ltr8.tson.schema.binary.BytesType;
 import io.ltr8.tson.schema.net.Cidr4Type;
 import io.ltr8.tson.schema.net.Cidr6Type;
@@ -23,7 +24,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.numeric.FloatType;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.numeric.IntegerType;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.net.HostType;
 import io.ltr8.tson.schema.net.HostnameType;
 import io.ltr8.tson.schema.net.MediaTypeType;
@@ -32,11 +33,14 @@ import io.ltr8.tson.schema.net.Ipv6Type;
 import io.ltr8.tson.schema.net.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+
 import io.ltr8.tson.schema.unicode.RegexType;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.temporal.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
+import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.net.IriType;
@@ -95,6 +99,18 @@ public enum DiscriminationClass {
         return AliasChain.terminalDefinition(name, namespace).flatMap(def -> classify(def, namespace));
     }
 
+    /**
+     * The class of what a type slot holds: a name's, as {@link #of(String, Function)} gives it, or a type written in
+     * place classified by its own body -- an array or a tuple bracket-class, a map brace-class where its keys are
+     * scalar, a reference string-class, and a nested choice none.
+     */
+    public static Optional<DiscriminationClass> of(TypeExpr type, Function<String, ? extends Top> namespace) {
+        return switch (type) {
+            case TypeRef reference -> of(reference.name(), namespace);
+            case TypeInline inline -> classify(inline.of(), namespace);
+        };
+    }
+
     private static Optional<DiscriminationClass> classify(Top def, Function<String, ? extends Top> namespace) {
         return switch (def) {
             case IntegerType ignored -> Optional.of(NUMBER);
@@ -102,7 +118,7 @@ public enum DiscriminationClass {
             case FloatType f -> f.allowNan() || f.allowInfinity() ? Optional.empty() : Optional.of(NUMBER);
             case TextType ignored -> Optional.of(STRING);
             case IdentifierType ignored -> Optional.of(STRING);
-            case ReferenceBody ignored -> Optional.of(STRING); // a name, written as a token
+            case RefBody ignored -> Optional.of(STRING); // a name, written as a token
             case UriType ignored -> Optional.of(STRING);
             case IriType ignored -> Optional.of(STRING);
             case RegexType ignored -> Optional.of(STRING);
@@ -123,17 +139,20 @@ public enum DiscriminationClass {
             case Cidr6Type ignored -> Optional.of(STRING);
             case MacType ignored -> Optional.of(STRING);
             case EnumBody members -> ofEnum(members);
+            case RecordBody record when record.isParametric() -> Optional.empty(); // never named bare (§5.10)
             case RecordBody ignored -> Optional.of(BRACE);
-            case RecordTemplateBody ignored -> Optional.of(BRACE); // every member is a record
             case MapBody m -> hasScalarKey(m, namespace) ? Optional.of(BRACE) : Optional.empty();
             case NamespaceBody ignored -> Optional.of(BRACE); // its keys are names
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
+            case ApplyBody ignored -> Optional.empty(); // an application stands only inside a parametric record
             case Atom ignored -> Optional.empty(); // rational/complex (need a tag), value, void, unknown
             case Sum ignored -> Optional.empty(); // a choice or a scope, classified through what it admits
             case Alias ignored -> Optional.empty();
-            case TemplateBody ignored -> Optional.empty();
+            // Classified at its landing, in the foreign namespace, by a caller holding the link (ExternHops).
+            case io.ltr8.tson.schema.meta.Extern ignored -> Optional.empty();
             case ValueEntry ignored -> Optional.empty();
+            case io.ltr8.tson.schema.meta.IncompleteEntry ignored -> Optional.empty(); // no type, refused at link
         };
     }
 

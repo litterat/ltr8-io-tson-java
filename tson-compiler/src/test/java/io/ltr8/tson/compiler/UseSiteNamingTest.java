@@ -18,12 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A diagnostic names the type <b>the author wrote at that position</b>, not the entry at the end of the
  * alias chain it resolves to.
  *
- * <p>[TSON-SCHEMA] §8.3 flattens a type position past an {@code ALIAS} entry and records the name the
- * author wrote as {@code @alias} on the type-ref, so {@code c: pct} over {@code pct => small} arrives at the
- * reader as {@code small} -- one shared reader, correctly named {@code small} for a position that names it
- * directly, and wrong for one that does not. A minted application ({@code e: b<10>}) is its expansion, an
- * entry whose content-derived key ({@code numeric_integer_type_10_100_786fbcfb}) appears nowhere in the author's file,
- * so its message leads with no name at all.
+ * <p>An alias entry's reader is its target's ({@code UseSite}), so {@code c: pct} over {@code pct => small} reaches
+ * one shared reader, correctly named {@code small} for a position that names it
+ * directly, and wrong for one that does not. A construction written in place ({@code e: pair_of<int32>}) has no
+ * entry, so its message names the application it was written as, its constructor and arguments.
  *
  * <p>The name is chosen where a composite reader wires
  * its children, which is <b>compile time</b>. Nothing is added to {@code TsonReadContext} and no per-read
@@ -41,15 +39,15 @@ class UseSiteNamingTest {
               small => !integer ^ { max: 100 }
               pct   => small
               outer => pct
-              b     => <N> !numeric.integer_type { min: N  max: 100 }
+              pair_of => !meta.array ^ { min_items: 1  max_items: 2 }
             """;
 
     /** Every diagnostic a read of {@code data} against {@code declarations} reports, message only. */
     private static List<String> messages(String declarations, String data) {
         String schema = """
                 !!id:"https://example.test/naming.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s%s
                 }
@@ -85,29 +83,20 @@ class UseSiteNamingTest {
     }
 
     /**
-     * <b>An application nothing declares is its expansion, named by the application as written</b> (§5.10, §8.2):
-     * {@code b<10>} is an atom instance under a content-derived name no author wrote, and the message names the
-     * application that closed to it instead.
+     * <b>A completion written in place is named by the construction it is</b> (§5.5): {@code pair_of<int32>} is the
+     * array {@code [int32; 1..2]} written at the field, equal to that array written anywhere, and has no entry.
      */
     @Test
-    void aMintedApplicationIsNamedByItsApplication() {
-        List<String> found = messages("  r => { e: b<10> }", "!r { e: 5 }");
-
-        assertEquals(List.of("'b<10>': '5' is less than the minimum 10"), found);
-    }
-
-    /** A record application nothing declares is named by its application too, not by its body. */
-    @Test
-    void aMintedRecordIsNamedByItsApplication() {
-        List<String> found = messages("  bx => <T> { v: T }\n  r => { e: bx<int32> }", "!r { e: { v: 1  nope: 2 } }");
+    void aCompletionInPlaceIsNamedByTheConstructionItIs() {
+        List<String> found = messages("  r => { e: pair_of<int32> }", "!r { e: [1 2 3] }");
 
         assertEquals(1, found.size(), found::toString);
-        assertTrue(found.getFirst().startsWith("unknown field 'nope' on 'bx<int32>'"), found.getFirst());
+        assertTrue(found.getFirst().startsWith("'[int32; 1..2]'"), found.getFirst());
     }
 
-    /** The same for a set: {@code set<text>} is named as the application, not as the array {@code [text]}. */
+    /** The same for a set in place: {@code set<text>} is named as the application, not as the array {@code [text]}. */
     @Test
-    void aMintedSetIsNamedByItsApplication() {
+    void aSetInPlaceIsNamedByItsApplication() {
         List<String> found = messages("  r => { t: set<text> }", "!r { t: [a a] }");
 
         assertEquals(List.of("'set<text>' requires unique elements, 'a' appears more than once"), found);

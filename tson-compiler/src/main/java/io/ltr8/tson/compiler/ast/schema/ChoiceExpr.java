@@ -4,8 +4,8 @@ import java.util.List;
 
 /**
  * {@code paren-type = "(" type-ref "|" type-ref *("|" type-ref) ")"} (Part 2 §12.1, §5.4) -- a choice type, at least
- * two variants, each a {@link TypeExpr}. {@code SchemaDesugarer} lifts it to an entry holding
- * {@code !meta.choice { variants: [...] }} (§5.4).
+ * two variants, each a {@link TypeExpr}. {@code SchemaDesugarer} rewrites it to the construction {@code
+ * !meta.choice { variants: [...] }} (§5.4), written in place at a slot.
  */
 public record ChoiceExpr(List<TypeExpr> variants) implements TypeExpr {
 

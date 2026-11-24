@@ -18,8 +18,8 @@ form only; history lives in git.
 - On a race, what is duplicated is work, never state; explicit `register` on an identity already present is still an
   error.
 - A cache hit takes no lock; a read canonicalizes its schema URI once.
-- A value entry no class binds is held as a tree by the core, read through the declaring schema's tree-mode compilation
-  (`treeVocabularyOf`); the bind registry refuses one anywhere in the closure it compiles, the tree registry nothing.
+- A value entry no class binds is held as a tree by the core, read at a tree-mode checkpoint; the bind registry refuses
+  one anywhere in the closure it compiles, the tree registry nothing.
 
 Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `design/namespace-types-and-value-entries.md`,
 `design/cli-config-hashing.md`, `design/facades-and-tree.md`.
@@ -33,18 +33,12 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   `TsonCompiledSchemaLoader`. It owns the paired `TsonSchemaRegistry`, a bind-mode resolver, a
   `SchemaSource`, content-hash verification, and the kernel's bootstrap. Its loader interface:
   `resolveLinked(uri) → TsonLinkedSchema` (an `!!import` target, or a user schema —
-  fetched/resolved/linked/registered), and `loadVocabulary(uri)` / `vocabularyOf(identity) → TsonCompiledVocabulary`,
-  a schema's **compiled vocabulary**: the readers a schema importing it reads a `!C { … }` body or an annotation
-  value through, where it declared `C` or the annotation's type (`design/resolver-vocabulary-and-bootstrap.md`).
-  `treeVocabularyOf(identity)` is the same schema compiled in tree mode, cached per identity beside it: what a value
-  entry's payload is read through where the bind context binds no class for its type, so the entry holds a
-  `TsonValue` and the schema still loads and validates (`design/namespace-types-and-value-entries.md`). `compileReady(ready,
-  pending, tree)` compiles a resolution in progress, its document's entries ready so far, in either mode, neither
-  registered nor cached: what a value read against an entry of the same document is read through (`WaitOrder`).
-  Any schema compiles to one (`TsonCompiledVocabulary.compile`), **on first use and cached per identity**, never per closure:
-  a construction head is read through the compile of the document that declared it, so a schema applying only the kernel's
-  constructors reaches exactly meta.tn's compiled schema, and numeric.tn, temporal.tn, net.tn, core.tn and policy.tn are
-  compiled here only if something applies a constructor or an annotation type they declare.
+  fetched/resolved/linked/registered), `compileReady(ready, pending, tree)`, a checkpoint of a resolution in progress in
+  either mode, neither registered nor cached, which every value a schema document reads is read at
+  (`design/resolver-vocabulary-and-bootstrap.md`), and `loadVocabulary(uri) → TsonCompiledVocabulary`, a schema's
+  **compiled vocabulary**. Only the kernel's is cached: its pre-loaded stand-in, which the kernel's own resolution reads
+  every head through, and its registered compile once something asks for it. No resolution compiles anything into the
+  core.
   `withStandardLibrary(context, source)` builds a core with the six bundled schemas resolved and registered, in
   `TsonBundledSchemas.IDS` order (the kernel meta.tn, then numeric, temporal, net, core, policy); an overload takes the
   identifier policy and the `LimitsPolicy` user schemas resolve under (`limits()`, whose wait depth `SchemaResolver` counts),

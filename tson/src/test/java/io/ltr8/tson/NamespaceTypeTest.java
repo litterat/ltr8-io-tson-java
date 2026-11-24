@@ -5,7 +5,6 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -30,7 +29,7 @@ class NamespaceTypeTest {
 
     private static final String META_TEXT = """
             !!id:"https://example.test/meta-headers.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               header_name => !unicode.identifier_type { continue_add: "-" }
               headers     => !meta.namespace { key_type: header_name  value_type: text }
@@ -85,7 +84,7 @@ class NamespaceTypeTest {
     void aSchemaImportingTheLayerTypesAFieldByIt() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/request.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !!import:"https://example.test/meta-headers.tn"
                 !schema {
                   request => { headers: headers }
@@ -96,12 +95,11 @@ class NamespaceTypeTest {
     }
 
     @Test
-    void theLinkedSchemaRecordsTheMapAndTheKind() {
+    void theLinkedSchemaRecordsTheMapAndItsConstructor() {
         TsonLinkedSchema meta = tson("").bindRegistry().core().resolveLinked(META);
 
         assertEquals(Optional.of(NamespaceBody.of(TypeRef.of("header_name"), TypeRef.of("text"), false)),
                 meta.namespace("headers"));
-        assertEquals(EntryKind.PRODUCT, meta.kindOf("headers"));
         assertEquals(Optional.of("meta.namespace"), meta.schema().constructorOf("headers"));
         assertEquals(Optional.empty(), meta.namespace("header_name"));
     }
@@ -121,7 +119,7 @@ class NamespaceTypeTest {
     }
 
     /**
-     * {@code namespace} refines {@code map}, so its size bounds are a map's: a value entry of a namespace type holds
+     * {@code namespace} composes {@code map}, so its size bounds are a map's: a value entry of a namespace type holds
      * no fewer than {@code min_items} entries and no more than {@code max_items}.
      */
     @Test
@@ -154,7 +152,7 @@ class NamespaceTypeTest {
     void aNamespaceTypeWhoseBoundsCrossIsRefused() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/crossed.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   hs => !meta.namespace { key_type: meta.identifier  value_type: text  min_items: 3  max_items: 1 }
                 }
@@ -187,7 +185,7 @@ class NamespaceTypeTest {
     void anySchemaDeclaresANamespaceType() {
         List<Diagnostic> problems = tson("").validateSchema("""
                 !!id:"https://example.test/governed.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   hs => !meta.namespace { key_type: meta.identifier  value_type: text }
                 }

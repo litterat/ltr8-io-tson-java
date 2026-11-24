@@ -5,33 +5,41 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
-import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.reader.DependentFieldReader;
 import io.ltr8.tson.compiler.resolver.KindMembers;
+import io.ltr8.tson.compiler.resolver.NameType;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Extern;
+import io.ltr8.tson.compiler.resolver.Externs;
 import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonValue;
-import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.Ref;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.unicode.IdentifierType;
+import io.ltr8.unicode.Normalization;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -42,20 +50,23 @@ import java.util.function.Function;
 
 /**
  * The names a value entry holds ({@link ValueEntry}) resolved and judged by their slots
- * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code meta.ref<T>}, held as a {@link Ref} the
- * linker delivers into or a {@link TypeRef} carrying the name alone; and a type's name at a slot typed by a kind,
+ * ([TSON-SCHEMA] §5.12, §4.2): a value's qualified name at a slot typed {@code meta.ref<T>}, held as a {@link ValueRef} the
+ * linker delivers into, or as the name alone where a host holds it as text; and a type's name at a slot typed by a kind,
  * judged a member ({@link #judgeMember}). The same walk judges every other value's name ({@link #reach}): a field's
  * default or pin at a reference, and a name a data document writes at one, which the linker leaves the reference a
- * lookup for ({@code ReferenceBody.Values}).
+ * lookup for ({@code RefBody.Values}).
  *
  * <p><b>Fed by the read, not by the host.</b> The references judged are the ones the resolver's read produced by
  * name, each with its slot ({@link TsonSchema#valuesByName()}). The host class declares nothing for them, so none
  * can be missed.
  *
- * <p><b>The grammar is judged here, where the name is resolved.</b> The read keeps any unquoted token; this splits
- * it at each {@code .} and requires each segment to be a [TSON-DATA] §7.7 identifier ({@link #segments}), so
- * {@code orders.1x}, {@code .orders} and {@code orders.} are refused as no qualified name before anything is looked
- * up. A reference carrying arguments is no value by name.
+ * <p><b>The grammar is judged here, where the name is resolved.</b> The read keeps a token of either form; this splits
+ * its text at each {@code .} before any family is consulted ({@link #segments}), so {@code .orders} and {@code
+ * orders.} are refused as no qualified name before anything is looked up. <b>Each segment is a name of the family of
+ * what it enters</b> ([TSON-SCHEMA] §5.12), judged as the walk enters it ({@link Family}): {@code meta.type_name} at
+ * the root and at a nested schema map, the namespace's {@code key_type} at a namespace value, the record's {@code
+ * name_type} at a record value, matched as a document's own key or field name there is, in the family's form. No
+ * family a segment is matched against admits {@code .} ({@link NameType#dotRefusal}), so the split is the walk's.
  *
  * <p><b>One namespace holds both sides.</b> The slot's type arrives with the name: the reader that read the name was built
  * from the slot's declared type and recorded it beside the name ({@link TsonSchema.SlotType}), the slot's reference's {@code
@@ -65,10 +76,10 @@ import java.util.function.Function;
  * entries and its import closure: the first segment, alias hops followed ([TSON-SCHEMA] §8.3), and each further segment
  * selects a key of a value of a named product -- a namespace value's key, or a record value's field, the record being a
  * namespace whose keys its type fixes; never a position in a list or a key of a map that is no namespace -- and a type entry
- * admits none. An open entry is no referent at all: a template denotes no value until it is applied. The referent's declared
- * type is then judged against the slot's by §7.2's IS-A, comparing canonical identities: an entry's declared type is the
- * constructor that built its body, a field's is its type, and a map value's is the map's value type. Found first, judged
- * after, never a choice among candidates.
+ * admits none. A parametric record is no referent at all: it denotes no value until it is applied. The referent's
+ * declared type is then judged against the slot's by §7.2's IS-A, comparing canonical identities: an entry's declared type
+ * is the constructor that built its body, a field's is its type, and a map value's is the map's value type. Found first,
+ * judged after, never a choice among candidates.
  *
  * <p><b>An entry's constructor</b> is its value's tag, as its facts record it, where that names a constructor, and
  * otherwise the kernel constructor its body mirrors ({@code @Typename}): a record declaration or a composition is
@@ -105,45 +116,60 @@ final class ValuesByName {
      *               record value through; {@code null} where the link was given none
      */
     ValuesByName(TsonSchema schema, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                 Map<String, String> origins, DataBindContext values) {
+                 Map<String, String> origins, DataBindContext values, ExternHops hops) {
         this.merged = merged;
         this.facts = facts;
         String ownIdentity = CanonicalIdentity.canonicalize(schema.id());
-        this.space = new Space(merged, name -> origins.getOrDefault(name, ownIdentity));
+        this.space = new Space(merged, name -> origins.getOrDefault(name, ownIdentity), hops);
         this.values = values;
     }
 
-    /** The schema's one namespace: its entries, and where each was declared. */
-    private record Space(Map<String, Top> entries, Function<String, String> originOf) {
+    /** The schema's one namespace: its entries, where each was declared, and where its externs land. */
+    private record Space(Map<String, Top> entries, Function<String, String> originOf, ExternHops hops) {
 
-        /** Whether {@code name} is a constructor, IS-A the kernel's {@code top} ({@link EntryKind#isConstructor}). */
+        /** Whether {@code name} is a constructor, IS-A the kernel's {@code top} ({@link TypeChain#isConstructor}). */
         boolean isConstructor(String name, Top value) {
-            return EntryKind.isConstructor(name, value, entry -> TsonBundledSchemas.isKernel(originOf.apply(entry)));
+            return TypeChain.isConstructor(name, value, entry -> TsonBundledSchemas.isKernel(originOf.apply(entry)));
         }
     }
 
     /** A type named in the schema's namespace. */
-    private record Typed(Space space, String name) {
+    private record Typed(Space space, String name, Optional<TypeInline> inline) {
+
+        Typed(Space space, String name) {
+            this(space, name, Optional.empty());
+        }
 
         String terminal() {
-            return AliasChain.terminal(name, space.entries()::get);
+            return inline.isPresent() ? name : AliasChain.terminal(name, space.entries()::get);
         }
 
         Top definition() {
-            return space.entries().get(terminal());
+            return inline.<Top>map(TypeInline::of).orElseGet(() -> space.entries().get(terminal()));
         }
 
         Typed of(String typeName) {
             return new Typed(space, typeName);
         }
 
+        /** What a field's type holds: a name's entry, or a type written in place, named by its written form. */
+        Typed of(TypeExpr type) {
+            return switch (type) {
+                case TypeRef reference -> of(reference.name());
+                case TypeInline written -> new Typed(space, written.text(), Optional.of(written));
+            };
+        }
+
         /**
          * Declaring schema and entry, which is what two spellings of one type agree on. Every entry of a linked
-         * namespace records its canonical origin, so the origin is compared as recorded.
+         * namespace records its canonical origin, so the origin is compared as recorded. A type written in place has
+         * no entry and is its own: no named type is it.
          */
         String identity() {
-            String terminal = terminal();
-            return space.originOf().apply(terminal) + "#" + terminal;
+            if (inline.isPresent()) {
+                return "#" + name;
+            }
+            return space.hops().identity(name);
         }
 
         Top body() {
@@ -181,26 +207,55 @@ final class ValuesByName {
         }
     }
 
-    /**
-     * The segments of the qualified name {@code reference} writes: its {@code name} split at each {@code .}, each a
-     * §7.7 identifier. Refused where the name has an empty segment, a segment that is no identifier, or arguments.
-     */
+    /** The segments of the qualified name {@code reference} writes, refused where {@link ReferenceGrammar} splits none. */
     static List<String> segments(String where, TypeRef reference) {
-        if (!reference.arguments().isEmpty()) {
-            throw new SchemaValidationException(where + " holds '" + reference.name() + "' with arguments, and a "
-                    + "value by name is a qualified name alone");
-        }
-        List<String> segments = List.of(reference.name().split("\\.", -1));
-        for (String segment : segments) {
-            Optional<String> violation = segment.isEmpty() ? Optional.of("a segment is empty")
-                    : IdentifierGrammar.validate(segment);
-            if (violation.isPresent()) {
-                throw new SchemaValidationException(where + " holds '" + reference.name() + "', which is no "
-                        + "qualified name: each segment between the dots is an identifier, and " + (segment.isEmpty()
-                        ? "one is empty" : "'" + segment + "' is not -- " + violation.get()));
+        ReferenceGrammar.malformed(reference.name()).ifPresent(violation -> {
+            throw new SchemaValidationException(where + " holds '" + reference.name() + "', which is no qualified "
+                    + "name -- " + violation);
+        });
+        return reference.segments();
+    }
+
+    /**
+     * The family a segment is a name of where it enters a container ([TSON-SCHEMA] §5.12): its name, as a message
+     * says it, the reader a document's own key or field name there is read by, and the form two names are one in.
+     */
+    private record Family(String name, AtomType<?> reader, Normalization form) {
+
+        private static final AtomType<?> IDENTIFIER = AtomParsers.forType(IdentifierType.IDENTIFIER).orElseThrow();
+
+        static final Family TYPE_NAME = new Family("meta.type_name", IDENTIFIER, Normalization.NFC);
+
+        static final Family DEFAULT_NAME_TYPE = new Family(RecordBody.DEFAULT_NAME_TYPE, IDENTIFIER, Normalization.NFC);
+
+        /**
+         * {@code segment} as a name of this family, in its form; refused, opening with {@code naming}, where it is
+         * none, the family's own reason given with {@code role}, what the family names there.
+         */
+        String read(String naming, String role, String segment) {
+            try {
+                return String.valueOf(reader.read(segment));
+            } catch (AtomTypeException refused) {
+                throw new SchemaValidationException(naming + ", and '" + segment + "' is no name of '" + name
+                        + "', " + role + " -- " + refused.getMessage());
             }
         }
-        return segments;
+
+        /** Whether {@code key}, as declared or as a value holds it, is the name {@code read}. */
+        boolean names(String read, String key) {
+            return read.equals(form.apply(key));
+        }
+    }
+
+    /** The family {@code typeName} states, or {@code fallback} where it reaches no identifier family. */
+    private Family family(String typeName, Family fallback) {
+        if (AliasChain.terminalDefinition(typeName, merged).orElse(null) instanceof IdentifierType identifiers) {
+            Optional<AtomType<?>> reader = AtomParsers.forType(identifiers);
+            if (reader.isPresent()) {
+                return new Family(typeName, reader.get(), identifiers.normalization());
+            }
+        }
+        return fallback;
     }
 
     /**
@@ -213,7 +268,7 @@ final class ValuesByName {
     }
 
     /**
-     * Judges one name by its slot, and returns what a {@code Ref} host receives: the value it reaches, or for a name
+     * Judges one name by its slot, and returns what a {@code ValueRef} host receives: the value it reaches, or for a name
      * at a slot that names types nothing.
      */
     private Object judge(String where, TypeRef reference, TsonSchema.SlotType slot) {
@@ -234,7 +289,8 @@ final class ValuesByName {
         // walk goes on from the member a segment names, and a further segment selects in that member's value.
         int entered = 1;
         while (entered < written.size() && SchemaPaths.isNestedMap(merged.get(head))) {
-            String member = head + '.' + written.get(entered);
+            String member = head + '.' + Family.TYPE_NAME.read(where + " names '" + name + "'",
+                    "which names the members of the schema map '" + head + "'", written.get(entered));
             if (!merged.containsKey(member)) {
                 throw new SchemaValidationException(where + " names '" + name + "', and the schema map '" + head
                         + "' declares no '" + written.get(entered) + "'");
@@ -252,9 +308,20 @@ final class ValuesByName {
                     + "' reaches no entry");
         }
         String entry = terminal.equals(head) ? "'" + head + "'" : "'" + head + "' (an alias of '" + terminal + "')";
-        if (OpenEntry.isOpen(referent)) {
-            throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is an open "
-                    + "entry: a template denotes no value until it is applied (§5.10), so nothing is there to name");
+        if (referent instanceof Extern extern && segments.size() > 1) {
+            throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is "
+                    + Externs.describe(extern) + ": no name walks through an extern into another schema's namespace, "
+                    + "so '" + segments.get(1) + "' selects nothing ([TSON-SCHEMA] §5.12, §5.13)");
+        }
+        if (referent instanceof Extern extern && !namesTypes) {
+            throw new SchemaValidationException(where + " wants " + a(slot.of()) + ", and " + entry + " is "
+                    + Externs.describe(extern) + ", a type and no value -- a slot over '" + slot.of() + "' holds the "
+                    + "name of a value ([TSON-SCHEMA] §5.12)");
+        }
+        if (ParametricEntry.isParametric(referent)) {
+            throw new SchemaValidationException(where + " names '" + name + "', and " + entry + " is a "
+                    + "parametric record, which denotes no value until it is applied (§5.10), so nothing is there "
+                    + "to name");
         }
         if (namesTypes) {
             judgeMember(where, name, segments, slot, referent, entry);
@@ -278,49 +345,56 @@ final class ValuesByName {
         Object value = valueEntry.value();
         String absent = null;
         String reached = head;
+        String naming = where + " names '" + name + "'";
         for (String segment : segments.subList(1, segments.size())) {
             Top body = at.body();
             switch (body) {
                 case RecordBody record -> {
-                    RecordField field = record.fields().get(segment);
-                    if (field == null) {
-                        throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
+                    Family names = record.nameType().map(type -> family(type, Family.DEFAULT_NAME_TYPE))
+                            .orElse(Family.DEFAULT_NAME_TYPE);
+                    String declared = declaredField(record, names, names.read(naming,
+                            "which names the fields of '" + reached + "'", segment));
+                    if (declared == null) {
+                        throw new SchemaValidationException(naming + ", and '" + reached
                                 + "' is " + a(at.name()) + ", which has no field '" + segment + "' -- it declares "
                                 + String.join(", ", record.fields().keySet()));
                     }
+                    RecordField field = record.fields().get(declared);
                     Object holder = value;
                     if (value != null) {
-                        value = value instanceof TsonValue tree ? present(tree.get(segment))
-                                : fieldOf(value, segment, where + " names '" + name + "', and '" + reached + '.'
-                                        + segment + "'");
+                        value = value instanceof TsonValue tree ? present(tree.get(declared))
+                                : fieldOf(value, declared, naming + ", and '" + reached + '.' + segment + "'");
                         if (value == null) {
-                            absent = "'" + reached + "' is " + a(at.name()) + " whose field '" + segment + "' is "
+                            absent = "'" + reached + "' is " + a(at.name()) + " whose field '" + declared + "' is "
                                     + "not present in the value";
                         }
                     }
                     if (field.sibling().isPresent()) {
-                        String naming = where + " names '" + name + "', and '" + reached + "." + segment + "' is a "
+                        String dependent = naming + ", and '" + reached + "." + segment + "' is a "
                                 + "dependent field, typed by its sibling '" + field.sibling().get() + "'";
                         String unreached = absent == null ? null : where + " names '" + name + "', and " + absent
                                 + ", so the name reaches no value";
-                        at = at.of(dependentType(naming, record, field.sibling().get(), holder, unreached));
+                        at = at.of(dependentType(dependent, record, field.sibling().get(), holder, unreached));
                     } else {
-                        at = at.of(field.typeRef().name());
+                        at = at.of(field.typeExpr());
                     }
                 }
                 case MapBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
                         + reached + "' is " + a(at.name()) + ", a map that is no namespace, so it is not entered by "
                         + "name -- a segment selects a key of a namespace value or a field of a record value");
                 case NamespaceBody namespace -> {
+                    Family keys = family(namespace.keyType().name(),
+                            new Family(namespace.keyType().name(), Family.IDENTIFIER, Normalization.NFC));
+                    String key = keys.read(naming, "which names the keys of '" + reached + "'", segment);
                     if (value != null) {
-                        Optional<Object> found = keyed(value, segment, reached);
+                        Optional<Object> found = keyed(value, keys, key, reached);
                         if (found.isEmpty()) {
                             throw new SchemaValidationException(where + " names '" + name + "', and '" + reached
                                     + "' has no key '" + segment + "' -- it holds " + keysOf(value, reached));
                         }
                         value = found.get();
                     }
-                    at = at.of(namespace.valueType().name());
+                    at = at.of(namespace.valueType());
                 }
                 case ArrayBody ignored -> throw new SchemaValidationException(where + " names '" + name + "', and '"
                         + reached + "' is a list, whose elements have no names -- a segment selects a field of a "
@@ -359,9 +433,9 @@ final class ValuesByName {
             throw new SchemaValidationException(wants + "'" + name + "' goes on past " + entry + ", a type, which "
                     + "admits no further segment");
         }
-        if (KindMembers.isMember(name, slot.of(), merged::get,
-                named -> TsonSchemaLinker.constructorOf(named, merged.get(named), facts),
-                merged::get)) {
+        if (space.hops().membership(name, slot.of()).orElseGet(() -> KindMembers.isMember(name, slot.of(),
+                merged::get, named -> TsonSchemaLinker.constructorOf(named, merged.get(named), facts),
+                merged::get))) {
             return;
         }
         if (referent instanceof ValueEntry value) {
@@ -398,26 +472,28 @@ final class ValuesByName {
         if (held == null && holder == null) {
             throw new SchemaValidationException(unreached);
         }
-        Reference named = DependentFieldReader.referenceIn(held);
-        if (named == null) {
+        io.ltr8.tson.schema.meta.TypeExpr typed = DependentFieldReader.typeIn(held);
+        if (typed == null) {
             throw new SchemaValidationException(naming + ", which the value does not hold, so the name has no type "
                     + "to go on through");
         }
-        return switch (typeNamed(named, declared, merged)) {
+        return switch (typeNamed(typed, merged)) {
             case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
+            case DependentFieldReader.TypeNamed.InPlace inline -> throw new SchemaValidationException(naming
+                    + ", which holds the type written in place '" + inline.type().text() + "', and a name goes on "
+                    + "through a value's declared type alone (§5.12)");
             case DependentFieldReader.TypeNamed.None none -> throw new SchemaValidationException(naming
                     + ", which holds " + none.held() + " -- so the name has no type to go on through");
         };
     }
 
     /**
-     * What a sibling declared {@code sibling} and holding {@code named} types its dependent field by in the namespace
-     * {@code merged}: the read path's rule ({@link DependentFieldReader#typeNamed}), the sibling's reference resolving
-     * an application, and a value entry naming no type either.
+     * What a sibling holding {@code named} types its dependent field by in the namespace
+     * {@code merged}: the read path's rule ({@link DependentFieldReader#typeNamed}), and a value entry naming no type
+     * either.
      */
-    static DependentFieldReader.TypeNamed typeNamed(Reference named, RecordField sibling, Map<String, Top> merged) {
-        DependentFieldReader.TypeNamed typed = DependentFieldReader.typeNamed(named,
-                DependentFieldReader.siblingType(sibling, merged::get), merged::get);
+    static DependentFieldReader.TypeNamed typeNamed(io.ltr8.tson.schema.meta.TypeExpr named, Map<String, Top> merged) {
+        DependentFieldReader.TypeNamed typed = DependentFieldReader.typeNamed(named, merged::get);
         if (typed instanceof DependentFieldReader.TypeNamed.Entry entry
                 && AliasChain.terminalDefinition(entry.name(), merged).orElse(null) instanceof ValueEntry value) {
             return new DependentFieldReader.TypeNamed.None("'" + named.text() + "', " + aValueNoType(value));
@@ -502,12 +578,33 @@ final class ValuesByName {
         return value.isMissing() ? null : value;
     }
 
-    /** The value under the key spelled {@code segment} of a namespace value, bound or held as a tree. */
-    private static Optional<Object> keyed(Object value, String segment, String reached) {
-        if (value instanceof TsonValue tree) {
-            return Optional.ofNullable(present(tree.get(segment)));
+    /** The field of {@code record} whose declared name is {@code read} under {@code names}, or null for none. */
+    private static String declaredField(RecordBody record, Family names, String read) {
+        if (record.fields().containsKey(read)) {
+            return read;
         }
-        return keyed(asMap(value, reached), segment);
+        for (String declared : record.fields().keySet()) {
+            if (names.names(read, declared)) {
+                return declared;
+            }
+        }
+        return null;
+    }
+
+    /** The value under the key that is {@code key} under {@code keys} of a namespace value, bound or held as a tree. */
+    private static Optional<Object> keyed(Object value, Family keys, String key, String reached) {
+        if (value instanceof TsonMap tree) {
+            for (TsonMap.Entry entry : tree.entries()) {
+                if (entry.key().asString().filter(held -> keys.names(key, held)).isPresent()) {
+                    return Optional.ofNullable(present(entry.value()));
+                }
+            }
+            return Optional.empty();
+        }
+        if (value instanceof TsonValue tree) {
+            return Optional.ofNullable(present(tree.get(key)));
+        }
+        return keyed(asMap(value, reached), keys, key);
     }
 
     /** The keys a namespace value holds, as a message lists them. */
@@ -519,13 +616,13 @@ final class ValuesByName {
         return keysOf(asMap(value, reached));
     }
 
-    /** The value under the key spelled {@code segment}: a {@code String} key directly, any other by its text. */
-    private static Optional<Object> keyed(Map<?, ?> map, String segment) {
-        if (map.containsKey(segment)) {
-            return Optional.ofNullable(map.get(segment));
+    /** The value under the key that is {@code key} under {@code keys}: a {@code String} key directly, any by its text. */
+    private static Optional<Object> keyed(Map<?, ?> map, Family keys, String key) {
+        if (map.containsKey(key)) {
+            return Optional.ofNullable(map.get(key));
         }
         for (Map.Entry<?, ?> entry : map.entrySet()) {
-            if (String.valueOf(entry.getKey()).equals(segment)) {
+            if (keys.names(key, String.valueOf(entry.getKey()))) {
                 return Optional.ofNullable(entry.getValue());
             }
         }

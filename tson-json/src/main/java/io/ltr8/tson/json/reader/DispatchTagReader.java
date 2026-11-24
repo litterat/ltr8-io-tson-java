@@ -24,7 +24,7 @@ import java.util.Set;
  *   <li><b>An OPEN record with subtypes</b> -- untagged, the value is the record itself and goes to its
  *       own concrete reader ({@link #untagged}); a tag restating the record goes there too, and one naming a
  *       subtype goes to that subtype.</li>
- *   <li><b>An ABSTRACT base</b>, closed or a family-base template -- there are no direct instances, so the
+ *   <li><b>An ABSTRACT base</b> -- there are no direct instances, so the
  *       tag is REQUIRED and the base itself is not admissible. The failure lands before the object's shape
  *       is consulted, which is the same refusal TSON text gives a missing {@code !variant}.</li>
  * </ul>
@@ -81,12 +81,12 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
         Map<String, Route> table = new LinkedHashMap<>();
         if (untagged != null) {
             // A tag restating the record reads it exactly as an untagged value does; wrapped, its `$value` is
-            // read here again, since the value inside may name a subtype of its own.
-            Route self = new Route(this, untagged);
+            // read here, untagged as every `$value` is (§3.3).
+            Route self = new Route(this, untagged, false);
             selfNames.forEach(written -> table.put(written, self));
         }
         for (String subtype : subtypes) {
-            table.putIfAbsent(subtype, Route.to(context.readers().resolve(subtype)));
+            table.putIfAbsent(subtype, Route.to(context, subtype));
         }
         this.routes = Map.copyOf(table);
     }
@@ -126,7 +126,7 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
         if (untagged != null && (lead.type() == null || !lead.wrapper() && selfNames.contains(lead.type()))) {
             // Untagged, an inline restatement, or leading annotation members naming no type: all of it is the
             // record's own reader's to judge, on exactly the terms a record without subtypes judges it. A
-            // restating wrapper takes its route instead, whose `$value` may name a subtype of its own.
+            // restating wrapper takes its route instead.
             return untagged instanceof ExactReader exact ? exact.readExact(ctx, this) : untagged.read(ctx);
         }
         if (Tags.refusesScope(ctx, lead, displayName, Tags.RECORD)) {
@@ -146,7 +146,7 @@ final class DispatchTagReader implements JsonTypeReader<Object>, ExactReader {
                 ctx.report(untagged != null ? subsumption.notAdmissible(lead.type(), admissible())
                         // The base itself is not admissible here, which is the whole of what ABSTRACT means --
                         // where a concrete position would take a tag naming it as a redundant restatement.
-                        : selfNames.contains(lead.type()) ? extension.tagNamesTheBase(TagMembers.TYPE)
+                        : selfNames.contains(lead.type()) ? extension.tagNamesTheBase(TagMembers.TYPE, false)
                         : extension.notASubtype(TagMembers.TYPE, lead.type()));
             }
             EventSkip.nextValue(ctx);

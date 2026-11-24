@@ -17,19 +17,21 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
+import io.ltr8.tson.compiler.resolver.AliasChain;
+import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.Namespace;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.SchemaPaths;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.Ref;
-import io.ltr8.tson.schema.meta.SiblingRef;
-import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.tson.schema.meta.ValueRef;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -45,7 +47,7 @@ import java.util.Map;
  *
  * <p>Two callers need exactly that. {@code TsonObjectWriter} puts a document around it, and the schema
  * resolver writes a wire record and immediately parses it back -- {@code DefinitionResolver}'s atom
- * refinement merge and {@code HeldBody}'s held template body -- where a header would be content the parse
+ * refinement merge and {@code WireForm}'s annotation values -- where a header would be content the parse
  * would then have to strip. That second caller is also why this is not simply {@code TsonObjectWriter}'s
  * private half: a resolver reaching for the facade would make the engine's own module depend on the front
  * door built over it.
@@ -70,8 +72,17 @@ public final class DataClassObjectWriter {
      */
     private final TreeValueWriter treeWriter = new TreeValueWriter();
 
+    /** The tags a value written at a position typed by an extern carries; {@link ExternTags#NONE} for none. */
+    private final ExternTags externs;
+
     public DataClassObjectWriter(DataBindContext context) {
+        this(context, ExternTags.NONE);
+    }
+
+    /** A writer whose values at a position typed by an extern are tagged in the enclosing scope ({@code externs}). */
+    public DataClassObjectWriter(DataBindContext context, ExternTags externs) {
         this.context = context;
+        this.externs = externs;
     }
 
     /** Over the {@code schema.meta} resolution vocabulary -- what the schema resolver writes through. */
@@ -135,14 +146,22 @@ public final class DataClassObjectWriter {
      * #writeUnion}, naming the member it dispatched to -- has to place it between the annotations and the
      * core. Without somewhere to hand it in, such a caller must emit the annotations, the type-ref and the
      * core itself, which means reproducing everything above them: the bridge unwrap, the annotated box, the
-     * parsed-value case. Reproducing part of it is the failure that shape invites, and it is not hypothetical
-     * -- a held template body unwrapped by a caller's own copy of the bridge step reaches {@link #writeCore}
-     * as an ordinary record and renders {@code !recordvalue { fields: [ ... ] }}, the description the branch
-     * below exists to prevent. With the seam there is nothing to reproduce, and a branch added here is seen by
-     * every caller.
+     * parsed-value case. Reproducing part of it is the failure that shape invites: a parsed value unwrapped by a
+     * caller's own copy of the bridge step reaches {@link #writeCore} as an ordinary record and renders {@code
+     * !recordvalue { fields: [ ... ] }}, the description the branch below exists to prevent. With the seam there is
+     * nothing to reproduce, and a branch added here is seen by every caller.
      */
     private void write(Object value, DataClass dataClass, TsonDataEmitter writer, String typeRef)
             throws DataBindException {
+        write(value, dataClass, writer, typeRef, null);
+    }
+
+    /**
+     * {@link #write(Object, DataClass, TsonDataEmitter, String)} at a position typed by an extern, {@code boundary}
+     * naming the tags the enclosing scope writes there; {@code null} elsewhere.
+     */
+    private void write(Object value, DataClass dataClass, TsonDataEmitter writer, String typeRef,
+                       ExternTags.Boundary boundary) throws DataBindException {
         try {
             if (value == null) {
                 writer.voidValue();
@@ -153,14 +172,14 @@ public final class DataClassObjectWriter {
                 // as a record carrier's precede the record (§7.4). Taken apart through its own handles, so
                 // nothing here names the carrier class.
                 writeAnnotations((Annotations) boxed.annotations().invoke(value), writer);
-                write(boxed.value().invoke(value), boxed.valueClass(), writer, typeRef);
+                write(boxed.value().invoke(value), boxed.valueClass(), writer, typeRef, boundary);
                 return;
             }
-            if (value instanceof Ref<?> reference) {
-                // A value held by name writes as the name, a bare token, as a type's name does: resolved output
-                // states the reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not wanted.
+            if (value instanceof ValueRef<?> reference) {
+                // A value held by name writes as the name, as a type's name does: resolved output states the
+                // reference as written ([TSON-SCHEMA] §5.12), so its bridge's text form is not wanted.
                 writeAnnotations(value, dataClass, writer);
-                writer.unquotedToken(reference.name());
+                writer.reference(reference.name());
                 return;
             }
             if (value instanceof ValueEntry entry) {
@@ -182,27 +201,21 @@ public final class DataClassObjectWriter {
                 return;
             }
             if (value instanceof TypeRef reference) {
-                // A reference is data grammar, written unquoted with the annotations written on it ahead: a name
-                // one token, an application its name and argument list. A name that is no qualified name reads
-                // back only quoted.
                 writeAnnotations(reference.annotations(), writer);
                 if (typeRef != null) {
                     writer.typeRef(typeRef);
                 }
-                if (qualified(reference)) {
-                    writer.reference(reference);
-                } else {
-                    writer.quotedString(reference.text());
-                }
+                writer.reference(reference.name());
                 return;
             }
-            if (value instanceof SiblingRef sibling) {
-                // A sibling reference is data grammar as well: its field's name and the mark, unquoted.
-                writeAnnotations(sibling.annotations(), writer);
-                if (typeRef != null) {
-                    writer.typeRef(typeRef);
-                }
-                writer.reference(sibling);
+            if (value instanceof TypeInline inline) {
+                // A type written in place is the untagged wrapper the kernel declares, `{ of: ... }`, and its body
+                // goes under the constructor that built it, which the body's class cannot say: a schema's own
+                // constructor of arrays is `{ of: !list_type { ... } }`, not the `!meta.array` its class names.
+                writer.beginRecord();
+                writer.field("of");
+                write(inline.of(), context.getDescriptor(inline.of().getClass()), writer, inline.constructor());
+                writer.endRecord();
                 return;
             }
             if (dataClass.bridge().isPresent()) {
@@ -215,10 +228,9 @@ public final class DataClassObjectWriter {
                 // written as the syntax it is (AstWriter). The rule is about the AST rather than about the one
                 // body that holds one, so anything carrying a parsed value writes correctly.
                 //
-                // Asked *after* the bridge, so an `@Transparent` wrapper over a parsed value reaches it: a
-                // held template body is exactly that, and unwrapping into the ordinary record path instead
-                // would write the description this branch exists to prevent. No other bridge produces one, so
-                // nothing else observes the order.
+                // Asked *after* the bridge, so an `@Transparent` wrapper over a parsed value reaches it:
+                // unwrapping into the ordinary record path instead would write the description this branch
+                // exists to prevent.
                 //
                 // A type-ref here is written rather than dropped, so that a caller offering one against a
                 // value that already carries its own head meets the emitter's at-most-one refusal instead of
@@ -233,7 +245,7 @@ public final class DataClassObjectWriter {
             if (typeRef != null) {
                 writer.typeRef(typeRef);
             }
-            writeCore(value, dataClass, writer);
+            writeCore(value, dataClass, writer, boundary);
         } catch (DataBindException | UncheckedIOException | WriteException e) {
             // Both of the non-binding failures pass through rather than being wrapped as "cannot write
             // <class> as TSON", which would blame the object for neither being its fault: an
@@ -251,15 +263,16 @@ public final class DataClassObjectWriter {
      * from {@link #write}, which owns that prologue; a caller wanting a type-ref of its own hands it to the
      * seam there rather than emitting it and coming here directly.
      */
-    private void writeCore(Object value, DataClass dataClass, TsonDataEmitter writer) throws DataBindException {
+    private void writeCore(Object value, DataClass dataClass, TsonDataEmitter writer, ExternTags.Boundary boundary)
+            throws DataBindException {
         try {
             switch (dataClass) {
                 case DataClassAtom atom -> writeAtom(value, writer);
                 case DataClassRecord record -> writeRecord(value, record, writer);
-                case DataClassArray array -> writeArray(value, array, writer);
-                case DataClassMap map -> writeMap(value, map, writer);
+                case DataClassArray array -> writeArray(value, array, writer, boundary);
+                case DataClassMap map -> writeMap(value, map, writer, boundary);
                 case DataClassTuple tuple -> writeTuple(value, tuple, writer);
-                case DataClassUnion union -> writeUnion(value, union, writer);
+                case DataClassUnion union -> writeUnion(value, union, writer, boundary);
                 default -> throw new DataBindException("unsupported DataClass for writing: " + dataClass);
             }
         } catch (DataBindException | UncheckedIOException | WriteException e) {
@@ -271,22 +284,6 @@ public final class DataClassObjectWriter {
         } catch (Throwable t) {
             throw new DataBindException("failed to write value of type " + dataClass.typeClass(), t);
         }
-    }
-
-    /**
-     * Whether {@code reference} reads back unquoted as written: its name a qualified name, every {@code .}-separated
-     * segment an identifier, and the name of each reference among its arguments the same ([TSON-DATA] §7.4).
-     */
-    private static boolean qualified(TypeRef reference) {
-        if (!ReferenceGrammar.isQualifiedName(reference.name())) {
-            return false;
-        }
-        for (TypeArgument argument : reference.arguments()) {
-            if (argument instanceof TypeArgument.Ref nested && !qualified(nested.ref())) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**
@@ -380,14 +377,15 @@ public final class DataClassObjectWriter {
                 continue;
             }
             writer.field(field.name());
-            write(field.get(value), field.dataClass(), writer);
+            write(field.get(value), field.dataClass(), writer, null, externs.at(dataClass.typeClass(), field.name()));
         }
         writer.endRecord();
     }
 
     // ── Arrays ───────────────────────────────────────────────────────────
 
-    private void writeArray(Object value, DataClassArray dataClass, TsonDataEmitter writer) throws Throwable {
+    private void writeArray(Object value, DataClassArray dataClass, TsonDataEmitter writer,
+                            ExternTags.Boundary boundary) throws Throwable {
         writer.beginArray();
         int size = (int) dataClass.size().invoke(value);
         Object iterator = dataClass.iterator().invoke(value);
@@ -395,14 +393,15 @@ public final class DataClassObjectWriter {
         for (int i = 0; i < size; i++) {
             Object element = dataClass.get().invoke(value, iterator);
             writer.beforeArrayElement();
-            write(element, elementClass, writer);
+            write(element, elementClass, writer, null, boundary);
         }
         writer.endArray();
     }
 
     // ── Maps ─────────────────────────────────────────────────────────────
 
-    private void writeMap(Object value, DataClassMap dataClass, TsonDataEmitter writer) throws Throwable {
+    private void writeMap(Object value, DataClassMap dataClass, TsonDataEmitter writer,
+                          ExternTags.Boundary boundary) throws Throwable {
         writer.beginMap();
         Object iterator = dataClass.iterator().invoke(value);
         DataClass keyClass = dataClass.keyDataClass();
@@ -414,7 +413,7 @@ public final class DataClassObjectWriter {
             writer.beforeMapEntry();
             write(key, keyClass, writer);
             writer.mapArrow();
-            write(entryValue, valueClass, writer);
+            write(entryValue, valueClass, writer, null, boundary);
         }
         writer.endMap();
     }
@@ -436,6 +435,16 @@ public final class DataClassObjectWriter {
     }
 
     /**
+     * Whether {@code held} is an incomplete entry, or an alias whose chain ends at one. The chain is walked in {@code
+     * root}, the outermost schema map, whose keys are the paths every name is written by.
+     */
+    private static boolean incomplete(Object held, Namespace<?> root) {
+        return held instanceof IncompleteEntry || held instanceof Alias alias && AliasChain.terminalDefinition(
+                alias.target().name(), name -> root.entries().get(name) instanceof Top top ? top : null)
+                .orElse(null) instanceof IncompleteEntry;
+    }
+
+    /**
      * A namespace value's entries, in the order held: each key with its annotations, as its bare name where it is an
      * identifier and quoted otherwise, and each value as its own class writes it, under the tag its {@link Typename}
      * names where it carries one -- a value of a subtype of the namespace's value type is selected by it on the way
@@ -443,12 +452,20 @@ public final class DataClassObjectWriter {
      * them inside the nested map alone.
      */
     private void writeNamespace(Namespace<?> namespace, TsonDataEmitter writer) throws Throwable {
+        writeNamespace(namespace, writer, namespace);
+    }
+
+    /** {@link #writeNamespace(Namespace, TsonDataEmitter)}, a schema map nested in {@code root}. */
+    private void writeNamespace(Namespace<?> namespace, TsonDataEmitter writer, Namespace<?> root) throws Throwable {
         boolean schemaMap = TsonSchema.SCHEMA.equals(namespace.type());
         writer.beginMap();
         for (Map.Entry<? extends io.ltr8.annotation.Annotated<String>, ?> entry
                 : namespace.entries().annotatedEntrySet()) {
             if (schemaMap && SchemaPaths.isPath(entry.getKey().value())) {
                 continue; // a nested map's member, written inside its map
+            }
+            if (schemaMap && incomplete(entry.getValue(), root)) {
+                continue; // a resolved form holds complete entries only ([TSON-SCHEMA] §5.5)
             }
             writer.beforeMapEntry();
             writeAnnotations(entry.getKey().annotations(), writer);
@@ -460,6 +477,12 @@ public final class DataClassObjectWriter {
             }
             writer.mapArrow();
             Object held = entry.getValue();
+            if (schemaMap && held instanceof ValueEntry nested && nested.value() instanceof Namespace<?> members
+                    && TsonSchema.SCHEMA.equals(members.type())) {
+                writer.typeRef(nested.type());
+                writeNamespace(members, writer, root);
+                continue;
+            }
             Typename tag = held == null ? null : held.getClass().getAnnotation(Typename.class);
             write(held, held == null ? null : descriptorOf(held), writer,
                     tag == null ? null : tag.name());
@@ -490,9 +513,12 @@ public final class DataClassObjectWriter {
      * the forms the read side accepts -- read/write asymmetry is fine here; a reader benefiting from
      * flexibility doesn't obligate a writer to be equally flexible about its own single output.
      */
-    private void writeUnion(Object value, DataClassUnion dataClass, TsonDataEmitter writer) throws Throwable {
-        if (value instanceof Namespace<?> || value instanceof ValueEntry) {
-            write(value, dataClass, writer, null); // names its own type, which no class does
+    private void writeUnion(Object value, DataClassUnion dataClass, TsonDataEmitter writer,
+                            ExternTags.Boundary boundary) throws Throwable {
+        if (value instanceof Namespace<?> || value instanceof ValueEntry || value instanceof TypeInline) {
+            // A namespace and a value entry name their own type, which no class does; a type written in place is
+            // untagged, recovered by its brace.
+            write(value, dataClass, writer, null);
             return;
         }
         Class<?> memberClass = value.getClass();
@@ -503,7 +529,23 @@ public final class DataClassObjectWriter {
         // Naming the member is the whole of this method's own business; the tag goes to write()'s seam so
         // that the prologue around it -- bridge, annotated box, parsed value -- is the one every other
         // position gets, rather than a copy of part of it maintained here.
-        write(value, context.getDescriptor(memberClass), writer, memberTypeRef(memberClass));
+        write(value, context.getDescriptor(memberClass), writer,
+                boundary == null ? memberTypeRef(memberClass) : tagAt(boundary, memberClass));
+    }
+
+    /**
+     * The tag a member writes at a boundary: the enclosing scope's name for the entry its class is bound to, since the
+     * tag is read there and the foreign schema's own name is not.
+     */
+    private static String tagAt(ExternTags.Boundary boundary, Class<?> memberClass) {
+        String tag = boundary.tagFor(memberClass);
+        if (tag == null) {
+            throw new WriteException(memberClass.getName() + " is written at a '" + boundary.extern() + "' position, "
+                    + "and the enclosing scope has no name reaching the entry it is bound to: a subtype is written at "
+                    + "the boundary through a name of the enclosing scope (" + boundary.admissible() + ") "
+                    + "([TSON-SCHEMA] §7.9)");
+        }
+        return tag;
     }
 
     /**

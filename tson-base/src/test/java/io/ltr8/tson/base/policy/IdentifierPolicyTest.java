@@ -4,10 +4,14 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.IdentifierProfile.Base;
 import io.ltr8.unicode.Normalization;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
+import static java.lang.Character.UnicodeScript.CYRILLIC;
+import static java.lang.Character.UnicodeScript.LATIN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -35,7 +39,7 @@ class IdentifierPolicyTest {
     private static final String RESTRICTED = new String(Character.toChars(0x0132));
 
     private static final IdentifierPolicy PER_SEGMENT =
-            IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment();
+            IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment();
 
     /** A JavaScript-like profile: {@code $} and {@code _} start a name, {@code $} continues one. */
     private static final IdentifierProfile JS =
@@ -99,13 +103,20 @@ class IdentifierPolicyTest {
         assertSame(List.of(), IdentifierPolicy.defaults().judge("admin", NAME));
     }
 
-    /** Level 6 alone drops the restricted-character rule; level 5 keeps it, as §8.2 says. */
+    /**
+     * Level 6 alone drops the restricted-character rule; level 5 keeps it, as §8.2 says. A deployment meaning
+     * "stop checking scripts" wants level 5.
+     */
     @Test
     void onlyUnrestrictedDropsTheRestrictedCharacterRule() {
+        assertTrue(IdentifierPolicy.of(RestrictionLevel.MINIMALLY_RESTRICTIVE).appliesIdentifierProfile(),
+                "level 5 keeps the identifier profile");
+        assertFalse(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED).appliesIdentifierProfile(),
+                "level 6 drops it -- §5.2 says so");
         String name = "a" + RESTRICTED + "b";
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_CHARACTER),
-                codes(IdentifierPolicy.of(ScriptPolicy.scriptsUnchecked()), name, NAME));
-        assertEquals(List.of(), codes(IdentifierPolicy.of(ScriptPolicy.unrestricted()), name,
+                codes(IdentifierPolicy.of(RestrictionLevel.MINIMALLY_RESTRICTIVE), name, NAME));
+        assertEquals(List.of(), codes(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED), name,
                 NAME));
     }
 
@@ -113,15 +124,32 @@ class IdentifierPolicyTest {
     @Test
     void skeletonDistinctnessIsItsOwnSwitch() {
         assertTrue(IdentifierPolicy.defaults().appliesSkeletonDistinctness());
-        assertTrue(IdentifierPolicy.of(ScriptPolicy.unrestricted()).appliesSkeletonDistinctness());
+        assertTrue(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED).appliesSkeletonDistinctness());
         assertFalse(IdentifierPolicy.defaults().withSkeletonDistinctness(false).appliesSkeletonDistinctness());
         assertFalse(IdentifierPolicy.none().appliesSkeletonDistinctness());
         assertEquals(List.of(), codes(IdentifierPolicy.none(), "a" + RESTRICTED + CYR_A, NAME));
     }
 
+    /** The narrowest relaxation: the named combination is admitted in each unit, and nothing else is widened. */
+    @Test
+    void anAdditionalPermittedSetAdmitsOnlyThatCombination() {
+        IdentifierPolicy bilingual = IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).permitting(LATIN, CYRILLIC);
+
+        assertTrue(accepts(bilingual, "id_" + CYR_P, NAME));
+        assertTrue(accepts(bilingual, CYR_A + "dmin", NAME), "deliberately: the deployment said so");
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT), codes(bilingual, "alpha_" + GREEK_ALPHA, NAME));
+        assertEquals(RestrictionLevel.HIGHLY_RESTRICTIVE, bilingual.level());
+        assertEquals(List.of(Set.of(LATIN, CYRILLIC)), bilingual.permittedScripts());
+        assertEquals(bilingual.perSegment(),
+                IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment().permitting(CYRILLIC, LATIN));
+        assertNotEquals(bilingual, IdentifierPolicy.defaults());
+        assertEquals("HIGHLY_RESTRICTIVE per segment permitting [" + Set.of(LATIN, CYRILLIC) + "]",
+                bilingual.perSegment().toString());
+    }
+
     @Test
     void aPolicyIsAValue() {
-        assertEquals(PER_SEGMENT, IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment());
+        assertEquals(PER_SEGMENT, IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment());
         assertNotEquals(PER_SEGMENT, IdentifierPolicy.defaults());
         assertNotEquals(IdentifierPolicy.defaults(), IdentifierPolicy.defaults().withSkeletonDistinctness(false));
         assertEquals("HIGHLY_RESTRICTIVE per segment without skeleton distinctness",

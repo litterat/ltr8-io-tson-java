@@ -13,7 +13,6 @@ import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
@@ -252,8 +251,7 @@ public final class Tson {
     public TsonLinkedSchema resolve(String schemaText) {
         TsonSchemaParser parser = new TsonSchemaParser(schemaText);
         SchemaDocument document = parser.parseSchemaDocument();
-        TsonSchema resolved = new TsonSchemaResolver(core).resolveSchema(document, parser.schemaPositions());
-        return core.register(core.link(resolved), schemaText);
+        return core.register(core.resolveAndLink(document, parser.schemaPositions()), schemaText);
     }
 
     /**
@@ -339,13 +337,8 @@ public final class Tson {
             }
             SchemaDocument document = parsed.get();
 
-            TsonSchema resolved = new TsonSchemaResolver(core)
-                    .resolveSchema(document, parser.schemaPositions(), problems);
-            if (!problems.isEmpty()) {
-                return problems.diagnostics();
-            }
-            TsonLinkedSchema linked = core.link(resolved, problems);
-            if (!problems.isEmpty()) {
+            TsonLinkedSchema linked = core.resolveAndLink(document, parser.schemaPositions(), problems);
+            if (linked == null) {
                 return problems.diagnostics();
             }
             treeRegistry().compile(core.register(linked, schemaText));

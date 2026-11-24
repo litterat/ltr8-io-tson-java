@@ -83,8 +83,8 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
         boolean tagged = false;
         // A dependent field's state, kept only where the record has one: each sibling's reference as written, and
         // each dependent member reached before its sibling was written, by the name written and where it stands.
-        io.ltr8.tson.schema.meta.Reference[] named = plan.hasDependents
-                ? new io.ltr8.tson.schema.meta.Reference[slots.length] : null;
+        io.ltr8.tson.schema.meta.TypeExpr[] named = plan.hasDependents
+                ? new io.ltr8.tson.schema.meta.TypeExpr[slots.length] : null;
         String[] readBefore = plan.hasDependents ? new String[slots.length] : null;
         JsonReadContext[] readBeforeAt = plan.hasDependents ? new JsonReadContext[slots.length] : null;
         for (int position = 0; ; position++) {
@@ -98,8 +98,7 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
             String name = member.name();
             if (TagMembers.isTagMember(name)) {
                 if (tagged && position == 1 && TagMembers.VALUE.equals(name)) {
-                    // §3.3's wrapper: the value is `$value`, at the reader the enclosing position chose for it,
-                    // since the value inside may carry a tag of its own.
+                    // §3.3's wrapper: the value is `$value`, at the reader the enclosing position chose for it.
                     Object value = TagMembers.readWrappedValue(ctx, wrapped);
                     return value == null ? builder.refused() : value;
                 }
@@ -135,7 +134,11 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
                 String text = ctx.peek() instanceof JsonEvent.StringValue string ? string.value() : null;
                 int before = ctx.reported();
                 slots[at] = readField(ctx, at, memberName);
-                named[at] = ctx.reported() > before ? null : DependentReader.referenceIn(text);
+                // A sibling holding a type written in place is that type, bound; a tree holds the object it is
+                // written as, no type a value can be read against (DependentReader).
+                named[at] = ctx.reported() > before ? null
+                        : slots[at] instanceof io.ltr8.tson.schema.meta.TypeInline inline ? inline
+                        : DependentReader.referenceIn(text);
             } else if (plan.siblingOf[at] >= 0 && !(ctx.peek() instanceof JsonEvent.NullValue)) {
                 slots[at] = readDependent(ctx, at, memberName, slots, named, readBefore, readBeforeAt);
             } else {
@@ -160,15 +163,23 @@ final class RecordReader implements JsonTypeReader<Object>, ExactReader {
      * rule, or when the object closes without it ([TSON-SCHEMA] §5.2).
      */
     private Object readDependent(JsonReadContext ctx, int at, String memberName, Object[] slots,
-                                 io.ltr8.tson.schema.meta.Reference[] named, String[] readBefore,
+                                 io.ltr8.tson.schema.meta.TypeExpr[] named, String[] readBefore,
                                  JsonReadContext[] readBeforeAt) {
         int sibling = plan.siblingOf[at];
         JsonReadContext fieldCtx = plan.field(ctx, at, memberName);
-        io.ltr8.tson.schema.meta.Reference reference;
+        io.ltr8.tson.schema.meta.TypeExpr reference;
         if (plan.fields[sibling].role() == FieldRole.FIXED && plan.stated[sibling] != null) {
             reference = DependentReader.referenceIn(plan.stated[sibling].text());
         } else if (slots[sibling] != null) {
             reference = named[sibling];
+            if (reference == null && slots[sibling] instanceof io.ltr8.tson.json.tree.JsonObject) {
+                fieldCtx.report(io.ltr8.tson.base.Diagnostic.Code.NOT_IMPLEMENTED, "'" + memberName + "' is typed "
+                        + "by its sibling '" + plan.declaredNames[sibling] + "', which holds a type written in place, "
+                        + "and a tree read does not yet read a value against one ([TSON-SCHEMA] §5.2); a bind read "
+                        + "does", "a value read against the type its sibling holds", "a type written in place");
+                EventSkip.nextValue(fieldCtx);
+                return Slots.REFUSED;
+            }
         } else if (plan.omitted[sibling] == RecordField.Omitted.VALUE && plan.stated[sibling] != null) {
             reference = DependentReader.referenceIn(plan.stated[sibling].text());
             readBefore[at] = memberName;

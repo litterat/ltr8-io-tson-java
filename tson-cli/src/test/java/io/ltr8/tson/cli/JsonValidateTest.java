@@ -28,8 +28,8 @@ class JsonValidateTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/cli-json.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               person => { name: text  tries?: int32 ~ 0 }
             }
@@ -80,6 +80,50 @@ class JsonValidateTest {
                 {"name": "Ada", "tries": 1.5}""");
         String out = captureStdout(() -> assertEquals(1, TsonCli.run(args(schema, json))));
         assertTrue(out.contains("ATOM_FORM_INVALID"), "1.5 is not an int32: " + out);
+    }
+
+    /**
+     * A schema declaring externs ([TSON-JSON] §8.6): the boundary's {@code $type} is the binding schema's name and
+     * the one inside the foreign schema's, and a problem inside names the scope it was read in.
+     */
+    @Test
+    void aForeignValueThroughAnExternValidates(@TempDir Path dir) throws IOException {
+        Path one = write(dir, "order-1.tn", """
+                !!id:"https://example.test/cli-order-1.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema { order => { id: text  payment: card }  card => { number: text } }
+                """);
+        Path two = write(dir, "order-2.tn", """
+                !!id:"https://example.test/cli-order-2.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema { order => { sku: text  payment: card }  card => { number: text } }
+                """);
+        Path shipping = write(dir, "shipping.tn", """
+                !!id:"https://example.test/cli-shipping.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  order_v1 => !meta.extern { schema: "https://example.test/cli-order-1.tn"  type: order }
+                  order_v2 => !meta.extern { schema: "https://example.test/cli-order-2.tn"  type: order }
+                  envelope => { id: text  body: (order_v1 | order_v2) }
+                }
+                """);
+        Path good = write(dir, "good.json", """
+                {"id": "e", "body": {"$type": "order_v2", "sku": "A", "payment": {"$type": "card", "number": "1"}}}""");
+        Path bad = write(dir, "bad.json", """
+                {"id": "e", "body": {"$type": "order_v2", "sku": "A", "payment": {"number": 1}}}""");
+        String[] binding = {"validate", "--schema", shipping.toString(), "--type", "envelope", one.toString(),
+                two.toString()};
+        String ok = captureStdout(() -> assertEquals(0, TsonCli.run(append(binding, good))));
+        assertEquals("OK", ok.strip());
+        String out = captureStdout(() -> assertEquals(1, TsonCli.run(append(binding, bad))));
+        assertTrue(out.contains("/body/payment/number"), out);
+        assertTrue(out.contains("through the extern 'order_v2' of example.test/cli-shipping.tn"), out);
+    }
+
+    private static String[] append(String[] head, Path last) {
+        String[] all = java.util.Arrays.copyOf(head, head.length + 1);
+        all[head.length] = last.toString();
+        return all;
     }
 
     // ── Usage errors: the command line's, not a document's ──────────────
@@ -152,6 +196,30 @@ class JsonValidateTest {
         String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {
                 "validate", "--schema", schema.toString(), "--type", "person", json.toString()})));
         assertEquals("OK", out.strip());
+    }
+
+    /**
+     * A bound schema that does not load for a gap in this library is no verdict on the schema: the run reports the
+     * gap as one and exits 70, as a gap anywhere else in a run does.
+     */
+    @Test
+    void aBoundSchemaWithAGapIsExitSeventy(@TempDir Path dir) throws IOException {
+        Path schema = write(dir, "gap.tn", """
+                !!id:"https://example.test/cli-gap.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  c => meta.product & { extra: text }
+                  x => !c { extra: "hello" }
+                  person => { name: text }
+                }
+                """);
+        Path json = write(dir, "good.json", """
+                {"name": "Ada"}""");
+        String out = captureStdout(() -> assertEquals(70, TsonCli.run(new String[] {
+                "validate", "--schema", schema.toString(), "--type", "person", json.toString()})));
+        assertTrue(out.contains("NOT_IMPLEMENTED"), out);
+        assertFalse(out.contains("SCHEMA_ERROR"), out);
     }
 
     /** Named by {@code --schema} and listed as well, it is one schema and loads once. */

@@ -7,7 +7,7 @@ import java.util.Optional;
  * Supertype composition and/or subtraction (Part 2 §12.1, §5.8, §5.9): one or more {@code &}-joined
  * supertypes, an optional trailing {@code record-def} body, and an optional trailing {@code
  * removal-set}. {@code supertypes} always has at least one element -- a lone reference with neither
- * a body nor a removal is not a {@code ConstructionDef} at all, just a {@link ReferenceTypeDef}
+ * a body nor a removal is not a {@code ConstructionDef} at all, just a {@link TypeExprDef}
  * holding it (§12.2's disambiguation: {@code name &}/{@code name -} enter this production, bare
  * {@code name} does not).
  *

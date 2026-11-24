@@ -24,6 +24,10 @@ applies, the continuation policy, and what a read leaves behind.
 - Records are closed under their type and a repeated field or map key is an error, on the schemaless path too.
 - A dependent field is read through its record (`DependentFieldReader.readAgainst`), never on its own: the record
   knows the sibling's value in this instance. A record with none keeps no per-read state for it.
+- A reader deciding by a tag reads it through `EventSkip.typeRefAhead`, an annotation's name is resolved in
+  `AnnotationCapture` alone, and `RecordMemberDispatchReader` alone places a value by its pins: those are where a schema
+  document's read stops for an entry its readers lack, so a reader that bypasses them refuses at a checkpoint what the
+  full closure admits (`design/resolver-vocabulary-and-bootstrap.md`).
 
 Related: `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`, `design/record-dispatch.md`,
 `design/name-hygiene-read-path.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
@@ -96,7 +100,13 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
 - **A dependent field is read against the type its sibling's value names** ([TSON-SCHEMA] §5.2;
   `DependentFieldReader`, built by `FieldReaders.declared` for a field typed `kind!`). It is `DeclaredReader`'s
   dispatch with the tag taken from the sibling: the named entry's reader, in the mode the schema compiled in, reads
-  the value, an application resolving through the sibling's reference (`ReferenceBody.entryOf`). The type is known
+  the value. A sibling typed by the type-slot choice may hold a type written in place
+  (`{ of: !meta.ref { of: method } }`): `DependentFieldReader.typeIn` carries it, and the value is read through that
+  type's own reader -- in bind mode, where the sibling binds to the `TypeInline`. A tree read holds the sibling as the
+  record it is written as, no type to read against, and reports the dependent value `NOT_IMPLEMENTED` rather than
+  dropping it (`RecordAbstractReader.Dependents.heldInPlace`); `tson-json`'s `RecordReader` does the same. A held
+  value in a schema document whose sibling holds one is judged at link through `TsonCompiledSchema.get(TypeExpr)`
+  (`HeldValues`). The type is known
   when the reader reaches the field in one of three ways, and only the third orders the document:
   - **a pinned sibling**: the pin types the field wherever the sibling is written, or whether it is;
   - **a discriminator**: member dispatch selects a member before any field is read, and each member pins it;
@@ -112,18 +122,19 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   dependent field once the record closes (`RecordDiagnostics.writtenWithoutItsSibling`,
   `RecordAbstractReader.refuseAbsentSiblings`), in tree and bind mode and in a schema document, which holds the value
   as written and refuses it all the same: the check runs over every field typed `kind!`, whatever reads it, so a bound
-  `Token` component's slot answers to it (`record_template_field.value` beside `type_param`). `RecordReader` is the same
+  `Token` component's slot answers to it (`record_field.value`). `RecordReader` is the same
   rule in JSON.
 
-  A sibling naming no type a value can be read against — a sibling reference, a template, an application the
-  closure does not hold — is refused at the sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and
-  the value is skipped unjudged; a sibling whose own read reported leaves the value skipped and nothing more. What a
-  sibling's value names is one rule, `DependentFieldReader.typeNamed`, which a value's name walked through a dependent
-  field asks too (`ValuesByName`). **In a schema document the value is held as written**, whatever its form, as the
-  schemaless tree (`SchemalessTreeReader.preserving()`, waiting on nothing, so `record_field` waits on no
-  entry for it), in either order of the fields, and so wherever names resolve in the document being read
-  (`readsSchemaNames`, a resolved form read as data among them): the type its sibling names is one of that document's
-  namespace, which the governing layer's readers do not hold. The record reader captures the value's events before reading it
+  A sibling naming no type a value can be read against — a parametric record, an application, which
+  names no entry where a value stands (§4.2) and which the sibling's own read refuses first — is refused at the
+  sibling, `VALIDATION_ERROR` (`RecordDiagnostics.siblingNamesNoType`), and the value is skipped unjudged; a
+  sibling whose own read reported leaves the value skipped and nothing more. What a sibling's value names is one
+  rule, `DependentFieldReader.typeNamed`, which a value's name walked through a dependent field asks too
+  (`ValuesByName`). **In a schema document the value is held as written**, whatever its form, as the schemaless tree
+  (`SchemalessTreeReader.preserving()`, waiting on nothing, so `record_field` waits on no entry for it), in either
+  order of the fields, and so wherever names resolve in the document being read (`readsSchemaNames`, a resolved form
+  read as data among them): the type its sibling names is one of that document's namespace, which the governing
+  layer's readers do not hold. The record reader captures the value's events before reading it
   (`TsonReadContext.asWritten`, a lookahead) for every field typed `kind!`, whatever reads it, a `Token` component's
   reader included, and once the record is read hands each to the read's sink with what its sibling holds
   (`RecordAbstractReader.Held`, `TsonReadContext.heldAsWritten`); the linker judges a value entry's
@@ -264,19 +275,12 @@ diagnostics begin before the whole document is parsed. The schema pipeline itsel
   the enclosing frame's next pull sees it — at the document boundary `requireDocumentEnd`, whose
   `IllegalStateException` then fires on ordinary caller input with the diagnostics lost inside it. Where the skip goes
   is the caller's question: `DataClassObjectReader.read` has taken nothing and skips a whole data value, while
-  `bindUnion` has consumed the framing to find the member and skips the core-value alone. A `ReferenceEvent` is a
-  leaf to it, as a token is: the stream delivered the reference whole.
-- **A reference-typed position reads a token or a `ReferenceEvent`** (`AtomTypeReader`, `KindSlotReader`), rolling
-  either into one `TypeRef`, and refuses a quoted token holding `<` as `TYPE_MISMATCH`: a quoted token is never a
-  reference ([TSON-DATA] §7.4). A `ReferenceEvent` holding a sibling reference (`kind!`) is admitted only where the
-  reference's `allow_sibling` admits one, a record field's type (`meta.field_type_ref`), and in bind mode only by a
-  slot reader whose component is a `Reference` besides; elsewhere the slot reader (`TYPE_MISMATCH`) and the atom's own
-  parser (`ATOM_CONSTRAINT_VIOLATION`) refuse it by the position rule ([TSON-SCHEMA] §5.2,
-  `design/schema-resolution.md`). Any other typed position
-  meeting a `ReferenceEvent` reports it as it reports any non-token, naming `the reference box<text>` or `the sibling
-  reference kind!`; `DataValueEvents` replays a `ReferenceValue` as one event. In a data document the name is judged
-  where it is read, whichever `of` names: a kind's members over the closure (`TypeNameRefParser`), a value's qualified
-  name by what it reaches in the governing schema (`RefParser`, `design/references.md`); in a schema document both
+  `bindUnion` has consumed the framing to find the member and skips the core-value alone.
+- **A reference-typed position reads a token** (`AtomTypeReader`, `TypeRefSlotReader`) into one `TypeRef`, its text
+  a qualified name (`ReferenceGrammar`); an argument list never reaches it, being no data form ([TSON-DATA]
+  §7.2.5). In a data document the name is judged
+  where it is read, whichever `of` names: a kind's members over the closure (`TypeRefParser`), a value's qualified
+  name by what it reaches in the governing schema (`ValueRefParser`, `design/references.md`); in a schema document both
   read the grammar alone and record the name for the link.
 - **`ListEventSource`** replays a pre-built event list: a schema default (`settleHeldValues` wraps the literal `Token`
   as one synthetic event, under `IdentifierPolicy.none()` since the real stream already judged it), an annotation probe,

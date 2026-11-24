@@ -2,15 +2,22 @@ package io.ltr8.tson.schema;
 
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.unicode.Normalization;
 
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The result of {@code TsonSchemaLinker.link} ({@code tson-compiler}) -- proof, at the type level, that a
@@ -50,20 +57,30 @@ import java.util.Optional;
  * closure, which the resolved {@link TsonSchema#entries()} do not hold and which linking is the last phase to see.
  * Like {@code entryOrigins} it is carried through {@code !!import}, each enum judged in the schema that declared it.
  *
- * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record whose {@code
- * name_type} is not the kernel's {@code meta.field_name} ([TSON-SCHEMA] §5.2), with the value that type
- * resolves to, by which its readers judge the field names a document writes. A record not listed has
- * identifiers for field names.
-
+ * <p><b>{@code nameTypes} is the third</b>, for the same reason: each record that states a {@code name_type}
+ * ([TSON-SCHEMA] §5.2), with the value that type resolves to, by which its readers judge the field names a document
+ * writes. A record not listed has identifiers for field names.
+ *
+ * <p><b>{@code externs} is the fourth</b>: each extern of the namespace ([TSON-SCHEMA] §5.13) with the entry it lands
+ * on in its foreign schema, which only a link holding that schema can find. Carried through {@code !!import}, an
+ * imported extern attached where its own schema linked.
  */
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
-                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
+                               Map<String, Normalization> enumForms, Map<String, Top> nameTypes,
+                               Map<String, ExternTarget> externs) {
 
     public TsonLinkedSchema {
         Objects.requireNonNull(schema, "schema");
         entryOrigins = Map.copyOf(entryOrigins);
         enumForms = Map.copyOf(enumForms);
         nameTypes = Map.copyOf(nameTypes);
+        externs = Map.copyOf(externs);
+    }
+
+    /** A schema whose namespace holds no extern. */
+    public TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
+                            Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
+        this(schema, entryOrigins, enumForms, nameTypes, Map.of());
     }
 
     /** A schema whose records all have the kernel's identifiers for field names. */
@@ -85,6 +102,42 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
         this(schema, Map.of());
     }
 
+    /**
+     * The canonical identities of the schemas this schema's own externs name, in declaration order, each once: its
+     * dependencies beside its {@code !!import}s, none of whose names enters its namespace ([TSON-SCHEMA] §3.4.1).
+     */
+    public List<String> externSchemas() {
+        String own = identity();
+        return schema.entries().keySet().stream()
+                .filter(name -> externs.containsKey(name) && originOf(name).equals(own))
+                .map(name -> externs.get(name).schema())
+                .distinct().toList();
+    }
+
+    /**
+     * Every schema this schema depends on directly, as canonical identities, each once: its {@code !!import}s in
+     * header order, then the schemas its own externs name ({@link #externSchemas}). What a caller walks to collect
+     * the closure a schema needs -- to publish it, to warm a cache, to fetch it ahead of a read -- since a schema an
+     * extern names loads with the imports ([TSON-SCHEMA] §3.4.1) though none of its names enters this namespace.
+     */
+    public List<String> dependencies() {
+        return java.util.stream.Stream.concat(schema.imports().stream().map(CanonicalIdentity::canonicalize),
+                externSchemas().stream()).distinct().toList();
+    }
+
+    /**
+     * The foreign entry {@code name} lands on past its alias hops and its extern, alias hops on both sides of every
+     * boundary followed ([TSON-SCHEMA] §5.13); empty where it lands through no extern this link attached.
+     */
+    public Optional<ExternTarget.Landing> landing(String name) {
+        String terminal = ExternAdmission.terminal(name, schema.entries()::get);
+        if (!(schema.entries().get(terminal) instanceof Extern)) {
+            return Optional.empty();
+        }
+        ExternTarget target = externs.get(terminal);
+        return target == null ? Optional.empty() : target.landing();
+    }
+
     /** The form enum {@code entryName} matches its members in -- {@code NONE} for one {@link #enumForms} omits. */
     public Normalization enumForm(String entryName) {
         return enumForms.getOrDefault(entryName, Normalization.NONE);
@@ -93,6 +146,31 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     /** What record {@code entryName}'s field names are judged by -- empty for one {@link #nameTypes} omits. */
     public Optional<Top> nameType(String entryName) {
         return Optional.ofNullable(nameTypes.get(entryName));
+    }
+
+    /**
+     * What the record a reader is built for under {@code name} judges its field names by: an entry's as {@link
+     * #nameType(String)} gives it, and for a record written in place, which no entry holds, the name type its body
+     * states, past its alias hops. A record in place states its parametric record's (§5.10) and inherits none, being
+     * IS-A nothing.
+     */
+    public Optional<Top> nameType(String name, Top definition) {
+        if (schema.entries().containsKey(name) || !(definition instanceof RecordBody record)) {
+            return nameType(name);
+        }
+        return record.nameType().map(stated -> {
+            Top type = schema.entries().get(stated);
+            while (type instanceof Alias alias) {
+                type = schema.entries().get(alias.target().name());
+            }
+            return type;
+        });
+    }
+
+    /** {@link #nameForm(String)} for the record a reader is built for under {@code name} ({@link #nameType(String,
+     * Top)}). */
+    public Normalization nameForm(String name, Top definition) {
+        return nameForm(nameType(name, definition));
     }
 
     /**
@@ -108,10 +186,14 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      * The form record {@code entryName}'s field names are matched in: its name type's {@code normalization}
      * ([TSON-SCHEMA] §5.5), so a document's name and a declared one that are one value of the type are one field --
      * the equality the linker judged the declared names distinct under. {@code NFC} for one {@link #nameTypes}
-     * omits, the kernel's {@code meta.field_name} being NFC; no form compares lower than NFC.
+     * omits, the kernel's {@code meta.identifier} being NFC; no form compares lower than NFC.
      */
     public Normalization nameForm(String entryName) {
-        return nameType(entryName)
+        return nameForm(nameType(entryName));
+    }
+
+    private static Normalization nameForm(Optional<Top> nameType) {
+        return nameType
                 .filter(IdentifierType.class::isInstance)
                 .map(body -> ((IdentifierType) body).normalization())
                 .filter(form -> form != Normalization.NONE)
@@ -128,8 +210,30 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     }
 
     /**
+     * {@link #originOf}, as a canonical identity ([TSON-DATA] §2.2.1): the namespace a host binds the entry's class
+     * within, so one entry reached through several schemas is one, and two schemas' entries of one name are two. An
+     * imported entry's origin is recorded canonical, and this schema's own entries are its {@link #identity()}.
+     */
+    public String declaringIdentity(String entryName) {
+        String recorded = entryOrigins.get(entryName);
+        return recorded != null ? recorded : identity();
+    }
+
+    /**
+     * This schema's canonical identity ([TSON-DATA] §2.2.1): its {@code !!id} canonicalized, or as it stands where it
+     * is already an identity rather than a reference (a stand-in named by identity).
+     */
+    public String identity() {
+        try {
+            return CanonicalIdentity.canonicalize(schema.id());
+        } catch (SchemaValidationException alreadyAnIdentity) {
+            return schema.id();
+        }
+    }
+
+    /**
      * Whether {@code entryName} denotes the kernel's own entry of that name: declared by the kernel, meta.tn,
-     * or merged in from it. What a kind and a constructor are judged by
+     * or merged in from it. What a base kind and a constructor are judged by
      * ([TSON-SCHEMA] §4.1), so a schema's own {@code namespace} or {@code top} is an ordinary declaration, the
      * kernel's being {@code meta.namespace} and {@code meta.top}.
      */
@@ -137,16 +241,61 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
         return schema.entries().containsKey(entryName) && TsonBundledSchemas.isKernel(originOf(entryName));
     }
 
-    /** {@code entryName}'s kind ({@link EntryKind#of}), judged by origin; {@code null} for a name it lacks. */
-    public EntryKind kindOf(String entryName) {
-        Top value = schema.entries().get(entryName);
-        return value == null ? null : EntryKind.of(value, this::isKernel);
-    }
-
     /** Whether entry {@code name}, whose value is {@code value}, IS-A the kernel's {@code top} ({@link
-     * EntryKind#isConstructor}). */
+     * TypeChain#isConstructor}). */
     public boolean isConstructor(String name, Top value) {
-        return EntryKind.isConstructor(name, value, this::isKernel);
+        return TypeChain.isConstructor(name, value, this::isKernel);
     }
 
+    /**
+     * The constructor {@code name}'s instances bind as where nothing binds {@code name}: its one direct parent, where
+     * {@code name} is a constructor composed over a constructor of types that has instances and has the same field
+     * names ([TSON-SCHEMA] §5.8). A composition adding no field only pins or defaults the parent's fields, so the
+     * parent's body holds every value an instance writes, and its pins take effect where the instance is read.
+     * Derived from the entries alone, so a resolved form read back binds as its source did. A field added, two
+     * parents, or an abstract parent (a base kind, {@code meta.type}) leaves no body to bind as.
+     *
+     * <p><b>Only a constructor of types, and never {@code meta.record}.</b> What some constructions may write is
+     * checked of the kernel's head by name -- a written {@code parameters} of {@code !meta.record} (§5.10), an
+     * alias's or an extern's body by what it denotes -- so an instance built under another head would skip it. An
+     * instance of a constructor composing {@code meta.top} alone is held as the value it is, and composing {@code
+     * record} is open work of its own.
+     */
+    public Optional<String> composedOver(String name) {
+        if (!(schema.entries().get(name) instanceof RecordBody record) || record.isParametric()
+                || !isConstructor(name, record)) {
+            return Optional.empty();
+        }
+        Set<String> supertypes = terminals(TypeChain.supertypesOf(record));
+        List<String> direct = supertypes.stream()
+                .filter(supertype -> supertypes.stream().noneMatch(other -> !other.equals(supertype)
+                        && terminals(TypeChain.supertypesOf(schema.entries().get(other))).contains(supertype)))
+                .toList();
+        if (direct.size() != 1) {
+            return Optional.empty();
+        }
+        String parentName = direct.getFirst();
+        if (!(schema.entries().get(parentName) instanceof RecordBody parent)
+                || parent.extension() == RecordExtensionType.ABSTRACT
+                || !TypeChain.supertypesOf(parent).contains(KernelNames.of("type")) || !isKernel(KernelNames.of("type"))
+                || parentName.equals(KernelNames.of("record")) && isKernel(parentName)
+                || !parent.fields().keySet().equals(record.fields().keySet())) {
+            return Optional.empty();
+        }
+        return Optional.of(parentName);
+    }
+
+    /** The entries {@code names} denote past their alias hops, each once. */
+    private Set<String> terminals(List<String> names) {
+        Set<String> terminals = new LinkedHashSet<>();
+        for (String name : names) {
+            String terminal = name;
+            for (int hops = 0; schema.entries().get(terminal) instanceof Alias alias
+                    && hops < schema.entries().size(); hops++) {
+                terminal = alias.target().name();
+            }
+            terminals.add(terminal);
+        }
+        return terminals;
+    }
 }

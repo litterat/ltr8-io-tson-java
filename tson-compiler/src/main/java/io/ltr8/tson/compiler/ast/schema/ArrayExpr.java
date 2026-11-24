@@ -8,7 +8,7 @@ import java.util.Optional;
  * choice variant.
  *
  * <p>One production serves every position: a size specifier and an element {@code ?} are admitted wherever the
- * array stands, because every form lifts to an entry that carries them.
+ * array stands, the construction it desugars to carrying them.
  *
  * <p>{@code size} absent means unconstrained. Nesting is the recursion in {@link ElementType}, which holds
  * a plain {@link TypeExpr}: {@code [[T; 2]; 3]} is this node twice over, needing no second node family.

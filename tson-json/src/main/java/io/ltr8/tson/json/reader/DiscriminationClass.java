@@ -2,15 +2,14 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.numeric.DecimalType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.numeric.FloatType;
 import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -43,20 +42,31 @@ enum DiscriminationClass {
 
     /** The class {@code name} resolves to, following its alias chain, or empty for a type §5.4 gives none. */
     static Optional<DiscriminationClass> of(TsonLinkedSchema linked, String name) {
-        return AliasChain.terminal(linked.schema(), name)
-                .flatMap(resolved -> classify(linked.schema(), resolved.definition()));
+        // An extern is classified at the entry it lands on, in the namespace that holds it ([TSON-SCHEMA] §5.13).
+        return AliasChain.landed(linked, name).flatMap(landed -> classify(landed.in(), landed.definition()));
     }
 
-    private static Optional<DiscriminationClass> classify(TsonSchema schema, Top definition) {
+    /**
+     * The class of what a type slot holds: a name's, as {@link #of(TsonLinkedSchema, String)} gives it, or a type
+     * written in place classified by its own body.
+     */
+    static Optional<DiscriminationClass> of(TsonLinkedSchema linked, io.ltr8.tson.schema.meta.TypeExpr type) {
+        return switch (type) {
+            case io.ltr8.tson.schema.meta.TypeRef reference -> of(linked, reference.name());
+            case io.ltr8.tson.schema.meta.TypeInline inline -> classify(linked, inline.of());
+        };
+    }
+
+    private static Optional<DiscriminationClass> classify(TsonLinkedSchema linked, Top definition) {
         return switch (definition) {
             case IntegerType ignored -> Optional.of(NUMBER);
             case DecimalType ignored -> Optional.of(NUMBER);
             case FloatType floats -> floats.allowNan() || floats.allowInfinity()
                     ? Optional.empty() : Optional.of(NUMBER);
             case EnumBody members -> ofEnum(members);
+            case RecordBody record when record.isParametric() -> Optional.empty(); // never named bare (§5.10)
             case RecordBody ignored -> Optional.of(BRACE);
-            case RecordTemplateBody ignored -> Optional.of(BRACE); // every member is a record
-            case MapBody map -> MapPlan.isObjectForm(schema, map) ? Optional.of(BRACE) : Optional.empty();
+            case MapBody map -> MapPlan.isObjectForm(linked, map) ? Optional.of(BRACE) : Optional.empty();
             case ArrayBody ignored -> Optional.of(BRACKET);
             case TupleBody ignored -> Optional.of(BRACKET);
             // Every remaining atom family is string-content (§5.6). `rational`, `complex`, `value`,
@@ -64,7 +74,7 @@ enum DiscriminationClass {
             // they can only be reached with a tag.
             case io.ltr8.tson.schema.unicode.TextType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.unicode.IdentifierType ignored -> Optional.of(STRING);
-            case io.ltr8.tson.schema.meta.ReferenceBody ignored -> Optional.of(STRING);
+            case RefBody ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.net.UriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.net.IriType ignored -> Optional.of(STRING);
             case io.ltr8.tson.schema.unicode.RegexType ignored -> Optional.of(STRING);

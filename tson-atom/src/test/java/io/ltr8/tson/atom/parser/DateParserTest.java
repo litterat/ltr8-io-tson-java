@@ -2,6 +2,7 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
+import io.ltr8.tson.schema.temporal.DateType;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import java.util.Optional;
@@ -69,6 +70,28 @@ class DateParserTest {
         DateParser type = new DateParser(Optional.empty(), Optional.of(LocalDate.of(2025, 1, 1)));
         assertEquals(LocalDate.of(2025, 1, 1), type.read(token("2025-01-01")));
         assertThrows(AtomValidationException.class, () -> type.read(token("2025-01-02")));
+    }
+
+    @Test
+    void exclusiveMinRefusesItsOwnDateAndEveryEarlierOne() {
+        DateParser type = new DateParser(new DateType(Optional.empty(), Optional.of(LocalDate.of(2000, 1, 1)),
+                Optional.empty(), Optional.empty()));
+        AtomValidationException at = assertThrows(AtomValidationException.class, () -> type.read("2000-01-01"));
+        assertEquals("> 2000-01-01", at.expected());
+        assertEquals("'2000-01-01' must be strictly greater than 2000-01-01", at.getMessage());
+        assertEquals(LocalDate.of(2000, 1, 2), type.read("2000-01-02"));
+        assertThrows(AtomValidationException.class, () -> type.read("1999-01-01"));
+    }
+
+    @Test
+    void exclusiveMaxRefusesItsOwnDateAndEveryLaterOne() {
+        DateParser type = new DateParser(new DateType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(LocalDate.of(2000, 1, 1))));
+        AtomValidationException at = assertThrows(AtomValidationException.class, () -> type.read("2000-01-01"));
+        assertEquals("< 2000-01-01", at.expected());
+        assertEquals("'2000-01-01' must be strictly less than 2000-01-01", at.getMessage());
+        assertEquals(LocalDate.of(1999, 12, 31), type.read("1999-12-31"));
+        assertThrows(AtomValidationException.class, () -> type.read("2001-01-01"));
     }
 
     @Test

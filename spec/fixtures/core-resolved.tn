@@ -1,9 +1,9 @@
-!!id:"https://tson.io/2026/39/m/core-resolved.tn"
-!!import:"https://tson.io/2026/39/m/numeric.tn"
-!!import:"https://tson.io/2026/39/m/temporal.tn"
-!!import:"https://tson.io/2026/39/m/net.tn"
+!!id:"https://tson.io/2026/40/m/core-resolved.tn"
+!!import:"https://tson.io/2026/40/m/numeric.tn"
+!!import:"https://tson.io/2026/40/m/temporal.tn"
+!!import:"https://tson.io/2026/40/m/net.tn"
 @doc:"""
-  Resolver-output fixture for core.tn (2026 Revision 39 draft).
+  Resolver-output fixture for core.tn (2026 Revision 40 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
   Conventions as in meta-resolved.tn.
 

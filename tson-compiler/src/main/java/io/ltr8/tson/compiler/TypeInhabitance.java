@@ -1,23 +1,27 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.resolver.AliasChain;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.DeclaredType;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
+
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -51,7 +55,7 @@ import java.util.Set;
  * <p><b>Exact, total and two-valued</b> -- unlike {@link ChoiceDisjointness}, which had to give up exactness
  * to stay total, this needs no such trade. There is no third answer to report.
  *
- * <p><b>Scope is structural.</b> An atom whose own facets admit nothing ({@code int8 ^ { min: 300 }}) is
+ * <p><b>Scope is structural.</b> An atom whose own facets admit nothing ({@code !int8 ^ { min: 300 }}) is
  * uninhabited too, but that is a question for the family that owns those facets, and the resolver asks it
  * ({@code Atom.coherenceCheck}). Every atom body counts as inhabited here.
  */
@@ -82,46 +86,43 @@ final class TypeInhabitance {
     /**
      * Whether one definition is satisfied by the entries marked so far.
      *
-     * <p><b>An open entry counts as inhabited, unjudged.</b> A template is not a type and no document ever
-     * has one; its closures are ordinary entries in this map by the time linking runs, and each is judged on
-     * its own. A template nobody applies is judged nowhere -- §5.10: "an unapplied template is checked no
-     * further and receives no verdict".
+     * <p><b>A parametric record is walked as a record, its parameters assumed inhabited</b> (§5.10.1). An application
+     * it holds, over its parameters, is inhabited where its head is: regularity passes every parameter through
+     * unchanged, so the recursion the walk follows is the one every application of it repeats, and an argument
+     * that is a name is assumed inhabited too, which leaves only what no argument can change to be judged here.
      */
     private static boolean isInhabited(Top definition, Map<String, Top> namespace,
             Set<String> inhabited) {
-        // A held body is not walked: its element type and bounds are tokens that mean nothing until
-        // substitution supplies the arguments, so a template is inhabited here and the closure that does
-        // supply them is judged on its own -- it is an ordinary entry in this map by the time linking
-        // runs, materialisation having minted it. A template nobody applies is judged nowhere, which is
-        // the same answer §5.10's deferred checking gives everywhere else.
-        if (OpenEntry.isOpen(definition)) {
-            return true;
-        }
         return switch (definition) {
             case RecordBody record -> recordInhabited(record, namespace, inhabited);
             case ArrayBody array -> array.voidable()
                     || isEmptyAllowed(array.minItems())
-                    || refInhabited(array.elementType(), namespace, inhabited);
+                    || slotInhabited(array.elementType(), namespace, inhabited);
             case MapBody map -> isEmptyAllowed(map.minItems())
                     || (refInhabited(map.keyType(), namespace, inhabited)
-                            && refInhabited(map.valueType(), namespace, inhabited));
+                            && slotInhabited(map.valueType(), namespace, inhabited));
             case io.ltr8.tson.schema.meta.NamespaceBody ignored -> true; // the empty map is a value of it
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .allMatch(element -> positionInhabited(element, namespace, inhabited));
             // A sum needs one good variant, where a product needs all its parts -- the one place the walk
             // branches rather than conjoins, and the reason `(leaf | node)` survives a non-productive `node`.
             case ChoiceBody choice -> choice.variants().stream()
-                    .anyMatch(variant -> refInhabited(variant, namespace, inhabited));
+                    .anyMatch(variant -> slotInhabited(variant, namespace, inhabited));
             // A reference that names types admits the names of its members, whatever the types they name admit,
             // so it is inhabited exactly when linking found a member. One that names values admits a name whose
             // referent only the linker judges.
-            case ReferenceBody reference -> !reference.namesTypes() || !reference.memberNames().isEmpty();
+            case RefBody reference -> !reference.namesTypes() || !reference.memberNames().isEmpty();
             case Alias alias -> refInhabited(alias.target(), namespace, inhabited);
-            case TemplateBody ignored -> true; // open, answered above
-            case RecordTemplateBody ignored -> true; // open, answered above
+            // What it lands on was judged inhabited where the schema declaring it linked.
+            case io.ltr8.tson.schema.meta.Extern ignored -> true;
+
             case Atom ignored -> true; // an atom's own satisfiability is its family's question, not this one
             case DeclaredType ignored -> true; // its values name their own types
+            case io.ltr8.tson.schema.meta.DependentBody ignored -> true; // as a declared type, chosen by its sibling
+            // Only inside a parametric record; one anywhere else is the linker's refusal.
+            case ApplyBody application -> refInhabited(application.head(), namespace, inhabited);
             case ValueEntry ignored -> true; // a value, which nothing is typed by
+            case io.ltr8.tson.schema.meta.IncompleteEntry ignored -> true; // no type, which nothing is typed by
         };
     }
 
@@ -199,14 +200,53 @@ final class TypeInhabitance {
             // A dependent field is stated with a value of whichever type its sibling names (§5.2).
             return true;
         }
-        return !AliasChain.resolvesToVoid(field.typeRef().name(), namespace)
-                && refInhabited(field.typeRef(), namespace, inhabited);
+        return switch (field.typeExpr()) {
+            case TypeRef reference -> !AliasChain.resolvesToVoid(reference.name(), namespace)
+                    && refInhabited(reference, namespace, inhabited);
+            case TypeInline inline -> inlineInhabited(inline, namespace, inhabited);
+        };
+    }
+
+    /**
+     * A type written in place, inhabited by the rules its body would be judged by as an entry, but for an abstract
+     * record in place, which is empty ([TSON-SCHEMA] §4.2): it has no direct instances, and with no name no schema can
+     * declare a member of it, where a declared abstract record stays open to the members an importing schema adds.
+     */
+    private static boolean inlineInhabited(TypeInline inline, Map<String, Top> namespace, Set<String> inhabited) {
+        return !abstractInPlace(inline) && isInhabited(inline.of(), namespace, inhabited);
+    }
+
+    private static boolean abstractInPlace(TypeInline inline) {
+        return inline.of() instanceof RecordBody record && record.extension() == RecordExtensionType.ABSTRACT;
     }
 
     private static boolean positionInhabited(TupleElement element, Map<String, Top> namespace,
             Set<String> inhabited) {
         return element.voidable()
-                || refInhabited(element.elementType(), namespace, inhabited);
+                || slotInhabited(element.elementType(), namespace, inhabited);
+    }
+
+    /**
+     * What a type slot holds, inhabited: a name as {@link #refInhabited} judges it, and a type written in place by
+     * the same rules its body would be judged by as an entry, the names inside it judged in turn.
+     */
+    private static boolean slotInhabited(TypeExpr type, Map<String, Top> namespace, Set<String> inhabited) {
+        return switch (type) {
+            case TypeRef reference -> refInhabited(reference, namespace, inhabited);
+            case TypeInline inline -> inlineInhabited(inline, namespace, inhabited);
+        };
+    }
+
+    /**
+     * The next link of the chain through a slot nothing satisfies: its name, or, for a type written in place, the
+     * first name inside it that is not satisfied -- none for an abstract record in place, empty by itself.
+     */
+    private static String slotDependency(TypeExpr type, Map<String, Top> namespace, Set<String> inhabited) {
+        return switch (type) {
+            case TypeRef reference -> reference.name();
+            case TypeInline inline -> abstractInPlace(inline)
+                    ? null : firstUnsatisfiedDependency(inline.of(), namespace, inhabited);
+        };
     }
 
     /**
@@ -221,11 +261,12 @@ final class TypeInhabitance {
     /**
      * A name this namespace does not hold counts as inhabited. The reference is unresolved, which {@code
      * TsonSchemaLinker.validateEntry} has already reported against this very entry -- calling it uninhabited
-     * too would report the same defect twice, in words that name a different problem.
+     * too would report the same defect twice, in words that name a different problem. A parameter is assumed
+     * inhabited (§5.10.1).
      */
     private static boolean refInhabited(TypeRef ref, Map<String, Top> namespace,
             Set<String> inhabited) {
-        return !namespace.containsKey(ref.name()) || inhabited.contains(ref.name());
+        return ref instanceof ParamRef || !namespace.containsKey(ref.name()) || inhabited.contains(ref.name());
     }
 
     /**
@@ -268,7 +309,7 @@ final class TypeInhabitance {
             RecordField field = entry.getValue();
             if (!grouped.contains(entry.getKey()) && !demandsNothing(field)
                     && !satisfiable(field, namespace, inhabited)) {
-                return field.typeRef().name();
+                return slotDependency(field.typeExpr(), namespace, inhabited);
             }
         }
         return record.groups().stream()
@@ -277,33 +318,38 @@ final class TypeInhabitance {
                 .flatMap(group -> group.memberNames().stream())
                 .flatMap(member -> java.util.Optional.ofNullable(record.fields().get(member)).stream())
                 .filter(field -> !satisfiable(field, namespace, inhabited))
-                .map(field -> field.typeRef().name()).findFirst().orElse(null);
+                .map(field -> slotDependency(field.typeExpr(), namespace, inhabited))
+                .filter(java.util.Objects::nonNull).findFirst().orElse(null);
     }
 
     /** The first thing a definition demands that nothing satisfies -- the next link of the chain. */
     private static String firstUnsatisfiedDependency(Top definition,
             Map<String, Top> namespace, Set<String> inhabited) {
-        if (definition == null || OpenEntry.isOpen(definition)) {
-            return null; // an open entry is inhabited, as isInhabited says
+        if (definition == null) {
+            return null;
         }
         return switch (definition) {
             case RecordBody record -> recordDependency(record, namespace, inhabited);
-            case ArrayBody array -> refInhabited(array.elementType(), namespace, inhabited)
-                    ? null : array.elementType().name();
-            case MapBody map -> refInhabited(map.valueType(), namespace, inhabited)
-                    ? null : map.valueType().name();
+            case ArrayBody array -> slotInhabited(array.elementType(), namespace, inhabited)
+                    ? null : slotDependency(array.elementType(), namespace, inhabited);
+            case MapBody map -> slotInhabited(map.valueType(), namespace, inhabited)
+                    ? null : slotDependency(map.valueType(), namespace, inhabited);
             case io.ltr8.tson.schema.meta.NamespaceBody ignored -> null;
+            case ApplyBody application -> refInhabited(application.head(), namespace, inhabited)
+                    ? null : application.head().name();
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .filter(element -> !positionInhabited(element, namespace, inhabited))
-                    .map(element -> element.elementType().name()).findFirst().orElse(null);
+                    .map(element -> slotDependency(element.elementType(), namespace, inhabited))
+                    .filter(java.util.Objects::nonNull).findFirst().orElse(null);
             case Alias alias -> refInhabited(alias.target(), namespace, inhabited)
                     ? null : alias.target().name();
+            case io.ltr8.tson.schema.meta.Extern ignored -> null;
             // A choice fails on every variant at once, so no single link continues the chain; the rest name none.
             case Sum ignored -> null;
             case Atom ignored -> null;
-            case TemplateBody ignored -> null;
-            case RecordTemplateBody ignored -> null;
+
             case ValueEntry ignored -> null;
+            case io.ltr8.tson.schema.meta.IncompleteEntry ignored -> null;
         };
     }
 }

@@ -8,10 +8,10 @@ import io.ltr8.annotation.Field;
  * an array element and a map value carry; a position is never left out. Bound through plain generic binding it
  * always appears in output, even at its default {@code false}.
  */
-public record TupleElement(@Field("element_type") TypeRef elementType, boolean voidable) {
+public record TupleElement(@Field("element_type") TypeExpr elementType, boolean voidable) {
 
     /** A position the void sentinel may not stand in. */
-    public static TupleElement required(TypeRef elementType) {
+    public static TupleElement required(TypeExpr elementType) {
         return new TupleElement(elementType, false);
     }
 }

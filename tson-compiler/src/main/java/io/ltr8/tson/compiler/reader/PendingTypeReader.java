@@ -37,6 +37,11 @@ public record PendingTypeReader(String entry) implements TsonTypeReader<Object> 
         return ValueParser.INSTANCE.read(new TokenValue(token.text(), token.form()));
     }
 
+    /** The signal that a schema document's read reached {@code entry}, a declaration its readers do not hold. */
+    public static NotReady notReady(String entry) {
+        return new NotReady(entry);
+    }
+
     /**
      * A read reached {@link #entry()}, which is not ready yet. A signal to the resolution that compiled the reader,
      * which catches it; no stack trace, since it is control flow rather than a failure.

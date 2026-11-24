@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/39/m/numeric-resolved.tn"
-!!import:"https://tson.io/2026/39/m/meta.tn"
+!!id:"https://tson.io/2026/40/m/numeric-resolved.tn"
+!!import:"https://tson.io/2026/40/m/meta.tn"
 @doc:"""
-  Resolver-output fixture for numeric.tn (2026 Revision 39 draft).
+  Resolver-output fixture for numeric.tn (2026 Revision 40 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
   Conventions as in meta-resolved.tn.
 
@@ -18,7 +18,8 @@
   """
 !schema {
   numeric => !meta.schema {
-    ieee_format => !enum { members: [BINARY16 BINARY32 BINARY64 BINARY128 BINARY256 DECIMAL32 DECIMAL64 DECIMAL128] }
+    @meta.completion:{ of: [enum] }
+    ieee_format => !meta.enum_type { name_type: meta.identifier  members: [BINARY16 BINARY32 BINARY64 BINARY128 BINARY256 DECIMAL32 DECIMAL64 DECIMAL128] }
 
     float_type => !meta.record { chain: { supertypes: [atom.specification meta.atom meta.top meta.type] }  fields: {
       chain               => !meta.record_field { type: meta.type_chain  optional: true }
@@ -38,7 +39,8 @@
       !meta.field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
 
-    decimal_member_set => !meta.set_type { element_type: number  min_items: 1 }
+    @meta.completion:{ of: [meta.set_type] }
+    decimal_member_set => !meta.array { element_type: number  ordered: false  unique_items: true  min_items: 1 }
 
     decimal_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
       chain           => !meta.record_field { type: meta.type_chain  optional: true }
@@ -69,7 +71,8 @@
       !meta.field_group { members: [[max] [exclusive_max]]  optional: true }
     ] }
 
-    complex_component => !enum { members: [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64] }
+    @meta.completion:{ of: [enum] }
+    complex_component => !meta.enum_type { name_type: meta.identifier  members: [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64] }
 
     complex_type => !meta.record { chain: { supertypes: [meta.atom meta.top meta.type] }  fields: {
       chain     => !meta.record_field { type: meta.type_chain  optional: true }

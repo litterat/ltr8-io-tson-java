@@ -9,10 +9,10 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -42,8 +42,8 @@ class IdentifierValueHygieneTest {
     private static final String ID = "https://example.test/names-2.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/names-2.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               slug => !unicode.identifier_type { continue_add: "-" }
               js_name => !unicode.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }
@@ -160,7 +160,7 @@ class IdentifierValueHygieneTest {
     /** §8.2's relaxation is the deployment's, stated in code, and reaches these values as it reaches names. */
     @Test
     void aRelaxedPolicyAdmitsWhatItRelaxes() {
-        assertEquals(List.of(), validate(IdentifierPolicy.of(ScriptPolicy.unrestricted()),
+        assertEquals(List.of(), validate(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED),
                 "!handlers { " + MIXED + " => b }"));
     }
 
@@ -182,26 +182,22 @@ class IdentifierValueHygieneTest {
     }
 
     /**
-     * A record template's literal value is every application's, so it is judged once, at the template, against the
-     * template's own declaration -- applied or not. A value parameter is no literal of the template's and is judged
-     * where an application writes its argument.
+     * A parametric record's literal value is every application's, so it is judged once, at the parametric record, against
+     * the parametric record's own declaration -- applied or not.
      */
     @Test
-    void aRecordTemplatesIdentifierTypedValueIsAName() {
+    void aParametricRecordsIdentifierTypedValueIsAName() {
         Diagnostic refused = only(tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
                 "acct => <T> { kind: slug = a\u0132b  v: T }")));
         assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, refused.code());
         assertEquals(Optional.of("/acct"), refused.schemaPointer());
-
-        assertEquals(List.of(), tson(IdentifierPolicy.defaults()).validateSchema(schemaWith(
-                "acct => <T, K> { kind: slug = K  v: T }")));
     }
 
     private static String schemaWith(String declaration) {
         return """
                 !!id:"https://example.test/names-3.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   slug => !unicode.identifier_type { continue_add: "-" }
                   js_name => !unicode.identifier_type { start: ID  continue: ID  start_add: "$_"  continue_add: "$" }

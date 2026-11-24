@@ -5,12 +5,15 @@ import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.meta.EnumBody;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -66,16 +69,14 @@ class EnumTypeTest {
                   shout      => !enum [LOUD QUIET] }""")));
     }
 
-    /** An {@code enum} applied in a template's held body is typed as one applied directly. */
+    /**
+     * A parametric record's body is a record body, so a parameter list before an enum is refused at the declaration (§5.10).
+     */
     @Test
-    void anEnumAppliedThroughATemplateNamesTheKernelsIdentifier() {
-        assertEquals(List.of(), Tson.standard().validateSchema(schema("held-enum", """
-                { names => <M> !enum [a b M]
-                  named => names<c> }""")));
-        List<Diagnostic> refused = Tson.standard().validateSchema(schema("held-enum-bad", """
-                { names => <M> !enum [a b M]
-                  named => names<"not a name"> }"""));
-        assertTrue(messages(refused).contains("is not an identifier"), messages(refused));
+    void aParametricRecordOverAnEnumIsRefused() {
+        List<Diagnostic> refused = Tson.standard().validateSchema(schema("held-enum", """
+                { names => <M> !enum [a b M] }"""));
+        assertTrue(messages(refused).contains("a parametric record's body is a record body"), messages(refused));
     }
 
     /** An author's own identifier type admits names the kernel's does not, and an enum over it has them. */
@@ -110,19 +111,32 @@ class EnumTypeTest {
                 { status => !enum [OPEN ACTIVE DONE]
                   live   => !status ^ { members: [OPEN ACTIVE] } }""")));
 
-        // Through a tightening that pins the type, the constructor itself refuses another value.
-        List<Diagnostic> pinned = Tson.standard().validateSchema(schema("retype-pinned", """
+        // A completion of `enum` is the construction written out, so the enum's own narrowing rule refuses both.
+        List<Diagnostic> completed = Tson.standard().validateSchema(schema("retype-completed", """
                 { upper  => !unicode.identifier_type { pattern: "[A-Z]+" }
                   names  => !enum [OPEN DONE]
                   strict => !names ^ { name_type: upper } }"""));
-        assertTrue(messages(pinned).contains("'name_type' is fixed on 'enum'"), messages(pinned));
+        assertTrue(messages(completed).contains("an enum's name_type is fixed where it is constructed"),
+                messages(completed));
 
-        // Through `enum_type` itself, the enum's own narrowing rule does.
         List<Diagnostic> free = Tson.standard().validateSchema(schema("retype-free", """
                 { upper  => !unicode.identifier_type { pattern: "[A-Z]+" }
                   names  => !meta.enum_type { name_type: meta.identifier  members: [OPEN DONE] }
                   strict => !names ^ { name_type: upper } }"""));
         assertTrue(messages(free).contains("an enum's name_type is fixed where it is constructed"), messages(free));
+    }
+
+    /** A name type is one by the entry it reaches, not by spelling (§5.2), and the refinement states the source's. */
+    @Test
+    void aRefinementRestatesTheNameTypeThroughAnAlias() {
+        TsonLinkedSchema linked = Tson.standard().resolve(schema("restated", """
+                { live   => !status ^ { name_type: label  members: [OPEN ACTIVE] }
+                  status => !enum [OPEN ACTIVE DONE]
+                  label  => meta.type_name }"""));
+
+        EnumBody live = assertInstanceOf(EnumBody.class, linked.schema().entries().get("live"));
+        assertEquals(EnumBody.IDENTIFIER, live.nameType());
+        assertEquals(List.of("OPEN", "ACTIVE"), live.members());
     }
 
     /**
@@ -182,7 +196,7 @@ class EnumTypeTest {
                 !!id:"%s"
                 !!import:"%s"
                 !schema { kebab      => !unicode.identifier_type { continue_add: "-"  pattern: "[a-z]+(-[a-z]+)*" }
-                  kebab_enum => meta.enum_type ^ { name_type?: = kebab } }
+                  kebab_enum => !meta.enum_type ^ { name_type: kebab } }
                 """.formatted(vocabularyId, TsonBundledSchemas.META_ID);
         String user = """
                 !!id:"%s"

@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 
 import java.util.Collection;
 import java.util.List;
@@ -16,8 +15,7 @@ import java.util.Optional;
  * build logic of its own; all the actual compile-time work (the eager walk, cycle detection,
  * per-entry build-failure deferral) lives in {@link TsonSchemaCompiler} itself, matching the
  * verb/noun split this project's own pipeline vocabulary uses everywhere else ({@code
- * TsonSchemaLinker}/{@code TsonLinkedSchema}, {@code TsonSchemaResolver}/its own resolved {@code
- * TsonSchema}).
+ * TsonSchemaLinker}/{@code TsonLinkedSchema}).
  *
  * <p>The compile output for *any* resolved schema. A schema compiled as vocabulary -- the readers another
  * schema's resolution reads its construction heads and annotation values through -- is the {@link
@@ -35,17 +33,37 @@ public sealed class TsonCompiledSchema permits TsonCompiledVocabulary {
     private final TsonLinkedSchema linkedSchema;
     private final Map<String, TsonTypeReader<?>> entries;
 
+    /** What builds the reader of a type written in place, or null where this schema was assembled from its entries. */
+    private final TsonTypeReaderResolver readers;
+
     public TsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, TsonTypeReader<?>> entries) {
+        this(linkedSchema, entries, null);
+    }
+
+    /** The same, with the readers a type written in place is read through ({@link #get(TypeExpr)}). */
+    TsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, TsonTypeReader<?>> entries,
+                       TsonTypeReaderResolver readers) {
         this.linkedSchema = linkedSchema;
         this.entries = entries;
+        this.readers = readers;
     }
 
     /**
-     * {@code name}'s kind ([TSON-SCHEMA] §4.1), judged by where each base kind its chain names is defined --
-     * {@code null} for a name this schema lacks.
+     * The reader of what a type slot holds: a name's entry reader ({@link #get(String)}), or the reader of a type
+     * written in place, built from its body. Package-private: the linker reads a held value against a type its sibling
+     * writes in place.
      */
-    public EntryKind kindOf(String name) {
-        return linkedSchema.kindOf(name);
+    TsonTypeReader<?> get(io.ltr8.tson.schema.meta.TypeExpr type) {
+        return switch (type) {
+            case io.ltr8.tson.schema.meta.TypeRef reference -> get(reference.name());
+            case io.ltr8.tson.schema.meta.TypeInline inline -> {
+                if (readers == null) {
+                    throw new IllegalStateException("this schema was assembled from its entries, and builds no "
+                            + "reader of the type written in place '" + inline.text() + "'");
+                }
+                yield readers.resolveInline(inline);
+            }
+        };
     }
 
     /** Whether {@code name} denotes the kernel's own entry of that name ({@link TsonLinkedSchema#isKernel}). */
@@ -164,11 +182,10 @@ public sealed class TsonCompiledSchema permits TsonCompiledVocabulary {
      * Where a read that entered through {@code typeName} should root its schema pointer: the name the
      * author wrote, not the entry it resolves to.
      *
-     * <p>The two differ exactly when the name is an alias for something the resolver minted -- {@code
-     * order_response => paged<order>} compiles to the instantiation entry's own reader, and that reader,
-     * shared by every entry point, cannot know which of its names a given read arrived through. So the
-     * facade seeds this before the reader runs; {@code inRecord} then keeps the pointer and re-anchors only
-     * the identity and line, which is the interaction those two methods were already written for.
+     * <p>The two differ exactly when the name is an alias -- {@code pct => small} compiles to {@code small}'s
+     * own reader, and that reader, shared by every entry point, cannot know which of its names a given read
+     * arrived through. So the facade seeds this before the reader runs; {@code inRecord} then keeps the pointer
+     * and re-anchors only the identity and line.
      *
      * <p>Empty for a name this schema does not declare -- the caller reports that as an unknown type rather
      * than reading anything.

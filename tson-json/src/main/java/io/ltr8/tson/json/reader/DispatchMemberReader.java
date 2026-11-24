@@ -80,7 +80,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     private final Set<String> selectorNames;
     private final Normalization nameForm;
 
-    /** The pins, as they compare, to the member that states them -- §5.7's mapping, derived and never declared. */
+    /** The pins, as they compare, to the member that states them -- §1.6's mapping, derived and never declared. */
     private final Map<List<Object>, String> members;
 
     /** Where a value goes once selected, by every name a member or a deeper tag may reach it under. */
@@ -91,10 +91,9 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     private final String pinned;
 
     /**
-     * <b>The selectors arrive already chosen, from either kind of base</b> ({@code FamilySelectors}), each
-     * read off the base's own fields with a family base's parameter pin dropped. Taking the fields rather than
-     * a {@code RecordBody} keeps "which fields select" in that one derivation, and is the same signature its
-     * {@code tson-compiler} peer takes.
+     * <b>The selectors arrive already chosen</b> ({@code FamilySelectors}), each read off the base's own fields.
+     * Taking the fields rather than a {@code RecordBody} keeps "which fields select" in that one derivation, and is
+     * the same signature its {@code tson-compiler} peer takes.
      */
     DispatchMemberReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
                            Set<String> subtypes,
@@ -108,7 +107,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         Namespace<Top> entries = schema.entries();
         this.selectors = selectorFields.entrySet().stream()
                 .map(field -> selectorOf(field.getKey(), field.getValue(), context.linked())).toList();
-        // The family's members compose the base, so they share its name type, a template base's included.
+        // The family's members compose the base, so they share its name type.
         this.nameForm = selfNames.stream().map(context.linked()::nameForm).filter(form -> form != Normalization.NFC)
                 .findFirst().orElse(Normalization.NFC);
         this.selectorNames = selectors.stream().map(selector -> nameForm.apply(selector.name()))
@@ -118,7 +117,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         Map<String, Set<String>> deeper = new LinkedHashMap<>();
         Map<String, Route> table = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            // Only a record is a member: a record template IS-A the base is none, its applications are.
+            // Only a record is a member, and a subtype index holds no parametric record (§5.10).
             if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }
@@ -131,7 +130,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
             under.addAll(record.subtypes());
             deeper.put(subtype, context.admitting(under));
             for (String written : deeper.get(subtype)) {
-                table.computeIfAbsent(written, ignored -> Route.to(context.readers().resolve(written)));
+                table.computeIfAbsent(written, ignored -> Route.to(context, written));
             }
         }
         this.routes = Map.copyOf(table);
@@ -141,14 +140,27 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
     }
 
     private static Selector selectorOf(String name, RecordField field, TsonLinkedSchema linked) {
-        AliasChain.Resolved target = AliasChain.terminal(linked.schema(), field.typeRef().name()).orElseThrow(
-                () -> new IllegalStateException("a discriminator typed '" + field.typeRef().name()
-                        + "' names nothing this schema declares"));
-        AtomType<?> parser = AtomParsers.forRead(target.definition(), linked.enumForm(target.name()))
-                .orElseThrow(
-                () -> new IllegalStateException("a discriminator typed '" + field.typeRef().name()
+        // A selector is an atom or an enum the linker judged; one written in place (a reference) is read by its body,
+        // and has no entry an enum's form is recorded under.
+        Top definition;
+        io.ltr8.unicode.Normalization form;
+        switch (field.typeExpr()) {
+            case io.ltr8.tson.schema.meta.TypeRef reference -> {
+                AliasChain.Resolved target = AliasChain.terminal(linked.schema(), reference.name()).orElseThrow(
+                        () -> new IllegalStateException("a discriminator typed '" + reference.name()
+                                + "' names nothing this schema declares"));
+                definition = target.definition();
+                form = linked.enumForm(target.name());
+            }
+            case io.ltr8.tson.schema.meta.TypeInline inline -> {
+                definition = inline.of();
+                form = io.ltr8.unicode.Normalization.NONE;
+            }
+        }
+        AtomType<?> parser = AtomParsers.forRead(definition, form).orElseThrow(
+                () -> new IllegalStateException("a discriminator typed '" + field.typeExpr().text()
                         + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
-        return new Selector(Nfc.of(name), parser, AtomForm.of(target.definition()));
+        return new Selector(Nfc.of(name), parser, AtomForm.of(definition));
     }
 
     /** One member's pins in the base's declaration order, or null where it does not pin them all. */
@@ -227,7 +239,7 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
         if (tag.type() != null && selfNames.contains(tag.type())) {
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances, and a sealed base has none: naming it selects nothing.
-            ctx.report(extension.tagNamesTheBase(TagMembers.TYPE));
+            ctx.report(extension.tagNamesTheBase(TagMembers.TYPE, true));
             EventSkip.nextValue(ctx);
             return null;
         }
@@ -235,8 +247,8 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
             return routes.get(selected).read(ctx, tag);
         }
         // A tag goes where it names, which is §6.1.5's "deeper than one level": the pins are inherited and
-        // §5.7 forbids changing them, so a family dispatches one level by member and every level below it by
-        // tag. Whether the tag agrees with the discriminator is the selected reader's to say -- it re-reads
+        // [TSON-SCHEMA] §5.8 forbids changing them, so a family dispatches one level by member and every level
+        // below it by tag. Whether the tag agrees with the discriminator is the selected reader's to say -- it re-reads
         // the whole object and re-verifies each pin as an ordinary FIXED check, so a tag naming anything but
         // the dispatched member or a subtype of it meets a pinned field the document contradicts.
         Route route = routes.get(tag.type());
@@ -304,6 +316,6 @@ final class DispatchMemberReader implements JsonTypeReader<Object>, ExactReader 
 
     /** One pin as written: a reference by its text, any other value by its own spelling. */
     private static String pin(Object pin) {
-        return pin instanceof io.ltr8.tson.schema.meta.Reference reference ? reference.text() : String.valueOf(pin);
+        return pin instanceof io.ltr8.tson.schema.meta.TypeRef reference ? reference.text() : String.valueOf(pin);
     }
 }

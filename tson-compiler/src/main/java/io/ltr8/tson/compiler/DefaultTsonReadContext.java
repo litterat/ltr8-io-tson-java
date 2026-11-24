@@ -4,9 +4,12 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.atom.IdentifierGrammar;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.compiler.reader.ForeignScope;
+import io.ltr8.tson.compiler.reader.ScopeCrossing;
 import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
@@ -18,7 +21,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 
 /**
@@ -99,6 +102,13 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Depth of {@link #readingSchemaNames} reads the cursor is inside; {@code 0} for a data document's read. */
         int schemaNames;
 
+        /**
+         * The foreign value the cursor is inside, innermost first; {@code null} in the document's own scope. On the
+         * cursor rather than on each context, as one more field per context copy would be bytes on every read: a
+         * foreign value is read by one call that returns before anything outside it reads on ({@link #CROSSING}).
+         */
+        Scope scope;
+
         Cursor(TsonEventSource events, DiagnosticsReceiver receiver, IdentifierPolicy identifierPolicy,
                TsonReadContext.HeldByName heldByName,
                boolean valueBody) {
@@ -152,6 +162,25 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     private final Optional<SourcePosition> positionOverride;
 
+    /**
+     * One foreign value's scope ([TSON-SCHEMA] §7.9), entered at {@code start}: the schema pointer renders the steps
+     * after it, into the foreign schema, and a schema document's sink hears nothing inside it, the names there being
+     * the foreign schema's and judged by its own readers. {@code schemaNames} is the depth of {@link
+     * #readingSchemaNames} reads the scope began inside, which a resolved form read within it counts above.
+     */
+    private record Scope(ForeignScope boundary, Scope parent, PathStep start, int schemaNames) {
+
+        /** What a diagnostic raised inside the scope adds to its message: every boundary crossed, innermost first. */
+        String suffix() {
+            StringBuilder out = new StringBuilder(" (read in the scope of ").append(boundary.schema())
+                    .append(", through the extern ").append(boundary.through());
+            for (Scope outer = parent; outer != null; outer = outer.parent) {
+                out.append(", within ").append(outer.boundary.through());
+            }
+            return out.append("; [TSON-SCHEMA] §7.9)").toString();
+        }
+    }
+
     private DefaultTsonReadContext(Cursor cursor, PathStep tail, String schemaRoot, String schemaId,
                                     Optional<SourcePosition> schemaPosition,
                                     Optional<SourcePosition> positionOverride) {
@@ -162,6 +191,23 @@ final class DefaultTsonReadContext implements TsonReadContext {
         this.schemaPosition = schemaPosition;
         this.positionOverride = positionOverride;
     }
+
+    /**
+     * Reading a foreign value ({@link ScopeCrossing}). The cast cannot fail for a context this library made (see
+     * {@link #lookingAhead}).
+     */
+    static final ScopeCrossing CROSSING = (ctx, boundary, reader) -> {
+        DefaultTsonReadContext outer = (DefaultTsonReadContext) ctx;
+        Cursor cursor = outer.cursor;
+        Scope enclosing = cursor.scope;
+        cursor.scope = new Scope(boundary, enclosing, outer.tail, cursor.schemaNames);
+        try {
+            return reader.read(new DefaultTsonReadContext(cursor, outer.tail, null, null, Optional.empty(),
+                    outer.positionOverride));
+        } finally {
+            cursor.scope = enclosing;
+        }
+    };
 
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver) {
         return of(events, receiver, IdentifierPolicy.defaults());
@@ -178,8 +224,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
                                             IdentifierPolicy identifierPolicy,
                                             TsonReadContext.HeldByName heldByName, boolean valueBody) {
         return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy, heldByName, valueBody), null,
-                null,
-                null, Optional.empty(), Optional.empty());
+                null, null, Optional.empty(), Optional.empty());
     }
 
     private DefaultTsonReadContext stepping(PathStep step) {
@@ -225,8 +270,8 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     /**
      * [TSON-DATA] §8.2's <b>restricted-character and restricted-script</b> rules over the three names a Class 1
-     * document carries -- a type-ref name, an annotation name and a record's field names, every position §7.4
-     * marks {@code meta.identifier}.
+     * document carries -- a type-ref name, an annotation name and a record's field names: §7.4 makes the first two
+     * qualified names, whose segments are identifiers, and matches a field name against §7.7 where no schema is named.
      *
      * <p>A field name reaches the same rules as the other two because it is the same thing: §2.5 makes it an
      * identifier at every layer, so there is one name rule and no per-conformance-class exception to it. The
@@ -326,12 +371,17 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public boolean readsSchemaDocument() {
-        return cursor.heldByName != null;
+        return sink() != null;
     }
 
     @Override
     public boolean readsSchemaNames() {
-        return cursor.heldByName != null || cursor.schemaNames > 0;
+        return sink() != null || cursor.schemaNames > (cursor.scope == null ? 0 : cursor.scope.schemaNames());
+    }
+
+    /** The schema document's sink, which a foreign value's scope does not reach ({@link Scope}). */
+    private TsonReadContext.HeldByName sink() {
+        return cursor.scope == null ? cursor.heldByName : null;
     }
 
     /**
@@ -351,25 +401,25 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public boolean readsValueBody() {
-        return cursor.valueBody;
+        return cursor.valueBody && cursor.scope == null;
     }
 
     @Override
-    public void heldByName(TypeRef reference, TsonSchema.SlotType type, io.ltr8.tson.schema.meta.Ref<?> cell) {
-        if (cursor.heldByName == null) {
+    public void heldByName(TypeRef reference, TsonSchema.SlotType type, ValueRef<?> cell) {
+        if (sink() == null) {
             return;
         }
         cursor.heldByName.held(slot(), type, reference, cell);
     }
 
     @Override
-    public void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.RecordField declared,
-                              io.ltr8.tson.schema.meta.Reference named, List<TsonEvent> written) {
-        if (cursor.heldByName == null) {
+    public void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.TypeExpr named,
+                              List<TsonEvent> written) {
+        if (sink() == null) {
             return;
         }
-        cursor.heldByName.heldAsWritten(new TsonSchema.HeldValue(slot(), field, sibling, declared,
-                Optional.ofNullable(named), List.copyOf(written)));
+        cursor.heldByName.heldAsWritten(new TsonSchema.HeldValue(slot(), field, sibling, Optional.ofNullable(named),
+                List.copyOf(written)));
     }
 
     /** The path this context has descended from the value's root: a field name, a key, or an index per step. */
@@ -483,6 +533,29 @@ final class DefaultTsonReadContext implements TsonReadContext {
         });
     }
 
+    /**
+     * {@link TsonReadContext#spendTypeRef}: the annotations are looked past and put back, and the type-ref behind them
+     * is the one event taken out of the queue. A lookahead records what it reads to rewind it, and a type-ref taken
+     * out from under one would be missing from what it puts back.
+     */
+    static void spendTypeRef(TsonReadContext ctx) {
+        Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;
+        if (cursor.recording != null) {
+            throw new IllegalStateException("a type-ref is spent by a read, never inside a lookahead");
+        }
+        List<TsonEvent> annotations = lookingAhead(ctx, lookahead -> {
+            io.ltr8.tson.compiler.stream.EventSkip.annotations(lookahead);
+            return List.copyOf(cursor.recording);
+        });
+        annotations.forEach(ignored -> cursor.rewound.removeFirst());
+        if (ctx.peek() instanceof io.ltr8.tson.compiler.stream.TypeRef) {
+            ctx.next();
+        }
+        for (int i = annotations.size() - 1; i >= 0; i--) {
+            cursor.rewound.addFirst(annotations.get(i));
+        }
+    }
+
     @Override
     public Optional<SourcePosition> position() {
         return positionOverride.isPresent() ? positionOverride : Optional.ofNullable(cursor.position);
@@ -513,15 +586,17 @@ final class DefaultTsonReadContext implements TsonReadContext {
         if (schemaOnly) {
             out.append(schemaRoot);
         }
-        append(out, tail, schemaOnly);
+        append(out, tail, schemaOnly, schemaOnly && cursor.scope != null ? cursor.scope.start() : null);
         return out.toString();
     }
 
-    private static void append(StringBuilder out, PathStep step, boolean schemaOnly) {
-        if (step == null) {
+    /** {@code step}'s chain back to {@code from}, exclusive: a foreign scope's pointer begins inside it. */
+    private static void append(StringBuilder out, PathStep step, boolean schemaOnly, PathStep from) {
+        if (step == null || step == from) {
             return;
         }
-        append(out, step.parent(), schemaOnly);   // parent first: the chain links backwards, the pointer reads forwards
+        // Parent first: the chain links backwards, the pointer reads forwards.
+        append(out, step.parent(), schemaOnly, from);
         if (schemaOnly) {
             if (step.schemaName() != null) {
                 out.append('/').append(escape(step.schemaName()));
@@ -576,9 +651,23 @@ final class DefaultTsonReadContext implements TsonReadContext {
                 : anchoredOn(declaration.pointer(), declaration.schemaId(), declaration.position());
     }
 
+    @Override
+    public void typeNamed(String name) {
+        if (sink() != null) {
+            cursor.heldByName.typeNamed(name);
+        }
+    }
+
+    @Override
+    public void pinsUnmatched(String base, Set<String> selectors, BiPredicate<String, String> samePin) {
+        if (sink() != null) {
+            cursor.heldByName.pinsUnmatched(base, selectors, samePin);
+        }
+    }
+
     /** A schema document's read tells its sink each declaration a reader reads against ({@link HeldByName#reached}). */
     private void reached(SchemaLocation declaration) {
-        if (cursor.heldByName != null) {
+        if (sink() != null) {
             cursor.heldByName.reached(declaration);
         }
     }
@@ -601,7 +690,8 @@ final class DefaultTsonReadContext implements TsonReadContext {
         // "" is the root.
         Diagnostic diagnostic = new Diagnostic(Optional.of(render(false)),
                 schemaRoot == null ? Optional.empty() : Optional.of(render(true)),
-                schemaRoot == null ? "" : schemaId, code, message, expected, actual,
+                schemaRoot == null ? "" : schemaId, code, cursor.scope == null ? message : message + cursor.scope.suffix(),
+                expected, actual,
                 position(), schemaRoot == null ? Optional.empty() : schemaPosition);
         cursor.reported++;
         cursor.receiver.report(diagnostic);

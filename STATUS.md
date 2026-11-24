@@ -2,11 +2,11 @@
 
 ← back to the [README](README.md)
 
-Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/39/tson-part1-data.md,
-and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/39/tson-part2-schema.md
+Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/40/tson-part1-data.md,
+and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/40/tson-part2-schema.md
 
 This is the spec's first implementation. Issues and ambiguities found in the spec while implementing are
-tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
+recorded in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md); Revision 40 answered every entry raised against Revision 39.
 
 **Implemented:**
 
@@ -29,37 +29,43 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Typed field names — `meta.record.name_type` names the identifier family a record's field names belong to, as
       `meta.enum_type.name_type` does an enum's members, so a record declares `@id`, `$ref` or `first name` as written,
       judged under its own name type in both encodings (Part 2 §5.2)
-- [x] References (Part 2 §4.2) — one atom, `!meta.reference_type { of: T }`, spelled
-      `meta.ref<T>` (`allow_sibling: false`) whatever `T` is, admits a name exactly when the named entry's value, past
+- [x] References (Part 2 §4.2) — one atom, `!meta.ref { of: T }`, spelled
+      `meta.ref<T>` whatever `T` is, admits a name exactly when the named entry's value, past
       its alias hops, is of a type IS-A `T`. Over a constructor (`meta.ref<net.uuid_type>`) its values are the names of
       the types in the schema's closure built with it: computed at link, never listed or written, and judged by
       membership in both encodings. Over any other type its values are qualified names of values. The kernel types
       `meta.enum_type.name_type` and `meta.record.name_type` by its `meta.identifier_ref`, a refinement of
       `meta.type_ref`, and judges a name type by membership (Part 2 §4.2). A refinement narrows `of` to the source's or
       a type IS-A it, judged at link (Part 2 §5.7)
-- [x] An application is a reference value (Part 2 §4.2, §8.2) — a reference with arguments is
-      data grammar ([TSON-DATA] §7.4), written unquoted (`t: set<text>`, `@meta.application:response<order 201>`, an open
-      alias's `target: pair<uuid B>`); a schemaless read keeps one as a `TsonApplicationReference`, and at a kind-typed
-      position it reads to a `TypeRef` that resolves level by level, by structural identity, to the entry the schema closed
-      it to, its `referent()` that entry's value. An application the schema never closes is refused; a quoted token is never
-      a reference. In JSON the same text is a string
-- [x] A sibling reference is a reference value (Part 1 §7.4, Part 2 §4.2) — `kind!` parses in data
-      and in sugar, its `!` followed by whitespace, and in JSON the same text is a string; it stands only at a record
-      field's type, the one slot whose type, `meta.field_type_ref`, keeps `meta.reference_type`'s `allow_sibling`, and
-      is refused elsewhere, naming the slot, in sugar, in an explicit instance and in data. A schemaless read keeps one
-      as a `TsonSiblingReference`
+- [x] A reference is a name (Part 2 §4.2, §5.10) — an application is schema grammar, the construction `meta.apply`
+      written in place, and an argument list is no data form ([TSON-DATA] §7.2.5): `t: set<text>` in a data document or
+      a schema value's payload is a parse error, the grammar's ordinary one, whether or not the schema closes the
+      application. A type's name reads to a `TypeRef` whose `referent()` is the entry's value, and a value's name to a
+      `ValueRef` delivered with the value it reaches. In JSON a reference is the string
+      of a qualified name, and `"set<text>"` is refused as a string outside its grammar. A quoted token is the
+      reference its text spells, each segment a name of the family of what it enters (Part 2 §5.12), so
+      `"main.public api.ping"` reaches a field named `public api`; no record's `name_type` or namespace's `key_type`
+      admits `.`
+- [x] A dependent field's type is a sum written in place (Part 2 §5.2) —
+      `{ of: !meta.dependent { on: kind } }` at a record field's type, `kind!` in schema-grammar sugar, which parses at
+      a field's or group member's type and nowhere else; a `meta.dependent` declared or at any other slot is refused at
+      link. `kind!` is no data form in either encoding
+- [x] A record written in place (Part 2 §5.2) — a record body at a field's type, a group member's, an array's
+      element, a map's value, a tuple's element or a choice's variant (`at: { x: int32 }`) is the record an
+      application of a parametric record closes to in place, read untagged in tree and bind mode in both encodings; one
+      over a parameter of its parametric record is `NOT_IMPLEMENTED`
 - [x] Dependent fields (Part 2 §5.2) — `v?: kind!` is read per instance
       against the type its sibling's value names, in tree and bind mode (an `Object` component) and in JSON. The
       sibling's rules are checked at the declaration against the flattened record: declared first, typed by a reference
       to types, there to read whenever it is (a field group's member only beside an optional dependent field, which is
-      refused where it is read without it), its pin or default no template; the dependent field never voidable, carrying
-      no value, restated only as itself. A pinned sibling gives the field a fixed reader, a discriminator a member's, and a
-      free sibling is written before its dependent field. A value's qualified name going on through one takes the
-      type its sibling names in that value (Part 2 §5.12). The kernel's `record_field.value` and
-      `record_template_field.value` are `type!`. A value entry's dependent value, of any form, is held as written and
+      refused where it is read without it), its pin or default no parametric record; the dependent field never voidable,
+      carrying no value, restated only as itself. A pinned sibling gives the field a fixed reader, a discriminator a
+      member's, and a free sibling is written before its dependent field. A value's qualified name going on through one takes
+      the type its sibling names in that value (Part 2 §5.12). The kernel's `record_field.value` is `type!`. A value
+      entry's dependent value, of any form, is held as written and
       judged when the schema links against the type its sibling names in the schema's own namespace
 - [x] Every `!schema` value declares (Part 2 §4.1) — `geo => !schema { address => { … }
-      }` is a schema map nested as an entry, its members declarations that lift, mint, link and compile as root
+      }` is a schema map nested as an entry, its members declarations that resolve, link and compile as root
       entries do, each named by its path from the root (`geo.address`). A nested map is open: several documents of a closure
       declaring `geo` contribute to one map, the union of their members, and only a member path declared twice
       collides.
@@ -69,11 +75,12 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       "geo.address"` in JSON), and resolved output writes a nested map nested
 - [x] A bundled document's root holds only what an author writes (Part 2 §9) — the
       one kernel document, meta.tn, pre-loaded and importing nothing, is its wait cycle's closure plus the map, tuple,
-      choice, template, reference and octet-sequence vocabulary and the classifying annotations; its root is `void`,
-      `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum` (`!enum [A B]`),
-      `set<T>` and `schema`, the alias of `meta.schema` every schema map's tag names, and all its machinery sits under
-      the open namespace `meta` (`meta.record`, `meta.identifier`, `meta.type_ref`, `meta.ref<meta.record>`,
-      `binary.bytes_type`, `@atom.ordering:TOTAL`, `@meta.synthetic`).
+      choice, parametric record, reference and octet-sequence vocabulary and the classifying annotations; its root is `void`,
+      `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum` (`!enum [A B]`) and
+      `set<T>`, each completing an incomplete entry, and `schema`, the alias of `meta.schema` every schema map's tag
+      names, and all its machinery sits under the open namespace `meta` (`meta.record`, `meta.identifier`,
+      `meta.type_ref`, `meta.ref<meta.record>`,
+      `binary.bytes_type`, `@atom.ordering:TOTAL`, `@meta.application`, `@meta.completion`).
       The data-format libraries numeric.tn, temporal.tn and net.tn each import the kernel alone, hold their
       instances at their root (`int32`, `date`, `uuid`) and their constructors under a map of their own
       (`numeric.decimal_type`, `temporal.date_type`, `net.uuid_type`). core.tn imports the three and its root holds
@@ -106,18 +113,19 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       `io.ltr8:<module>`, with sources and javadoc, usable on the class path or the module path (see
       the README's [Use it from another project](README.md#use-it-from-another-project))
 - [x] Part 2 schema grammar — full schema document parsing into a faithful AST (records, compositions,
-      refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against
+      atom refinements, applications and container sugar, field groups, and more), verified end-to-end against
       the spec's own real `meta.tn`/`numeric.tn`/`temporal.tn`/`net.tn`/`core.tn` fixtures
-- [x] Part 2 schema resolution — composition (`&`), refinement (`^`) including tightening, bare and
-      generic type references, field modifiers/defaults/fixed values, type parameters, array sugar,
+- [x] Part 2 schema resolution — composition (`&`) including a restated field's tightening, names and
+      applications, field modifiers/defaults/fixed values, type parameters, array sugar,
       and generalized constructor-application/atom-refinement resolution (`!C value`), every declaration
       made ready in wait order whatever order it is written in, so a constructor, a type or an annotation
       type may be used in the document that declares it; every declaration in `meta.tn`, `numeric.tn`,
       `temporal.tn`, `net.tn`, `core.tn` and `policy.tn` resolves end to end (see [BACKLOG.md](BACKLOG.md) for the
       specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
-      directives during resolution, flattens argument-bearing type references into real named
-      entries, merges every `!!import`'s namespace into one per schema
+      directives during resolution, closes each argument-bearing type reference into its declaration or in place
+      (a construction, or the record a parametric record's application closes to, with no name), merges every
+      `!!import`'s namespace into one per schema
       (Part 2 §2.2.3, §3.3), validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`
 - [x] Value entries (Part 2 §4.1) — an entry whose tag names an ordinary type
@@ -125,6 +133,23 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       is a value of it, no type and in no kind, named by a reference over its type and walked by key and field;
       bound through the one bind context, or held as a tree where no class binds its type, so the schema loads and
       validates
+- [x] Incomplete entries (Part 2 §5.5) — `!C ^ { … }` over a constructor of types with a
+      required field absent, refined by fields it has not written and completed by `!X { … }`, `!X value` or `X<…>`
+      into the plain construction; refused wherever a type is named, imported like any entry, and left out of the
+      resolved form. An array, a map or a namespace type refines by its facets' kinds, `!tags ^ { min_items: 2 }` (§5.7)
+- [x] Externs (Part 2 §5.13, §7.9) — `order_v1 => !meta.extern { schema: … type: order }`
+      names one entry of another schema, whose schema loads with the imports and none of whose names enter the
+      namespace; judged through the hop by the foreign entry's identity, and sealed. A value through one is read in
+      TSON text, in tree mode, by the foreign schema's own compiled reader: the tag and the annotations in front of it
+      in the enclosing scope, every name inside in the foreign schema's, at every position a type's name stands, the
+      root and an annotation's value included, and scopes nest; bound in bind mode, each class by its entry's
+      identity, and written back by `TsonObjectWriter.describing(linked, root)` under the enclosing scope's names.
+      In JSON ([TSON-JSON] §8.6) a foreign value is read in tree mode and bound at every position an extern types:
+      the `$type` leading its object or wrapper in the enclosing scope, every other name in the foreign schema's. No
+      JSON writer writes a tag, a boundary's included
+- [x] Binding by entry identity — a `DataNameBinder` is asked `resolve(namespace, name)`, the namespace the
+      canonical identity of the schema declaring the entry, so two schemas' `order` bind two classes through one
+      context (`DataNameBinder.byNamespace`); a binder answering by name alone answers every schema alike
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
       reads against real TSON data documents (see the README's [Schema pipeline](README.md#schema-pipeline))

@@ -19,9 +19,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.ReferenceBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.HashMap;
@@ -48,9 +46,9 @@ final class RecordPlan {
     final JsonSchemaLocation schemaLocation;
 
     /**
-     * What this type is called in a message: the name the author wrote, where {@link #name} is the entry a
-     * {@code $type} resolves against. The two differ for a minted entry, which shows as {@code box<text>} rather
-     * than as a content-derived name in neither the schema nor the document.
+     * What this type is called in a message ({@link EntryDisplayName}), where {@link #name} is the entry a
+     * {@code $type} resolves against. The two differ for an entry no source was read for, which shows as the
+     * form its body is, {@code box<text>} for an application its key records.
      */
     final String displayName;
 
@@ -81,9 +79,9 @@ final class RecordPlan {
     private final Normalization nameForm;
 
     /**
-     * The record's name type, by name for messages, and its reader -- {@code null} for the kernel's
-     * {@code meta.field_name}, which §7.7's grammar answers without allocating -- and the profile a member name it
-     * admits is judged under ({@link #unmatched}).
+     * The record's name type, by name for messages, and its reader -- {@code null} where the record states none,
+     * the kernel's {@code meta.identifier} being one §7.7's grammar answers without allocating -- and the profile a
+     * member name it admits is judged under ({@link #unmatched}).
      */
     private final String nameType;
     private final AtomType<?> nameReader;
@@ -128,9 +126,9 @@ final class RecordPlan {
         Map<String, Integer> byName = new HashMap<>();
         // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule, and
         // then put into the record's name type's form (§5.5), so a name the type holds equal to a field is it.
-        this.nameForm = context.linked().nameForm(name);
+        this.nameForm = context.linked().nameForm(name, body);
         this.nameType = body.nameTypeName();
-        IdentifierType identifiers = context.linked().nameType(name)
+        IdentifierType identifiers = context.linked().nameType(name, body)
                 .map(type -> type instanceof IdentifierType family ? family : null)
                 .orElse(null);
         this.nameReader = identifiers == null ? null : AtomParsers.forType(identifiers).orElseThrow(() ->
@@ -151,17 +149,23 @@ final class RecordPlan {
                     }
                 }
                 // A dependent field's type is chosen per instance by its sibling's value, which the record hands it.
-                case SiblingRef sibling -> {
-                    int at = order.indexOf(sibling.field());
+                case io.ltr8.tson.schema.meta.TypeInline inline when inline.dependentOn().isPresent() -> {
+                    String sibling = inline.dependentOn().get();
+                    int at = order.indexOf(sibling);
                     if (at < 0) {
                         throw new IllegalStateException("'" + name + "': dependent field '" + declared + "' names no "
-                                + "field '" + sibling.field() + "'; the linker refuses one");
+                                + "field '" + sibling + "'; the linker refuses one");
                     }
                     siblingOf[i] = at;
                     typesADependent[at] = true;
                     dependents = true;
-                    schemaReaders[i] = new DependentReader(declared, sibling.field(), context,
-                            siblingType(body.fields().get(sibling.field()), context));
+                    schemaReaders[i] = new DependentReader(declared, sibling, context);
+                }
+                case io.ltr8.tson.schema.meta.TypeInline inline -> {
+                    schemaReaders[i] = context.readers().resolve(inline);
+                    if (field.value().isPresent()) {
+                        stated[i] = FieldValue.of(inline, field.value().get());
+                    }
                 }
             }
         }
@@ -171,15 +175,6 @@ final class RecordPlan {
                 .toArray(GroupPlan[]::new);
         this.rules = new RecordDiagnostics(displayName, String.join(" | ", body.fields().keySet()));
         this.subsumption = new SubsumptionDiagnostics(displayName);
-    }
-
-    /** The reference typing a dependent field's {@code sibling}, past its alias hops, or null where it is none. */
-    private static ReferenceBody siblingType(RecordField sibling, ValueReaderContext context) {
-        if (!(sibling.type() instanceof TypeRef type)) {
-            return null;
-        }
-        return AliasChain.terminal(context.schema(), type.name()).map(AliasChain.Resolved::definition)
-                .filter(ReferenceBody.class::isInstance).map(ReferenceBody.class::cast).orElse(null);
     }
 
     /** The field slot an NFC member name fills, in the name type's form, or -1 where it names no field. */

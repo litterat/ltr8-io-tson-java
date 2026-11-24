@@ -5,7 +5,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.unicode.RestrictionLevel;
-import io.ltr8.tson.base.policy.ScriptPolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -39,8 +38,8 @@ class SchemaPolicyRefusalTest {
     private static List<Diagnostic> refusals(String declarations) {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/refusal.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s
                 }
@@ -111,17 +110,18 @@ class SchemaPolicyRefusalTest {
      */
     @Test
     void theInstanceStatesThePolicyThatRefusedTheName() {
-        Tson tson = Tson.of(ProcessorConfig.defaults().withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.asciiOnly())));
+        Tson tson = Tson.of(ProcessorConfig.defaults()
+                .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.ASCII_ONLY)));
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, tson.validateSchema("""
                 !!id:"https://example.test/refusal-policy.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { p%sy => text }
                 """.formatted(CYR_A)).getFirst().code());
 
         assertEquals(RestrictionLevel.ASCII_ONLY,
-                tson.processorPolicy().identifierPolicy().scripts().level());
+                tson.processorPolicy().identifierPolicy().level());
         assertEquals(ProcessorPolicy.dataVersion(), tson.processorPolicy().unicodeDataVersion());
     }
 
@@ -142,8 +142,8 @@ class SchemaPolicyRefusalTest {
                 "the default policy refuses a mixed-script type-ref");
 
         List<Diagnostic> relaxed = Tson.of(ProcessorConfig.defaults()
-                        .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()
-                                .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC))))
+                        .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE)
+                                .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC)))
                 .validate(document);
 
         assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),

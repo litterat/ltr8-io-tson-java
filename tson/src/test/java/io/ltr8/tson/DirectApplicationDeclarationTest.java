@@ -2,7 +2,6 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -13,24 +12,18 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * <b>A declaration whose body is a fully-bound application is the instantiation entry</b>, not a reference to
- * a content-named one (§8.2): {@code bx => box<text>} resolves to {@code bx => !record
- * { … }}, and no {@code box_text_…} entry is minted beside it.
+ * <b>A declaration whose body is a fully-bound application is the record it closes to</b> (§8.2): {@code bx =>
+ * box<text>} resolves to {@code bx => !record { … }} under the author's name, its key recording the application
+ * ({@code @meta.application}).
  *
- * <p><b>Why the hop was worth removing.</b> It made an author's name a second-class citizen of its own
- * declaration: the entry a document's {@code typeRef} reported, the entry {@code subtypes} indexed, and the
- * entry a diagnostic had to render through {@code EntryDisplayName} were all the derived one, and the name
- * the author wrote reached them only by being followed back. §8.2's own split says a declared entry's
- * identity is its name; this makes a declaration that denotes a type obey it, as a declaration that
- * constructs one already did (§5.3's lift leaves {@code text_list => [text]} as the entry).
+ * <p>So the author's name is the entry a document's {@code typeRef} reports, the entry {@code subtypes} indexes and
+ * the name a diagnostic renders. §8.2 makes a declared entry's identity its name, and a declaration that denotes a
+ * type obeys it as one that constructs a type does ({@code text_list => [text]}).
  *
- * <p><b>One entry, not two.</b> A use site writing the same application resolves to the declaration rather
- * than minting a parallel entry, so §8.2's "two fully-bound applications denote the same entry" still holds
- * within the schema. Where two declarations name one application the first is the entry and the second is an
- * ordinary bare-name alias of it -- which composes and refines like any other reference (§4.3's chain walk).
+ * <p><b>One declaration, one entry.</b> A use site writing the same application closes in place and is never looked
+ * up to the declaration (§5.10), and two declarations of one application are two entries.
  */
 class DirectApplicationDeclarationTest {
 
@@ -55,16 +48,15 @@ class DirectApplicationDeclarationTest {
     // ── The declaration is the entry ─────────────────────────────────────
 
     @Test
-    void aDeclaredApplicationIsTheInstantiationEntry() {
+    void aDeclaredApplicationIsTheRecordItClosesTo() {
         TsonLinkedSchema linked = resolve("dad1", """
                   box => <V> { item: V }
                   bx  => box<text>
                 """);
 
         Top bx = linked.schema().entries().get("bx");
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(bx, n -> true),
-                "the declaration is the instantiation, not a hop to one");
-        RecordBody body = assertInstanceOf(RecordBody.class, bx, "its body is the closed record");
+        RecordBody body = assertInstanceOf(RecordBody.class, bx,
+                "the declaration is the instantiation, its body the closed record, not a hop to one");
         assertEquals(List.of("item"), body.fields().keySet().stream().toList());
     }
 
@@ -76,26 +68,17 @@ class DirectApplicationDeclarationTest {
                   bx  => box<text>
                 """).schema().applicationOf("bx");
 
-        assertEquals("box", application.orElseThrow().name());
+        assertEquals("box", application.orElseThrow().head().name());
         assertEquals(1, application.orElseThrow().arguments().size(),
                 () -> "the canonical application, arguments included: " + application);
     }
 
-    /** Nothing is minted beside it: an entry with no referent and no reader is not an entry. */
+    /**
+     * A use site writing the same application is never looked up to the declaration (§5.10): it closes in place to a
+     * record of the same shape, with no name, and adds no entry.
+     */
     @Test
-    void noContentNamedEntryIsMintedBesideTheDeclaration() {
-        TsonLinkedSchema linked = resolve("dad3", """
-                  box => <V> { item: V }
-                  bx  => box<text>
-                """);
-
-        assertEquals(List.of(), named(linked, "box_"),
-                () -> "the declaration is the only entry for this application: " + linked.schema().entries().keySet());
-    }
-
-    /** A use site writing the same application reaches the declaration rather than a second entry. */
-    @Test
-    void aUseSiteWritingTheSameApplicationReachesTheDeclaration() {
+    void aUseSiteWritingTheSameApplicationClosesInPlace() {
         TsonLinkedSchema linked = resolve("dad4", """
                   box    => <V> { item: V }
                   bx     => box<text>
@@ -103,17 +86,19 @@ class DirectApplicationDeclarationTest {
                 """);
 
         assertEquals(List.of(), named(linked, "box_"),
-                () -> "one entry for one application: " + linked.schema().entries().keySet());
+                () -> "one entry for one declaration: " + linked.schema().entries().keySet());
         RecordBody holder = (RecordBody) linked.schema().entries().get("holder");
-        assertEquals("bx", holder.fields().values().stream().toList().get(0).typeRef().name(),
-                "the field names the declaration, which is what the application denotes");
+        io.ltr8.tson.schema.meta.TypeInline f = assertInstanceOf(io.ltr8.tson.schema.meta.TypeInline.class,
+                holder.fields().get("f").type(), "the field holds the record in place, not the name 'bx'");
+        assertEquals(linked.schema().entries().get("bx"), f.of(), "one shape");
     }
 
     /**
      * <b>Two declarations of one application are two entries</b>, exactly as {@code a => { v: text }} and
-     * {@code b => { v: text }} are two entries with one structure. Nothing dedupes them and nothing is
+     * {@code b => { v: text }} are two entries with one structure. Neither is
      * privileged: §8.2 gives each its name as its identity, and a rule that cares about the duplication --
-     * §5.2's pin distinctness over a family's members -- catches it downstream on its own terms.
+     * §5.2's pin distinctness over a family's members -- catches it downstream on its own terms. Neither is IS-A
+     * the parametric record (§5.10).
      */
     @Test
     void twoDeclarationsOfOneApplicationAreTwoEntries() {
@@ -123,37 +108,41 @@ class DirectApplicationDeclarationTest {
                   by  => box<text>
                 """);
 
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("bx"), n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(linked.schema().entries().get("by"), n -> true));
-        assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().name());
-        assertEquals("box", linked.schema().applicationOf("by").orElseThrow().name());
-        assertEquals(java.util.List.of("bx", "by"), TypeChain.subtypesOf(linked.schema().entries().get("box")),
-                "both are members of the template they close");
+        assertInstanceOf(RecordBody.class, linked.schema().entries().get("bx"));
+        assertInstanceOf(RecordBody.class, linked.schema().entries().get("by"));
+        assertEquals("box", linked.schema().applicationOf("bx").orElseThrow().head().name());
+        assertEquals("box", linked.schema().applicationOf("by").orElseThrow().head().name());
+        assertEquals(java.util.List.of(), TypeChain.subtypesOf(linked.schema().entries().get("box")),
+                "a parametric record is in no index");
     }
 
-    // ── What it buys a family: the member is named, not hashed ───────────
+    // ── What it buys a family: the member is named by its declaration ───
 
     private static final String FAMILY = """
               dog_type => { breed: text }
               cat_type => { indoor: boolean }
-              pet      => <V> { value: V }
-              dogs     => pet<dog_type>
-              cats     => pet<cat_type>
+              pet      => abstract { }
+              pet_of   => <V> pet & { value: V }
+              dogs     => pet_of<dog_type>
+              cats     => pet_of<cat_type>
               holder   => { p: pet }
             """;
 
-    /** The base indexes the names the author wrote, so a refusal can list names an author can write. */
+    /**
+     * The base -- the record the parametric record composes -- indexes the names the author wrote, so a refusal can list
+     * names an author can write.
+     */
     @Test
     void theFamilyBaseIndexesTheDeclaredMemberNames() {
         TsonLinkedSchema linked = resolve("dad6", FAMILY);
 
         assertEquals(List.of("dogs", "cats"), TypeChain.subtypesOf(linked.schema().entries().get("pet")),
-                "the members are the declarations, not content-derived names");
+                "the members are the declarations");
     }
 
-    /** And the tag a document writes is that name -- the whole point of the change. */
+    /** And the tag a document writes is that name. */
     @Test
-    void anAbstractTemplateBaseDispatchesOnTheDeclaredName() {
+    void anAbstractBaseDispatchesOnTheDeclaredName() {
         Tson tson = Tson.standard();
         tson.resolve(schema("dad7", FAMILY));
 

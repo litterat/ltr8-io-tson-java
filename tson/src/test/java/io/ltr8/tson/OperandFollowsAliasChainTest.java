@@ -15,15 +15,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * <b>An operand is judged at the end of its alias chain, not at the name the author wrote</b>
- * ([TSON-SCHEMA] §4.3): "the source of a refinement and every operand of a composition or subtraction MUST,
- * after following its alias chain (§8.3), be a definition whose body is a {@code !record}".
+ * ([TSON-SCHEMA] §4.3): every operand of a composition or subtraction MUST, after following its alias chain (§8.3),
+ * be a definition whose body is a {@code !meta.record}.
  *
  * <p>Both halves of that rule matter, and only the second was applied. A reference is the same type under
  * another name (§5.7's table), so an alias of a record has a field set to merge or tighten and MUST be
  * admitted; an alias whose chain ends at a body with no fields -- a top-level constructor application
  * (§5.6) or a choice -- is finished and admits neither operator.
  *
- * <p><b>The body is the whole test</b> (§4.3). A record template's instantiation
+ * <p><b>The body is the whole test</b> (§4.3). A parametric record's instantiation
  * closes to a {@code !record} carrying fields, so it merges and tightens like the hand-written record of the
  * same shape; §8.2 makes identity the question rather than provenance, so which of the two an author wrote
  * cannot decide it. Every other instantiation is refused by that same body test, having no fields of its own.
@@ -89,16 +89,16 @@ class OperandFollowsAliasChainTest {
     }
 
     @Test
-    void aRefinementThroughAnAliasToARecordIsAdmitted() {
+    void aRestatementThroughAnAliasToARecordIsAdmitted() {
         TsonLinkedSchema linked = resolve("ofc3", """
                   rec => { x: int32 }
                   ali => rec
-                  sub => ali ^ { x?: int32 = 1 }
+                  sub => ali & { x?: int32 = 1 }
                 """);
 
         assertEquals(1, TypeChain.supertypesOf(linked.schema().entries().get("sub")).stream()
                         .filter(name -> name.equals("rec")).count(),
-                () -> "refinement reaches the same terminal: "
+                () -> "a restatement reaches the same terminal: "
                         + TypeChain.supertypesOf(linked.schema().entries().get("sub")));
     }
 
@@ -118,7 +118,7 @@ class OperandFollowsAliasChainTest {
     // ── Admitted: the chain ends at an instantiation that is a record ────
 
     /**
-     * <b>A record template's instantiation composes like the record it is</b> (§4.3). {@code bx} closes to
+     * <b>A parametric record's instantiation composes like the record it is</b> (§4.3). {@code bx} closes to
      * {@code !record { item: text }}, which is what §4.3's MUST asks for, so there is a field set to merge.
      * Refusing it would make composition depend on whether an application or a pen produced those fields,
      * which §8.2 rules out: what is canonicalised is identity, not provenance.
@@ -137,16 +137,16 @@ class OperandFollowsAliasChainTest {
                 () -> "and IS-A the operand: " + TypeChain.supertypesOf(linked.schema().entries().get("sub")));
     }
 
-    /** The refinement half: a vocabulary to tighten is a vocabulary however the entry came by it. */
+    /** A body that only restates: a vocabulary to tighten is a vocabulary however the entry came by it. */
     @Test
-    void aRefinementThroughAnAliasToARecordInstantiationIsAdmitted() {
+    void aRestatementThroughAnAliasToARecordInstantiationIsAdmitted() {
         TsonLinkedSchema linked = resolve("ofc8", """
                   box => <V> { item: V }
                   bx  => box<text>
-                  sub => bx ^ { item?: text = "x" }
+                  sub => bx & { item?: text = "x" }
                 """);
 
-        assertEquals(List.of("item"), fieldNames(linked, "sub"), "refinement adds no field (§5.7)");
+        assertEquals(List.of("item"), fieldNames(linked, "sub"), "a restatement adds no field (§5.8)");
         assertTrue(TypeChain.supertypesOf(linked.schema().entries().get("sub")).contains("bx"),
                 () -> "and preserves IS-A: " + TypeChain.supertypesOf(linked.schema().entries().get("sub")));
     }
@@ -174,15 +174,15 @@ class OperandFollowsAliasChainTest {
     }
 
     /**
-     * The same body test refuses an instantiation that is <em>not</em> a record: {@code vector<text, 3>}
+     * The same body test refuses a construction, which is <em>not</em> a record: {@code vector<text>}
      * closes to an {@code !array}, which has elements rather than fields. This is what keeps §4.3's
      * "finished" idea intact where it was always doing the work.
      */
     @Test
     void aCompositionThroughAnAliasToANonRecordInstantiationIsRefused() {
         assertTrue(refusal("ofc9", """
-                  vector => <T, N> !meta.array { element_type: T  min_items: N  max_items: N }
-                  triple => vector<text, 3>
+                  vector => !meta.array ^ { min_items: 3  max_items: 3 }
+                  triple => vector<text>
                   sub    => triple & { extra: text }
                 """).contains("has no fields to contribute"));
     }

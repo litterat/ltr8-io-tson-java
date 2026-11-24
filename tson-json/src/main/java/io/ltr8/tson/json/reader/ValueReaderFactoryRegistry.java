@@ -16,9 +16,9 @@ import java.util.function.UnaryOperator;
  * carried instead ({@link TreeAtomReader}) and changes nothing about what was parsed or refused, and bind mode
  * leaves it bare for a record to bind to a component.
  *
- * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), a
- * family-base template's, the choice's ({@link DispatchChoiceReader}) and a declared position's ({@link
- * DispatchDeclaredReader}) select a reader and build nothing,
+ * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), the
+ * choice's ({@link DispatchChoiceReader}) and a declared position's ({@link DispatchDeclaredReader}) select a
+ * reader and build nothing, and a parametric record's refusal builds nothing either,
  * so every mode registers the same ones. So does a concrete record's loop ({@link RecordReader}); what is the
  * mode's own is the factory that builds it and the {@link RecordBuilder} it hands its slots to.
  *
@@ -34,7 +34,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
             // meta.tn, under meta
             "numeric.integer_type", "unicode.text_type", "unicode.identifier_type", "unicode.regex_type", "net.iri_type",
-            "meta.reference_type", "binary.bytes_type",
+            "meta.ref", "binary.bytes_type",
             // numeric.tn, under numeric
             "numeric.float_type", "numeric.decimal_type", "numeric.rational_type", "numeric.complex_type",
             // temporal.tn, under temporal
@@ -61,8 +61,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      */
     public static ValueReaderFactoryRegistry atoms() {
         Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
-        factories.put("meta.template", DispatchFactories.TEMPLATE);
-        factories.put("meta.record_template", DispatchFactories.RECORD_TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -78,15 +76,10 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         Map<String, ValueReaderFactory> factories = vocabulary(TreeAtomReader::over);
         factories.put("meta.record", DispatchFactories.over(TreeRecordBuilder.FACTORY));
         factories.put("meta.array", TreeArrayBuilder.FACTORY);
-        // A `set` resolves to an ArrayBody like `array` itself -- refinement never adds or removes a field --
-        // so the same factory serves it and the body's own `unique_items` is what separates them.
-        factories.put("meta.set_type", TreeArrayBuilder.FACTORY);
         factories.put("meta.tuple", TreeTupleBuilder.FACTORY);
         factories.put("meta.map", TreeMapBuilder.FACTORY);
         factories.put("meta.choice", DispatchChoiceReader.FACTORY);
         factories.put("meta.declared_type", DispatchDeclaredReader.FACTORY);
-        factories.put("meta.template", DispatchFactories.TEMPLATE);
-        factories.put("meta.record_template", DispatchFactories.RECORD_TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -102,15 +95,12 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      */
     public static ValueReaderFactoryRegistry bind(DataBindContext binding) {
         Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
-        factories.put("meta.record", DispatchFactories.over(BindRecordBuilder.factory(binding)));
+        factories.put("meta.record", DispatchFactories.over(BindRecordBuilder.inPlace(binding)));
         factories.put("meta.array", BindArrayBuilder.FACTORY);
-        factories.put("meta.set_type", BindArrayBuilder.FACTORY);
         factories.put("meta.tuple", BindTupleBuilder.FACTORY);
         factories.put("meta.map", BindMapBuilder.FACTORY);
         factories.put("meta.choice", DispatchChoiceReader.FACTORY);
         factories.put("meta.declared_type", DispatchDeclaredReader.FACTORY);
-        factories.put("meta.template", DispatchFactories.TEMPLATE);
-        factories.put("meta.record_template", DispatchFactories.RECORD_TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -118,7 +108,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     private static Map<String, ValueReaderFactory> vocabulary(UnaryOperator<ValueReaderFactory> leaf) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
         factories.put("meta.void_type", leaf.apply(AtomReader.VOID));
-        factories.put("enum", leaf.apply(AtomReader.ENUM));
+        factories.put("meta.enum_type", leaf.apply(AtomReader.ENUM));
         for (String constructor : ATOM_CONSTRUCTORS) {
             factories.put(constructor, leaf.apply(AtomReader.ATOM));
         }

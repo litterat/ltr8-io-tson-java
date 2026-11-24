@@ -5,11 +5,10 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
@@ -33,7 +32,6 @@ import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.ReferenceEvent;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
@@ -154,7 +152,7 @@ public final class TsonDataStream implements TsonEventSource {
     private final LimitsPolicy limits;
 
     /** §8.2's token surface, or {@code null} where a read named none -- see {@link #checkTokenPolicy}. */
-    private ScriptPolicy tokenPolicy;
+    private TokenPolicy tokenPolicy;
     private DiagnosticsReceiver tokenPolicyReceiver;
 
     /**
@@ -345,132 +343,14 @@ public final class TsonDataStream implements TsonEventSource {
      * "found '!!'" is true and useless; naming the directive says which rule was broken. The rule is the
      * <em>position's</em>, not the document kind's, so this holds whoever is reading.
      */
-    // ── A reference ([TSON-DATA] §7.4) ────────────────────────────────────────────────────────────
-
-    /**
-     * Whether the token just consumed, {@code head}, opens a reference's argument list: the next token is a {@code <}
-     * adjacent to it. A {@code <} with whitespace before it opens nothing and is refused, as is one after a quoted
-     * token, which is never a reference (§7.5).
-     */
-    private boolean opensArguments(Token head) {
-        Token next = peekToken();
-        if (next.type() != TokenType.LESS_THAN) {
-            return false;
-        }
-        if (!head.adjacentTo(next)) {
-            throw parseError("'<' opens a reference's argument list only adjacent to the name it applies (§7.5): "
-                    + "write '" + head.text() + "<...>' with no whitespace before '<'");
-        }
-        if (head.type() != TokenType.UNQUOTED) {
-            throw parseError("a quoted token is never a reference, so '<' cannot apply it: write the qualified "
-                    + "name unquoted");
-        }
-        return true;
-    }
-
-    /**
-     * The reference {@code head} heads, its argument list next at the cursor: {@code "<" ws type-args ws ">"}, each
-     * argument a qualified name (a reference, itself possibly applied) or any other token (a value), separated as an
-     * array's elements are. Assembled whole, so the stream delivers one value.
-     */
-    private io.ltr8.tson.schema.meta.TypeRef referenceArguments(Token head) {
-        requireQualifiedName(head);
-        advance(); // '<'
-        List<io.ltr8.tson.schema.meta.TypeArgument> arguments = new ArrayList<>();
-        if (check(TokenType.GREATER_THAN)) {
-            throw parseError("an argument list holds at least one argument, and '" + head.text() + "<>' holds none");
-        }
-        arguments.add(referenceArgument());
-        while (consumeSeparatorOrCloseCheck(TokenType.GREATER_THAN)) {
-            arguments.add(referenceArgument());
-        }
-        expect(TokenType.GREATER_THAN, "a reference's closing '>'");
-        return io.ltr8.tson.schema.meta.TypeRef.of(head.text(), arguments);
-    }
-
-    private io.ltr8.tson.schema.meta.TypeArgument referenceArgument() {
-        Token t = peekToken();
-        switch (t.type()) {
-            case UNQUOTED -> {
-                advance();
-                if (marksSibling(t)) {
-                    throw new ParseException(siblingReference(t).refusedAt("a template argument"), t.start());
-                }
-                boolean applied = opensArguments(t);
-                if (ReferenceGrammar.isQualifiedName(t.text())) {
-                    return new io.ltr8.tson.schema.meta.TypeArgument.Ref(applied ? referenceArguments(t)
-                            : io.ltr8.tson.schema.meta.TypeRef.of(t.text()));
-                }
-                if (applied) {
-                    requireQualifiedName(t);
-                }
-                return new io.ltr8.tson.schema.meta.TypeArgument.Value(
-                        new io.ltr8.tson.schema.meta.Token(t.text(), io.ltr8.tson.schema.meta.Token.Form.UNQUOTED));
-            }
-            case SINGLE_LINE_STRING, MULTI_LINE_STRING -> {
-                advance();
-                opensArguments(t);
-                return new io.ltr8.tson.schema.meta.TypeArgument.Value(new io.ltr8.tson.schema.meta.Token(t.text(),
-                        t.type() == TokenType.SINGLE_LINE_STRING ? io.ltr8.tson.schema.meta.Token.Form.SINGLE_LINE_QUOTED
-                                : io.ltr8.tson.schema.meta.Token.Form.MULTI_LINE_QUOTED));
-            }
-            default -> throw mismatch("a reference's argument: a qualified name, an application or a token "
-                    + "(no structure stands in an argument list in data)");
-        }
-    }
-
-    /**
-     * Whether the token just consumed, {@code head}, is marked as a sibling reference ([TSON-DATA] §7.4): the next
-     * token is a {@code !} adjacent to it. A prefix {@code !} is adjacent to the token after it and so is never
-     * adjacent to the one before ({@link #siblingReference} holds the other half). A quoted token is never a
-     * reference, so a {@code !} after one is refused.
-     */
-    private boolean marksSibling(Token head) {
-        Token next = peekToken();
-        // A multi-line token's end is past its closing line's terminator, where the next line starts, so a prefix
-        // `!` opening that line would read as adjacent to it.
-        if (next.type() != TokenType.BANG || !head.adjacentTo(next) || head.type() == TokenType.MULTI_LINE_STRING) {
-            return false;
-        }
-        if (head.type() != TokenType.UNQUOTED) {
-            throw parseError("a quoted token is never a reference, so '!' cannot mark it as a sibling reference: "
-                    + "a sibling is a field named by one unquoted identifier");
-        }
-        return true;
-    }
-
-    /**
-     * The sibling reference {@code head} and the {@code !} next at the cursor spell: {@code sibling-ref =
-     * unquoted-token "!"}, the token one identifier (a single segment), and the {@code !} followed by whitespace
-     * (§7.5) or the end of the document. The whitespace is what keeps a postfix {@code !} apart from a prefix one,
-     * so {@code a!b}, <code>kind!}</code>, {@code kind!]} and {@code kind!?} are refused here. Assembled whole, so the
-     * stream delivers one value.
-     */
-    private io.ltr8.tson.schema.meta.SiblingRef siblingReference(Token head) {
-        if (!ReferenceGrammar.isSiblingField(head.text())) {
-            throw new ParseException("'" + head.text() + "!' is no sibling reference -- the '!' marks one field "
-                    + "of the same record, named by one identifier, a single segment (§7.4)", head.start());
-        }
-        Token bang = advance();
-        Token next = peekToken();
-        if (next.type() != TokenType.EOF && bang.adjacentTo(next)) {
-            throw parseError("a sibling reference's '!' must be followed by whitespace (§7.5): write '"
-                    + head.text() + "! ' before " + describe(next));
-        }
-        return new io.ltr8.tson.schema.meta.SiblingRef(head.text(), null);
-    }
-
-    private void requireQualifiedName(Token head) {
-        if (!ReferenceGrammar.isQualifiedName(head.text())) {
-            throw new ParseException("'" + head.text() + "' is no qualified name, so it takes no argument list -- "
-                    + "each segment between the dots is an identifier (§7.7)", head.start());
-        }
-    }
-
     private ParseException notAValue(Token t) {
         if (t.type() == TokenType.DIRECTIVE) {
             return parseError("directive '!!" + peekDirectiveName() + "' is not permitted here: a directive "
                     + "stands only in the document header (§2.2, §3.3)");
+        }
+        if (t.type() == TokenType.LESS_THAN || t.type() == TokenType.GREATER_THAN) {
+            return parseError("'" + t.text() + "' has no role in a data value: an argument list is schema grammar "
+                    + "(§7.2.5)");
         }
         return parseError("expected a value (record, map, array, empty braces, "
                 + "the void sentinel '_', or a token), found " + describe(t));
@@ -916,10 +796,6 @@ public final class TsonDataStream implements TsonEventSource {
                     + "not available in a data value (§3.2): a data type-ref is a bare name. Name the "
                     + "application in the schema ('my_type => " + name.text() + "<...>') and write '!my_type' here");
         }
-        if (next.type() == TokenType.BANG && name.adjacentTo(next)) {
-            throw parseError("'!" + name.text() + "!' marks a type's name as a sibling reference, and a tag names a "
-                    + "type (§7.4): a tag is '!' and a qualified name, never a reference to a field");
-        }
         if (next.type() == TokenType.QUESTION && name.adjacentTo(next)) {
             throw parseError("'!" + name.text() + "?' uses the optional suffix, which is schema syntax and not "
                     + "available in a data value (§3.2): optionality is a field's state where the schema "
@@ -1057,13 +933,7 @@ public final class TsonDataStream implements TsonEventSource {
                 }
                 case UNQUOTED, SINGLE_LINE_STRING, MULTI_LINE_STRING -> {
                     advance();
-                    if (opensArguments(t)) {
-                        ready.add(new ReferenceEvent(referenceArguments(t), t.start()));
-                    } else if (marksSibling(t)) {
-                        ready.add(new ReferenceEvent(siblingReference(t), t.start()));
-                    } else {
-                        ready.add(new TokenEvent(t.text(), formOf(t.type()), t.start()));
-                    }
+                    ready.add(new TokenEvent(t.text(), formOf(t.type()), t.start()));
                 }
                 default -> throw notAValue(t);
             }
@@ -1098,14 +968,6 @@ public final class TsonDataStream implements TsonEventSource {
                     ready.add(new RecordStart(lbrace.start()));
                     ready.add(new FieldName(Nfc.of(t1.text()), t1.start()));
                     pushFrame(new RecordFrame());
-                    pushFrame(new DataValueFrame());
-                    return;
-                }
-                if ((t2.type() == TokenType.LESS_THAN || t2.type() == TokenType.BANG && t1.type() == TokenType.UNQUOTED)
-                        && t1.adjacentTo(t2)) {
-                    // A reference as the first key: the entry's own frame reads it, and the arrow after it.
-                    ready.add(new MapStart(lbrace.start()));
-                    pushFrame(new MapFrame(MapFrame.Mode.AWAITING_ARROW));
                     pushFrame(new DataValueFrame());
                     return;
                 }

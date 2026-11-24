@@ -192,7 +192,7 @@ enum OutputFormat {
                 + (policy.skeletonDistinctness() ? "" : " without skeleton distinctness");
     }
 
-    private static String summary(CliPolicy.CliScriptPolicy policy) {
+    private static String summary(CliPolicy.CliTokenPolicy policy) {
         return policy.level() + permitting(policy.permitting());
     }
 
@@ -248,7 +248,6 @@ enum OutputFormat {
                 Map.entry("max_schema_entries", limits.maxSchemaEntries()),
                 Map.entry("max_alias_chain", limits.maxAliasChain()),
                 Map.entry("max_supertype_chain", limits.maxSupertypeChain()),
-                Map.entry("max_materialisation_depth", limits.maxMaterialisationDepth()),
                 Map.entry("max_wait_depth", limits.maxWaitDepth()));
     }
 
@@ -360,7 +359,7 @@ enum OutputFormat {
         jsonPermitting(json, policy.identifierPolicy().permitting());
         json.append('}');
         json.append(",\"token_policy\":");
-        jsonScriptPolicy(json, policy.tokenPolicy());
+        jsonTokenPolicy(json, policy.tokenPolicy());
         json.append(",\"unicode_data_version\":").append(jsonString(policy.unicodeDataVersion()));
         json.append(",\"limits\":{");
         List<Map.Entry<String, Long>> limits = limits(policy.limits());
@@ -373,7 +372,7 @@ enum OutputFormat {
         json.append("}}");
     }
 
-    private static void jsonScriptPolicy(StringBuilder json, CliPolicy.CliScriptPolicy policy) {
+    private static void jsonTokenPolicy(StringBuilder json, CliPolicy.CliTokenPolicy policy) {
         json.append("{\"level\":").append(jsonString(policy.level().name())).append(',');
         jsonPermitting(json, policy.permitting());
         json.append('}');

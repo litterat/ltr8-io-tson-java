@@ -6,21 +6,23 @@ import io.ltr8.tson.schema.*;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.numeric.IntegerSize;
 import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.RecordTemplateField;
+
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.SiblingRef;
+import io.ltr8.tson.schema.meta.DependentBody;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.unicode.TextType;
-import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.Param;
+import io.ltr8.tson.schema.meta.ParamRef;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.VoidType;
@@ -37,9 +39,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -128,20 +127,41 @@ class TsonSchemaLinkerTest {
 
     /**
      * §5.10's arity rule at a field type. {@code set} declares no parameters, so applying it to one is the
-     * author's error -- and it is caught here rather than carried, because {@code arguments} non-empty means
-     * an open form and nothing else once inline sugar lifts to entries.
+     * author's error -- and it is caught here rather than carried, because a resolved field holds a closed
+     * application in place ({@code TypeInline}), so {@code arguments} non-empty there means an open form.
      */
     @Test
-    void anArgumentBearingFieldTypeAgainstANonTemplateIsRejected() {
+    void anArgumentBearingFieldTypeAgainstAnEntryWithNoParametersIsRejected() {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", textEntry());
         entries.put("set", emptyRecord());
         entries.put("container", RecordBody.of(RecordBody.fieldMap(Map.entry("members",
-                RecordField.required(TypeRef.of("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
+                RecordField.required(new ApplyBody(TypeRef.of("set"), List.of(TypeRef.of("token"))).inPlace())))));
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
         assertTrue(thrown.getMessage().contains("'set' declares no type parameters"), thrown.getMessage());
+    }
+
+    /**
+     * A closed body holds no parameter ([TSON-SCHEMA] §8.1): one built by hand into a closed record, at a field or
+     * inside a record written in place, is an unresolved reference, though an entry of the same name exists.
+     */
+    @Test
+    void aParameterInAClosedRecordIsAnUnresolvedReference() {
+        for (Top closed : List.<Top>of(
+                RecordBody.of(RecordBody.fieldMap(Map.entry("v", RecordField.required(ParamRef.of("T"))))),
+                RecordBody.of(RecordBody.fieldMap(Map.entry("m", RecordField.required(new TypeInline(
+                        RecordBody.of(RecordBody.fieldMap(Map.entry("v",
+                                RecordField.required(ParamRef.of("T"))))))))))))  {
+            Map<String, Top> entries = new LinkedHashMap<>();
+            entries.put("T", textEntry());
+            entries.put("r", closed);
+
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> TsonSchemaLinker.link(schemaOf(entries), null));
+            assertTrue(thrown.getMessage().contains("unresolved reference 'T'"), thrown.getMessage());
+        }
     }
 
     /**
@@ -154,7 +174,7 @@ class TsonSchemaLinkerTest {
         entries.put("token", textEntry());
         entries.put("message", RecordBody.of(RecordBody.fieldMap(
                 Map.entry("kind", RecordField.required(TypeRef.of("token"))),
-                Map.entry("payload", RecordField.required(SiblingRef.of("kind"))))));
+                Map.entry("payload", RecordField.required(new TypeInline(DependentBody.on("kind")))))));
 
         SchemaValidationException refused = assertThrows(SchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
@@ -162,34 +182,27 @@ class TsonSchemaLinkerTest {
                 refused.getMessage());
     }
 
-    /** A one-parameter record template whose one field {@code field} is typed by the parameter ([TSON-SCHEMA] §5.10). */
-    private static Top recordTemplate(String parameter, String field) {
-        AnnotatedMap<String, RecordTemplateField> fields = new AnnotatedMap<>();
-        fields.put(field, new RecordTemplateField(Optional.empty(), Optional.of(parameter), false, false,
-                FieldRole.FREE, Optional.empty(), Optional.empty(), null, null));
-        return new RecordTemplateBody(null, fields, null, RecordExtensionType.OPEN, null, Optional.empty(),
-                List.of(TemplateParam.typeParameter(parameter)));
+    /** A one-parameter parametric record whose one field {@code field} is typed by the parameter ([TSON-SCHEMA] §5.10). */
+    private static Top parametricRecord(String parameter, String field) {
+        return new RecordBody(null, List.of(new Param(parameter)),
+                RecordBody.fieldMap(Map.entry(field, RecordField.required(TypeRef.of(parameter)))), null,
+                RecordExtensionType.OPEN, null, Optional.empty());
     }
 
     /**
-     * An argument-bearing type-ref reaches the linker only from a parameterized declaration's own body --
-     * {@code SchemaDesugarer} turns every other one into a real declaration before resolution ever runs, so
-     * there is nothing here to synthesize an entry for. This pins that: link carries the application through
-     * untouched and adds no entries at all. What the linker therefore does <em>not</em> do -- building the
-     * {@code ArrayBody}/placeholder entries a materialisation pass would -- is covered in {@code
-     * SchemaDesugarerTest}, one phase earlier.
+     * The linker closes nothing: an application an entry's key records ({@code @meta.application}) is carried
+     * through as stated, and link adds no entry for it. Closing an application is the resolver's (§5.10).
      *
      * <p><b>The argument is a real entry, and it has to be.</b> An instantiation's key records the
-     * application it closes, closed; a partial application states the arguments it binds in its own {@code
-     * alias.target} (§8.1's alias paragraph). Neither puts a parameter here.
+     * application it closes, closed, so no parameter stands here.
      */
     @Test
     void anArgumentBearingApplicationIsCarriedThroughWithoutMaterialising() {
         Map<String, Top> entries = new LinkedHashMap<>();
         entries.put("token", textEntry());
         entries.put("other",
-                recordTemplate("U", "v"));
-        TypeRef otherOfToken = TypeRef.of("other", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
+                parametricRecord("U", "v"));
+        ApplyBody otherOfToken = new ApplyBody(TypeRef.of("other"), List.of(TypeRef.of("token")));
         entries.put("generic", RecordBody.of(RecordBody.fieldMap()));
 
         AnnotatedMap<String, Top> annotated = AnnotatedMap.of(entries)
@@ -200,10 +213,10 @@ class TsonSchemaLinkerTest {
 
         assertEquals(otherOfToken, result.schema().applicationOf("generic").orElseThrow());
         assertEquals(3, result.schema().entries().size(),
-                "no synthetic entry created for an application an instantiation records");
+                "link adds no entry for an application an entry's key records");
     }
 
-    /** The same body under a declared parameter is a template, which is exactly what may route one. */
+    /** The same body under a declared parameter is a parametric record, which is exactly what may route one. */
     @Test
     void rejectsAFieldReferencingAnUndeclaredType() {
         Map<String, Top> entries = new LinkedHashMap<>();
@@ -473,22 +486,14 @@ class TsonSchemaLinkerTest {
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(local, loader));
     }
 
-    @Test
-    void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
-        // A genuinely different type under the same name: two identical entries are one entry ([TSON-SCHEMA]
-        // §8.2), which is no collision.
-        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), textEntry()));
-    }
-
     /**
-     * And the other half of the same rule: an entry a local declaration and an import both reach, agreeing
-     * byte for byte, unifies rather than colliding. §8.2 names a materialised instantiation by a function of
-     * its resolved form alone -- "two {@code box<text>} anywhere share one entry" -- so a consumer that
-     * closes an application its import already closed must link, or exporting a template is exporting a trap.
+     * A local entry of a name an import declares collides ([TSON-SCHEMA] §2.2.3), whatever its body: two schemas
+     * declaring one name declare two entries, as the resolver refuses the same declaration from text.
      */
     @Test
-    void anImportedEntryAndAnIdenticalLocalOneUnify() {
-        assertDoesNotThrow(() -> link("shared_name", emptyRecord(), emptyRecord()));
+    void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
+        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), textEntry()));
+        assertThrows(SchemaValidationException.class, () -> link("shared_name", emptyRecord(), emptyRecord()));
     }
 
     /** Links a schema declaring {@code name} locally against an import declaring the same name. */
@@ -612,63 +617,6 @@ class TsonSchemaLinkerTest {
         assertTrue(thrown.getMessage().contains("shared_name"), thrown::getMessage);
         assertTrue(thrown.getMessage().contains("import-one.tn")
                 && thrown.getMessage().contains("import-two.tn"), thrown::getMessage);
-    }
-
-    /**
-     * A synthetic's identity is its form (§8.2): two libraries that each mint {@code array_text_…} for {@code [text]},
-     * neither importing the other, declare one entry, and a schema importing both takes it once, from the first.
-     */
-    @Test
-    void oneSyntheticMintedByTwoImportsUnifies() {
-        TsonLinkedSchema linked = TsonSchemaLinker.link(importingBoth(),
-                twoMinting(true, emptyRecord(), true, emptyRecord()));
-
-        assertEquals(CanonicalIdentity.canonicalize("https://example.test/import-one.tn"),
-                linked.originOf("minted_name"));
-        assertTrue(linked.schema().factsOf("minted_name").synthetic());
-    }
-
-    /** A name only one side minted is a declared entry meeting a synthetic, and still the §2.2.3 collision. */
-    @Test
-    void aSyntheticAndADeclaredEntryOfOneNameCollide() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> TsonSchemaLinker.link(importingBoth(),
-                        twoMinting(true, emptyRecord(), false, emptyRecord())));
-        assertTrue(thrown.getMessage().contains("'minted_name' is declared by two different schemas"),
-                thrown::getMessage);
-    }
-
-    /** Two forms under one minted name are a broken naming function, neither the author's error nor a gap. */
-    @Test
-    void twoFormsUnderOneMintedNameAreAnInvariantBreak() {
-        assertThrows(IllegalStateException.class,
-                () -> TsonSchemaLinker.link(importingBoth(),
-                        twoMinting(true, emptyRecord(), true, textEntry())));
-    }
-
-    /** The importer of {@code import-one.tn} and {@code import-two.tn}, declaring nothing itself. */
-    private static TsonSchema importingBoth() {
-        return new TsonSchema("https://example.test/importer.tn",
-                List.of("https://example.test/import-one.tn", "https://example.test/import-two.tn"), Map.of());
-    }
-
-    /** Two schemas each declaring {@code minted_name}, its key marked {@code @meta.synthetic} where asked. */
-    private static TsonSchemaLoader twoMinting(boolean firstSynthetic, Top first, boolean secondSynthetic,
-                                               Top second) {
-        Map<String, TsonLinkedSchema> byIdentity = Map.of(
-                CanonicalIdentity.canonicalize("https://example.test/import-one.tn"),
-                minting("https://example.test/import-one.tn", firstSynthetic, first),
-                CanonicalIdentity.canonicalize("https://example.test/import-two.tn"),
-                minting("https://example.test/import-two.tn", secondSynthetic, second));
-        return id -> Optional.ofNullable(byIdentity.get(id));
-    }
-
-    private static TsonLinkedSchema minting(String id, boolean synthetic, Top body) {
-        AnnotatedMap<String, Top> entries = new AnnotatedMap<>();
-        entries.put("minted_name", body, synthetic
-                ? Annotations.of(List.of(Annotation.of(TsonSchema.SYNTHETIC))) : Annotations.empty());
-        return new TsonLinkedSchema(new TsonSchema(id, List.of(), entries, false, Map.of(), Map.of()),
-                Map.of("minted_name", CanonicalIdentity.canonicalize(id)));
     }
 
     /**

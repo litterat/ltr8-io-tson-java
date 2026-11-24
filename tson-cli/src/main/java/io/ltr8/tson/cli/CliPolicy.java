@@ -5,7 +5,7 @@ import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.unicode.RestrictionLevel;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 
 import java.lang.Character.UnicodeScript;
 import java.util.List;
@@ -33,7 +33,7 @@ import java.util.Set;
  * configuration and the report it produces are one vocabulary.
  */
 public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifierPolicy,
-                        @Field("token_policy") CliScriptPolicy tokenPolicy,
+                        @Field("token_policy") CliTokenPolicy tokenPolicy,
                         @Field("unicode_data_version") String unicodeDataVersion,
                         CliLimits limits) {
 
@@ -63,7 +63,7 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
      */
     static CliPolicy from(ProcessorPolicy policy) {
         return new CliPolicy(CliIdentifierPolicy.from(policy.identifierPolicy()),
-                CliScriptPolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion(),
+                CliTokenPolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion(),
                 CliLimits.from(policy.limits()));
     }
 
@@ -96,7 +96,6 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
                             @Field("max_schema_entries") long maxSchemaEntries,
                             @Field("max_alias_chain") long maxAliasChain,
                             @Field("max_supertype_chain") long maxSupertypeChain,
-                            @Field("max_materialisation_depth") long maxMaterialisationDepth,
                             @Field("max_wait_depth") long maxWaitDepth) {
 
         static CliLimits from(LimitsPolicy limits) {
@@ -105,7 +104,7 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
                     limits.maxElements(), limits.maxEntries(), limits.maxFields(), limits.maxAnnotations(),
                     limits.maxValues(), limits.maxImportClosure(),
                     limits.maxSchemaEntries(), limits.maxAliasChain(), limits.maxSupertypeChain(),
-                    limits.maxMaterialisationDepth(), limits.maxWaitDepth());
+                    limits.maxWaitDepth());
         }
     }
 
@@ -120,8 +119,8 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
                                       List<List<String>> permitting) {
 
         static CliIdentifierPolicy from(IdentifierPolicy policy) {
-            return new CliIdentifierPolicy(policy.scripts().level(), policy.isPerSegment(),
-                    policy.appliesSkeletonDistinctness(), CliScriptPolicy.from(policy.scripts()).permitting());
+            return new CliIdentifierPolicy(policy.level(), policy.isPerSegment(),
+                    policy.appliesSkeletonDistinctness(), scriptNames(policy.permittedScripts()));
         }
     }
 
@@ -129,35 +128,35 @@ public record CliPolicy(@Field("identifier_policy") CliIdentifierPolicy identifi
      * §8.2's token policy: the UTS #39 §5.2 restriction level over each whole token, and the script combinations
      * admitted over and above it.
      */
-    public record CliScriptPolicy(RestrictionLevel level, List<List<String>> permitting) {
+    public record CliTokenPolicy(RestrictionLevel level, List<List<String>> permitting) {
 
-        static CliScriptPolicy from(ScriptPolicy policy) {
-            return new CliScriptPolicy(policy.level(),
-                    policy.permittedScripts().stream().map(CliScriptPolicy::names).toList());
+        static CliTokenPolicy from(TokenPolicy policy) {
+            return new CliTokenPolicy(policy.level(), scriptNames(policy.permittedScripts()));
         }
+    }
 
-        /** One admitted combination, script names sorted so two deployments' reports compare as text. */
-        private static List<String> names(Set<UnicodeScript> scripts) {
-            return scripts.stream().map(CliScriptPolicy::alias).sorted().toList();
+    /** Each admitted combination, script names sorted so two deployments' reports compare as text. */
+    private static List<List<String>> scriptNames(List<Set<UnicodeScript>> combinations) {
+        return combinations.stream().map(scripts -> scripts.stream().map(CliPolicy::alias).sorted().toList())
+                .toList();
+    }
+
+    /**
+     * A script's UAX #24 property value alias, the name {@code policy.tn} states a script by: {@code
+     * Latin}, {@code Old_Italic}. The JDK's constant is the alias upper-cased, so each segment is
+     * title-cased back; {@code SignWriting} is the one alias with a capital inside a segment.
+     */
+    static String alias(UnicodeScript script) {
+        if (script == UnicodeScript.SIGNWRITING) {
+            return "SignWriting";
         }
-
-        /**
-         * A script's UAX #24 property value alias, the name {@code policy.tn} states a script by: {@code
-         * Latin}, {@code Old_Italic}. The JDK's constant is the alias upper-cased, so each segment is
-         * title-cased back; {@code SignWriting} is the one alias with a capital inside a segment.
-         */
-        static String alias(UnicodeScript script) {
-            if (script == UnicodeScript.SIGNWRITING) {
-                return "SignWriting";
+        StringBuilder alias = new StringBuilder();
+        for (String segment : script.name().split("_")) {
+            if (!alias.isEmpty()) {
+                alias.append('_');
             }
-            StringBuilder alias = new StringBuilder();
-            for (String segment : script.name().split("_")) {
-                if (!alias.isEmpty()) {
-                    alias.append('_');
-                }
-                alias.append(segment.charAt(0)).append(segment.substring(1).toLowerCase(Locale.ROOT));
-            }
-            return alias.toString();
+            alias.append(segment.charAt(0)).append(segment.substring(1).toLowerCase(Locale.ROOT));
         }
+        return alias.toString();
     }
 }

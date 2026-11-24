@@ -1,71 +1,37 @@
-!!id:"https://tson.io/2026/39/m/core.tn?sha256=4e8d9c43cbbabf6a73548b819ac74e06e18859b573d05ce99988ae9d4d9a562e"
-!!import:"https://tson.io/2026/39/m/numeric.tn?sha256=dfa66c5d3775a7845776db737f07b16630824f2434f6587aface2f88b77bf0f2"
-!!import:"https://tson.io/2026/39/m/temporal.tn?sha256=fb4ada8f238de82821e7fcf512c21980a8b73c8df9260cdf295ba0157cc3971e"
-!!import:"https://tson.io/2026/39/m/net.tn?sha256=371fc20c8628b5461b56a7a28f2559a1cfde4eda718f72d60ceb1b5a007bac06"
+!!id:"https://tson.io/2026/40/m/core.tn?sha256=00eaf2174c7ba05510ce8410a4b7577bf6fd4bf6db8f099a7c8ec02edd053241"
+!!import:"https://tson.io/2026/40/m/numeric.tn?sha256=0337c18854a0e689ce53d9cae47e1cfd32bd54026acd6a3bac9abae358cb86f7"
+!!import:"https://tson.io/2026/40/m/temporal.tn?sha256=3d516776324209f0406523dac4cc7bac85af0d530599de85a55cdc0b3ef77b20"
+!!import:"https://tson.io/2026/40/m/net.tn?sha256=80b8d1c1af70469b6513891498781454595202cdb3a49501b70b216b5108ea7d"
 @doc:"""
-  TSON core — every bundled type in one import (2026 Revision 39 draft).
-
-  core.tn imports the three data-format libraries, numeric.tn, temporal.tn
-  and net.tn, each of which imports the kernel, meta.tn, alone. A schema
-  importing core therefore has the whole bundled vocabulary, each type under
-  one identity ([TSON-SCHEMA] §2.2.3): the common types at the roots of the
-  kernel and the libraries (`text`, `integer`, `bytes`, `enum`, `set`, `doc`,
-  `number`, `int32`, `date`, `datetime`, `uuid`, `uri`), and the machinery
-  under the maps those documents declare, by path (`meta.record`,
-  `meta.type_ref`, `unicode.text_type`, `numeric.decimal_type`,
-  `temporal.date_type`, `net.uuid_type`). It reserves the map names `meta`,
-  `atom`, `numeric`, `unicode`, `net`, `binary` and `temporal` and every root
-  name of those documents and of this one. A schema that wants only some of
-  the libraries imports those instead.
-
-  Its own root holds the author annotations, which describe a declaration or
-  a field for its readers and tools and never change what it admits:
-  `@deprecated`, `@title`, `@comment`, `@examples`, `@read_only` and
-  `@write_only`. It declares no namespace of its own.
-
-  Hash pins here are real digests over the bytes of this copy; see meta.tn's
-  note.
-
-  References:
-    JSON Schema 2020-12   Meta-data and annotation vocabulary (`title`,
-                          `deprecated`, `readOnly`, `writeOnly`,
-                          `examples`, `$comment`)
+  TSON core: every bundled type in one import. It imports numeric.tn,
+  temporal.tn and net.tn, and declares the author annotations, none of which
+  changes what a type admits ([TSON-SCHEMA] §6, §9).
   """
 !schema {
   @doc:"""
-    Marks a definition or field as deprecated. A bare presence marker like
-    `@atom.numeric`; the reason, where there is one, is `@doc`'s to give.
+    Marks a definition or field as deprecated, written bare before it:
+    `@deprecated`.
     """
   deprecated => @meta.annotation void
 
-  @doc:"Short human-readable name for a definition or field."
+  @doc:"A short human-readable name for a definition or field."
   title => @meta.annotation text
 
   @doc:"""
-    A note for a schema's maintainers rather than its readers (JSON Schema's
-    `$comment`): where `@doc` is what a documentation tool shows, `@comment`
-    is what it leaves out.
+    A note for a schema's maintainers, which a documentation tool leaves out.
     """
   comment => @meta.annotation text
 
   @doc:"""
-    Example values for a definition or field, each the text a reader is shown:
-    conventionally the value written in TSON notation, so a record's example
-    is a string such as `"{ x: 1 }"`. Nothing parses or checks an example
-    against the type it illustrates; the annotation is documentation only.
+    Example values for a definition or field. Each is the text a reader is
+    shown, conventionally the value in TSON notation, and nothing parses or
+    checks one.
     """
   examples => @meta.annotation [text]
 
-  @doc:"""
-    Marks a field an encoding's consumers may read but not write. A bare
-    presence marker like `@atom.numeric`: absence is the default, so there is no
-    false to write (JSON Schema's `readOnly: false` maps to no annotation).
-    """
+  @doc:"Marks a field a consumer may read but not write."
   read_only => @meta.annotation void
 
-  @doc:"""
-    Marks a field an encoding's consumers may write but not read. A bare
-    presence marker, on `@read_only`'s terms.
-    """
+  @doc:"Marks a field a consumer may write but not read."
   write_only => @meta.annotation void
 }

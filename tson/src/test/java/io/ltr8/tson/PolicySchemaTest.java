@@ -1,7 +1,9 @@
 package io.ltr8.tson;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.ltr8.unicode.RestrictionLevel;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -25,11 +27,21 @@ import org.junit.jupiter.api.Test;
 class PolicySchemaTest {
 
     @Test
-    void restrictionLevelMirrorsScriptPolicyLevel() {
+    void restrictionLevelMirrorsTokenPolicyLevel() {
         EnumBody declared = assertInstanceOf(EnumBody.class, Tson.standard().bindRegistry().core()
                 .resolveLinked(TsonBundledSchemas.POLICY_ID).schema().entries().get("policy.restriction_level"));
 
         assertEquals(Arrays.stream(RestrictionLevel.values()).map(Enum::name).toList(), declared.members());
+    }
+
+    /** [TSON-DATA] §8.2 names the token policy so that two reports agree on what it is called. */
+    @Test
+    void theTokenPolicyRecordCarriesThePolicysName() {
+        var entries = Tson.standard().bindRegistry().core().resolveLinked(TsonBundledSchemas.POLICY_ID).schema()
+                .entries();
+
+        assertTrue(entries.containsKey("policy.token_policy"), entries::toString);
+        assertFalse(entries.containsKey("policy.script_policy"), entries::toString);
     }
 
     /**
@@ -56,7 +68,6 @@ class PolicySchemaTest {
         expected.put("max_schema_entries", 65_536L);
         expected.put("max_alias_chain", 64L);
         expected.put("max_supertype_chain", 64L);
-        expected.put("max_materialisation_depth", 64L);
         expected.put("max_wait_depth", 64L);
         Map<String, Long> actual = new LinkedHashMap<>();
         limits.fields().forEach((name, value) -> actual.put(name, ((Number) ((TsonAtom) value).value()).longValue()));
@@ -85,7 +96,7 @@ class PolicySchemaTest {
     @Test
     void aDeploymentsPolicyDocumentValidates() {
         assertEquals(List.of(), Tson.standard().validate("""
-                !!import:"https://tson.io/2026/39/m/policy.tn"
+                !!import:"https://tson.io/2026/40/m/policy.tn"
                 !policy.processor {
                   identifier_policy: { level: HIGHLY_RESTRICTIVE  per_segment: false
                                        skeleton_distinctness: true  permitting: [] }

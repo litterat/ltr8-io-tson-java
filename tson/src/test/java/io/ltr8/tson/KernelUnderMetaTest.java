@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class KernelUnderMetaTest {
 
     private static List<Diagnostic> problems(String body) {
-        return problems("https://tson.io/2026/39/m/core.tn", body);
+        return problems("https://tson.io/2026/40/m/core.tn", body);
     }
 
     private static List<Diagnostic> problems(String imported, String body) {
@@ -100,14 +100,13 @@ class KernelUnderMetaTest {
                 "host_load => { at: host  load: float64  id: uuid }"));
     }
 
-    /** The names a document declares at its root, synthetics and its own maps aside. */
+    /** The names a document declares at its root, its own maps aside. */
     private static Set<String> rootNames(String id) {
         TsonLinkedSchema linked = linked(id);
         String own = CanonicalIdentity.canonicalize(id);
         Set<String> names = new java.util.TreeSet<>();
         linked.schema().entries().forEach((name, value) -> {
-            if (linked.originOf(name).equals(own) && !SchemaPaths.isPath(name) && !SchemaPaths.isNestedMap(value)
-                    && !linked.schema().factsOf(name).synthetic()) {
+            if (linked.originOf(name).equals(own) && !SchemaPaths.isPath(name) && !SchemaPaths.isNestedMap(value)) {
                 names.add(name);
             }
         });
@@ -122,8 +121,8 @@ class KernelUnderMetaTest {
     void metaIsOneOpenNamespaceAcrossItsContributors() {
         TsonLinkedSchema linked = Tson.standard().resolve("""
                 !!id:"https://example.test/contributes.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
-                !schema { meta => !schema { code_type => unicode.text_type ^ { max_length?: = 4 } } }
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema { meta => !schema { code_type => unicode.text_type & { max_length?: = 4 } } }
                 """);
         Namespace<?> members = (Namespace<?>) ((ValueEntry) linked.schema().entries().get("meta")).value();
         assertTrue(members.containsKey("record") && members.containsKey("code_type"), members.keySet()::toString);
@@ -159,7 +158,6 @@ class KernelUnderMetaTest {
                 namespace  => [text]
                 template   => !enum [a b]
                 type_ref  => { k: text }
-                field_name => !text ^ { max_length: 8 }
                 bounded    => !integer ^ { min: 0  max: 9 }
                 value      => { v: int32 }
                 uuid_type  => { u: uuid }
@@ -197,12 +195,15 @@ class KernelUnderMetaTest {
         assertFalse(problems("meta => !schema { map => { id: uuid } }").isEmpty());
     }
 
-    /** A schema may contribute a constructor to {@code meta}, and an ordinary declaration names it by its path. */
+    /**
+     * A schema may contribute an incomplete entry or a constructor to {@code meta}, and an ordinary declaration names
+     * it by its path.
+     */
     @Test
     void aSchemaContributesAConstructorToMeta() {
         assertEquals(List.of(), problems("""
-                meta => !schema { short_text_type => unicode.text_type ^ { max_length?: = 16 } }
-                name => !meta.short_text_type {}
+                meta  => !schema { short_list => !meta.array ^ { max_items: 16 } }
+                names => !meta.short_list { element_type: text }
                 """));
         assertEquals(List.of(), problems("""
                 meta => !schema { pick_type => meta.atom & atom.specification & { picks?: numeric.count } }
@@ -221,7 +222,7 @@ class KernelUnderMetaTest {
     void aRefinementNamesTheKernelsInstanceBare() {
         TsonSchema schema = Tson.standard().resolve("""
                 !!id:"https://example.test/r.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { small => !integer ^ { min: 0 } }
                 """).schema();
         assertEquals(List.of("integer"), TypeChain.supertypesOf(schema.entries().get("small")));

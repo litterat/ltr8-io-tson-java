@@ -2,7 +2,6 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
@@ -13,7 +12,7 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.Top;
 
@@ -72,7 +71,8 @@ final class AtomReader<T> implements JsonTypeReader<T> {
 
     /**
      * Whether this reads a reference ({@code meta.ref<T>}, a kind or a value by name), whose value is the {@code
-     * TypeRef} itself: a component holding one is bound to it directly ({@link #readsAReference}).
+     * TypeRef} or the {@code ValueRef} itself: a component holding one is bound to it directly ({@link
+     * #readsAReference}).
      */
     private final boolean reference;
 
@@ -88,8 +88,8 @@ final class AtomReader<T> implements JsonTypeReader<T> {
 
     /**
      * Whether this reads a reference. A reference's value finds what it names ({@code TypeRef.referent}, and a {@code
-     * Ref} the value delivered), which a bridge over its text would drop, so a component holding a {@code TypeRef} or
-     * a {@code Ref} binds the family's own production rather than a bridge from its name.
+     * ValueRef} the value delivered), which a bridge over its text would drop, so a component holding a {@code TypeRef} or
+     * a {@code ValueRef} binds the family's own production rather than a bridge from its name.
      */
     boolean readsAReference() {
         return reference;
@@ -101,7 +101,7 @@ final class AtomReader<T> implements JsonTypeReader<T> {
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition));
         IdentifierProfile names = definition instanceof IdentifierType identifier ? identifier.profile() : null;
         return new AtomReader<>(name, parser, AtomForm.of(definition), context.locationOf(name),
-                names, definition instanceof ReferenceBody);
+                names, definition instanceof RefBody);
     }
 
     /**
@@ -131,13 +131,14 @@ final class AtomReader<T> implements JsonTypeReader<T> {
         }
         try {
             T value = parser.read(content);
-            // Hygiene judges the name the value is, in its type's normalization form, not the spelling -- each name
-            // an application writes, where a kind's value is one.
-            String named = value instanceof String name ? name
-                    : value instanceof io.ltr8.tson.schema.meta.TypeRef reference ? reference.text() : content;
-            JsonReadContext reading = ctx;
-            return names != null && ReferenceGrammar.anyRefused(named,
-                    each -> NameHygiene.refusesValue(reading, each, names)) ? null : value;
+            // Hygiene judges the name the value is, in its type's normalization form, not the spelling.
+            String named = switch (value) {
+                case String name -> name;
+                case io.ltr8.tson.schema.meta.TypeRef reference -> reference.text();
+                case io.ltr8.tson.schema.meta.ValueRef<?> reference -> reference.name();
+                default -> content;
+            };
+            return names != null && NameHygiene.refusesValue(ctx, named, names) ? null : value;
         } catch (UnsupportedOperationException gap) {
             // A value this library cannot judge yet, such as a type named by a qualified name (`geo.address<T>`).
             ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, gap.getMessage(), "a value this library can judge", content);

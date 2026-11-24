@@ -9,15 +9,21 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.Ref;
-import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.ValueRef;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TupleElement;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 /**
  * A position's reader bound to what a Java target declares -- a record component, or, at any depth below one, a
@@ -40,20 +46,18 @@ import java.util.Optional;
  *       ({@link NamespaceInstanceReader}). A map that is no namespace has no constructor to name and cannot fill
  *       one; a {@code Map} target at a namespace type receives the map.</li>
  *   <li><b>A record</b> is bound by its schema type's own name, so its class is checked against the target and
- *       nothing is rebuilt.</li>
+ *       nothing is rebuilt. A record written in place has no name to bind by, and is read into the target's own
+ *       record class ({@link RecordInPlaceBindReader}).</li>
  *   <li><b>A name at a reference- or kind-typed slot</b> is recorded with the slot's declared type for the linker
- * to judge, whatever the target holds. A {@code Reference} target reads as a {@code TypeRef} one does, a type reference
- * being a reference, and admits a sibling reference besides, which a {@code TypeRef} target refuses at its token, naming the
- * slot ([TSON-SCHEMA] §5.2's position rule). A {@code Ref} or {@code TypeRef} target at a reference-typed slot ({@code
- * meta.ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ReferenceNameReader}: a {@code Ref} receives the value the
- * name reaches -- when the schema links, for a name a schema document writes, and at the read for one in a data
- * document -- and a {@code TypeRef} the name, carrying that value as its referent in a data document. A {@code
- * TypeRef} target at a kind-typed slot ({@code meta.record_field.type} is {@code meta.type_ref}, a meta's {@code
- * request: meta.ref<record>}) reads through a {@link TypeNameSlotReader}: a type's name, or in a kernel body an
- * application still to close, written unquoted. Any other target there is bound as at an atom and wrapped in a {@link
- * RecordedNameReader}, which records the name it read. The slot declares the spelling, so a {@code TypeRef} or
- * {@code Ref} target is a mismatch at a record-typed slot, which holds the record's value inline, and at any other
- * atom, where a token is a literal and never a reference.</li>
+ * to judge, whatever the target holds. A {@code ValueRef} target at a reference-typed slot naming values ({@code
+ * meta.ref<T>}, [TSON-SCHEMA] §5.12) reads through a {@link ValueRefSlotReader}, and receives the value the name
+ * reaches -- when the schema links, for a name a schema document writes, and at the read for one in a data document.
+ * A {@code TypeRef} target there is a mismatch, a value being no type; a {@code String} receives the name. A {@code
+ * TypeRef} target at a kind-typed slot (a name at {@code meta.record_field.type} is a {@code meta.type_ref}, a meta's
+ * {@code request: meta.ref<record>}) reads through a {@link TypeRefSlotReader}: a type's name. Any other target
+ * there is bound as at an atom and wrapped in a {@link RecordedNameReader}, which records the name it read. The slot
+ * declares the spelling, so a {@code TypeRef} or {@code ValueRef} target is a mismatch at a record-typed slot, which
+ * holds the record's value inline, and at any other atom, where a token is a literal and never a reference.</li>
  * </ul>
  * A dependent field ({@link DependentFieldReader}) binds to an {@code Object} component, which receives what the
  * type its sibling names reads to, and to nothing narrower.
@@ -71,9 +75,12 @@ final class BindTargets {
     private BindTargets() {
     }
 
-    /** What every rebuild at one record field shares: the field's name, the schema's readers, the mismatches. */
+    /**
+     * What every rebuild at one record field shares: the field's name, the schema's readers, the mismatches, and the
+     * entry a name reaches past its alias hops ([TSON-SCHEMA] §8.3).
+     */
     record Site(String field, TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes,
-                List<String> mismatches) {
+                List<String> mismatches, UnaryOperator<String> terminal) {
     }
 
     /**
@@ -97,21 +104,47 @@ final class BindTargets {
             return reader;
         }
         TsonTypeReader<?> bound;
-        boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == Reference.class;
-        boolean byName = typeRef || payload.typeClass() == Ref.class;
-        if (byName && readsARef(reader)) {
-            // The name reader produces the host value itself -- the Ref the linker will deliver into, or the
-            // TypeRef -- so the atom's own bridge (Ref's name form) is not applied on top of it.
+        // A component holding what a type slot holds -- a name, or a name or a type written in place -- reads a name
+        // at a kind as a TypeRef component does; a type written in place reaches it through the choice that types
+        // the slot (meta.type_expr), whose own reader this leaves as it is.
+        boolean typeRef = payload.typeClass() == TypeRef.class || payload.typeClass() == TypeExpr.class;
+        boolean byName = typeRef || payload.typeClass() == ValueRef.class;
+        boolean slot = payload.typeClass() == TypeExpr.class;
+        if (slot && RecordAbstractReader.unwrapped(reader) instanceof NamedDispatchReader choice
+                && choice.recovers(DiscriminationClass.STRING)) {
+            // A type slot's choice (meta.type_expr): a name at it is read as a TypeRef component reads one, so the
+            // annotations written on the name are kept; a type written in place is read by the choice's own variant,
+            // under the constructor its body is tagged with, which no field of the wrapper holds.
+            TsonTypeReader<?> named = site.resolver().resolve(choice.recoveredTo(DiscriminationClass.STRING));
+            if (readsAKind(named)) {
+                Map<DiscriminationClass, TsonTypeReader<?>> readers = new EnumMap<>(DiscriminationClass.class);
+                readers.put(DiscriminationClass.STRING, new TypeRefSlotReader(slotAtom(named),
+                        site.annotationTypes()));
+                if (choice.recovers(DiscriminationClass.BRACE)) {
+                    readers.put(DiscriminationClass.BRACE, new TypeInlineReader(
+                            site.resolver().resolve(choice.recoveredTo(DiscriminationClass.BRACE)), site.terminal()));
+                }
+                return AnnotationBoxing.wrap(choice.recoveringWith(readers), target, site.annotationTypes());
+            }
+        }
+        if (typeRef && readsARef(reader)) {
+            site.mismatches().add(what + " holds a value by name (meta.ref<" + slotAtom(reader).refOf() + ">), and "
+                    + where + " holds a " + payload.typeClass().getSimpleName() + " -- a value is no type, so declare "
+                    + "it ValueRef, which receives the value its name reaches, or String, which receives the name");
+            bound = reader;
+        } else if (byName && readsARef(reader)) {
+            // The name reader produces the host value itself, the ValueRef a schema's link delivers into, so the
+            // atom's own bridge (ValueRef's name form) is not applied on top of it.
             AtomTypeReader<?> atom = slotAtom(reader);
-            TsonTypeReader<?> named = new ReferenceNameReader(expectedAt(reader, what), payload.typeClass() == Ref.class,
-                    atom.slotType(), atom.boundTo(payload.typeClass()).orElseThrow(() -> new IllegalStateException(
-                            what + " reads a reference, whose atom binds no " + payload.typeClass().getSimpleName())));
+            TsonTypeReader<?> named = new ValueRefSlotReader(expectedAt(reader, what), atom.slotType(),
+                    atom.boundTo(ValueRef.class).orElseThrow(() -> new IllegalStateException(
+                            what + " reads a reference, whose atom binds no ValueRef")));
             return AnnotationBoxing.wrap(named, target, site.annotationTypes());
         } else if (typeRef && readsAKind(reader)) {
             // The same for a type's name or an application: the reader produces the TypeRef itself, so the atom's
             // own bridge (the reference's text form) is not applied on top of it.
-            return AnnotationBoxing.wrap(new TypeNameSlotReader(slotAtom(reader), site.annotationTypes(), what,
-                    payload.typeClass() == Reference.class), target, site.annotationTypes());
+            return AnnotationBoxing.wrap(new TypeRefSlotReader(slotAtom(reader), site.annotationTypes()), target,
+                    site.annotationTypes());
         } else if (byName && (recordHeldByName(reader) || readsAnAtom(reader))) {
             site.mismatches().add(what + " is not a reference, and " + where + " holds a "
                     + payload.typeClass().getSimpleName() + " -- a value stands by name only at a position typed "
@@ -125,12 +158,36 @@ final class BindTargets {
                 // and the name is recorded as a TypeRef host's would be.
                 AtomTypeReader<?> atom = slotAtom(reader);
                 TsonTypeReader<?> refusing = readsARef(reader)
-                        ? new ReferenceNameReader(expectedAt(reader, what), false, atom.slotType(), bound)
-                        : new TypeNameSlotReader(atom, site.annotationTypes(), what, false);
+                        ? new ValueRefSlotReader(expectedAt(reader, what), atom.slotType(), bound)
+                        : new TypeRefSlotReader(atom, site.annotationTypes());
                 bound = new RecordedNameReader(bound, atom.slotType(), refusing);
             }
         }
         return AnnotationBoxing.wrap(ElementBridging.wrap(bound, payload), target, site.annotationTypes());
+    }
+
+    /**
+     * The host type a natural reader guesses for what a slot holds: a name's bound class ({@code named}), and for a
+     * type written in place, which has no bound class of its own, the shape its constructor reads to -- a {@code List}
+     * of its element's host type for an array, a {@code Map} of its key's and value's for a map, and for a tuple, a
+     * choice or a reference whatever {@code named} gives a name it has no binding for -- what the host binds there is
+     * declared by the component holding it, which rebinds the reader ({@link #to}).
+     */
+    static java.lang.reflect.Type hostType(TypeExpr type, java.util.function.Function<String, Class<?>> named) {
+        return switch (type) {
+            case TypeRef reference -> named.apply(reference.name());
+            case TypeInline inline -> switch (inline.of()) {
+                case ArrayBody array -> new io.ltr8.bind.DataParameterizedType(List.class,
+                        hostType(array.elementType(), named));
+                case MapBody map -> new io.ltr8.bind.DataParameterizedType(
+                        map.ordered() ? java.util.LinkedHashMap.class : java.util.Map.class,
+                        named.apply(map.keyType().name()), hostType(map.valueType(), named));
+                // Reached by an array or map holding a tuple, a choice, a reference or a record in place, read
+                // naturally. Nothing binds a type in place by name, so asking for its form lands on `named`'s
+                // answer for an unbound name; the component holding it declares the class it binds.
+                default -> named.apply(inline.text());
+            };
+        };
     }
 
     /** Whether {@code reader} reads a reference ({@code meta.ref<T>}): a token there is a value's qualified name. */
@@ -139,13 +196,14 @@ final class BindTargets {
     }
 
     /**
-     * Whether {@code reader} reads a record position a {@code TypeRef} or {@code Ref} target cannot hold: a record
+     * Whether {@code reader} reads a record position a {@code TypeRef} or {@code ValueRef} target cannot hold: a record
      * whose bare token is not positional, or a record position this compile cannot see into (a dispatcher, an
      * unbuildable type).
      */
     private static boolean recordHeldByName(TsonTypeReader<?> reader) {
         return switch (RecordAbstractReader.unwrapped(reader)) {
             case RecordAbstractReader<?> record -> !record.bareTokenFillsPositionally();
+            case RecordInPlaceBindReader ignored -> true;
             case ErrorReader ignored -> true;
             case RecordTagDispatchReader ignored -> true;
             case RecordMemberDispatchReader ignored -> true;
@@ -191,6 +249,7 @@ final class BindTargets {
             case MapBindReader map -> map(map, target, what, where, site, top);
             case TupleBindReader tuple -> tuple(tuple, target, what, where, site, top);
             case RecordBindReader record -> record(record, target, what, where, site);
+            case RecordInPlaceBindReader inPlace -> recordInPlace(inPlace, target, what, where, site);
             default -> reader;
         };
     }
@@ -232,7 +291,7 @@ final class BindTargets {
                     + collection.typeClass().getSimpleName() + ", which has no null to hold one");
         }
         String targetName = collection.typeClass().getSimpleName();
-        TsonTypeReader<?> element = to(site.resolver().resolve(array.body.elementType().name()),
+        TsonTypeReader<?> element = to(site.resolver().resolve(array.body.elementType()),
                 collection.arrayDataClass(), what + "'s element", targetName + "'s element", site, false);
         return new ArrayBindReader(top ? site.field() : array.name, top ? site.field() : array.displayName,
                 array.body, collection, element, array.schemaLocation, array.elementsAreNames);
@@ -254,7 +313,7 @@ final class BindTargets {
         String targetName = keyed.typeClass().getSimpleName();
         TsonTypeReader<?> key = to(site.resolver().resolve(map.body.keyType().name()), keyed.keyDataClass(),
                 what + "'s key", targetName + "'s key", site, false);
-        TsonTypeReader<?> value = to(site.resolver().resolve(map.body.valueType().name()), keyed.valueDataClass(),
+        TsonTypeReader<?> value = to(site.resolver().resolve(map.body.valueType()), keyed.valueDataClass(),
                 what + "'s value", targetName + "'s value", site, false);
         return new MapBindReader(top ? site.field() : map.name, top ? site.field() : map.displayName, map.body,
                 keyed, key, value, map.schemaLocation, map.keysAreNames, map.namespace);
@@ -281,7 +340,7 @@ final class BindTargets {
     }
 
     /**
-     * A tuple written inline has a minted entry no author binds, so its own reader is unbound
+     * A tuple written in place has no name to bind a class to, so its own reader is unbound
      * ({@link TupleBindReader#unbound}) and the target's {@code @Tuple} class is the only one there is.
      */
     private static TsonTypeReader<?> tuple(TupleBindReader tuple, DataClass target, String what, String where,
@@ -303,12 +362,28 @@ final class BindTargets {
         List<TsonTypeReader<?>> positions = new ArrayList<>(tuple.body.elements().size());
         for (int i = 0; i < tuple.body.elements().size(); i++) {
             TupleElement element = tuple.body.elements().get(i);
-            positions.add(to(site.resolver().resolve(element.elementType().name()),
+            positions.add(to(site.resolver().resolve(element.elementType()),
                     positional.elements()[i].dataClass(), what + "'s position " + i,
                     targetName + "'s element " + i, site, false));
         }
         return new TupleBindReader(top ? site.field() : tuple.name, top ? site.field() : tuple.displayName,
                 tuple.body, positional, positions, tuple.schemaLocation);
+    }
+
+    /**
+     * A record written in place is bound by the component that holds it: no binding map can name it ([TSON-SCHEMA]
+     * §8.2), so the target's record class is the only one there is, and the record is read into it, each field bound
+     * to the class's component as a declared record's is.
+     */
+    private static TsonTypeReader<?> recordInPlace(RecordInPlaceBindReader inPlace, DataClass target, String what,
+                                                   String where, Site site) {
+        if (!(target instanceof DataClassRecord record)) {
+            site.mismatches().add(what + " is a record written in place, and " + where + " binds "
+                    + target.typeClass().getName() + ", which is not a record class -- a record in place binds to "
+                    + "the record class its component declares");
+            return inPlace;
+        }
+        return inPlace.boundTo(record);
     }
 
     /** A record is bound by its own schema type's name, so the class it builds has to be one the target holds. */

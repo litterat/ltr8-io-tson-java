@@ -3,28 +3,26 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.schema.meta.ApplyBody;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.unicode.Normalization;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.AliasChain;
-import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -34,10 +32,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
-import java.util.function.Predicate;
 
 /**
- * What each {@code record.extension} member obliges, checked over the linked closure ([TSON-SCHEMA] §5.2, §5.7,
+ * What each {@code record.extension} member obliges, checked over the linked closure ([TSON-SCHEMA] §5.2, §5.8,
  * §5.9). The peer of {@link ChoiceDisjointness}, and a checker rather than a derivation: the fact is written by
  * the author's mark and lowered by the resolver, and what is left is whether the rest of the closure agrees with
  * it.
@@ -45,8 +42,8 @@ import java.util.function.Predicate;
  * <p><b>Why here and not at resolution.</b> Every rule below needs a namespace the declaration does not have.
  * FINAL constrains whoever composes onto it, which may be another schema; the family rules range over {@code
  * subtypes}, which nothing populates until linking; and a discriminator field's type has to be followed to the
- * end of its alias chain. What <em>is</em> local -- two definition marks on one declaration, a mark
- * carrying a value, a mark on a non-record -- the resolver already refused while lowering.
+ * end of its alias chain. What <em>is</em> local is settled before: two marks on one declaration, or a mark before
+ * anything but a record definition, is a parse error (§12.1).
  *
  * <p><b>A selector implies {@code abstract}, and states the dispatch by itself.</b> A field written
  * {@code =?} says its members pin it, so the record is the base they are selected from and has no values of
@@ -57,17 +54,14 @@ import java.util.function.Predicate;
  * <p><b>Extending a family is a declaration.</b> A family's members are open across schemas (§3.3.4), so a
  * member changes what every position typed by its base does, in every schema that imports it; and a member is
  * something a read reports, a tag names (§6.1.5) and a binding maps, all by name. An application at a use site
- * has only a minted name, which nothing may write (§8.2), so a member it produced could be selected and never
- * named. It is refused, and the author declares it: {@code dogs => dog_of<text>}. A minted entry that joins no
- * family -- an array, a set, a choice, an application of a family's base -- is untouched, and two schemas
- * minting one such form hold two entries that are the same type in every way a value can tell.
+ * whose record in place would be a member is refused before linking ({@code ParametricMaterialiser}), so every
+ * member this checks is a declaration.
  */
 final class RecordExtension {
 
     /**
-     * One problem, and the entry it is reported against: one this schema declares or minted -- the linker
-     * reports a minted one against the declaration that wrote it -- or {@code ""}, the schema itself, for what
-     * its imports brought together.
+     * One problem, and the entry it is reported against: one this schema declares, or {@code ""}, the schema itself,
+     * for what its imports brought together.
      */
     record Violation(String entry, String message) {
     }
@@ -87,83 +81,41 @@ final class RecordExtension {
      * collision inside one import cannot reach here, since that import was refused when it linked.
      */
     static List<Violation> check(Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                 Map<String, TypeRef> applications, Set<String> localNames,
+                                 Map<String, ApplyBody> applications, Set<String> localNames,
                                  Map<String, String> origins, Map<String, Normalization> enumForms) {
         List<Violation> violations = new ArrayList<>();
-        Predicate<String> kernel = name -> TsonBundledSchemas.isKernel(origins.get(name));
         for (String name : localNames) {
             Top def = merged.get(name);
-            if (def != null && isUndeclaredMember(name, def, facts, applications, kernel)) {
-                String base = nearest(TypeChain.supertypesOf(def), merged);
-                String shownName = shown(name, merged, facts, applications);
-                violations.add(new Violation(name, "'" + shownName + "' composes onto '"
-                        + shown(base, merged, facts, applications) + "', so it is a member of that family, and a "
-                        + "member is declared: a read reports the member it selects, a tag names it and a binding maps "
-                        + "it, all by a name an application at a use site does not have (§3.3.4, §8.2). Declare it -- "
-                        + "'my_name => " + shownName + "' -- and use that name in place of the application"));
-                continue;
-            }
-            RecordBody record = def == null ? null : familyBodyOf(def);
-            if (record != null) {
-                checkDeclaration(name, def, record, merged, facts, violations);
+            if (def instanceof RecordBody record) {
+                checkDeclaration(name, def, record, merged, facts, appliesParametric(name, merged, applications),
+                        violations);
             }
         }
         for (Map.Entry<String, Top> entry : merged.entrySet()) {
             Top def = entry.getValue();
-            RecordBody base = familyBodyOf(def);
-            if (base != null && FamilySelectors.dispatchesOnMembers(def)) {
+            if (def instanceof RecordBody && FamilySelectors.dispatchesOnMembers(def)) {
                 checkFamily(entry.getKey(), def, merged, facts, applications, localNames, origins, enumForms, violations);
             }
         }
         return violations;
     }
 
-    /**
-     * A record a use-site template application minted that composes onto another: a family member with no
-     * declared name. Refused at minting for an expansion ({@code TemplateMaterialiser}), where the application is
-     * in hand; what reaches here is the instantiation entry an expansion naming itself keeps, which has no source
-     * position and records its application. A constructor (IS-A the kernel's {@code top}) is no member of anything.
-     */
-    private static boolean isUndeclaredMember(String name, Top def, Map<String, TsonSchema.EntryFacts> facts,
-                                              Map<String, TypeRef> applications, Predicate<String> kernel) {
-        TsonSchema.EntryFacts known = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
-        TypeRef application = applications.get(name);
-        return known.position().isEmpty() && def instanceof RecordBody record
-                && application != null && !application.arguments().isEmpty()
-                && !record.supertypes().isEmpty() && !EntryKind.isConstructor(name, record, kernel);
-    }
-
-    /**
-     * The nearest of {@code chain}'s members -- the first that no other member IS-A, which is a parent the
-     * declaration wrote or reached through one hop -- for a message that names what an entry composes onto.
-     */
-    private static String nearest(List<String> chain, Map<String, Top> merged) {
-        return chain.stream()
-                .filter(member -> chain.stream().noneMatch(other -> !other.equals(member)
-                        && TypeChain.supertypesOf(merged.get(other)).contains(member)))
-                .findFirst().orElse(chain.getFirst());
-    }
-
-
-
     // ── The declaration's own obligations ────────────────────────────────
 
     private static void checkDeclaration(String name, Top def, RecordBody record,
                                           Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                                  List<Violation> violations) {
+                                          boolean appliesParametric, List<Violation> violations) {
         checkNothingComposesOntoFinal(name, def, merged, facts, violations);
 
         // The *names* this declaration states, never fields resolved from its members: which fields a family
-        // dispatches on is the base's own statement (§5.2), and a template nobody has applied yet has no
-        // members to resolve against -- asking for fields here refused a correct marked template for having
-        // no instantiations. It needs no inherited-selector exemption either: a member states no discriminators
-        // of its own, where the per-field mark had to be cleared at each one to say the same thing.
-        List<String> declared = FamilySelectors.namesOf(def);
-        if (declared.isEmpty() || record.extension() != RecordExtensionType.ABSTRACT) {
+        // dispatches on is the base's own statement (§5.2). It needs no inherited-selector exemption either: a
+        // member states no discriminators of its own. A parametric record's are judged at its declaration (§5.10):
+        // a selector's type names no parameter, so every application states the same selectors, and an application
+        // declared under a name repeats its head's verdict.
+        List<String> declared = record.discriminators();
+        if (declared.isEmpty() || record.extension() != RecordExtensionType.ABSTRACT || appliesParametric) {
             return;
         }
-        // Each is checked as the base reads it: a template's selector is FIXED to its parameter where it is
-        // written, and the base dispatches on it with the pin dropped.
         SequencedMap<String, RecordField> selectors = FamilySelectors.of(def);
         for (String selector : declared) {
             RecordField field = selectors.get(selector);
@@ -173,8 +125,16 @@ final class RecordExtension {
         }
     }
 
+    /** Whether {@code name} is a declared application of a parametric record, past its head's alias hops. */
+    private static boolean appliesParametric(String name, Map<String, Top> merged,
+                                             Map<String, ApplyBody> applications) {
+        ApplyBody application = applications.get(name);
+        return application != null && ParametricEntry.isParametric(
+                merged.get(AliasChain.terminal(application.head().name(), merged)));
+    }
+
     /**
-     * §5.9's subtraction leaves the chain empty and mints no IS-A edge, which is the only thing FINAL
+     * §5.9's subtraction leaves the chain empty and adds no IS-A edge, which is the only thing FINAL
      * constrains, so a subtracted record is not refused here: the one operation §5.9 admits against a final type
      * names no parent at all.
      */
@@ -185,18 +145,17 @@ final class RecordExtension {
             if (target instanceof RecordBody parent
                     && parent.extension() == RecordExtensionType.FINAL) {
                 violations.add(new Violation(name, "'" + name + "' names '" + supertype + "' as a supertype, "
-                        + "but '" + supertype + "' is final and admits none -- composition and refinement are "
-                        + "both refused, in the declaring schema and in any that imports it. Subtraction is "
-                        + "not: §5.9 empties the chain and mints no IS-A edge, which is the only "
-                        + "thing final constrains (§5.2, §5.9)"));
+                        + "but '" + supertype + "' is final and admits none -- composition is refused, in the "
+                        + "declaring schema and in any that imports it. Subtraction is not: §5.9 empties the chain "
+                        + "and adds no IS-A edge, which is the only thing final constrains (§5.2, §5.9)"));
             }
         }
     }
 
     /**
      * §5.2's own rule for a field carrying a value, applied to a field that carries none. The base declares
-     * the discriminator unpinned -- §5.7's identity diagonal forbids it pinning what its subtypes each pin
-     * differently -- so nothing else asks whether its type could hold a pin at all, and a family whose
+     * the discriminator unpinned -- a restatement never changing a pin (§5.8), it cannot pin what its subtypes
+     * each pin differently -- so nothing else asks whether its type could hold a pin at all, and a family whose
      * selector is a record would be discovered only by the subtypes failing one at a time.
      */
     private static void checkDiscriminatorField(String name, String fieldName, RecordField field,
@@ -213,7 +172,7 @@ final class RecordExtension {
             violations.add(new Violation(name, "'" + name + "': discriminator field '" + fieldName
                     + "' is " + field.describe() + ", and must be required -- an optional selector leaves a value "
                     + "with nothing to dispatch on, and a pinned or defaulted one fixes in the base what each "
-                    + "subtype has to state differently (§5.2, §5.7)"));
+                    + "subtype has to state differently (§5.2, §5.8)"));
         }
         Optional<AtomType<?>> parser = parserFor(field, merged, facts);
         if (parser.isEmpty()) {
@@ -227,12 +186,10 @@ final class RecordExtension {
     // ── The family's obligations, over the closure ───────────────────────
 
     private static void checkFamily(String base, Top def, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-            Map<String, TypeRef> applications, Set<String> localNames, Map<String, String> origins,
+            Map<String, ApplyBody> applications, Set<String> localNames, Map<String, String> origins,
             Map<String, Normalization> enumForms, List<Violation> violations) {
         // The same derivation the dispatchers read, never a second filter over the fields: a check that
         // decided "which fields select" differently from the read could pass a family no reader can place.
-        // Each is checked as the base reads it: a template's selector is FIXED to its parameter where it is
-        // written, and the base dispatches on it with the pin dropped.
         SequencedMap<String, RecordField> selectors = FamilySelectors.of(def);
         if (selectors.isEmpty() || selectors.values().stream().anyMatch(f -> parserFor(f, merged, facts).isEmpty())) {
             return; // already reported against the base, and a pin has nothing to be read at
@@ -240,11 +197,8 @@ final class RecordExtension {
         Map<List<Object>, String> seen = new LinkedHashMap<>();
         for (String subtype : new LinkedHashSet<>(TypeChain.subtypesOf(def))) {
             Top sub = merged.get(subtype);
-            // Only a record is a member: a record template IS-A the base is not one, its applications are. An
-            // undeclared member is refused on its own, and judging its pins too would report one mistake twice.
-            if (!(sub instanceof RecordBody record)
-                    || isUndeclaredMember(subtype, sub, facts, applications,
-                    name -> TsonBundledSchemas.isKernel(origins.get(name)))) {
+            // Only a record is a member.
+            if (!(sub instanceof RecordBody record)) {
                 continue;
             }
             List<Object> pins = pinsOf(base, subtype, selectors, record, merged, facts, localNames, enumForms, violations);
@@ -271,13 +225,11 @@ final class RecordExtension {
     }
 
     /**
-     * A member named the way the author wrote it: a minted entry as the application that produced it, which
-     * is the same rule a reader's own messages follow. A family whose members are template applications
-     * collides under names the resolver chose ({@code pet_of_cat_int32_1c52dc45}, §8.2), and those name
-     * nothing an author can open.
+     * A member named the way the author wrote it, the rule a reader's own messages follow: its declared name,
+     * and for an entry with no source position the form or the application its key records.
      */
     private static String shown(String name, Map<String, Top> merged, Map<String, TsonSchema.EntryFacts> facts,
-                                Map<String, TypeRef> applications) {
+                                Map<String, ApplyBody> applications) {
         Top definition = merged.get(name);
         return definition == null ? name : EntryDisplayName.of(name, definition,
                 facts.getOrDefault(name, TsonSchema.EntryFacts.NONE), Optional.ofNullable(applications.get(name)),
@@ -308,7 +260,7 @@ final class RecordExtension {
                             + "and it is those values a position typed '" + base + "' dispatches on. "
                             + (pinned == null ? "The field is not restated here."
                                     : "It is " + pinned.describe() + " here, and a default is omissible so it "
-                                            + "cannot dispatch.") + " (§5.2, §5.7)"));
+                                            + "cannot dispatch.") + " (§5.2, §5.8)"));
                 }
                 return null;
             }
@@ -342,47 +294,30 @@ final class RecordExtension {
     private static Optional<AtomType<?>> parserFor(RecordField field, Map<String, Top> merged, Map<String,
             TsonSchema.EntryFacts> facts,
                                                    Map<String, Normalization> enumForms) {
-        if (field.namedType().isEmpty() || !field.typeRef().arguments().isEmpty()) {
+        String terminal;
+        Top target;
+        switch (field.type()) {
+            case TypeRef reference -> {
+                terminal = AliasChain.terminal(reference.name(), merged);
+                target = merged.get(terminal);
+            }
+            // A type written in place is read by its own body; only a reference among them reads a token.
+            case TypeInline inline -> {
+                terminal = "";
+                target = inline.of();
+            }
+            default -> {
+                return Optional.empty(); // a dependent field, or an application a resolution has not closed
+            }
+        }
+        if (target == null || ParametricEntry.isParametric(target) || target instanceof Alias) {
             return Optional.empty();
         }
-        String terminal = AliasChain.terminal(field.typeRef().name(), merged);
-        Top target = merged.get(terminal);
-        if (target == null || OpenEntry.isOpen(target) || target instanceof Alias) {
-            return Optional.empty();
-        }
-        if (target instanceof ReferenceBody reference && !reference.namesTypes()) {
+        if (target instanceof RefBody reference && !reference.namesTypes()) {
             // A value's name: the pins compare by the name, and what each reaches is checkFieldValue's to judge.
             return AtomParsers.inSchemaDocument(reference);
         }
         return AtomParsers.forType(target, enumForms.getOrDefault(terminal, Normalization.NONE));
-    }
-
-    /**
-     * The record body whose family rules this entry is subject to, or {@code null} where it has none.
-     *
-     * <p><b>A record template is a family base and is judged as one</b> (§5.10). Its own fields may still
-     * carry its parameters, so the body checked here is assembled from the facts it states as a base: ABSTRACT,
-     * the {@code discriminators} it names, and each selector at the type the base declares it, which names no
-     * parameter. Skipping it would accept a template family with no family check at all: no rule that every
-     * member pins every selector, and no rule that the pins are pairwise distinct. An unchecked family is worse
-     * than a refused one.
-     *
-     * <p><b>The selector derivation is the reader's own</b> ({@code FamilySelectors}), so the check and the
-     * dispatch cannot disagree about which fields a family is selected by -- a check that passed a family
-     * the read could not place is the defect one derivation per consumer produces.
-     *
-     * <p>A held template has none: it is no type until applied (§5.10), nothing can stand at it, and its
-     * instantiations are judged as the closed records they are.
-     */
-    private static RecordBody familyBodyOf(Top def) {
-        return switch (def) {
-            case RecordBody record -> record;
-            // The selectors come from `FamilySelectors`, the one derivation both encodings read.
-            case RecordTemplateBody template -> new RecordBody(RecordBody.fieldMap(FamilySelectors.of(template)),
-                    List.of(), FamilySelectors.extensionOf(template).orElseThrow(), template.discriminators(),
-                    java.util.Optional.empty());
-            case null, default -> null;
-        };
     }
 
     /** The colliding pin, named the way an author reads it: one value, or the tuple the selectors form. */

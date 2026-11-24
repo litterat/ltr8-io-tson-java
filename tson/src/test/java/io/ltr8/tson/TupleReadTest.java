@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Where {@code TupleTreeReaderTest} exercises the reader over a hand-built {@code TupleBody}, these run
  * the whole pipeline: the sugar desugars to {@code !tuple { elements: [...] } }, resolves to a real entry,
  * links and compiles. Both spellings are covered -- at declaration position the bracket form <em>is</em> the
- * construction, at a field position it is hoisted into its own declaration and referenced -- since they
+ * construction, at a field position it is the construction written in place, with no entry -- since they
  * reach the resolver by different routes.
  *
  * <p>The counterpart to {@code ChoiceReadTest} for the other half of §5.3's variadic pair.
@@ -40,8 +40,8 @@ class TupleReadTest {
     private static String schema(String declaration) {
         return """
                 !!id:"%s"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   pair => %s
                   holder => {
@@ -86,7 +86,7 @@ class TupleReadTest {
         assertEquals(Optional.of("text"), pair.get(1).typeRef());
     }
 
-    /** An inline tuple at a field position is hoisted, so the field's value carries the injected entry's name. */
+    /** An inline tuple at a field position is written in place, and reads as a tuple as the declared one does. */
     @Test
     void anInlineTupleAtAFieldPositionReadsAsATupleToo() {
         TsonValue holder = read("[integer, text]", "holder", "{ p: [1 \"a\"]  inline: [\"x\" true] }");
@@ -94,8 +94,8 @@ class TupleReadTest {
         TsonTuple inline = assertInstanceOf(TsonTuple.class, holder.get("inline"));
         assertEquals(Optional.of("x"), inline.get(0).asString());
         assertEquals(Optional.of(Boolean.TRUE), inline.get(1).as(Boolean.class));
-        assertTrue(inline.typeRef().orElseThrow().startsWith("tuple_text_boolean_"),
-                "the injected declaration's derived name: " + inline.typeRef());
+        // A tuple written in place has no entry, so no name a tag could write: the value carries none.
+        assertEquals(Optional.empty(), inline.typeRef());
     }
 
     /** Arity is fixed and exact (§5.3) -- too few positions is a WRONG_ARITY, not a partial read. */

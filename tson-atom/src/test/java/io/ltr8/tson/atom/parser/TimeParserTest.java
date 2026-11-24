@@ -74,19 +74,59 @@ class TimeParserTest {
     }
 
     @Test
+    void exclusiveMinRefusesItsOwnInstantAndEveryEarlierOne() {
+        TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.of(OffsetTime.parse("09:00:00Z")),
+                Optional.empty(), Optional.empty(), Optional.empty()));
+        AtomValidationException at = assertThrows(AtomValidationException.class, () -> type.read("09:00:00Z"));
+        assertEquals("> 09:00Z", at.expected());
+        assertEquals(OffsetTime.parse("09:00:00.001Z"), type.read("09:00:00.001Z"));
+        assertThrows(AtomValidationException.class, () -> type.read("08:59:59Z"));
+    }
+
+    @Test
+    void exclusiveMaxRefusesItsOwnInstantAndEveryLaterOne() {
+        TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(OffsetTime.parse("17:00:00Z")), Optional.empty()));
+        AtomValidationException at = assertThrows(AtomValidationException.class, () -> type.read("17:00:00Z"));
+        assertEquals("< 17:00Z", at.expected());
+        assertEquals(OffsetTime.parse("16:59:59Z"), type.read("16:59:59Z"));
+        assertThrows(AtomValidationException.class, () -> type.read("17:00:01Z"));
+    }
+
+    /** The offset is a spelling (§5.5): the bound's own instant written in another offset is still the bound. */
+    @Test
+    void anExclusiveBoundExcludesItsInstantInAnyOffset() {
+        TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.of(OffsetTime.parse("09:00:00Z")),
+                Optional.empty(), Optional.empty(), Optional.empty()));
+        assertThrows(AtomValidationException.class, () -> type.read("10:00:00+01:00"));
+        assertEquals(OffsetTime.parse("10:00:01+01:00"), type.read("10:00:01+01:00"));
+    }
+
+    /** A time is its time of day in UTC (§5.5), so {@code 23:30:00-02:00} is {@code 01:30:00Z} and not a day later. */
+    @Test
+    void aValueWhoseOffsetCarriesItPastMidnightIsJudgedAsItsUtcTimeOfDay() {
+        TimeParser beforeTwo = new TimeParser(Optional.empty(), Optional.of(OffsetTime.parse("02:00:00Z")));
+        assertEquals(OffsetTime.parse("23:30:00-02:00"), beforeTwo.read("23:30:00-02:00"));
+        assertThrows(AtomValidationException.class, () -> beforeTwo.read("00:30:00-02:00"));
+        TimeParser afterTen = new TimeParser(Optional.of(OffsetTime.parse("22:00:00Z")), Optional.empty());
+        assertEquals(OffsetTime.parse("01:00:00+02:00"), afterTen.read("01:00:00+02:00"));
+        assertThrows(AtomValidationException.class, () -> afterTen.read("23:00:00+02:00"));
+    }
+
+    @Test
     void writeRoundTripsThroughRead() {
         assertEquals("10:15:30+01:00",
                 TimeParser.UNCONSTRAINED.write(TimeParser.UNCONSTRAINED.read(token("10:15:30+01:00"))));
     }
 
     /**
-     * <b>{@code precision} constrains the value, not the spelling</b> (§5.5): {@code precision: N} admits an
-     * instant that is a whole number of 10⁻ᴺ seconds. temporal.tn's own {@code @doc} gives the example this
-     * turns on -- "{@code 12:00:00.500} is admitted under {@code precision: 1}". The atom is exact either way: an
-     * instant genuinely off the grid is refused rather than rounded onto it.
+     * <b>{@code fraction_digits} constrains the value, not the spelling</b> (§5.5): {@code fraction_digits: N}
+     * admits an instant that is a whole number of 10⁻ᴺ seconds. temporal.tn's own {@code @doc} gives the example
+     * this turns on -- "{@code 12:00:00.500} is admitted under {@code fraction_digits: 1}". The atom is exact
+     * either way: an instant genuinely off the grid is refused rather than rounded onto it.
      */
     @Test
-    void precisionConstrainsTheValueNotTheSpelling() {
+    void fractionDigitsConstrainsTheValueNotTheSpelling() {
         TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
                 Optional.of(3L)));
         assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));
@@ -118,9 +158,9 @@ class TimeParserTest {
         assertEquals("at most 9 fractional-second digits", refused.expected());
     }
 
-    /** {@code precision: 0} admits no fractional part at all (§5.5). */
+    /** {@code fraction_digits: 0} admits no fractional part at all (§5.5). */
     @Test
-    void precisionZeroAdmitsNoFraction() {
+    void fractionDigitsZeroAdmitsNoFraction() {
         TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
                 Optional.of(0L)));
         assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));

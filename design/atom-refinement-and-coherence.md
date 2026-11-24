@@ -16,7 +16,7 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
 - Coherence is hooked in `bindAtomInstance`, where `!C value` and `!I ^ { ... }` meet, and runs after binding.
 - Emptiness is the rule, not narrowness: `{ min: 5 max: 5 }` resolves; integer folds its `size`-derived range in first.
 - `Product.coherenceCheck` lives on the family, not with any one spelling, and `TsonSchemaLinker` asks every family
-  again for the entries materialisation mints.
+  again for the bodies materialisation produces, a declaration closing an application among them.
 - A bound, step or member of a bundled constructor is typed by its family's instance in the same document
   (`temporal.duration_type.min` is a `duration`, `net.ipv4_type.within` a `[cidr4]`), so it is read by that instance's
   reader and binds the family's host type; a float's bounds are `number`, validated before rounding. A refinement of a
@@ -24,9 +24,22 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
 - A network family's `within`/`excluding` pair is judged for emptiness by the family's own `coherenceCheck`
   (`AtomCoherence.checkAdmitsAValue`), never by the linker or the resolver; its prefix bounds fold in.
 - Unchecked by design: `pattern` against `pattern` (and `pattern` emptiness), selector facets.
+- `!T ^ { … }` over a type built by a constructor that is or IS-A `meta.array` or `meta.map` is judged by
+  `CollectionFacets` over the two **bound** bodies, a namespace type's as the map `NamespaceBody.read()` states, so a
+  facet neither wrote compares at its default: bounds move inward, a type slot and `ordered` are restated only,
+  `unique_items` only rises, `voidable` only falls. A field the constructor pins (`meta.namespace`'s `voidable`) may
+  be written, and its reader compares it against the pin. Its chain is `T` and `T`'s, where an atom refinement's is
+  `[I]`, and its body is the source constructor's, so a refined namespace type is a `NamespaceBody` that everything
+  recognising a namespace type takes. The gate asks the source's constructor and its chain, never the body's class:
+  keeping the source to the two constructors, a namespace type bounded only where it is constructed, lost to §5.7's
+  rule that the facets' rules are the fields', kept through composition. A namespace *value* stays finished.
+- A type slot, and an enum's `name_type`, is one by the entry its name reaches, not by spelling: a restatement by
+  another name is left out of the merge, so the source's spelling carries and `CollectionFacets` compares equal
+  values, and whether the two names reach one entry is judged in `judgeDeferred`, since a name at a type position
+  orders nothing and walking it during resolution would make the refinement wait on what it only names.
 - A reference's `of` narrows to the source's or a type IS-A it, and that one rule is judged at **link**, not in
-  `checkNarrows`: `ReferenceBody.constraintsCheck` asks that a reference refines a reference and that `allow_sibling`
-  is only withdrawn, and `ReferenceBody.ofNarrowing` takes the IS-A as a predicate the linker supplies
+  `checkNarrows`: `RefBody.constraintsCheck` asks that a reference refines a reference, and
+  `RefBody.ofNarrowing` takes the IS-A as a predicate the linker supplies
   (`TsonSchemaLinker.checkReferenceNarrows`).
 - `unicode.text_type`'s `pattern` and `members` are each **settable once** — they occupy one logical position and the pattern
   half cannot be narrowed, so the position takes one rule. A member set may still be *added* to a patterned source.
@@ -50,8 +63,8 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   exactly (`IntegerWidthTest`).
 
 Related: `design/schema-resolution.md` (the resolution phase and its exception boundary),
-`design/constructor-application.md` (what makes an entry an atom instance), `design/template-materialisation.md`
-(the minted entries the linker re-checks), `design/linking-and-compilation.md`.
+`design/constructor-application.md` (what makes an entry an atom instance), `design/parametric-materialisation.md`
+(the closed bodies the linker re-checks), `design/linking-and-compilation.md`.
 
 ## Atom refinement, narrowing and coherence (`tson-compiler/.../resolver/DefinitionResolver.java`)
 
@@ -88,17 +101,14 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   source left unset widens the profile, so no set-once form of the rule is sound (`IdentifierType`). Every text
   family's `normalization` is identity-only on the same terms (`TextType`): turning folding on would make
   `Content-Type` one value under the source and another under the refinement.
-- **A reference narrows `of` by IS-A, and the link judges it** (§5.7, `meta.reference_type`'s own `@doc`). The refined `of`
+- **A reference narrows `of` by IS-A, and the link judges it** (§5.7). The refined `of`
   is the source's or a type IS-A it -- a constructor IS-A one by its chain (`unicode.identifier_type` lists
-  `meta.type`), an ordinary type by its own (`big_order => order ^ {}`) -- so every name the refinement admits, the
+  `meta.type`), an ordinary type by its own (`big_order => order & {}`) -- so every name the refinement admits, the
   source admits too: `meta.identifier_ref => !meta.type_ref ^ { of: unicode.identifier_type }` is the kernel's case.
   The two names are a namespace's, not the bodies', and `of` holds names that order nothing
   (`design/resolver-vocabulary-and-bootstrap.md`), so at resolution neither need be ready:
-  `ReferenceBody.constraintsCheck` admits any reference whose `allow_sibling` withdraws or keeps the source's, a
-  permission as `float_type`'s `allow_nan` is (`AtomNarrowing.checkOnlyWithdraws`: `meta.type_ref => !meta.field_type_ref
-  ^ { allow_sibling: false }` narrows, `!meta.type_ref ^ { allow_sibling: true }` is refused at resolution), and the
-  linker's `checkReferenceNarrows` asks the family's
-  rule, `ReferenceBody.ofNarrowing`, with §7.2's IS-A over the merged namespace (alias hops followed, the entry's chain
+  `RefBody.constraintsCheck` admits any reference, and the linker's `checkReferenceNarrows` asks the family's
+  rule, `RefBody.ofNarrowing`, with §7.2's IS-A over the merged namespace (alias hops followed, the entry's chain
   read), against each reference the refinement's chain names. A widening (`!maps ^ { of: meta.product }` over `of:
   meta.map`) and an unrelated `of` are `SchemaValidationException`s, reported as `checkNarrows` reports, "not a valid
   refinement of '!maps' (§5.7)". The refinement's chain lists its source, as every atom refinement's does, so kind
@@ -108,7 +118,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `SchemaValidationException`
   when a body's own facets admit nothing (`{ min_length: 10 max_length: 3 }`, `{ min: 10 max: 3 }`,
   `{ min_prefix: 40 max_prefix: 8 }`). §7.2 puts the rule and its home in one sentence — "family coherence
-  between bindings (e.g. `min ≤ max`) is a **compilation** and ingest concern (§8), **not data validation**"
+  between bindings (e.g. `min ≤ max`) is a compilation concern (§8), not data validation"
   — which is also why it cannot live in the atom parsers. Running it at *resolution* rather than compilation
   is deliberate and strictly earlier: the bound constraint objects first exist here, and both are schema-load
   time. It asks the **container** families the same question through `Product.coherenceCheck()`, the
@@ -116,17 +126,13 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   the one rule since they carry the identical pair. Stating it on the family rather than with any one
   spelling is what makes `[text; 5..3]` and the `!meta.array { … min_items: 5 max_items: 3 }` body it denotes get
   the same verdict — they are one type, and a rule kept in the desugar phase would only ever see the
-  first. `TsonSchemaLinker` asks it a second time for the entries **materialisation** mints, which
-  resolution never produced: §8.2's "family coherence rules whose operands were parameters" is exactly a
-  template whose bounds were `MIN`/`MAX` until an application supplied both. numeric.tn's and temporal.tn's header
-  `@doc`s state the same obligation from the other side: bounds are field
-  groups so an inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
-  lower bound not exceeding the upper) is a schema-load check". `net.cidr4_type`'s `@doc` adds the family
-  range — prefixes narrow "within the family range 0-32", and "bounds outside that range are invalid at the
-  schema level" — so the CIDR pair is judged against its address width as well as against itself.
-  - **The linker asks every family, and needs no list to do it.** `TsonSchemaLinker` asks **every** family the
-    same question again for the entries materialisation mints, which is how §8.2's "every family coherence rule
-    ... asked once more of the closed record" is met without a list — "a resolver needs no list", as it puts it.
+  first. `TsonSchemaLinker` asks it again of every entry (`checkCoherent`), the bodies **materialisation**
+  produces among them; no facet holds a parameter (§5.10), so a closed body's facets are ones its declaration already
+  wrote, and §8.2 re-judges only what an argument decides. numeric.tn's header `@doc` states the
+  same obligation from the other side, for its families and temporal.tn's: bounds are field groups, so an
+  inclusive/exclusive pair on one side is unrepresentable, while "a lower bound does not exceed the upper" is a
+  rule over the body. `net.cidr4_type`'s `@doc` adds the family range, `min_prefix` and `max_prefix` lying in
+  0-32, so the CIDR pair is judged against its address width as well as against itself.
   - **Hooked in `bindAtomInstance`, not at either call site**, because that is where the `!C value` and `!I ^ { ... }`
     paths meet — one hook covers both. `checkCoherent` asks an `Atom`, `Product` or `Sum` body; any other passes
     through. Running it after binding is what makes it generic: facets arrive converted to the host type their family

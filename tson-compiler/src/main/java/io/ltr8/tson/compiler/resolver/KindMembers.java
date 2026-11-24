@@ -2,12 +2,14 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.ParametricEntry;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Alias;
-import io.ltr8.tson.schema.meta.OpenEntry;
-import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.Extern;
+
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.ValueEntry;
 
 import java.util.ArrayList;
@@ -33,16 +35,16 @@ import java.util.function.Function;
  * meta.ref<order>} names values and {@code meta.ref<record>} types.
  *
  * <p><b>Membership of a type name is one walk</b> over resolved entries, never over spellings. From an entry, alias
- * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, a template
- * over another constructor (a {@code template} body, which is no type) and a value entry are no type's name. For every
- * other entry the type of its value -- the tag resolved output writes, {@code !meta.record}, {@code
- * !unicode.identifier_type}, {@code !meta.namespace} -- is followed, through a constructor template's held body to the
- * constructor it applies, until a constructor is reached, and the entry is a member when that constructor is {@code of} or
- * has {@code of} among its supertypes. A record template is built with {@code record}, so a reference over {@code record}
- * holds it. So does the kernel's {@code top}, a fresh abstract record IS-A nothing. So does a constructor whose declaration
- * is a record, {@code uuid_type => atom & { … }}: its value is a record whose instances are declarations, and nothing in the
- * predicate sets it apart -- {@link io.ltr8.tson.schema.meta.EntryKind#isConstructor} answers for applicability, a
- * different question, and is not consulted here.
+ * hops first ([TSON-SCHEMA] §8.3) reach the entry the name means; an alias that stops at an application, a
+ * parametric record (§5.10) and a value entry are no type's name, so no member set over {@code
+ * meta.ref<meta.record>} reaches a parametric record. For every other entry the type of its value -- the tag resolved output
+ * writes, {@code !meta.record}, {@code !unicode.identifier_type}, {@code !meta.namespace} -- is followed until a
+ * constructor is reached, and the entry is a member when that constructor is {@code of} or has {@code of} among its
+ * supertypes. A reference over {@code record} holds the kernel's {@code top}, a fresh
+ * abstract record IS-A nothing, and a constructor whose declaration is a record, {@code uuid_type => atom & { … }}:
+ * its value is a record whose instances are declarations, and nothing in the predicate sets it apart -- {@link
+ * io.ltr8.tson.schema.meta.TypeChain#isConstructor} answers for applicability, a different question, and is not
+ * consulted here.
  *
  * <p><b>A reference is a member of itself where the walk says so.</b> {@code meta.type_ref} is built with {@code
  * reference}, which IS-A {@code type}, so it is one of the names it holds. Nothing loops: membership reads
@@ -55,7 +57,7 @@ import java.util.function.Function;
  * itself reaches it whether or not a namespace in reach declares it: the name is the constructor's.
  *
  * <p><b>A reference is not a bound.</b> {@code of} is the type of the named entry's value, and the walk is
- * construction; {@code meta.template_param.bound} names a type the argument itself IS-A.
+ * construction; {@code meta.param.bound} names a type the argument itself IS-A.
  */
 public final class KindMembers {
 
@@ -66,12 +68,12 @@ public final class KindMembers {
 
     /**
      * Every entry of {@code merged} whose name {@code reference}, one that names types, admits, in the map's own
-     * order -- {@link ReferenceBody#linked} sorts them.
+     * order -- {@link RefBody#linked} sorts them.
      *
      * @param constructorOf the constructor an entry of {@code merged} applies, from its recorded facts
      * @param structure where a constructor is looked up first; the linker hands it the schema's one namespace
      */
-    public static List<String> of(ReferenceBody reference, Map<String, Top> merged,
+    public static List<String> of(RefBody reference, Map<String, Top> merged,
                                   Function<String, Optional<String>> constructorOf, Function<String, Top> structure) {
         List<String> members = new ArrayList<>();
         for (String name : merged.keySet()) {
@@ -103,7 +105,9 @@ public final class KindMembers {
     public static boolean isMember(Top type, String head, String of, Function<String, Top> local,
                                    Function<String, Top> structure) {
         Function<String, Top> constructors = structureFirst(structure, local);
-        if (type == null || type instanceof TemplateBody || type instanceof Alias || type instanceof ValueEntry) {
+        // An extern is a member where the entry it lands on is, which only a caller holding the link can judge.
+        if (type == null || ParametricEntry.isParametric(type) || type instanceof Alias || type instanceof Extern
+                || type instanceof ValueEntry || type instanceof IncompleteEntry) {
             return false;
         }
         String constructorOf = AliasChain.terminal(of, constructors);
@@ -113,15 +117,6 @@ public final class KindMembers {
             Optional<Found> next = reached(current, constructors);
             if (next.isEmpty()) {
                 return current.equals(constructorOf);
-            }
-            if (next.get().definition() instanceof TemplateBody held) {
-                // A constructor template (`kind => <T> !meta.reference_type { of: T }`): built with what its body applies.
-                Optional<String> applied = HeldBody.of(held).application().typeRef();
-                if (applied.isEmpty()) {
-                    return false;
-                }
-                current = applied.get();
-                continue;
             }
             return isConstructor(next.get().definition()) && reaches(next.get(), constructorOf);
         }
@@ -141,10 +136,10 @@ public final class KindMembers {
     /**
      * Why {@code reference}'s {@code of} cannot be one, or empty where it can: any type or constructor of the writer's
      * namespace may be. Refused are a name {@code structure} does not declare (an empty answer from this method's
-     * caller's resolution, reported as an unresolved reference), an open entry, which denotes no type until it is
-     * applied (§5.10), and a value entry, which is a value and no type.
+     * caller's resolution, reported as an unresolved reference), a parametric record, which denotes no type until it is
+     * applied (§5.10), a value entry, which is a value and no type, and an incomplete entry, which is no type.
      */
-    public static Optional<String> ofRefusal(ReferenceBody reference, Function<String, Top> structure) {
+    public static Optional<String> ofRefusal(RefBody reference, Function<String, Top> structure) {
         String of = reference.of().name();
         Optional<Found> found = reached(of, structure);
         if (found.isEmpty()) {
@@ -155,9 +150,12 @@ public final class KindMembers {
             return Optional.of("its 'of' names '" + of + "', which is a value and no type -- a reference admits the "
                     + "names of entries whose values are of a type, and nothing has a value of a value");
         }
-        if (OpenEntry.isOpen(definition)) {
-            return Optional.of("its 'of' names '" + of + "', an open entry: a template denotes no type until it is "
+        if (ParametricEntry.isParametric(definition)) {
+            return Optional.of("its 'of' names '" + of + "', a parametric record, which denotes no type until it is "
                     + "applied (§5.10)");
+        }
+        if (definition instanceof IncompleteEntry incomplete) {
+            return Optional.of("its 'of' names '" + of + "', " + IncompleteEntries.noType(of, incomplete));
         }
         return Optional.empty();
     }

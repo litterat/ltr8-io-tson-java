@@ -4,16 +4,18 @@ import io.ltr8.tson.schema.numeric.IntegerType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A type carries its own IS-A chain ([TSON-SCHEMA] §4.1): {@code type}'s one field on every type body, a record
- * template's included, the kind an entry's value gives it, judged by where a base kind is defined, and the constructor test.
+ * A type carries its own IS-A chain ([TSON-SCHEMA] §4.1): {@code type}'s one field on every type body, a
+ * parametric record's included, and the constructor test, judged by where {@code top} is defined.
  */
 class TypeChainTest {
 
@@ -45,46 +47,23 @@ class TypeChainTest {
     }
 
     @Test
-    void anEntrysKindIsItsValuesAndARecordsIsTheBaseKindItsChainReaches() {
-        RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
-                .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
-
-        assertEquals(EntryKind.ATOM, EntryKind.of(constructor, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(RecordBody.of(RecordBody.fieldMap()), n -> true));
-        assertEquals(EntryKind.ATOM, EntryKind.of(IntegerType.UNCONSTRAINED, n -> true));
-        assertEquals(EntryKind.ALIAS, EntryKind.of(new Alias(TypeRef.of("text")), n -> true));
-    }
-
-    @Test
-    void aBaseKindIsJudgedByWhereItIsDefinedNeverBySpelling() {
-        RecordBody payload = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("meta.atom"));
-
-        assertEquals(EntryKind.ATOM, EntryKind.of(payload, n -> true));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(payload, n -> false), "a schema's own `meta.atom` is a record");
-        RecordBody bare = RecordBody.of(RecordBody.fieldMap()).withSupertypes(List.of("atom"));
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(bare, n -> true), "a schema's own `atom` is no kernel name");
-    }
-
-    @Test
     void aConstructorIsWhatIsATheKernelsTopAndTheKernelsTopItself() {
         RecordBody constructor = RecordBody.of(RecordBody.fieldMap())
                 .withSupertypes(List.of("meta.atom", "meta.top", "meta.type"));
-        RecordTemplateBody templated = emptyTemplate(
-                        List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())))
+        RecordBody parametric = emptyParametricRecord(List.of(new Param("T")))
                 .withSupertypes(List.of("meta.namespace", "meta.top"));
 
-        assertTrue(EntryKind.isConstructor("numeric.integer_type", constructor, n -> true));
-        assertTrue(EntryKind.isConstructor("op", templated, n -> true), "a template answers as its closed form");
-        assertTrue(EntryKind.isConstructor("meta.top", RecordBody.of(RecordBody.fieldMap()), n -> true));
-        assertFalse(EntryKind.isConstructor("numeric.integer_type", constructor, n -> false), "a schema's own top");
-        assertFalse(EntryKind.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
+        assertTrue(TypeChain.isConstructor("numeric.integer_type", constructor, n -> true));
+        assertTrue(TypeChain.isConstructor("op", parametric, n -> true), "a parametric record answers as its closed form");
+        assertTrue(TypeChain.isConstructor("meta.top", RecordBody.of(RecordBody.fieldMap()), n -> true));
+        assertFalse(TypeChain.isConstructor("numeric.integer_type", constructor, n -> false), "a schema's own top");
+        assertFalse(TypeChain.isConstructor("person", RecordBody.of(RecordBody.fieldMap()), n -> true));
     }
 
     @Test
-    void aRecordTemplateCarriesAChainAsAnyTypeDoes() {
-        RecordTemplateBody pet = emptyTemplate(
-                List.of(new TemplateParam("T", TemplateParam.TYPE_REF, Optional.empty())));
-        RecordTemplateBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
+    void aParametricRecordCarriesAChainAsAnyTypeDoes() {
+        RecordBody pet = emptyParametricRecord(List.of(new Param("T")));
+        RecordBody placed = pet.withChain(TypeChain.of(List.of("animal")).withParents(List.of(TypeRef.of("animal")))
                 .withSubtypes(List.of("dog")));
 
         assertEquals(List.of("animal"), TypeChain.supertypesOf(placed));
@@ -93,8 +72,46 @@ class TypeChainTest {
         assertEquals(placed.parameterNames(), pet.parameterNames());
     }
 
-    private static RecordTemplateBody emptyTemplate(List<TemplateParam> parameters) {
-        return new RecordTemplateBody(TypeChain.EMPTY, new io.ltr8.annotation.AnnotatedMap<>(), List.of(),
-                RecordExtensionType.OPEN, List.of(), Optional.empty(), parameters);
+    @Test
+    void aParametricRecordHoldsItsParametersAsParameterReferences() {
+        RecordBody record = new RecordBody(TypeChain.EMPTY.withParents(List.of(ApplyBody.of("base", "T").inPlace())),
+                List.of(new Param("T")), RecordBody.fieldMap(
+                Map.entry("v", RecordField.required(TypeRef.of("T"))),
+                Map.entry("w", RecordField.required(ApplyBody.of("box", "T").inPlace())),
+                Map.entry("x", RecordField.required(TypeRef.of("text")))),
+                List.of(), RecordExtensionType.OPEN, List.of(), Optional.empty());
+
+        assertTrue(record.isParametric());
+        assertEquals(ParamRef.of("T"), record.fields().get("v").type());
+        assertEquals(new ApplyBody(TypeRef.of("box"), List.of(ParamRef.of("T"))).inPlace(),
+                record.fields().get("w").type());
+        assertEquals(TypeRef.of("text"), record.fields().get("x").type());
+        assertEquals(List.of(new ApplyBody(TypeRef.of("base"), List.of(ParamRef.of("T"))).inPlace()), record.parents());
+    }
+
+    /**
+     * Inside a type written in place a parametric record's parameter is scoped at every slot, and one it does not declare is
+     * refused there too; a closed record judges none, since one in place holds its parametric record's.
+     */
+    @Test
+    void aParametricRecordScopesItsParametersInsideATypeWrittenInPlace() {
+        TypeInline inPlace = new TypeInline(RecordBody.of(RecordBody.fieldMap(
+                Map.entry("cursor", RecordField.required(TypeRef.of("T"))),
+                Map.entry("all", RecordField.required(new TypeInline(ArrayBody.of(TypeRef.of("T"))))))));
+        RecordBody record = new RecordBody(TypeChain.EMPTY, List.of(new Param("T")), RecordBody.fieldMap(
+                Map.entry("meta", RecordField.required(inPlace))), List.of(), RecordExtensionType.OPEN, List.of(),
+                Optional.empty());
+
+        RecordBody meta = (RecordBody) ((TypeInline) record.fields().get("meta").type()).of();
+        assertEquals(ParamRef.of("T"), meta.fields().get("cursor").type());
+        assertEquals(new TypeInline(ArrayBody.of(ParamRef.of("T"))), meta.fields().get("all").type());
+        assertThrows(IllegalArgumentException.class, () -> new RecordBody(TypeChain.EMPTY, List.of(new Param("U")),
+                RecordBody.fieldMap(Map.entry("meta", RecordField.required(new TypeInline(meta)))), List.of(),
+                RecordExtensionType.OPEN, List.of(), Optional.empty()), "T is not U's");
+    }
+
+    private static RecordBody emptyParametricRecord(List<Param> parameters) {
+        return new RecordBody(TypeChain.EMPTY, parameters, new io.ltr8.annotation.AnnotatedMap<>(), List.of(),
+                RecordExtensionType.OPEN, List.of(), Optional.empty());
     }
 }

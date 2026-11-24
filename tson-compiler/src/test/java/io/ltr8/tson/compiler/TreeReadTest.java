@@ -22,8 +22,8 @@ class TreeReadTest {
     private static final String SCHEMA_ID = "https://example.test/tree-read.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/tree-read.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               point => { x: int32  y: int32 }
               shape => { name: text  origin: point  tags: [text] }

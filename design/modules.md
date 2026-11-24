@@ -37,11 +37,13 @@ module has a real `module-info.java`; module names mirror each module's root exp
   (`DataBindContext.Builder.profile`), selecting among a class's `@Profile` constructors so one class binds
   several shapes — one context per schema version, descriptors still cached per context. The name is opaque
   here: matched by equality, with nothing in the module knowing what it stands for, which is what keeps
-  selection out of the schema layer. **A cyclic type graph resolves** — a record reaching itself, directly or
+  selection out of the schema layer. A `DataNameBinder` is asked a name within a **namespace**, opaque on the same
+  terms: the engine passes the declaring schema's identity, and `ltr8-bind` only routes by equality
+  (`byNamespace`). **A cyclic type graph resolves** — a record reaching itself, directly or
   through others: `getDescriptor` hands a re-entrant call a deferred supplier and each holder keeps it in a
   final `Memoized`, so laziness is confined to the cyclic edge and every other component still resolves
   eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` →
-  `DataValue`), which is what lets a held template body be written at all. **A generic record is described at its
+  `DataValue`), which is what lets a value carrying a parsed AST be written at all. **A generic record is described at its
   arguments**: a component's declared type has the class's type parameters replaced by the arguments it is
   described at (`TypeArguments`, `DefaultRecordBinder.resolveRecord(context, class, parameterizedType)`), so
   `Namespace<RecordField>` binds `entries` as a map of `RecordField`; a type variable left in place has no
@@ -127,7 +129,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `BidiRule` (RFC 5893). A true leaf that knows nothing of TSON, named for the publisher rather than the format. The
   boundary is **mechanism versus choice**: what the Unicode standards define lives here, and what a format chooses —
   its own profile, the policy it applies and the words of a refusal — stays with the format (`tson-atom`'s
-  `IdentifierGrammar`, `tson-base`'s `ScriptPolicy` and `IdentifierPolicy`). One version for every table is the reason
+  `IdentifierGrammar`, `tson-base`'s `TokenPolicy` and `IdentifierPolicy`). One version for every table is the reason
   it is one module: a JDK whose Unicode version moves re-derives them together. `tson-base` requires it transitively,
   so the engines above read `Nfc`, `Normalization` and `IdentifierProfile` without naming a second module, and a
   consumer naming a level names `RestrictionLevel`, since the levels are Unicode's.

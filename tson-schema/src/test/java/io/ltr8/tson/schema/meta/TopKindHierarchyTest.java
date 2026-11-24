@@ -1,14 +1,18 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.TsonSchema;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiPredicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -56,7 +60,7 @@ class TopKindHierarchyTest {
     /** A reference is an atom whose values are names (Part 2 §4.2), as an enum is: a set of names, not a sum. */
     @Test
     void aReferenceIsAnAtom() {
-        ReferenceBody reference = ReferenceBody.of("uuid_type");
+        RefBody reference = RefBody.of("uuid_type");
         assertInstanceOf(Atom.class, reference);
         assertInstanceOf(Type.class, reference);
     }
@@ -64,47 +68,41 @@ class TopKindHierarchyTest {
     /**
      * A reference's identity is its {@code of}: its index is derived over a closure, and one reference holds
      * different members in two schemas. A refinement's {@code of} is the source's or IS-A it, a question the
-     * namespace answers ({@link ReferenceBody#ofNarrowing}); a reference refines only a reference.
+     * namespace answers ({@link RefBody#ofNarrowing}); a reference refines only a reference.
      */
     @Test
     void aReferenceIsItsOf() {
-        ReferenceBody linked = ReferenceBody.of("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of(),
-                Map.of(), Map.of(), List.of("stock_id", "customer_id"));
+        RefBody linked = RefBody.of("uuid_type").linked(true, List.of("stock_id", "customer_id"), Map.of(),
+                List.of("stock_id", "customer_id"));
 
-        assertEquals(ReferenceBody.of("uuid_type"), linked);
+        assertEquals(RefBody.of("uuid_type"), linked);
         assertEquals(List.of("customer_id", "stock_id"), linked.memberNames());
         assertTrue(linked.namesTypes());
-        assertEquals(List.of(), linked.constraintsCheck(ReferenceBody.of("uuid_type")));
-        assertEquals(List.of(), linked.constraintsCheck(ReferenceBody.of("text_type")));
+        assertEquals(List.of(), linked.constraintsCheck(RefBody.of("uuid_type")));
+        assertEquals(List.of(), linked.constraintsCheck(RefBody.of("text_type")));
         assertEquals(1, linked.constraintsCheck(new EnumBody(List.of("A"))).size());
 
         BiPredicate<String, String> isA = (sub, sup) -> sub.equals(sup)
                 || sub.equals("uuid_v4_type") && sup.equals("uuid_type");
-        assertEquals(List.of(), linked.ofNarrowing(ReferenceBody.of("uuid_type"), isA));
-        assertEquals(List.of(), linked.ofNarrowing(ReferenceBody.of("uuid_v4_type"), isA));
-        assertEquals(1, linked.ofNarrowing(ReferenceBody.of("text_type"), isA).size());
-        assertEquals(1, ReferenceBody.of("uuid_v4_type").ofNarrowing(ReferenceBody.of("uuid_type"), isA).size());
+        assertEquals(List.of(), linked.ofNarrowing(RefBody.of("uuid_type"), isA));
+        assertEquals(List.of(), linked.ofNarrowing(RefBody.of("uuid_v4_type"), isA));
+        assertEquals(1, linked.ofNarrowing(RefBody.of("text_type"), isA).size());
+        assertEquals(1, RefBody.of("uuid_v4_type").ofNarrowing(RefBody.of("uuid_type"), isA).size());
     }
 
     /**
-     * An application resolves by the identity [TSON-SCHEMA] §8.2 gives it: each argument past its alias chain, a
-     * nested one first to the entry it closed to. Over {@code user_id => uuid} and {@code uid => user_id}, {@code
-     * box<user_id>} is {@code box<uuid>} and {@code box<box<uid>>} is {@code box<box<uuid>>}; a name that is no alias
-     * is compared as itself.
+     * A reference read in data is a name ([TSON-SCHEMA] §4.2): it finds the entry its name names in the closure the
+     * reference was linked over, and an application, which names no entry there, finds nothing.
      */
     @Test
-    void anApplicationIsResolvedPastItsArgumentsAliases() {
-        ReferenceBody linked = ReferenceBody.of("type").linked(true, List.of("boxed", "nested"),
-                Map.of(box(TypeRef.of("uuid")), "boxed", box(TypeRef.of("boxed")), "nested"),
-                Map.of("user_id", "uuid", "uid", "uuid"), Map.of(), List.of());
+    void aReadReferenceFindsTheEntryItsNameNames() {
+        Top boxed = new Alias(TypeRef.of("text"));
+        TypeRef.Closure closure = RefBody.of("type").linked(true, List.of("boxed"), Map.of("boxed", boxed),
+                List.of("boxed")).closure();
 
-        assertEquals(Optional.of("boxed"), linked.entryOf(box(TypeRef.of("user_id"))));
-        assertEquals(Optional.of("nested"), linked.entryOf(box(box(TypeRef.of("uid")))));
-        assertEquals(Optional.empty(), linked.entryOf(box(TypeRef.of("order_id"))));
-    }
-
-    private static TypeRef box(TypeRef argument) {
-        return TypeRef.of("box", List.of(new TypeArgument.Ref(argument)));
+        assertEquals(Optional.of(boxed), closure.referentOf(TypeRef.of("boxed")));
+        assertEquals(Optional.empty(), closure.referentOf(TypeRef.of("nowhere")));
+        assertEquals(Optional.empty(), RefBody.of("type").closure().referentOf(TypeRef.of("boxed")));
     }
 
     @Test
@@ -114,5 +112,45 @@ class TopKindHierarchyTest {
         // (Alias isn't in Atom's/Product's/Sum's own permits lists).
         Alias alias = new Alias(TypeRef.of("token"));
         assertInstanceOf(Top.class, alias);
+    }
+
+    /** The three base kinds, and an application, which stands for a type only once its parametric record is applied. */
+    @Test
+    void theThreeBaseKindsAndAnApplicationAreTypes() {
+        assertEquals(Set.of(Atom.class, Product.class, Sum.class, ApplyBody.class),
+                Set.of(Type.class.getPermittedSubclasses()));
+    }
+
+    @Test
+    void whatComposesWithTopDirectlyIsNoType() {
+        assertEquals(Set.of(Type.class, Alias.class, Extern.class, ValueEntry.class, IncompleteEntry.class),
+                Set.of(Top.class.getPermittedSubclasses()));
+        assertFalse(Type.class.isAssignableFrom(Alias.class));
+        assertFalse(Type.class.isAssignableFrom(Extern.class));
+        assertFalse(Type.class.isAssignableFrom(ValueEntry.class));
+        assertFalse(Type.class.isAssignableFrom(IncompleteEntry.class));
+    }
+
+    @Test
+    void anExternNamesItsConstructor() {
+        assertEquals("meta.extern", TsonSchema.constructorOf(new Extern("https://example.test/order-1.tn", "order")));
+    }
+
+    @Test
+    void anIncompleteEntryNamesItsConstructor() {
+        IncompleteEntry nonempty = new IncompleteEntry("meta.array", List.of("element_type"), "written", Map.of(),
+                List.of());
+        assertEquals("meta.array", TsonSchema.constructorOf(nonempty));
+    }
+
+    @Test
+    void anIncompleteEntryWithNothingAbsentIsABrokenInvariant() {
+        assertThrows(IllegalStateException.class,
+                () -> new IncompleteEntry("meta.array", List.of(), "written", Map.of(), List.of()));
+    }
+
+    @Test
+    void aNamespaceTypeIsAProductLikeAMapType() {
+        assertInstanceOf(Product.class, NamespaceBody.of(TypeRef.of("meta.identifier"), TypeRef.of("method"), false));
     }
 }

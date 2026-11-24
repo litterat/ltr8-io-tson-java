@@ -21,7 +21,7 @@ class IntegerWidthTest {
 
     private static final String WIDE = """
             !!id:"https://example.test/wide.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               wide       => !integer ^ { size: { bits: 3000000000  signed: true } }
               wide_plain => !integer ^ { size: { bits: 3000000000  signed: false } }
@@ -52,7 +52,7 @@ class IntegerWidthTest {
     void wideningAWideWidthIsRefused() {
         List<?> problems = Tson.of(ProcessorConfig.defaults()).validateSchema("""
                 !!id:"https://example.test/wider.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   w5000 => !integer ^ { size: { bits: 5000  signed: false } }
                   w6000 => !w5000 ^ { size: { bits: 6000  signed: false } }
@@ -67,7 +67,7 @@ class IntegerWidthTest {
     void aBoundOutsideAWideWidthIsIncoherent() {
         List<?> problems = Tson.of(ProcessorConfig.defaults()).validateSchema("""
                 !!id:"https://example.test/outside.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   w => !numeric.integer_type { size: { bits: 5000  signed: false }  max: -1 }
                 }

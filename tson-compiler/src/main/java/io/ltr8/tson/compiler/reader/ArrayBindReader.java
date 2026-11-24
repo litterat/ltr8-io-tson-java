@@ -69,7 +69,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                            AnnotationTypes annotationTypes, boolean elementsAreNames) {
         super(name, displayName, body,
                 ElementBridging.wrap(
-                        AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()),
+                        AnnotationBoxing.wrap(resolver.resolve(body.elementType()),
                                 descriptor.arrayDataClass(), annotationTypes),
                         descriptor.arrayDataClass()),
                 schemaLocation, elementsAreNames);
@@ -183,9 +183,11 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition instanceof ArrayBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition);
+                throw new IllegalStateException("'" + name + "' is not array-shaped: " + typeDefinition);
             }
-            Type elementType = resolveElementType(body.elementType().name());
+            // A type written in place has no bound class of its own: its host type is its constructor's shape.
+            Type elementType = BindTargets.hostType(body.elementType(),
+                    element -> resolveElementType(element, context));
             DataClass dataClass = descriptorFor(new DataParameterizedType(List.class, elementType));
             if (!(dataClass instanceof DataClassArray descriptor)) {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
@@ -196,10 +198,10 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                     AnnotationTypes.of(context), elementsAreNames(body, context));
         }
 
-        /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */
-        private Class<?> resolveElementType(String schemaTypeName) {
+        /** {@code schemaTypeName} has no real bound Java class only where none is bound by that name. */
+        private Class<?> resolveElementType(String schemaTypeName, ValueReaderContext vctx) {
             try {
-                return context.getDescriptor(schemaTypeName).typeClass();
+                return context.getDescriptor(vctx.namespaceOf(schemaTypeName), schemaTypeName).typeClass();
             } catch (DataBindException e) {
                 return String.class;
             }

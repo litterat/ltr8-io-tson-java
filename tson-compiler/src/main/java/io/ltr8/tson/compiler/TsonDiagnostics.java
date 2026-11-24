@@ -105,16 +105,24 @@ public final class TsonDiagnostics {
     }
 
     /**
-     * {@link #ofSchemaSyntaxError(String, String, ParseException)} over the three ways a *schema* document
-     * can fail before any declaration resolves, classified exactly as {@link #ofBaseSyntaxError} classifies
-     * them and rethrowing anything else for the same reason. Lives here for the same reason too: {@code
-     * LexException} is in the unexported {@code lexer} package, so a caller in another module cannot catch it.
+     * {@link #ofSchemaSyntaxError(String, String, ParseException)} over the ways a *schema* document can fail
+     * before any declaration resolves, classified exactly as {@link #ofBaseSyntaxError} classifies them and
+     * rethrowing anything else for the same reason. Lives here for the same reason too: {@code LexException} is in
+     * the unexported {@code lexer} package, so a caller in another module cannot catch it.
+     *
+     * <p>A document past a {@code LimitsPolicy} bound ([TSON-DATA] §9.1) is among them, under its own code: it was
+     * declined, not judged, and the position is the schema's.
      */
     public static Diagnostic ofSchemaSyntaxError(String schemaId, RuntimeException e) {
         SourcePosition position;
         switch (e) {
             case ParseException p -> {
                 return ofSchemaSyntaxError(schemaId, "", p);
+            }
+            case LimitExceededException limit -> {
+                Diagnostic declined = Diagnostic.ofLimitExceeded(limit);
+                return new Diagnostic(Optional.empty(), Optional.of(""), schemaId, declined.code(), declined.message(),
+                        declined.expected(), declined.actual(), Optional.empty(), declined.dataPosition());
             }
             case io.ltr8.tson.compiler.lexer.LexException l -> position = l.position();
             case TsonUnsupportedDocumentException u -> position = u.position();
@@ -161,7 +169,7 @@ public final class TsonDiagnostics {
      *                    problem with the document as a whole rather than one of its declarations -- an
      *                    unloadable {@code !!import}, say -- which makes the pointer a <em>present</em>
      *                    {@code ""}, RFC 6901's own spelling of "the whole document", not an absence
-     * @param position    where that declaration begins in the schema source, absent for a synthesized entry
+     * @param position    where that declaration begins in the schema source, absent for an entry with no source text
      */
     public static Diagnostic ofSchemaError(String schemaId, String declaration, String message,
                                            Optional<SourcePosition> position) {

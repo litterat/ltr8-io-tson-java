@@ -3,9 +3,10 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.lang.Character.UnicodeScript;
@@ -27,7 +28,7 @@ class OutputFormatTest {
      * configuration, so a report that did not state them could not be interpreted anywhere but here.
      */
     private static final CliPolicy POLICY = CliPolicy.from(ProcessorPolicy.of(
-            IdentifierPolicy.defaults(), ScriptPolicy.unrestricted(),
+            IdentifierPolicy.defaults(), TokenPolicy.unrestricted(),
             LimitsPolicy.defaults()));
 
     /** {@link #POLICY} as {@code --output json} writes it -- built from the accessor, not pinned to a version. */
@@ -41,7 +42,7 @@ class OutputFormatTest {
                     + "\"max_document_size\":16777216,\"max_elements\":1048576,\"max_entries\":1048576,"
                     + "\"max_fields\":65536,\"max_annotations\":64,\"max_values\":16777216,"
                     + "\"max_import_closure\":64,\"max_schema_entries\":65536,"
-                    + "\"max_alias_chain\":64,\"max_supertype_chain\":64,\"max_materialisation_depth\":64,"
+                    + "\"max_alias_chain\":64,\"max_supertype_chain\":64,"
                     + "\"max_wait_depth\":64}}";
 
     @Test
@@ -240,10 +241,10 @@ class OutputFormatTest {
     @Test
     void tsonOutputRoundTripsARelaxedPolicy() {
         CliPolicy relaxed = CliPolicy.from(ProcessorPolicy.of(
-                IdentifierPolicy.of(ScriptPolicy.moderatelyRestrictive()
-                        .permitting(UnicodeScript.LATIN, UnicodeScript.CYRILLIC)).perSegment()
+                IdentifierPolicy.of(RestrictionLevel.MODERATELY_RESTRICTIVE)
+                        .permitting(UnicodeScript.LATIN, UnicodeScript.CYRILLIC).perSegment()
                         .withSkeletonDistinctness(false),
-                ScriptPolicy.unrestricted(), LimitsPolicy.defaults()));
+                TokenPolicy.unrestricted(), LimitsPolicy.defaults()));
         ValidationReport original = ValidationReport.ok(relaxed);
 
         String rendered = OutputFormat.TSON.render(original);
@@ -262,11 +263,11 @@ class OutputFormatTest {
      */
     @Test
     void aScriptIsWrittenAsItsUnicodeAlias() {
-        assertEquals("Latin", CliPolicy.CliScriptPolicy.alias(UnicodeScript.LATIN));
-        assertEquals("Old_Italic", CliPolicy.CliScriptPolicy.alias(UnicodeScript.OLD_ITALIC));
-        assertEquals("SignWriting", CliPolicy.CliScriptPolicy.alias(UnicodeScript.SIGNWRITING));
+        assertEquals("Latin", CliPolicy.alias(UnicodeScript.LATIN));
+        assertEquals("Old_Italic", CliPolicy.alias(UnicodeScript.OLD_ITALIC));
+        assertEquals("SignWriting", CliPolicy.alias(UnicodeScript.SIGNWRITING));
         for (UnicodeScript script : UnicodeScript.values()) {
-            assertEquals(script, UnicodeScript.forName(CliPolicy.CliScriptPolicy.alias(script)), script::name);
+            assertEquals(script, UnicodeScript.forName(CliPolicy.alias(script)), script::name);
         }
     }
 
@@ -326,7 +327,7 @@ class OutputFormatTest {
     @Test
     void textPrintsANonDefaultPolicyEvenWhenNothingWasRefused() {
         CliPolicy relaxed = CliPolicy.from(ProcessorPolicy.of(
-                IdentifierPolicy.of(ScriptPolicy.scriptsUnchecked()), ScriptPolicy.unrestricted(),
+                IdentifierPolicy.of(RestrictionLevel.MINIMALLY_RESTRICTIVE), TokenPolicy.unrestricted(),
                 LimitsPolicy.defaults()));
 
         String rendered = OutputFormat.TEXT.render(ValidationReport.ok(relaxed));
@@ -366,7 +367,6 @@ class OutputFormatTest {
                 "max schema entries:         65536",
                 "max alias chain:            64",
                 "max supertype chain:        64",
-                "max materialisation depth:  64",
                 "max wait depth:             64"), text);
 
         Object reread = DiagnosticsSchema.compiled().get("policy.processor")

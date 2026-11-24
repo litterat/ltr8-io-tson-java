@@ -21,8 +21,8 @@ class JsonFieldNameTypeTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/json-field-names.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               json_name => !unicode.identifier_type { start_add: "@$" }
               node => !meta.record { name_type: json_name  fields: {
@@ -39,8 +39,9 @@ class JsonFieldNameTypeTest {
               dog => pet & { kind?: = "dog"  breed: text }
               kennel => { p: pet }
               tpet => <B> fbase & { kind: text =?  name: text  extra?: B }
+              tpet_text => tpet<text>
               tdog => tpet<text> & { kind?: = "dog" }
-              tkennel => { p: tpet }
+              tkennel => { p: tpet_text }
               words => !unicode.identifier_type { continue_add: "-"  medial: " " }
               row => !meta.record { name_type: words  fields: { "first name" => { type: text } } }
               json_record => !meta.record { name_type: json_name  extension: ABSTRACT  fields: {} }
@@ -97,8 +98,8 @@ class JsonFieldNameTypeTest {
     }
 
     /**
-     * A member name is matched in the record's name type's form, and so is a family's selector (§5.5) -- a record
-     * template base's included, whose members take its name type.
+     * A member name is matched in the record's name type's form, and so is a family's selector (§5.5) -- a base that
+     * is a parametric record's application included, whose members take the parametric record's name type.
      */
     @Test
     void aMemberNameIsMatchedInItsNameTypesForm() {

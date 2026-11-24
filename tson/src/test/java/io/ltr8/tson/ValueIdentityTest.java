@@ -22,8 +22,8 @@ class ValueIdentityTest {
     private static final String ID = "https://example.test/identity.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/identity.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               digests => set<bytes>
               tags    => set<text>

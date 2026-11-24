@@ -13,7 +13,7 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  * of these directly and never needs to know how it was built.
  *
  * <p>The Class 2 analogue of {@link AtomType}, generalized from atoms to every {@link
- * io.ltr8.tson.schema.meta.Top} kind. One instance is compiled per {@link TsonCompiledSchema} entry;
+ * io.ltr8.tson.schema.meta.Top} branch. One instance is compiled per {@link TsonCompiledSchema} entry;
  * unlike consulting the resolved schema's {@code Map<String, Top>} directly, a compiled
  * instance already knows its own child readers as real object references, so reading a value at
  * this position never re-consults the schema's own name-keyed map at read time -- except at the

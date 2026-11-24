@@ -159,6 +159,9 @@ final class AnnotationCapture {
      */
     private static Optional<Object> value(TsonReadContext ctx, AnnotationStart start, AnnotationTypes types,
                                           SchemalessTreeReader structural) {
+        // Every annotation's name is resolved here, so here a schema document's read stops at one naming a declaration
+        // its readers do not hold yet.
+        ctx.typeNamed(start.name());
         Optional<TsonTypeReader<?>> reader = types.readerFor(start.name());
         if (types.validating() && reader.isEmpty()) {
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,

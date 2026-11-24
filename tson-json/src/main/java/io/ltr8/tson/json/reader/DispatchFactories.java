@@ -5,9 +5,8 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FamilySelectors;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Top;
 
 import java.util.List;
@@ -31,8 +30,7 @@ import java.util.Set;
  * </ul>
  *
  * <p>Both dispatchers compare a written tag against flattened names ([TSON-SCHEMA] §7.2 compares "after
- * alias flattening of both"). A family whose base is a template has minted entries for every member, and
- * §8.2 makes a minted name non-normative -- so an alias is the only name a document has for one.
+ * alias flattening of both"), so a tag may name a family member by any alias of it.
  */
 final class DispatchFactories {
 
@@ -43,6 +41,9 @@ final class DispatchFactories {
     static ValueReaderFactory over(ValueReaderFactory concrete) {
         return (name, definition, context) -> {
             RecordBody body = (RecordBody) definition;
+            if (body.isParametric()) {
+                return PARAMETRIC_RECORD.create(name, definition, context);
+            }
             return switch (body.extension()) {
                 // Linking refuses anything composed onto a FINAL record, so it has no subtype a tag could name.
                 case FINAL -> concrete.create(name, definition, context);
@@ -70,23 +71,14 @@ final class DispatchFactories {
     }
 
     /**
-     * A record template (§5.10), a <b>family base</b>: a type by the only test that matters, a value standing at it
-     * being a value of one of its members, so it dispatches exactly as a closed ABSTRACT base does: on {@code
-     * $type}, or on the discriminators the template states. Reported under the template's own name, the one the
-     * author wrote; a family base has no field list of its own, so the closure rules carry none.
+     * A parametric record, which no position names bare ([TSON-SCHEMA] §5.10): no value is read against it, so it
+     * reaches {@link ParametricRecordReader} unexamined.
      */
-    static final ValueReaderFactory RECORD_TEMPLATE = (name, definition, context) ->
-            family(name, name, definition, context, new RecordDiagnostics(name, ""));
+    static final ValueReaderFactory PARAMETRIC_RECORD = (name, definition, context) ->
+            new ParametricRecordReader(name, ParametricEntry.parameterNames(definition), context.locationOf(name));
 
     /**
-     * Any other template, which is not a type until it is applied ([TSON-SCHEMA] §5.10): its body is held
-     * unsubstituted text no reader could read, so it reaches {@link OpenTemplateReader} unexamined.
-     */
-    static final ValueReaderFactory TEMPLATE = (name, definition, context) ->
-            new OpenTemplateReader(name, OpenEntry.parameterNames(definition), context.locationOf(name));
-
-    /**
-     * An ABSTRACT base, closed or a template: the family's dispatcher, with no concrete reading. Which
+     * An ABSTRACT base: the family's dispatcher, with no concrete reading. Which
      * dispatcher is the body's own statement -- selectors named, or none and the tag decides.
      */
     private static JsonTypeReader<?> family(String name, String displayName, Top definition,

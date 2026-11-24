@@ -38,13 +38,13 @@ class SchemaResolverDiagnosticsTest {
     /**
      * Four independently broken declarations plus one good one, each failing a different rule so that no one
      * is a consequence of another: two refinements that widen rather than narrow (§5.7), a record body
-     * declaring the same field name twice (§5.8), and a refinement source that names nothing at all (§3.3.1)
+     * declaring the same field name twice (§5.8), and an atom refinement source that names nothing at all (§3.3.1)
      * -- the plain typo, and the most common of the four in practice.
      */
     private static final String FOUR_BROKEN = """
             !!id:"https://example.test/broken.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               widens => !uint8 ^ { min: -10  max: 300 }
               fine => int32
@@ -128,8 +128,8 @@ class SchemaResolverDiagnosticsTest {
     void aDeclarationThatFailsWhileNestedIsReportedOnceAndAgainstItself() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   child => !uint8 ^ { min: -10 }
                   parent => child & { extra: int32 }
@@ -151,8 +151,8 @@ class SchemaResolverDiagnosticsTest {
     void aBodyTheConstructorsVocabularyRejectsJoinsTheOtherDiagnostics() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   bad_min => !integer ^ { min: "abc" }
                   bad_max => !integer ^ { max: "xyz" }
@@ -186,8 +186,8 @@ class SchemaResolverDiagnosticsTest {
     void everyInvalidSugarFormIsReportedInOnePass() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   vacuous => [int32; 0..]
                   inverted => [int32; 5..3]
@@ -214,8 +214,8 @@ class SchemaResolverDiagnosticsTest {
     void aSugarFormErrorAndAResolutionErrorAreBothReported() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   vacuous => [int32; 0..]
                   widens => !uint8 ^ { min: -10  max: 300 }
@@ -239,8 +239,8 @@ class SchemaResolverDiagnosticsTest {
     void aDependentOfAFailedSugarFormDoesNotReportAConsequence() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   vacuous => [int32; 0..]
                   user => vacuous & { extra: int32 }
@@ -256,8 +256,8 @@ class SchemaResolverDiagnosticsTest {
     void withoutAReceiverAnInvalidSugarFormStillThrows() {
         TsonSchemaParser parser = new TsonSchemaParser("""
                 !!id:"https://example.test/broken.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   vacuous => [int32; 0..]
                   fine => int32

@@ -11,9 +11,9 @@ import java.util.Optional;
 /**
  * Parses and validates against the kernel's {@code identifier_type} constructor -- a UAX #31 identifier profile with
  * {@code text_type}'s facets inside it. The kernel's {@code meta.identifier} instance is the type of every naming position
- * in the series: type names, field names and parameter names through the
- * {@code meta.type_name}/{@code meta.field_name}/{@code meta.param_name} roles, and {@code enum}'s members, its
- * {@code type}. Other instances name an outside system's positions under that system's own profile.
+ * in the series: type names and parameter names through the {@code meta.type_name}/{@code meta.param_name} roles, the
+ * field names of a record that states no name type, and {@code enum}'s members, its {@code type}. Other instances name
+ * an outside system's positions under that system's own profile.
  *
  * <p><b>The text is put into the {@code normalization} form, then the profile judges it, then the text
  * facets.</b> The value is the normalised text ([TSON-SCHEMA] §5.5), so the profile asks whether the

@@ -8,12 +8,15 @@ in git.
 
 - `displayName` is beside `name`, never instead of it: the entry name is what a type-ref resolves against and what a
   tree node carries as its `typeRef`.
-- A missing source position is what tells a minted entry from an authored one — exactly, not by the name's shape.
+- Every entry is declared, so a reader of an entry names itself by the entry's name; a type written in place, which is
+  no entry, names itself by its form as written (`TypeInline.text()`).
 - A position naming an alias gets a reader copy at compile time; a choice keeps naming the variant, since renaming
   there would allocate per read.
 - Both pointers are rendered from the `PathStep` chain only when a diagnostic is built; concatenating per step is
   quadratic in depth.
-- The pointer is the path taken (`/point/y`), not the leaf reached (`/int32` in numeric.tn).
+- The pointer is the path taken (`/point/y`), not the leaf reached (`/int32` in numeric.tn). Inside a value read
+  through an extern it restarts at the foreign reader's own declaration, the steps before the boundary being the
+  enclosing schema's (`design/externs.md`).
 - `schemaField` steps data and schema together; `field`/`index` step the data alone. It takes two names — the
   field as the document wrote it for the data path, as declared for the schema pointer — which differ under a
   case-folding name type, where only the written one is an RFC 6901 pointer into the document.
@@ -28,41 +31,29 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
 
 ## A reader names itself by what the author wrote
 
-- **A reader names itself by what the author wrote, not by its entry name** (`EntryDisplayName`, threaded to
-  every reader that puts its own name in a message as a `displayName` beside `name`). Sugar lifts each form
-  to an entry of its own and every §5.10 application materialises one, both named content-derived (§8.2), so
-  the entry name for `[order; 1..]` is `array_order_1_e9777a39` — a string in neither the author's file nor
-  the spec, and now travelling to readers who cannot open the schema at all. **A missing source position is
-  what tells the two apart**, exactly rather than by guessing at the name's shape: a parsed declaration
-  carries its own name token's position and a minted entry has none. So `tag_list => [text; 1..2]` keeps
-  `tag_list` and the anonymous form inside it renders as `[order; 1..]`, a map as `{text => order}`, a tuple
-  as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application it records
-  (`@meta.application` on its key, `TsonSchema.applicationOf`, stated as written: `paged<order>`, `pair<box<text>
-  int32>`). Anything with no sugar spelling falls
-  back to the entry name — honest rather than invented.
+- **A reader names itself by what the author wrote** (`EntryDisplayName`, threaded to every reader that puts its own
+  name in a message as a `displayName` beside `name`). Nothing is lifted or minted (§8.2), so an entry's name is an
+  author's, and an entry with a source position is named by it. A type written in place has no entry: its reader is
+  built under its form as written (`TypeInline.text()`: `[order; 1..]`, `{text => order}`, `[text, int32]`,
+  `(text | int32)`, `set<text>` for an unbounded set, a schema's own constructor's application, and a record in place as
+  the application it closes, `page<order>`, or its fields where a resolved form left that unknown), and
+  `ValueReaderContext.displayName`/`authoredName` pass a name that is no entry through unchanged, since a body alone
+  cannot say which constructor built it. An entry with no source position — one the kernel's bootstrap builds by hand,
+  or one read from a resolved form — is shown as the form its body is, and a declared application as the application
+  its key records (`@meta.application`, `TsonSchema.applicationOf`, `paged<order>`).
 - **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). A field
   declared `c: pct` over `pct => small` reads with `small`'s reader, that being the type at the end of the
   chain, and a message from it would otherwise name a declaration the author did write but did not write
   *here*. §8.3 makes a reference a hop and forbids collapsing it in resolved output, so a position reaches its
   child by resolving the name it names and nothing more — no carrier on the type-ref, and nothing added to
-  `TsonReadContext`. The renaming happens one level up instead: the `ALIAS` entry's own compile names its
+  `TsonReadContext`. The renaming happens one level up instead: the alias entry's own compile names its
   target's reader for the entry doing the referring (`TsonSchemaCompiler`, through `UseSite.named`), which is
   the collapse §8.3 permits *after linking, when a processor compiles for reading*. It runs where a composite
   reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only
   in its name, every other position gets the shared reader back unchanged and allocates nothing
   (`AllocationHarnessTest` is the guard).
-    - **An application nothing declares is named by the application that closed to it.** It is its expansion
-      (§5.10): the position names the synthetic directly, so `e: b<10>` over `b => <N> !numeric.integer_type { min: N
-      max: 100 }` reads an atom instance no author named, which carries no `@meta.application`. Its
-      `TsonSchema.EntryFacts.closes` does record the application, so `EntryDisplayName` shows a synthetic with
-      none by `closes().getFirst().text()`: `'b<10>': '5' is less than the minimum 10`, `unknown field 'nope'
-      on 'bx<int32>'`, `'set<text>' requires unique elements`, never the entry's content-derived key. One with
-      neither an application nor a sugar spelling leads with no name at all — the family's own sentence, located
-      by the diagnostic's position. An expansion that names its own application keeps an instantiation entry (an
-      `Alias` to the synthetic, recording the application), and that one is named like any other hop.
-    - **A kind's refusal lists its members the same way** (`ReferenceBody.shownMembers()`, the index's `shown`): a
-      minted member by its application, `meta.ref<net.uuid_type>`, never `reference_uuid_type_…`, and one with no spelling
-      left out.
+    - **A kind's refusal lists its members by name** (`RefBody.shownMembers()`, the index's `shown`), each an
+      entry.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
       read — and the variant that rejected the value is the informative name anyway.
@@ -70,8 +61,8 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
     against (`VariantSchemaReader` dispatches on it) and what a tree node carries as its own `typeRef`, so
     substituting the display name would break dispatch and round-tripping alike.
   - **The pointer roots at the name the read entered through**, which is a different mechanism for the same
-    principle. A compiled reader is shared by every name that reaches it — `order_response => paged<order>`
-    compiles to the instantiation entry's own reader — so the root cannot come from the reader and comes
+    principle. A compiled reader is shared by every name that reaches it — `resp => order_response` compiles
+    to `order_response`'s own reader — so the root cannot come from the reader and comes
     from the facade, which seeds `ctx.underDeclaration(compiled.rootDeclaration(name))` before the read.
     `inRecord` then keeps that pointer and re-anchors only identity and line; a non-alias root seeds exactly
     what the reader would have established.
@@ -79,7 +70,7 @@ Related: `design/readers-and-diagnostics.md`, `design/declared-positions.md`, `d
     whatever the descent had established rather than replacing it with an absence. Entries without a line
     are exactly those nobody wrote, and taking their absence answered "which line do I open" with nothing
     for a document whose author has a perfectly good line: the alias they wrote, or the record whose field
-    the application sits at. That half is independent of the seed: a template application at a *field* has
+    the application sits at. That half is independent of the seed: an application of a parametric record at a *field* has
     the right pointer from the descent and needs only its line kept.
 
 ## The cursor's position is wrapped when it is asked for, not when it is set
@@ -166,7 +157,7 @@ the offending token.
 
 - **A position table is identity-keyed, so every phase that rebuilds a node has to carry it over**, and
   three do. `SchemaDesugarer` re-registers a rebuilt *declaration* and a rebuilt *field* (any record holding
-  a single `[T]` field is rewritten whole, so this is the common case, not an edge); `MetaRefs.mapRefs`, the
+  a single `[T]` field is rewritten whole, so this is the common case, not an edge); `TypeSlots.mapBody`, the
   reference walk a rename runs through, rebuilds every `RecordField` it visits to rewrite its type-ref. That
   last one is why
   `RecordField.withType`/`withState` exist: a rebuild naming components positionally silently drops the ones

@@ -20,7 +20,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.SiblingRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -104,12 +103,12 @@ import java.util.stream.Collectors;
  *
  * <p><b>In a schema document, a bare token is a positional fill only where the positional field is atom-typed</b>
  * ([TSON-SCHEMA] §5.6). When the read is of a value inside a schema document ({@link
- * TsonReadContext#readsSchemaDocument()}), an unquoted token at a record position ({@link
- * ReferenceNameReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
+ * TsonReadContext#readsSchemaDocument()}), a token at a record position ({@link
+ * ValueRefSlotReader#nameIn}) is a name, so the positional form keeps a bare token only where the record's one
  * positional field is <b>atom</b>-typed -- {@code meta.record_field}'s {@code type}, a {@code meta.type_ref}, so {@code
  * !meta.record { fields: { p => text } }} fills {@code type} -- and loses it where that field is a product or a sum,
  * where the explicit record is the only spelling. The record reader refuses a name it does not take as no record,
- * since a component that holds the name is read by {@link ReferenceNameReader} instead and never reaches this
+ * since a component that holds the name is read by {@link ValueRefSlotReader} instead and never reaches this
  * class. A data document has no namespace to resolve a name in,
  * so its reads are untouched: there a bare token fills the positional field whatever its type. Whether the positional
  * field is atom-typed is read off its own compiled reader ({@link #bareTokenFillsPositionally}), the one this class
@@ -196,7 +195,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * What this record's field names are judged by as they are read ({@link TsonReadContext#nextFieldName}):
-     * its name type, the kernel's {@code meta.field_name} where it states none.
+     * its name type, the kernel's {@code meta.identifier} where it states none.
      */
     private final TsonReadContext.FieldNameRule fieldNames;
     /**
@@ -223,7 +222,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final boolean hasDependents;
 
     /**
-     * Each field's sibling index where the field is typed by a sibling reference, whatever reads it -- a {@link
+     * Each field's sibling index where the field is a dependent one, whatever reads it -- a {@link
      * DependentFieldReader} or a bound {@code Token} component's reader -- and -1 elsewhere: a schema document holds
      * every such value as written and hands it to the read's sink ({@link Held}).
      */
@@ -232,7 +231,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     /** Whether each field is the sibling of some field {@link #heldSiblingOf} names. */
     private final boolean[] typesAHeld;
 
-    /** Whether any field is typed by a sibling reference ({@link #heldSiblingOf}). */
+    /** Whether any field is a dependent one ({@link #heldSiblingOf}). */
     private final boolean holdsAsWritten;
 
     /**
@@ -261,8 +260,6 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     throw new IllegalStateException("'" + displayName + "': dependent field '" + fields.get(i).name()
                             + "' names no field '" + dependent.sibling() + "'; the linker refuses one");
                 }
-                fields.set(i, new CompiledField(fields.get(i).name(), fields.get(i).schema(),
-                        dependent.forRecord(body)));
                 siblingOf[i] = at;
                 typesADependent[at] = true;
                 dependents = true;
@@ -359,9 +356,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         static TsonTypeReader<?> declared(TsonTypeReaderResolver resolver, ValueReaderContext context, String name,
                                           RecordField field) {
             return switch (field.type()) {
-                case TypeRef type when !type.arguments().isEmpty() -> new UnclosedApplicationReader(name, type);
                 case TypeRef type -> resolver.resolve(type.name());
-                case SiblingRef sibling -> new DependentFieldReader(name, sibling.field(), resolver, context);
+                case io.ltr8.tson.schema.meta.TypeInline inline
+                        when inline.of() instanceof io.ltr8.tson.schema.meta.ApplyBody apply ->
+                        new UnclosedApplicationReader(name, apply);
+                case io.ltr8.tson.schema.meta.TypeInline inline when inline.dependentOn().isPresent() ->
+                        new DependentFieldReader(name, inline.dependentOn().get(), resolver, context);
+                case io.ltr8.tson.schema.meta.TypeInline inline -> resolver.resolve(inline);
             };
         }
     }
@@ -395,12 +396,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             ctx.next();
             return new ShapeResult(Shape.EMPTY, anchor);
         }
-        Optional<String> byName = ctx.readsSchemaDocument() ? ReferenceNameReader.nameIn(e) : Optional.empty();
+        Optional<String> byName = ctx.readsSchemaDocument() ? ValueRefSlotReader.nameIn(e) : Optional.empty();
         if (positionalFieldIndex >= 0 && (byName.isEmpty() || bareTokenFillsPositionally())) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
         ctx.report(rules.notARecord(byName.map(written -> "the name '" + written + "'")
-                .orElseGet(() -> TypeRefCheck.describe(e))));
+                .orElseGet(() -> TypeTagCheck.describe(e))));
         EventSkip.coreValue(ctx);
         return new ShapeResult(Shape.MISMATCH, anchor);
     }
@@ -409,7 +410,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * Whether a bare token at this record's position fills its one positional field (§5.6) in a schema document --
      * false where the record has none, and where that field is product- or sum-typed, so a token well-formed as a
      * qualified name there is a value by name ([TSON-SCHEMA] §5.6). {@link BindTargets} asks it before giving a
-     * {@code TypeRef} component at a slot of this type a {@link ReferenceNameReader}: a type whose bare token is
+     * {@code TypeRef} component at a slot of this type a {@link ValueRefSlotReader}: a type whose bare token is
      * positional binds the reference through its own reader.
      *
      * <p>Asked of the field's own reader rather than of its declaration, at the read rather than at construction:
@@ -433,6 +434,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             case VoidReader ignored -> true;
             case VoidTreeReader ignored -> true;
             case ErrorReader ignored -> true;
+            // A choice that recovers an untagged token reads it at its atom variant -- the kernel's
+            // `meta.type_expr`, where a name is the reference variant's -- so the token is that atom's value.
+            case NamedDispatchReader choice -> choice.recovers(DiscriminationClass.STRING);
+            case NamedDispatchReader.Recovering choice -> choice.dispatch().recovers(DiscriminationClass.STRING);
             default -> false;
         };
     }
@@ -456,18 +461,19 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     /**
      * The rule entry {@code name}'s field names are judged by, from what linking recorded of its name type, or
-     * {@link TsonReadContext.FieldNameRule#FIELD_NAME} where it has the kernel's default.
+     * {@link TsonReadContext.FieldNameRule#DEFAULT_NAME_TYPE} where it has the kernel's default.
      */
     static TsonReadContext.FieldNameRule fieldNameRule(String name, RecordBody body, ValueReaderContext context) {
-        return context.linked().nameType(name).map(type -> {
+        return context.linked().nameType(name, body).map(type -> {
             if (!(type instanceof IdentifierType identifiers)) {
                 throw new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName() + "' reached a "
                         + "reader as no identifier family; the linker admits only one");
             }
             return new TsonReadContext.FieldNameRule(body.nameTypeName(), AtomParsers.forType(identifiers)
                     .orElseThrow(() -> new IllegalStateException("'" + name + "': name_type '" + body.nameTypeName()
-                            + "' has no reader of its own")), identifiers.profile(), context.linked().nameForm(name));
-        }).orElse(TsonReadContext.FieldNameRule.FIELD_NAME);
+                            + "' has no reader of its own")), identifiers.profile(),
+                    context.linked().nameForm(name, body));
+        }).orElse(TsonReadContext.FieldNameRule.DEFAULT_NAME_TYPE);
     }
 
     /**
@@ -509,7 +515,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     // Under the default the message is the plain one, as for any undeclared identifier; only an
                     // author's own name type is named, with its reason, since its rules are the ones to look up.
                     String stated = fieldName.name();
-                    Optional<String> notAName = fieldNames == TsonReadContext.FieldNameRule.FIELD_NAME
+                    Optional<String> notAName = fieldNames == TsonReadContext.FieldNameRule.DEFAULT_NAME_TYPE
                             ? Optional.empty() : fieldNames.refusal(stated);
                     ctx.field(stated).report(notAName.isEmpty() ? rules.unrecognizedField(stated)
                             : rules.unrecognizedField(stated, fieldNames.typeName(), notAName.get()));
@@ -561,12 +567,15 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 }
                 int before = ctx.reported();
                 decoded = fields.get(schemaIndex).parser().read(fieldCtx);
-                io.ltr8.tson.schema.meta.Reference named = null;
+                io.ltr8.tson.schema.meta.TypeExpr named = null;
                 if (dependents != null && typesADependent[schemaIndex] || held != null && typesAHeld[schemaIndex]) {
-                    named = ctx.reported() > before ? null : DependentFieldReader.referenceIn(decoded);
+                    named = ctx.reported() > before ? null : DependentFieldReader.typeIn(decoded);
                 }
                 if (dependents != null && typesADependent[schemaIndex]) {
                     dependents.named[schemaIndex] = named;
+                    // A tree holds a type written in place as the record it is written as, no type to read against.
+                    dependents.heldInPlace[schemaIndex] = named == null
+                            && decoded instanceof io.ltr8.tson.tree.TsonValue tree && tree.isRecord();
                 }
                 if (held != null && typesAHeld[schemaIndex]) {
                     held.named[schemaIndex] = named;
@@ -586,7 +595,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * Each field typed by a sibling reference that {@code seen} holds and whose sibling, a field group's member, it does
+     * Each dependent field that {@code seen} holds and whose sibling, a field group's member, it does
      * not: nothing typed the value, so it is refused where it was {@code written}. A sibling with nothing to stand for
      * it is known to be absent only here, at the record's close, a dependent field written first being a sibling that
      * may yet arrive; a required one is the missing-field error instead. Whatever reads the field, a bound {@code
@@ -637,13 +646,21 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         CompiledField sibling = fields.get(at);
         TsonReadContext fieldCtx = ctx.schemaField(written, field.name(), field.schema().position());
         TsonReadContext siblingCtx = ctx.schemaField(sibling.name(), sibling.name(), sibling.schema().position());
-        io.ltr8.tson.schema.meta.Reference named;
+        io.ltr8.tson.schema.meta.TypeExpr named;
         if (fixedCheck[at] != null) {
-            named = DependentFieldReader.referenceIn(precomputedValue[at]);
+            named = DependentFieldReader.typeIn(precomputedValue[at]);
         } else if (seen[at]) {
             named = dependents == null ? null : dependents.named[at];
+            if (named == null && dependents != null && dependents.heldInPlace[at]) {
+                fieldCtx.report(Diagnostic.Code.NOT_IMPLEMENTED, "'" + written + "' is typed by its sibling '"
+                        + sibling.name() + "', which holds a type written in place, and a tree read does not yet "
+                        + "read a value against one ([TSON-SCHEMA] §5.2); a bind read does",
+                        "a value read against the type its sibling holds", "a type written in place");
+                TsonReadContext.skipUnjudged(ctx);
+                return null;
+            }
         } else if (omitted[at] == RecordField.Omitted.VALUE && !ctx.readsSchemaNames()) {
-            named = DependentFieldReader.referenceIn(precomputedValue[at]);
+            named = DependentFieldReader.typeIn(precomputedValue[at]);
             if (dependents != null) {
                 dependents.readBefore(index, written, fieldCtx);
             }
@@ -667,12 +684,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     private static final class Dependents {
 
-        final io.ltr8.tson.schema.meta.Reference[] named;
+        final io.ltr8.tson.schema.meta.TypeExpr[] named;
+        final boolean[] heldInPlace;
         final String[] readBefore;
         final TsonReadContext[] readBeforeAt;
 
         Dependents(int size) {
-            named = new io.ltr8.tson.schema.meta.Reference[size];
+            named = new io.ltr8.tson.schema.meta.TypeExpr[size];
+            heldInPlace = new boolean[size];
             readBefore = new String[size];
             readBeforeAt = new TsonReadContext[size];
         }
@@ -702,7 +721,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * What one read of a record in a schema document keeps of the fields typed by a sibling reference: each such
+     * What one read of a record in a schema document keeps of its dependent fields: each such
      * value's events, captured before it is read and held, where it stands, and each sibling's value as this instance
      * wrote it. Handed to the read's sink once the record is read ({@link TsonReadContext#heldAsWritten}), since a
      * schema document holds the value whatever the order its fields are written in, so the sibling may come after.
@@ -711,12 +730,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
         final List<List<TsonEvent>> written;
         final TsonReadContext[] at;
-        final io.ltr8.tson.schema.meta.Reference[] named;
+        final io.ltr8.tson.schema.meta.TypeExpr[] named;
 
         Held(int size) {
             written = new ArrayList<>(java.util.Collections.nCopies(size, null));
             at = new TsonReadContext[size];
-            named = new io.ltr8.tson.schema.meta.Reference[size];
+            named = new io.ltr8.tson.schema.meta.TypeExpr[size];
         }
 
         /** Field {@code index}'s value, at {@code fieldCtx}'s cursor, before it is read. */
@@ -735,18 +754,17 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     continue;
                 }
                 int sibling = record.heldSiblingOf[i];
-                io.ltr8.tson.schema.meta.Reference holds;
+                io.ltr8.tson.schema.meta.TypeExpr holds;
                 if (record.fixedCheck[sibling] != null) {
-                    holds = DependentFieldReader.referenceIn(record.precomputedValue[sibling]);
+                    holds = DependentFieldReader.typeIn(record.precomputedValue[sibling]);
                 } else if (seen[sibling]) {
                     holds = named[sibling];
                 } else if (record.omitted[sibling] == RecordField.Omitted.VALUE) {
-                    holds = DependentFieldReader.referenceIn(record.precomputedValue[sibling]);
+                    holds = DependentFieldReader.typeIn(record.precomputedValue[sibling]);
                 } else {
                     holds = null;
                 }
-                CompiledField declared = record.fields.get(sibling);
-                at[i].heldAsWritten(record.fields.get(i).name(), declared.name(), declared.schema(), holds,
+                at[i].heldAsWritten(record.fields.get(i).name(), record.fields.get(sibling).name(), holds,
                         written.get(i));
             }
         }

@@ -43,8 +43,8 @@ class BindStrictnessTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               order => { sku: text  quantity: int32  currency: text }
             }
@@ -190,8 +190,8 @@ class BindStrictnessTest {
 
     private static final String MONEY_SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               money => text
               order => { sku: text  quantity: int32  currency: money }

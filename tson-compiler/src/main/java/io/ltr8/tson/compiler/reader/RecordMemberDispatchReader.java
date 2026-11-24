@@ -69,6 +69,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
      */
     private final Set<String> selfNames;
 
+    /** The base's entry name, which a resolution asks of the declarations that may join it. */
+    private final String base;
+
     private final List<Selector> selectors;
 
     /** Each selector's name in the base's name form (§5.5), to the name as declared -- what the scan matches. */
@@ -81,20 +84,20 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private final String pinned;
 
     /**
-     * <b>The selectors arrive already chosen, from either kind of base</b> ({@code FamilySelectors}), each
-     * read off the base's own fields: a family base's selector is pinned to a parameter, which the derivation
-     * drops, so its field is handed over as the selector a closed base declares. Taking the fields rather than
-     * a {@code RecordBody} is what keeps the choice of "which fields select" in that one derivation.
+     * <b>The selectors arrive already chosen</b> ({@code FamilySelectors}), each read off the base's own fields.
+     * Taking the fields rather than a {@code RecordBody} is what keeps the choice of "which fields select" in that
+     * one derivation.
      */
-    RecordMemberDispatchReader(Set<String> selfNames, String displayName, SequencedMap<String, RecordField> selectorFields,
-                                Set<String> subtypes, ValueReaderContext context,
-                                TsonTypeReaderResolver readerFor) {
+    RecordMemberDispatchReader(String base, Set<String> selfNames, String displayName,
+                               SequencedMap<String, RecordField> selectorFields, Set<String> subtypes,
+                               ValueReaderContext context, TsonTypeReaderResolver readerFor) {
         Namespace<Top> entries = context.schema().entries();
+        this.base = base;
         this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
         this.selectors = selectorFields.entrySet().stream()
                 .map(field -> selectorOf(field.getKey(), field.getValue(), entries, context.linked())).toList();
-        // The family's members compose the base, so they share its name type, a template base's included.
+        // The family's members compose the base, so they share its name type.
         this.nameForm = selfNames.stream().map(context.linked()::nameForm)
                 .filter(form -> form != io.ltr8.unicode.Normalization.NFC).findFirst()
                 .orElse(io.ltr8.unicode.Normalization.NFC);
@@ -103,7 +106,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
         for (String subtype : subtypes) {
-            // Only a record is a member: a record template IS-A the base is none, its applications are.
+            // Only a record is a member, and a subtype index holds no parametric record (§5.10).
             if (!(entries.get(subtype) instanceof RecordBody record)) {
                 continue;
             }
@@ -123,11 +126,17 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
 
     private static Selector selectorOf(String name, RecordField field, Namespace<Top> entries,
                                        TsonLinkedSchema linked) {
-        String terminal = AliasChain.terminal(field.typeRef().name(), entries::get);
-        Top target = entries.get(terminal);
-        AtomType<?> parser = AtomParsers.forRead(target, linked.enumForm(terminal)).orElseThrow(
-                () -> new IllegalStateException("a discriminator typed '" + field.typeRef().name()
-                        + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
+        // A selector is an atom or an enum the linker judged; one written in place (a reference) is read by its body,
+        // and has no entry an enum's form is recorded under.
+        AtomType<?> parser = (switch (field.typeExpr()) {
+            case io.ltr8.tson.schema.meta.TypeRef reference -> {
+                String terminal = AliasChain.terminal(reference.name(), entries::get);
+                yield AtomParsers.forRead(entries.get(terminal), linked.enumForm(terminal));
+            }
+            case io.ltr8.tson.schema.meta.TypeInline inline ->
+                    AtomParsers.forRead(inline.of(), io.ltr8.unicode.Normalization.NONE);
+        }).orElseThrow(() -> new IllegalStateException("a discriminator typed '" + field.typeExpr().text()
+                + "' reached a reader; the linker refuses a selector that is not an atom or an enum"));
         return new Selector(Nfc.of(name), parser);
     }
 
@@ -158,7 +167,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances. A sealed base has none, so naming it selects nothing -- and letting it through
             // would hand the member's reader a tag its own §7.2 guard must refuse, one position too late.
-            ctx.report(extension.tagNamesTheBase(TAG));
+            ctx.report(extension.tagNamesTheBase(TAG, true));
             EventSkip.dataValue(ctx);
             return null;
         }
@@ -185,6 +194,9 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         }
         String selected = members.get(key);
         if (selected == null) {
+            // The one place a value is placed by its pins, so the one place a schema document's read stops for a
+            // member its readers do not hold.
+            ctx.pinsUnmatched(base, Set.copyOf(selectorNames.values()), (selector, pin) -> samePin(selector, pin, found));
             ctx.report(extension.unmatchedDiscriminator(named(), render(key), pinned));
             EventSkip.dataValue(ctx);
             return null;
@@ -195,7 +207,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             return null;
         }
         // A deeper tag wins over the dispatched member ([TSON-JSON] §6.1.5's "deeper than one level"): the
-        // pins are inherited and §5.7 forbids changing them, so a family dispatches one level by member and
+        // pins are inherited and §5.8 forbids changing them, so a family dispatches one level by member and
         // every level below it by tag.
         return readerFor.resolve(tag.orElse(selected)).read(ctx);
     }
@@ -217,12 +229,26 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
                 return found;
             }
             String selector = selectorNames.get(nameForm.apply(field.name()));
+            // Past the selector's own annotations and tag, which a tree writer states: the member's field reads
+            // and judges them.
+            EventSkip.annotationsAndTypeRef(ctx);
             if (selector != null && ctx.peek() instanceof TokenEvent token) {
                 found.putIfAbsent(selector, token);
             }
-            EventSkip.dataValue(ctx);
+            EventSkip.coreValue(ctx);
         }
         return found;
+    }
+
+    /** Whether {@code pin}, written for the selector {@code name}, is the value {@code found} holds there. */
+    private boolean samePin(String name, String pin, Map<String, TokenEvent> found) {
+        for (Selector selector : selectors) {
+            if (selector.name().equals(Nfc.of(name)) && found.get(selector.name()) != null) {
+                Object written = decode(selector, pin);
+                return written != null && written.equals(decode(selector, found.get(selector.name()).text()));
+            }
+        }
+        return false;
     }
 
     private Object decode(Selector selector, String text) {
@@ -247,6 +273,6 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
 
     /** One pin as written: a reference by its text, any other value by its own spelling. */
     private static String pin(Object pin) {
-        return pin instanceof io.ltr8.tson.schema.meta.Reference reference ? reference.text() : String.valueOf(pin);
+        return pin instanceof io.ltr8.tson.schema.meta.TypeRef reference ? reference.text() : String.valueOf(pin);
     }
 }

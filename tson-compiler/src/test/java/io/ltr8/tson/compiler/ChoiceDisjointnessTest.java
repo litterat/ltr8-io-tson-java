@@ -54,7 +54,8 @@ class ChoiceDisjointnessTest {
     }
 
     private boolean disjoint(TypeRef... variants) {
-        return ChoiceDisjointness.derive(new ChoiceBody(List.of(variants)), namespace);
+        return ChoiceDisjointness.derive(new ChoiceBody(List.of(variants)), namespace,
+                new ExternHops(namespace::get, name -> "", Map.of()));
     }
 
     private static FloatType float64(boolean allowNan, boolean allowInfinity) {

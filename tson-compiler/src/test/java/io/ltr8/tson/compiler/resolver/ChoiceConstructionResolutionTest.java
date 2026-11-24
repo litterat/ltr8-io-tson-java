@@ -32,7 +32,7 @@ class ChoiceConstructionResolutionTest {
 
     private static final String CHOICE_DOCUMENT = """
             !!id:"https://example.test/choice.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               contact => !meta.choice { variants: [text integer] }
             }
@@ -47,8 +47,8 @@ class ChoiceConstructionResolutionTest {
 
         Top contact = resolved.entries().get("contact");
         ChoiceBody body = assertInstanceOf(ChoiceBody.class, contact);
-        assertEquals(List.of("text", "integer"), body.variants().stream().map(TypeRef::name).toList());
-        // Each variant is a bare reference -- empty arguments, never null.
-        assertTrue(body.variants().stream().allMatch(variant -> variant.arguments().isEmpty()));
+        assertEquals(List.of("text", "integer"),
+                body.variants().stream().map(io.ltr8.tson.schema.meta.TypeExpr::text).toList());
+        assertTrue(body.variants().stream().allMatch(TypeRef.class::isInstance));
     }
 }

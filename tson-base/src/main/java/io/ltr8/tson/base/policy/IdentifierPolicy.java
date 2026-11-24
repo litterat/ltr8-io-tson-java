@@ -4,15 +4,17 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.RestrictionLevel;
 
+import java.lang.Character.UnicodeScript;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * [TSON-DATA] §8.2's <b>identifier policy</b>: all three name-hygiene mechanisms, as a deployment configures
  * them for the positions that hold a name. Skeleton distinctness over a scope ({@link
  * #appliesSkeletonDistinctness()}), {@code Identifier_Status} (the restricted-character rule, which the level
- * carries), and a restriction level ({@link #scripts()}) applied to a unit that is the whole name or each
+ * carries), and a restriction level ({@link #level()}) applied to a unit that is the whole name or each
  * segment of it ({@link #isPerSegment()}).
  *
  * <p><b>A name is judged under its family's profile as well as this policy</b> ({@link #judge}). The profile
@@ -33,8 +35,8 @@ import java.util.Optional;
  * a relation over a set to a level that judges one name. The per-name rules are judged here; the relation is
  * judged where a scope is enumerated, and asks {@link #appliesSkeletonDistinctness()} first.
  *
- * <p>Instances are immutable; {@link #perSegment()} and {@link #withSkeletonDistinctness} return modified
- * copies.
+ * <p>Instances are immutable; {@link #permitting}, {@link #perSegment()} and {@link #withSkeletonDistinctness}
+ * return modified copies.
  */
 public final class IdentifierPolicy {
 
@@ -46,26 +48,27 @@ public final class IdentifierPolicy {
     public record Violation(Diagnostic.Code code, String reason) {
     }
 
-    private static final IdentifierPolicy NONE = new IdentifierPolicy(ScriptPolicy.unrestricted(), false, false);
+    private static final IdentifierPolicy NONE =
+            new IdentifierPolicy(new ScriptRule(RestrictionLevel.UNRESTRICTED), false, false);
 
-    private final ScriptPolicy scripts;
+    private final ScriptRule rule;
     private final boolean perSegment;
     private final boolean skeletonDistinctness;
 
-    private IdentifierPolicy(ScriptPolicy scripts, boolean perSegment, boolean skeletonDistinctness) {
-        this.scripts = Objects.requireNonNull(scripts, "scripts");
+    private IdentifierPolicy(ScriptRule rule, boolean perSegment, boolean skeletonDistinctness) {
+        this.rule = rule;
         this.perSegment = perSegment;
         this.skeletonDistinctness = skeletonDistinctness;
     }
 
-    /** {@code scripts} over each whole name, with skeleton distinctness -- §8.2's defaults bar the level. */
-    public static IdentifierPolicy of(ScriptPolicy scripts) {
-        return new IdentifierPolicy(scripts, false, true);
+    /** {@code level} over each whole name, with skeleton distinctness -- §8.2's defaults bar the level. */
+    public static IdentifierPolicy of(RestrictionLevel level) {
+        return new IdentifierPolicy(new ScriptRule(level), false, true);
     }
 
     /** §8.2's recommended policy: Highly Restrictive over the whole name, all three mechanisms on. */
     public static IdentifierPolicy defaults() {
-        return of(ScriptPolicy.highlyRestrictive());
+        return of(RestrictionLevel.HIGHLY_RESTRICTIVE);
     }
 
     /**
@@ -84,17 +87,33 @@ public final class IdentifierPolicy {
      * IdentifierProfile#separates}).
      */
     public IdentifierPolicy perSegment() {
-        return new IdentifierPolicy(scripts, true, skeletonDistinctness);
+        return new IdentifierPolicy(rule, true, skeletonDistinctness);
+    }
+
+    /**
+     * This policy with one further script combination admitted in each unit, the same device §5.2 uses for
+     * Latn+Jpan: {@code permitting(LATIN, CYRILLIC)} admits that mix without dropping a level.
+     */
+    public IdentifierPolicy permitting(UnicodeScript... scripts) {
+        return new IdentifierPolicy(rule.permitting(scripts), perSegment, skeletonDistinctness);
     }
 
     /** This policy with skeleton distinctness -- mechanism 1, the look-alike rule over a scope -- on or off. */
     public IdentifierPolicy withSkeletonDistinctness(boolean on) {
-        return new IdentifierPolicy(scripts, perSegment, on);
+        return new IdentifierPolicy(rule, perSegment, on);
     }
 
-    /** The restriction level and any combinations admitted over it. */
-    public ScriptPolicy scripts() {
-        return scripts;
+    /** The UTS #39 §5.2 restriction level applied to each unit. */
+    public RestrictionLevel level() {
+        return rule.level();
+    }
+
+    /**
+     * The script combinations admitted over and above {@link #level()}, in the order {@link #permitting} added
+     * them -- empty for a policy that has taken no such relaxation.
+     */
+    public List<Set<UnicodeScript>> permittedScripts() {
+        return rule.permittedScripts();
     }
 
     /** Whether the level applies to each segment of a name rather than to the whole of it. */
@@ -112,7 +131,7 @@ public final class IdentifierPolicy {
      * profile too", taking {@code Identifier_Status} with it.
      */
     public boolean appliesIdentifierProfile() {
-        return scripts.appliesIdentifierProfile();
+        return rule.appliesIdentifierProfile();
     }
 
     /**
@@ -138,11 +157,11 @@ public final class IdentifierPolicy {
 
     /** The restriction level over {@code name}'s unit, or each unit: the first that fails, or empty. */
     private Optional<String> restrictedScript(String name, IdentifierProfile profile) {
-        if (!scripts.checksScripts() || name.isEmpty()) {
+        if (!rule.checksScripts() || name.isEmpty()) {
             return Optional.empty();
         }
         if (!perSegment) {
-            return scripts.checkUnit(name, 0, name.length(), false);
+            return rule.checkUnit(name, 0, name.length(), false);
         }
         int start = 0;
         for (int i = 0; i <= name.length(); ) {
@@ -152,7 +171,7 @@ public final class IdentifierPolicy {
                 continue;
             }
             if (i > start) {
-                Optional<String> failure = scripts.checkUnit(name, start, i, true);
+                Optional<String> failure = rule.checkUnit(name, start, i, true);
                 if (failure.isPresent()) {
                     return failure;
                 }
@@ -166,19 +185,19 @@ public final class IdentifierPolicy {
     /** Two policies are equal when they would judge every name and every scope alike. */
     @Override
     public boolean equals(Object o) {
-        return o instanceof IdentifierPolicy other && scripts.equals(other.scripts) && perSegment == other.perSegment
+        return o instanceof IdentifierPolicy other && rule.equals(other.rule) && perSegment == other.perSegment
                 && skeletonDistinctness == other.skeletonDistinctness;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(scripts, perSegment, skeletonDistinctness);
+        return Objects.hash(rule, perSegment, skeletonDistinctness);
     }
 
     @Override
     public String toString() {
-        return scripts.level() + (perSegment ? " per segment" : "")
-                + (scripts.permittedScripts().isEmpty() ? "" : " permitting " + scripts.permittedScripts())
+        return level() + (perSegment ? " per segment" : "")
+                + (permittedScripts().isEmpty() ? "" : " permitting " + permittedScripts())
                 + (skeletonDistinctness ? "" : " without skeleton distinctness");
     }
 }

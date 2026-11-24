@@ -120,12 +120,12 @@ class DurationParserTest {
     }
 
     /**
-     * {@code precision: N} is {@code fraction_digits: N} on the seconds count, which §5.5 makes a constraint
-     * on the value and not on the spelling -- {@code PT0.250S} is a whole number of hundredths however it
-     * was typed, and the same rule {@code time_type}'s own {@code @doc} spells out.
+     * {@code fraction_digits: N} admits a whole number of 10⁻ᴺ seconds, which §5.5 makes a constraint on the
+     * value and not on the spelling -- {@code PT0.250S} is a whole number of hundredths however it was typed, and the same
+     * rule {@code time_type}'s own {@code @doc} spells out.
      */
     @Test
-    void precisionConstrainsTheSecondsCountNotTheSpelling() {
+    void fractionDigitsConstrainsTheSecondsCountNotTheSpelling() {
         AtomType<Duration> twoDigits = new DurationParser(new DurationType(Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(2L), Optional.empty()));
 

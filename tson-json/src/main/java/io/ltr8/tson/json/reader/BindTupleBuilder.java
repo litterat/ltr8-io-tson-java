@@ -16,8 +16,8 @@ import java.util.List;
  * as every bind builder is.
  *
  * <p><b>A tuple binds by the component that holds it, not by its schema name.</b> An inline tuple -- {@code
- * [text, int32]} written at a field -- has an entry name the resolver minted, which no binding map can hold
- * ([TSON-SCHEMA] §8.2), so a name-bound tuple would be unreachable exactly where tuples are usually written. Its
+ * [text, int32]} written at a field -- is a type written in place, with no name a binding map could hold, so a
+ * name-bound tuple would be unreachable exactly where tuples are usually written. Its
  * natural reading is a {@code List}, and a component declaring a tuple class reads the position again for that
  * class ({@link #forTarget}), each position bound to the class's element.
  */

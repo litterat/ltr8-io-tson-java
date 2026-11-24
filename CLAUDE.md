@@ -14,15 +14,15 @@ applies to all work in the repo.
 
 ## Design notes (`design/`)
 
-Forty-odd notes, each under ~25 KB and opening with its invariants. Pick by the class you are about to touch.
+Forty-odd notes, each opening with its invariants. Pick by the class you are about to touch.
 
 | Area | Notes (`design/…`) |
 |---|---|
 | **Lexing and data parsing** | `lexer-and-data-parsing.md` (lexer, Tier 2 stream, Tier 3 AST) · `base-types-and-atom-vocabulary.md` (§4 resolution, `tson-atom`) |
-| **Schema grammar, desugaring** | `schema-grammar.md` (`TsonSchemaParser`) · `schema-grammar-and-desugaring.md` (`SchemaDesugarer`, sugar table, lifts) · `desugaring-open-forms-and-templates.md` |
-| **Resolution** | `references.md` (the forms a name takes, an application's argument list; which slot is typed `meta.type_ref` or a key) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`MetaRefs`/`DerivedName`, alias hops, `@meta.synthetic`, meta-kernel bootstrap) |
-| **Templates (§5.10)** | `held-template-bodies.md` (`TemplateBody`, parameter kinds) · `template-materialisation.md` (`TemplateMaterialiser`, `SyntheticMerge`, regularity) |
-| **Linking** | `linking-and-compilation.md` (registry, identity, import merge, link order, values by name) · `kinds-and-name-types.md` (`KindMembers`, `name_type`) · `inhabitance-and-record-extension.md` · `choice-disjointness.md` · `namespace-types-and-value-entries.md` (namespace types, value entries, `ValueEntry`) · `name-hygiene-and-minted-names.md` (`checkNames`, `InternalName`) |
+| **Schema grammar, desugaring** | `schema-grammar.md` (`TsonSchemaParser`) · `schema-grammar-and-desugaring.md` (`SchemaDesugarer`, sugar table, forms written in place) · `desugaring-forms-over-parameters.md` (forms over a parameter, a parametric record's body refused) |
+| **Resolution** | `references.md` (the forms a name takes, an application's argument list; which slot is typed `meta.type_ref` or a key) · `schema-resolution.md` (`DefinitionResolver`, field states, groups, exception boundary) · `constructor-application.md` (`!C {…}`, which fields take `~`/`=`) · `atom-refinement-and-coherence.md` · `resolver-vocabulary-and-bootstrap.md` (`WireForm`/`TypeSlots`/`CanonicalApplication`, alias hops, meta-kernel bootstrap) |
+| **Parametric records (§5.10)** | `parametric-records.md` (a parametric record, `Param`, `ParamRef`, bounds) · `parametric-materialisation.md` (`ParametricMaterialiser`, where an application closes, regularity) |
+| **Linking** | `linking-and-compilation.md` (registry, identity, import merge, link order, values by name) · `kinds-and-name-types.md` (`KindMembers`, `name_type`) · `inhabitance-and-record-extension.md` · `choice-disjointness.md` · `namespace-types-and-value-entries.md` (namespace types, value entries, `ValueEntry`) · `externs.md` (`!meta.extern`, `ExternHops`, loading with the imports) · `name-hygiene.md` (`checkNames`) |
 | **Compilation** | `class2-compilation.md` (`TsonSchemaCompiler`, `CompiledReaders`, `ErrorReader`, untagged choices) · `compiled-registries.md` (the two registries, concurrency) |
 | **Reading** | `readers-and-diagnostics.md` (`TsonReadContext`, the read rules, tree/bind asymmetry) · `record-dispatch.md` · `declared-positions.md` (§7.8) · `reader-naming-and-schema-location.md` · `name-hygiene-read-path.md` |
 | **Diagnostics and policy** | `diagnostic-model.md` (`Diagnostic`, `Code`, the component rule) · `diagnostic-rules-and-messages.md` (`base.diagnostics`, `expected`) · `schema-side-diagnostics.md` (reporting overloads, `validateSchema`, bind agreement) · `processor-policy.md` (`ProcessorPolicy`, `LimitsPolicy`) |
@@ -42,12 +42,12 @@ consumer-facing `README.md`, `STATUS.md` (the implemented checklist) and `CONFOR
 A from-scratch Java implementation of TSON (Typed Schema Object Notation), built directly against the TSON spec series
 (2026 revision), and the spec's first implementation:
 
-- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/39/tson-part1-data.md
-- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/39/tson-part2-schema.md
+- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/40/tson-part1-data.md
+- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/40/tson-part2-schema.md
 - Part 3 — the JSON encoding, **drafted in this repo**: `spec/tson-part3-json.md`
 
 The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
-and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 39, not
+and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 40, not
 edited here) with **two exceptions that are live**: `spec/m/{meta,numeric,temporal,net,core,policy}.tn` are packaged
 from here at build time, and `spec/tson-part3-json.md` is edited in place.
 
@@ -57,12 +57,12 @@ from here at build time, and `spec/tson-part3-json.md` is edited in place.
 table in `spec/` is the one pin it does not write. Keep `spec/fixtures/*-resolved.tn` in step — `ResolvedFixtureTest`
 checks them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
 
-**Branches.** `main` is the reference implementation of the *published* revision (39): identities `/2026/39/m/`,
-version `0.39.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`,
-`r2026-38`), each added when the next revision merges. **No proposal branch is open.** Work the published spec cannot
-carry opens `r2026-40-proposal`, with a corpus branch of the same name, carrying Revision 40 identities and version
-`0.40.0-SNAPSHOT`; it merges when the spec lands and not before. Proposal work branches off it and PRs into it; work
-the published revision can carry still goes to `main`. Check the branch before quoting identities or the version.
+**Branches.** `main` is the reference implementation of the *published* revision (40): identities `/2026/40/m/`,
+version `0.40.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`,
+`r2026-38`, `r2026-39`), each added when the next revision merges. **No proposal branch is open.** Work the published
+spec cannot carry opens `r2026-41-proposal`, with a corpus branch of the same name, carrying Revision 41 identities and
+version `0.41.0-SNAPSHOT`; it merges when the spec lands and not before. Proposal work branches off it and PRs into it;
+work the published revision can carry still goes to `main`. Check the branch before quoting identities or the version.
 `design/process.md` has the procedure.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version
@@ -71,15 +71,15 @@ deprecated, a wrongly-shaped public method deleted rather than wrapped. The one 
 of a *published* schema `!!id`.
 
 **Status.** Parts 1 and 2 work end to end — the bundled schemas resolve, link and compile; user schemas validate and
-read in tree and bind mode; the `tson` CLI drives it. The JSON encoding has its own full stack in tree mode. What is
-left is in `BACKLOG.md`.
+read in tree and bind mode; the `tson` CLI drives it. The JSON encoding has its own full stack, in tree and bind
+mode. What is left is in `BACKLOG.md`.
 
 **Hard constraints:** Java 25 only. No external runtime dependencies in main code; JUnit (Jupiter) for tests only.
 
 ## Pipeline and modules
 
 Schema documents: **parse → desugar → resolve → link → register → compile → read** (`TsonSchemaParser`,
-`SchemaDesugarer`, `TsonSchemaResolver`, `TsonSchemaLinker`, `TsonSchemaRegistry`, `TsonSchemaCompiler`,
+`SchemaDesugarer`, `SchemaResolver`, `TsonSchemaLinker`, `TsonSchemaRegistry`, `TsonSchemaCompiler`,
 `TsonTypeReader`). Data documents with no schema run lex → parse → base-type-resolve.
 
 | Module | Holds |
@@ -120,12 +120,29 @@ record it — never silently pick an interpretation.
 
 ## Conventions
 
-**Javadoc and notes document the current contract only.** No dates, no "renamed from", no "used to", no "on the user's
-direction". If a design needs a why, state the invariant and its rationale, once, in proportion to its logic. When you
-edit a class, clean its Javadoc in the same edit. `design/` and this file follow the same rule.
+**A comment says why, never what.** The code says what it does, a test's name says what must hold, and the spec
+states the rule. A comment earns its place by saying what none of those can: the invariant a reader would break, the
+reason the obvious alternative is wrong, or the section that requires the behaviour (`[TSON-SCHEMA] §5.10`).
 
-**Keep the `design/` note current in the same session as the change**, the way you would the Javadoc. A note that
-silently drifts is worse than no note.
+- No comment restates the code beneath it, a signature or a type. A method whose name and types say it has no Javadoc.
+- A comment describes its own class. Another class's mechanism is named by `{@link}`, never retold: when that class
+  changes, this file should not have to.
+- A fact is stated once, where it is enforced. Where an assertion, a sealed type or a test can hold the invariant,
+  write that and not the sentence.
+- Present tense, current contract: no dates, no "renamed from", no "used to", no "no longer".
+- When you edit a class, delete the comments the edit makes untrue or unnecessary, in the same edit. Adding prose is
+  never part of finishing a change.
+
+The one place a comment says what is public API (`Tson`, the facades, `tson-base`): what a caller may pass and what
+comes back.
+
+**A design note holds what the code cannot.** One per area: the invariants that are easy to break silently, each
+with its reason, and the decisions that lost and why. It does not walk through the code, list methods or restate the
+spec. A note is under ~8 KB; one that needs more is describing the implementation. Update a note when an invariant
+or a decision changes, not when code moves: a change that touches no invariant touches no note.
+
+**The test for both:** if this sentence were deleted, could a reader recover it from the code, the tests or the
+spec in a minute? If so, delete it.
 
 **`BACKLOG.md` is a list of outstanding work and nothing else.** Every entry is something someone could pick up. Not
 entries: what was done (a shipped item comes out entirely), what was decided against, what might become work later. A
@@ -141,7 +158,7 @@ says so. `UnsupportedOperationException`: this library has not implemented that 
 internal invariant broke. The test: *a schema error's verdict doesn't change when this library improves; a gap's does.*
 A gap travels as `Diagnostic.Code.NOT_IMPLEMENTED`, and the CLI's exit 1 vs 70 rides on that code.
 
-**Project-owned schema `!!id`:** `https://tson.io/2026/39/io/ltr8/<group>/<name>.tn`. Between releases the schema is
+**Project-owned schema `!!id`:** `https://tson.io/2026/40/io/ltr8/<group>/<name>.tn`. Between releases the schema is
 edited in place; a release fixes the document under its identity (§10). Use `.tn`, never `.tn1`.
 
 **Line wrapping:** 125 characters, comments and code. Count characters, not bytes (`scripts/check-line-length.sh`).
@@ -155,10 +172,13 @@ edited in place; a release fixes the document under its identity (§10). Use `.t
 
 One line each; the class Javadoc and the note carry the why. Read before touching the class involved.
 
-- `TypeArgument` is a sealed interface (`Ref`/`Value`), never a record with two `Optional`s, and compares by its text.
+- A `TypeRef` is a name, never an application: an application is an `ApplyBody` written in place, whose arguments are
+  names, compared by head and arguments. A constructor's application is no `ApplyBody`: it is rewritten to its
+  construction before anything reads it (`ConstructionRewrite`).
 - `SchemaDesugarer` returns un-rewritten nodes **by identity** — positions live in an `IdentityHashMap`.
-- A desugar-reported declaration is replaced with an absorbing stand-in that **keeps its type parameters**; injected
-  declarations are never rolled back.
+- A desugar-reported declaration is replaced with an absorbing stand-in that **keeps its type parameters**.
+- A type slot holds a `TypeExpr`: a `TypeRef`, or a `TypeInline` wrapping a body with its constructor. A `TypeInline`
+  is no entry, so nothing looks one up by name, and a name and a `TypeInline` are never the same type.
 - `requireDocumentEnd`: the pull past the root value is the point, not the assertion after it.
 - Lexer multi-line close detection strips leading whitespace *before* comparing against `"""`.
 - `Position` must keep the record's default `toString()` — `ResolvedForm` normalises positions by regex over it.
@@ -182,7 +202,7 @@ No system Gradle — always the wrapper. `build` also runs javadoc (doclint), so
 ./gradlew :tson-base:test :tson-json:test
 ./gradlew :tson-cli:installDist      # then tson-cli/build/install/tson/bin/tson validate ...
 ./gradlew :tson:allocationReport     # allocation harness, numbers on stdout
-./gradlew publishToMavenLocal        # io.ltr8:<module>:0.39.0-SNAPSHOT; no remote repository, deliberately
+./gradlew publishToMavenLocal        # io.ltr8:<module>:0.40.0-SNAPSHOT; no remote repository, deliberately
 scripts/restamp-bundled-schemas.sh --check
 ```
 

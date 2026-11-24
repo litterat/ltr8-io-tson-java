@@ -16,7 +16,6 @@ import io.ltr8.tson.schema.numeric.IntegerType;
 import io.ltr8.tson.schema.unicode.RegexType;
 import io.ltr8.tson.schema.unicode.TextType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.tson.schema.meta.VoidType;
 import io.ltr8.tson.schema.net.IriType;
@@ -74,7 +73,7 @@ class KernelBootstrapResolverTest {
         // A sample spanning every construct DefinitionResolver already handles on its own.
         for (String name : List.of("meta.top", "meta.atom", "meta.product", "meta.sum", "meta.alias",
                 "numeric.integer_size", "numeric.integer_type", "meta.record", "meta.array", "meta.namespace", "meta.schema",
-                "meta.type_name", "meta.declared", "meta.map", "meta.tuple", "meta.choice", "meta.template")) {
+                "meta.type_name", "meta.declared", "meta.map", "meta.tuple", "meta.choice", "meta.param")) {
             assertTrue(schema.entries().containsKey(name), name + " should resolve via DefinitionResolver alone");
         }
     }
@@ -88,7 +87,6 @@ class KernelBootstrapResolverTest {
                 "unicode.identifier_type");
         expected.forEach((name, body) -> {
             Top resolved = schema.entries().get(name);
-            assertEquals(EntryKind.ATOM, EntryKind.of(resolved, n -> true));
             assertEquals(body, resolved);
             assertEquals(List.of(), TypeChain.supertypesOf(resolved));
             assertEquals(java.util.Optional.of(constructors.get(name)), schema.constructorOf(name));
@@ -96,22 +94,20 @@ class KernelBootstrapResolverTest {
     }
 
     @Test
-    void integerResolvesToAnUnconstrainedIntegerTypeBodyWithAtomKind() {
+    void integerResolvesToAnUnconstrainedIntegerTypeBody() {
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         Top integer = schema.entries().get("integer");
-        assertEquals(EntryKind.ATOM, EntryKind.of(integer, n -> true));
         assertEquals(IntegerType.UNCONSTRAINED, integer);
     }
 
     @Test
     void booleanResolvesEvenThoughEnumItselfIsDeclaredLaterInTheFile() {
         // boolean => !enum [true false] appears near the top of the file and enum much later: the order is the
-        // entries' waits, never the order they are written in.
+        // entries' waits, never the order they are written in. It completes `enum`, so it is that construction.
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         Top booleanDef = schema.entries().get("boolean");
-        assertEquals(EntryKind.ATOM, EntryKind.of(booleanDef, n -> true));
         assertEquals(new EnumBody(List.of("true", "false")), booleanDef);
     }
 
@@ -127,50 +123,41 @@ class KernelBootstrapResolverTest {
     }
 
     @Test
-    void textIriRegexResolveToTheirUnconstrainedTypeBodiesWithAtomKind() {
+    void textIriRegexResolveToTheirUnconstrainedTypeBodies() {
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
         Top text = schema.entries().get("text");
-        assertEquals(EntryKind.ATOM, EntryKind.of(text, n -> true));
         assertEquals(TextType.UNCONSTRAINED, text);
 
         Top iri = schema.entries().get("iri");
-        assertEquals(EntryKind.ATOM, EntryKind.of(iri, n -> true));
         assertEquals(IriType.IRI, TypeChain.withoutChain(iri));
         assertEquals(List.of("iri_reference"), ((IriType) iri).chain().supertypes(), "an iri IS-A iri_reference");
 
         Top regex = schema.entries().get("regex");
-        assertEquals(EntryKind.ATOM, EntryKind.of(regex, n -> true));
         assertEquals(RegexType.UNCONSTRAINED, regex);
 
         // The kernel's second identifier_type instance, read rather than built: it comes out as the constant the
         // readers of iri_type.schemes hold.
         Top schemeName = schema.entries().get("net.scheme_name");
-        assertEquals(EntryKind.ATOM, EntryKind.of(schemeName, n -> true));
         assertEquals(IdentifierType.SCHEME_NAME, schemeName);
     }
 
     /**
-     * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is its 88 declarations -- its six maps and their 69 members, and the root's thirteen -- and one
-     * injected declaration per distinct sugar form within them: seven {@code array} entries from §5.3's {@code [X]}
-     * field-type sugar, minted at the root. Producing them here is what leaves the linker with nothing to materialize
-     * (see {@code MetaKernelSchemaRegistryTest}).
-     * {@code enum}'s member set is not among them: it is the fixture's own {@code meta.enum_set} declaration, since
-     * {@code set} has no sugar and a {@code !} form stays prohibited at a field position (§5.2) -- and {@code
-     * record.fields} is the fixture's own
-     * {@code field_map} for the same reason, an ordered map having no sugar either.
+     * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, and the phase
+     * adds no declaration: each {@code [X]} at a field's type is the construction written in place there, so the
+     * output is the kernel's 77 declarations -- its six maps' members and the root's own, its three incomplete
+     * entries and alias of one among them -- and the six maps, and
+     * {@code record.parents} holds its array in place.
      */
     @Test
-    void theFixtureDeclarationsResolveAlongsideSevenDesugaredEntries() {
+    void theFixtureDeclarationsResolveWithNoEntryAdded() {
         TsonSchema schema = KernelBootstrapResolver.kernelSchema();
 
-        assertEquals(94, schema.entries().size());
-        for (String head : List.of("array_array_text_1", "array_text_1", "array_type_ref",
-                "array_template_param", "array_template_param_1", "array_field_group", "array_tuple_element")) {
-            assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
-                    "expected a desugared entry with head '" + head + "'");
-        }
+        assertEquals(83, schema.entries().size());
+        io.ltr8.tson.schema.meta.RecordBody chain =
+                (io.ltr8.tson.schema.meta.RecordBody) schema.entries().get("meta.type_chain");
+        assertEquals(new io.ltr8.tson.schema.meta.TypeInline(io.ltr8.tson.schema.meta.ArrayBody.of(
+                io.ltr8.tson.schema.meta.TypeRef.of("meta.type_expr"))), chain.fields().get("parents").type());
     }
 
     // ── The pre-loaded set, and what the rest of the kernel comes out as ──
@@ -194,11 +181,7 @@ class KernelBootstrapResolverTest {
                 read.add(entry);
             }
         }
-        Set<String> handBuilt = new TreeSet<>();
-        // A content hash is §8.2's to spell, and the fixture writes a placeholder for it.
-        KernelBootstrapResolver.preLoaded().forEach(name ->
-                handBuilt.add(name.replaceFirst("_[0-9a-f]{8}$", "_xxhash")));
-        assertEquals(read, handBuilt);
+        assertEquals(read, new TreeSet<>(KernelBootstrapResolver.preLoaded()));
     }
 
     /**
@@ -271,8 +254,8 @@ class KernelBootstrapResolverTest {
     @Test
     void aTargetNoPreLoadedInstanceAppliesIsRefused() {
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> KernelBootstrapResolver.instanceBody("x", emptyInstance("meta.void_type")));
-        assertTrue(thrown.getMessage().contains("meta.void_type"));
+                () -> KernelBootstrapResolver.instanceBody("x", emptyInstance("meta.record")));
+        assertTrue(thrown.getMessage().contains("meta.record"));
     }
 
     @Test

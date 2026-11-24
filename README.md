@@ -6,7 +6,7 @@ one hash verifies the whole chain. The finishing touch, TSON's data format is a 
 actually enjoy writing — JSON-like in shape, and not a superset of it.
 
 > **Status: pure design, no users.** This is the first implementation of TSON, built against a working-draft
-> spec (Revision 39 of the 2026 series), and it is the first real test of whether that spec resolves to one
+> spec (Revision 40 of the 2026 series), and it is the first real test of whether that spec resolves to one
 > behaviour — which is the point of it existing. Nothing is released: there is no Maven Central artifact, no
 > remote repository is configured, and every version carries `-SNAPSHOT`.
 >
@@ -53,12 +53,12 @@ Try it (the data names its own schema and type, so no --type is needed):
 ```
 
 Here's the `person.tn` schema created. It shows a few of the basic schema features,
-including records, record groups, enums and some in-built types. The `2026/39` in the
+including records, record groups, enums and some in-built types. The `2026/40` in the
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/39/getting-started/person.tn?sha256=de13379825dada812daea91cb4fed0f197ff691d2fee97ff91b8382b112e5cde"
-!!import:"https://tson.io/2026/39/m/core.tn?sha256=4e8d9c43cbbabf6a73548b819ac74e06e18859b573d05ce99988ae9d4d9a562e"
+!!id:"https://example.com/2026/40/getting-started/person.tn?sha256=1db107ec9fc3708817ab76390f1327696f1b26bea1f869515c28c17a03a967cf"
+!!import:"https://tson.io/2026/40/m/core.tn?sha256=00eaf2174c7ba05510ce8410a4b7577bf6fd4bf6db8f099a7c8ec02edd053241"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 !schema {
   role => !enum [admin member guest]
@@ -98,7 +98,7 @@ And here's a corresponding `person-data.tn` *data* document. It's *self-describi
 `!!import` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-!!import:"https://example.com/2026/39/getting-started/person.tn"
+!!import:"https://example.com/2026/40/getting-started/person.tn"
 !person {
   id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
   name: "Ada Lovelace"
@@ -361,8 +361,8 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.standard();
 
 String schema = """
-        !!id:"https://example.com/2026/39/app/server-1.tn"
-        !!import:"https://tson.io/2026/39/m/core.tn"
+        !!id:"https://example.com/2026/40/app/server-1.tn"
+        !!import:"https://tson.io/2026/40/m/core.tn"
         !schema {
             server => { hostname: text  port: int32 }
         }""";
@@ -370,7 +370,7 @@ String schema = """
 tson.resolve(schema);
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/39/app/server-1.tn")
+        .withSchema("https://example.com/2026/40/app/server-1.tn")
         .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
 
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
@@ -404,11 +404,11 @@ Tson tson = Tson.of(ProcessorConfig.defaults()
         // Schemas you already hold, keyed by identity. Not `schemas::get` -- a source says "I cannot
         // supply that" by throwing, where a map returns null, for whichever identity the document names.
         .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(   // the `server` schema from §4
-                Map.of("https://example.com/2026/39/app/server-1.tn", schema)))));
+                Map.of("https://example.com/2026/40/app/server-1.tn", schema)))));
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
 TsonValue server = tson.treeReader().read("""
-        !!import:"https://example.com/2026/39/app/server-1.tn"
+        !!import:"https://example.com/2026/40/app/server-1.tn"
         !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
 
 // No !!import? The same reader reads schemalessly, straight off the wire.
@@ -516,7 +516,7 @@ unchanged, and a writer that was not asked for a header still writes a bare valu
 ## Status
 
 This is the **first implementation** of TSON, built against a working-draft spec (Part 1 data format
-and Part 2 schema layer, Revision 39 of the 2026 series). Part 1 and most of Part 2 — schema grammar,
+and Part 2 schema layer, Revision 40 of the 2026 series). Part 1 and most of Part 2 — schema grammar,
 resolution, linking/registration, and a compiled schema-validating reader — are implemented; some Part 2
 constructs are still out of scope.
 
@@ -542,17 +542,17 @@ handful of well-defined stages, each with its own class, deliberately named afte
 vocabulary — parse → resolve → link → register → compile → read:
 
 1. **Parse** (`TsonSchemaParser`) — schema document text into a faithful AST (`SchemaDocument`):
-   records, compositions (`&`), refinements (`^`), type references, and so on. No interpretation yet —
+   records, compositions (`&`), refinements (`!I ^`), type references, and so on. No interpretation yet —
    a name is still just a name.
 2. **Desugar** (`SchemaDesugarer`) — an AST→AST rewrite turning every sugar form (`[T]`, `[T; 1..5]`,
    `[T, U]`, `{K => V}`, `(A | B)`) into the constructor application it denotes, off a fixed table. At a
-   declaration's own position the form simply *is* that application; anywhere else it becomes an injected
-   declaration plus a bare reference to it, so identical forms anywhere in the document share one entry.
-3. **Resolve** (`TsonSchemaResolver`) — one declaration at a time, the AST becomes a concrete
-   value (`Top`): composition induces supertypes and flattens fields, refinement tightens an
-   inherited field against a state-transition table, a constructor application (`!C value`) transfers
-   its constructor's own kind, and so on. A reference to another declaration is still a bare, unverified
-   name at this point.
+   declaration's own position the form simply *is* that application; at any other type slot it is that construction
+   written in place, `{ of: !meta.array { … } }`, with no entry of its own, and equal forms are one type.
+3. **Resolve** (`SchemaResolver`) — one declaration at a time, the AST becomes a concrete
+   value (`Top`): composition induces supertypes, flattens fields and tightens a restated
+   inherited field along its three orders (Part 2 §5.8), a constructor application (`!C value`) builds an
+   instance tagged with its constructor and IS-A nothing, and so on. A reference to another declaration is
+   still a bare, unverified name at this point.
 4. **Link** (`TsonSchemaLinker`) — the whole-schema pass: merges `!!import`s, populates `subtypes`, derives
    choice disjointness, and validates that every reference in the schema actually resolves to something.
    Produces a `TsonLinkedSchema` — proof, in the type system, that this pass has run, not a runtime flag to
@@ -666,7 +666,6 @@ max import closure:         64
 max schema entries:         65536
 max alias chain:            64
 max supertype chain:        64
-max materialisation depth:  64
 max wait depth:             64
 ```
 
@@ -709,7 +708,7 @@ pinned reference and a plain one still resolve to the same schema).
 
 **`tson strip`** prints a schema's reading form to standard output — the same declarations in as few tokens
 as the syntax allows, for a language model to read in a prompt. It drops the `!!id`, every header pin and the
-documentary annotation `@doc`, shortens the spec's own library to its revision and name (`!!import:"39/core"`), and
+documentary annotation `@doc`, shortens the spec's own library to its revision and name (`!!import:"40/core"`), and
 puts each directive and each declaration on one line with its whitespace collapsed; other annotations and other
 references stay. `--keep-docs` keeps `@doc`, for a model that should read the documentation too.
 The output is valid syntax but not loadable, so the file is never rewritten.
@@ -736,8 +735,8 @@ nothing to reopen, so piped input is always treated as data.
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
-!!id:"https://example.com/2026/39/app/person-1.tn"
-!!import:"https://tson.io/2026/39/m/core.tn"
+!!id:"https://example.com/2026/40/app/person-1.tn"
+!!import:"https://tson.io/2026/40/m/core.tn"
 !schema {
     person => { name: text  age: int32 }
 }
@@ -752,7 +751,7 @@ $ tson validate --output json person.tn bad.tn   # bad.tn = !!import:"…/person
   "skeleton_distinctness":true,"permitting":[]},"token_policy":{"level":"UNRESTRICTED","permitting":[]},
   "unicode_data_version":"16.0"},
   "files":[{"file":"bad.tn","outcome":"REJECTED","errors":[{"path":"/name",
-  "schema_pointer":"/person/name","schema_id":"example.com/2026/39/app/person-1.tn",
+  "schema_pointer":"/person/name","schema_id":"example.com/2026/40/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(missing)","data_position":"2:9:63",
   "schema_position":"4:5:110"}]}],"errors":[]}
@@ -849,7 +848,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.ltr8:tson:0.39.0-SNAPSHOT")
+    implementation("io.ltr8:tson:0.40.0-SNAPSHOT")
 }
 ```
 

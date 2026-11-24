@@ -27,7 +27,7 @@ import io.ltr8.annotation.Typename;
  * can be checked by the invariance verifier for first param and the getter matches the field.
  *
  */
-@Typename(namespace = "test", name="ComplexImmutable")
+@Typename(name="ComplexImmutable")
 public class ComplexImmutable {
 
 	public static int multiplier = 2;

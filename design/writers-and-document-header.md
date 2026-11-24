@@ -18,18 +18,10 @@ keeps the rest of the document. Current form only; history lives in git.
   will not read back.
 - `TsonDataEmitter.field` writes a name that is no identifier as a quoted string: a relaxed `name_type`
   ([TSON-SCHEMA] §5.2) admits `"@id"`, which written bare would not lex back.
-- A reference is written unquoted, as data grammar ([TSON-DATA] §7.4):
-  `TsonDataEmitter.reference(TypeRef)` writes the qualified name and, where it carries arguments, an adjacent `<`,
-  the arguments one space apart and `>`, the canonical text `map<text list<int32>>`, a value argument keeping its
-  token form. `TsonDataEmitter.reference(SiblingRef)` writes `kind!` ([TSON-DATA] §7.4), and
-  `reference(Reference)` picks between the two. A sibling's `!` must be followed by whitespace ([TSON-DATA] §7.5),
-  which the emitter always supplies: a space separates every element, a map's arrow and a non-empty scope's closing
-  delimiter, and ends an annotation's value. `AstWriter` writes a `ReferenceValue` through it, `TreeValueWriter` a
-  `TsonReference` (either record), and
-  `DataClassObjectWriter` a `schema.meta.TypeRef` (a `meta.type_ref` value): a name as its one token, as a value written
-  by name has only that spelling ([TSON-SCHEMA] §5.12), and an application as `!meta.alias { target: result<T> }` or
-  `@meta.application:response<order 201>` writes it. A reference some name in which is no qualified name is written as a
-  quoted string, never as bare text that would not read back.
+- A reference is written by `TsonDataEmitter.reference`, unquoted where every segment is an identifier and quoted
+  otherwise, so a segment outside the token profile reads back ([TSON-SCHEMA] §5.12, the form carrying nothing);
+  `TreeValueWriter` and `DataClassObjectWriter` write a `TypeRef` and a `ValueRef` through it. An application is a
+  record, `meta.apply`, written as any record is, since an argument list is no data form ([TSON-DATA] §7.2.5).
 - `DataClassObjectWriter` writes a `Namespace` as the map it holds: each key keeps its annotations and is bare where
   it is an identifier, quoted otherwise; a value is tagged only where its class carries `@Typename`, which is what
   selects a subtype of the value type on the way back in. A value entry (`ValueEntry`) is written as its `type` for
@@ -43,6 +35,9 @@ keeps the rest of the document. Current form only; history lives in git.
 - A peek is total: a malformed header yields nothing rather than throwing, never a schema the document does
   not name, and the failure it kept is reported by the read that continues.
 - The resolver reaches for the `writer`-package engine (`DataClassObjectWriter`), never the facade.
+- The object writer reads a schema in one place only: `describing(TsonLinkedSchema, root)` tags a union member at a
+  position typed by an extern with the enclosing scope's name (`writer.ExternTags`, `design/externs.md`); every other
+  tag is the class's own, and a writer derived from strings writes none of the schema's.
 
 Related: `design/facades-and-tree.md` (the read facades, annotation capture), `design/tree-model.md`
 (`TsonValue`, `TsonDocument`, `TsonObjectDocument`), `design/front-door-and-config.md` (`Tson`),
@@ -124,7 +119,7 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
   type-ref, the sinks it writes to) where an engine owns one value and contributes no framing. `AstWriter`
   and `AtomWriter` are engines too and live there beside them.
 - **The resolver reaches for the engine, never the facade.** `DefinitionResolver`'s atom-refinement merge
-  and `HeldBody`'s held template body both write a wire record and parse it straight back, where a header
+  and `WireForm.annotationValue` both write a wire record and parse it straight back, where a header
   would be content the parse would then have to strip — so what they want *is* the engine's contract. It is
   also what keeps the direction honest: a resolver naming `TsonObjectWriter` would make the engine depend
   on a front door built over it.

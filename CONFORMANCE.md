@@ -114,5 +114,22 @@ reasonable default. Tuples write as plain arrays, with nothing marking them as t
 round trip on both paths: `TsonTreeWriter` re-emits a node's own, and `TsonObjectWriter` re-emits those a
 bound class captured by declaring an `Annotations` component.
 
+**An extern's schema is loaded as an import is, and judged before it is fetched where it can be.** ([TSON-SCHEMA]
+§5.13.) An extern whose `schema` is a relative reference or carries a fragment names no identity and is refused, as
+an `!!import` of one is. A schema that reaches itself is a cycle named by its path, each extern edge marked with its
+entry (`a.tn -[extern 'x']-> b.tn -> a.tn`), and that holds for a schema handed over as text as for one loaded by
+identity: the document is in flight under its own `!!id`, so a reference to that identity is never fetched. A closure
+reaching the kernel of another revision through an extern is refused before that kernel is fetched, naming both
+kernels. A foreign schema that is not available keeps its own classification, `SCHEMA_NOT_FOUND` with the extern
+named, and does not become a schema error.
+
+**The tag in front of a foreign value is judged by identity.** ([TSON-SCHEMA] §7.9, [TSON-JSON] §8.6.) A tag at a
+position an extern types may be any name of the enclosing scope that reaches the extern's target, an entry IS-A it,
+or a variant of it where it is a choice; a tag naming the position's own extern is read as no tag. In JSON the
+`$type` that selects a variant at a choice or a declared position is that boundary tag, and a position whose
+extern's target is a map is map-typed, so a leading `$type` there is a key. An annotation named through an extern in
+a schema document binds where the bind context binds the foreign schema's classes and is read as a tree where it
+does not.
+
 Ambiguities, inconsistencies, and errors in the spec text itself — as opposed to this implementation's own
 behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).

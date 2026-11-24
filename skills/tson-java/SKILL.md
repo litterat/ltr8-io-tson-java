@@ -42,14 +42,14 @@ TypeScript port is [ltr8-io-tson-typescript](https://github.com/litterat/ltr8-io
 the shared conformance vectors both are tested against are
 [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite).
 
-**Versioning is `0.<spec revision>.<patch>`.** `0.39.x` implements **2026 Revision 39**: its bundled schemas
-carry Revision 39 identities (`https://tson.io/2026/39/m/…`). A new revision moves the minor, and the spec is a working draft
+**Versioning is `0.<spec revision>.<patch>`.** `0.40.x` implements **2026 Revision 40**: its bundled schemas
+carry Revision 40 identities (`https://tson.io/2026/40/m/…`). A new revision moves the minor, and the spec is a working draft
 with no compatibility guarantee between revisions — so a schema `!!id` pinned at
-`https://tson.io/2026/39/m/core.tn` is revision-specific and must match the library's own revision.
+`https://tson.io/2026/40/m/core.tn` is revision-specific and must match the library's own revision.
 
 > **Not on Maven Central**, deliberately — publishing needs signed artifacts and a fuller POM, which is a
 > separate decision. To use it from another project on the same machine: clone, `./gradlew
-> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.39.0-SNAPSHOT` (the front
+> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.40.0-SNAPSHOT` (the front
 > door pulls the rest in). The jars carry real `module-info.class`es, so class path or module path both
 > work.
 
@@ -103,7 +103,7 @@ by every read but `readAs`; `tson.validateSchema(text)` is its door.
 ```java
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.*;        // Diagnostic, the receivers, ProcessorConfig, the exceptions
-import io.ltr8.tson.base.policy.*; // IdentifierPolicy, ScriptPolicy, LimitsPolicy, ProcessorPolicy, FetchPolicy
+import io.ltr8.tson.base.policy.*; // IdentifierPolicy, TokenPolicy, LimitsPolicy, ProcessorPolicy, FetchPolicy
 import io.ltr8.tson.base.source.*; // SchemaAccess, SchemaSource, the two fetching sources
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
@@ -111,8 +111,8 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.standard();   // bootstraps meta.tn (the kernel), numeric.tn, temporal.tn, net.tn, core.tn, policy.tn
 
 String schema = """
-        !!id:"https://example.com/2026/39/app/order-1.tn"
-        !!import:"https://tson.io/2026/39/m/core.tn"
+        !!id:"https://example.com/2026/40/app/order-1.tn"
+        !!import:"https://tson.io/2026/40/m/core.tn"
         !schema {
           order => {
             order_id: int32
@@ -125,7 +125,7 @@ String schema = """
 tson.resolve(schema);                 // registers it under its own !!id
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/39/app/order-1.tn")
+        .withSchema("https://example.com/2026/40/app/order-1.tn")
         .readAs("""
                 { order_id: 1042  customer: "Ada Lovelace"  placed: !date 2026-07-01  total: 149.95 }""",
                 "order");
@@ -173,9 +173,8 @@ Where schemas come from is one value, `SchemaAccess` — the source plus the `Fe
 
 ## Reading into a tree
 
-`TsonValue` is a sealed interface over eight pure immutable node kinds — `TsonRecord`, `TsonMap`,
-`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonReference`, `TsonVoid`, `TsonMissing` (no `Node` suffix,
-deliberately); `TsonReference` is itself sealed over `TsonApplicationReference` and `TsonSiblingReference`. **Every
+`TsonValue` is a sealed interface over seven pure immutable node kinds — `TsonRecord`, `TsonMap`,
+`TsonArray`, `TsonTuple`, `TsonAtom`, `TsonVoid`, `TsonMissing` (no `Node` suffix, deliberately). **Every
 accessor is total — nothing throws.**
 
 | Call                                                     | Answers                                                         |
@@ -195,24 +194,25 @@ returns that same node, so the first failure stays the informative one.
 node because there is one no-value spelling: `TsonVoid` carries `_` and a collecting-mode read failure.
 The token `null` is not absence — §4 resolves it to the string `null`, so it arrives as a `TsonAtom`.
 
-**A reference with arguments is data, written unquoted** (`t: set<text>`, `@meta.application:response<order 201>`;
-[TSON-DATA] §7.4). A schemaless read keeps one as a `TsonApplicationReference` — `segments()`, `arguments()` (each
-read by the ordinary rule: `201` a number, `text` a string, a nested application another `TsonApplicationReference`),
-`text()` for the canonical spelling — and resolves nothing, so it has no referent. A sibling reference, `kind!` (a record
-field's type taken from the field `kind` of the same record), is kept as a `TsonSiblingReference` (`field()`, `text()`). Both
-are a `TsonReference`, the references the grammar alone shows to be one; a bare name is a `TsonAtom`. Under a schema, a value
-at a kind-typed position (`meta.ref<T>`, `meta.type_ref`) arrives in tree mode as an atom holding a `schema.meta.TypeRef`
-(`as(TypeRef.class)`), never a `String`: `name()`, `arguments()`, `text()`, and `referent()`, the value of the entry it names
-in the schema it was read under. An application the schema never closes is refused, and a quoted `"set<text>"` there is text,
-a type mismatch. A record field's type (`meta.field_type_ref`, the reference whose `allow_sibling` is left true) may hold
-a sibling reference, read as a `schema.meta.SiblingRef`; every other reference refuses one. A position typed by a reference
-over a type that is no constructor (`meta.ref<order>`) holds a value's qualified name (`o1`, `book.first`), judged by what it
-reaches in the schema, and its `TypeRef`'s `referent()` is that value.
+**A reference in data is a name, one token's text** (`order`, `geo.address`; `"order"` is the same reference, and
+`"main.public api.ping"` reaches a field named `public api`). An argument list is schema grammar
+and no data form ([TSON-DATA] §7.2.5): `t: set<text>` in a data document, or in a schema value's payload, is a parse
+error whether or not the schema closes the application, and the document names the entry the schema declares for it
+(`names => set<text>`, then `t: names`). A schemaless read keeps a name as a `TsonAtom` holding its text. Under a
+schema, a value at a kind-typed position (`meta.ref<T>`, `meta.type_ref`) arrives in tree mode as an atom holding a
+`schema.meta.TypeRef` (`as(TypeRef.class)`), never a `String`: `name()`, `segments()`, `text()`, and `referent()`, the
+value of the entry it names in the schema it was read under. A quoted `"set<text>"` there is no
+qualified name, refused as outside the reference's grammar (`ATOM_FORM_INVALID`), as the JSON string is. `kind!` is schema
+sugar for a dependent field's type and no data form: written in data it is a syntax error. A position typed by a
+reference over a type that is no constructor (`meta.ref<order>`) holds a value's qualified name (`o1`, `book.first`),
+judged by what it reaches in the schema, and reads to a `schema.meta.ValueRef` (`as(ValueRef.class)`, bound as
+`ValueRef<T>` or as a `String` name; a `TypeRef` component there is a bind mismatch): `name()`, and `get()`, that
+value.
 
 **A dependent field, `v?: kind!`, is read against the type its sibling names in each instance** (Part 2 §5.2): `{ kind:
 point  v: { x: 1  y: 2 } }`. Write a free sibling before its dependent field (a pinned or discriminator sibling may come
-anywhere); a sibling naming a template is refused at the sibling. In tree mode the value is whatever the named type reads
-to; in bind mode declare the component `Object` and register `Object` as an atom in the `DataBindContext`
+anywhere); a sibling naming a parametric record is refused at the sibling. In tree mode the value is whatever the named type
+reads to; in bind mode declare the component `Object` and register `Object` as an atom in the `DataBindContext`
 (`registerAtom(Object.class)`), and it receives what the named type binds to.
 
 **Casting and converting are different questions.** `as(Class)`/`asString`/`asBigDecimal` only ever
@@ -421,18 +421,18 @@ Two policies, defaulting opposite ways for the same reason in each case:
 ```java
 Tson tson = Tson.of(ProcessorConfig.defaults()
         .withIdentifierPolicy(IdentifierPolicy.defaults().perSegment())  // names
-        .withTokenPolicy(ScriptPolicy.unrestricted()));                 // values
+        .withTokenPolicy(TokenPolicy.unrestricted()));                  // values
 ```
 
 `identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names, and every
 value whose type is a `unicode.identifier_type` family — with all three §8.2 mechanisms on and Highly Restrictive over
-the whole name (§8.2's SHOULD). Reach for `perSegment()`, or `permitting(scripts…)` on the level, before
+the whole name (§8.2's SHOULD). Reach for `perSegment()`, or `permitting(scripts…)`, before
 loosening the level: both keep the rule everywhere else. A segment ends at `_`, and at whatever a name's profile
 adds that is not a letter or digit (`-` for core names, a `$` or a medial `.` for a family that adds one).
 `withSkeletonDistinctness(false)` drops the look-alike rule over a scope, independently of the level. `tokenPolicy`
 governs **every token a read pulls** and defaults to `unrestricted()`, a value being data that may
 legitimately be anything; raise it when values are more than payload (a service that renders what it
-reads into a UI). A token policy is a plain `ScriptPolicy` and has **no unit**: `_` and `-` are ordinary
+reads into a UI). A token policy is a plain `TokenPolicy` and has **no unit**: `_` and `-` are ordinary
 characters in a value rather than word separators, and UTS #39's own `Toys-Я-Us` is the spoof segmenting one
 would admit. Note
 also that a token policy stricter than the identifier policy **subsumes it** — the token scan runs before
@@ -533,7 +533,8 @@ validates in full and builds the classes the binding resolves, all-or-nothing li
 "body": "hi"}`; a bare value there is refused, and the tree comes back without the tag. `$schema` binds the
 document on the root alone, and anywhere else is refused (`SCOPE_NOT_ADMITTED`). Built from the same
 `ProcessorConfig`, `Json.of(config)` and `Tson.of(config)` judge under the same policy and bind the same
-classes.
+classes. At a position an extern types, the `$type` leading the object (or its wrapper) is the reading schema's
+name for it, and every name inside is the foreign schema's: `{"$type": "order_v2", "payment": {"$type": "card", …}}`.
 
 ## Streaming and allocation
 
@@ -603,14 +604,14 @@ java --module-path tson/build/modules --add-modules io.ltr8.tson examples/Object
 (Java 25, no external runtime dependencies), the module dependency direction, the pipeline phase by
 phase, the exception-classification policy, and the traps that look like cleanup targets; each module has
 its own `CLAUDE.md` beside it. The `design/` notes carry the per-area design detail, `BACKLOG.md` the
-outstanding work, `SPEC-FEEDBACK.md` the spec issues still open against the current revision, and
+outstanding work, `SPEC-FEEDBACK.md` the spec issues open against Parts 1 and 2, and
 `STATUS.md` the implemented checklist.
 `references/` here documents the API as it stands, not how to extend it.
 
 ## Specification
 
-- Part 1 — Text Data Format: https://tson.io/raw/2026/39/tson-part1-data.md
-- Part 2 — Type System and Schema: https://tson.io/raw/2026/39/tson-part2-schema.md
+- Part 1 — Text Data Format: https://tson.io/raw/2026/40/tson-part1-data.md
+- Part 2 — Type System and Schema: https://tson.io/raw/2026/40/tson-part2-schema.md
 - Part 3 — JSON Encoding: drafted in the repository, `spec/tson-part3-json.md`
 
 Both are working revisions and change without compatibility guarantees. Re-fetch and check the revision

@@ -25,7 +25,7 @@ void main() {
     // A schema document says so with its root's tag, !schema -- the same peek classifies it.
     TsonDocumentPeek schema = TsonDocumentPeek.of("""
             !!id:"https://example.com/order-2.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema { order => { id: int32 } }""");
     IO.println("schema document? " + schema.isSchemaDocument() + " (imports " + schema.header().imports() + ")");
 

@@ -27,8 +27,8 @@ class ValidateCommandTest {
 
     private static final String RECORD_SCHEMA = """
             !!id:"https://example.test/cli-validate.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               my_record => { a: int32  b: int32 }
             }
@@ -168,8 +168,8 @@ class ValidateCommandTest {
         Path recordSchema = writeFile(dir, "record.tn", RECORD_SCHEMA);
         Path pointSchema = writeFile(dir, "point.tn", """
                 !!id:"https://example.test/cli-point.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { point => { x: int32  y: int32 } }
                 """);
         Path recordData = writeFile(dir, "rec.tson", selfDescribing("{ a: 1  b: 2 }"));
@@ -341,8 +341,8 @@ class ValidateCommandTest {
     void aSchemaPinnedByItsOwnHashResolvesAgainstAPlainReference(@TempDir Path dir) throws IOException {
         // The schema's !!id carries a ?sha256= pin, its own content's (the id line is not hashed); the data's
         // !!schema is plain. Matching is by canonical identity (the hash is not identity), so it still validates.
-        String body = "!!import:\"https://tson.io/2026/39/m/meta.tn\"\n"
-                + "!!import:\"https://tson.io/2026/39/m/core.tn\"\n"
+        String body = "!!import:\"https://tson.io/2026/40/m/meta.tn\"\n"
+                + "!!import:\"https://tson.io/2026/40/m/core.tn\"\n"
                 + "!schema { my_record => { a: int32  b: int32 } }\n";
         String unpinned = "!!id:\"https://example.test/cli-validate.tn\"\n" + body;
         String pin = io.ltr8.tson.compiler.TsonContentHash.sha256(unpinned.getBytes(StandardCharsets.UTF_8));
@@ -361,8 +361,8 @@ class ValidateCommandTest {
         // Overriding a bundled schema isn't supported -- the file is skipped, not used, and a
         // note goes to stderr so it isn't silently dropped.
         Path fake = writeFile(dir, "core.tn", """
-                !!id:"https://tson.io/2026/39/m/core.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!id:"https://tson.io/2026/40/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema { my_thing => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");   // plain -> schemaless -> valid

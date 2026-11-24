@@ -11,10 +11,13 @@ import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeInline;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -49,7 +52,18 @@ public final class JsonSchemaCompiler {
     /** Compiles every entry, dispatching each resolved body to {@code factories} by its constructor name. */
     public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema,
                                              ValueReaderFactoryResolver factories) {
-        Compilation compilation = new Compilation(linkedSchema, factories);
+        return compile(linkedSchema, factories, null);
+    }
+
+    /**
+     * {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}, the schema a value through an extern is read in
+     * compiled by {@code foreign} ([TSON-SCHEMA] §7.9): a registry's cache, so each foreign schema compiles once in
+     * its mode and is shared by every importer. Null compiles each foreign schema once for this compile.
+     */
+    static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
+                                      ExternReader.ForeignSchemas foreign) {
+        Compilation compilation = new Compilation(linkedSchema, factories,
+                foreign != null ? foreign : onePerCompile(factories));
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -58,22 +72,75 @@ public final class JsonSchemaCompiler {
         return compiled;
     }
 
+    /**
+     * Each foreign schema compiled once for one compile and whatever it reaches, for a compile with no registry, which
+     * obtains no schema by identity it has not compiled.
+     */
+    private static ExternReader.ForeignSchemas onePerCompile(ValueReaderFactoryResolver factories) {
+        Map<String, JsonCompiledSchema> compiled = new HashMap<>();
+        return new ExternReader.ForeignSchemas() {
+            @Override
+            public JsonCompiledSchema compiled(TsonLinkedSchema linked) {
+                JsonCompiledSchema done = compiled.get(linked.identity());
+                if (done == null) {
+                    done = compile(linked, factories, this);
+                    compiled.put(linked.identity(), done);
+                }
+                return done;
+            }
+
+            @Override
+            public Optional<JsonCompiledSchema> compiled(String identity) {
+                return Optional.ofNullable(compiled.get(identity));
+            }
+        };
+    }
+
+    /**
+     * Builds the reader of a type written in place ({@link TypeInline}) from its body, through the factory its
+     * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice, a reference, or the
+     * record an application closes to in place, named for a message by the form as written. It holds the factories,
+     * the linked schema and the readers' handle, never the {@link Compilation}.
+     */
+    private static final class InlineReaders {
+        private final TsonLinkedSchema linked;
+        private final ValueReaderFactoryResolver factories;
+        private CompiledReaders readers;
+
+        InlineReaders(TsonLinkedSchema linked, ValueReaderFactoryResolver factories) {
+            this.linked = linked;
+            this.factories = factories;
+        }
+
+        JsonTypeReader<?> build(TypeInline type) {
+            Top read = type.of();
+            return factories.resolve(constructorOf(read)).create(type.text(), read,
+                    new ValueReaderContext(linked, readers));
+        }
+    }
+
     /** One compile's own state: what is finished, what is in flight, and the factories it dispatches through. */
     private static final class Compilation {
 
         private final TsonLinkedSchema linked;
         private final TsonSchema schema;
         private final ValueReaderFactoryResolver factories;
+        private final ExternReader.ForeignSchemas foreign;
         private final Map<String, JsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
         /** How a factory reaches another entry's reader -- rebound once, when this ends. */
-        private final CompiledReaders readers = new CompiledReaders(this::resolve);
+        private final CompiledReaders readers;
 
-        Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories) {
+        Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories,
+                    ExternReader.ForeignSchemas foreign) {
             this.linked = linked;
             this.schema = linked.schema();
             this.factories = factories;
+            this.foreign = foreign;
+            InlineReaders inline = new InlineReaders(linked, factories);
+            this.readers = new CompiledReaders(this::resolve, inline::build);
+            inline.readers = readers;
         }
 
         JsonTypeReader<?> resolve(String name) {
@@ -82,7 +149,7 @@ public final class JsonSchemaCompiler {
                 return done;
             }
             if (!building.add(name)) {
-                return new DeferredTypeReader(name, finished);
+                return new DeferredTypeReader(linked, name, finished);
             }
             try {
                 Top definition = schema.entries().get(name);
@@ -121,6 +188,9 @@ public final class JsonSchemaCompiler {
                 // than walked on every value.
                 return resolve(alias.target().name());
             }
+            if (body instanceof io.ltr8.tson.schema.meta.Extern) {
+                return ExternReader.of(name, context, foreign, JsonReadContext.CROSSING);
+            }
             // A namespace type's value is the map it describes (NamespaceBody#read), its keys read under its key
             // family.
             Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;
@@ -130,14 +200,17 @@ public final class JsonSchemaCompiler {
     }
 
     /**
-     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, so a record
-     * template takes {@code record_template}'s reader and every other open entry {@code template}'s ([TSON-SCHEMA]
-     * §5.10). A value entry names the ordinary type it is a value of, which has no factory: nothing is typed by
-     * such an entry, and its reader is the refusal.
+     * Which constructor a resolved body is an instance of -- the name every {@code Top} leaf carries, so a parametric
+     * record takes {@code record}'s factory, which answers it with the refusal of a parametric record named where a type is
+     * read ([TSON-SCHEMA] §5.10). A value entry names the ordinary type it is a value of, which has no factory:
+     * nothing is typed by such an entry, and its reader is the refusal; an incomplete entry, no type either, the same.
      */
     private static String constructorOf(Top body) {
         if (body instanceof ValueEntry value) {
             return value.type();
+        }
+        if (body instanceof io.ltr8.tson.schema.meta.IncompleteEntry) {
+            throw new IllegalStateException("an incomplete entry is no type, and has no reader");
         }
         Class<?> leaf = body.getClass();
         Typename typename = leaf.getAnnotation(Typename.class);

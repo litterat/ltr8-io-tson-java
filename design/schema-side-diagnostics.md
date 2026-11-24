@@ -87,39 +87,37 @@ distinction. They rethrow the original untouched (the linker re-states only an `
   resolve. That is javac's error-type contract (it answers every question) rather than Swift's (every questioner must
   check first), and the choice is load-bearing: a `Sum`-bodied placeholder makes `parent => child & { ... }` fail
   *because* `child` did, reporting a consequence beside its cause. Swift's other half is kept — producing one means a
-  diagnostic was already reported, so it never escapes a reporting resolve and needs no `EntryKind` of its own.
+  diagnostic was already reported, so it never escapes a reporting resolve and needs no branch of `Top` of its own.
   - **It keeps the declaration's own type parameters**, the one declaration-specific thing it carries. With the arity
-    dropped, an application `bl<int32>` of a broken template `bl => <T> …` is told that `bl` "declares no type
+    dropped, an application `bl<int32>` of a broken parametric record `bl => <T> …` is told that `bl` "declares no type
     parameters … drop the argument list" — a fix that breaks the schema further, the real one being upstream. With the
     arity intact the application closes against the empty body and says nothing.
-- **A template condemned by `TemplateRegularity` is replaced before materialisation**, on the same terms.
-  `TemplateRegularity.check` returns the names it rejected and `SchemaResolver.condemn` puts a placeholder in both the
+- **A parametric record condemned by `ParametricRegularity` is replaced before materialisation**, on the same terms.
+  `ParametricRegularity.check` returns the names it rejected and `SchemaResolver.condemn` puts a placeholder in both the
   entry map and the namespace (`materialise` walks the first, an application's head resolves through the second).
-  Left in place, an application of one runs to `MAX_CLOSING_DEPTH` and reports the same defect again, against
-  whichever entry applied it, with a 64-link chain of synthetic names. **The depth guard does not stand down**: it
-  guards a hole in the static check, not a template the check already condemned.
-- **A defect a held body deferred is reported against the declaration whose text wrote it**
-  (`TsonSchemaLinker.heldDeclarationNaming`). A template's references cannot be settled until an application supplies
-  arguments, so the verdict arrives on the entry materialisation minted, and the walk to a positioned entry
-  (`reportedAgainst`) finds the *applier*: `box => <T> { v: T  w: no_such_type }` would be reported against
-  `holder => { b: box<text> }`, a line that is not wrong, once per applier. Deferred checking is survivable only if the
-  author is sent to the line they can edit.
-  - **The offending name is the evidence, not the entry.** A derived entry's provenance cannot answer this: a sugar
-    lift records only the constructor it applies, and an alias composes its argument into someone else's application
-    (`half => <B> pair<no_such_type, B>` closes to a `pair` instantiation, and `pair` is faultless). Asking which held
-    body *mentions the name* (`HeldBody.names()`) reaches `half` directly — and reaches nothing when the name came from
-    the argument list, so `box<3>` and `box<some_typo>` keep their verdict at the application, where those mistakes are.
-  - **Both filters are load-bearing.** Only a *derived* entry (no position of its own) is retargeted, or a closed
-    declaration's own typo would be blamed on any template that names it; and only an authored open declaration
-    (`OpenEntry.isOpen`) is a candidate. `HeldBody.names()` cannot tell a type reference from a field name, so it is
-    asked only about a name already known to resolve to nothing; a field of that name misleads no worse than naming
-    the applier does.
+  Left in place, an application of one would report the same defect again, against whichever entry applied it.
+- **A defect a parametric record deferred is reported against the declaration whose text wrote it**
+  (`TsonSchemaLinker.heldDeclarationNaming`). A parametric record's references cannot be settled until an application
+  supplies arguments, so the verdict arrives inside the record an application closes to in place, in the applier's entry --
+  a line that is not wrong, once per applier. Deferred checking is
+  survivable only if the author is sent to the line they can edit.
+  - **The offending name is the evidence, not the entry.** The entry's provenance cannot answer this. Asking which parametric
+    record *mentions the name* -- among its references (`ParametricEntry.names`) or inside a type it holds in place
+    (`writes`) -- reaches the parametric record directly, and reaches nothing when the name came from the argument list, so
+    `box<some_typo>` keeps its verdict at the application, where that mistake is.
+  - **Both filters are load-bearing.** Only a failure inside a record in place (`UnresolvedReference.inPlace`, marked
+    by `validateSlot`) or in an entry with no position of its own is retargeted, or a closed declaration's own typo
+    would be blamed on any parametric record that names it; and only an authored parametric declaration
+    (`ParametricEntry.isParametric`) is a candidate.
+  - **A type written in place is named by its form** (`validateSlot`): a failure inside one states its subject as the
+    form written, `'box<some_typo>' field 'v'` or `'[some_typo]' element_type`, reported against the declaration that
+    holds it. A construction's form stays the subject when the failure is retargeted (`namedByForm`).
   - **The subject moves with the location**, which is why `UnresolvedReference` carries the sentence in parts
     (subject, trail, name): `'box<text>' field 'w'` states the mistake against an application that is itself correct.
     It is linker-internal and re-stated as a `SchemaValidationException` — not a subclass of it, since that type is
     sealed and lives in `tson-base`, which holds no pipeline machinery.
-  - **One mistake gets one diagnostic** (`blamedOnce`), however many declarations apply the template; otherwise the
-    count would be a property of the template's callers rather than of the defect.
+  - **One mistake gets one diagnostic** (`blamedOnce`), however many declarations apply the parametric record; otherwise
+    the count would be a property of the parametric record's callers rather than of the defect.
 
 ### Desugaring
 
@@ -180,8 +178,8 @@ does.*
   code rides on the codes alone (`TsonCli.exitCodeFor`); a gap that escapes some other way still exits 70 through
   `TsonCli.notImplemented`.
 - **A bind mismatch is neither an author error nor a gap.** `DefinitionResolver.bindAtomInstance` and
-  `bindAnnotationValue` keep it clear of their catch-alls; relabelled `UnsupportedOperationException`, a missing line
-  of wiring would read as *this library cannot do that*. The reachable case is a value entry of a type the consumer
+  `bindAnnotationValue` restate it as itself; relabelled `UnsupportedOperationException`, a missing line of wiring
+  would read as *this library cannot do that*. The reachable case is a value entry of a type the consumer
   bound no class for (`pings => !notifications { ping => … }` with none for `notification`): the resolver holds it as
   a tree, so the schema loads and validates, and the bind registry reports it at the entry (`/pings`) where the
   schema is obtained to bind (`design/compiled-registries.md`). `BindMismatchClassificationTest` pins it beside an
@@ -220,10 +218,10 @@ declares.** `RecordBindReader` refuses four disagreements; `BindTargets` carries
   diagnostics).
 - **An atom field** is refused when its component binds structurally, or when its family cannot produce the class the
   component binds.
-- **The rule bites the library first**: `temporal.datetime_type` and `temporal.time_type` declare `precision`, so
-  `DateTimeType` and `TimeType` carry it and their parsers enforce it. §5.5 makes it a constraint on the value — a whole
-  number of 10⁻ᴺ seconds — not on the spelling, so `12:00:00.500` is admitted at `precision: 1`; nothing is truncated to
-  satisfy it (`FractionalSeconds`).
+- **The rule bites the library first**: `temporal.datetime_type` and `temporal.time_type` declare `fraction_digits`,
+  so `DateTimeType` and `TimeType` carry it and their parsers enforce it. §5.5 makes it a constraint on the value — a
+  whole number of 10⁻ᴺ seconds — not on the spelling, so `12:00:00.500` is admitted at `fraction_digits: 1`; nothing is
+  truncated to satisfy it (`FractionalSeconds`).
 - **The class is the target at every depth.** A collection's element, a map's key and value and a tuple's position are
   bound to what the component's class declares there, recursively (`reader.BindTargets`, the rule `tson-json`'s class
   of that name states too): an atom narrowed to the element's wire class, a nested container rebuilt for its declared
@@ -237,7 +235,7 @@ declares.** `RecordBindReader` refuses four disagreements; `BindTargets` carries
   (`ConcurrentHashMap`, `ArrayDeque`) is not refused here, since no JDK type says so; the read that meets one reports it
   (`design/readers-and-diagnostics.md`).
 - **A tuple field binds to its component's own `@Tuple` class**, which must have the tuple's arity
-  (`TupleBindReader.disagreements`). An inline tuple's minted entry has no author binding and no natural Java form, so
+  (`TupleBindReader.disagreements`). A tuple written in place has no entry, no author binding and no natural Java form, so
   its own reader is unbound (`TupleBindReader.unbound`, raising `MissingBindingException` if read directly) and
   `BindTargets` builds it into the component's class.
 - **An ordered map needs a component that keeps insertion order** (`DataClassMap.ordered()`: a `SequencedMap` that is

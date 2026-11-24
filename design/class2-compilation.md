@@ -1,7 +1,7 @@
 # Class 2 compilation
 
 Design notes for `TsonSchemaCompiler` and the compiled reader stack it wires: eager compilation, `CompiledReaders`,
-`ErrorReader`, template entries, the two compile and two output modes, §7.2's subsumption guard, and untagged labelled
+`ErrorReader`, parametric records, the two compile and two output modes, §7.2's subsumption guard, and untagged labelled
 choices. Current form only; history lives in git.
 
 **Invariants**
@@ -13,19 +13,48 @@ choices. Current form only; history lives in git.
 - Building a reader resolves its parts' readers and reads through none of them. Work that reads through one (a
   record's defaults and pins) goes to `CompiledReaders.afterEveryReader` and runs in `settle`, once, after the walk.
 - `ErrorReader` reports `NOT_IMPLEMENTED` and skips the value. Two causes are deliberately not reported that way: a
-  `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile.
-- An open entry never reaches a factory: a record template (`RecordTemplateBody`, a family base) compiles to an
-  `AbstractTemplateReader`, which takes that type and nothing else, and a held template (`TemplateBody`) to an
-  `OpenTemplateReader`. A value entry (`ValueEntry`) never
+  `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile -- but at a
+  checkpoint (`compileReady`), where it is the read's that reaches the entry.
+- A parametric record never reaches a factory: a `RecordBody` with `parameters` is no type (§5.10) and compiles
+  to a `ParametricRecordReader`. A value entry (`ValueEntry`) never
   reaches one either: it compiles to a `ValueEntryReader`, which refuses a data tag naming it as `TYPE_MISMATCH`.
 - A namespace type compiles through the `map` factory with the map `NamespaceBody.read()` states; the kernel's
   `meta.schema` entry's reader marks its read as a schema document's (`readsSchemaNames`), so a resolved form read as data
   reads its kind and reference names by grammar alone.
 - The read mode is which factory registry you hold; `ValueReaderFactoryResolver` stays in the unexported `reader` package.
-- The subsumption guard follows the body, not `kind()`, admits an entry's aliases as the entry itself, and is transparent
+- The subsumption guard follows the body, admits an entry's aliases as the entry itself, and is transparent
   to `UseSite` renaming and bind-mode container rebinding.
 - `Subsumption.namesMeaning` and the binding-name index are built once per compile, not per entry.
-- A bind lookup redirects through an alias only for a derived entry (one with no source position).
+- A type written in place (`TypeInline`) has no entry and no compiled entry reader: a slot's reader is
+  `TsonTypeReaderResolver.resolve(TypeExpr)`, a name's entry reader or one built from the body through its
+  constructor's factory (`TsonSchemaCompiler.InlineReaders`) -- a container, a tuple, a choice, a reference, or the
+  record an application closes to in place, through `meta.record`'s factory -- memoised in `CompiledReaders` by the
+  construction and the form it is named by (`InlineKey`), and buildable after the rebind, since the builder holds the
+  factories and the linked schema, never the `Compilation`. Equality includes the constructor, so `pair_of<int32>` and
+  `[int32; 1..2]` are two readers; `box<int32>` and `crate<int32>` closing to one record are one type and two readers,
+  each named by its own application. It is named for a message by its form as written (`TypeInline.text()`: `[text]`,
+  `set<text>`, `pair_of<int32>`, `page<order>`), which `ValueReaderContext.displayName`/`authoredName` pass through
+  for a name that is no entry rather than re-render from the body. It carries no tag in a tree
+  (`ValueReaderContext.tagOf`, `RecordTreeReader` included), a record dispatcher in front of a record in place admits
+  no tag naming it (`RecordDispatch`), and its §7.2 guard admits none. A record in place judges its field names by
+  the name type its body states (`TsonLinkedSchema.nameType(String, Top)`), having no entry the linker indexed.
+  `tson-json` builds its own the same way (`JsonSchemaCompiler.InlineReaders`).
+- In bind mode **a record in place binds by the component that holds it** (`RecordInPlaceBindReader`): no binding map
+  can name it (§8.2) and a record has no natural host form, so the factory builds a reader that builds nothing, and
+  `BindTargets` reads it again into the component's record class -- a field's, an element's, a map value's, a tuple
+  position's -- each field bound to that class's component as a declared record's is. A component whose class is no
+  record is a bind mismatch; read where no component says, it raises `MissingBindingException`. `tson-json`'s
+  `RecordInPlaceReader` is the same rule.
+- In bind mode a component typed `TypeExpr` at a type slot's choice reads an untagged value through
+  readers of its own (`NamedDispatchReader.recoveringWith`): a name through the `TypeRefSlotReader` a `TypeRef`
+  component gets, so the annotations written on the name are kept, and the `{ of: !C { … } }` wrapper through
+  `TypeInlineReader`, which looks ahead for `C` -- the tag on `of`, no field of the wrapper -- and records it, past its
+  alias hops, on the `TypeInline` the wrapper's own reader built. A natural reader's guess at an inline type's host
+  class is its constructor's shape (`BindTargets.hostType`).
+- The writer (`DataClassObjectWriter`) writes a `TypeInline` as the untagged wrapper with its body under the recorded
+  constructor, never under the `@Typename` of the body's class: a schema's own constructor of arrays writes
+  `{ of: !list_type { … } }`.
+- A bind lookup redirects through an alias only for an entry with no source position.
 
 Related: `design/linking-and-compilation.md`, `design/choice-disjointness.md`, `design/compiled-registries.md`,
 `design/readers-and-diagnostics.md`, `design/schema-resolution.md`.
@@ -57,7 +86,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   delegate rather than falling back to it, which is what actually makes that invariant true.
   `CompiledReadersTest` pins the handover; a second `bind` is rejected.
 - **A compile of a resolution in progress is the one in which a name may have no entry** (`compileReady`). A
-  resolution compiles its document's entries ready so far to read a value against one of them (`WaitOrder`), and a
+  resolution compiles a checkpoint, its imports and its entries ready so far, to read every value at (`WaitOrder`), and a
   declaration not yet ready compiles to a `PendingTypeReader`: a schema-document read that reaches one throws
   `NotReady` for the resolution to make the entry ready and read again, and a held value decoded through one at
   `settle` binds as written. A finished schema's compile has no pending set, and an absent name stays the linker's
@@ -76,7 +105,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   *reading* that entry fails, with the original message preserved. Real causes: a constructor with no
   registered factory — which only a schema's own constructor this library has never seen can be, every
   constructor meta.tn, numeric.tn, temporal.tn and net.tn declare having a factory — or a factory that rejects one entry.
-    - **It reports `NOT_IMPLEMENTED` and skips the value**, the same report-then-skip shape `OpenTemplateReader` uses
+    - **It reports `NOT_IMPLEMENTED` and skips the value**, the same report-then-skip shape `ParametricRecordReader` uses
       (with `TYPE_MISMATCH`) for the entry it refuses — report before consuming so the position names the value, then
       `EventSkip.dataValue` so the stream stays in step. The code, not the channel, is what says this is a gap rather
       than a verdict, which is the same rule the schema pipeline follows: throwing instead would cost the whole read,
@@ -91,24 +120,25 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
       that application as itself; wrapped, a service's missing configuration goes out as a 501.
     - **A `BindMismatchException` is the other, and it never becomes an `ErrorReader` at all**: it is
       rethrown from the compile, so a schema and a class that disagree fail at startup rather than at the
-      first read.
+      first read. A checkpoint is the exception: it holds entries before their applications close and their
+      subtypes join, so the class may disagree with what is not yet the entry, and only a read reaching it fails
+      (`design/resolver-vocabulary-and-bootstrap.md`).
   - A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and propagates
     uncaught.
-- **An open entry never reaches a factory, and which of two readers it becomes is decided by its Java type.**
-  `TsonSchemaCompiler.build` asks before any factory is consulted. A `RecordTemplateBody` is a **family base**
-  and becomes an `AbstractTemplateReader`, which dispatches to one of its members by tag or by the
-  discriminators exactly as a closed abstract or sealed record does; no record reader is ever built for it, and
-  none can be, a record reader taking a `RecordBody`. A `TemplateBody` becomes an `OpenTemplateReader`: a
-  template with no such dispatch is not a type (§5.10), so there is nothing a value could validate against.
-- **`OpenTemplateReader` reports `TYPE_MISMATCH` against the data and skips the value**, like any other
+- **A parametric record never reaches a factory.** `TsonSchemaCompiler.build` asks `ParametricEntry.isParametric`
+  before any factory is consulted, and a parametric record becomes a `ParametricRecordReader` (in `tson-json` the
+  `meta.record` factory asks the same of the body, `DispatchFactories.over`): a parametric record is not a type (§5.10),
+  so there is nothing a value could validate against, and the record factories, which take a `RecordBody`, would
+  otherwise build a reader over its parameters.
+  A family declared through a parametric record is read at its base, a record.
+- **`ParametricRecordReader` reports `TYPE_MISMATCH` against the data and skips the value**, like any other
   reader finding data the schema does not admit. Reaching it is **always** a data error: a *schema* naming
-  such a template without applying it is rejected at link time (`checkArity`'s zero-argument case, which
-  exempts only a family base), so no field,
-  element or supertype routes here — only a data type-ref naming the template, `!paged` against `paged =>
+  any parametric record without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
+  element or supertype routes here — only a data type-ref naming the parametric record, `!paged` against `paged =>
   <T> { … }`, which §5.10 makes an ordinary resolver error rather than anything exceptional. Refusing the
   whole entry is what makes the verdict right: built, a parameterised body would either
-  reach the parameter (`ErrorReader`, message blaming the linker for a stray `T`) or the lifted open
-  synthetic (no factory for an open body), both a library-gap report for a plainly invalid document. The message
+  reach the parameter (`ErrorReader`, message blaming the linker for a stray `T`), a library-gap report for a plainly
+  invalid document. The message
   mirrors the linker's schema-side sentence for the same mistake and adds the route — name the application
   in the schema, write that name in the data.
 - **`TsonCompiledSchema` is `sealed permits TsonCompiledVocabulary`.** A schema compiled as vocabulary, in the
@@ -129,30 +159,28 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   record's container-typed fields) differ per mode. `ValueReaderFactoryResolver` (the `constructor
   name → factory` dispatch interface) lives in the unexported `reader` package — a consumer picks a mode
   by which registry they hold, never by naming it.
-- **A bind lookup asks under the name the author wrote.** An entry a template application materialised is
-  named by content (§8.2 — resolver-chosen, fresh, unreachable from source), so a binding map cannot be keyed
-  on one: the hash is not knowable when the map is written, and a generator emitting bindings cannot invent
-  it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
-  an `ALIAS` body, in declaration order, then the entry's own name, then — for a constructor tightening
-  another — that constructor's, up its chain — and `RecordBindReader` and `TupleBindReader` try them in that
-  order, so `ping => msg_of<"ping", ping_body>` binds under `ping`, and `meta.set_type`, `enum` and a meta
-  layer's `kebab_enum => meta.enum_type ^ { name_type?: = kebab }` bind as the constructor they tighten: a tightening
-  restates fields and adds none (§5.7), so the source's class is theirs. It is tried last, and confined to
-  constructors — an ordinary record refining another may be bound to a narrower class, and falling back to
-  its parent's would lose that silently.
-  **Only a derived entry is reached this way**, which is the test `EntryDisplayName` already applies: an entry
-  with a source position was declared, so its own name is the one the author wrote and an alias naming it must
-  never redirect its binding. The index is built once per compile beside `namesMeaning`, for that one's
-  reason — a property of the schema, not of the entry being looked up. **A class that is mapped and fails
+- **A bind lookup asks under the name the author wrote.** An entry with a source position was declared, so its own
+  name is that name and an alias naming it never redirects its binding. An entry with none — one the kernel's
+  bootstrap builds, or one read from a resolved form — is asked first under the names that reach it through an alias
+  body, in declaration order, then under its own (`ValueReaderContext.bindingNamesFor`, the inverse of §8.3's hop), by
+  `RecordBindReader` and `TupleBindReader` alike. Nothing falls back along a chain: the kernel's set and enum are
+  incomplete entries, whose completions are the constructor's own construction (§5.5). Lost: binding an entry by its
+  supertype's class, which an ordinary record composing another could not share without silently losing a narrower
+  class.
+  **Every lookup is by entry identity**: a name is asked within the canonical identity of the schema declaring it
+  (`ValueReaderContext.namespaceOf`, `DataNameBinder.resolve(namespace, name)`), never the scope it was reached
+  through, so a type two schemas share binds once, and two schemas' entries of one name bind apart through one
+  context. Lost: the scope's identity, which binds a shared import once per importer.
+  The test is `EntryDisplayName`'s, and the alias index is built once per compile beside `namesMeaning`, for that
+  one's reason — a property of the schema, not of the entry being looked up. **A class that is mapped and fails
   analysis stops the search at once** and says so — `'sets' binds Sets, which cannot be analysed: …`, each
   cause along the chain — rather than reading as a name nothing binds; only `ltr8-bind`'s
   `UnboundNameException` moves on to the next candidate, and a search that finds nothing reports the first,
   the author-written name. That is what makes an erased component
   (`no valid data conversion for class java.lang.Object`) visible from an ordinary read.
 - **A family check names its members the same way.** `RecordExtension`'s pin-collision message renders each
-  colliding member through `EntryDisplayName`, so a family whose members are template applications reports
-  `pet_of<cat, int32>` rather than `pet_of_cat_int32_1c52dc45` — a name that points at no declaration an
-  author can open. The blame still rides the real entry name, which is what locates the violation.
+  colliding member through `EntryDisplayName`, so every member is named by its declaration, the line an author can
+  open. The blame rides the real entry name, which is what locates the violation.
 
 ## §7.2's subsumption guard (`Subsumption`, `VariantSchemaReader`)
 
@@ -162,8 +190,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
 non-empty `subtypes()`. An atom, array, map, tuple, or record whose type has no subtype would otherwise
 consume the type-ref and discard it, so a document could claim any type at those positions. The guard is the
 same `VariantSchemaReader` a record with subtypes dispatches through, wired wherever the rule
-applies. Three things it has to get right: it **follows the body, not
-`kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and declared instances have their
+applies. Three things it has to get right: it **follows the body** (choices and declared instances have their
 own membership relations §7.2 excludes); it accepts an entry's **aliases as the entry itself**, since §7.2
 compares "after following both alias chains to their terminal entries" and resolving an alias would
 arrive back at the same reader and recurse; and it is **transparent to `UseSite` renaming and to bind-mode
@@ -177,9 +204,9 @@ a `VariantSchemaReader` go through — the guard's, and the record factories' fo
 Two routes answering separately would admit the same alias at a leaf record and refuse it at one that happens
 to have a subtype, decided by which construction site the entry reached. The subtype end is where it is
 load-bearing rather than tidy: a materialised entry's name is
-implementation-chosen and non-normative (§8.2), so an alias is the *only* name a document has for a template
-instantiation, and without it a subtype-template family exists in the index with no member anything can
-write. **The alias is admitted rather than reduced to its target** — an alias entry compiles to its
+implementation-chosen and non-normative (§8.2), so an alias is the *only* name a document has for an
+instantiation of a parametric record, and without it a family of parametric subtypes exists in the index with no member
+anything can write. **The alias is admitted rather than reduced to its target** — an alias entry compiles to its
 target's reader named for the referring entry, so dispatching on the written name runs the same reader and
 reports under the name the author typed.
 
@@ -214,6 +241,5 @@ only onto a record descriptor (`requireRecord`), so without this reader a sealed
   the read: a member whose component is a `schema.meta.Token` gets `RawTokenParser` instead of its field's reader,
   by the component's own Java type. The factory refuses to build at all if two
   group members share a slot type and disagree, since the resolver is keyed by type name and could not serve
-  both. (A value argument of an application never comes this way: the reference grammar keeps its token,
-  and `NumericIdentity` applies §4.3's equivalence to it, `design/desugaring-open-forms-and-templates.md`.)
+  both.
 - **Bind mode only.** Tree mode reads into `TsonValue` and has no Java shape to satisfy.

@@ -8,17 +8,22 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.ValueEntry;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Alias;
+import io.ltr8.tson.schema.meta.Extern;
+import io.ltr8.tson.schema.ExternAdmission;
+import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.compiler.reader.Subsumption;
+import io.ltr8.tson.compiler.stream.EventSkip;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -28,7 +33,7 @@ import java.util.function.Function;
  * pipeline vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces.
  * Requires a {@link TsonLinkedSchema}, not a bare {@code TsonSchema} -- every reference
  * reachable from a body must already be argument-free (materialisation closes every {@code <...>}
- * application into a reference to the entry it mints), and every name a body refers to must
+ * application, into the declaration that names it or in place as a type written there), and every name a body refers to must
  * actually be present in {@code linkedSchema.schema().entries()}; a referenced-but-missing name is
  * treated as a bug, not a normal failure (see {@link Compilation#resolve}'s own {@code
  * IllegalStateException}).
@@ -46,13 +51,10 @@ import java.util.function.Function;
  * but rejects this particular entry. Every constructor the kernel and the three libraries declare has a factory,
  * so the first case is a constructor a schema declared itself that this library has never seen.
  *
- * <p><b>An entry declaring type parameters never reaches a factory at all</b>, and compiles to one of two
- * readers. A template whose held body carries {@code extension} is a <em>family base</em> and compiles to
- * an {@link AbstractTemplateReader}, which dispatches to one of its instantiations by tag or by the
- * discriminators exactly as a closed abstract or sealed record does. Every other template is not a type
- * (§5.10) and compiles to an {@link OpenTemplateReader}, which reports against the data and skips the
- * value: only a <em>data</em> type-ref can reach one -- a schema naming a template without applying it is
- * refused when it links -- and that is the author's error, not a gap.
+ * <p><b>An entry declaring type parameters never reaches a factory at all.</b> No position names a parametric record
+ * bare (§5.10), and one compiles to a {@link ParametricRecordReader}, which reports against the data and skips the value:
+ * only a <em>data</em> type-ref can reach one -- a schema naming a parametric record without applying it is refused when it
+ * links -- and that is the author's error, not a gap.
  *
  * <p>A compile dispatches each body's constructor name to a factory through one factory set ({@link
  * #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}), with no scoping: linking already established that every
@@ -82,7 +84,60 @@ public final class TsonSchemaCompiler {
      * stand-in ({@link TsonSchema#bootstrap()}) among it.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {
-        return compileWith(linkedSchema, factories::resolve, Set.of());
+        return compile(linkedSchema, factories, null);
+    }
+
+    /**
+     * {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}, the schema an extern names compiled by {@code
+     * foreign} ([TSON-SCHEMA] §7.9): a registry's cache, so each foreign schema compiles once in its mode and is
+     * shared by every importer. Null compiles each foreign schema once for this compile ({@link #onePerCompile}).
+     */
+    static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
+                                      ForeignSchemas foreign) {
+        return compileWith(linkedSchema, factories::resolve, Set.of(), false, foreign, bindingOf(factories));
+    }
+
+    /** The context {@code factories} binds objects with, or {@code null} for a table that reads trees. */
+    static io.ltr8.bind.DataBindContext bindingOf(ValueReaderFactoryResolver factories) {
+        return factories instanceof ValueReaderFactoryRegistry registry ? registry.binding() : null;
+    }
+
+    /**
+     * Where a compile obtains the compiled schema a foreign value is read in ([TSON-SCHEMA] §7.9), in its own mode:
+     * the schema an extern names, or the one declaring an entry a tag reaches at an extern position.
+     */
+    interface ForeignSchemas {
+
+        TsonCompiledSchema compiled(TsonLinkedSchema linked);
+
+        /** The schema of canonical identity {@code identity}, compiled; empty where this compile cannot obtain it. */
+        Optional<TsonCompiledSchema> compiled(String identity);
+    }
+
+    /**
+     * Each foreign schema compiled once for one compile and whatever it reaches, in that compile's mode, for a compile
+     * with no registry, which obtains no schema by identity it has not compiled.
+     */
+    private static ForeignSchemas onePerCompile(Function<String, ValueReaderFactory> factoryFor,
+                                                io.ltr8.bind.DataBindContext binding) {
+        Map<String, TsonCompiledSchema> compiled = new java.util.HashMap<>();
+        return new ForeignSchemas() {
+            @Override
+            public TsonCompiledSchema compiled(TsonLinkedSchema linked) {
+                String identity = linked.identity();
+                TsonCompiledSchema done = compiled.get(identity);
+                if (done == null) {
+                    done = compileWith(linked, factoryFor, Set.of(), false, this, binding);
+                    compiled.put(identity, done);
+                }
+                return done;
+            }
+
+            @Override
+            public Optional<TsonCompiledSchema> compiled(String identity) {
+                return Optional.ofNullable(compiled.get(identity));
+            }
+        };
     }
 
     /**
@@ -95,27 +150,72 @@ public final class TsonSchemaCompiler {
      */
     public static TsonCompiledSchema compileReady(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
                                                   Set<String> pending) {
-        return compileWith(linkedSchema, factories::resolve, Set.copyOf(pending));
+        return compileReady(linkedSchema, factories, pending, null);
+    }
+
+    /** {@link #compileReady}, a value read through an extern compiled by {@code foreign} ({@link #compile}). */
+    static TsonCompiledSchema compileReady(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
+                                           Set<String> pending, ForeignSchemas foreign) {
+        return compileWith(linkedSchema, factories::resolve, Set.copyOf(pending), true, foreign,
+                bindingOf(factories));
     }
 
     /**
      * The shared eager walk (see the "Eager, not lazy" note) over {@code factoryFor}'s factories, {@code pending}
-     * naming the declarations of a resolution in progress not yet ready (empty for every finished schema).
+     * naming the declarations of a resolution in progress not yet ready, {@code checkpoint} whether this compiles
+     * one ({@link #compileReady}), {@code foreign} where a foreign schema is compiled (null: once for this compile),
+     * and {@code binding} the context {@code factoryFor}'s readers bind with, {@code null} where they read trees.
      */
-    private static TsonCompiledSchema compileWith(
-            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, Set<String> pending) {
-        Compilation compilation = new Compilation(linkedSchema, factoryFor, pending);
+    static TsonCompiledSchema compileWith(
+            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, Set<String> pending,
+            boolean checkpoint, ForeignSchemas foreign, io.ltr8.bind.DataBindContext binding) {
+        Compilation compilation = new Compilation(linkedSchema, factoryFor, pending, checkpoint,
+                foreign != null ? foreign : onePerCompile(factoryFor, binding), binding);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
         // Every reader exists now, so the values readers hold as written -- a field's default or pin -- are
         // decoded through their types here, still before the schema is handed out (see CompiledReaders).
         compilation.readers.settle();
-        TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished));
+        TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished),
+                compilation.readers);
         // Hand every reader that resolves at *read* time over to the finished schema, releasing this
         // compilation -- see CompiledReaders, and the "never escape" invariant below that this preserves.
         compilation.readers.bind(compiled);
         return compiled;
+    }
+
+    /**
+     * Builds the reader of a type written in place ({@link TypeInline}) from its body, through the factory its
+     * constructor dispatches to, as an entry's reader is built: a container, a tuple, a choice, a reference, or the
+     * record an application closes to in place, named for a message by the form as written. It has no entry, so it
+     * has no name a binding map, a schema location or a tree's tag keys on, nothing IS-A it, so §7.2's guard at its
+     * position admits no tag, and it is no alias. It holds the factories, the linked schema and the readers' handle,
+     * never the {@link Compilation}, so the handle may build one at read time.
+     */
+    private static final class InlineReaders {
+        private final TsonLinkedSchema linked;
+        private final Function<String, ValueReaderFactory> factoryFor;
+        private final Map<String, Set<String>> namesMeaning;
+        private final Map<String, List<String>> referrers;
+        private CompiledReaders readers;
+
+        InlineReaders(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor,
+                      Map<String, Set<String>> namesMeaning, Map<String, List<String>> referrers) {
+            this.linked = linked;
+            this.factoryFor = factoryFor;
+            this.namesMeaning = namesMeaning;
+            this.referrers = referrers;
+        }
+
+        TsonTypeReader<?> build(TypeInline type) {
+            Top read = type.of();
+            ValueReaderFactory factory = factoryFor.apply(TsonCompiledVocabulary.typenameOf(read));
+            TsonTypeReader<?> built = factory.create(type.text(), read,
+                    new ValueReaderContext(linked, readers, namesMeaning, referrers));
+            // §7.2 at the position: no tag names a type written in place, so the guard admits none.
+            return Subsumption.guard(type.text(), read, built, namesMeaning, readers);
+        }
     }
 
     /**
@@ -147,9 +247,10 @@ public final class TsonSchemaCompiler {
 
         /**
          * The inverse of §8.3's alias hop, built once: which written names reach each entry. A binding map is
-         * keyed on the names an author wrote and a materialised entry has none of its own (§8.2), so a bind
-         * lookup asks under these before the entry's own name -- and, like {@code namesMeaning}, this is a
-         * property of the schema rather than of the entry, so deriving it per entry would be quadratic.
+         * keyed on the names an author wrote, so a bind lookup for an entry with no source position asks under
+         * these before the entry's own name ({@code ValueReaderContext.bindingNamesFor}) -- and, like {@code
+         * namesMeaning}, this is a property of the schema rather than of the entry, so deriving it per entry would
+         * be quadratic.
          */
         private final Map<String, List<String>> referrers;
 
@@ -158,18 +259,34 @@ public final class TsonSchemaCompiler {
          * while the walk runs, then is rebound to the finished schema so nothing here outlives the call --
          * a reader that resolves at read time (dispatch, annotations) holds this, not {@code this}.
          */
-        private final CompiledReaders readers = new CompiledReaders(this::resolve);
+        private final CompiledReaders readers;
 
         /** The entries a compile of a resolution in progress reads as {@link PendingTypeReader}s; else empty. */
         private final Set<String> pending;
 
-        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor, Set<String> pending) {
+        /** Whether this compiles a checkpoint of a resolution in progress ({@link #compileReady}). */
+        private final boolean checkpoint;
+
+        /** Where an extern's foreign schema is compiled, in this compile's mode. */
+        private final ForeignSchemas foreign;
+
+        /** The context this compile's readers bind with; {@code null} where they read trees. */
+        private final io.ltr8.bind.DataBindContext binding;
+
+        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor, Set<String> pending,
+                    boolean checkpoint, ForeignSchemas foreign, io.ltr8.bind.DataBindContext binding) {
+            this.foreign = foreign;
+            this.binding = binding;
             this.pending = pending;
+            this.checkpoint = checkpoint;
             this.linked = linked;
             this.schema = linked.schema();
             this.factoryFor = factoryFor;
             this.namesMeaning = Subsumption.namesMeaning(schema.entries());
             this.referrers = ValueReaderContext.referrers(schema.entries());
+            InlineReaders inline = new InlineReaders(linked, factoryFor, namesMeaning, referrers);
+            this.readers = new CompiledReaders(this::resolve, inline::build);
+            inline.readers = readers;
         }
 
         TsonTypeReader<?> resolve(String name) {
@@ -198,14 +315,25 @@ public final class TsonSchemaCompiler {
                     // mode unusable. It reaches the first read of this specific type still saying what it is.
                     built = new ErrorReader(name, e);
                 } catch (BindMismatchException e) {
-                    // Deliberately not an ErrorReader. Every other build failure is one entry's problem and
-                    // deferring it keeps the rest of the schema usable; this one is a wiring mistake between
-                    // the schema and the caller's own classes, and deferring it to the first document that
-                    // happens to have that type is exactly what makes it expensive to find. See the
-                    // exception's own Javadoc.
-                    throw e;
+                    if (!checkpoint) {
+                        // Deliberately not an ErrorReader. Every other build failure is one entry's problem and
+                        // deferring it keeps the rest of the schema usable; this one is a wiring mistake between
+                        // the schema and the caller's own classes, and deferring it to the first document that
+                        // happens to have that type is exactly what makes it expensive to find. See the
+                        // exception's own Javadoc.
+                        throw e;
+                    }
+                    // A checkpoint holds entries before materialisation closes their applications and before
+                    // their subtypes join, so a class may disagree with what is not yet the entry: the mismatch is
+                    // a read's that reaches it, and the finished schema's compile judges the rest.
+                    built = refusedAtCheckpoint(name, ctx -> {
+                        throw e;
+                    });
                 } catch (RuntimeException e) {
                     built = new ErrorReader(name, e);
+                    if (checkpoint) {
+                        built = refusedAtCheckpoint(name, built);
+                    }
                 }
                 finished.put(name, built);
                 return built;
@@ -214,18 +342,93 @@ public final class TsonSchemaCompiler {
             }
         }
 
-        private TsonTypeReader<?> build(String name, Top definition) {
-            if (definition instanceof RecordTemplateBody template) {
-                // A *family base* -- a record template (§5.10). No value is read against it: one of its
-                // members is, selected by a tag or by the discriminators, so it dispatches exactly as a closed
-                // abstract or sealed record does.
-                return new AbstractTemplateReader(name, template,
-                        new ValueReaderContext(linked, readers, namesMeaning, referrers), readers);
+        /**
+         * {@code failing}, a reader a checkpoint could not build, which may have failed for want of an entry the
+         * checkpoint lacks: which reader a record gets depends on its subtypes. So a read stops first where a later
+         * checkpoint may build it otherwise -- at the value's tag ({@link EventSkip#typeRefAhead}) and at a declaration
+         * not held that may be IS-A {@code name} -- and the failure is the read's only where neither holds.
+         */
+        private static TsonTypeReader<?> refusedAtCheckpoint(String name, TsonTypeReader<?> failing) {
+            return ctx -> {
+                EventSkip.typeRefAhead(ctx);
+                ctx.pinsUnmatched(name, Set.of(), (selector, pin) -> true);
+                return failing.read(ctx);
+            };
+        }
+
+        /**
+         * The boundary at a position typed by the extern {@code name} ([TSON-SCHEMA] §7.9): every name of this
+         * namespace that reaches, past its alias chain and its externs, the entry {@code name} lands on or one it
+         * admits -- one IS-A it, §7.2's subsumption, or a variant of it where it is a choice -- judged of the entries
+         * by identity, each with the foreign reader it crosses through.
+         */
+        private TsonTypeReader<?> boundary(String name, ValueReaderContext context) {
+            ExternAdmission admission = ExternAdmission.of(linked, name);
+            ExternTarget.Landing landing = admission.landing();
+            ExternReader.Crossing own = crossing(name, landing);
+            Map<String, ExternReader.Crossing> admitted = new LinkedHashMap<>();
+            List<String> narrower = new java.util.ArrayList<>();
+            Map<String, ExternReader.Crossing> byEntry = new java.util.HashMap<>(Map.of(name, own));
+            admission.admitted().forEach((written, reach) -> {
+                String terminal = reach.terminal();
+                if (reach.through().isPresent()) {
+                    admitted.put(written, byEntry.computeIfAbsent(terminal,
+                            extern -> crossing(extern, reach.through().get())));
+                } else {
+                    // A name of this scope that is no extern: the target itself says no more than the position does,
+                    // and anything narrower is read where the position's foreign schema reads it.
+                    admitted.put(written, reach.same() ? own : byEntry.computeIfAbsent(terminal,
+                            entry -> imported(name, landing, entry, reach.identity(), reach.reached())));
+                }
+                // What a message offers is a tag that is read: an abstract record naming no selectors would refuse in turn.
+                if (!reach.same() && !ExternAdmission.namesASubtype(reach.reached())) {
+                    narrower.add(written);
+                }
+            });
+            return new ExternReader(name, context, own, admitted, admission.selectsNone(),
+                    String.join(" | ", narrower), DefaultTsonReadContext.CROSSING, binding);
+        }
+
+        private ExternReader.Crossing crossing(String extern, ExternTarget.Landing landing) {
+            ExternTarget target = linked.externs().get(extern);
+            return new ExternReader.Crossing(foreign.compiled(target.foreign()).get(target.type()),
+                    new ForeignScope(extern, linked.originOf(extern), target.schema()),
+                    ExternAdmission.namesASubtype(landing.definition()));
+        }
+
+        /**
+         * The crossing at the extern {@code position} for {@code entry}, a name of this namespace that is no extern and
+         * reaches a subtype or a variant of its target: read in the position's foreign schema, or in the namespace its
+         * target lands in, where either holds that entry, else in the schema declaring it.
+         */
+        private ExternReader.Crossing imported(String position, ExternTarget.Landing landing, String entry,
+                                               String identity, Top definition) {
+            String declaredBy = linked.originOf(entry);
+            boolean namesASubtype = ExternAdmission.namesASubtype(definition);
+            for (TsonLinkedSchema in : List.of(linked.externs().get(position).foreign(), landing.in())) {
+                if (in.schema().entries().containsKey(entry) && in.originOf(entry).equals(declaredBy)) {
+                    return new ExternReader.Crossing(foreign.compiled(in).get(entry), new ForeignScope(position,
+                            linked.originOf(position), io.ltr8.tson.base.CanonicalIdentity.canonicalize(
+                                    in.schema().id())), namesASubtype);
+                }
             }
-            if (definition instanceof TemplateBody held) {
-                // Every other template is not a type ([TSON-SCHEMA] §5.10). See OpenTemplateReader for why the
-                // refusal is the entry's own reader rather than a check at the root.
-                return new OpenTemplateReader(name, held.parameterNames(),
+            TsonTypeReader<?> reader = foreign.compiled(declaredBy).<TsonTypeReader<?>>map(compiled -> compiled.get(entry))
+                    .orElseGet(() -> ctx -> {
+                        ctx.report(io.ltr8.tson.base.Diagnostic.Code.NOT_IMPLEMENTED, "'" + entry + "' reaches '"
+                                + identity + "', which a compile with no registry cannot read in its own schema's scope "
+                                + "([TSON-SCHEMA] §7.9)", "a schema this compile can obtain", entry);
+                        EventSkip.coreValue(ctx);
+                        return null;
+                    });
+            return new ExternReader.Crossing(reader, new ForeignScope(position, linked.originOf(position), declaredBy),
+                    namesASubtype);
+        }
+
+        private TsonTypeReader<?> build(String name, Top definition) {
+            if (ParametricEntry.isParametric(definition)) {
+                // No position names a parametric record bare ([TSON-SCHEMA] §5.10). See ParametricRecordReader for why
+                // the refusal is the entry's own reader rather than a check at the root.
+                return new ParametricRecordReader(name, ParametricEntry.parameterNames(definition),
                         new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
             }
             Top body = definition;
@@ -233,15 +436,21 @@ public final class TsonSchemaCompiler {
                 // An alias is a hop, and this is where the chain is collapsed: after linking, once per
                 // entry, at the moment a reader is built. Resolved output states the chain the author wrote,
                 // so the target's reader is named for the entry doing the referring -- which is what a use
-                // site naming `pct` over `pct => small` needs, and what names a self-reaching instantiation by
-                // the application it records rather than by its synthetic's content-derived key.
+                // site naming `pct` over `pct => small` needs.
                 return UseSite.named(resolve(r.target().name()),
                         EntryDisplayName.of(name, definition, linked.schema().factsOf(name),
                                 linked.schema().applicationOf(name)));
             }
+            if (body instanceof Extern) {
+                return boundary(name, new ValueReaderContext(linked, readers, namesMeaning, referrers));
+            }
             if (body instanceof ValueEntry value) {
                 // A value, which nothing is read against: a data tag naming it is the document's mistake.
                 return new ValueEntryReader(name, value.type(),
+                        new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
+            }
+            if (body instanceof io.ltr8.tson.schema.meta.IncompleteEntry incomplete) {
+                return new IncompleteEntryReader(name, incomplete,
                         new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
             }
             // A namespace type's value is the map it describes (NamespaceBody#read), its keys read under its key

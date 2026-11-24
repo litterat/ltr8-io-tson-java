@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.atom.IdentifierGrammar;
-import io.ltr8.tson.atom.ReferenceGrammar;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.base.DiagnosticsReceiver;
@@ -16,18 +15,18 @@ import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ChoiceExpr;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.DefinitionMark;
+import io.ltr8.tson.compiler.ast.schema.DependentType;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.FieldTypeExpr;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
-import io.ltr8.tson.compiler.ast.schema.Reference;
-import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
-import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
-import io.ltr8.tson.compiler.ast.schema.RefinedDef;
+import io.ltr8.tson.compiler.ast.schema.RecordExpr;
+import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -35,9 +34,9 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
-import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
+import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -132,7 +131,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      * chain threads -- see {@link SchemaPositions}.
      */
     public SchemaPositions schemaPositions() {
-        return new SchemaPositions(new IdentityHashMap<>(declarationPositions), new IdentityHashMap<>(fieldPositions));
+        return new SchemaPositions(new IdentityHashMap<>(declarationPositions), new IdentityHashMap<>(fieldPositions),
+                new IdentityHashMap<>(), SchemaPositions.identitySet(java.util.Set.of()));
     }
 
     /** Parses fail-fast: the first syntax error anywhere in the document leaves as a {@link ParseException}. */
@@ -323,11 +323,16 @@ public final class TsonSchemaParser extends TsonDataParser {
         declarationPrefix = name + ".";
         expect(TokenType.MAP_ARROW, "a declaration's '=>'");
         List<Annotation> typeDefAnnotations = parseAnnotationList();
+        Position markPosition = peek().start();
         Optional<DefinitionMark> mark = parseDefinitionMarkOpt();
         parameterTypes = new LinkedHashMap<>();
         TypeDef typeDef = parseTypeDef(mark);
+        if (mark.isPresent() && !(typeDef instanceof StructuralTypeDef)) {
+            throw new ParseException("'" + mark.get().word() + "' marks a record definition -- a record body, a"
+                    + " composition or a subtraction -- and none follows it (§5.2, §12.1)", markPosition);
+        }
         SchemaMap.Declaration declaration = new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations,
-                mark, typeDef, parameterTypes);
+                typeDef, parameterTypes);
         declarationPositions.put(declaration, namePosition);
         declarationInProgress = "";
         return declaration;
@@ -337,8 +342,9 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     /**
      * {@code [definition-mark ws]} at the head of a type definition (§12.1) -- {@code abstract} or {@code
-     * final}, the words that say how the type may be realised. Empty where the declaration writes neither,
-     * which is OPEN and has no spelling.
+     * final}, the words that say how a record may be realised. Empty where the declaration writes neither,
+     * which is OPEN and has no spelling. That a record definition follows is checked once the type definition is
+     * read, since only a brace's dispatch or the tokens after a name tell one from a map, an alias or an application.
      *
      * <p><b>The words are marks here unconditionally, and that is the whole of the reservation.</b> They are
      * ordinary identifiers at every other position -- a declaration name, a field name, a field's type, an
@@ -381,7 +387,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      */
     private ParseException missingDefinition(DefinitionMark mark) {
         return parseError("'" + mark.word() + "' here marks how the type that follows may be realised (§5.2),"
-                + " and no definition follows -- a type or template named '" + mark.word() + "' may be"
+                + " and no definition follows -- a type or parametric record named '" + mark.word() + "' may be"
                 + " declared and referenced anywhere else, but not named as a whole declaration body");
     }
 
@@ -393,12 +399,12 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private TypeDef parseTypeDef(Optional<DefinitionMark> mark) {
         // The parameter list comes first, so one token then decides the alternative: `!` with no parameters
-        // is an instance or an atom refinement, `!` with parameters an instance-template (§12.1). `<` only
+        // is an instance or an atom refinement, `!` with parameters an instance carrying them (§12.1). `<` only
         // ever starts a parameter list, so consuming it costs no lookahead.
         List<String> typeParams = parseTypeParamsOpt();
         if (mark.isPresent() && !startsTypeDef()) {
             // Reached both by a bare `pet => abstract` and by `pet => abstract<text>`, which applies a
-            // template of that name. The second cannot be caught where the mark is read, since `abstract <T>
+            // parametric record of that name. The second cannot be caught where the mark is read, since `abstract <T>
             // { … }` opens identically; what separates them is whether a definition follows the parameters.
             throw missingDefinition(mark.get());
         }
@@ -408,65 +414,68 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
 
         if (check(TokenType.LBRACE)) {
-            return braceTypeDef(typeParams);
+            return braceTypeDef(mark, typeParams);
         }
         if (check(TokenType.LPAREN)) {
-            return new ReferenceTypeDef(typeParams, parseTypeRef());
+            return new TypeExprDef(typeParams, parseTypeRef());
         }
         if (check(TokenType.LBRACKET)) {
-            return new ReferenceTypeDef(typeParams, parseBracket());
+            return new TypeExprDef(typeParams, parseBracket());
         }
 
-        Reference head = parseTypeRefHead();
+        TypeRef head = parseTypeRefHead();
         if (check(TokenType.CARET)) {
-            advance();
-            return new StructuralTypeDef(typeParams, new RefinedDef(head, parseRecordDef()));
+            String written = switch (head) {
+                case NameRef name -> name.name();
+                case ApplicationRef generic -> generic.name() + "<...>";
+            };
+            throw parseError("'^' follows '!name' and takes values (§5.5, §5.7), and '" + written + "' has no '!': "
+                    + "a record's fields are restated in a composition, '" + written + " & { ... }' (§5.8)");
         }
         if (check(TokenType.AMPERSAND) || check(TokenType.MINUS)) {
-            return new StructuralTypeDef(typeParams, parseConstructionDefContinuation(head));
+            return new StructuralTypeDef(mark, typeParams, parseConstructionDefContinuation(head));
         }
         if (check(TokenType.LBRACE)) {
-            throw parseError("expected '^' (refinement) or '&' (composition) after a bare type-ref, "
-                    + "found '{'");
+            throw parseError("expected '&' (composition) after a bare type-ref, found '{'");
         }
-        return new ReferenceTypeDef(typeParams, head);
+        return new TypeExprDef(typeParams, head);
+    }
+
+    /** A brace at a type-def position: a record body is the declaration's structural-def, a map its type-expr. */
+    private TypeDef braceTypeDef(Optional<DefinitionMark> mark, List<String> typeParams) {
+        TypeExpr form = parseBraceType();
+        return form instanceof RecordExpr record ? new StructuralTypeDef(mark, typeParams, record.body())
+                : new TypeExprDef(typeParams, form);
     }
 
     /**
-     * §12.2's brace dispatch at a type-def position, where a {@code '{'} opens either a record body or the
-     * map sugar. The token is consumed and the decision made on what follows -- the consume-one-then-inspect
-     * idiom [TSON-DATA] §2.8 already fixes for the data grammar's own brace, within the same budget of one
-     * consumed token plus one of lookahead. {@code '}'} (the empty record, {@code top}'s shape), {@code '('}
-     * (a leading field group) and {@code '@'} (§6 annotations, which the map sugar admits nowhere inside its
-     * braces) commit to a record; a name followed by {@code '=>'}, or by {@code '<'} opening a generic key's
-     * arguments, commits to a map. A name followed by anything else is a record whose field is missing its
-     * {@code ':'}, and {@link #parseFieldDef} names it as one.
+     * §12.2's brace dispatch, one rule at every position a brace opens a type: a record body or the map sugar. The
+     * token is consumed and the decision made on what follows -- the consume-one-then-inspect idiom [TSON-DATA] §2.8
+     * already fixes for the data grammar's own brace, within the same budget of one consumed token plus one of
+     * lookahead. {@code '}'} (the empty record), {@code '('} (a leading field group) and {@code '@'} (§6 annotations,
+     * which the map sugar admits nowhere inside its braces) commit to a record; a name followed by {@code '=>'}, or by
+     * {@code '<'} opening a generic key's arguments, commits to a map, and so does an adjacent {@code '!'}, so the key
+     * refuses {@code kind!} by name rather than as a field missing its {@code ':'}. A name followed by anything else is
+     * a record whose field is missing its {@code ':'}, and {@link #parseFieldDef} names it as one. A brace or bracket
+     * opens neither, a key being a name.
      */
-    private TypeDef braceTypeDef(List<String> typeParams) {
+    private TypeExpr parseBraceType() {
         expect(TokenType.LBRACE, "a record body's or map type's opening '{'");
-        if (braceOpensMap()) {
-            return new ReferenceTypeDef(typeParams, parseMapBody());
+        if (check(TokenType.LBRACE) || check(TokenType.LBRACKET)) {
+            throw parseError("a map type's key is a type name (§5.3), and " + describe(peek()) + " opens a type "
+                    + "written in place, which no key is: declare the key type under a name and write that name");
         }
-        return new StructuralTypeDef(typeParams, parseRecordBody());
+        if (braceOpensMap()) {
+            return parseMapBody();
+        }
+        return new RecordExpr(parseRecordBody());
     }
 
-    /** The dispatch decision itself, with the {@code '{'} already consumed -- see {@link #braceTypeDef}. */
+    /** The dispatch decision itself, with the {@code '{'} already consumed -- see {@link #parseBraceType}. */
     private boolean braceOpensMap() {
         return check(TokenType.UNQUOTED)
                 && (peekSecond().type() == TokenType.MAP_ARROW || peekSecond().type() == TokenType.LESS_THAN
                         || peekSecond().type() == TokenType.BANG && peek().adjacentTo(peekSecond()));
-    }
-
-    /**
-     * The two brace meanings, distinguished (§12.2). Everywhere except a type-def position a {@code '{'} opens
-     * the map sugar and nothing else: a bare record body is not spellable at a type position (§5.2), so a
-     * field name behind the brace is answered by saying which of the two constructs the author reached for.
-     */
-    private void requireMapBrace() {
-        if (!braceOpensMap()) {
-            throw parseError("'{' here opens the map sugar '{K => V}'; a record body is not permitted at a "
-                    + "type position (§5.2), so declare a named record type and reference it by name");
-        }
     }
 
     /**
@@ -502,10 +511,6 @@ public final class TsonSchemaParser extends TsonDataParser {
         advance();
         requireQualifiedName(name);
         String target = name.text();
-        if (check(TokenType.BANG) && name.adjacentTo(peek())) {
-            throw parseError("'!" + target + "!' marks a type's name as a sibling reference, and a tag names a type "
-                    + "([TSON-DATA] §7.4): a tag is '!' and a qualified name, never a reference to a field");
-        }
 
         // A nested schema map is tagged `!schema`, the kernel root's alias the root's tag names, or by its target's
         // path, `!meta.schema`, as resolved output writes it: one grammar for both (see nestedSchemaMap).
@@ -535,11 +540,6 @@ public final class TsonSchemaParser extends TsonDataParser {
         // instance = [type-params] "!" qualified-name ws core-value (§12.1) -- see Instance's own Javadoc. The
         // constructor name goes straight into the wrapping DataValue's own typeRef; there is no room in this
         // production for the payload to carry further annotations or a second, competing type-ref.
-        //
-        // A parameter list makes it a template and changes nothing else, which is the point: the payload is
-        // held rather than read against the constructor's own vocabulary, so every core-value the closed form
-        // admits the open one admits too -- a collection included, which is what the separate template-def
-        // production could not express.
         return new Instance(typeParams, new DataValue(List.of(), Optional.of(target), parseCoreValue()));
     }
 
@@ -600,7 +600,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * {@link #parseRecordDef} past its opening {@code '{'} -- {@link #braceTypeDef} consumes that token
+     * {@link #parseRecordDef} past its opening {@code '{'} -- {@link #parseBraceType} consumes that token
      * before it knows which construct it opened.
      */
     private RecordDef parseRecordBody() {
@@ -632,8 +632,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         boolean omittable = consumeAdjacentQuestion();
         if (check(TokenType.MAP_ARROW)) {
             throw parseError("a record body's entries are 'name: type'; '=>' begins a map type only where a "
-                    + "type is expected (§12.2), not in a refinement body, a composition tail or a "
-                    + "constructor vocabulary");
+                    + "type is expected (§12.2), not in a composition tail or a constructor vocabulary");
         }
         expect(TokenType.COLON, "a record field's ':'");
 
@@ -642,7 +641,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
             modifier = Optional.of(parseFieldModifier());
         } else {
-            TypeExpr ref = parseTypeRef();
+            FieldTypeExpr ref = parseFieldType();
             boolean voidable = consumeAdjacentQuestion();
             type = Optional.of(new FieldDef.FieldType(ref, voidable));
             if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
@@ -678,6 +677,9 @@ public final class TsonSchemaParser extends TsonDataParser {
                         : "a scalar token, the void sentinel '_', or '?' after '='");
             };
             advance();
+            if (form == TokenForm.UNQUOTED && check(TokenType.BANG) && t.adjacentTo(peek())) {
+                throw dependentTypeOffAFieldsType(t);
+            }
             value = new FieldDef.Modifier.Value.Literal(recordPosition(new TokenValue(t.text(), form), t.start()));
         }
         return new FieldDef.Modifier(kind, value);
@@ -729,7 +731,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         // Optional once the member's option is chosen: the option, not the record, is what the mark is about.
         boolean omittable = consumeAdjacentQuestion();
         expect(TokenType.COLON, "a field group member's ':'");
-        TypeExpr type = parseTypeRef();
+        FieldTypeExpr type = parseFieldType();
         boolean voidable = consumeAdjacentQuestion();
         if (check(TokenType.TILDE) || check(TokenType.EQUAL)) {
             // §5.11: a member's presence is the group's, and a group does not inject, so `~`, `=` and `=?`
@@ -799,7 +801,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * A type-ref position (§5.3): a field's type, a group member's type, a choice variant, an inline element,
      * a type argument. <b>{@code !} is rejected here by name rather than by falling through to "expected a
      * type reference"</b> -- writing the refinement inline ({@code quantity: !integer ^ { min: 1 }}) is the
-     * natural first attempt, and the grammar's answer (hoist it to its own declaration, reference it by name)
+     * natural first attempt, and the grammar's answer (declare it under its own name, reference it by name)
      * is a one-line fix an author cannot guess from a token-level complaint.
      */
     private TypeExpr parseTypeRef() {
@@ -810,30 +812,70 @@ public final class TsonSchemaParser extends TsonDataParser {
             return parseBracket();
         }
         if (check(TokenType.LBRACE)) {
-            return parseMap();
+            return parseBraceType();
         }
         if (check(TokenType.BANG)) {
             throw parseError("an atom refinement or constructor application is not permitted at a type-ref "
                     + "position (§5.3); declare a named type instead (e.g. 'quantity_t => !integer ^ { min: 1 }') "
                     + "and reference it by name");
         }
-        if (check(TokenType.SINGLE_LINE_STRING) && peekSecond().type() == TokenType.BANG
-                && peek().adjacentTo(peekSecond())) {
-            throw parseError("a quoted token is never a reference, so '!' cannot mark it as a sibling reference "
-                    + "([TSON-DATA] §7.4): a sibling is a field named by one unquoted identifier");
-        }
         return parseTypeRefHead();
     }
 
     /**
-     * {@code sibling-ref / type-name ["<" type-args ">"]} -- the name-based tail shared by every type-ref position and
-     * by refinement/construction heads. One token of lookahead after the name picks the alternative: an adjacent
-     * {@code !} a sibling reference, an adjacent {@code <} an application, neither a bare name.
+     * A record field's or a field group member's type: a type-ref, or {@code kind!}, a {@link DependentType}, which
+     * the grammar admits here and nowhere else (§5.2, §12.1). One token of lookahead after the name decides it.
      */
-    private Reference parseTypeRefHead() {
+    private FieldTypeExpr parseFieldType() {
+        if (check(TokenType.UNQUOTED) && peekSecond().type() == TokenType.BANG && peek().adjacentTo(peekSecond())) {
+            return parseDependentType(advance());
+        }
+        if (check(TokenType.SINGLE_LINE_STRING) && peekSecond().type() == TokenType.BANG
+                && peek().adjacentTo(peekSecond())) {
+            throw parseError("a dependent field's '!' follows the name of a field of the same record, one unquoted "
+                    + "identifier, and a quoted token is none (§12.1)");
+        }
+        return inPlace(parseTypeRef());
+    }
+
+    /**
+     * A type at a slot, past which nothing composes or subtracts: those are written at a declaration and never in
+     * place (§5.2), since what they make would be named by nothing. {@code at: point & { z: int32 }} is refused naming
+     * the declaration to write, and so is a name followed by {@code '{'}, the same reach without the operator, or a
+     * definition mark, which marks a declaration alone. A {@code '^'} there is refused as at a declaration: it follows
+     * {@code !name}.
+     */
+    private TypeExpr inPlace(TypeExpr written) {
+        if (check(TokenType.CARET)) {
+            throw parseError("'^' follows '!name' and takes values (§5.5, §5.7), and a record's fields are restated "
+                    + "in a composition, declared under a name ('my_type => base & { ... }') and named here (§5.2)");
+        }
+        String operator = check(TokenType.AMPERSAND) ? "&" : check(TokenType.MINUS) ? "-" : null;
+        if (operator != null) {
+            String what = operator.equals("&") ? "composes a type, and a composition"
+                    : "removes fields from a type, and a subtraction";
+            throw parseError("'" + operator + "' " + what + " is declared, never written in place (§5.2): declare it "
+                    + "under a name ('my_type => base " + operator + " { ... }') and write that name");
+        }
+        if (written instanceof NameRef name && check(TokenType.LBRACE)) {
+            throw parseError(DefinitionMark.of(name.name()).isPresent()
+                    ? "'" + name.name() + "' marks how a declared record may be realised (§5.2), and a record "
+                            + "written in place is its bare body, '{ ... }': declare the record to mark it"
+                    : "'" + name.name() + "' followed by '{' is no type: a record written in place is its bare body, "
+                            + "'{ ... }', and a composition ('&') of a named type is declared (§5.2)");
+        }
+        return written;
+    }
+
+    /**
+     * {@code type-name ["<" type-args ">"]} -- the name-based tail shared by every type-ref position and by
+     * construction heads. An adjacent {@code <} makes it an application; an adjacent {@code !} is a
+     * dependent field's type off a field's type ({@link #parseFieldType}), refused naming where it stands.
+     */
+    private TypeRef parseTypeRefHead() {
         Token head = expect(TokenType.UNQUOTED, "a type reference");
         if (check(TokenType.BANG) && head.adjacentTo(peek())) {
-            return parseSiblingRef(head);
+            throw dependentTypeOffAFieldsType(head);
         }
         requireQualifiedName(head);
         String name = head.text();
@@ -843,7 +885,7 @@ public final class TsonSchemaParser extends TsonDataParser {
                         + "<...>' with no whitespace before '<'");
             }
             advance();
-            List<TypeArg> args = parseTypeArgs();
+            List<TypeExpr> args = parseTypeArgs();
             expect(TokenType.GREATER_THAN, "a type argument list's closing '>'");
             return new ApplicationRef(name, args);
         }
@@ -851,35 +893,41 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * {@code sibling-ref = unquoted-token "!"} past its token, the {@code !} next at the cursor: the token one
-     * identifier, a single segment, and the {@code !} followed by whitespace (§12.3). The whitespace is what keeps a
-     * postfix {@code !} apart from a prefix one, so {@code a!b}, <code>kind!}</code>, {@code [kind!]} and {@code
-     * kind!?} do not parse. Where it may stand is §5.2's position rule, {@code SchemaDesugarer}'s to state.
+     * {@code kind!} past its token, the {@code !} next at the cursor: the token one identifier, a single segment, and
+     * the {@code !} followed by whitespace (§12.3). The whitespace is what keeps a postfix {@code !} apart from a
+     * prefix one, so {@code a!b}, <code>kind!}</code> and {@code kind!?} do not parse.
      */
-    private SiblingRef parseSiblingRef(Token head) {
-        if (!ReferenceGrammar.isSiblingField(head.text())) {
-            throw new ParseException("'" + head.text() + "!' is no sibling reference -- the '!' marks one field of "
-                    + "the same record, named by one identifier, a single segment ([TSON-DATA] §7.4)", head.start());
+    private DependentType parseDependentType(Token head) {
+        if (head.text().indexOf('.') >= 0 || IdentifierGrammar.validate(head.text()).isPresent()) {
+            throw new ParseException("'" + head.text() + "!' types no dependent field -- the '!' follows the name of "
+                    + "one field of the same record, one identifier, a single segment (§12.1)", head.start());
         }
         Token bang = advance();
         if (!check(TokenType.EOF) && bang.adjacentTo(peek())) {
-            throw parseError("a sibling reference's '!' must be followed by whitespace (§12.3): write '"
+            throw parseError("a dependent field's '!' must be followed by whitespace (§12.3): write '"
                     + head.text() + "! ' before " + describe(peek()));
         }
-        return new SiblingRef(head.text());
+        return new DependentType(head.text());
+    }
+
+    /** {@code head} followed by an adjacent {@code !} where no field's type is written. */
+    private static ParseException dependentTypeOffAFieldsType(Token head) {
+        return new ParseException("'" + head.text() + "!' is a dependent field's type, and stands only as a record "
+                + "field's type, a field group member's included -- never inside a type, nor at any other position "
+                + "(§5.2, §12.1)", head.start());
     }
 
     private TypeExpr parseChoiceRef() {
         Position start = peek().start();
         expect(TokenType.LPAREN, "a choice type's opening '('");
         List<TypeExpr> variants = new ArrayList<>();
-        variants.add(parseTypeRef());
+        variants.add(inPlace(parseTypeRef()));
         if (!check(TokenType.PIPE)) {
             throw new ParseException("a choice type requires at least two variants separated by '|' (§5.4)", start);
         }
         while (check(TokenType.PIPE)) {
             advance();
-            variants.add(parseTypeRef());
+            variants.add(inPlace(parseTypeRef()));
         }
         expect(TokenType.RPAREN, "a choice type's closing ')'");
         return new ChoiceExpr(variants);
@@ -891,9 +939,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      * distinguishes them, which is why both alternatives share a first element.
      *
      * <p>There is no separate inline form, and no position where a size specifier or an element {@code ?} is
-     * refused. That split existed because a sized form had no inline representation to carry it; every form
-     * lifts to an entry now, so the restriction protected nothing and is gone rather than relocated: §12.1
-     * has one bracket production, and §5.3 makes both legal at every type-ref position.
+     * refused: §12.1 has one bracket production, and §5.3 makes both legal at every type-ref position, the
+     * construction written in place carrying them.
      */
     private TypeExpr parseBracket() {
         expect(TokenType.LBRACKET, "an array or tuple type's opening '['");
@@ -913,20 +960,13 @@ public final class TsonSchemaParser extends TsonDataParser {
         return elements.size() == 1 ? new ArrayExpr(first, Optional.empty()) : new TupleExpr(elements);
     }
 
-    /** {@code map-type} (§12.1) including its opening brace -- {@link #braceTypeDef} reaches the body directly, having consumed one already. */
-    private TypeExpr parseMap() {
-        expect(TokenType.LBRACE, "a map type's opening '{'");
-        requireMapBrace();
-        return parseMapBody();
-    }
-
     /**
      * {@code map-key = type-name ["<" type-args ">"]} (§12.1) -- a plain reference, optionally carrying type
      * arguments, and never a bracket or paren form. That restriction is what holds {@link #braceOpensMap}'s
      * record/map decision to two tokens; a composite key type earns a named declaration instead.
      */
-    private Reference parseMapKey() {
-        Reference key = parseTypeRefHead();
+    private TypeRef parseMapKey() {
+        TypeRef key = parseTypeRefHead();
         rejectKeyQuestion();
         return key;
     }
@@ -956,50 +996,42 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
     }
 
-    private List<TypeArg> parseTypeArgs() {
-        List<TypeArg> args = new ArrayList<>();
-        args.add(parseTypeArg());
+    private List<TypeExpr> parseTypeArgs() {
+        List<TypeExpr> args = new ArrayList<>();
+        args.add(inPlace(parseTypeArg()));
         while (consumeSeparatorOrCloseCheck(TokenType.GREATER_THAN)) {
-            args.add(parseTypeArg());
+            args.add(inPlace(parseTypeArg()));
         }
         return args;
     }
 
     /**
-     * {@code type-arg = type-ref / value-literal} (§12.1, §5.10). A quoted token or a numeric
-     * unquoted token is unambiguously a {@link TypeArg.Value}; any other unquoted token parses as
-     * a {@link TypeArg.Ref} -- §12.1's own prose says this classification is deliberately deferred
-     * to the semantic layer ("settled against the applied signature's parameter kinds... not by
-     * the grammar"), so a bare enum-member-shaped argument parses as a type reference here and is
-     * reclassified later, exactly as the spec describes.
+     * {@code type-arg = type-ref} (§12.1, §5.10): an argument is a type, so a quoted or numeric token, which names
+     * none, is refused here rather than read as a value.
      */
-    private TypeArg parseTypeArg() {
+    private TypeExpr parseTypeArg() {
         Token t = peek();
-        if (t.type() == TokenType.SINGLE_LINE_STRING || t.type() == TokenType.MULTI_LINE_STRING) {
-            advance();
-            TokenForm form = t.type() == TokenType.SINGLE_LINE_STRING ? TokenForm.SINGLE_LINE_QUOTED : TokenForm.MULTI_LINE_QUOTED;
-            return new TypeArg.Value(recordPosition(new TokenValue(t.text(), form), t.start()));
+        if (t.type() == TokenType.SINGLE_LINE_STRING || t.type() == TokenType.MULTI_LINE_STRING
+                || (t.type() == TokenType.UNQUOTED && NumberGrammar.tryParse(t.text()).isPresent())) {
+            throw parseError("'" + t.text() + "' is no type argument: an argument is a type, written as a "
+                    + "reference -- a name or an application -- and never a literal token (§5.10)");
         }
         if (t.type() == TokenType.UNQUOTED) {
-            if (NumberGrammar.tryParse(t.text()).isPresent()) {
-                advance();
-                return new TypeArg.Value(recordPosition(new TokenValue(t.text(), TokenForm.UNQUOTED), t.start()));
-            }
-            return new TypeArg.Ref(parseTypeRefHead());
+            return parseTypeRefHead();
         }
         if (t.type() == TokenType.LPAREN) {
-            return new TypeArg.Ref(parseChoiceRef());
+            return parseChoiceRef();
         }
         if (t.type() == TokenType.LBRACKET) {
-            return new TypeArg.Ref(parseBracket());
+            return parseBracket();
         }
         if (t.type() == TokenType.LBRACE) {
-            return new TypeArg.Ref(parseMap());
+            return parseBraceType();
         }
         if (t.type() == TokenType.VOID) {
             throw parseError("the void sentinel '_' is not valid in a type argument position (§7.6)");
         }
-        throw mismatch("a type argument (a type reference or a scalar value)");
+        throw mismatch("a type argument (a type reference)");
     }
 
     // ── Declaration-Level Container Forms (§5.3, §12.1) ──────────────────
@@ -1016,7 +1048,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * unconditionally permitted.
      */
     private MapExpr parseMapBody() {
-        Reference key = parseMapKey();
+        TypeRef key = parseMapKey();
         expect(TokenType.MAP_ARROW, "a map type's '=>'");
         ElementType value = parseElementType();
         Optional<SizeSpec> size = Optional.empty();
@@ -1034,7 +1066,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * <em>is</em> a type-ref, so {@code [[T; 2]; 3]} is the recursion here and not a second production.
      */
     private ElementType parseElementType() {
-        TypeExpr ref = parseTypeRef();
+        TypeExpr ref = inPlace(parseTypeRef());
         return new ElementType(ref, consumeAdjacentQuestion());
     }
 

@@ -1,102 +1,133 @@
 # Constructor application
 
-What `!C { … }` builds, how its head resolves, and why a template is never one of the things it applies — the
+What `!C { … }` builds, how its head resolves, and why a parametric record is never one of the things it applies — the
 `DefinitionResolver` rules behind §4.1/§4.2/§5.5 construction. Current form only; history lives in git.
 
 **Invariants**
 
-- A template closes by application (`C<...>`), never by construction (`!C { ... }`); naming one at a construction site
-  is an author error (`SchemaValidationException`), never an `IllegalStateException`.
+- A parametric record closes by application (`C<...>`), never by construction (`!C { ... }`); naming one at a construction
+  site is an author error (`SchemaValidationException`), never an `IllegalStateException`.
 - A construction head resolves in the schema's one namespace, among the entries its closure imports
   (§3.3.1), through its alias chain first (`resolveConstructorTarget`): every question is asked of
   the entry at the end, while the entry's facts record the name the author wrote as its constructor.
 - A head declared in the same document is made ready before its instance is read, in wait order (`WaitOrder`,
-  `design/schema-resolution.md`), whichever is written first; the body is read through readers compiled from the
-  entries ready so far. An imported head's body is read through the compiled form of the schema that declared it
-  (`design/resolver-vocabulary-and-bootstrap.md`).
-- An instance of a constructor meta.tn, numeric.tn, temporal.tn or net.tn declares is the schema model's body. An instance of
-  any other constructor is held as a `ValueEntry` where the head composes `meta.top` and not `meta.type` (its instances are
+  `design/schema-resolution.md`), whichever is written first. Every body, under a local head or an imported one, is read at
+  a checkpoint of the document writing it (`design/resolver-vocabulary-and-bootstrap.md`).
+- An instance of a constructor meta.tn, numeric.tn, temporal.tn or net.tn declares is the schema model's body, and so is
+  an instance of a constructor composed over one of those constructors of types with no field added, which binds as its
+  one direct parent (`TsonLinkedSchema.composedOver`): derived from the entries, so a resolved form read back binds alike,
+  and never over `meta.record`, whose construction's checks are asked of `!meta.record` by name. An instance of any
+  other constructor is held as a `ValueEntry` where the head composes `meta.top` and not `meta.type` (its instances are
   no types), and refused as `NOT_IMPLEMENTED` where it composes `meta.type` (`SchemaResolver.constructed`).
 - `!C { … }` applies a constructor exactly when `C` IS-A `meta.top` (§4.1) — there is no constructor marker — and
   `TsonCompiledVocabulary.buildConstructors` filters on the same predicate, so every constructor head has a reader. With `C`
   any other type the entry is a value of `C` (`resolveValueEntry`, `design/namespace-types-and-value-entries.md`), never a
   refusal for want of applicability.
-- `meta.template` is resolver vocabulary (§8.1): IS-A `meta.top`, yet a source declaration applying it, closed or open, is an
-  author error (`requireAuthorable`).
-- An atom instance is **ATOM-kinded and not itself applicable**; both halves are needed, and IS-A `meta.atom` alone runs
-  backwards (true of the constructor, false of every instance).
-- `!meta.alias { target: X }` resolves to the alias's own entry — `kind: ALIAS`, `X` as source and body — the same
+- A construction never writes `parameters` (`refuseWrittenParameters`): a parametric record's parameters are the list before
+  its body, `<T> { … }` or `<T> !meta.record { … }`, and a parameter list before any other head is refused
+  (`parametricInstance`, `design/parametric-records.md`).
+- An atom instance is **a body that is an `Atom`**, which no constructor's is: a constructor's body is the
+  `!meta.record` describing its instances. IS-A `meta.atom` runs backwards (true of the constructor, false of every
+  instance).
+- `!meta.alias { target: X }` resolves to the alias's own entry — an `Alias`, `X` as source and body — the same
   entry `name => X` denotes.
-- Construction transfers kind and no supertypes (§5.5), so an instance carries an empty chain and is not itself a
+- Construction grants no supertypes (§5.5), so an instance carries an empty chain and is not itself a
   constructor. Any schema may declare a constructor; nothing ties it to what the document imports.
-- A constructor's parameters are confined to no channel: nothing is checked at the declaration, and each channel is
-  decided where the argument lands.
+- `C<args>` over a constructor (a closed record IS-A `meta.type`) is the construction `!C { … }` over its argument
+  slots (§5.3, `ConstructionSugar`), **rewritten on the written form before anything reads it** (`ConstructionRewrite`),
+  innermost first: `meta.map<text meta.array<box<T>>>` is `!meta.map { key_type: text  value_type: { of: !meta.array {
+  element_type: { of: !meta.apply { head: box  arguments: [T] } } } } }`, every argument then kernel data, read once. No
+  verdict is the sugar's own but the argument count, an argument written in place at a slot that holds only a name,
+  and a namespace type in place.
+- `!C ^ { … }` over a constructor of types (`ConstructionSugar.constructs`) is an **incomplete entry**
+  (`IncompleteEntry`) where a required field -- neither optional nor pinned -- is absent, and refused where none is.
+  `!X ^ { … }`, `!X { … }`, `!X value` (§5.6's positional form, one required field absent) and `X<…>` over one
+  write only fields `X` has not written
+  (`IncompleteEntries`): **write-once, never a narrowing judgement**, since narrowing is a relation between types and
+  an incomplete entry only accumulates. A refinement keeps one required field absent; a completion is the plain
+  construction of the constructor and **carries no chain**, so `nonempty<text>` equals `!meta.array { … }` written
+  anywhere. A chain naming `X` lost for that reason: the same type would be two entries by spelling. What a declared
+  completion closed is the key's `@meta.completion` instead, which changes no value
+  (`design/resolver-vocabulary-and-bootstrap.md`).
+- `!R ^ { … }` over a record that builds no types is refused naming `R & { … }` (`resolveAtomRefinement`): a record
+  states no rule for a body of values. `&` is the one way to derive a record, so the one way to declare a
+  constructor; a bare `name ^` is the parser's to refuse (`design/schema-grammar.md`).
+- A tag or an annotation's value naming an incomplete entry is refused: only a construction's payload is rewritten
+  (`ConstructionRewrite`), an annotation's value being data, so `@slot:{ of: !rows { … } }` over an incomplete
+  `rows` is no completion.
+- Each field of an incomplete entry is read against its declared type where it is written (`readEachField`), and a
+  pinned one against its pin (§5.2), by the equality the constructor's reader uses: a pin's own value is written
+  like any field's, once, and another value is refused at that declaration, since nothing need complete it;
+  required fields, defaults and coherence wait for the completion, which reads the whole. What each field read is
+  kept on the entry (`IncompleteEntry.read`), and the names it holds are judged when its own schema links
+  (`TsonSchemaLinker.validateHeld`), never again by an importer's. Reading only at the completion lost: an entry no
+  completion can use would load. A field typed by a type written in place names no type to read against and is read
+  at the completion: every resolver read goes through a compiled reader looked up by a type's name at a checkpoint.
+- An incomplete entry is a `Top` held in the schema's one namespace, so imports, collisions, key annotations and alias
+  hops carry it unchanged; it holds the parsed node, never a tree, which loses a token's form. A second map beside the
+  entries lost: both import merges and the collision rule would be written twice.
 
 Related: `design/schema-resolution.md` (the resolution phase around this), `design/atom-refinement-and-coherence.md`
-(`!I ^ { ... }`), `design/template-materialisation.md` and `design/held-template-bodies.md` (how `C<...>` closes),
+(`!I ^ { ... }`), `design/parametric-materialisation.md` and `design/parametric-records.md` (how `C<...>` closes),
 `design/resolver-vocabulary-and-bootstrap.md` (alias hops, the vocabulary), `design/linking-and-compilation.md`.
 
 ## Constructor application (`tson-compiler/.../resolver/DefinitionResolver.java`)
 
-- **A template closes by application, never by construction**, and naming one at a construction site is an
-  author error (`DefinitionResolver.resolveInstance`). `C<...>` substitutes a template's parameters away
+- **A parametric record closes by application, never by construction**, and naming one at a construction site is an
+  author error (`DefinitionResolver.resolveInstance`). `C<...>` substitutes a parametric record's parameters away
   (§5.10); `!C { ... }` fills a *constructor's* own vocabulary (§4.2). Different operations, and the check
-  is on being a template — having parameters — so any §5.10 template gets the
+  is on being a parametric record — having parameters — so any §5.10 parametric record gets the
   same advice instead of the "did you mean atom refinement?" hint, which cannot help when what is missing is
-  the argument list. **This check is what keeps the `RecordBody` check below it sound**: a parameterised
-  declaration is either held (a `TemplateBody`) or a record template (a `RecordTemplateBody`), so without it
-  `!my_set { … }` would reach an `IllegalStateException` — this project's spelling of *an internal invariant broke*,
-  which the CLI reports as a library fault at exit 70 — and `!box { … }` over a record template would apply a
-  template as a constructor.
-  `TemplateClosesByApplicationTest` pins all of it.
+  the argument list. **This check is what keeps the construction below it sound**: a parameterised declaration is
+  a parametric record, a `RecordBody` like any constructor's, so without it `!box { … }` over a parametric record
+  composing `meta.top` would apply a parametric record as a constructor.
+  `ParametricRecordClosesByApplicationTest` pins all of it.
 - **A construction head resolves through its alias chain first** (§8.3, `resolveConstructorTarget`).
   An alias is a hop, not a rewrite, so `alias_array => meta.array` makes `!alias_array { … }` an application of
-  `meta.array`, and every question the head is then asked — is it a template, is it applicable, what kind does
-  construction transfer, whose vocabulary reads the payload — is a question about the entry at the end.
-  Asking the alias would answer all four from an empty supertype chain and an `ALIAS` kind, which is what
+  `meta.array`, and every question the head is then asked — is it a parametric record, is it applicable, whose vocabulary
+  reads the payload — is a question about the entry at the end.
+  Asking the alias would answer all three from an empty supertype chain and an `Alias` body, which is what
   a hop looks like rather than what it points at. The author's spelling survives where it is visible: the tag resolved output
   writes (`EntryFacts.constructor`) is the name they wrote, so the chain stays walkable from resolved output.
-- **`!C { … }` applies a constructor exactly when `C` IS-A `meta.top` (§4.1)** (`EntryKind.isConstructor`), asked of that
+- **`!C { … }` applies a constructor exactly when `C` IS-A `meta.top` (§4.1)** (`TypeChain.isConstructor`), asked of that
   entry. §4.1 makes every base kind IS-A `meta.top` and every constructor transitively so, while IS-A stops at
   construction — an instance or a fresh record carries an empty chain — so the predicate admits every constructor and
   nothing else. Over the bundled schemas that is every vocabulary constructor plus `meta.top`, `meta.type`, the three base
-  kinds, `meta.namespace`, `meta.alias` and `meta.template` — judged by where `meta.top` is defined (one predicate the
-  resolver, the compiled vocabulary's reader table and the linker all ask), and over a template's chain as over a closed
-  one's. Every other head is an ordinary type, and the entry is a value of it (`resolveValueEntry`): a component record,
-  `!meta.record_field { … }`, a namespace type, `!api { … }`, and a consumer's record type, `!operation { … }`, alike. **A
+  kinds, `meta.namespace`, `meta.alias`, `meta.ref` — judged by where `meta.top`
+  is defined (one predicate the resolver, the compiled vocabulary's reader table and the linker all ask), and over an
+  parametric record's chain as over a closed one's. Every other head is an ordinary type, and the entry is a value of it
+  (`resolveValueEntry`): a component record, `!meta.record_field { … }`, a namespace type, `!api { … }`, and a consumer's
+  record type, `!operation { … }`, alike. **A
   per-entry constructor marker would be both too narrow and inconsistent.** `meta.alias` describes no value, so it would go
-  unmarked, and the language needs it applicable — which takes a by-name exception that the open and closed paths must then
-  both remember, or `<T> !meta.alias { target: T }` resolves while `!meta.alias { target: int32 }` does not, one construction
-  with two answers. IS-A `meta.top` needs no exception. `meta.top`, `meta.type` and the base kinds are admitted and then
+  unmarked, and the language needs it applicable — which takes a by-name exception. IS-A `meta.top` needs none. `meta.top`,
+  `meta.type` and the base kinds are admitted and then
   refused as abstract (§4.1, `refuseAbstractHead`): each is `extension: ABSTRACT`, so its reader is the abstract dispatch
   every abstract record has, and a tag naming the base itself is refused naming the subtypes that would satisfy the position,
   which is the better message. **Admitting `meta.alias` closed means giving it the alias's own entry**, not just letting it
-  through: `!meta.alias { target: X }` resolves to `kind: ALIAS` with `X` as its body, the same entry `name => X` denotes
-  (§8.3), where a construction of any other head takes the head's kind and records the head as its constructor
-  (`design/schema-resolution.md`). The closed path dispatches on the *body* being an `Alias`, having already read it;
-  `resolveInstanceTemplate` holds its body unread and so goes by the head's name. **`meta.template` is admitted by the
-  predicate and refused by name** (`requireAuthorable`, on both paths). It is IS-A `meta.top` because resolved output is
-  typed by it, but it is resolver vocabulary (§8.1): an open entry's body, derived from a declaration's `<…>` and never
-  applied by a source declaration. Admitted, `!meta.template { parameters: [T] template: "…" }` would mint an open entry with
-  a hand-written held body, skipping every declaration-time check §5.10 makes of a template. Tested at the chain's end, so an
-  alias of it is refused too. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's question — *is
-  this an atom instance?* — as **ATOM-kinded and not itself applicable**, which is exactly what an instance is: §4.1's "IS-A
-  does not extend below construction" is what separates the pair, `!T {}` transferring kind and not supertypes, so `integer`
-  carries an empty chain where `numeric.integer_type => meta.atom & { … }` carries `[meta.atom, meta.top]`. **Both halves are
-  needed, and the obvious single test runs backwards.** IS-A `meta.atom` is true of the *constructor* and false of every
-  instance — over the bundled entries it selects precisely the wrong side — while kind alone cannot separate them either,
-  an atom constructor being ATOM-kinded exactly like its instances. Together they agree on every bundled entry. The
+  through: `!meta.alias { target: X }` resolves to an `Alias` with `X` as its body, the same entry `name => X` denotes
+  (§8.3), where a construction of any other head records the head as its constructor
+  (`design/schema-resolution.md`); the path dispatches on the *body* being an `Alias`, having already read it. **A
+  construction of `meta.record` writing `parameters` is refused** (`refuseWrittenParameters`, tested at the head's chain
+  end): admitted, it would build a parametric record whose parameters no `<…>` put in scope, skipping every declaration-time
+  check §5.10 makes of a parametric record. **Two more questions are asked in the same terms.** Atom refinement asks §5.5's
+  question — *is this an atom instance?* — as **a body that is an `Atom`**, which is exactly what an instance is: §4.1's
+  "IS-A does not extend below construction" is what separates the pair, `!T {}` granting no supertypes, so `integer`
+  carries an empty chain where `numeric.integer_type => meta.atom & { … }` carries `[meta.atom, meta.top]`. **The
+  obvious chain test runs backwards.** IS-A `meta.atom` is true of the *constructor* and false of every
+  instance — over the bundled entries it selects precisely the wrong side — while the body's class separates them: an
+  atom constructor's body is a `!meta.record`, an instance's an `Atom`. The
   construction hint in the refusal rides on the same applicability question, so
   `!meta.top ^ { … }` gets the plain answer rather than advice that would fail in turn. **There is no marker.** §12.1's
   grammar has no constructor sigil and §8.1's `meta.type` no `constructor` field: what makes an entry a constructor is that
   it IS-A `meta.top`, which its supertype chain records. **There is no level discipline**: composition propagates the chain,
   so an entry deriving from a constructor *is* one, and any schema may declare one (§4.2).
-  **Construction is exempt**: §5.5 transfers kind and no supertypes, so `!C { … }` yields an entry with an empty chain,
+  **Construction is exempt**: §5.5 grants no supertypes, so `!C { … }` yields an entry with an empty chain,
   which is why an instance is not itself a constructor. `ApplicabilityIsIsATopTest` and `ConstructorLevelDisciplineTest` pin
   both halves; §3.3.1 and §4.2 are the spec side.
 - **What an instance of a schema's own constructor holds** (`SchemaResolver.constructed`). The constructors meta.tn,
-  numeric.tn, temporal.tn and net.tn declare bind to the schema model, so their instances are `Top` bodies. Any other
-  constructor's instance builds no body this library models. Where its head composes `meta.top` and not the kernel's
+  numeric.tn, temporal.tn and net.tn declare bind to the schema model, so their instances are `Top` bodies, as are a
+  composed constructor's that binds as its parent (above). Any other constructor's instance builds no body this library
+  models. Where its head composes `meta.top` and not the kernel's
   `meta.type` (`s => !step { … }` over `step => meta.top & { … }`), the instance is no type, so it is held as the value it
   is, the way a value entry's payload is: `ValueEntry(step, object)` where the bind context binds `step` to a class,
   `ValueEntry(step, tree)` where none does, so the schema loads and validates without host classes, and a schema obtained to
@@ -104,15 +135,60 @@ Related: `design/schema-resolution.md` (the resolution phase around this), `desi
   composes `meta.type` (`c => meta.product & { … }`), the instance would be a type, whose body must be one of the schema
   model's, and it is refused as `NOT_IMPLEMENTED` (`unmodelledType`): a gap, since a generic body for such an instance is
   open work.
-- **A constructor's parameters are confined to no channel**, which is §4.2's own rule: "an argument is
-  substituted as a token and read by the position it lands in, so a slot typed `meta.type_ref` takes a type where
-  an atom-typed slot takes a value". Nothing is checked at the declaration, and each channel is decided where
-  the argument lands. A parameter routed into a *vocabulary slot* typed `meta.type_ref` — `my_set => <T> array ^ {
-  element_type: = T }` — pins the element type when it closes, `meta.type_ref` being an atom whose value is a type's
-  name, so §5.2 admits the fixed value and judges it a member where it is written; the value-routed form
-  (`max_items: = N`, an atom-typed
-  slot) closes normally. A parameter standing as a *field type* or a *variant* closes into a working type
-  rather than a tolerated one: `ctor_box => <T> base & { value: T }` with `flagged => ctor_box<boolean>`
-  materialises, compiles, accepts `{ value: true }` and rejects `{ value: banana }` with a `TYPE_MISMATCH` at
-  `/value`, and the variant channel behaves the same
-  (`DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord`).
+- **A parametric record over a constructor is refused; the constructor is applied instead** (§5.10): `<T> !meta.array {
+  element_type: T  min_items: 1 }` has no home for `parameters`, so `parametricInstance` refuses it, naming the remedy -- the
+  application where it is used (`meta.array<T>`, `[T]`), or its construction left open once and completed where used
+  (`nonempty => !meta.array ^ { min_items: 1 }`, then `nonempty<T>`). A pin is a field's value, so a
+  parametric record pinning a slot to its parameter -- `my_set => <T> meta.array & { element_type?: = T }` -- is refused
+  with every other parameter at a value (`ParameterTypes.atValue`).
+
+## Construction sugar (`resolver/ConstructionSugar.java`)
+
+- **`C<a₁ … aₙ>` over a constructor is `!C { f₁: a₁ … fₙ: aₙ }`** (§5.3), the arguments landing in `C`'s argument
+  slots: its required fields typed by a reference naming types and not pinned by its chain, in declaration order. A
+  field is a slot where it is not optional, its role is `FREE` (a pin or a default supplies its value, so the
+  construction needs none), and its type, past its alias hops, is a reference whose `of` names types
+  (`KindMembers.namesTypes`). `meta.array` has one (`element_type`), `meta.map` two (`key_type value_type`),
+  `meta.namespace` the same two, `meta.ref` one (`of`), `meta.enum_type` one (`name_type`, `members`
+  being a set of values), and `meta.tuple` none. Nothing is written on a constructor to permit
+  it, and it is the rule `[T]` and `{K => V}` already follow.
+- **A constructor here is a closed record IS-A `meta.type`** (`ConstructionSugar.constructs`), read past the head's
+  alias hops: its instances are types. A head composing `meta.top` alone builds values and is no constructor of this
+  rule, and a parametric record substitutes (§5.10) whatever its chain reaches -- `listed => <T> meta.atom & { … }` composes
+  `meta.top` and is still a parametric record. The check runs before the parametric record path in both places an application
+  resolves, so a head is asked once which operation it stands for.
+- **The kernel applies its own constructors this way**, `meta.ref<method>` being `!meta.ref { of: method }`, and
+  completes its own incomplete entries the way a schema does: `set<text>` through the root's alias `set` is
+  `!meta.array { element_type: text  ordered: false  unique_items: true }`, `!enum [A B]` is `!meta.enum_type { … }`.
+  **A body is bound by its constructor's class, or its parent's where the constructor adds no field**
+  (`!x { … }` over `x => meta.array & { min_items?: = 1 }`); one adding a field has no class and is a gap. A set and an
+  enum are incomplete entries and need none, a completion being the plain construction.
+- **Where an application is first met, it is rewritten.** A declaration's body (`x => meta.array<text>`) becomes
+  `!C { … }` tagged by the head as written and goes through `resolveInstance`, so it gets every check and fact the
+  braced form does and records no application. A field's or group member's type (`f: meta.array<text>`) becomes the
+  construction tagged by the constructor past its alias hops, read by that constructor's reader and held as a
+  `TypeInline` under it. A payload -- a construction in place the desugarer wrote, a declaration's sugar body
+  (`x => [meta.array<box<text>>]`), an author's `!C { … }` or `<T> !meta.record { … }` -- is rewritten at every
+  `meta.apply` in it, then read once. Arguments are written as the author wrote them, not dereferenced. A use site is
+  never looked up to a declaration of the same construction (§8.2).
+- **Who wrote an application decides how much is rewritten.** One desugaring wrote from `head<args>` is sugar: a
+  constructor's is constructed whatever its arguments, and any other's argument that is no name is refused (§5.3).
+  The desugarer marks the bodies it writes for declarations (`SchemaPositions.desugared`); everything at a field is
+  its own. An author's explicit `{ of: !meta.apply { … } }` means the same where its arguments are names (§5.10) and
+  is rewritten then; one whose arguments hold a type in place is left for the kernel's reader to refuse. Rewriting
+  every payload's applications alike would accept that explicit form, which the kernel's `meta.apply` refuses.
+- **Asking whether a head constructs never waits on a parametric record** (`DefinitionGetter.opens`, answered by
+  `WaitOrder` from parameter lists and alias targets as written): an application of one orders nothing (§3.4.1), so
+  `chain => <T> { next?: chain<T> }` and mutual recursion are no wait cycles. Any other head is made ready before it
+  is asked, as reading a construction against it would make it.
+- **`meta.apply` is never a declaration's body** (`refuseDeclaredApplication`, §5.10): `x => !meta.apply { … }` is
+  refused where it resolves, whatever the head, naming `x => H<args>`.
+- **The sugar decides where an argument lands and nothing else.** The arity (`requireArity`, also the linker's
+  `checkArity` over a held reference) is refused here; a literal
+  argument (`meta.array<3>`) never arrives, the grammar refusing it where it is written (§5.10); an argument a slot's
+  `of` refuses is refused at link as the braced form's is; a required field no
+  slot fills leaves the construction incomplete and the constructor's reader refuses it. `ConstructionSugarTest` pins
+  all of it.
+- **The desugarer cannot tell a constructor from a record**, so `checkApplication` refuses an argument list
+  only on a local head whose body says it is none: a fresh record or a construction. A composition, an
+  alias or an atom refinement (an incomplete entry, completed by application) passes through for resolution to judge.

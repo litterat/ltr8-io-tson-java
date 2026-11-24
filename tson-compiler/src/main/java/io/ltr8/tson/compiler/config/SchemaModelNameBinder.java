@@ -34,8 +34,8 @@ import java.util.stream.Stream;
  * <p><b>It answers only for that vocabulary, by declaring document.</b> Those entries are the ones whose values the
  * schema model describes; the libraries' roots, core.tn and policy.tn declare ordinary types over them, whose values are
  * data, and a member a consumer's schema contributes to an open map ({@code meta}, {@code numeric}, …) is the
- * consumer's own. The packages also hold classes no schema declares -- {@code Token}, {@code EntryKind}, {@code
- * OpenEntry}, {@code ValueEntry} and the like, the resolver's own model -- and a name that merely mangles to one of
+ * consumer's own. The packages also hold classes no schema declares -- {@code Token}, {@code ParametricEntry}, {@code
+ * ValueEntry} and the like, the resolver's own model -- and a name that merely mangles to one of
  * them ({@code meta.token}) is not this binder's: it refuses it, so a consumer's type of that name binds through the
  * consumer's binder. The vocabulary is read from the bundled sources themselves, once ({@link Vocabulary}), so it
  * cannot drift from them.
@@ -44,10 +44,7 @@ import java.util.stream.Stream;
  * shape of the {@code *Body} class that represents a bound instance of it ({@link
  * io.ltr8.tson.schema.meta.RecordBody}, {@link io.ltr8.tson.schema.meta.ArrayBody}, ...), and each such class's own
  * {@code @Typename} is the constructor's path, so the schema-name-to-class direction needs the {@code "_body"}
- * suffix added explicitly ({@link #ALIASES}: {@code meta.record} is {@code meta.RecordBody}). A constructor that
- * tightens another -- {@code meta.set_type} over {@code meta.array}, {@code enum} over {@code meta.enum_type} -- needs
- * no alias: it restates fields and adds none, and the bind lookup falls back along its chain to the constructor it
- * tightens ({@code ValueReaderContext.bindingNamesFor}).
+ * suffix added explicitly ({@link #ALIASES}: {@code meta.record} is {@code meta.RecordBody}).
  *
  * <p>Some entries resolve to a class that is not a record: {@code meta.atom}/{@code meta.product}/{@code
  * meta.sum}/{@code meta.top} mangle to the sealed marker interfaces {@link io.ltr8.tson.schema.meta.Atom}/{@link
@@ -71,15 +68,17 @@ public final class SchemaModelNameBinder {
     /** Full path to the path its class is mangled from, where the entry's own name does not reach it. */
     private static final Map<String, String> ALIASES = Map.ofEntries(
             Map.entry("meta.record", "meta.record_body"),
-            Map.entry("meta.record_template", "meta.record_template_body"),
+
             Map.entry("meta.array", "meta.array_body"),
             Map.entry("meta.map", "meta.map_body"),
             Map.entry("meta.namespace", "meta.namespace_body"),
             Map.entry("meta.tuple", "meta.tuple_body"),
             Map.entry("meta.choice", "meta.choice_body"),
-            Map.entry("meta.reference_type", "meta.reference_body"),
+            Map.entry("meta.dependent", "meta.dependent_body"),
+            Map.entry("meta.apply", "meta.apply_body"),
+            Map.entry("meta.ref", "meta.ref_body"),
             Map.entry("meta.enum_type", "meta.enum_body"),
-            Map.entry("meta.template", "meta.template_body"),
+
             Map.entry("temporal.datetime_type", "temporal.date_time_type"));
 
     private static final DataNameBinder MANGLED = new DataNameBinder.DefaultDataNameBinder(Set.of(PACKAGE), ALIASES);
@@ -115,7 +114,7 @@ public final class SchemaModelNameBinder {
      *
      * <p>Composition, never replacement: a name in {@link #INSTANCE}'s vocabulary binds there and {@code
      * additional} is asked for every other name ({@link #extendedWith}). So a consumer cannot shadow {@code
-     * record}/{@code enum}, and cannot lose {@link ResolverBindContext}'s registrations by building a context
+     * meta.record}/{@code meta.enum_type}, and cannot lose {@link ResolverBindContext}'s registrations by building a context
      * that forgets them -- what the extension adds is names, and nothing else.
      */
     public static DataBindContext contextExtendedWith(DataNameBinder additional) {
@@ -140,15 +139,24 @@ public final class SchemaModelNameBinder {
      * binder half of {@link #contextExtendedWith}, for a caller assembling a {@link DataBindContext} themselves.
      *
      * <p>Decided by the name, never by a failed lookup: a vocabulary name {@link #INSTANCE} binds no class for
-     * ({@code enum}, {@code set}) is still not the consumer's, so the bind lookup moves on to the constructor it
-     * tightens rather than to a consumer class of that name; and a name outside the vocabulary never reaches the
+     * ({@code enum}, {@code set}) is still not the consumer's; and a name outside the vocabulary never reaches the
      * schema model, whatever class it would mangle to. A {@link DataBindException} from {@code additional}
      * propagates as it stands: it names what that consumer's own binder searched, which is where the name was
-     * expected to be.
+     * expected to be. A type asked within its namespace reaches {@code additional} with it.
      */
     public static DataNameBinder extendedWith(DataNameBinder additional) {
         Objects.requireNonNull(additional, "additional");
-        return name -> Vocabulary.NAMES.contains(name) ? INSTANCE.resolve(name) : additional.resolve(name);
+        return new DataNameBinder() {
+            @Override
+            public Class<?> resolve(String name) throws DataBindException {
+                return Vocabulary.NAMES.contains(name) ? INSTANCE.resolve(name) : additional.resolve(name);
+            }
+
+            @Override
+            public Class<?> resolve(String namespace, String name) throws DataBindException {
+                return Vocabulary.NAMES.contains(name) ? INSTANCE.resolve(name) : additional.resolve(namespace, name);
+            }
+        };
     }
 
     private static DataBindContext context(DataNameBinder binder) {

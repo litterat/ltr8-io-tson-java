@@ -20,17 +20,17 @@ JSON inputs are in `design/cli-config-hashing.md`.
   inspecting a value.
 - A choice value may omit its tag only when the choice is disjoint; no member-shape matching, no trying variants in
   order. A missing required tag is `TYPE_MISMATCH`.
-- A kind (a `meta.reference_type` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and
+- A kind (a `meta.ref` over a constructor) is an atom, read by `AtomReader` from a string naming a member, and
   never a discrimination case ([TSON-JSON] §5.6). A JSON document is always data, so the name is judged a member over the
-  reading document's closure, whatever it imports (`AtomParsers.forType`). JSON has no unquoted form, so an
-  application is a JSON string holding the TSON reference text, `"set<text>"`, parsed by `atom.ReferenceGrammar`
-  into the same `TypeRef` and judged as TSON judges it: through the entry it denotes, an application nothing in the
-  closure closed being refused. A sibling reference's string, `"kind!"`, is read by the same production and admitted
-  only where the reference's `allow_sibling` admits it, a record field's type; elsewhere it is refused as a constraint
-  the value breaks, as the TSON reader refuses it ([TSON-JSON] §5.6). A tree read keeps the `JsonString` as written.
+  reading document's closure, whatever it imports (`AtomParsers.forType`). A string is read by
+  `atom.ReferenceGrammar`, as a TSON token of either form is, and judged as TSON judges it by the shared
+  `TypeRefParser`: a data document's reference is a name, so a string holding an application, `"set<text>"`, is
+  refused (`ATOM_CONSTRAINT_VIOLATION`) whether or not the closure closes it ([TSON-JSON] §5.6). A string holding
+  `kind!` spells no reference, schema-grammar sugar having no data form, and is refused as malformed
+  (`ATOM_FORM_INVALID`). A tree read keeps the `JsonString` as written.
 - A reference over a type that is no constructor (`meta.ref<order>`) is an atom too, read from a string holding a
   value's qualified name and judged by what it reaches in the governing schema, as the TSON reader judges it
-  (`AtomParsers.forRead`, `RefParser` over the lookup the link left on the reference, `ReferenceBody.Values`). A
+  (`AtomParsers.forRead`, `ValueRefParser` over the lookup the link left on the reference, `RefBody.Values`). A
   schema-stated value at one (`FieldValue`) is decoded the same way. `AtomParsers.forType` is the pre-link callers'
   and refuses such a reference as a gap, so no JSON reader asks it for an atom position.
 - A dependent field (`v?: kind!`, [TSON-SCHEMA] §5.2) is read by `DependentReader` through its record, against the
@@ -42,6 +42,12 @@ JSON inputs are in `design/cli-config-hashing.md`.
   component, as the TSON reader does.
 - A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
   set serves every mode. The reader it selects validates in full.
+- A wrapper's `$value` is no annotation object ([TSON-JSON] §3.3): every wrapper's value is read through
+  `TagMembers`, which refuses an object there leading with an annotation member before the selected reader sees it,
+  unless the selected type is map-typed (`TagMembers.keyed`, fixed at compile on the `Route`, the boundary's
+  `Crossing` and a cycle's `DeferredTypeReader`).
+- A position an extern types is a boundary (`ExternReader`): its leading `$type` is the enclosing scope's, everything
+  inside the foreign schema's, read by that schema's own compiled readers (`design/externs.md`).
 - Every mode is all-or-nothing: no builder builds where anything was reported while its value was read.
 - Readers are named mode, then family, then form, and carry no `Json` prefix inside the unexported `reader` package; a
   dispatcher has no mode and carries none.
@@ -109,8 +115,8 @@ compares a written name against a set: a plain record's own name and its subtype
 base's own name and the deeper names each member admits, and a choice's variants and their subtypes. One index answers
 it — `AliasChain.namesMeaning`, built once per compile and held by `ValueReaderContext` (`admitting`) — so the set
 of positions that flatten cannot become whichever ones someone remembered. TSON text's peer is `Subsumption.admitting`.
-It is load-bearing for a template instantiation, whose entry name is minted and non-normative ([TSON-SCHEMA] §8.2): an
-alias is the only name a document has for one.
+It is load-bearing for an alias of a declared application, which a document may name as the application's
+declaration itself ([TSON-SCHEMA] §8.3).
 
 **Recognising one is a bounded peek, because the selectors lead** (§4.1). `$import` where present, then `$type`, then
 a sealed position's discriminators in any order among themselves (§6.1.5). `TagMembers.lead` reads those members and
@@ -120,17 +126,19 @@ holds before dispatch is a count the schema fixes, never one the document choose
 are the three only, so its `$value` directly follows them and the peek sees it there; a `$value` anywhere else is an
 extra member of an invalid object, refused by whoever reads it.
 
-**The concrete record reader does no lookahead at all.** It is reached only for its own type, so `RecordReader`'s
-member loop judges annotation members as they arrive: a `$type` in first place must restate the record
-(`RecordPlan.admitsTag`); `$value` straight after it makes the object a wrapper, read at the reader the enclosing
-position chose (`ExactReader`, `Route`), since the value inside may carry a tag of its own; a misplaced `$type` or
-`$value`, or any `$import`, refuses the object and the rest of it is skipped (`RecordPlan.refuseTagMember`).
-A member name is matched in NFC and then in the record's name type's form (`TsonLinkedSchema.nameForm`, held by
-`RecordPlan`; §6.1.1), so under a case-folding name type `NAME` is the field `name`; `TagMembers.lead` puts a sealed
-base's selectors in the same form. A member matching nothing is judged by that name type (`RecordPlan.unmatched`), as
-TSON's record reader judges it: one that is no value of the type is `UNRECOGNIZED_FIELD` with the type's reason and
-meets no hygiene rule, being no name; one that is meets [TSON-DATA] §8.2 under the type's profile, and only then is
-unknown (§9.4).
+**The concrete record reader does no lookahead at all.** It is reached only for its own type, so `RecordReader`'s member
+loop judges annotation members as they arrive: a `$type` in first place must restate the record (`RecordPlan.admitsTag`)
+-- a record written in place has no name, and `ValueReaderContext.admitting` admits nothing for a name no entry holds,
+so its `$type` is refused whatever it holds, its application's text included (§7.2); `$value` straight after it makes
+the object a wrapper, read at the reader the enclosing position chose (`ExactReader`, `Route`); a misplaced `$type` or
+`$value`, or any `$import`, refuses the object and the rest of it is skipped (`RecordPlan.refuseTagMember`). A member
+name is matched in NFC and then in the record's name type's form (`TsonLinkedSchema.nameForm`, held by `RecordPlan`,
+the name type a record in place's body states included; §6.1.1), so under a case-folding name type `NAME` is the field
+`name`; `TagMembers.lead` puts a sealed base's selectors in the same form. A member matching nothing is judged by that
+name type (`RecordPlan.unmatched`), as TSON's record reader judges it: one that is no value of the type is
+`UNRECOGNIZED_FIELD` with the type's reason and meets no hygiene rule, being no name; one that is meets [TSON-DATA]
+§8.2 under the type's profile, and only then is unknown (§9.4).
+
 
 Members read before a refusal have already reported, so an invalid document's diagnostics follow its member order —
 accepted deliberately: holding them back would cost every valid document a buffer to tidy the answer for invalid
@@ -170,20 +178,23 @@ record factory, because the concrete reading is the only one that differs by mod
   the object's shape is consulted, and a tag naming the base is refused, the base having no direct instances.
 - **ABSTRACT naming discriminators** (SEALED) gets `DispatchMemberReader`, which reads those members and looks the
   value up. In the wrapper form the discriminators are inside `$value`, so the tag places the value and is required.
-- **A family-base template** ([TSON-SCHEMA] §5.10) gets whichever dispatcher its body asks for, through
-  `DispatchFactories.RECORD_TEMPLATE`, the factory registered for `meta.record_template`, which `JsonSchemaCompiler`
-  picks by the body's `@Typename` as it picks every other: `{ b: box }` admits `{"$type": "int_box", "v": 1}` and
-  refuses an untagged object, as TSON text does. The selectors are stated on the entry (`tson-schema`'s
-  `FamilySelectors`), so neither side of the module wall keeps its own opinion of them. A member is a `RecordBody`, so
-  a record template IS-A the base is no member, and `DispatchMemberReader` passes it by type. Every other template is
-  a `meta.template` and reaches `OpenTemplateReader` (`DispatchFactories.TEMPLATE`).
+- **A parametric record is no type** ([TSON-SCHEMA] §5.10): its `@Typename` is `meta.record`, so
+  `JsonSchemaCompiler` picks the record factory for it as for every record, and that factory (`DispatchFactories.over`)
+  answers a parametric record's body with `DispatchFactories.PARAMETRIC_RECORD`, a `ParametricRecordReader`. A family
+  declared through a parametric record is read at its base, a record: an abstract record a parametric record composes
+  (`{ b: boxed }` over `box => <T> boxed & { … }` admits `{"$type": "int_box", "v": 1}` and refuses an untagged object,
+  as TSON text does), or an abstract parametric record's application, a closed record carrying the parametric record's
+  selectors. The selectors are stated on the base (`tson-schema`'s `FamilySelectors`), so neither side of the module
+  wall keeps its own opinion of them. A subtype index holds no parametric record, so a parametric record composing a
+  base is no member.
 
 **Every reader a dispatcher can select is wired at compile** (`Route`). A base's `subtypes` is its whole family, so a
 tag reaches a type any levels down, or an alias of one, in one step. A route holds two readers because §3.3's forms want
 two: the inline form goes to the reader for exactly that type (an OPEN record's concrete reader, not its dispatcher),
-the wrapper's `$value` to the type's entry reader, which dispatches again on a tag of its own. A choice routes through a
-variant placed by `$type` the same way, and through a sealed variant only by handing it the value, whose selectors a
-choice position cannot bypass.
+the wrapper's `$value`, which carries no tag of its own, to the type's entry reader, which places it as a position of
+that type would (a sealed family by its discriminators). A choice routes through a variant placed by `$type` the same
+way, through a sealed variant only by handing it the value, whose selectors a choice position cannot bypass, and below
+an atom variant to the refinement's own reader, whose facets the variant's would not check.
 
 **A sealed position** decodes its pins once, at the fields' declared types in the base, keyed by `ValueIdentity` (so
 `255` selects the member pinned `= 0xFF`). A discriminator that does not lead is missing, with JSON's own wording,
@@ -257,10 +268,13 @@ which is all any mode can promise ([TSON-SCHEMA] §7.5).
 standalone array or tuple binds to an unmodifiable `List` of its values' natural host values and a map to an
 unmodifiable `Map`; a record field declaring `long[]`, `List<Long>`, `Set<UUID>`, an `@Tuple` class or
 `Map<LocalDate, BigDecimal>` reads the same position again for that class. A tuple binds by its component and not by
-its schema name because an inline tuple's entry name is minted, and no binding map can hold it. `BindTargets` is the
-one place that meets a component — an atom through `AtomReader.boundTo` (a reference's `TypeRef` or `Ref` component
-bound to the family's own production rather than a bridge from its name, so the `TypeRef` keeps its referent and the
-`Ref` is delivered), a container rebuilt over the component's class
+its schema name because a tuple written in place has no entry name, and no binding map can hold it; a record written in
+place, the record an application closes to at a slot, has none either and no natural host form, so it is read into the
+record class its component declares (`RecordInPlaceReader`, `BindRecordBuilder.boundTo`) and builds nothing where no
+component says. `BindTargets` is the
+one place that meets a component — an atom through `AtomReader.boundTo` (a kind's `TypeRef` component or a value
+reference's `ValueRef` bound to the family's own production rather than a bridge from its name, so the `TypeRef` keeps
+its referent and the `ValueRef` is delivered, each the other's mismatch), a container rebuilt over the component's class
 with every element, key and value bound in turn, a record checked against it — and every disagreement joins the record's
 one `BindMismatchException`. So an element of a `List<Long>` over `[int32]` is a `Long`, where `tson-compiler` reads it
 at the family's natural class.
@@ -309,5 +323,4 @@ compiles, so a read is one lookup and a route, as at a tagged record position. A
 An `!!import` merges the imported entries first, so a list in namespace order would show the bundled names and none of the
 author's. `JsonCompiledSchema.unknownTypeMessage` (the CLI's `--type` refusal, and `UNKNOWN_TYPE` at the facades)
 leads with the entries this schema declares and the author wrote — by the origin index and by having a source
-position, the test that tells a minted entry from an authored one. Imported and minted names remain usable root
-types; the count that follows covers them.
+position. Imported names remain usable root types; the count that follows covers them.

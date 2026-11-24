@@ -11,54 +11,61 @@ import io.ltr8.tson.compiler.ast.schema.ArrayExpr;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ChoiceExpr;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
+import io.ltr8.tson.compiler.ast.schema.DependentType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.FieldTypeExpr;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
+import io.ltr8.tson.compiler.ast.schema.InlineConstruction;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapExpr;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
+import io.ltr8.tson.compiler.ast.schema.RecordExpr;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
-import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
-import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
-import io.ltr8.tson.compiler.ast.schema.RefinedDef;
+
+import io.ltr8.tson.compiler.ast.schema.TypeExprDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SchemaMapDef;
-import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleExpr;
-import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
+import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.EntryKind;
+import io.ltr8.tson.schema.meta.CollectionFacets;
+import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.NamespaceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldRole;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.Completion;
+import io.ltr8.tson.schema.meta.IncompleteEntry;
+import io.ltr8.tson.schema.meta.Extern;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
-import io.ltr8.tson.schema.meta.RecordTemplateField;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Sum;
-import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Type;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeChain;
-import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -69,11 +76,12 @@ import java.util.Optional;
 import java.util.SequencedMap;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Resolves one declaration from a {@link SchemaMap} (the grammar-layer AST) into the value its entry maps to
- * ([TSON-SCHEMA] §4.1, §8.1) -- a type body carrying its own IS-A chain, an {@code Alias},
- * a held {@code TemplateBody} or a constructor's instance -- and records the entry's facts that no value holds
+ * ([TSON-SCHEMA] §4.1, §8.1) -- a type body carrying its own IS-A chain (a parametric record's included), an {@code
+ * Alias} or a constructor's instance -- and records the entry's facts that no value holds
  * ({@link TsonSchema.EntryFacts}). Per-declaration work only: ordering, imports, materialisation and everything else
  * that needs the whole schema is {@link SchemaResolver}'s. {@link #resolveTypeDef} dispatches on the shape of
  * the declaration, every sugar form having been rewritten by {@link SchemaDesugarer} first:
@@ -83,21 +91,17 @@ import java.util.function.Predicate;
  *   {@link #resolveField}, and field groups (§5.11).</li>
  *   <li><b>Composition</b> ({@code A & B & { ... }}, §5.8, {@link #resolveComposition}) -- each supertype's
  *   fields and groups absorbed left to right, a body entry naming an inherited field being a
- *   <em>tightening</em> entry (§5.7, {@link #resolveTighteningField}) that replaces it in place, checked
- *   against §5.7's transition table ({@link #refines}), with an elided type-ref inheriting
- *   the source field's type. A supertype may be an application: a closed one is closed to the entry it
- *   denotes ({@link #closedApplication}), one naming the declaration's own parameters contributes its fields
- *   while still open ({@link #openOperand}).</li>
- *   <li><b>Refinement</b> ({@code source ^ { ... }}, §5.7, {@link #resolveRefinement}) -- copies the source's
- *   whole field set and admits no new fields: every body entry tightens an inherited field or restates an
- *   inherited group ({@link #restatesInheritedGroup}: same member labels in the same order, state tightening
- *   OPTIONAL&#8594;REQUIRED only). A closed source heads the result's chain. The source takes an application
- *   on composition's terms.</li>
- *   <li><b>An alias</b> ({@code name => other_name}, §8.3) -- an {@code ALIAS}-kind entry whatever the
- *   name resolves to, carried unverified; the linker validates it. <b>A template application</b>
- *   ({@code bx => box<text>}, {@link #resolveTemplateApplication}) is the same declaration carrying
- *   arguments -- a reference or a value each, nested applications included -- and a closed one closes
- *   <em>into</em> the declared name.</li>
+ *   <em>tightening</em> entry (§5.8, {@link #resolveTighteningField}) that replaces it in place, checked
+ *   against §5.8's three orders ({@link #refines}), with an elided type-ref inheriting
+ *   the source field's type. A supertype may be an application of a parametric record, absorbed by value whether its
+ *   arguments are concrete or the declaration's own parameters ({@link #parametricOperand}). A body group naming an
+ *   inherited group restates it ({@link #restatesInheritedGroup}).</li>
+ *   <li><b>An alias</b> ({@code name => other_name}, §8.3) -- a {@code meta.alias} entry whatever the
+ *   name resolves to, carried unverified; the linker validates it. <b>An application</b>
+ *   ({@code bx => box<text>}, {@link #resolveApplication}) is the same declaration carrying
+ *   arguments: over a constructor it is the construction it spells, a constructor's application among its arguments
+ *   constructed in turn, and over a parametric record, its arguments names, it closes <em>into</em> the declared
+ *   name.</li>
  *   <li><b>Constructor application</b> ({@code !C value}, §5.5/§5.6, {@link #resolveInstance}) -- bound
  *   through the compiled reader of the schema declaring {@code C} ({@link #bindAtomInstance}), with no
  *   name-to-class table --
@@ -108,54 +112,45 @@ import java.util.function.Predicate;
  *   built from them wherever the schema is ({@code SchemaPaths.synced}).</li>
  * </ul>
  *
- * <p><b>A declaration carrying type parameters (§5.10) is open.</b> A record template is a {@code
- * record_template}, its fields labelled: bound from the payload {@code SchemaDesugarer} labelled ({@link #openRecord}),
- * or, for a composition or refinement, which absorbs fields from a source and so is a template in its flattened form,
- * built over the builder's own fields ({@link Built}). Any other open instance is held as written
- * ({@link #resolveInstanceTemplate}). Nothing is substituted here -- that is {@code TemplateMaterialiser}'s, over
- * the resolved form.
+ * <p><b>A declaration carrying type parameters (§5.10) is a parametric record</b>: a {@code meta.record} carrying
+ * {@code parameters}, read at its declaration against {@code record}'s own vocabulary as any record is -- a fresh
+ * record or a composition built over the builder's own fields ({@link Built}), or the explicit {@code
+ * <T> !meta.record { … }} bound through {@code record}'s reader ({@link #parametricInstance}). Inside it a name its
+ * parameters declare is a parameter, which {@link RecordBody} holds as a {@code ParamRef}. Any other head under a
+ * parameter list is refused ({@link #parametricInstance}). Nothing is substituted here -- that is {@code
+ * ParametricMaterialiser}'s, over the resolved form.
  *
  * <p><b>The exception types are the classification.</b> A {@link io.ltr8.tson.base.SchemaValidationException}
  * says the author's schema is wrong and the spec says so; an {@link UnsupportedOperationException} says this
  * library could not do something, and travels as {@code NOT_IMPLEMENTED}; an {@link IllegalStateException}
- * says an internal invariant broke -- a container sugar form reaching resolution unlifted ({@link #unlifted}),
+ * says an internal invariant broke -- a container sugar form reaching resolution unrewritten ({@link #unlifted}),
  * which only a caller that skipped {@link SchemaDesugarer} can produce, or a resolved value no well-formed
  * pipeline builds. The test for which is which: <b>a schema error's verdict does not change
  * when this library improves; a gap's does.</b> Misfiling an author error as a gap tells the author their
  * correct understanding of the spec is this library's fault. Schema errors include: an atom refinement that
  * loosens its source ({@link #checkNarrows}); a name in a {@code !} position that resolves nowhere in the
  * namespace ({@link #resolveConstructorTarget}, {@link #resolveAtomRefinement}); a {@code !} form used
- * against the wrong kind of target -- refining a constructor, applying a non-constructor, refining a
- * non-atom -- each answered with the form the author probably meant; a supertype chain reaching two base
- * kinds ({@link #determineKind}); and a body or annotation value the declaring schema's compiled reader
- * rejects, which arrives as a {@link ReadException} and is restated as a schema error
+ * against the wrong kind of target -- refining a constructor of values or a record, applying a non-constructor,
+ * refining a non-atom -- each answered with the form the author probably meant; and a body or annotation value
+ * the compiled reader rejects, which arrives as a {@link ReadException} and is restated as a schema error
  * ({@link #bodyIsNotValidData}).
  *
  * <p><b>No construct of the schema grammar is a gap.</b> Every {@code UnsupportedOperationException} this
- * class throws is one of:
- * <ul>
- *   <li><b>A {@code RuntimeException} from the compiled vocabulary reader that is none of the classified ones</b>
- *   -- binding a constructor's payload ({@link #bindAtomInstance}) or an annotation's value
- *   ({@link #bindAnnotationValue}). A {@code ReadException} or {@code SchemaValidationException} there is
- *   the author's and a {@code BindMismatchException} the deployment's, each rethrown as itself; what is left
- *   is unexplained, and a gap is the classification that claims least.</li>
-  *   <li><b>A failed write round-trip</b> -- re-serialising an atom refinement's source
- *   ({@link #sourceSerializedFields}). The value was bound by this library, so failing to write it back is
- *   no verdict on the schema.</li>
- *   <li><b>A closed application at a supertype or refinement-source position with no
- *   {@link ApplicationCloser}</b> ({@link #closedApplication}) -- a resolver built standalone, without the
- *   whole-schema materialiser {@link SchemaResolver} supplies.</li>
- * </ul>
- * {@link #resolveTemplateApplication} and {@link #closedApplication} also rethrow one from below with the
- * declaration's name in front. What §5.7 leaves unchecked is not reported at all: a restated FIXED field
- * MUST NOT change its pinned value, and {@link #resolveTighteningField} does not compare the two.
+ * class throws relays one from a read it made: a gap the compiled vocabulary reader reached while binding a
+ * constructor's payload ({@link #bindAtomInstance}) or an annotation's value ({@link #bindAnnotationValue}) -- an
+ * instance of a constructor of types no factory backs -- or a payload read that reported {@code NOT_IMPLEMENTED}.
+ * Around those reads a {@code ReadException} or {@code SchemaValidationException} is the author's and a {@code
+ * BindMismatchException} the deployment's, each rethrown as itself; anything else is a fault, and propagates as
+ * one.
+ * One rule is not checked at all: a restated FIXED field MUST NOT change its pinned value (§5.8), and {@link
+ * #resolveTighteningField} does not compare the two.
  *
  * <p>Declarations resolve in one namespace per schema (§3.3, §3.3.1): the schema's own entries and its
  * import closure. It reaches this class as two getters over that one
  * namespace, required constructor parameters fixed for as long as this resolver is used:
  * <ul>
  *   <li>{@code namespaceDefinitions} -- the whole namespace, consulted by composition's supertype lookup
- *   (§5.8), refinement's source lookup (§5.7), and atom refinement's source lookup (§5.5). Never populated
+ *   (§5.8) and atom refinement's source lookup (§5.5). Never populated
  *   by this class: the caller supplies a {@link DefinitionGetter} over a map it owns. A supertype or source
  *   must be answerable when asked for, so a caller wanting forward references resolves on demand, as
  *   {@link SchemaResolver} does.</li>
@@ -168,18 +163,10 @@ import java.util.function.Predicate;
  * </ul>
  * Either getter can be an always-{@code null} lookup for a resolver that never needs it.
  *
- * <p><b>Kind determination</b> (§4.1, {@link #determineKind}) checks the transitive supertype chain for the
- * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum}/{@code namespace} -- not a general
- * "inherit the nearest ancestor's own kind" rule, which would be wrong: {@code atom} the entry is itself
- * {@code kind: PRODUCT}, its own chain being {@code [top type]}. None found is {@code PRODUCT} (the
- * structural default), exactly one is that kind, and two or more is a schema error. A fresh (non-composed)
- * record has an empty chain by construction, so it is always {@code PRODUCT}. The kind is not stored: it is
- * the value's ({@code EntryKind.of}), read from the same chain.
- *
  * <p><b>A chain is the resolver's to compute, never the author's to write</b> ([TSON-SCHEMA] §4.1): a
  * construction or an atom refinement stating {@code supertypes} or {@code subtypes} is refused
  * ({@link #refuseWrittenChain}), as stating {@code choice.disjoint} would be. In a closed body {@code supertypes}
- * is the complete chain; in a template's held body it is the parents as written, which closing completes.
+ * is the complete chain; in a parametric record it is the parents as written, which closing completes.
  *
  * <p><b>Field groups (§5.11) flatten</b>: each member becomes an ordinary {@link RecordField} in
  * source position, optional and voidable, whether or not the group is optional (a group that is not
@@ -191,7 +178,7 @@ import java.util.function.Predicate;
  * lists me as a supertype, transitively), imports included, so {@code TsonSchemaLinker} computes it.
  *
  * <p>Note the two reference models in play: this class imports the grammar layer's ({@link TypeExpr}, and the
- * references {@link NameRef}, {@link ApplicationRef} and {@link SiblingRef}) for reading the AST, and refers to the
+ * references {@link NameRef} and {@link ApplicationRef}) for reading the AST, and refers to the
  * resolved model's ({@code io.ltr8.tson.schema.meta.TypeRef} and its variants, the references it produces) by
  * fully-qualified name -- the two layers name their references alike, so only one can be the unqualified import.
  *
@@ -205,21 +192,13 @@ import java.util.function.Predicate;
  */
 final class DefinitionResolver {
 
-    /**
-     * The kernel's alias constructor -- §5.10's partial application, {@code <B> pair<uuid, B>}, whose held
-     * body is a {@code !meta.alias { target: ... }} and whose entry is {@link EntryKind#ALIAS} rather than
-     * the constructor's own kind.
-     */
-    private static final String ALIAS = KernelNames.of("alias");
-
-    /** The kernel's open-entry body constructor -- resolver vocabulary, see {@link #requireAuthorable}. */
-    private static final String TEMPLATE = KernelNames.of("template");
-
-    /** The kernel's {@code record_template}: what a record with type parameters resolves to (§5.10). */
-    private static final String RECORD_TEMPLATE = KernelNames.of("record_template");
 
     /** {@code type}'s one field ([TSON-SCHEMA] §4.1): a type's IS-A chain, which no declaration writes. */
     private static final String CHAIN = "chain";
+    private static final Set<String> COLLECTION_CONSTRUCTORS = Set.of(KernelNames.of("array"), KernelNames.of("map"));
+
+    /** The kernel's {@code meta.apply}, which no declaration's body constructs. */
+    private static final String APPLY = KernelNames.of("apply");
 
     /** The {@code _} a bare annotation stands for (§6), read against the annotation's type like a written one. */
     private static final DataValue VOID = new DataValue(List.of(), Optional.empty(), new VoidValue());
@@ -235,6 +214,9 @@ final class DefinitionResolver {
     private final AnnotationValueReader annotationValueReader;
     private final DefinitionGetter vocabularyDefinitions;
     private final DefinitionGetter namespaceDefinitions;
+
+    /** Each constructor's application written as its construction before it is read ([TSON-SCHEMA] §5.3). */
+    private final ConstructionRewrite rewrite;
 
     /**
      * Whether a name in this namespace denotes the kernel's own entry -- what a kind and a constructor are
@@ -256,15 +238,14 @@ final class DefinitionResolver {
     private final boolean annotationsResolve;
 
     /**
-     * Closes a fully-bound template application into the entry it denotes, returning that entry's name.
-     * Needed at the two positions that absorb a supertype's <em>fields</em> -- a composition supertype and a
-     * refinement source -- because those resolve here, while the rest of §5.10 materialisation runs as a
-     * pass afterwards. Everywhere else an application is simply carried as a reference with arguments and
-     * closed later.
+     * The materialiser's on-demand half, for what a declaration needs of an application while it resolves, before
+     * the rest of §5.10 materialisation runs as a pass afterwards: a declaration naming an application closes into
+     * its own name ({@link ApplicationCloser#closeApplicationInto}). Everywhere else an application is carried as a
+     * reference with arguments and closed by that pass.
      *
-     * <p>Defaults to refusing, for the callers that resolve a declaration outside a whole-schema pass (the
-     * kernel bootstrap, and unit tests) -- there is no materialiser in those, and no schema for an
-     * instantiation entry to land in.
+     * <p>{@code null} for the callers that resolve a declaration outside a whole-schema pass (the kernel bootstrap,
+     * and unit tests): there is no materialiser in those, so a declared application keeps its reference form and an
+     * operand's arguments go unchecked.
      */
     private final ApplicationCloser applicationCloser;
 
@@ -283,8 +264,18 @@ final class DefinitionResolver {
      */
     private final Map<String, TsonSchema.EntryFacts> facts;
 
+    /** What each declared completion closed ({@link #completionOf}). */
+    private final Map<String, Completion> completions = new LinkedHashMap<>();
+
     /** The judgements left for after every entry is ready ({@link #judgeDeferred}). */
     private final List<Deferred> deferred = new ArrayList<>();
+
+    /**
+     * Where a composition records the fields it restates over a source its chain will not reach, and the applied
+     * operands whose own restatements become its ({@link Restatements}). {@code null} where nothing links what this
+     * resolves (the kernel bootstrap, and unit tests).
+     */
+    private final Restatements restatements;
 
     /**
      * No annotation reader: an annotation's name is kept, its value is out of reach, and no name is checked
@@ -293,24 +284,30 @@ final class DefinitionResolver {
     DefinitionResolver(ConstructionReader constructionReader, DefinitionGetter vocabularyDefinitions,
                        DefinitionGetter namespaceDefinitions) {
         this(constructionReader, null, vocabularyDefinitions, namespaceDefinitions, null,
-                SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true);
+                SchemaPositions.none(), new LinkedHashMap<>(), name -> true, name -> true, null);
     }
 
     DefinitionResolver(ConstructionReader constructionReader, AnnotationValueReader annotationValueReader,
                        DefinitionGetter vocabularyDefinitions, DefinitionGetter namespaceDefinitions,
                        ApplicationCloser applicationCloser, SchemaPositions positions,
                        Map<String, TsonSchema.EntryFacts> facts, Predicate<String> kernel,
-                       Predicate<String> vocabularyKernel) {
+                       Predicate<String> vocabularyKernel, Restatements restatements) {
+        this.restatements = restatements;
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.vocabularyKernel = Objects.requireNonNull(vocabularyKernel, "vocabularyKernel");
         this.positions = Objects.requireNonNull(positions, "positions");
         this.facts = Objects.requireNonNull(facts, "facts");
         this.constructionReader = Objects.requireNonNull(constructionReader, "constructionReader");
         this.annotationsResolve = annotationValueReader != null;
-        this.annotationValueReader = annotationValueReader == null ? (type, value) -> null : annotationValueReader;
+        this.annotationValueReader = annotationValueReader == null ? (type, value, foreign) -> null
+                : annotationValueReader;
         this.vocabularyDefinitions = Objects.requireNonNull(vocabularyDefinitions, "vocabularyDefinitions");
         this.namespaceDefinitions = Objects.requireNonNull(namespaceDefinitions, "namespaceDefinitions");
         this.applicationCloser = applicationCloser;
+        this.rewrite = new ConstructionRewrite(type -> {
+            Top found = vocabularyDefinitions.definition(type);
+            return found != null ? found : namespaceDefinitions.definition(type);
+        }, namespaceDefinitions::opens);
     }
 
     /**
@@ -332,12 +329,37 @@ final class DefinitionResolver {
      * path already funnels through, regardless of which internal {@code resolve*} method built the value.
      */
     Top resolve(SchemaMap.Declaration declaration, Optional<SourcePosition> declarationPosition) {
-        Top resolved = withExtension(declaration, resolveTypeDef(declaration.name(), declaration.typeDef()));
+        Top resolved = withBounds(declaration,
+                withExtension(declaration, resolveTypeDef(declaration.name(), declaration.typeDef())));
         Annotations annotations = annotationsOf(declaration.name(), declaration.typeDefAnnotations());
         TsonSchema.EntryFacts known = factsOf(declaration.name());
         facts.put(declaration.name(), known.withPosition(declarationPosition.or(known::position))
                 .withAnnotations(annotations));
         return resolved;
+    }
+
+    /**
+     * A parametric record with each parameter carrying the bound its declaration wrote ({@code <T: text>}, §5.10), the
+     * others unbounded: a parameter is its name and its written bound, known in full where it is declared, and
+     * nothing about it is inferred. Whether a bound names a type, and whether a parameter passed on is written with a
+     * bound its callee admits, are judged once every declaration is ready ({@link ParameterTypes#check}).
+     */
+    private Top withBounds(SchemaMap.Declaration declaration, Top resolved) {
+        if (declaration.parameterTypes().isEmpty() || !ParametricEntry.isParametric(resolved)) {
+            return resolved;
+        }
+        Map<String, Param> bounded = new LinkedHashMap<>();
+        declaration.parameterTypes().forEach((parameter, written) -> bounded.put(parameter,
+                new Param(parameter, Optional.of(parameterType(parameter, written)))));
+        return ParametricEntry.withParameters(resolved, bounded);
+    }
+
+    /**
+     * The incomplete entries {@code name}'s declaration completed, nearest first, where it is a completion: what its
+     * key states as {@code @meta.completion} ([TSON-SCHEMA] §8.1).
+     */
+    Optional<Completion> completionOf(String name) {
+        return Optional.ofNullable(completions.get(name));
     }
 
     /** {@code name}'s facts as resolution has recorded them so far. */
@@ -352,8 +374,12 @@ final class DefinitionResolver {
 
     /**
      * A declaration's own {@code abstract}/{@code final} mark lowered into {@code record.extension} ({@link
-     * DefinitionMarks}), and ABSTRACT derived where the body names selectors -- the resolved definition
+     * DefinitionMarks}), and ABSTRACT derived where a source record names selectors -- the resolved definition
      * unchanged where neither applies, every record being OPEN by default.
+     *
+     * <p><b>Derived from the source's {@code =?} alone.</b> A record written as {@code !meta.record { … }} states its
+     * {@code extension}, or takes the field's default, and a stated field means what it says: {@code discriminators}
+     * beside anything but ABSTRACT is refused rather than overridden (§5.2). No mark stands before it (§12.1).
      *
      * <p><b>Applied here rather than where the body is built</b>, because every route to a record body reaches
      * this method and none of them owns the mark: a fresh record, a composition and a refinement each build
@@ -361,30 +387,37 @@ final class DefinitionResolver {
      * is also what makes the rule that extensibility is never inherited fall out rather than need stating --
      * a composition's body is built OPEN from its operands and the mark, if any, is this declaration's own.
      *
-     * <p><b>A template takes {@code abstract} and refuses {@code final}.</b> {@code abstract} constrains the
-     * marked type alone -- no direct instances, true of every instantiation identically -- so it is stated in
-     * the held body and closing carries it through: every application of {@code result} mints an abstract
-     * entry, and the family it is abstract over is the one the closed applications of its subtype templates
-     * join (§5.8, {@code SubtypeTemplateFamilyTest}). {@code final} is a claim about <em>other</em>
-     * declarations -- that nothing composes onto it -- and
-     * a template has no set for such a claim to range over: {@code subtypes} indexes entries, an instantiation
-     * entry exists only where some schema wrote that application, so the claim's subject would be assembled
-     * from whichever applications happen to have been written and a new one elsewhere would silently change
-     * it. That is a schema error (§5.2).
+     * <p><b>On a parametric record the mark and the selectors are each application's</b> (§5.10): the parametric record is
+     * no type, and closing carries its {@code extension} and {@code discriminators} to the record each application
+     * denotes, so {@code result => abstract <T> { ok: boolean =? }} makes {@code result<text>} an abstract base over
+     * the declarations composing it, and a selector makes a parametric record ABSTRACT as it makes a record so. {@code
+     * final} is refused on a parametric record: a parametric record is applied to be composed, each member of a family
+     * composing an application of it, and the mark would forbid that of every application. A final type over it is a
+     * record composing its application, marked as itself, a declared application taking no mark (§12.1).
      *
-     * <p><b>On a record template the mark is the instantiation's</b>, set on the template's own {@code extension}:
-     * the base is ABSTRACT by construction (§5.10), so the field is free to say how each application is realised,
-     * and a second-level base is spelled {@code result => abstract <T> { … }}. Its {@code discriminators} are the
-     * base's, so the selector rule above is a closed record's alone.
-     *
-     * <p>A mark on anything else is the author's error, an open one named by the constructor its held body
-     * applies: {@code TemplateBody} is the Java shape of every other open form alike and would name none of them.
+     * <p>A mark stands before a record definition alone (§12.1), which resolves to a record, so a definition that is
+     * no record has neither a mark nor a selector to lower.
      */
     private Top withExtension(SchemaMap.Declaration declaration, Top resolved) {
-        Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.mark());
-        boolean open = OpenEntry.isOpen(resolved);
-        boolean selectors = !open && resolved instanceof RecordBody body && !body.discriminators().isEmpty();
-        if (selectors) {
+        if (!(resolved instanceof RecordBody record)) {
+            return resolved;
+        }
+        Optional<RecordExtensionType> extension = declaration.typeDef() instanceof StructuralTypeDef structural
+                ? DefinitionMarks.extension(structural.mark()) : Optional.empty();
+        if (record.isParametric() && extension.orElse(null) == RecordExtensionType.FINAL) {
+            throw new SchemaValidationException("'" + declaration.name() + "': 'final' is refused on a parametric record"
+                    + " -- a parametric record is applied to be composed, each member of a family composing an application"
+                    + " of it, and the mark would forbid that of every application. Declare a record composing the"
+                    + " application and mark it instead, 'x => final " + declaration.name() + "<...> & { }'"
+                    + " ([TSON-SCHEMA] §5.2, §5.10)");
+        }
+        boolean written = declaration.typeDef() instanceof Instance;
+        if (written) {
+            record.discriminatorsRefusal("'" + declaration.name() + "'").ifPresent(why -> {
+                throw new SchemaValidationException(why + " ([TSON-SCHEMA] §5.2)");
+            });
+        }
+        if (!written && !record.discriminators().isEmpty()) {
             // A selector says the members pin it, so the record is the base they are selected from and has
             // no values of its own -- ABSTRACT, derived. `abstract` beside it asserts what the body already
             // says and is admitted; `final` claims the opposite and is refused.
@@ -395,34 +428,7 @@ final class DefinitionResolver {
             }
             extension = Optional.of(RecordExtensionType.ABSTRACT);
         }
-        if (extension.isEmpty()) {
-            return resolved;
-        }
-        if (open) {
-            if (extension.get() == RecordExtensionType.FINAL) {
-                // FINAL forbids anything composing onto the marked type, and every application of a template
-                // is a subtype of it by construction -- so the claim is false of a template before an author
-                // writes a second declaration. ABSTRACT has a subject: `subtypes` holds the template's own
-                // instantiations (§5.10).
-                throw new SchemaValidationException("'" + declaration.name() + "': 'final' forbids anything "
-                        + "composing onto this type, and every application of a template is a subtype of it by "
-                        + "construction -- so the claim is false of '" + declaration.name() + "' whatever else "
-                        + "the schema says. Mark a closed declaration instead ([TSON-SCHEMA] §5.2, §5.10)");
-            }
-            if (!(resolved instanceof RecordTemplateBody template)) {
-                String head = HeldBody.of((io.ltr8.tson.schema.meta.TemplateBody) resolved).application().typeRef()
-                        .orElse("?");
-                throw new SchemaValidationException("'" + declaration.name() + "': only a record states how it"
-                        + " may be realised -- this entry's body applies '!" + head + "' ([TSON-SCHEMA] §5.2)");
-            }
-            return template.withExtension(extension.get());
-        }
-        if (!(resolved instanceof RecordBody record)) {
-            throw new SchemaValidationException("'" + declaration.name()
-                    + "': only a record states how it may be realised -- this entry's body is "
-                    + resolved.getClass().getSimpleName() + " ([TSON-SCHEMA] §5.2)");
-        }
-        return record.withExtension(extension.get());
+        return extension.map(record::withExtension).orElse(record);
     }
 
     /**
@@ -430,7 +436,7 @@ final class DefinitionResolver {
      * written <em>after</em> {@code =>} annotate the value and ride the entry's facts; those
      * written before the name annotate the <em>name</em>, and a resolver "does not hoist annotations from key
      * to value", so {@link SchemaResolver} binds them through this same method and places them on the output
-     * schema-map <em>key</em> (§8.1), beside the derived {@code @meta.synthetic} marker.
+     * schema-map <em>key</em> (§8.1), beside the derived {@code @meta.application}.
      *
      * <p>A value is bound the same way §6 describes reading one: the annotation's name resolves in the schema's one
      * namespace (§3.3.3), and its value is read by that type's own compiled reader -- so {@code
@@ -461,7 +467,7 @@ final class DefinitionResolver {
             if (annotationsResolve && vocabularyDefinitions.definition(annotation.name()) == null) {
                 throw unresolvedAnnotation(name, annotation.name());
             }
-            refuseWrittenApplication(name, annotation.name());
+            refuseDerivedAnnotation(name, annotation.name());
             if (annotation.value().isEmpty()) {
                 bindAnnotationValue(name, annotation.name(), VOID);
             }
@@ -485,8 +491,9 @@ final class DefinitionResolver {
         if (vocabularyDefinitions.definition(annotationName) == null) {
             return null;
         }
+        boolean foreign = Externs.terminal(annotationName, vocabularyDefinitions::definition).isPresent();
         try {
-            return annotationValueReader.read(annotationName, value);
+            return annotationValueReader.read(annotationName, value, foreign);
         } catch (ReadException e) {
             // Same split as bindAtomInstance, for the same reason: an annotation value that does not conform
             // to the type its name refers to (§6) is the author's error, and relabelling it a coverage gap
@@ -495,18 +502,12 @@ final class DefinitionResolver {
                     "'" + declaration + "': the value of annotation '@" + annotationName + "' is not valid data "
                             + "for the type '" + annotationName + "' names -- " + e.getMessage(), e);
         } catch (BindMismatchException e) {
-            // The same arm {@link #bindAtomInstance} carries, for the same reason and it is not a stylistic
-            // echo: an annotation naming a type the consumer never bound is their configuration, and
-            // `MissingBindingException` exists precisely so that a missing line of wiring does not read as "this
-            // library cannot do that", which is what the catch-all below would make of it.
+            // The same arm bindAtomInstance carries: an annotation naming a type the consumer never bound is their
+            // configuration, restated against the declaration and still saying which of the two it is.
             String where = "'" + declaration + "': " + e.getMessage();
             throw e instanceof MissingBindingException ? new MissingBindingException(where)
                     : new BindMismatchException(where);
-        } catch (SchemaValidationException e) {
-            // A verdict reached while the value was read -- the annotation's type waiting on an entry that waits
-            // back, a wait chain past the limit -- is the schema's, whatever read reached it.
-            throw e;
-        } catch (RuntimeException e) {
+        } catch (UnsupportedOperationException e) {
             throw new UnsupportedOperationException("'" + declaration + "': failed to bind the value of "
                     + "annotation '@" + annotationName + "' via the compiled vocabulary reader: "
                     + e.getMessage(), e);
@@ -518,35 +519,32 @@ final class DefinitionResolver {
             case StructuralTypeDef structural -> {
                 List<String> parameters = structural.typeParams();
                 yield (switch (structural.body()) {
-                    // Only an error placeholder is both open and still a bare RecordDef here -- the desugar phase
-                    // rewrote every real record template into the `RecordTemplateDef` §5.2 says it denotes.
                     case RecordDef recordDef -> resolveRecordBody(recordDef.entries(), parameters);
                     case ConstructionDef construction -> resolveComposition(name, construction, parameters);
-                    case RefinedDef refined -> resolveRefinement(name, refined, parameters);
                 }).finish(parameters);
             }
-            case ReferenceTypeDef referenceTypeDef -> {
-                // A parameter list here is §5.10's partial application -- `uuid_pair => <B> pair<uuid, B>`, a
-                // reference that leaves parameters open and re-declares them, which makes the alias itself a
-                // template. It threads straight through; substituting into the recorded application is
-                // materialisation's job, and until then the open form is what the entry records.
-                List<String> parameters = referenceTypeDef.typeParams();
-                yield switch (referenceTypeDef.ref()) {
-                    case NameRef simple -> openAliasOr(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
-                    case ApplicationRef generic -> resolveTemplateApplication(name, generic, parameters);
-                    // A declaration-level container form is rewritten by SchemaDesugarer before resolution -- a
-                    // sized array into the `!meta.array { ... }` construction it denotes with min_items/max_items bound
-                    // directly (§5.3), a size-less one into the same without them (§5.6), a voidable element as
-                    // `voidable: true`, and a tuple into `!meta.tuple { ... }` -- so one here is that phase not having run.
-                    case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, SiblingRef _ ->
-                            throw unlifted("'" + name + "'", referenceTypeDef.ref());
+            case TypeExprDef typeExprDef -> {
+                // A parameter list before a reference -- a parametric alias -- is refused by SchemaDesugarer
+                // (§5.10: a parametric record's body is a record), so one here is that phase not having run.
+                if (!typeExprDef.typeParams().isEmpty()) {
+                    throw new IllegalStateException("'" + name + "': a parameter list before a reference reached "
+                            + "resolution -- SchemaDesugarer refuses one (§5.10), so this declaration was resolved "
+                            + "from raw AST without that phase");
+                }
+                yield switch (typeExprDef.ref()) {
+                    case NameRef simple -> new io.ltr8.tson.schema.meta.Alias(
+                            io.ltr8.tson.schema.meta.TypeRef.of(simple.name()));
+                    case ApplicationRef generic -> resolveApplication(name, generic);
+                    // A declaration-level container form is rewritten by SchemaDesugarer before resolution into the
+                    // `!meta.array { ... }` (or map, tuple, choice) construction it denotes (§5.3), and a construction
+                    // in place stands only at a field's type -- so one here is that phase not having run.
+                    case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, RecordExpr _, InlineConstruction _ ->
+                            throw unlifted("'" + name + "'", typeExprDef.ref());
                 };
             }
-            // The parameter list is the whole difference: with one, the payload is held rather than bound,
-            // and stays that way until materialisation substitutes it away (§5.10).
+            // A parameter list admits only a parametric record's explicit spelling, `<T> !meta.record { ... }` (§5.10).
             case Instance instance -> instance.typeParams().isEmpty() ? resolveInstance(name, instance)
-                    : resolveInstanceTemplate(name, instance);
-            case RecordTemplateDef template -> openRecord(name, template);
+                    : parametricInstance(name, instance);
             case AtomRefinement refinement -> resolveAtomRefinement(name, refinement);
             // A schema map nested as an entry: a value of `schema` whose members are declarations of this document
             // under their paths, each resolved as any entry is. Its namespace is built from them wherever the
@@ -557,137 +555,82 @@ final class DefinitionResolver {
     }
 
     /**
-     * A container sugar form that reached resolution. {@link SchemaDesugarer} lifts every one -- closed or open, at
-     * any depth, an element that is itself an application included (written as its reference and
-     * rewritten to its entry at materialisation) -- to an entry before this resolver runs, so no schema an author
-     * writes can produce one here: it is a caller resolving raw AST without that phase, an invariant of the pipeline
-     * rather than a gap in it.
+     * A sugar form that reached resolution, or a construction in place off a field's type. {@link
+     * SchemaDesugarer} rewrites every sugar form -- into the construction a declaration's body is, or into a
+     * construction in place at a field's type -- and refuses one as an argument, so no schema an author writes can
+     * produce one here: it is a caller resolving raw AST without that phase, an invariant of the pipeline rather than a
+     * gap in it.
      */
-    private static IllegalStateException unlifted(String where, TypeExpr ref) {
-        if (ref instanceof SiblingRef) {
-            return new IllegalStateException(where + ": a sibling reference reached resolution off a field's type: "
-                    + ref + " -- SchemaDesugarer refuses one there (§5.2), so this declaration was resolved from raw "
-                    + "AST without that phase");
-        }
-        return new IllegalStateException(where + ": a container sugar form reached resolution unlifted: " + ref
-                + " -- SchemaDesugarer lifts every sugar form to an entry before DefinitionResolver runs (§5.3), so "
-                + "this declaration was resolved from raw AST without that phase");
+    private static IllegalStateException unlifted(String where, FieldTypeExpr ref) {
+        return new IllegalStateException(where + ": a sugar form reached resolution where it is not "
+                + "rewritten: " + ref + " -- SchemaDesugarer rewrites every sugar form before DefinitionResolver runs "
+                + "(§5.3), so this declaration was resolved from raw AST without that phase");
     }
 
     /**
-     * A record body as resolution builds it -- a fresh record, a composition or a refinement, flattened -- before it
-     * is either a record or a record template. Its fields are {@link BuiltField}s, the builder's own, so neither a
-     * closed record's working value nor a template's kernel value is the other's: {@link #finish} makes the one the
-     * declaration is.
+     * A record body as resolution builds it -- a fresh record or a composition, flattened -- before it
+     * is the record the declaration is. Its fields are {@link BuiltField}s, the builder's own working value.
      */
     private record Built(TypeChain chain, SequencedMap<String, BuiltField> fields, List<FieldGroup> groups,
                          List<String> discriminators, Optional<String> nameType) {
 
         /**
-         * The record, where the declaration declares no parameters, or the record template it is otherwise -- its
-         * chain the parents as written and the closed entries they reach, a template being IS-A its parents as a
-         * record is, closing completing each application's from the same parents; and the two rules a template's
-         * fields answer to checked against its parameters ({@link #checked}).
+         * The record, carrying {@code parameters} where the declaration declares them -- a parametric record, its chain
+         * the parents as written and the closed entries they reach, closing completing each application's from the
+         * same parents; and the two rules a parametric record's fields answer to checked against its parameters
+         * ({@link #checked}).
          */
         Top finish(List<String> parameters) {
+            SequencedMap<String, RecordField> built = new LinkedHashMap<>();
+            fields.forEach((name, field) -> built.put(name, field.field()));
             if (parameters.isEmpty()) {
-                SequencedMap<String, RecordField> closed = new LinkedHashMap<>();
-                fields.forEach((name, field) -> closed.put(name, field.closed()));
-                return new RecordBody(chain, RecordBody.fieldMap(closed), groups, RecordExtensionType.OPEN,
+                return new RecordBody(chain, RecordBody.fieldMap(built), groups, RecordExtensionType.OPEN,
                         discriminators, nameType);
             }
-            SequencedMap<String, RecordTemplateField> template = new LinkedHashMap<>();
-            fields.forEach((name, field) -> template.put(name, field.template()));
-            return checked(new RecordTemplateBody(chain.withSubtypes(List.of()), AnnotatedMap.copyOf(template), groups,
-                    RecordExtensionType.OPEN, discriminators, nameType, typeParameters(parameters)));
+            return checked(new RecordBody(chain.withSubtypes(List.of()), typeParameters(parameters),
+                    RecordBody.fieldMap(built), groups, RecordExtensionType.OPEN, discriminators, nameType));
         }
     }
 
     /**
-     * One field as resolution builds it: a field's four facts and a label where one of the declaration's own
-     * parameters stands for the whole type or value. Classified once, where it is built: an entry this declaration
-     * writes labels a bare parameter name in its type slot and an unquoted parameter token in its value slot ({@link
-     * #written}, §5.10's shadowing rule over the source spelling); a closed source's field arrives as it is ({@link
-     * #of(RecordField)}), and an open operand's substituted on the model ({@link #of(RecordTemplateField)}), neither
-     * relabelled. A closed declaration's fields are never labelled, so {@link #closed} is total for them; a template's
-     * become {@link RecordTemplateField}s ({@link #template}).
+     * One field as resolution builds it: a field's four facts. A parameter in its type is a name the enclosing
+     * record's parameters declare, which the record holds as its parameter when it is built ({@link RecordBody}).
      */
-    private record BuiltField(Optional<io.ltr8.tson.schema.meta.Reference> type, Optional<String> typeParam,
-                              boolean optional, boolean voidable, FieldRole role, Optional<Token> value,
-                              Optional<String> valueParam, Annotations annotations, Optional<SourcePosition> position) {
+    private record BuiltField(io.ltr8.tson.schema.meta.TypeExpr type, boolean optional, boolean voidable,
+                              FieldRole role, Optional<Token> value, Annotations annotations,
+                              Optional<SourcePosition> position) {
 
-        /** A closed source's field: its facts as they are, labelling nothing. */
+        /** A source's field: its facts as they are. */
         static BuiltField of(RecordField field) {
-            return new BuiltField(Optional.of(field.type()), Optional.empty(), field.optional(), field.voidable(),
-                    field.role(), field.value(), Optional.empty(), field.annotations(), field.position());
-        }
-
-        /** An open operand's field, substituted with the absorbing declaration's parameters as its arguments. */
-        static BuiltField of(RecordTemplateField field) {
-            return new BuiltField(field.type(), field.typeParam(), field.optional(), field.voidable(), field.role(),
-                    field.value(), field.valueParam(), field.annotations(), field.position());
+            return new BuiltField(field.type(), field.optional(), field.voidable(), field.role(), field.value(),
+                    field.annotations(), field.position());
         }
 
         /**
-         * A field this declaration writes, classified against its own {@code parameters} by its source spelling
-         * (§5.10): a type that is a bare parameter name is its {@code type_param}, an unquoted value token that is one
-         * its {@code value_param}, and anything else its {@code type} or {@code value}.
+         * This field restated by a modifier-only entry that elides its type: the type kept, the facts and the value the
+         * entry's own.
          */
-        static BuiltField written(io.ltr8.tson.schema.meta.Reference type, List<String> parameters,
-                boolean optional, boolean voidable, FieldRole role, Optional<Token> value, Annotations annotations,
-                Optional<SourcePosition> position) {
-            Optional<String> whole = type instanceof io.ltr8.tson.schema.meta.TypeRef named
-                    && named.arguments().isEmpty() && parameters.contains(named.name())
-                    ? Optional.of(named.name()) : Optional.empty();
-            return new BuiltField(whole.isPresent() ? Optional.empty() : Optional.of(type), whole, optional, voidable,
-                    role, Optional.empty(), Optional.empty(), annotations, position).valued(value, parameters);
+        BuiltField restated(boolean optional, boolean voidable, FieldRole role, Optional<Token> value,
+                            Optional<SourcePosition> position) {
+            return new BuiltField(type, optional, voidable, role, value, Annotations.empty(), position);
         }
 
-        /**
-         * This field restated by a modifier-only entry that elides its type: the type and its label kept, the facts
-         * and the value the entry's own, the value classified as {@link #written} classifies one.
-         */
-        BuiltField restated(List<String> parameters, boolean optional, boolean voidable, FieldRole role,
-                            Optional<Token> value, Optional<SourcePosition> position) {
-            return new BuiltField(type, typeParam, optional, voidable, role, Optional.empty(), Optional.empty(),
-                    Annotations.empty(), position).valued(value, parameters);
-        }
-
-        /** This field with {@code value} as the declaration wrote it: a parameter's token is its {@code value_param}. */
-        private BuiltField valued(Optional<Token> value, List<String> parameters) {
-            Optional<String> parameter = value
-                    .filter(token -> token.form() == Token.Form.UNQUOTED && parameters.contains(token.text()))
-                    .map(Token::text);
-            return new BuiltField(type, typeParam, optional, voidable, role,
-                    parameter.isPresent() ? Optional.empty() : value, parameter, annotations, position);
-        }
-
-        /** The record field a closed declaration holds; it never labels one, having no parameter to label. */
-        RecordField closed() {
-            if (typeParam.isPresent() || valueParam.isPresent()) {
-                throw new IllegalStateException("a closed declaration's field names the parameter '"
-                        + typeParam.or(() -> valueParam).orElseThrow() + "'");
-            }
-            return new RecordField(type.orElseThrow(), optional, voidable, role, value, annotations, position);
-        }
-
-        /** The record template field a template holds. */
-        RecordTemplateField template() {
-            return new RecordTemplateField(type, typeParam, optional, voidable, role, value, valueParam, annotations,
-                    position);
+        /** The record field this is. */
+        RecordField field() {
+            return new RecordField(type, optional, voidable, role, value, annotations, position);
         }
 
         BuiltField withFacts(boolean optional, boolean voidable, FieldRole role) {
-            return new BuiltField(type, typeParam, optional, voidable, role, value, valueParam, annotations, position);
+            return new BuiltField(type, optional, voidable, role, value, annotations, position);
         }
 
         BuiltField withAnnotations(Annotations annotations) {
-            return new BuiltField(type, typeParam, optional, voidable, role, value, valueParam, annotations, position);
+            return new BuiltField(type, optional, voidable, role, value, annotations, position);
         }
 
         /** What a document that never writes the field yields, asked of a plain field ({@link RecordField#omitted}). */
         RecordField.Omitted omitted() {
-            return RecordField.omitted(optional, value.isPresent() || valueParam.isPresent(), false);
+            return RecordField.omitted(optional, value.isPresent(), false);
         }
 
         /** These facts in a diagnostic's words ({@link RecordField#describe}). */
@@ -695,12 +638,15 @@ final class DefinitionResolver {
             return RecordField.describe(optional, role);
         }
 
-        /** The type as a message names it: the type's name, the parameter standing for it, or the sibling's text. */
+        /**
+         * The type as a message names it: the type's name, the parameter standing for it, or the form a type
+         * written in place was written as.
+         */
         String typeName() {
-            return typeParam.orElseGet(() -> switch (type.orElseThrow()) {
+            return switch (type) {
                 case io.ltr8.tson.schema.meta.TypeRef reference -> reference.name();
-                case io.ltr8.tson.schema.meta.SiblingRef sibling -> sibling.text();
-            });
+                case io.ltr8.tson.schema.meta.TypeInline inline -> inline.text();
+            };
         }
     }
 
@@ -710,16 +656,14 @@ final class DefinitionResolver {
      * Refuses a construction whose head is abstract -- {@code top}, {@code type}, a base kind ([TSON-SCHEMA] §4.1),
      * or a meta layer's own abstract record: it has no direct instances (§5.2), so {@code !C { ... }} builds
      * nothing. One sentence, naming what would satisfy it: the instantiable entries IS-A the head among the imported
-     * entries, every abstract one among them left out, since naming one would refuse in turn, and {@code
-     * template}, which no declaration constructs ({@link #requireAuthorable}).
+     * entries, every abstract one among them left out, since naming one would refuse in turn.
      */
     private void refuseAbstractHead(String name, String target, Top head) {
         if (!(head instanceof RecordBody record) || record.extension() != RecordExtensionType.ABSTRACT) {
             return;
         }
         List<String> instantiable = TypeChain.subtypesOf(head).stream()
-                .filter(subtype -> !TEMPLATE.equals(subtype) && !RECORD_TEMPLATE.equals(subtype)
-                        && isInstantiable(vocabularyDefinitions.definition(subtype)))
+                .filter(subtype -> isInstantiable(vocabularyDefinitions.definition(subtype)))
                 .toList();
         String terminal = AliasChain.terminal(target, vocabularyDefinitions::definition);
         throw new SchemaValidationException("'" + name + "': '!" + target + "' names an abstract entry, which has no "
@@ -732,32 +676,41 @@ final class DefinitionResolver {
 
     /** Whether a construction may apply {@code definition} directly: a closed entry that is not abstract. */
     private static boolean isInstantiable(Top definition) {
-        return definition != null && !OpenEntry.isOpen(definition)
+        return definition != null && !ParametricEntry.isParametric(definition)
                 && !(definition instanceof RecordBody record && record.extension() == RecordExtensionType.ABSTRACT);
     }
 
     /**
-     * Refuses {@code template} and {@code record_template} as a construction head, closed or open: each is resolver
-     * vocabulary (§8.1), the body of an open entry, which the resolver derives from a declaration's parameter list,
-     * so a source declaration applying one directly is a resolver error. Each IS-A {@code top}, since resolved
-     * output is typed by it, so it is applied as a constructor would be -- which is why it needs a check of its
-     * own: admitted, it would mint an open entry whose body was hand-written, skipping every check §5.10 makes of a
-     * template's declaration. Tested at the end of the head's alias chain (§8.3), so an alias of either is refused
-     * as well.
+     * Refuses {@code parameters} written in a construction of {@code record}: a parametric record's parameters are declared
+     * by the list before its body, {@code <T> { ... }} or {@code <T> !meta.record { ... }} (§5.10), which is what puts
+     * them in scope and what every check §5.10 makes of a parametric record's declaration reads. Written as a binding
+     * instead, the record would be open with none of them made. Tested at the end of the head's alias chain (§8.3).
      */
-    private static void requireAuthorable(String name, String target, ConstructorHead head) {
-        if (head.name().equals(TEMPLATE)) {
-            throw new SchemaValidationException("'" + name + "': '!" + target + "' is resolver vocabulary -- "
-                    + "the body of an open entry, which the resolver derives from a declaration's parameter "
-                    + "list, and a source declaration never applies it directly (§8.1). Name the parameters on "
-                    + "the declaration instead: '" + name + " => <T> !C { ... }' (§5.10)");
+    private static void refuseWrittenParameters(String name, ConstructorHead head, DataValue written) {
+        if (head.name().equals(WireForm.RECORD) && written.coreValue() instanceof RecordValue record
+                && record.fields().stream().anyMatch(field -> WireForm.PARAMETERS.equals(field.name()))) {
+            throw new SchemaValidationException("'" + name + "': '!" + head.name() + "' states 'parameters', which "
+                    + "a construction never writes -- a parametric record's parameters are the list written before its "
+                    + "body, '" + name + " => <T> { ... }' or '" + name + " => <T> !" + head.name() + " { ... }' "
+                    + "(§5.10)");
         }
-        if (head.name().equals(RECORD_TEMPLATE)) {
-            throw new SchemaValidationException("'" + name + "': '!" + target + "' is resolver vocabulary -- "
-                    + "the body of a record template, which the resolver derives from a record declared with "
-                    + "type parameters, and a source declaration never applies it directly (§8.1). Name the "
-                    + "parameters on the declaration instead: '" + name + " => <T> { ... }' (§5.10)");
+    }
+
+    /**
+     * Refuses {@code meta.apply} constructed as a declaration's body ([TSON-SCHEMA] §5.10): an application is written
+     * in place, and a declared one is written {@code name => H<args>}, whose value is what it closes or constructs to
+     * (§8.2), whatever its head is. Tested at the end of the head's alias chain (§8.3).
+     */
+    private static void refuseDeclaredApplication(String name, ConstructorHead head, DataValue written) {
+        if (!head.name().equals(APPLY)) {
+            return;
         }
+        String spelled = ConstructionRewrite.text(readAs(written, APPLY));
+        throw new SchemaValidationException("'" + name + "': '!" + written.typeRef().orElse(APPLY) + " { ... }' is "
+                + "written as a declaration's body, and an application is written in place, never as a declaration's "
+                + "body (§5.10): declare it as '" + name + " => "
+                + (spelled.matches("[^<]+<.+>") ? spelled : "H<args>")
+                + "', whose value is the type it closes or constructs to (§8.2)");
     }
 
     /**
@@ -765,17 +718,17 @@ final class DefinitionResolver {
      * with {@code value}.
      *
      * <p>{@code C} resolves in the schema's one namespace, an imported entry (see {@link #resolveConstructorTarget}).
-     * It MUST be <b>closed</b>: a template ({@code C} declaring type parameters) closes by application, {@code
+     * It MUST be <b>closed</b>: a parametric record ({@code C} declaring type parameters) closes by application, {@code
      * C<...>}, never by construction, so naming one here is a resolver error whether or not it also carries {@code ~}.
      * Where {@code C} is no constructor -- not IS-A {@code top} (§4.1) -- the entry is a value of the type {@code C}
      * ({@link #resolveValueEntry}).
      *
      * <p>{@code value} is bound via {@link #bindAtomInstance} directly -- {@code instance.value().typeRef()}
      * already names {@code C} (per {@code Instance}'s own reshape, matching §12.1's {@code instance = "!"
-     * type-name ws core-value}); positional form (§5.6) and schema-composed defaults (§5.2/§5.7) are handled
+     * type-name ws core-value}); positional form (§5.6) and schema-composed defaults (§5.2/§5.8) are handled
      * uniformly by the compiled {@code Record*Reader} itself (see {@code RecordAbstractReader}'s own
-     * Javadoc), not by a separate normalization step here. Construction transfers only {@code C}'s {@code
-     * kind} (§5.5): no supertypes, no parameters, {@code constructor: false} on the result -- except for an
+     * Javadoc), not by a separate normalization step here. Construction grants no IS-A (§5.5): no
+     * supertypes, no parameters, {@code constructor: false} on the result -- except for an
      * alias, where the result is the entry {@code name => X} denotes, since {@code !meta.alias { target: X }}
      * is that alias written out (§8.3).
      *
@@ -785,35 +738,49 @@ final class DefinitionResolver {
      * than check: see the note at the binding site.
      */
     private Top resolveInstance(String name, Instance instance) {
+        return resolveInstance(name, instance, positions.desugared(instance.value()));
+    }
+
+    /**
+     * {@link #resolveInstance(String, Instance)}, {@code desugared} saying desugaring wrote the payload, so every
+     * application in it is the author's sugar ({@link ConstructionRewrite}).
+     */
+    private Top resolveInstance(String name, Instance instance, boolean desugared) {
         String target = instance.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
-        requireAuthorable(name, target, head);
+        if (head.definition() instanceof IncompleteEntry incomplete) {
+            return complete(name, target, head.name(), incomplete, instance.value(), desugared);
+        }
+        refuseDeclaredApplication(name, head, instance.value());
+        refuseWrittenParameters(name, head, instance.value());
         Top constructor = head.definition();
-        List<String> constructorParameters = OpenEntry.parameterNames(constructor);
+        List<String> constructorParameters = ParametricEntry.parameterNames(constructor);
         if (!constructorParameters.isEmpty()) {
             int declared = constructorParameters.size();
-            throw new SchemaValidationException("'" + name + "': '" + target + "' is a template taking "
+            throw new SchemaValidationException("'" + name + "': '" + target + "' is a parametric record taking "
                     + declared + " type argument" + (declared == 1 ? "" : "s") + " " + constructorParameters
-                    + ", and a template closes by application, not by construction -- write '" + target
+                    + ", and a parametric record closes by application, not by construction -- write '" + target
                     + "<...>' with its arguments (§5.10). '!" + target + " { ... }' fills a constructor's own "
                     + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
         }
-        if (!EntryKind.isConstructor(head.name(), constructor, vocabularyKernel)) {
+        if (!TypeChain.isConstructor(head.name(), constructor, vocabularyKernel)) {
             return resolveValueEntry(name, target, head, instance.value());
         }
         refuseAbstractHead(name, target, constructor);
         refuseWrittenChain(name, target, instance.value());
         // No check that the head's own body is a record: a chain reaching `top` is built only by composition and
-        // refinement, both of which build a `RecordBody` -- or a `RecordTemplateBody` for an open declaration, which
-        // is refused as a template above. Every other body shape
+        // refinement, both of which build a `RecordBody` -- a parametric one refused above. Every other body
+        // shape
         // comes with an empty chain, since IS-A stops at construction (§4.1), and so is read as a value entry.
         // Parameters empty and IS-A `top` therefore imply a record body.
-        Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
+        // Read as constructed, restored as written: a field of a record in place is found by the identity of the value
+        // desugaring wrote for it, and the rewrite rebuilds what holds an application it constructs.
+        DataValue payload = rewrite.inPlace(instance.value(), desugared);
+        Top body = asWritten(bindAtomInstance(name, readAs(payload, head.name())), instance.value());
         if (body instanceof io.ltr8.tson.schema.meta.Alias) {
             // `!meta.alias { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
-            // denotes the same entry: `kind: ALIAS` (§4.1 -- a meta.type_ref, not one the supertype chain
-            // could give). Dispatched on the *body* rather than on the head's name because this path has
-            // already read it; `resolveInstanceTemplate` holds its body unread and so has only the name.
+            // denotes the same entry. Dispatched on the *body* rather than on the head's name because this path has
+            // already read it.
             return body;
         }
         // The author's own spelling of the head is the tag, not the terminal, so the chain stays walkable.
@@ -824,7 +791,7 @@ final class DefinitionResolver {
     /**
      * {@code name => !T { ... }} where {@code T} is no constructor: a value entry, an instance of the ordinary type
      * {@code T} ([TSON-SCHEMA] §4.1), its payload read against {@code T} as a data value is and held as the value
-     * ({@link ValueEntry}). It is no type, so nothing is minted or lifted for it, and its tag is {@code T}.
+     * ({@link ValueEntry}). It is no type, and its tag is {@code T}.
      *
      * <p>Refused: a head that is itself a value, since a value has no instances; and a braced payload at an atom
      * type, which reads as no value of it and is almost always an atom refinement missing its {@code ^}.
@@ -906,18 +873,26 @@ final class DefinitionResolver {
     }
 
     /**
-     * Refuses an author-written {@code @meta.application}: the kernel's annotation is the resolver's, stating on an
-     * entry's key the application it is the instantiation of (§8.2), as {@code chain} states where it sits -- so
-     * a declaration writing it makes a claim no declaration can make. Judged by where the name is defined, so a
+     * Refuses an author-written {@code @meta.application} or {@code @meta.completion}: each is the resolver's,
+     * stating on an entry's key what its declaration closed (§8.1, §8.2), as {@code chain} states where it sits -- so
+     * a declaration writing one makes a claim no declaration can make. Judged by where the name is defined, so a
      * meta layer's own annotation of that name is its own.
      */
-    private void refuseWrittenApplication(String name, String annotation) {
-        if (TsonSchema.APPLICATION.equals(annotation) && vocabularyDefinitions.definition(annotation) != null
-                && vocabularyKernel.test(annotation)) {
+    private void refuseDerivedAnnotation(String name, String annotation) {
+        if (vocabularyDefinitions.definition(annotation) == null || !vocabularyKernel.test(annotation)) {
+            return;
+        }
+        if (TsonSchema.APPLICATION.equals(annotation)) {
             throw new SchemaValidationException("'" + name + "': '@meta.application' is written, which a declaration "
                     + "never writes -- it is the application an entry is the instantiation of, which the resolver "
                     + "states on the key of every entry that closes one (§8.2). Write the application itself: '"
-                    + name + " => template<arguments>'");
+                    + name + " => head<arguments>'");
+        }
+        if (TsonSchema.COMPLETION.equals(annotation)) {
+            throw new SchemaValidationException("'" + name + "': '@meta.completion' is written, which a declaration "
+                    + "never writes -- it is the incomplete entries an entry's declaration completed, which the "
+                    + "resolver states on the key of every declared completion (§8.1). Write the completion itself: '"
+                    + name + " => entry<arguments>' or '" + name + " => !entry { ... }'");
         }
     }
 
@@ -947,17 +922,17 @@ final class DefinitionResolver {
     private void requireOneNameType(String name, String aFrom, Optional<String> a, String bFrom, Optional<String> b) {
         if (!sameNameType(a, b)) {
             throw new SchemaValidationException("'" + name + "': supertypes '" + aFrom + "' and '" + bFrom
-                    + "' have different name types, '" + a.orElse(RecordBody.FIELD_NAME) + "' and '"
-                    + b.orElse(RecordBody.FIELD_NAME) + "' -- a record's name type is set where it is declared, "
+                    + "' have different name types, '" + a.orElse(RecordBody.DEFAULT_NAME_TYPE) + "' and '"
+                    + b.orElse(RecordBody.DEFAULT_NAME_TYPE) + "' -- a record's name type is set where it is declared, "
                     + "the default included, and a subtype cannot change it; declare both over one name type");
         }
     }
 
     /**
      * Whether two records' name types are one type: the same entry at the end of each one's alias chain, not
-     * the same spelling, so {@code jn => json_name} is {@code json_name} and the kernel's {@code meta.field_name} is
-     * {@code meta.identifier}. Both resolve in the schema's one namespace, the absent default being the kernel's {@code
-     * meta.field_name}, and two that resolve to nothing are compared as written, the linker refusing each on its own.
+     * the same spelling, so {@code jn => json_name} is {@code json_name}. Both resolve in the schema's one namespace,
+     * the absent default being the kernel's {@code meta.identifier}, so a record stating it is one with a record
+     * stating none; two that resolve to nothing are compared as written, the linker refusing each on its own.
      */
     private boolean sameNameType(Optional<String> a, Optional<String> b) {
         String ka = nameTypeIdentity(a);
@@ -967,126 +942,141 @@ final class DefinitionResolver {
 
     /** {@code nameType}'s terminal entry, or {@code null} where the namespace holds no such name. */
     private String nameTypeIdentity(Optional<String> nameType) {
-        String written = nameType.orElse(RecordBody.FIELD_NAME);
+        return entryReached(nameType.orElse(RecordBody.DEFAULT_NAME_TYPE));
+    }
+
+    /** The entry at the end of {@code written}'s alias chain, or {@code null} where the namespace holds no such name. */
+    private String entryReached(String written) {
         DefinitionGetter in = vocabularyDefinitions.definition(written) != null ? vocabularyDefinitions
                 : namespaceDefinitions;
         return in.definition(written) == null ? null : AliasChain.terminal(written, in::definition);
     }
 
     /**
-     * {@code <T, N> !meta.array { element_type: T  min_items: N }} -- the open counterpart of {@link
-     * #resolveInstance}. The target resolves the same way and must be a constructor for the same reason; what
-     * differs is that the payload is <b>not read through that constructor's reader at all</b>. At least one
-     * binding stands for a parameter and no parameter is an {@code integer}, so the body is held as written
-     * ({@link HeldBody}) and bound once, at materialisation, when substitution has left no parameter in it.
-     *
-     * <p><b>Holding is what removes the collection boundary.</b> A typed open vocabulary has to spell a
-     * parameter per slot kind, and has no spelling for one inside a collection -- so {@code <T> !meta.choice
-     * { variants: [T error] }} would have no representation. Held, the parameter is a token inside an array,
-     * and no phase has to classify it.
-     *
-     * <p><b>What is still checked here is what does not depend on the parameters</b> (§5.10). Two structural
-     * questions can be answered from the binding record's own field names, with no stand-in values and so no
-     * risk of failing a template that is correct for every argument anyone passes: that each name is a field
-     * the constructor declares, and that every REQUIRED-without-default field of it is bound by something.
-     * Both are conditions no application could repair, which makes the declaration the right place to report
-     * them. Everything value-shaped -- the typing of each binding, the family coherence rules -- waits for
-     * materialisation, where the whole body binds through the constructor's own reader at once.
-     *
-     * <p>A positional payload (§5.6) carries no field names, so neither check applies to it; the reader
-     * settles it at materialisation like any other positional form.
+     * {@code <T> !C value} -- a parameter list before a construction. A parametric record's body is a record body
+     * ([TSON-SCHEMA] §5.10), so it is admitted before {@code record} alone, past its alias hops:
+     * {@code <T> !meta.record { … }} is the explicit spelling of a parametric record ({@link #parametricRecord}). Before a
+     * constructor it is refused with what to write instead -- the application where it is used, or its construction left
+     * open and completed -- and before an ordinary type,
+     * whose value is no record body at all, with one declaration per instantiation.
      */
-    private Top resolveInstanceTemplate(String name, Instance template) {
-        String target = template.target();
+    private Top parametricInstance(String name, Instance instance) {
+        String target = instance.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
-        requireAuthorable(name, target, head);
-        Top constructor = head.definition();
-        if (!EntryKind.isConstructor(head.name(), constructor, vocabularyKernel)) {
-            // A template over an ordinary type closes to a value entry, read against the type when it is applied.
-            if (constructor instanceof ValueEntry value) {
-                throw new SchemaValidationException("'" + name + "': '!" + target + "' names a value of the type '"
-                        + value.type() + "', and a value has no instances -- '!T { ... }' builds a value of the "
-                        + "type T");
-            }
-            return HeldBody.held(template.typeParams(), template.value());
+        if (head.name().equals(WireForm.RECORD)) {
+            return parametricRecord(name, instance);
         }
-        // `alias` needs no exception here: it IS-A `top`, so the generic rule admits it, which is what
-        // makes the open and closed spellings of one construction agree. Nor does its kind need one any
-        // more -- every open entry is TEMPLATE whatever constructor its held body applies, so the alias form
-        // stopped being the one shape whose kind had to be read off the head.
-        refuseAbstractHead(name, target, constructor);
-        refuseWrittenChain(name, target, template.value());
-        if (!(constructor instanceof RecordBody vocabulary)) {
-            throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
-                    + constructor.getClass().getSimpleName() + " body; a constructor is record-shaped "
-                    + "(§7.2) and cannot be declared otherwise");
+        String prefix = "'" + name + "': a parametric record's body is a record body -- braces or a composition (§5.10) -- "
+                + "and '!" + target + " { ... }' ";
+        if (TypeChain.isConstructor(head.name(), head.definition(), vocabularyKernel)) {
+            String open = head.name().equals(KernelNames.of("array"))
+                    ? "'nonempty => !" + target + " ^ { min_items: 1 }'"
+                    : "'my_" + target.substring(target.lastIndexOf('.') + 1) + " => !" + target + " ^ { ... }'";
+            throw new SchemaValidationException(prefix + "constructs '" + target + "'. Write the application where it "
+                    + "is used ('" + target + "<...>'), or leave its construction open (" + open
+                    + ") and complete it where it is used");
         }
-        if (template.value().coreValue() instanceof RecordValue bindings) {
-            checkTemplateBindings(name, target, vocabulary, bindings);
-        }
-        // §5.10: an open entry is a template, not a type. Its kind says that and nothing about what an
-        // application of it produces -- that is the constructor's, read off the closed body at
-        // materialisation. The alias form is no exception: `<B> pair<uuid, B>` is a template whose closure
-        // is a reference, not a reference that happens to have parameters.
-        return HeldBody.held(template.typeParams(), template.value());
+        throw new SchemaValidationException(prefix + "is a value of the type '" + target + "', no type, and a "
+                + "parametric record over a value is no record. Declare one value per instantiation ('order_api => !"
+                + target + " { ... }'), or carry what varies as data of the type");
     }
 
     /**
-     * A record template, built directly: the {@code !meta.record_template { … }} payload {@code SchemaDesugarer}
-     * labelled ({@link RecordTemplateDef}), read through {@code record_template}'s own reader ([TSON-SCHEMA] §5.10).
-     * What the author wrote is answered first, in the terms they wrote it in -- a construction of {@code meta.record}
-     * -- so a binding the record does not declare names the record's vocabulary, and a parameter in a scalar slot is
-     * refused for standing there rather than for not reading as a boolean. The parameter list the desugarer stated
-     * last is no binding the author wrote.
+     * {@code <T> !meta.record { … }} -- a parametric record in its explicit spelling, read against {@code record}'s own
+     * vocabulary as any record is, with the declaration's parameters added ([TSON-SCHEMA] §5.10). What the author wrote
+     * is answered first, in the terms they wrote it in -- a construction of {@code meta.record} -- so a binding the record
+     * does not declare names the record's vocabulary, and a parameter at a slot that names no type is refused for
+     * standing there ({@link ParameterTypes#checkSlots}) rather than for not reading as a boolean.
      */
-    private Top openRecord(String name, RecordTemplateDef template) {
-        DataValue payload = template.payload();
+    private Top parametricRecord(String name, Instance instance) {
+        DataValue payload = instance.value();
         if (!(resolveConstructorTarget(name, WireForm.RECORD).definition() instanceof RecordBody vocabulary)) {
             throw new IllegalStateException("'" + name + "': constructor '" + WireForm.RECORD + "' is no record");
         }
+        ConstructorHead head = resolveConstructorTarget(name, WireForm.RECORD);
+        refuseWrittenParameters(name, head, payload);
         refuseWrittenChain(name, WireForm.RECORD, payload);
-        if (payload.coreValue() instanceof RecordValue bindings && !bindings.fields().isEmpty()) {
-            checkTemplateBindings(name, WireForm.RECORD, vocabulary,
-                    new RecordValue(bindings.fields().subList(0, bindings.fields().size() - 1)));
+        if (!(payload.coreValue() instanceof RecordValue bindings)) {
+            throw new SchemaValidationException("'" + name + "': a parametric record's explicit body is a braced record of "
+                    + "'" + WireForm.RECORD + "' bindings (§5.10)");
         }
-        ParameterTypes.checkSlots(template.typeParams(), payload, vocabularyDefinitions::definition);
-        refuseLiteralOnParameter(payload);
-        if (!(bindAtomInstance(name, payload, WireForm.RECORD) instanceof RecordTemplateBody built)) {
-            throw new IllegalStateException("'" + name + "': '!record_template { ... }' bound to something other "
-                    + "than a record template");
+        checkParametricBindings(name, WireForm.RECORD, vocabulary, bindings);
+        ParameterTypes.checkSlots(instance.typeParams(), payload, vocabularyDefinitions::definition);
+        refuseLiteralOnParameter(payload, instance.typeParams());
+        List<RecordValue.Field> withParameters = new ArrayList<>(
+                ((RecordValue) rewrite.inPlace(payload, false).coreValue()).fields());
+        withParameters.add(new RecordValue.Field(WireForm.PARAMETERS, WireForm.plain(new ArrayValue(
+                instance.typeParams().stream().map(parameter -> WireForm.plain(new RecordValue(List.of(
+                        WireForm.nameField(WireForm.NAME, parameter))))).toList()))));
+        Top built = bindAtomInstance(name, new DataValue(payload.annotations(), Optional.of(WireForm.RECORD),
+                new RecordValue(withParameters)), WireForm.RECORD);
+        if (!(built instanceof RecordBody record) || !record.isParametric()) {
+            throw new IllegalStateException("'" + name + "': '!" + WireForm.RECORD + " { ... }' with parameters bound to "
+                    + "something other than a parametric record");
         }
-        return checked(built);
-    }
-
-    /** The two rules a template's fields answer to, checked against its parameters. */
-    private static RecordTemplateBody checked(RecordTemplateBody template) {
-        refuseParameterTypedSelector(template);
-        refuseLiteralOnOpenType(template);
-        return template;
+        return checked(record);
     }
 
     /**
-     * A literal {@code value} needs a closed type ([TSON-SCHEMA] §5.10): what a literal token
-     * means is decided by the type it is read as, and a field typed by a parameter, whole ({@code w?: T ~ 5}) or as
-     * an argument ({@code w?: box<T> ~ 5}), has a different type in every application. Such a field takes a value parameter
-     * or no value; a field of a closed type takes either.
+     * The rules a parametric record answers to, checked against its parameters: a parameter is a type, so it is never a
+     * field's name (a group member's included) or the record's name type -- the record's own field names are read by
+     * that, at the declaration -- and a selector and a literal each need a closed type.
      */
-    private static void refuseLiteralOnOpenType(RecordTemplateBody template) {
-        template.fields().forEach((name, field) -> {
-            Optional<String> parameter = field.parameterInType(template.parameterNames());
+    private static RecordBody checked(RecordBody record) {
+        for (String field : record.fields().keySet()) {
+            if (record.parameterNames().contains(field)) {
+                throw ParameterTypes.at(field, "a key of " + WireForm.RECORD + "." + WireForm.FIELDS);
+            }
+        }
+        record.nameType().filter(record.parameterNames()::contains).ifPresent(parameter -> {
+            throw ParameterTypes.at(parameter, WireForm.RECORD + "." + WireForm.NAME_TYPE);
+        });
+        refuseParameterTypedSelector(record);
+        refuseLiteralOnParameterType(record);
+        return record;
+    }
+
+    /**
+     * A literal {@code value} needs a closed type ([TSON-SCHEMA] §5.10): what a literal token means is decided by the
+     * type it is read as, and a field typed by a parameter, whole ({@code w?: T ~ 5}), as an argument ({@code w?:
+     * box<T> ~ 5}) or at a slot in place ({@code w?: [T] ~ []}), has a different type in every application. Such a
+     * field takes no value, in the parametric record and in every record written in place inside it.
+     */
+    private static void refuseLiteralOnParameterType(RecordBody record) {
+        literalsOnParameterTypes(record);
+        io.ltr8.tson.schema.meta.TypeSlots.Rewrite inPlace = new io.ltr8.tson.schema.meta.TypeSlots.Rewrite() {
+            @Override
+            public io.ltr8.tson.schema.meta.TypeRef atName(io.ltr8.tson.schema.meta.TypeRef reference) {
+                return reference;
+            }
+
+            @Override
+            public Type inPlace(Type body) {
+                if (body instanceof RecordBody nested) {
+                    literalsOnParameterTypes(nested);
+                }
+                return body;
+            }
+        };
+        record.fields().values().forEach(field -> io.ltr8.tson.schema.meta.TypeSlots.map(field.type(), inPlace));
+    }
+
+    private static void literalsOnParameterTypes(RecordBody record) {
+        record.fields().forEach((name, field) -> {
+            Optional<String> parameter = ParametricEntry.parameterIn(field.type());
             if (parameter.isPresent() && field.value().isPresent()) {
-                throw literalOnOpenType(name, parameter.get(), field.value().get().text());
+                throw literalOnParameterType(name, parameter.get(), field.value().get().text());
             }
         });
     }
 
     /**
-     * {@link #refuseLiteralOnOpenType}'s rule over the payload not yet bound, for a field whose whole type is a
-     * parameter: read against {@code record_template_field} its literal {@code value}, typed {@code type!}, has no
-     * sibling, which is the same verdict in words that say nothing of the parameter. So it is refused for where it
-     * stands before the reader is asked, as {@link ParameterTypes#checkSlots} refuses a parameter in a scalar slot.
+     * {@link #refuseLiteralOnParameterType}'s rule over the payload not yet bound, for a field whose whole type is a
+     * parameter: read against {@code record_field} its literal {@code value}, typed {@code type!}, would be read against
+     * a type nothing declares. So it is refused for where it stands before the reader is asked, as {@link
+     * ParameterTypes#checkSlots} refuses a parameter at a value.
      */
-    private static void refuseLiteralOnParameter(DataValue payload) {
+    private static void refuseLiteralOnParameter(DataValue payload, List<String> parameters) {
         if (!(payload.coreValue() instanceof RecordValue bindings)) {
             return;
         }
@@ -1095,10 +1085,10 @@ final class DefinitionResolver {
                 fields.entries().forEach(entry -> {
                     if (entry.value().coreValue() instanceof RecordValue field && entry.key().coreValue()
                             instanceof TokenValue name) {
-                        Optional<String> parameter = tokenAt(field, WireForm.TYPE_PARAM);
+                        Optional<String> parameter = tokenAt(field, WireForm.TYPE).filter(parameters::contains);
                         Optional<String> literal = tokenAt(field, WireForm.VALUE);
                         if (parameter.isPresent() && literal.isPresent()) {
-                            throw literalOnOpenType(name.text(), parameter.get(), literal.get());
+                            throw literalOnParameterType(name.text(), parameter.get(), literal.get());
                         }
                     }
                 });
@@ -1113,44 +1103,44 @@ final class DefinitionResolver {
                 .map(field -> ((TokenValue) field.value().coreValue()).text());
     }
 
-    private static SchemaValidationException literalOnOpenType(String field, String parameter, String literal) {
+    private static SchemaValidationException literalOnParameterType(String field, String parameter, String literal) {
         return new SchemaValidationException("field '" + field + "' is typed by the parameter '" + parameter
                 + "' and carries the literal value '" + literal + "' -- a literal needs a closed type, and this "
-                + "field's type differs in every application. Supply the value as a parameter too, or write none "
-                + "(§5.10)");
+                + "field's type differs in every application. Write no value here, and state it where the "
+                + "application is declared: 'name => head<argument> & { " + field + "?: = value }' (§5.10)");
     }
 
     /**
-     * A family base's selector may not be typed by one of its parameters, directly ({@code kind: K =?}) or as an
-     * argument ({@code kind: bounded<M> = N}): a position typed by the base reads the selector before it knows
-     * which member it has, so a type that varies per application is one it cannot read. The <em>pin</em>
-     * varying is the whole point, and does (§5.10).
+     * A parametric record's selector may not be typed by one of its parameters, directly ({@code kind: K =?}) or as an
+     * argument ({@code kind: bounded<M> =?}): each application is a family base carrying the selector, and its
+     * members pin it in the declarations composing the application, so a selector whose type varies per application
+     * is no selector a family can be written against (§5.2, §5.10).
      */
-    private static RecordTemplateBody refuseParameterTypedSelector(RecordTemplateBody open) {
-        for (String name : open.discriminators()) {
-            RecordTemplateField field = open.fields().get(name);
-            Optional<String> parameter = field == null ? Optional.empty()
-                    : field.parameterInType(open.parameterNames());
+    private static void refuseParameterTypedSelector(RecordBody record) {
+        for (String name : record.discriminators()) {
+            RecordField field = record.fields().get(name);
+            Optional<String> parameter = field == null ? Optional.empty() : ParametricEntry.parameterIn(field.type());
             if (parameter.isPresent()) {
-                String typed = field.typeParam().isPresent() ? "typed by the type parameter '"
-                        : "typed by an application of the parameter '";
+                String typed = field.type() instanceof io.ltr8.tson.schema.meta.ParamRef
+                        ? "typed by the type parameter '" : "typed by an application of the parameter '";
                 throw new SchemaValidationException("discriminator field '" + name + "' is " + typed
-                        + parameter.get() + "', and a position typed by this template reads a discriminator "
+                        + parameter.get() + "', and a position typed by this parametric record reads a discriminator "
                         + "before it knows which member it has -- so its type cannot vary per application "
-                        + "(§5.10). The value it is pinned to is what an argument supplies; its type is the "
-                        + "base's own");
+                        + "(§5.10)");
             }
         }
-        return open;
     }
 
-    /** Every parameter provisionally a type parameter: its type is derived once the schema has resolved. */
-    private static List<TemplateParam> typeParameters(List<String> parameters) {
-        return parameters.stream().map(TemplateParam::typeParameter).toList();
+    /** Every parameter by name: a written bound is put on where the declaration resolves ({@link #withBounds}). */
+    private static List<Param> typeParameters(List<String> parameters) {
+        return parameters.stream().map(Param::new).toList();
     }
 
-    /** §5.10's two declaration-time questions about a held binding record -- see {@link #resolveInstanceTemplate}. */
-    private static void checkTemplateBindings(String name, String target, RecordBody vocabulary,
+    /**
+     * §5.10's two declaration-time questions about a parametric record's explicit payload -- see {@link
+     * #parametricRecord}.
+     */
+    private static void checkParametricBindings(String name, String target, RecordBody vocabulary,
             RecordValue bindings) {
         Set<String> bound = new LinkedHashSet<>();
         for (RecordValue.Field binding : bindings.fields()) {
@@ -1164,11 +1154,11 @@ final class DefinitionResolver {
         for (Map.Entry<String, RecordField> entry : vocabulary.fields().entrySet()) {
             RecordField field = entry.getValue();
             if (!field.optional() && field.value().isEmpty() && !bound.contains(entry.getKey())) {
-                // No application of this template could ever produce a valid instance, so the template is
-                // wrong wherever the application is -- exactly the case the declaration is the right place
+                // No application of this parametric record could ever produce a valid instance, so the parametric
+                // record is wrong wherever the application is -- exactly the case the declaration is the right place
                 // to report.
                 throw new SchemaValidationException("'" + name + "': '" + target + "' requires a '"
-                        + entry.getKey() + "', and nothing binds it (§7.2), so no application of this template "
+                        + entry.getKey() + "', and nothing binds it (§7.2), so no application of this parametric record "
                         + "could build one");
             }
         }
@@ -1179,8 +1169,8 @@ final class DefinitionResolver {
     /**
      * {@code !I ^ { values }} -- refines an atom-family instance by tightening its constructor's
      * constraint fields. {@code I} resolves in the schema's one namespace, this document's own entries
-     * included (§3.3.1), and MUST be a non-constructor instance of an atom family (kind {@code ATOM},
-     * {@code constructor: false}). The constructor {@code I} was built from is reached through {@code I}'s
+     * included (§3.3.1), and MUST be a non-constructor instance of an atom family, its body an
+     * {@link Atom}. The constructor {@code I} was built from is reached through {@code I}'s
      * own facts -- the tag its value carries -- never a further name lookup.
      *
      * <p>Unlike {@link #resolveInstance}, {@code refinement.bindings()}'s own {@code typeRef} is not
@@ -1194,16 +1184,19 @@ final class DefinitionResolver {
      * #mergeWithSource}) -- required for a *chained* refinement to behave correctly: given {@code
      * int8 => !integer ^ { size: {...} } }, {@code big => !int8 ^ { min: -500 } } MUST still carry
      * {@code int8}'s own {@code size}, since {@code big} is declared as a refinement -- a narrowing --
-     * of {@code int8}, and §5.7's own "Body materialisation" rule for the structurally analogous
-     * record-refinement case is explicit that inherited fields survive a refinement that doesn't
-     * mention them. A field named in the new refinement's own {@code values} overrides {@code I}'s
-     * own value for it; any field {@code I} itself bound that {@code values} doesn't mention keeps
-     * {@code I}'s own value.
+     * of {@code int8}, and §5.8's "Body materialisation" rule for the analogous record case, a
+     * composition, is explicit that inherited fields survive a body that doesn't mention them. A field named in
+     * the new refinement's own {@code values} overrides {@code I}'s own value for it; any field {@code I} itself bound that
+     * {@code values} doesn't mention keeps {@code I}'s own value.
      *
-     * <p>Per §5.5's own text (not the general composition/refinement induction of §5.7/§5.8): the value's
+     * <p>Per §5.5's own text (not composition's chain induction, §5.8): the value's
      * constructor is {@code I}'s own (e.g. {@code numeric.integer_type} for {@code I = integer}), and its chain is
      * the literal single-element {@code [I]} -- not transitively chained with {@code I}'s own supertypes (empty for
      * every fresh {@code Instance}). {@code I} written as an alias names the instance at the end of its chain.
+     *
+     * <p>Three sources are no atom instance and take the same spelling: a constructor of types, whose construction is
+     * left open ({@link #constructOpen}); an incomplete entry ({@link #refineIncomplete}); and a type a collection
+     * constructor built, refined by its facets' kinds ({@link #refineCollection}).
      */
     private Top resolveAtomRefinement(String name, AtomRefinement refinement) {
         // An alias is a hop, not a supertype (§8.3): `!integer ^ { ... }` through core's `integer => integer`
@@ -1218,30 +1211,300 @@ final class DefinitionResolver {
         // (`integer` carries an `!numeric.integer_type {}`), where its constructor's body is the vocabulary record
         // describing one (`integer_type` carries a `!meta.record { ... }`). So one test separates the pair and
         // establishes atom-ness at once, where neither half does alone -- a plain record has no supertypes
-        // either, and `integer_type` is ATOM-kinded exactly like its instances. It is also how the reader
-        // stack decides everything of this shape (`Subsumption`), rather than trusting a stated kind.
+        // either, and `integer_type`'s chain reaches `meta.atom` as surely as its instances are atoms. It is also
+        // how the reader stack decides everything of this shape (`Subsumption`), rather than reading a chain.
+        if (source instanceof Extern extern) {
+            throw Externs.sealed("'" + name + "'", "'^' refines", refinement.target(), sourceName, extern);
+        }
+        if (source instanceof IncompleteEntry incomplete) {
+            return refineIncomplete(name, refinement.target(), sourceName, incomplete, refinement.bindings());
+        }
+        if (ConstructionSugar.constructs(sourceName, source)) {
+            return constructOpen(name, refinement.target(), sourceName, (RecordBody) source, refinement.bindings());
+        }
+        if (source instanceof Type type && collectionConstructor(sourceName, type).isPresent()) {
+            return refineCollection(name, sourceName, type, refinement.bindings());
+        }
         if (!(source instanceof io.ltr8.tson.schema.meta.Atom)) {
             // The construction hint is offered only where construction would actually work, which is the
             // same applicability question (§4.1) -- so `top`, not applicable, gets the plain answer rather
             // than advice that would fail in turn.
-            throw new SchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an "
-                    + "atom-family instance to narrow (§5.5), and '" + sourceName + "' is "
-                    + (EntryKind.isConstructor(sourceName, source, kernel)
+            throw new SchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an atom "
+                    + "instance, an array or a map type to narrow, or a constructor of types to build from (§5.5), and '"
+                    + sourceName + "' is "
+                    + (TypeChain.isConstructor(sourceName, source, kernel)
                             ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
                                     + "constructor application ('!" + sourceName + " { ... }')?"
-                            : "kind=" + EntryKind.of(source, kernel) + ", which has no atom constraints to tighten"));
+                            : source instanceof RecordBody record
+                                    ? "a record, which takes no '^' -- its fields are restated in a composition, '"
+                                            + sourceName + (record.isParametric() ? "<...>" : "") + " & { ... }' (§5.8)"
+                                    : "a '!" + tagOf(sourceName, source) + "' value, which is finished and takes "
+                                            + "no refinement"));
         }
-        // The tag the source's value carries, and failing a recorded one the constructor its class is the body
-        // of -- every resolved instance records its tag, and a hand-assembled one is the class's own.
-        String constructor = factsOf(sourceName).constructor()
-                .orElseGet(() -> TsonSchema.constructorOf(source));
+        // Every resolved instance records its tag, and a hand-assembled one is the class's own.
+        String constructor = tagOf(sourceName, source);
         refuseWrittenChain(name, sourceName + " ^", refinement.bindings());
+        DataValue bindings = source instanceof io.ltr8.tson.schema.meta.EnumBody enumBody
+                ? restatedByEntry(name, sourceName, Map.of(WireForm.NAME_TYPE, enumBody.nameType()), refinement.bindings(),
+                        (facet, held, written) -> io.ltr8.tson.schema.meta.EnumBody.nameTypeReplaced(held, written))
+                : refinement.bindings();
 
-        DataValue merged = mergeWithSource(name, source, refinement.bindings(), constructor);
+        DataValue merged = mergeWithSource(name, source, bindings, constructor);
         Top body = bindAtomInstance(name, merged);
         checkNarrows(name, sourceName, source, body);
         constructedBy(name, constructor);
         return ((Type) body).withSupertypes(List.of(sourceName));
+    }
+
+    // ── Incomplete entries (§5.5) ───────────────────────────────────────────
+
+    /**
+     * {@code !C ^ { … }}, {@code C} a constructor of types: its construction left open, an incomplete entry, where a
+     * required field of {@code C} is absent. Each field is read where it is written; required fields, defaults and
+     * coherence across fields wait for the completion, which reads the whole.
+     */
+    private Top constructOpen(String name, String target, String constructorName, RecordBody constructor,
+                              DataValue bindings) {
+        refuseAbstractHead(name, target, constructor);
+        refuseWrittenChain(name, target + " ^", bindings);
+        DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
+        refuseWrittenParameters(name, new ConstructorHead(constructorName, constructor), payload);
+        SequencedMap<String, DataValue> written = braced(name, target, payload);
+        IncompleteEntries.requireDeclared(name, constructorName, constructor, written);
+        List<String> absent = IncompleteEntries.required(constructor).stream()
+                .filter(field -> !written.containsKey(field)).toList();
+        if (absent.isEmpty()) {
+            throw new SchemaValidationException("'" + name + "': '!" + target + " ^ { ... }' writes every required "
+                    + "field of '" + constructorName + "', so nothing is left open -- write the construction '!"
+                    + target + " { ... }' (§5.5)");
+        }
+        Map<String, Object> read = readEachField(name, constructorName, constructor, written);
+        constructedBy(name, constructorName);
+        return new IncompleteEntry(constructorName, absent,
+                IncompleteEntries.record(payload, constructorName, written), read, List.of());
+    }
+
+    /**
+     * {@code !X ^ { … }}, {@code X} incomplete: the fields {@code X} has not written, a required one left absent. The
+     * result is another incomplete entry, with no IS-A to {@code X}.
+     */
+    private Top refineIncomplete(String name, String target, String baseName, IncompleteEntry base,
+                                 DataValue bindings) {
+        RecordBody constructor = constructorOf(name, base);
+        refuseWrittenChain(name, target + " ^", bindings);
+        DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
+        refuseWrittenParameters(name, new ConstructorHead(base.constructor(), constructor), payload);
+        SequencedMap<String, DataValue> written = braced(name, target, payload);
+        IncompleteEntries.requireDeclared(name, base.constructor(), constructor, written);
+        IncompleteEntries.requireWrittenOnce(name, target, base, written);
+        Map<String, Object> read = readEachField(name, base.constructor(), constructor, written);
+        constructedBy(name, base.constructor());
+        return IncompleteEntries.refined(name, target, base, payload, written, read, baseName);
+    }
+
+    /**
+     * {@code !X { … }}, {@code !X [ … ]} or a declaration's {@code X<A …>}, {@code X} incomplete: the plain
+     * construction of {@code X}'s constructor over what {@code X} writes and what the completion adds, read whole by
+     * that constructor's reader. It carries no chain: a completion is equal to the same construction written
+     * directly. What it closed, {@code baseName} and {@code base}'s bases, is recorded for its key ({@link
+     * #completionOf}).
+     */
+    private Top complete(String name, String target, String baseName, IncompleteEntry base, DataValue payload,
+                         boolean desugared) {
+        RecordBody constructor = constructorOf(name, base);
+        refuseWrittenChain(name, target, payload);
+        DataValue body = IncompleteEntries.completed(name, target, base, constructor,
+                rewrite.inPlace(payload, desugared));
+        ConstructorHead head = new ConstructorHead(base.constructor(), constructor);
+        refuseDeclaredApplication(name, head, body);
+        refuseWrittenParameters(name, head, body);
+        Top built = asWritten(bindAtomInstance(name, body, target), body);
+        constructedBy(name, base.constructor());
+        completions.put(name, new Completion(IncompleteEntries.closedThrough(baseName, base)));
+        return built;
+    }
+
+    /**
+     * The constructor that built {@code source}, where it is {@code meta.array}, {@code meta.map} or a constructor IS-A
+     * either, {@code meta.namespace} among them: [TSON-SCHEMA] §5.7 states the collection facets' kinds as the fields'
+     * rules, which composition keeps.
+     */
+    private Optional<String> collectionConstructor(String sourceName, Type source) {
+        String constructorName = AliasChain.terminal(tagOf(sourceName, source), vocabularyDefinitions::definition);
+        if (!(vocabularyDefinitions.definition(constructorName) instanceof RecordBody constructor)) {
+            return Optional.empty();
+        }
+        boolean collection = Stream.concat(Stream.of(constructorName), constructor.supertypes().stream())
+                .anyMatch(COLLECTION_CONSTRUCTORS::contains);
+        return collection ? Optional.of(constructorName) : Optional.empty();
+    }
+
+    /**
+     * {@code !T ^ { … }}, {@code T} a type a collection constructor built ({@link #collectionConstructor}): a
+     * refinement by the same constructor, IS-A {@code T} and its chain, each written facet judged by its kind over
+     * effective values ({@link CollectionFacets}).
+     */
+    private Top refineCollection(String name, String sourceName, Type source, DataValue bindings) {
+        String constructorName = collectionConstructor(sourceName, source).orElseThrow();
+        RecordBody constructor = (RecordBody) vocabularyDefinitions.definition(constructorName);
+        refuseWrittenChain(name, sourceName + " ^", bindings);
+        DataValue payload = rewrite.inPlace(bindings, positions.desugared(bindings));
+        // A pinned field is a facet fixed at construction, which a refinement restates as a value or leaves alone
+        // ([TSON-SCHEMA] §5.7): the constructor's reader compares a written value against the pin.
+        IncompleteEntries.requireDeclared(name, constructorName, constructor, braced(name, sourceName, payload));
+        payload = restatedByEntry(name, sourceName, namedSlots(source), payload, CollectionFacets::replaced);
+        Top body = bindAtomInstance(name, mergeWithSource(name, source, payload, constructorName));
+        List<String> violations = switch (source) {
+            case ArrayBody array -> CollectionFacets.narrowing(array, (ArrayBody) body);
+            case MapBody map -> CollectionFacets.narrowing(map, (MapBody) body);
+            case NamespaceBody namespace -> CollectionFacets.narrowing(namespace, (NamespaceBody) body);
+            // Every type meta.array, meta.map or a constructor composing either builds is one of the three: an
+            // instance of a schema's own constructor of types is refused before it is a type (unmodelledType).
+            default -> throw new IllegalStateException("'" + name + "': refining '" + sourceName + "', built by '"
+                    + constructorName + "', which is no array, map or namespace type");
+        };
+        if (!violations.isEmpty()) {
+            throw new SchemaValidationException("'" + name + "': not a valid refinement of '!" + sourceName
+                    + "' (§5.7): " + String.join("; ", violations));
+        }
+        constructedBy(name, tagOf(sourceName, source));
+        List<String> supertypes = new ArrayList<>(List.of(sourceName));
+        source.supertypes().stream().filter(supertype -> !supertypes.contains(supertype)).forEach(supertypes::add);
+        return ((Type) body).withSupertypes(supertypes);
+    }
+
+    /**
+     * The type slots of a type a collection constructor built that hold a name, by field name, to that name. A slot
+     * holding a type written in place is no name's, so no name restates it.
+     */
+    private static Map<String, String> namedSlots(Type source) {
+        Map<String, io.ltr8.tson.schema.meta.TypeExpr> slots = switch (source) {
+            case ArrayBody array -> Map.of("element_type", array.elementType());
+            case MapBody map -> Map.of("key_type", map.keyType(), "value_type", map.valueType());
+            case NamespaceBody namespace -> Map.of("key_type", namespace.keyType(), "value_type", namespace.valueType());
+            default -> Map.of();
+        };
+        Map<String, String> named = new HashMap<>();
+        slots.forEach((slot, held) -> {
+            if (held instanceof io.ltr8.tson.schema.meta.TypeRef reference) {
+                named.put(slot, reference.name());
+            }
+        });
+        return named;
+    }
+
+    /**
+     * {@code payload} without each field of {@code held} it restates by another name, which is judged once every entry
+     * is ready ({@link #judgeDeferred}) to reach the entry the source's name reaches, and refused with {@code
+     * replaced}'s violation where it does not. A fixed slot is one by the entry its name resolves to and not by
+     * spelling, and the resolved value states it as the source wrote it ([TSON-SCHEMA] §5.2, §5.7): leaving the field
+     * out lets the merge carry the source's spelling. A name at such a slot orders nothing, so waiting on it here
+     * would make the refinement wait on what it only names.
+     *
+     * @param held each fixed slot whose source value is a name, by field name, to that name
+     */
+    private DataValue restatedByEntry(String name, String sourceName, Map<String, String> held, DataValue payload,
+                                      Replaced replaced) {
+        if (!(payload.coreValue() instanceof RecordValue record)) {
+            return payload;
+        }
+        List<RecordValue.Field> kept = new ArrayList<>();
+        for (RecordValue.Field field : record.fields()) {
+            String source = held.get(field.name());
+            if (source != null && field.value().typeRef().isEmpty()
+                    && field.value().coreValue() instanceof TokenValue token && !token.text().equals(source)) {
+                String written = token.text();
+                deferred.add(new Deferred(name, () -> {
+                    String reached = entryReached(written);
+                    if (reached == null || !reached.equals(entryReached(source))) {
+                        throw new SchemaValidationException("'" + name + "': not a valid refinement of '!"
+                                + sourceName + "' (§5.7): " + replaced.violation(field.name(), source, written));
+                    }
+                }));
+            } else {
+                kept.add(field);
+            }
+        }
+        return kept.size() == record.fields().size() ? payload
+                : new DataValue(payload.annotations(), payload.typeRef(), new RecordValue(List.copyOf(kept)));
+    }
+
+    /** A family's violation for a fixed facet written as {@code written} where its source holds {@code source}. */
+    @FunctionalInterface
+    private interface Replaced {
+        String violation(String facet, String source, String written);
+    }
+
+    /** The tag {@code source}'s value carries, and failing a recorded one the constructor its class is the body of. */
+    private String tagOf(String sourceName, Top source) {
+        return factsOf(sourceName).constructor().orElseGet(() -> TsonSchema.constructorOf(source));
+    }
+
+    /** The constructor {@code incomplete} builds, ready since {@code incomplete} was. */
+    private RecordBody constructorOf(String name, IncompleteEntry incomplete) {
+        if (!(vocabularyDefinitions.definition(incomplete.constructor()) instanceof RecordBody constructor)) {
+            throw new IllegalStateException("'" + name + "': an incomplete entry builds '" + incomplete.constructor()
+                    + "', which is no constructor");
+        }
+        return constructor;
+    }
+
+    /** A {@code ^} payload's fields; the grammar writes a braced record there, and nothing else is one. */
+    private static SequencedMap<String, DataValue> braced(String name, String target, DataValue payload) {
+        return IncompleteEntries.braced(payload).orElseThrow(() -> new SchemaValidationException("'" + name
+                + "': '!" + target + " ^' takes a braced record of the constructor's fields (§5.5)"));
+    }
+
+    /**
+     * Each field of {@code written} read against the type {@code constructor} declares it with, where it is written,
+     * and what each read; a field {@code constructor} pins is the pin's value or refused here (§5.2). A field typed
+     * by a type written in place names no type to read against, and is read where the entry is completed.
+     */
+    private Map<String, Object> readEachField(String name, String constructorName, RecordBody constructor,
+                                              SequencedMap<String, DataValue> written) {
+        Map<String, Object> read = new LinkedHashMap<>();
+        written.forEach((field, value) -> {
+            RecordField declared = constructor.fields().get(field);
+            if (!(declared.type() instanceof io.ltr8.tson.schema.meta.TypeRef type)) {
+                return;
+            }
+            Object bound;
+            try {
+                bound = constructionReader.readValue(type.name(), value);
+            } catch (ReadException e) {
+                if (e.diagnostic().code() == Diagnostic.Code.NOT_IMPLEMENTED) {
+                    throw new UnsupportedOperationException("'" + name + "': '" + field + "' cannot yet be read "
+                            + "against '" + type.name() + "' -- " + e.getMessage(), e);
+                }
+                throw payloadFailure("'" + name + "': '" + field + "'", "'" + name + "': '" + field + "' is no "
+                        + "value of '" + type.name() + "', its type in '" + constructorName + "' -- "
+                        + e.getMessage(), e);
+            } catch (BindMismatchException e) {
+                String where = "'" + name + "': " + e.getMessage();
+                throw e instanceof MissingBindingException ? new MissingBindingException(where)
+                        : new BindMismatchException(where);
+            }
+            if (declared.role() == FieldRole.FIXED) {
+                IncompleteEntries.requirePinned(name, constructorName, field, bound,
+                        readPin(name, constructorName, field, type.name(), declared.value().orElseThrow()));
+            }
+            if (bound != null) {
+                read.put(field, bound);
+            }
+        });
+        return read;
+    }
+
+    /** {@code field}'s pin in {@code constructorName}, read as a value written there is ({@link #readEachField}). */
+    private Object readPin(String name, String constructorName, String field, String type, Token pin) {
+        try {
+            return constructionReader.readValue(type, new DataValue(List.of(), Optional.empty(),
+                    new TokenValue(pin.text(), TokenForm.valueOf(pin.form().name()))));
+        } catch (ReadException e) {
+            throw new IllegalStateException("'" + name + "': '" + constructorName + "' pins '" + field + "' to "
+                    + pin.text() + ", judged a value of '" + type + "' when its schema linked, and its reader refuses "
+                    + "it -- " + e.getMessage(), e);
+        }
     }
 
     /**
@@ -1275,7 +1538,7 @@ final class DefinitionResolver {
     }
 
     /**
-     * §5.7's "Body materialisation" rule, applied to atom refinement (§5.6's chained-refinement merge):
+     * §5.8's "Body materialisation" rule, applied to atom refinement (§5.6's chained-refinement merge):
      * {@code newBindings} merged *over* {@code sourceBody}'s own
      * already-bound fields, not replacing them. {@code sourceBody} is re-serialized back to plain
      * record wire form via {@code DataClassObjectWriter.toTson} (writing a {@code Top}-typed value by its
@@ -1331,7 +1594,8 @@ final class DefinitionResolver {
             String sourceText = writer.toTson(sourceBody);
             return new TsonDataParser(sourceText).parseDocument().root().coreValue();
         } catch (WriteException e) {
-            throw new UnsupportedOperationException(
+            // The source was bound by this vocabulary's readers, so the same vocabulary writes it back.
+            throw new IllegalStateException(
                     "'" + name + "': failed to re-serialize the refinement source: " + e.getMessage(), e);
         }
     }
@@ -1343,10 +1607,9 @@ final class DefinitionResolver {
      * <p>An alias is a hop, not a rewrite: resolved output states the chain the author wrote, and a
      * processor collapses it when it needs the type. So {@code alias_array => array} makes
      * {@code !alias_array { ... }} an application of {@code array}, and everything this resolver then asks of
-     * the head -- is it a template, is it applicable, what kind does construction transfer, whose vocabulary
-     * reads the payload -- is a question about the entry at the end. Asking the alias instead answered every
-     * one of them from an empty supertype chain and an {@code ALIAS} kind, which is what a hop looks like
-     * rather than what it points at.
+     * the head -- is it a parametric record, is it applicable, whose vocabulary reads the payload -- is a question about
+     * the entry at the end. Asking the alias instead answers every one of them from an empty supertype chain and
+     * an {@link io.ltr8.tson.schema.meta.Alias} body, which is what a hop looks like rather than what it points at.
      *
      * <p>The author's own spelling survives where it is visible: {@link #resolveInstance} records {@code C} as
      * the value's tag, not the terminal, so the chain stays walkable from resolved output.
@@ -1363,6 +1626,14 @@ final class DefinitionResolver {
             // not this declaration's, but this is where it becomes visible.
             throw new SchemaValidationException("'" + name + "': '!" + target + "' is an alias whose chain "
                     + "ends at '" + terminal + "', which this schema's namespace does not declare (§8.3)");
+        }
+        if (atEnd instanceof Extern extern) {
+            throw Externs.sealed("'" + name + "'", "'!" + target + " { ... }' constructs", target, terminal, extern);
+        }
+        if (!terminal.equals(target) && Externs.HEAD.equals(terminal) && vocabularyKernel.test(terminal)) {
+            throw new SchemaValidationException("'" + name + "': '!" + target + "' reaches '" + terminal
+                    + "' through its alias hops, and an extern is written '!" + Externs.HEAD + "': its head is how "
+                    + "a document's externs are found before any name resolves ([TSON-SCHEMA] §5.13)");
         }
         return new ConstructorHead(terminal, atEnd);
     }
@@ -1395,8 +1666,8 @@ final class DefinitionResolver {
     }
 
     /**
-     * The same, a refusal naming {@code written} -- the constructor the author's spelling applies, where the payload
-     * read is the one it denotes ({@code !record} written, {@code !record_template} read).
+     * The same, a refusal naming {@code written} -- the constructor the author's spelling applies, where it differs
+     * from the head the payload is read against.
      */
     private Top bindAtomInstance(String name, DataValue value, String written) {
         String constructorName = value.typeRef().orElseThrow(() -> new IllegalStateException(
@@ -1425,10 +1696,11 @@ final class DefinitionResolver {
             // A constructor's own record refusing the values it was handed. `decimal_type`'s member set is the
             // case: `members` is typed `set<value>`, so the wire admits anything and the family itself is what
             // says a member must be a number the atom reads. The author's error either way -- the verdict on
-            // `members: ["abc"]` does not change when this library improves -- so it keeps its classification
-            // rather than being relabelled a gap by the catch-all below.
+            // `members: ["abc"]` does not change when this library improves -- so it keeps its classification.
             throw new SchemaValidationException("'" + name + "': " + e.getMessage(), e);
-        } catch (RuntimeException e) {
+        } catch (UnsupportedOperationException e) {
+            // A gap the read reached stays one, named against this declaration; anything else is a fault, and
+            // propagates as one.
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to bind '" + constructorName + "' via the compiled vocabulary reader: "
                             + e.getMessage(), e);
@@ -1513,81 +1785,66 @@ final class DefinitionResolver {
     // ── Top-level constructor application (§5.6) ──────────────────────────
 
     /**
-     * A declaration whose body is an application that {@code SchemaDesugarer} did not rewrite -- in practice
-     * a <em>template</em> application, since every constructor application is turned into an {@code !C value}
-     * instance before resolution.
-     *
-     * <p><b>A closed one is the entry it denotes</b> (§8.2): {@code bx => box<text>}
-     * resolves to the closed record itself, the canonical application among its facts, rather than to a {@code
-     * ALIAS} at a content-derived entry. §8.2 makes a declared entry's identity its
-     * name, and a declaration that <em>constructs</em> a type already keeps it (§5.3's lift leaves {@code
-     * text_list => [text]} as the entry), so one that <em>denotes</em> a type obeys the same rule.
-     *
-     * <p>{@code parameters} is the declaration's own {@code <...>} list, empty for a closed application and
-     * non-empty for §5.10's <b>partial application</b> ({@code uuid_pair => <B> pair<uuid, B>}), where some
-     * of the arguments name parameters this declaration re-declares. That case threads through untouched --
-     * what makes the entry a template is exactly that list, and the open form is the application itself.
+     * A declaration whose body is an application, {@code bx => box<text>} or {@code text_list => meta.array<text>}.
+     * Over a constructor it is the construction it spells ({@link ConstructionRewrite#body}), resolved exactly as
+     * {@code text_list => !meta.array { element_type: text }} is: its value states the constructor and the arguments,
+     * its tag is the head as written, and it records no application, since nothing was substituted. Over a parametric
+     * record it <b>is</b> the entry it denotes (§8.2): the closed record itself, the canonical application among its
+     * facts. §8.2 makes a declared entry's identity its name, and a declaration that <em>constructs</em> a type keeps
+     * it ({@code text_list => [text]} is the entry), so one that <em>denotes</em> a type obeys the same rule.
      */
-    private Top resolveTemplateApplication(String name, ApplicationRef generic, List<String> parameters) {
-        List<TypeArgument> arguments = new ArrayList<>();
-        for (TypeArg arg : generic.args()) {
-            try {
-                arguments.add(typeArgument(arg));
-            } catch (UnsupportedOperationException e) {
-                throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
-            }
+    private Top resolveApplication(String name, ApplicationRef generic) {
+        Optional<DataValue> constructed = rewrite.body(generic);
+        if (constructed.isPresent()) {
+            return resolveInstance(name, new Instance(constructed.get()), true);
         }
-        io.ltr8.tson.schema.meta.TypeRef target =
-                io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), arguments);
-        if (parameters.isEmpty() && applicationCloser != null) {
-            // Closed: this declaration owns the entry. A null answer means it cannot -- an unresolved head,
-            // an arity mismatch, or a partial application -- and the reference form below is the fallback.
+        if (!ConstructionRewrite.namesOnly(generic)) {
+            // Which parametric record is applied, and to how many arguments, is judged before what the arguments are.
+            Top definition = namespaceDefinitions.definition(Ancestry.parametricHead(generic.name(),
+                    namespaceDefinitions));
+            if (!ParametricEntry.isParametric(definition)
+                    || ParametricEntry.parameterNames(definition).size() != generic.args().size()) {
+                throw unclosed(name, generic.name(), generic.args().size());
+            }
+            throw ConstructionRewrite.argumentNotAName(generic);
+        }
+        ApplyBody target = ConstructionRewrite.names(generic);
+        if (applicationCloser != null) {
+            // This declaration owns the entry. A null answer means it cannot -- an unresolved head or an arity
+            // mismatch -- and the reference form below is the fallback, for the ordinary path to report.
             Top owned = applicationCloser.closeApplicationInto(name, target);
             if (owned != null) {
                 return owned;
             }
         }
-        return openAliasOr(target, parameters);
+        throw unclosed(name, generic.name(), generic.args().size());
     }
 
     /**
-     * An alias entry: closed, with an {@code Alias} body naming its target, or -- §5.10's partial
-     * application -- <b>open</b>, with that same {@code !meta.alias { target: ... }} held as its body.
-     *
-     * <p>An open entry's body is held whatever shape it takes, with no exception for the alias form: that is
-     * what lets materialisation dispatch on the constructor head, and what makes "declares parameters" and
-     * "holds its body" one question.
-     *
-     * <p><b>A closed template application never reaches the first branch</b> when an
-     * {@link ApplicationCloser} is present -- it is the entry it denotes (see
-     * {@link #resolveTemplateApplication}) -- so what that branch takes is a bare-name alias
-     * ({@code day => date}), and the second takes partial application.
+     * Why a declaration naming {@code head} applied to {@code supplied} arguments could not be closed into it: its head
+     * names nothing, takes no arguments, or takes another number of them (§5.10). The application has no entry to be
+     * in that case, so the verdict is given here rather than left to a later phase.
      */
-    private static Top openAliasOr(io.ltr8.tson.schema.meta.TypeRef target, List<String> parameters) {
-        return parameters.isEmpty() ? new io.ltr8.tson.schema.meta.Alias(target)
-                : HeldBody.held(parameters, WireForm.heldReference(target));
-    }
-
-    /**
-     * One argument of an application as the {@link TypeArgument} it denotes: a literal keeps its own token
-     * form, and a reference resolves through {@link #resolveTypeRef}, so an argument may itself be an
-     * application ({@code box<box<text>>}). §12.1 defers the reference/literal classification to this layer,
-     * and the grammar has already made it -- a quoted or numeric token parsed as a {@link TypeArg.Value}.
-     */
-    private TypeArgument typeArgument(TypeArg arg) {
-        if (arg instanceof TypeArg.Value value) {
-            return new TypeArgument.Value(new Token(value.value().text(), tokenForm(value.value().form())));
+    private SchemaValidationException unclosed(String name, String head, int supplied) {
+        Top definition = namespaceDefinitions.definition(Ancestry.parametricHead(head, namespaceDefinitions));
+        if (definition == null) {
+            return new SchemaValidationException("'" + name + "' has an unresolved reference '" + head + "'");
         }
-        return new TypeArgument.Ref(resolveTypeRef(((TypeArg.Ref) arg).ref()));
+        Optional<Extern> extern = Externs.terminal(head, namespaceDefinitions::definition);
+        if (extern.isPresent()) {
+            return Externs.sealed("'" + name + "'", "'" + head + "<...>' applies", head,
+                    AliasChain.terminal(head, namespaceDefinitions::definition), extern.get());
+        }
+        List<String> parameters = ParametricEntry.parameterNames(definition);
+        if (parameters.isEmpty()) {
+            return new SchemaValidationException("'" + head + "' declares no type parameters, so '" + head
+                    + "<...>' applies arguments to something that takes none (§5.10); drop the argument list");
+        }
+        return new SchemaValidationException("'" + head + "' takes " + parameters.size() + " type argument"
+                + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but " + supplied
+                + " " + (supplied == 1 ? "was" : "were") + " applied (§5.10)");
     }
 
-    private static Token.Form tokenForm(TokenForm form) {
-        return switch (form) {
-            case UNQUOTED -> Token.Form.UNQUOTED;
-            case SINGLE_LINE_QUOTED -> Token.Form.SINGLE_LINE_QUOTED;
-            case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
-        };
-    }
 
     // ── Composition (§5.8) and subtraction (§5.9) ─────────────────────────
 
@@ -1598,22 +1855,22 @@ final class DefinitionResolver {
      * checked for name overlap across supertypes; the trailing body's own entries are then resolved
      * against {@code inheritedFieldIndex} (name -&gt; position in {@code fields}, populated by the
      * supertype loop above) -- a body field naming an inherited field is a *tightening* entry
-     * (§5.7, via {@link #resolveTighteningField}) and replaces that field in place; a body field
+     * (§5.8, via {@link #resolveTighteningField}) and replaces that field in place; a body field
      * naming nothing inherited is genuinely new and is appended, same as before (§5.8's "new fields
      * are permitted; existing fields may be tightened" and "tightening entries replace inherited
      * fields in place; new fields are appended after all inherited fields"). The chain accumulates by induction: each
      * supertype's own {@code supertypes} is already
      * its full transitive chain (by the same induction, computed when *that* entry was resolved), so
      * {@code direct + parent.supertypes} for every direct supertype, deduplicated, is the complete transitive
-     * chain -- no separate graph walk needed. A template keeps the parents as written as well ({@link Built#finish}),
-     * and closing it completes each application's chain the same way ({@link Ancestry}).
-     * {@code parameters} (a template's own {@code <T, ...>} list, §5.10) threads straight through
+     * chain -- no separate graph walk needed. A parametric record keeps the parents as written as well ({@link
+     * Built#finish}), and closing it completes each application's chain the same way ({@link Ancestry}).
+     * {@code parameters} (a parametric record's own {@code <T, ...>} list, §5.10) threads straight through
      * from the declaration's {@code typeParams} into the result -- {@code array}'s own shape
      * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
      * actually uses each parameter.
      */
     private Built resolveComposition(String name, ConstructionDef construction, List<String> parameters) {
-        List<io.ltr8.tson.schema.meta.TypeRef> directSupertypes = new ArrayList<>();
+        List<io.ltr8.tson.schema.meta.TypeExpr> directSupertypes = new ArrayList<>();
         // [TSON-SCHEMA] §5.2: a record's name type is set where it is declared, the kernel's default included,
         // and a composition takes its supertypes' one type: supertypes that disagree compose names of two types,
         // and choosing either would re-judge the other's names by a type they were never declared under.
@@ -1625,50 +1882,47 @@ final class DefinitionResolver {
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
         Set<String> inheritedFields = new HashSet<>();
+        // Each inherited field whose source the closed chain will not reach, with that source: an applied operand's
+        // fields, and under a removal every operand's (§5.8, §5.9 rule 4). A body entry naming one is judged at link
+        // through Restatements, the chain holding no record that has it.
+        Map<String, io.ltr8.tson.schema.meta.TypeExpr> offTheChain = new LinkedHashMap<>();
+        boolean subtracts = construction.removal().isPresent();
 
         for (TypeExpr supertypeRef : construction.supertypes()) {
             if (supertypeRef instanceof ApplicationRef generic) {
                 // §5.8's "Parameterized references", open end and closed alike: an application at an operand
                 // denotes no entry of its own, whether its arguments are this declaration's parameters or
-                // concrete. A template is a macro here -- it contributes its fields and its own ancestors,
-                // and the type the composition produces is *this* declaration. Minting an entry for the
-                // application instead would give a form nothing else names an entry with one subtype, no
-                // referent and no reader, and put it in this declaration's chain in place of the ancestors that
-                // are really there. An application some *other* position names is minted by
-                // that position (§8.2 keys identity on the application, so both land on one entry); an
-                // operand mints nothing on its own account.
-                OpenOperand operand = openOperand(name, generic, parameters, "supertype");
+                // concrete. A parametric record is a macro here -- it contributes its fields and its own ancestors,
+                // and the type the composition produces is *this* declaration.
+                ParametricOperand operand = parametricOperand(name, generic, parameters, "supertype");
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
                 }
-                // A *family base* -- a record template -- is the one head that is itself a type (§5.10), so a
-                // value can stand at it and be a value of one of its members. Where this declaration takes no
-                // parameters of its own it is closed already, so there is no later materialisation to close the
-                // application kept in the chain and mint the edge the way an open operand's gets one. So the
-                // edge is stated here, and to the base itself rather than to an instantiation nothing mints:
-                // `dog => pet<"dog"> & { … }` IS-A `pet` (§5.8), which puts `dog` in `pet.subtypes` and lets a
-                // `pet` position dispatch.
-                if (parameters.isEmpty()
-                        && OpenEntry.isFamilyBase(namespaceDefinitions.definition(generic.name()))) {
-                    addIfAbsent(transitiveSupertypes, seenTransitive, generic.name());
-                }
-                // The application itself goes into the chain, arguments and all. It names no entry yet, and an
-                // applied parent reaches the entry its arguments name, never its head (§5.8): a template keeps it in
+                // The application itself goes into the chain, arguments and all. It names no entry, and an
+                // applied parent reaches the entry its arguments name, never its head (§5.8, §5.10: no application is
+                // IS-A its head): a parametric record keeps it in
                 // `parents`, substituted when each application closes, and a closed declaration's is folded by
                 // SchemaResolver into the edge to the entry `result<text>` denotes.
                 // A removal revokes IS-A for every parent (§5.9), so nothing is kept.
-                if (construction.removal().isEmpty()) {
-                    // Closed: the arguments go in as §5.10 classifies them, since this channel is validated
-                    // and a value argument left as a reference is looked up as a type. Open: they stay as
-                    // written, the argument being this declaration's own parameter and materialisation being
-                    // what classifies it when an application closes.
-                    directSupertypes.add(io.ltr8.tson.schema.meta.TypeRef.of(generic.name(),
-                            namesOwnParameter(generic, parameters)
-                                    ? typeArguments(name, generic)
-                                    : operand.arguments()));
+                // Closed: the arguments go in as the operand read them, since this channel is validated.
+                // Open: they stay as written, the argument being this declaration's own parameter, substituted
+                // when an application closes.
+                io.ltr8.tson.schema.meta.TypeInline applied = new ApplyBody(
+                        io.ltr8.tson.schema.meta.TypeRef.of(generic.name()), namesOwnParameter(generic, parameters)
+                                ? typeArguments(name, generic)
+                                : operand.arguments()).inPlace();
+                if (!subtracts) {
+                    directSupertypes.add(applied);
+                }
+                operand.fields().keySet().forEach(field -> offTheChain.put(field, applied));
+                if (restatements != null) {
+                    Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings = new LinkedHashMap<>();
+                    operand.bindings().forEach((parameter, argument) -> bindings.put(parameter,
+                            (io.ltr8.tson.schema.meta.TypeRef) asParameters(argument, parameters)));
+                    restatements.absorbs(name, operand.head(), bindings);
                 }
                 absorb(name, operand.fields(), operand.groups(), fields, groups, seenFieldNames, inheritedFields);
-                // An applied operand states its template's name type, which every application keeps (§5.2).
+                // An applied operand states its head's name type, which every application keeps (§5.2).
                 if (nameTypeFrom == null) {
                     nameType = operand.nameType();
                     nameTypeFrom = generic.name();
@@ -1682,8 +1936,8 @@ final class DefinitionResolver {
             }
             if (!(supertypeRef instanceof NameRef simple)) {
                 // A choice or an inline array/tuple at a supertype position. §12.1 lets these through only
-                // because `construction-def` draws its operands from `type-ref` where `refined-def` takes a
-                // name -- nothing here could ever denote a record, so there is no field set to compose with
+                // because `construction-def` draws its operands from `type-ref` -- nothing here could ever
+                // denote a record, so there is no field set to compose with
                 // and no implementation to wait for; §12.1's `supertype-ref` narrows the operands to named
                 // references, so this shape is the grammar's own error to refuse.
                 throw new SchemaValidationException("'" + name + "': a "
@@ -1692,7 +1946,7 @@ final class DefinitionResolver {
                         + (supertypeRef instanceof ChoiceExpr ? "variants" : "elements") + ", not fields (§5.8)");
             }
             String supertypeName = simple.name();
-            refuseParameterOperand(name, supertypeName, parameters, "supertype", "&");
+            refuseParameterOperand(name, supertypeName, parameters, "supertype");
             Top supertypeDef = namespaceDefinitions.definition(supertypeName);
             if (supertypeDef == null) {
                 // Not a library gap: composition copies the supertype's own fields, so the name has to
@@ -1702,22 +1956,26 @@ final class DefinitionResolver {
             }
             // §4.3 judges an operand at the end of its alias chain (§8.3), never at the name written: a
             // reference is the same type under another name (§5.7's table), so an alias of a record has that
-            // record's fields to contribute. The walk stops at an argument-bearing target, which is the entry
-            // that application denotes -- so the test below sees that entry's own body, and an alias is
-            // judged for the terminal's reason rather than by whichever body the written name happened to
-            // have.
+            // record's fields to contribute. The walk stops at an argument-bearing target (AliasChain), and an
+            // alias is judged for the terminal's reason rather than by whichever body the written name happened
+            // to have.
             String supertypeTerminal = AliasChain.terminal(supertypeName,
                     namespaceDefinitions::definition);
             boolean supertypeHops = !supertypeTerminal.equals(supertypeName);
             Top terminalSupertype = supertypeHops
                     ? namespaceDefinitions.definition(supertypeTerminal) : supertypeDef;
             // §4.3's rule is the body test and nothing beside it: an operand MUST be a definition whose body
-            // is a `!meta.record`. A record template's instantiation satisfies that -- `box<text>` closes to a
+            // is a `!meta.record`. A declared application satisfies that -- `text_box => box<text>` closes to a
             // `!meta.record` carrying fields -- so it composes exactly as the hand-written record of the same
             // shape does, and how the author spelled it is no part of the question (§8.2: what is
-            // canonicalised is identity, not provenance). Every other instantiation fails this same test on
-            // its own body: an array, a map or a choice has no fields to contribute (§4.3).
-            refuseUnappliedTemplate(name, supertypeName, terminalSupertype, "supertype", "&");
+            // canonicalised is identity, not provenance). Any other body fails this same test on its own: an
+            // array, a map or a choice has no fields to contribute (§4.3).
+            refuseUnappliedParametricRecord(name, supertypeName, terminalSupertype, "supertype");
+            refuseIncomplete(name, supertypeName, terminalSupertype, "supertype");
+            if (terminalSupertype instanceof Extern extern) {
+                throw Externs.sealed("'" + name + "'", "'&' and '-' compose", supertypeName, supertypeTerminal,
+                        extern);
+            }
             if (!(terminalSupertype instanceof RecordBody supertypeBody)) {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
                         + (supertypeHops ? " resolves through its alias chain to '" + supertypeTerminal
@@ -1738,7 +1996,10 @@ final class DefinitionResolver {
                 addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
             }
 
-            refuseAbsorbedSpelling(name, supertypeName, typesOf(supertypeBody), parameters, List.of());
+            if (subtracts) {
+                supertypeBody.fields().keySet().forEach(field -> offTheChain.put(field,
+                        io.ltr8.tson.schema.meta.TypeRef.of(supertypeName)));
+            }
             absorb(name, closedFields(supertypeBody), supertypeBody.groups(), fields, groups, seenFieldNames,
                     inheritedFields);
             if (nameTypeFrom == null) {
@@ -1757,28 +2018,28 @@ final class DefinitionResolver {
 
         if (construction.body().isPresent()) {
             refuseDeclaredChain(name, construction.body().get().entries(), transitiveSupertypes);
+            Map<String, BuiltField> inherited = new LinkedHashMap<>(fields);
             for (RecordEntry entry : construction.body().get().entries()) {
                 resolveEntry(name, entry, parameters, fields, groups, seenFieldNames, inheritedFields);
             }
+            recordRestatements(name, bodyNames(construction), offTheChain, inherited, fields, parameters);
         }
 
         if (construction.removal().isPresent()) {
             applyRemovals(name, construction.removal().get(), bodyNames(construction), fields, groups);
         }
-        // Two base kinds in one chain describe nothing (§4.1), refused here whether or not a removal empties it.
-        determineKind(name, transitiveSupertypes);
         // §5.9: subtraction breaks IS-A, so a subtracted record's chain is empty -- for EVERY supertype,
         // including one that contributed nothing to the removal: `A & B - { f }` with `f` from A loses IS-A with
         // B as well, though every field B declares survives untouched. The clause is head-level, so its effect
         // must be readable without scanning the parents' field sets. An author wanting partial IS-A subtracts
         // first and composes second. A subtracted record is a record with an empty chain.
         //
-        // A template keeps its parents as written, which closing completes (Ancestry); a closed declaration's
+        // A parametric record keeps its parents as written, which closing completes (Ancestry); a closed declaration's
         // parents hold only its closed applications, for SchemaResolver's fold to turn into edges and drop.
         TypeChain chain = TypeChain.EMPTY;
         if (construction.removal().isEmpty()) {
             chain = TypeChain.of(transitiveSupertypes).withParents(parameters.isEmpty()
-                    ? directSupertypes.stream().filter(parent -> !parent.arguments().isEmpty()).toList()
+                    ? directSupertypes.stream().filter(io.ltr8.tson.schema.meta.TypeInline.class::isInstance).toList()
                     : directSupertypes);
         }
         return new Built(chain, fields, groups,
@@ -1802,6 +2063,46 @@ final class DefinitionResolver {
             }
         }
         return names;
+    }
+
+    /**
+     * Each field the body names that restates one inherited from {@code offTheChain}'s sources, as inherited and as
+     * restated, for the link to judge by §5.8's rule ({@link Restatements}). Inside a parametric record the
+     * parameters stand as such, substituted wherever it is applied.
+     */
+    private void recordRestatements(String name, Set<String> bodyNames,
+                                    Map<String, io.ltr8.tson.schema.meta.TypeExpr> offTheChain,
+                                    Map<String, BuiltField> inherited, SequencedMap<String, BuiltField> fields,
+                                    List<String> parameters) {
+        if (restatements == null) {
+            return;
+        }
+        for (String field : bodyNames) {
+            io.ltr8.tson.schema.meta.TypeExpr source = offTheChain.get(field);
+            if (source != null && inherited.containsKey(field) && fields.containsKey(field)) {
+                restatements.restates(name, new TsonSchema.Restatement(asParameters(source, parameters), field,
+                        asParameters(inherited.get(field).field(), parameters),
+                        asParameters(fields.get(field).field(), parameters)));
+            }
+        }
+    }
+
+    private static RecordField asParameters(RecordField field, List<String> parameters) {
+        return field.withType(asParameters(field.type(), parameters));
+    }
+
+    /**
+     * {@code type} with each name {@code parameters} declares as the {@code ParamRef} it is, as the parametric record
+     * holds it ({@link RecordBody}), so substituting it later finds the parameter.
+     */
+    private static io.ltr8.tson.schema.meta.TypeExpr asParameters(io.ltr8.tson.schema.meta.TypeExpr type,
+                                                                 List<String> parameters) {
+        if (parameters.isEmpty()) {
+            return type;
+        }
+        return io.ltr8.tson.schema.meta.TypeSlots.map(type, reference ->
+                reference instanceof io.ltr8.tson.schema.meta.NameRef named && parameters.contains(named.name())
+                        ? new io.ltr8.tson.schema.meta.ParamRef(named.name(), named.annotations()) : reference);
     }
 
     /**
@@ -1902,188 +2203,6 @@ final class DefinitionResolver {
     }
 
     /**
-     * §4.1: a type's kind is settled by which of the kernel's base kinds -- {@code atom}/{@code product}/
-     * {@code sum}/{@code namespace}, {@code top} never counts -- its transitive supertype chain reaches, each
-     * judged by where it is defined ({@link #kernel}), never by its spelling: a schema's own {@code namespace} is
-     * an ordinary record. The base kinds themselves and not each ancestor's own kind: the {@code atom}
-     * entry is itself a PRODUCT (its own chain is {@code [chained, top, type]}), so "inherit the nearest ancestor's
-     * kind" would give the wrong answer even for {@code atom}'s own subtypes. A chain reaching two of them is
-     * refused, {@code namespace} beside a base kind included.
-     */
-    EntryKind determineKind(String name, List<String> transitiveSupertypes) {
-        List<String> baseKindsFound = new ArrayList<>();
-        for (String supertype : transitiveSupertypes) {
-            if (BASE_KINDS.contains(supertype) && kernel.test(supertype)) {
-                baseKindsFound.add(supertype);
-            }
-        }
-        if (baseKindsFound.size() > 1) {
-            // §4.1's base kinds are disjoint categories, not facets a type can hold several of, so a chain
-            // reaching two of them describes nothing. A verdict, not a gap: no improvement to this library
-            // makes a type both an atom and a product.
-            throw new SchemaValidationException("'" + name + "' reaches " + baseKindsFound.size()
-                    + " base kinds through its supertypes (" + String.join(", ", baseKindsFound) + ") -- §4.1 "
-                    + "gives a type exactly one, so nothing can be both. Compose or refine from sources that "
-                    + "agree on their base kind");
-        }
-        return EntryKind.ofChain(baseKindsFound, kernel);
-    }
-
-    private static final Set<String> BASE_KINDS = Set.of(KernelNames.of("atom"), KernelNames.of("product"),
-            KernelNames.of("sum"), KernelNames.of("namespace"));
-
-    // ── Refinement (§5.7): T ^ { ... } ─────────────────────────────────────
-
-    /**
-     * {@code source ^ { ... }} (optionally {@code ~}-marked and/or parameterized, e.g. {@code
-     * set => <T> ~array<T> ^ { state: = REQUIRED ... }}): copies the *entire* inherited field set
-     * and any groups from the (already-resolved) source's own {@link RecordBody} -- unlike
-     * composition, refinement never adds fields, so every body entry MUST tighten one of them
-     * ({@link #resolveTighteningField}, the same machinery composition-body tightening uses); a
-     * body field naming nothing inherited is a resolver error (§5.7: "adding fields is a resolver
-     * error"), as is a group naming no inherited group. A group that <em>does</em> name one restates it
-     * (§5.11, {@link #restatesInheritedGroup}). The chain accumulates by the same induction composition
-     * uses: {@code [sourceName] + source.supertypes}, deduplicated -- {@code set_type}'s own {@code [array,
-     * product, top, type]}. A template's body keeps the source as its one written parent instead, which closing
-     * completes ({@link Ancestry}). The kind is determined the same way composition determines it (the
-     * transitive chain's literal atom/product/sum name, not the source's own resolved kind).
-     */
-    private Built resolveRefinement(String name, RefinedDef refined, List<String> parameters) {
-        if (refined.target() instanceof ApplicationRef generic && namesOwnParameter(generic, parameters)) {
-            // §5.7 against an open source: the same absorption composition does. The source names no entry
-            // yet, but its own ancestors are types and its whole field set arrives, which is what `^` re-emits
-            // and then tightens; the held body writes the source as its parent, and closing it reaches the
-            // edge to the entry the closed application denotes.
-            OpenOperand operand = openOperand(name, generic, parameters, "refinement source");
-            return refineOnto(name, refined, parameters,
-                    io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), typeArguments(name, generic)),
-                    new ArrayList<>(operand.ancestors()), operand.fields(), operand.groups(), operand.nameType());
-        }
-        if (refined.target() instanceof NameRef simple) {
-            refuseParameterOperand(name, simple.name(), parameters, "refinement source", "^");
-        }
-        io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target(), parameters);
-        String sourceName = sourceRef.name();
-        Top sourceDef = namespaceDefinitions.definition(sourceName);
-        if (sourceDef == null) {
-            // As with a supertype: a refinement reads the source's own field set, so the source must resolve.
-            throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName
-                    + "' names no type this schema declares or imports");
-        }
-        // §5.7 states the walk explicitly -- "the source of `^`, after following its alias chain (§8.3)"
-        // -- and §4.3 states it for both operator families. What is *finished* is a body with no vocabulary
-        // to tighten: a top-level constructor application (§5.6), a choice, or an alias resolving to either.
-        // What the walk adds is the case that is not finished: an alias of a record, which has that record's
-        // vocabulary to tighten -- a record template's instantiation included (§4.3).
-        String sourceTerminal = AliasChain.terminal(sourceName, namespaceDefinitions::definition);
-        boolean sourceHops = !sourceTerminal.equals(sourceName);
-        Top terminalSource = sourceHops
-                ? namespaceDefinitions.definition(sourceTerminal) : sourceDef;
-        // §4.3's test is the body and nothing beside it, and §5.7 states the same of its own source: a
-        // definition whose body is a `!meta.record` has a vocabulary to tighten. A record template's
-        // instantiation has one -- `box<text>` closes to a `!meta.record` carrying fields -- so it refines like
-        // the hand-written record of the same shape, and what polices a value the substitution already fixed
-        // is §5.7's own per-field rule, which refuses re-fixing a FIXED field to a different value
-        // whoever wrote it. Every other instantiation fails on its own body (§4.3).
-        refuseUnappliedTemplate(name, sourceName, terminalSource, "refinement source", "^");
-        if (!(terminalSource instanceof RecordBody sourceBody)) {
-            throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName + "'"
-                    + (sourceHops ? " resolves through its alias chain to '" + sourceTerminal
-                            + "', which" : "")
-                    + " has no vocabulary to tighten -- its body is a binding record, so it is "
-                    + "finished and '^' on it is a resolver error (§4.3, §5.7). Refine the "
-                    + "head it derives from, or, for an atom instance, use atom refinement "
-                    + "('!" + sourceName + " ^ { ... }', §5.5)");
-        }
-
-        List<String> transitiveSupertypes = new ArrayList<>();
-        Set<String> seenTransitive = new HashSet<>();
-        addIfAbsent(transitiveSupertypes, seenTransitive, sourceName);
-        if (sourceHops) {
-            addIfAbsent(transitiveSupertypes, seenTransitive, sourceTerminal);
-        }
-        for (String ancestor : Ancestry.closedNames(sourceBody)) {
-            addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
-        }
-        refuseAbsorbedSpelling(name, sourceName, typesOf(sourceBody), parameters, List.of());
-        return refineOnto(name, refined, parameters, sourceRef, transitiveSupertypes, closedFields(sourceBody),
-                sourceBody.groups(), sourceBody.nameType());
-    }
-
-    /**
-     * §5.7's tightening, over a field set already obtained. The two callers differ only in where that field
-     * set came from and in what the source can be named: a closed source is an entry, so it heads the chain; an
-     * open one names no entry, so only its own ancestors reach the chain until a template closing it reaches the
-     * rest. Everything after that -- restating groups, tightening fields, the presence check, the kind -- is
-     * one rule and lives here once. {@code source} is the parent as written, what a template's held body keeps.
-     */
-    private Built refineOnto(String name, RefinedDef refined,
-            List<String> parameters, io.ltr8.tson.schema.meta.TypeRef source, List<String> transitiveSupertypes,
-            SequencedMap<String, BuiltField> sourceFields, List<FieldGroup> sourceGroups,
-            Optional<String> nameType) {
-        SequencedMap<String, BuiltField> fields = new LinkedHashMap<>(sourceFields);
-        List<FieldGroup> groups = new ArrayList<>(sourceGroups);
-        Set<String> inheritedFields = Set.copyOf(sourceFields.keySet());
-        refuseDeclaredChain(name, refined.body().entries(), transitiveSupertypes);
-
-        for (RecordEntry entry : refined.body().entries()) {
-            if (entry instanceof GroupDef groupDef) {
-                if (!restatesInheritedGroup(name, groupDef, parameters, fields, groups, inheritedFields)) {
-                    throw new SchemaValidationException("'" + name + "': the group ("
-                            + groupDef.fieldGroup().describe() + ") names no inherited group -- a "
-                            + "refinement copies its source's whole field set and admits no new fields or "
-                            + "groups; composition (`&`) is what adds one (§5.7, §5.11)");
-                }
-                continue;
-            }
-            FieldDef fieldDef = (FieldDef) entry;
-            BuiltField inherited = fields.get(fieldDef.name());
-            if (inherited == null) {
-                throw new SchemaValidationException("'" + name + "': refinement body field '" + fieldDef.name()
-                        + "' names no inherited field -- a refinement copies its source's whole field set and "
-                        + "admits no new fields; composition (`&`) is what adds one (§5.7)");
-            }
-            fields.put(fieldDef.name(), resolveTighteningField(name, fieldDef, inherited, parameters, groups));
-        }
-
-        determineKind(name, transitiveSupertypes);
-        // §5.7's one written parent: a template keeps it in its chain, and a closed refinement records it as a
-        // fact, since its chain cannot tell `^` from a composition adding nothing (TsonSchema.EntryFacts).
-        TypeChain chain = TypeChain.of(transitiveSupertypes);
-        if (parameters.isEmpty()) {
-            facts.put(name, factsOf(name).withRefines(Optional.of(source.name())));
-        } else {
-            chain = chain.withParents(List.of(source));
-        }
-        return new Built(chain, fields, groups, markedNames(refined.body().entries()), nameType);
-    }
-
-    /**
-     * A refinement's source ({@code target}) is always a {@link NameRef} or an {@link
-     * ApplicationRef} by grammar (see {@code RefinedDef}'s own Javadoc) -- a bare name resolves to a
-     * reference without arguments; a generic application (e.g. {@code box<T>}, {@code T} shadowing the
-     * refining declaration's own parameter) resolves each argument the way every other application does
-     * ({@link #typeArgument}).
-     */
-    private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeExpr target,
-            List<String> typeParams) {
-        if (target instanceof NameRef simple) {
-            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-        }
-        if (target instanceof ApplicationRef generic) {
-            // Closed, not carried, for the reason composition closes its supertypes: §5.7 re-emits the
-            // source's whole field set, and this phase needs that field set to flatten. Carrying the
-            // application instead copied the template's body with its parameters unbound, and the author was
-            // told about an unresolved reference to a parameter they never wrote.
-            return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, typeParams, "refinement source"));
-        }
-        // Not a gap and not the author's error: the two shapes above are the two §12.1's `atom-refinement`
-        // can produce, so a third means this resolver was handed a tree the grammar cannot build.
-        throw new IllegalStateException(
-                "'" + name + "': a refinement source is always a simple or generic type-ref by grammar, got " + target);
-    }
-
-    /**
      * One source's fields and groups copied into the record being built. Shared by the two composition paths
      * -- a closed supertype's own {@code RecordBody} and an open operand's substituted one -- so an operand
      * that contributes no name still contributes its fields on exactly the terms one that does would.
@@ -2100,68 +2219,7 @@ final class DefinitionResolver {
         groups.addAll(sourceGroups);
     }
 
-    /**
-     * Refuses a record template's parameter spelled like a name or an unquoted token an absorbed field's type writes
-     * among an application's arguments ([TSON-SCHEMA] §5.10), {@code excluded} -- an open operand's own parameters,
-     * which this declaration's arguments replace -- aside. Inside a template a parameter's name is read before the
-     * schema's, and §5.10's shadowing rule classifies what the template writes, never what it absorbs; so a field
-     * absorbed with {@code two<V, T>}, its {@code T} an enum member, would become an application of this template's
-     * {@code T}, a different type in every application and none of them the source's. A literal {@code value} needs
-     * no rule: the {@code value}/{@code value_param} labels already tell it from a parameter. A name spelled like a
-     * schema entry is refused at the parameter list itself, the shadowing rule's other half.
-     *
-     * <p><b>It judges what the source holds when it is absorbed.</b> A closed source of this schema has not been
-     * materialised yet, so its fields still write their applications; an imported one has, so each closed application
-     * is the bare name of the entry it denotes, with no argument a parameter could be read in, and nothing is refused
-     * -- nor needs to be.
-     */
-    private static void refuseAbsorbedSpelling(String name, String source,
-            Map<String, io.ltr8.tson.schema.meta.TypeRef> types, List<String> parameters, List<String> excluded) {
-        if (parameters.isEmpty()) {
-            return;
-        }
-        types.forEach((field, type) -> type.arguments().forEach(argument ->
-                spelledIn(argument, parameters, excluded).ifPresent(parameter -> {
-                    throw new SchemaValidationException("'" + name + "': parameter '" + parameter + "' is spelled "
-                            + "like '" + parameter + "' in the field '" + field + ": " + ParameterTypes.spell(type)
-                            + "' it absorbs from '" + source + "', where it is no parameter of '" + name + "' -- "
-                            + "inside a template a parameter's name is read before the schema's, so the absorbed type "
-                            + "would change its meaning (§5.10). Rename the parameter");
-                })));
-    }
-
-    /** The first of {@code parameters} an argument writes, as a name or an unquoted token, at any depth. */
-    private static Optional<String> spelledIn(TypeArgument argument, List<String> parameters, List<String> excluded) {
-        return switch (argument) {
-            case TypeArgument.Ref ref -> {
-                String head = ref.ref().name();
-                if (parameters.contains(head) && !excluded.contains(head)) {
-                    yield Optional.of(head);
-                }
-                yield ref.ref().arguments().stream().map(nested -> spelledIn(nested, parameters, excluded))
-                        .flatMap(Optional::stream).findFirst();
-            }
-            case TypeArgument.Value value -> Optional.of(value.value()).filter(token -> token.form()
-                    == Token.Form.UNQUOTED && parameters.contains(token.text()) && !excluded.contains(token.text()))
-                    .map(Token::text);
-        };
-    }
-
-    /**
-     * A closed record's field type references, by field name. A sibling reference names a field of the record, never
-     * a parameter, so it writes nothing {@link #refuseAbsorbedSpelling} judges.
-     */
-    private static Map<String, io.ltr8.tson.schema.meta.TypeRef> typesOf(RecordBody record) {
-        Map<String, io.ltr8.tson.schema.meta.TypeRef> types = new LinkedHashMap<>();
-        record.fields().forEach((field, declared) -> {
-            if (declared.type() instanceof io.ltr8.tson.schema.meta.TypeRef type) {
-                types.put(field, type);
-            }
-        });
-        return types;
-    }
-
-    /** A closed source's fields as the fields resolution builds with: as they are, labelling nothing. */
+    /** A closed source's fields as the fields resolution builds with: as they are. */
     private static SequencedMap<String, BuiltField> closedFields(RecordBody source) {
         SequencedMap<String, BuiltField> fields = new LinkedHashMap<>();
         source.fields().forEach((name, field) -> fields.put(name, BuiltField.of(field)));
@@ -2169,61 +2227,68 @@ final class DefinitionResolver {
     }
 
     /**
-     * A template named at an operand with no arguments: {@code &} and {@code ^} read the operand's fields, and a
-     * template's are its applications', each with its parameters bound (§5.8, §5.10). A record template is a type a
-     * position may name, but an operand is no position -- it is flattened into this declaration.
+     * A parametric record named at an operand with no arguments: {@code &} reads the operand's fields, and a parametric
+     * record's are its applications', each with its parameters bound (§5.8, §5.10). No position names a parametric
+     * record bare, an operand included.
      */
-    private static void refuseUnappliedTemplate(String name, String operand, Top definition, String position,
-                                                String operator) {
-        if (OpenEntry.isOpen(definition)) {
-            throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' is a template "
-                    + "and is applied to no arguments -- '" + operator + "' takes the fields of a record, and a "
-                    + "template has fields once its parameters are bound. Write '" + operand + "<...>' (§5.8, "
-                    + "§5.10)");
+    private static void refuseUnappliedParametricRecord(String name, String operand, Top definition, String position) {
+        if (ParametricEntry.isParametric(definition)) {
+            throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' is a parametric "
+                    + "record and is applied to no arguments -- '&' takes the fields of a record, and no position "
+                    + "names a parametric record bare: it has fields once its parameters are bound. Write '" + operand
+                    + "<...>' with its arguments, or name the record its applications compose (§5.8, §5.10)");
+        }
+    }
+
+    /** Refuses an operand that names an incomplete entry, which is no type and has no fields to contribute. */
+    private static void refuseIncomplete(String name, String operand, Top definition, String position) {
+        if (definition instanceof IncompleteEntry incomplete) {
+            throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' names "
+                    + IncompleteEntries.noType(operand, incomplete));
         }
     }
 
     /**
-     * A parameter is never an operand of {@code &} or {@code ^} ([TSON-SCHEMA] §5.10): both read the operand's
-     * field set to flatten, and a parameter has none until the template is applied, so {@code <T> T & { … }} and
-     * {@code <T> T ^ { … }} have no body to hold. An operand applied <em>to</em> a parameter, {@code result<T>},
+     * A parameter is never an operand of {@code &} ([TSON-SCHEMA] §5.10): it reads the operand's field set to
+     * flatten, and a parameter has none until the parametric record is applied, so {@code <T> T & { … }} has no body to
+     * hold. An operand applied <em>to</em> a parameter, {@code result<T>},
      * is a different thing and is admitted. Checked before the name is looked up, as §5.10's shadowing rule
      * reads it: a parameter hides a schema entry of the same name.
      */
-    private static void refuseParameterOperand(String name, String operand, List<String> parameters, String position,
-                                               String operator) {
+    private static void refuseParameterOperand(String name, String operand, List<String> parameters, String position) {
         if (parameters.contains(operand)) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + operand + "' is a parameter of"
-                    + " this declaration, and a parameter is never an operand of '" + operator + "' -- its fields are"
-                    + " unknown until the template is applied, so there is nothing to flatten (§5.10)");
+                    + " this declaration, and a parameter is never an operand of '&' -- its fields are"
+                    + " unknown until the parametric record is applied, so there is nothing to flatten (§5.10)");
         }
     }
 
     /**
      * Whether an application is applied to a parameter of the declaration that writes it, and so still open.
-     * <b>Through nesting</b>: {@code box<inner<T>>} is as open as {@code box<T>} is, and reading only the top
-     * level sent it down the closing path, where materialisation reported the author's own parameter as an
-     * unresolved reference -- a wrong verdict on a schema that is not wrong.
+     * <b>Through nesting</b>: {@code box<inner<T>>} is as open as {@code box<T>} is, and read only at the top level
+     * it would be taken as closed, the author's own parameter then reported as an unresolved reference -- a wrong
+     * verdict on a schema that is not wrong.
      */
     private static boolean namesOwnParameter(ApplicationRef application, List<String> typeParams) {
-        return application.args().stream().anyMatch(arg -> arg instanceof TypeArg.Ref(TypeExpr ref)
-                && (ref instanceof NameRef simple && typeParams.contains(simple.name())
-                        || ref instanceof ApplicationRef nested && namesOwnParameter(nested, typeParams)));
+        return application.args().stream().anyMatch(ref -> ref instanceof NameRef simple
+                && typeParams.contains(simple.name())
+                || ref instanceof ApplicationRef nested && namesOwnParameter(nested, typeParams));
     }
 
     /**
      * What an applied operand contributes to the declaration absorbing it: a field set, its groups and name type,
-     * and the operand's own supertypes. Not an edge to the operand's head -- an applied parent reaches the entry its
-     * arguments name, never its head (§5.8), except the one edge a closed declaration states to a family base
-     * itself. Its <em>ancestors</em> are types, and the fields arriving here came with them, so a declaration
-     * composing {@code box&lt;T&gt;} stands where {@code box}'s own {@code base} is expected.
+     * and the operand's own supertypes. Never an edge to the operand's head -- no application is IS-A its head (§5.10), and
+     * an applied parent reaches the entry its arguments name (§5.8). Its <em>ancestors</em> are types, and the fields
+     * arriving here came with them, so a declaration composing {@code box&lt;T&gt;} stands where {@code box}'s own
+     * {@code base} is expected: {@code dog => pet_of<dog_type> & { … }} over {@code pet_of => <T> pet & { … }} IS-A
+     * {@code pet}.
      *
-     * <p><b>Absorbing needs no closure, which is the whole of why this works.</b> The operand is a record template,
-     * so its field set is known while the application is open: substituting its parameters with the arguments
-     * <em>as written</em> on the model ({@link RecordTemplateSubstitution}) is the substitution closing performs,
-     * and an argument that is one of the absorbing declaration's own parameters lands as that declaration's label
-     * again -- {@code type_param} or {@code value_param} -- so the result is the absorbing template's fields as they
-     * are, and a closed declaration's as closed fields.
+     * <p><b>Absorbing needs no closure, which is the whole of why this works.</b> The operand is a parametric record, so its
+     * field set is known while the application is open: substituting its parameters with the arguments <em>as
+     * written</em> on the model ({@link Substitution}) is the substitution closing performs, and an argument that is one
+     * of the absorbing declaration's own parameters lands as that declaration's name for it, which its own record holds
+     * as its parameter in turn -- so the result is the absorbing parametric record's fields as they are, and a closed
+     * declaration's as closed fields.
      *
      * <p><b>Inner applications are deliberately left unclosed.</b> {@code closeApplications} is
      * materialisation's step, not this one: an operand body holding {@code inner&lt;T&gt;} cannot close while
@@ -2231,120 +2296,89 @@ final class DefinitionResolver {
      * moment every other application in the absorbing declaration's body does. Both are the absorbing
      * declaration's own materialisation, one pass later.
      *
-     * <p><b>The IS-A edge to the operand itself is minted one pass later, not here.</b> This declaration
-     * cannot state it -- there is no instantiation of {@code box} yet to be IS-A -- so what it does instead
-     * is keep the application in the template's {@code parents}, substituted when each application closes, and
-     * {@code SchemaResolver} folds the closed application into the edge to the entry it denotes.
+     * <p><b>The IS-A edge to the operand's application is derived one pass later, not here.</b> This declaration
+     * cannot state it -- the entry a closed application denotes is whichever declaration names it, known only once
+     * every declaration has resolved -- so what it does instead is keep the application in the parametric record's {@code
+     * parents}, substituted when each application closes, and {@code SchemaResolver} folds the closed application
+     * into the edge to the declaration naming it, where one does.
      * That is why the parent is carried as a reference and not as the head name §5.8 describes: an edge to
      * {@code box} would hold of {@code box&lt;int32&gt;} as much as of {@code box&lt;text&gt;}, and only one
      * of those admits a {@code vip&lt;text&gt;}.
      */
-    private OpenOperand openOperand(String name, ApplicationRef application, List<String> typeParams, String position) {
+    private ParametricOperand parametricOperand(String name, ApplicationRef application, List<String> typeParams,
+            String position) {
         String head = application.name();
-        Top template = namespaceDefinitions.definition(head);
-        if (template == null) {
+        // An alias of a parametric record is the parametric record under another name (§8.3), and is applied as it is.
+        String parametricHead = Ancestry.parametricHead(head, namespaceDefinitions);
+        Top definition = namespaceDefinitions.definition(parametricHead);
+        if (definition == null) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' names no type this schema declares or imports");
         }
-        if (!OpenEntry.isOpen(template)) {
+        String terminal = AliasChain.terminal(head, namespaceDefinitions::definition);
+        if (ConstructionSugar.constructs(terminal, namespaceDefinitions.definition(terminal))
+                || namespaceDefinitions.definition(terminal) instanceof IncompleteEntry) {
+            // A constructor applied is a construction (§5.3), a binding record with elements or slots, not fields:
+            // the same verdict its closed spelling gets once it closes.
+            throw new SchemaValidationException("'" + name + "': " + position + " '" + head
+                    + "<...>' has no fields to contribute -- it constructs a '!" + head + "', a binding record, not a "
+                    + "vocabulary, so there is nothing to compose with (§5.8)");
+        }
+        if (!ParametricEntry.isParametric(definition)) {
             // Applied to this declaration's own parameter, so the author wrote arguments; the head takes none.
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' declares no type parameters, so it cannot be applied to '"
                     + String.join(", ", typeParams) + "' (§5.10)");
         }
-        List<String> templateParameters = OpenEntry.parameterNames(template);
-        if (templateParameters.size() != application.args().size()) {
+        List<String> headParameters = ParametricEntry.parameterNames(definition);
+        if (headParameters.size() != application.args().size()) {
             throw new SchemaValidationException("'" + name + "': " + position + " '" + head + "' declares "
-                    + templateParameters.size() + " type parameter(s) and is applied to "
+                    + headParameters.size() + " type parameter(s) and is applied to "
                     + application.args().size() + " (§5.10)");
         }
-        List<TypeArgument> arguments = new ArrayList<>();
-        for (TypeArg arg : application.args()) {
-            // An argument that is itself an application needs no special case: substitution writes a bound
-            // reference as a reference value when it carries arguments, so `box<inner<T>>` keeps `inner<T>`
-            // whole and the absorbing declaration's own materialisation closes it.
-            arguments.add(typeArgument(arg));
+        // An argument that is itself an application needs no special case: substitution writes a bound reference
+        // as a reference value when it carries arguments, so `box<inner<T>>` keeps `inner<T>` whole and the
+        // absorbing declaration's own materialisation closes it.
+        List<io.ltr8.tson.schema.meta.TypeRef> arguments = typeArguments(name, application);
+        // §5.10's bound check, which an operand absorbed by value would otherwise never get.
+        if (applicationCloser != null) {
+            applicationCloser.checkArguments(parametricHead, definition, arguments);
         }
-        // §5.10's argument kinds, which an operand absorbed by value would otherwise never get: §12.1 reads
-        // an argument's channel off the token that spells it, so an unquoted `red` is a reference until the
-        // parameter's kind says otherwise. A resolver built without a materialiser keeps §12.1's reading --
-        // the open case never needed the inference, its arguments being parameters.
-        List<TypeArgument> classified = applicationCloser == null ? arguments
-                : applicationCloser.byParameterKind(head, template, templateParameters, arguments);
-        Map<String, TypeArgument> bindings = new LinkedHashMap<>();
-        for (int i = 0; i < templateParameters.size(); i++) {
-            bindings.put(templateParameters.get(i), classified.get(i));
+        Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings = new LinkedHashMap<>();
+        for (int i = 0; i < headParameters.size(); i++) {
+            bindings.put(headParameters.get(i), arguments.get(i));
         }
-        if (!(template instanceof RecordTemplateBody record)) {
-            // A held template rather than a record template -- `<T> [T]` has elements, not fields, so there
-            // is nothing for `&` or `^` to take. The same verdict its closed spelling gets, one phase earlier.
-            throw new SchemaValidationException("'" + name + "': " + position + " '" + head
-                    + "<...>' has no fields to contribute -- it is a binding record, not a vocabulary, so "
-                    + "there is nothing to compose with (§5.8, and §5.7's vocabulary-body rule read across)");
-        }
-        // The operand's own parameters are replaced by what this declaration writes; every other name stays.
-        Map<String, io.ltr8.tson.schema.meta.TypeRef> written = new LinkedHashMap<>();
-        record.fields().forEach((field, open) -> open.type().ifPresent(type -> {
-            if (type instanceof io.ltr8.tson.schema.meta.TypeRef reference) {
-                written.put(field, reference);
-            }
-        }));
-        refuseAbsorbedSpelling(name, head, written, typeParams, templateParameters);
-        // A closed declaration takes the member's fields, an open one its own template's, each applied argument
-        // that is one of its parameters landing as its label.
+        RecordBody record = (RecordBody) definition;
+        // The operand's own parameters are replaced by what this declaration writes, which may be its own parameters;
+        // every other name stays.
         SequencedMap<String, BuiltField> fields = new LinkedHashMap<>();
-        if (typeParams.isEmpty()) {
-            RecordTemplateSubstitution.closed(head, record, bindings)
-                    .forEach((field, closed) -> fields.put(field, BuiltField.of(closed)));
-        } else {
-            RecordTemplateSubstitution.fields(head, record, bindings, typeParams)
-                    .forEach((field, open) -> fields.put(field, BuiltField.of(open)));
-        }
-        return new OpenOperand(Ancestry.ofTemplate(head, namespaceDefinitions), fields, record.groups(),
-                record.nameType(), classified);
+        Substitution.fields(record, bindings).forEach((field, substituted) -> fields.put(field,
+                BuiltField.of(substituted)));
+        return new ParametricOperand(Ancestry.ofApplication(parametricHead, namespaceDefinitions), fields, record.groups(),
+                record.nameType(), arguments, parametricHead, bindings);
     }
 
     /**
      * What an operand hands its absorber: the ancestors it can still be indexed under, its fields, and its
-     * arguments as §5.10 classifies them.
-     *
-     * <p>The arguments matter to the caller because a closed operand is <b>kept</b> in the chain as written
-     * until {@code SchemaResolver} folds it, and the linker validates that channel: an argument left on
-     * §12.1's token-shape reading sends it looking for a type called {@code red}.
+     * arguments, which a closed operand keeps in the chain as written until {@code SchemaResolver} folds it; and the
+     * parametric record it applies with the binding of each of its parameters, under which its own restatements are
+     * the absorber's ({@link Restatements}).
      */
-    private record OpenOperand(List<String> ancestors, SequencedMap<String, BuiltField> fields,
-                               List<FieldGroup> groups, Optional<String> nameType, List<TypeArgument> arguments) {
+    private record ParametricOperand(List<String> ancestors, SequencedMap<String, BuiltField> fields,
+                               List<FieldGroup> groups, Optional<String> nameType,
+                               List<io.ltr8.tson.schema.meta.TypeRef> arguments, String head,
+                               Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings) {
     }
 
     /**
-     * A fully-bound application at one of the two field-absorbing positions, closed to the entry it denotes.
-     * Closing is what gives it both a name to index under and a field set to absorb.
-     *
-     * <p>Only reached once {@link #namesOwnParameter} has said the application is closed: one still open
-     * denotes no entry and goes to {@link #openOperand} instead, which absorbs its fields without closing
-     * anything.
+     * The arguments of an application of a parametric record, each a name or a parameter ([TSON-SCHEMA] §5.3): an
+     * application or a sugar form there is refused, to be declared under a name first.
      */
-    private String closedApplication(String name, ApplicationRef application, List<String> typeParams, String position) {
-        if (applicationCloser == null) {
-            throw new UnsupportedOperationException("'" + name + "': closing the " + position + " '"
-                    + application.name() + "<...>' needs a whole-schema materialiser, and this resolver was "
-                    + "built without one");
+    private List<io.ltr8.tson.schema.meta.TypeRef> typeArguments(String name, ApplicationRef application) {
+        if (!ConstructionRewrite.namesOnly(application)) {
+            throw ConstructionRewrite.argumentNotAName(application);
         }
-        io.ltr8.tson.schema.meta.TypeRef resolved;
-        try {
-            resolved = io.ltr8.tson.schema.meta.TypeRef.of(application.name(), typeArguments(name, application));
-        } catch (UnsupportedOperationException e) {
-            throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
-        }
-        return applicationCloser.closeApplication(resolved);
-    }
-
-    private List<TypeArgument> typeArguments(String name, ApplicationRef application) {
-        List<TypeArgument> args = new ArrayList<>();
-        for (TypeArg arg : application.args()) {
-            args.add(typeArgument(arg));
-        }
-        return args;
+        return ConstructionRewrite.names(application).arguments();
     }
 
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────
@@ -2396,7 +2430,7 @@ final class DefinitionResolver {
      * {@code declarationName} is only used to word error messages -- {@code null} for a fresh
      * record, where {@code inheritedFields} is always empty (no supertype means no field could
      * ever be inherited, so every entry is either genuinely new or a duplicate declaration). A {@link
-     * FieldDef} whose name is in {@code inheritedFields} is a *tightening* entry (§5.7): it's resolved
+     * FieldDef} whose name is in {@code inheritedFields} is a *tightening* entry (§5.8): it's resolved
      * against, and replaces in place, the already-inherited field of that name, rather than being appended.
      */
     private void resolveEntry(String declarationName, RecordEntry entry, List<String> parameters,
@@ -2429,15 +2463,14 @@ final class DefinitionResolver {
     }
 
     /**
-     * §5.7's refinement/tightening rules, applied to one composition-body field that names an
+     * §5.8's rules for a restated field, applied to one composition-body field that names an
      * already-inherited field: resolved the same way as any field ({@link #resolveField}), except
      * an elided type-ref (a modifier-only entry, {@code field: = value}) inherits {@code
      * inherited.type()} and its voidability rather than failing, and the result MUST refine the inherited
      * field ({@link #refines}) -- e.g. {@code array}'s own {@code access_pattern?: meta.product_access_type =
      * INDEX} pins {@code product}'s required field, which refines it. Whether a restated type narrows the inherited
      * one is an IS-A question over names not yet ready here, so the link asks it ({@code
-     * TsonSchemaLinker.checkRestatedFieldTypes}). The identity-diagonal rule (a FIXED
-     * restatement MUST NOT change the pinned value) is not checked here: the two values are never compared.
+     * TsonSchemaLinker.checkRestatedFieldTypes}), and with it whether a pin changed, a value read at a type.
      *
      * <p><b>A restated group member stays a member</b> (§5.11). Its presence is the group's, so the name takes
      * no {@code ?} and the member stays optional whatever the restatement writes; a default is refused, being
@@ -2461,12 +2494,11 @@ final class DefinitionResolver {
             tightened = tightened.withFacts(true, tightened.voidable(), tightened.role());
         }
         if (!refines(inherited, tightened)) {
-            // §5.7's table is a rule about schemas, not a coverage boundary: "refinement can only restrict,
-            // never expand -- FIXED states are terminal, and loosening a required field to optional is a
-            // resolver error".
+            // §5.8's orders are a rule about schemas, not a coverage boundary: a restatement refines its
+            // source exactly when no question moves backwards.
             throw new SchemaValidationException("'" + declarationName + "': tightening '" + fieldDef.name()
                     + "' from " + inherited.describe() + " to " + tightened.describe() + " is not a permitted "
-                    + "state transition -- a refinement can only restrict, never expand (§5.7)");
+                    + "state transition -- a refinement can only restrict, never expand (§5.8)");
         }
         return tightened;
     }
@@ -2503,13 +2535,9 @@ final class DefinitionResolver {
     }
 
     /**
-     * §5.7's refinement of one field, as three orders -- one per question a field answers, each running from
-     * least to most determined -- and a restatement refines its source exactly when no question moves
-     * backwards. What omission yields runs absent → missing-field error → injected; whether {@code _} is
-     * admitted runs voidable → not; the value's role runs FREE → DEFAULT → FIXED.
-     *
-     * <p>That reproduces §5.7's transition table cell for cell: a plain required field may take a default or
-     * a pin, an optional one may become anything, a default may be pinned, and a pin is terminal.
+     * §5.8's three orders for a restated field, one per question a field answers: what omission yields runs
+     * absent → missing-field error → injected; whether {@code _} is admitted runs voidable → not; the value's
+     * role runs FREE → DEFAULT → FIXED.
      */
     private static boolean refines(BuiltField from, BuiltField to) {
         return omission(to) >= omission(from) && (from.voidable() || !to.voidable())
@@ -2567,29 +2595,24 @@ final class DefinitionResolver {
     }
 
     /**
-     * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2, §5.10) is the field's {@code
-     * value} where it is a literal and its {@code value_param} where it is one of this declaration's own
-     * {@code parameters} -- told apart once, here, by §5.10's shadowing rule over the source spelling: an
-     * unquoted token is a parameter exactly when its text names one ({@link BuiltField#written}). A bare parameter
-     * name in the type slot is likewise the field's {@code type_param}.
-     *
-     * <p><b>The role is the modifier's, whatever stands in {@code value}.</b> {@code =} gives FIXED and
-     * {@code ~} DEFAULT, a parameter as a literal does ([TSON-SCHEMA] §5.7): the parameter is the value an
-     * application will supply, and closing substitutes it without changing a fact. Whether omission reaches the
-     * value is the name's {@code ?}, which {@link FieldModifiers} reads beside it.
+     * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2) is the field's {@code value}, a
+     * literal. A field's value is never a parameter ([TSON-SCHEMA] §5.10): an unquoted token naming one of this
+     * declaration's own {@code parameters} -- §5.10's shadowing rule over the source spelling -- is refused here,
+     * naming the slot ({@link ParameterTypes#atValue}). A parameter name in the type slot is the field's type, which
+     * the parametric record holds as its parameter.
      *
      * <p>{@code inherited}, supplied only from {@link #resolveTighteningField}, is the field this entry
      * tightens. Two things are read off it: its <b>type</b>, when {@code field.type()} is elided ({@code
-     * field: = value}, a modifier-only entry, §5.7's "Elided type-refs"), and with the type its
+     * field: = value}, a modifier-only entry, §5.8's "Elided type expressions"), and with the type its
      * <b>voidability</b>, the type's {@code ?} living in the slot the entry elides. The name's {@code ?} is
      * always the entry's own and is never inherited. A fresh (non-tightening)
      * field always passes {@code Optional.empty()}, and an elided type with nothing to inherit from is the
-     * <b>author's</b> error, not a gap -- §5.7 requires the resolver to reject a modifier-only entry both in a
+     * <b>author's</b> error, not a gap -- §5.8 requires the resolver to reject a modifier-only entry both in a
      * fresh record (no source to elide toward) and in a composition body naming no inherited field, so it
      * raises {@link io.ltr8.tson.base.SchemaValidationException}.
      *
      * <p><b>A restatement's annotations merge over the inherited ones</b> ({@link #merged}), rather than
-     * replacing them: a tightening entry states what it tightens, and §5.7's modifier-only spelling ({@code
+     * replacing them: a tightening entry states what it tightens, and §5.8's modifier-only spelling ({@code
      * extra: ?}) has no annotation position at all, so an entry that mentions nothing must not be able to
      * erase what it does not mention.
      */
@@ -2644,15 +2667,15 @@ final class DefinitionResolver {
     private BuiltField resolveFieldEntry(FieldDef field, Optional<BuiltField> inherited,
                                                   List<String> parameters) {
         if (field.type().isEmpty() && inherited.isEmpty()) {
-            // §5.7: "a modifier-only entry is always a tightening -- it names no type, so it cannot declare a
+            // §5.8: "a modifier-only entry is always a tightening -- it names no type, so it cannot declare a
             // new field". Reaching here means there was nothing to elide toward: either a fresh record body
-            // ("every field MUST have an explicit type-ref, and the resolver MUST reject modifier-only entries
+            // ("every field MUST have an explicit type expression, and the resolver MUST reject modifier-only entries
             // there") or a composition body entry naming no inherited field. Both are the author's error, not
-            // a gap in this resolver -- the two positions where elision *is* legal resolve above.
+            // a gap in this resolver -- a tightening entry, where elision *is* legal, has an inherited field.
             throw new SchemaValidationException("field '" + field.name() + "' states only a modifier and no "
                     + "type-ref, but names no inherited field to take a type from -- a modifier-only entry is "
-                    + "always a tightening, so it is only meaningful in a refinement or composition body, "
-                    + "against a field the source declares (§5.7)");
+                    + "always a tightening, so it is only meaningful in a composition body, against a field a "
+                    + "supertype declares (§5.8)");
         }
         // The type's `?` sits in the type slot, so an entry that elides the type -- a modifier-only
         // tightening, `min: = 0` -- inherits the voidability of the field it tightens with the type itself.
@@ -2661,17 +2684,33 @@ final class DefinitionResolver {
                 ? field.type().get().voidable()
                 : inherited.map(BuiltField::voidable).orElse(false);
 
-        // The role is the modifier's whatever stands in the value -- a literal, or this declaration's own
-        // parameter, which labels it (§5.10's shadowing rule over the source spelling).
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), field.omittable(), voidable, field.modifier());
         Optional<Token> value = resolved.value().map(DefinitionResolver::toMetaToken);
+        value.filter(token -> token.form() == Token.Form.UNQUOTED && parameters.contains(token.text()))
+                .ifPresent(token -> {
+                    throw ParameterTypes.atValue(token.text(), field.name());
+                });
         if (field.type().isPresent()) {
-            return BuiltField.written(resolveFieldType(field.type().get().typeRef()), parameters, resolved.optional(),
-                    resolved.voidable(), resolved.role(), value, Annotations.empty(), positions.of(field));
+            io.ltr8.tson.schema.meta.TypeExpr type = resolveFieldType(field.name(), field.type().get().typeRef());
+            // An application is judged by what it closes to, once materialisation has closed it.
+            if (value.isPresent() && type instanceof io.ltr8.tson.schema.meta.TypeInline inline
+                    && !(inline.of() instanceof RefBody)
+                    && !(inline.of() instanceof ApplyBody)) {
+                // §5.2: a value is admitted at a field typed by an atom or an enum, and a type written in place is one
+                // only as a reference; a container, a tuple or a choice in place carries none, as a declared one
+                // carries none.
+                throw new SchemaValidationException("field '" + field.name() + "' is declared '" + inline.text()
+                        + "', a type written in place that is no reference, so it cannot have "
+                        + (resolved.role() == FieldRole.DEFAULT ? "a default" : "a fixed value") + " (§5.2): a "
+                        + "fixed or default value is available on a field typed by an atom, an enum or a reference, "
+                        + "and nowhere else -- drop the modifier, or declare the field with a scalar type");
+            }
+            return new BuiltField(type, resolved.optional(), resolved.voidable(), resolved.role(), value,
+                    Annotations.empty(), positions.of(field));
         }
         // An elided type is the inherited field's, a parameter it carries and what its names mean included.
-        return inherited.get().restated(parameters, resolved.optional(), resolved.voidable(), resolved.role(), value,
+        return inherited.get().restated(resolved.optional(), resolved.voidable(), resolved.role(), value,
                 positions.of(field));
     }
 
@@ -2686,14 +2725,14 @@ final class DefinitionResolver {
     }
 
     /**
-     * §5.11's group restatement, shared by a refinement body and a composition body -- "a body entry may also
+     * §5.11's group restatement in a composition body -- "a body entry may also
      * restate a group: the restated group MUST have the same member labels in the same order (member
      * type-refs restated verbatim), and may tighten state OPTIONAL→REQUIRED; REQUIRED→OPTIONAL is a resolver
      * error, and changing membership is a resolver error."
      *
      * <p>Returns {@code true} having applied the restatement, or {@code false} when this group names nothing
-     * inherited and is therefore a genuinely new one -- which a composition body appends and a refinement
-     * body rejects, each at its own call site. A fresh record reaches here with an empty {@code
+     * inherited and is therefore a genuinely new one, which the body appends. A fresh record reaches here with an
+     * empty {@code
      * inheritedFields} and so always takes the {@code false} path.
      *
      * <p>Only the <em>group's</em> state changes. Members flatten as {@code OPTIONAL} whatever the group says
@@ -2747,8 +2786,7 @@ final class DefinitionResolver {
         for (GroupDef.Member member : groupDef.members()) {
             BuiltField restatedMember = resolveGroupMember(member, parameters);
             BuiltField inheritedMember = fields.get(member.name());
-            if (!restatedMember.type().equals(inheritedMember.type())
-                    || !restatedMember.typeParam().equals(inheritedMember.typeParam())) {
+            if (!sameType(restatedMember.type(), inheritedMember.type())) {
                 throw new SchemaValidationException(prefix + "gives member '" + member.name() + "' the type "
                         + "'" + restatedMember.typeName() + "' where the source declares '"
                         + inheritedMember.typeName()
@@ -2767,6 +2805,15 @@ final class DefinitionResolver {
 
 
     /**
+     * Whether a restated member's type is the inherited one's, verbatim: a parameter is the name it is written as, so
+     * a member an open source holds as its parameter is restated by that name.
+     */
+    private static boolean sameType(io.ltr8.tson.schema.meta.TypeExpr restated,
+                                    io.ltr8.tson.schema.meta.TypeExpr inherited) {
+        return restated.equals(inherited) || restated.text().equals(inherited.text());
+    }
+
+    /**
      * §12.1 gives a group member its own annotation position ({@code group-member = *annotation field-name ws
      * ":" ws type-ref ["?"]}), and it is read here on {@link #resolveField}'s terms: the marks are consumed and
      * everything else reaches the annotation channel -- which is what keeps the member's {@code @doc}. A
@@ -2776,59 +2823,199 @@ final class DefinitionResolver {
      * governed by the group (§5.11), and voidable exactly where its type carries {@code ?}.
      */
     private BuiltField resolveGroupMember(GroupDef.Member member, List<String> parameters) {
-        return BuiltField.written(resolveFieldType(member.typeRef()), parameters, true, member.voidable(), FieldRole.FREE,
+        return new BuiltField(resolveFieldType(member.name(), member.typeRef()), true, member.voidable(),
+                FieldRole.FREE,
                 Optional.empty(), annotationsOf(member.name(), member.annotations()), Optional.empty());
     }
 
     /**
      * The type a declaration's parameter list wrote after {@code parameter} ({@code <T: text>}, §5.10), as a
-     * type-ref. A written type names a type or an application of one; a container sugar form is not lifted at
-     * this position, so it has no entry to name and is refused here in those terms.
+     * type-ref. A written type names a type or an application of one; a container sugar form there names none,
+     * and is refused here in those terms.
      */
-    io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeExpr written) {
-        if (written instanceof SiblingRef sibling) {
-            throw new SchemaValidationException(io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field())
-                    .refusedAt("the type of parameter '" + parameter + "'"));
-        }
+    private io.ltr8.tson.schema.meta.TypeRef parameterType(String parameter, TypeExpr written) {
         if (!(written instanceof NameRef) && !(written instanceof ApplicationRef)) {
-            throw new SchemaValidationException("parameter '" + parameter + "' is written with the type "
-                    + written + ", and a parameter's written type names a declared type or an application of one "
-                    + "(§5.10); declare the form under a name and write that name");
+            throw new SchemaValidationException("parameter '" + parameter + "' is written with the type '"
+                    + SchemaDesugarer.spell(written) + "', and a parameter's written type names a declared type or an "
+                    + "application of one (§5.10); declare the form under a name and write that name");
         }
         return resolveTypeRef(written);
     }
 
     /**
-     * A field/group-member's type-ref, as one of the two shapes that reach resolution: a bare
-     * {@link NameRef}, or an {@link ApplicationRef} -- a §5.10 application, or a constructor's own generic
-     * vocabulary such as a field typed {@code set<T>}.
+     * A type-ref at a position that holds a name -- a parameter's written type -- which is a bare {@link NameRef}: an
+     * application there closes nowhere ([TSON-SCHEMA] §4.2), and is refused.
      *
-     * <p><b>A container sugar form is the third case and a broken invariant</b>, because by this phase every one
-     * of them is an entry: {@link SchemaDesugarer} lifts each to a declaration and leaves a bare reference behind
-     * ({@link #unlifted}).
+     * <p><b>A sugar form or a construction in place is a broken invariant here</b>: {@link SchemaDesugarer} writes a
+     * construction in place only at a field's type, and refuses one as an argument ({@link #unlifted}).
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeExpr ref) {
         return switch (ref) {
             case NameRef simple -> io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-            case ApplicationRef generic -> {
-                List<TypeArgument> args = new ArrayList<>();
-                for (TypeArg arg : generic.args()) {
-                    args.add(typeArgument(arg));
-                }
-                yield io.ltr8.tson.schema.meta.TypeRef.of(generic.name(), args);
-            }
-            case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, SiblingRef _ ->
+            case ApplicationRef generic -> throw ConstructionRewrite.nameRequired(generic);
+            case ArrayExpr _, TupleExpr _, MapExpr _, ChoiceExpr _, RecordExpr _, InlineConstruction _ ->
                     throw unlifted("a type-ref position", ref);
         };
     }
 
     /**
-     * A field's or group member's type-ref, as {@link #resolveTypeRef} resolves one, or the sibling reference it is
-     * ([TSON-SCHEMA] §5.2): the one position a sibling reaches the model, {@link SchemaDesugarer} having refused one
-     * anywhere else.
+     * A field's or group member's type: a name, an application ({@link #applicationAt}), or a construction written in
+     * place, {@code !meta.dependent { on: kind }} among them, read through its constructor's reader as a declaration's
+     * {@code !C { ... }} is ({@link #bindAtomInstance}) and held at the field ({@link
+     * io.ltr8.tson.schema.meta.TypeInline}). Reading it waits on its constructor, and on each type the read reaches, as
+     * reading any value does ([TSON-SCHEMA] §3.4.1).
      */
-    private io.ltr8.tson.schema.meta.Reference resolveFieldType(TypeExpr ref) {
-        return ref instanceof SiblingRef sibling ? io.ltr8.tson.schema.meta.SiblingRef.of(sibling.field())
-                : resolveTypeRef(ref);
+    private io.ltr8.tson.schema.meta.TypeExpr resolveFieldType(String field, FieldTypeExpr ref) {
+        return switch (ref) {
+            case InlineConstruction inline -> inlineType(field, inline);
+            case DependentType _ -> throw unlifted("field '" + field + "'", ref);
+            case ApplicationRef generic -> applicationAt(field, generic);
+            case TypeExpr type -> resolveTypeRef(type);
+        };
+    }
+
+    /**
+     * An application at field {@code field}'s type: over a constructor, its construction written in place, read once
+     * through the constructor's reader ({@link ConstructionRewrite#atSlot}); over anything else the application written
+     * in place, its arguments names, for materialisation to close. Only a container, a tuple, a choice or a reference
+     * is constructed in place ({@link io.ltr8.tson.schema.meta.TypeInline#constructible}); any other construction is
+     * declared under a name.
+     */
+    private io.ltr8.tson.schema.meta.TypeExpr applicationAt(String field, ApplicationRef generic) {
+        Optional<DataValue> constructed = rewrite.atSlot(generic);
+        if (constructed.isEmpty()) {
+            return ConstructionRewrite.names(generic).inPlace();
+        }
+        String constructor = constructed.get().typeRef().orElseThrow();
+        String written = ConstructionRewrite.text(generic);
+        Top body;
+        try {
+            body = constructionReader.read(constructor, constructed.get());
+        } catch (ReadException e) {
+            throw payloadFailure("'" + written + "' constructs a body that", "'" + written + "' constructs '!"
+                    + constructor + " { ... }', which is not valid data for '" + constructor + "' -- "
+                    + e.getMessage(), e);
+        }
+        if (!(body instanceof Type type) || !io.ltr8.tson.schema.meta.TypeInline.constructible(type)) {
+            throw new SchemaValidationException("'" + written + "' constructs a " + (body instanceof Type ? "type"
+                    : "value") + " that is no container, tuple, choice or reference, and only those are written where "
+                    + "they are used (§5.2): declare it under a name ('my_" + generic.name().substring(
+                    generic.name().lastIndexOf('.') + 1) + " => " + written + "') and write that name");
+        }
+        return new io.ltr8.tson.schema.meta.TypeInline(constructor, type.withChain(TypeChain.EMPTY));
+    }
+
+    /**
+     * The type a construction written in place at field {@code field} denotes: a container, a tuple, a choice, a
+     * reference, a dependent type or a record ({@link io.ltr8.tson.schema.meta.TypeInline}). The desugarer writes
+     * nothing else, so another body here is a broken invariant.
+     */
+    private io.ltr8.tson.schema.meta.TypeInline inlineType(String field, InlineConstruction inline) {
+        // The head is made ready first, as a declaration's `!C { ... }` makes its own (§3.4.1): reading a value
+        // against a type waits on the type.
+        String constructor = resolveConstructorTarget("field '" + field + "'", inline.constructor()).name();
+        Top body = bindAtomInstance("field '" + field + "'", rewrite.inPlace(inline.value(), true));
+        if (!(body instanceof io.ltr8.tson.schema.meta.Type type)
+                || !io.ltr8.tson.schema.meta.TypeInline.constructible(type)
+                        && !(type instanceof io.ltr8.tson.schema.meta.DependentBody) && !(type instanceof RecordBody)) {
+            throw new IllegalStateException("field '" + field + "': the construction '!" + inline.constructor()
+                    + " { ... }' written in place built " + body + ", which is no container, tuple, choice, "
+                    + "reference, dependent type or record -- SchemaDesugarer writes only those in place");
+        }
+        return new io.ltr8.tson.schema.meta.TypeInline(constructor,
+                ((Type) asWritten(type, inline.value())).withChain(io.ltr8.tson.schema.meta.TypeChain.EMPTY));
+    }
+
+    /**
+     * {@code body}, read from {@code written}, with each field of a record written in place in it as its source wrote
+     * it: desugaring writes a record in place as the value of its construction, which has no room for where a field
+     * was written or for annotations that resolve in this schema's namespace, so each is found against the field's
+     * {@code meta.record_field} value ({@link SchemaPositions#inPlace}) and restored here, at any depth.
+     */
+    private Top asWritten(Top body, DataValue written) {
+        if (positions.inPlace().isEmpty() || !(written.coreValue() instanceof RecordValue binding)) {
+            return body;
+        }
+        return switch (body) {
+            case RecordBody record -> record.withFields(fieldsAsWritten(record, member(binding, WireForm.FIELDS)));
+            case io.ltr8.tson.schema.meta.ArrayBody array -> new io.ltr8.tson.schema.meta.ArrayBody(array.chain(),
+                    slotAsWritten(array.elementType(), member(binding, "element_type")), array.voidable(),
+                    array.ordered(), array.uniqueItems(), array.minItems(), array.maxItems());
+            case io.ltr8.tson.schema.meta.MapBody map -> new io.ltr8.tson.schema.meta.MapBody(map.chain(),
+                    map.keyType(), slotAsWritten(map.valueType(), member(binding, "value_type")), map.voidable(),
+                    map.ordered(), map.minItems(), map.maxItems());
+            case TupleBody tuple -> {
+                List<DataValue> elements = elements(member(binding, "elements"));
+                List<io.ltr8.tson.schema.meta.TupleElement> restored = new ArrayList<>();
+                for (int i = 0; i < tuple.elements().size(); i++) {
+                    io.ltr8.tson.schema.meta.TupleElement element = tuple.elements().get(i);
+                    restored.add(new io.ltr8.tson.schema.meta.TupleElement(slotAsWritten(element.elementType(),
+                            i < elements.size() && elements.get(i).coreValue() instanceof RecordValue position
+                                    ? member(position, "element_type") : Optional.empty()), element.voidable()));
+                }
+                yield new TupleBody(tuple.chain(), restored);
+            }
+            case io.ltr8.tson.schema.meta.ChoiceBody choice -> {
+                List<DataValue> variants = elements(member(binding, "variants"));
+                List<io.ltr8.tson.schema.meta.TypeExpr> restored = new ArrayList<>();
+                for (int i = 0; i < choice.variants().size(); i++) {
+                    restored.add(slotAsWritten(choice.variants().get(i),
+                            i < variants.size() ? Optional.of(variants.get(i)) : Optional.empty()));
+                }
+                yield new io.ltr8.tson.schema.meta.ChoiceBody(choice.chain(), restored, choice.disjoint());
+            }
+            default -> body;
+        };
+    }
+
+    /** A record's fields, each written by a record in place restored from its {@code meta.record_field} value. */
+    private AnnotatedMap<String, RecordField> fieldsAsWritten(RecordBody record, Optional<DataValue> written) {
+        Map<String, DataValue> values = new HashMap<>();
+        if (written.isPresent() && written.get().coreValue() instanceof MapValue map) {
+            for (MapValue.MapEntry entry : map.entries()) {
+                if (entry.key().coreValue() instanceof TokenValue key) {
+                    values.put(key.text(), entry.value());
+                }
+            }
+        }
+        AnnotatedMap<String, RecordField> fields = new AnnotatedMap<>();
+        record.fields().forEach((name, field) -> {
+            DataValue value = values.get(name);
+            RecordField restored = field;
+            if (value != null) {
+                Optional<SchemaPositions.WrittenField> source = positions.inPlace(value);
+                if (source.isPresent()) {
+                    restored = restored.withPosition(source.get().position())
+                            .withAnnotations(annotationsOf(name, source.get().annotations()));
+                }
+                restored = restored.withType(slotAsWritten(field.type(), value.coreValue() instanceof RecordValue facts
+                        ? member(facts, WireForm.TYPE) : Optional.empty()));
+            }
+            fields.put(name, restored, record.fields().getAnnotations(name));
+        });
+        return AnnotatedMap.copyOf(fields);
+    }
+
+    /** A type slot read from {@code written}: a type written in place, {@code { of: … }}, restored within. */
+    private io.ltr8.tson.schema.meta.TypeExpr slotAsWritten(io.ltr8.tson.schema.meta.TypeExpr slot,
+                                                            Optional<DataValue> written) {
+        if (!(slot instanceof io.ltr8.tson.schema.meta.TypeInline inline) || written.isEmpty()
+                || !(written.get().coreValue() instanceof RecordValue wrapper)) {
+            return slot;
+        }
+        return member(wrapper, WireForm.OF).<io.ltr8.tson.schema.meta.TypeExpr>map(
+                of -> inline.withOf((Type) asWritten(inline.of(), of))).orElse(slot);
+    }
+
+    /** The value {@code binding} writes for its member {@code name}, if it writes one. */
+    private static Optional<DataValue> member(RecordValue binding, String name) {
+        return binding.fields().stream().filter(field -> name.equals(field.name())).map(RecordValue.Field::value)
+                .findFirst();
+    }
+
+    /** The elements of an array value, none where {@code written} is no array. */
+    private static List<DataValue> elements(Optional<DataValue> written) {
+        return written.map(DataValue::coreValue).filter(ArrayValue.class::isInstance)
+                .map(array -> ((ArrayValue) array).elements()).orElse(List.of());
     }
 }

@@ -28,7 +28,7 @@ class ProcessorPolicyConfigTest {
     private static final String CYR_A = new String(Character.toChars(0x0430));
 
     private static final ProcessorPolicy TIGHTENED = ProcessorPolicy.of(
-            IdentifierPolicy.of(ScriptPolicy.asciiOnly()), ScriptPolicy.asciiOnly(),
+            IdentifierPolicy.of(RestrictionLevel.ASCII_ONLY), TokenPolicy.asciiOnly(),
             LimitsPolicy.defaults().withMaxDepth(8));
 
     @Test
@@ -61,11 +61,11 @@ class ProcessorPolicyConfigTest {
     void statingOneComponentLeavesTheOthersAlone() {
         ProcessorPolicy stated = Tson.of(ProcessorConfig.defaults()
                         .withLimits(LimitsPolicy.defaults().withMaxDepth(8))
-                        .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.asciiOnly())))
+                        .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.ASCII_ONLY)))
                 .processorPolicy();
 
         assertEquals(8, stated.limits().maxDepth(), "the limit stated first survives the policy stated after it");
-        assertEquals(RestrictionLevel.ASCII_ONLY, stated.identifierPolicy().scripts().level());
+        assertEquals(RestrictionLevel.ASCII_ONLY, stated.identifierPolicy().level());
         assertEquals(ProcessorPolicy.defaults().tokenPolicy(), stated.tokenPolicy(),
                 "the component nothing stated keeps its default");
     }
@@ -91,8 +91,8 @@ class ProcessorPolicyConfigTest {
     void theIdentifierHalfOfAWholePolicyReachesTheLinker() {
         List<Diagnostic> refused = Tson.of(ProcessorConfig.defaults().withProcessorPolicy(TIGHTENED)).validateSchema("""
                 !!id:"https://example.test/whole-policy.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema { p%sy => text }
                 """.formatted(CYR_A));
 
@@ -109,5 +109,21 @@ class ProcessorPolicyConfigTest {
         assertEquals(LimitsPolicy.defaults().withMaxDepth(3), tson.limitsPolicy());
         assertEquals(List.of(Diagnostic.Code.LIMIT_EXCEEDED),
                 tson.validate("[[[[1]]]]").stream().map(Diagnostic::code).toList());
+    }
+
+    @Test
+    void aSchemaDocumentPastTheDepthLimitIsDeclinedNotAFault() {
+        int levels = LimitsPolicy.defaults().maxDepth() + 6;
+        String schema = """
+                !!id:"https://example.test/deep.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                  t => %stext%s
+                }
+                """.formatted("{ a: ".repeat(levels), " }".repeat(levels));
+
+        assertEquals(List.of(Diagnostic.Code.LIMIT_EXCEEDED),
+                Tson.standard().validateSchema(schema).stream().map(Diagnostic::code).toList());
     }
 }

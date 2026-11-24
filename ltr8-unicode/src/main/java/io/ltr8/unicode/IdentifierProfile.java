@@ -204,6 +204,11 @@ public final class IdentifierProfile {
                 : base.isEmpty() ? "'" + added + "'" : base + " and '" + added + "'");
     }
 
+    /** Whether {@code cp} may stand somewhere in a name under this profile: it is Start, Continue or medial. */
+    public boolean admits(int cp) {
+        return isStart(cp) || isContinue(cp) || contains(medial, cp);
+    }
+
     private boolean isStart(int cp) {
         return (inBase(start, cp, true) || contains(startAdd, cp)) && !contains(exclude, cp);
     }

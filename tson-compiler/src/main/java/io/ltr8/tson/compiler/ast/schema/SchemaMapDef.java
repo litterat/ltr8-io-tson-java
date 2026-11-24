@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * {@code "!schema" ws schema-map} as a declaration's value: a schema map nested as an entry, {@code geo => !schema {
  * address => { … } }}. It is a value of the kernel's {@code schema} namespace type, and every value of {@code schema}
- * declares as the document's root does: its members are declarations, which lift, mint, link and compile as root
+ * declares as the document's root does: its members are declarations, which resolve, link and compile as root
  * entries do. The {@code !schema} tag is read as a spelling, as the root's is.
  *
  * <p><b>The members are not held here.</b> The parser puts each into the document's one declaration map under its

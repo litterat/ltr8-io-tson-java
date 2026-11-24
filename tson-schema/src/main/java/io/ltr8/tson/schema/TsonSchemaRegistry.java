@@ -108,8 +108,8 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
         if (unwrapped.bootstrap()) {
             throw new SchemaValidationException("'" + unwrapped.id() + "' is the kernel's pre-loaded form "
                     + "(bootstrap() == true) -- the kernel's own identity "
-                    + "must be registered via a schema resolved ordinarily (TsonSchemaResolver.resolveSchema,"
-                    + " which never sets bootstrap), never the bootstrap-produced form directly, "
+                    + "must be registered via a schema resolved ordinarily, which never sets bootstrap, "
+                    + "never the bootstrap-produced form directly, "
                     + "materialized or not");
         }
         return CanonicalIdentity.canonicalize(unwrapped.id());

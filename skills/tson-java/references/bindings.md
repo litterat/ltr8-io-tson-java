@@ -37,6 +37,11 @@ natural reading (an `int32` to `Integer`, an array to a `List`), and a component
 specific is met when the reader is built: `List<Long>` under `int32` elements holds `Long`s, and `long[]`,
 `List<int[]>` and `Map<String, SequencedMap<String, Long>>` each receive what they declare. A tuple position binds
 the same way, so a tuple written inline at a field binds to the component's `@Tuple` record, nested ones included.
+So does a record written in place, a record body at a slot (`at: { x: int32 }`, `lines: [{ sku: text }]`) or the
+record an application of a parametric record closes to (`p: page<order>`, `ps: [page<order>]`): it has no name a binding
+map could hold, so it binds to the record class its component declares, at any depth, and a
+component that is no record class is a `BindMismatchException`; a declaration (`order_page => page<order>`,
+`point => { x: int32 }`) gives it a name to bind by.
 Most atom families also bind to `String` or `CharSequence`, as the spelling they validated.
 
 A cyclic type graph resolves: `getDescriptor` hands a re-entrant call a deferred supplier and each
@@ -134,6 +139,21 @@ yours cannot shadow them, and every other name is yours, a member your schema co
 A **profile** is fixed when the context is built (`DataBindContext.Builder.profile`), never afterwards, so
 one `Tson` is one profile — a server speaking two schema versions builds one instance per version.
 
+**A type is bound by the schema that declares it.** The engine asks a binder `resolve(namespace, name)`, the namespace
+being the canonical identity of the schema declaring the entry (`example.test/order-2.tn`), never the one it was
+reached through, so a type two schemas share through an import binds once. A binder answering by name alone (a
+lambda, `ofMap`) answers every schema alike; where two schemas declare one name, route each to its own binder:
+
+```java
+DataNameBinder.byNamespace(Map.of(
+        "example.test/order-1.tn", DataNameBinder.ofMap(Map.of("order", OrderV1.class)),
+        "example.test/order-2.tn", DataNameBinder.ofMap(Map.of("order", OrderV2.class))),
+        DataNameBinder.ofMap(Map.of("customer", Customer.class)))   // every other schema
+```
+
+That is how two versions of one schema bind through one context, and how a value read through an extern binds its
+foreign classes. A namespace's binder is the last word for it; the fallback answers the rest.
+
 **Writing a binder rather than a map.** `DataNameBinder` is a one-method interface, and the implementation
 a consumer usually wants is already there — mangle the schema's `snake_case` name to `PascalCase` and try
 `Class.forName` against each package in turn, first match wins:
@@ -216,8 +236,9 @@ Tson v3 = Tson.of(ProcessorConfig.defaults().withDataBindContext(
                 .registerAtoms(AtomContext.hostTypes()).build()));
 ```
 
-A `Tson` is one profile: a server speaking two schema versions builds one instance per version and
-routes a document to the right one. Nothing derives the profile from the schema a document names — that
+A `Tson` is one profile: a server speaking two schema versions with one class per type builds one instance
+per version and routes a document to the right one (classes of their own per version need no profile: bind them
+by namespace, above). Nothing derives the profile from the schema a document names — that
 mapping is the application's, and it is the one thing the application knows better than this library.
 Pointing a profile at the wrong version does not bind quietly: the constructor it selects is checked
 against that schema's fields, and a disagreement is a `BindMismatchException`.

@@ -48,17 +48,18 @@ class KernelWaitGraphTest {
         int longest = depth.values().stream().mapToInt(Integer::intValue).max().orElse(0);
         assertTrue(longest <= WAIT_DEPTH_LIMIT, "the longest wait chain is " + longest);
     }
-
     /**
      * The kernel holds what its one cycle needs to resolve and link on its own -- the cycle, what reading the document
      * itself waits on (its root tag's {@code schema}, an alias of {@code meta.schema}, the key and value types that
-     * reads, the annotations on its header and on its keys, {@code @atom.ordering} and {@code @atom.bounded} among
-     * them), and every entry a declaration of that set names, closed to a fixed point -- and the concepts that belong
-     * with them, which nothing in the closure names: the tuple and choice constructors, the tuple's element and
-     * the one-element tuple templates, held template bodies, record templates with their fields, the parameters both
-     * bind and the {@code application} annotation, the {@code ref} reference with {@code field_name}, the {@code set}
-     * template, the {@code disjoint} assertion, and the octet-sequence constructor with its encodings and instance. The
-     * measurement: a cycle of 25, a closure of 66.
+     * reads, the annotations on its header and on its keys, {@code @atom.ordering}, {@code @atom.bounded} and {@code
+     * @meta.completion} among them), and every entry a declaration of that set names, closed to a fixed point -- and
+     * the concepts that belong with them, which nothing in the closure names: the tuple and choice constructors and the
+     * tuple's element, the {@code application} annotation, the {@code ref} reference, the {@code disjoint}
+     * assertion, and the octet-sequence constructor with its encodings and instance. A parametric record's
+     * {@code param} and {@code param_name} are in the closure, reached through {@code record.parameters}. The choice
+     * constructor and the disjoint assertion are on the cycle: a record field's type is read against {@code
+     * meta.type_expr}, a choice asserted disjoint, and a type written in place reaches every constructor's record
+     * through {@code meta.type}.
      */
     @Test
     void theKernelHoldsTheClosureOfItsCycleAndItsRelatedConcepts() throws Exception {
@@ -84,15 +85,13 @@ class KernelWaitGraphTest {
         System.out.println("  related concepts beyond the closure: " + related);
 
         assertEquals(List.of(), graph.problems(), "a wait names no entry of the kernel");
-        assertEquals(25, cycle.size(), "the cycle");
+        assertEquals(31, cycle.size(), "the cycle");
         assertEquals(66, closure.size(), "the cycle's closure");
-        assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application",
-                "binary.bytes_encoding", "binary.bytes_type", "meta.choice", "meta.disjoint",
-                "meta.field_name", "meta.param_name", "meta.record_template", "meta.record_template_field",
-                "meta.record_template_field_map", "meta.ref", "meta.template", "meta.template_param", "meta.tuple",
-                "meta.tuple1", "meta.tuple_element", "meta.voidable_tuple1", "set")),
-                new java.util.TreeSet<>(related.stream().filter(name -> !name.startsWith("array_")).toList()),
-                "the related concepts");
+        assertEquals(74, graph.entries().size(), "the kernel's entries");
+        assertTrue(closure.containsAll(List.of("meta.param", "meta.param_name")), "reached through record.parameters");
+        assertEquals(new java.util.TreeSet<>(List.of("bytes", "meta.application", "meta.apply",
+                "binary.bytes_encoding", "binary.bytes_type", "meta.extern", "meta.tuple", "meta.tuple_element")),
+                new java.util.TreeSet<>(related), "the related concepts");
     }
 
     // ── Measuring ────────────────────────────────────────────────────────

@@ -82,7 +82,7 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
 
     /**
      * {@inheritDoc} <p>Renames the <em>wrapped</em> reader and keeps this one's own {@code name} for
-     * dispatch: the display name is what the position wrote (§8.3's {@code @alias}), while dispatch compares
+     * dispatch: the display name is what the position wrote, while dispatch compares
      * against the entry's real name and its aliases. Without this the wrapper would swallow the rename and a
      * diagnostic would report the entry a use site resolved to rather than the name the author typed --
      * which is the rule {@link UseSite} exists to keep.

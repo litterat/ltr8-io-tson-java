@@ -5,8 +5,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.EntryKind;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Alias;
@@ -44,7 +43,7 @@ class NamespaceEntryTest {
     static {
         DOCUMENTS.put(META, """
                 !!id:"https://example.test/meta-api.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   status_name => meta.identifier
                   method    => { request?: meta.ref<meta.record>  response?: meta.type_ref
@@ -77,7 +76,7 @@ class NamespaceEntryTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!import:"https://example.test/meta-api.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order      => { sku: text }
                   order_list => [order]
@@ -128,7 +127,6 @@ class NamespaceEntryTest {
         assertEquals(new Method(TypeRef.of("order"), TypeRef.of("order"), null, null),
                 myapi.entries().get("place_order"));
         assertEquals(Optional.of("api"), linked.schema().factsOf("myapi").constructor());
-        assertEquals(EntryKind.VALUE, linked.kindOf("myapi"));
     }
 
     /** A key's annotations are the entry's, kept beside the key as a schema map's are. */
@@ -147,7 +145,7 @@ class NamespaceEntryTest {
 
     /**
      * {@code handler: myapi.get_orders}: the first segment names the entry, the second a key of the namespace value,
-     * whose type is {@code api}'s value type, {@code method} -- and the {@code Ref} receives the value at the link.
+     * whose type is {@code api}'s value type, {@code method} -- and the {@code ValueRef} receives the value at the link.
      */
     @Test
     void aQualifiedNameSelectsAKeyOfANamespaceEntry() {
@@ -226,7 +224,6 @@ class NamespaceEntryTest {
         String id = schema("constructed", "more => !meta.namespace { key_type: meta.identifier  value_type: text }");
         assertEquals(List.of(), problems(id));
         TsonLinkedSchema linked = registry().resolveLinked(id);
-        assertEquals(EntryKind.PRODUCT, linked.kindOf("more"));
         assertTrue(linked.namespace("more").isPresent());
     }
 
@@ -252,15 +249,16 @@ class NamespaceEntryTest {
     }
 
     /**
-     * A kind slot of a value body holds a type's name, one token: an application there is refused with the alias
-     * spelling named, nothing lifting or minting in a value body.
+     * A kind slot of a value body holds a type's name, one token: an argument list there does not parse
+     * ([TSON-DATA] §7.2.5), a syntax error under the base-syntax code.
      */
     @Test
-    void anApplicationInANamespaceValueIsRefused() {
-        refused(schema("applied", """
+    void anApplicationInANamespaceValueDoesNotParse() {
+        List<Diagnostic> problems = problems(schema("applied", """
                 box   => <T> { v: T }
-                other => !api { m => { response: box<order> } }"""),
-                "a position typed by a kind holds the name of a type", "declare an alias");
+                other => !api { m => { response: box<order> } }"""));
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code(), problems.toString());
     }
 
     // ── Kinds ─────────────────────────────────────────────────────────────────────────────────────────
@@ -296,7 +294,7 @@ class NamespaceEntryTest {
     private static List<String> members(TsonLinkedSchema linked, String kind) {
         String terminal = linked.schema().entries().get(kind) instanceof Alias alias
                 ? alias.target().name() : kind;
-        return assertInstanceOf(ReferenceBody.class, linked.schema().entries().get(terminal)).memberNames();
+        return assertInstanceOf(RefBody.class, linked.schema().entries().get(terminal)).memberNames();
     }
 
     // ── Resolved output ───────────────────────────────────────────────────────────────────────────────

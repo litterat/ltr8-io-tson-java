@@ -435,7 +435,7 @@ public final class JsonObjectReader {
                     schema.get().declaredTypeNames(), typeName);
             return null;
         }
-        Class<?> bound = boundClass(typeName);
+        Class<?> bound = boundClass(schema.get().linkedSchema().declaringIdentity(typeName), typeName);
         if (bound != null && !type.isAssignableFrom(bound)) {
             report(Diagnostic.Code.TYPE_MISMATCH, "the schema's type `" + typeName + "` binds to " + bound.getName()
                     + ", which is not assignable to the requested " + type.getName(), type.getName(), bound.getName());
@@ -445,12 +445,12 @@ public final class JsonObjectReader {
     }
 
     /**
-     * The class {@code typeName} is bound to, or null where it is not bound by name -- a container, an atom, a
-     * type the context cannot resolve. The before-read check then falls to the after-read one.
+     * The class {@code typeName}, declared by {@code declaredBy}, is bound to, or null where it is not bound by name --
+     * a container, an atom, a type the context cannot resolve. The before-read check then falls to the after-read one.
      */
-    private Class<?> boundClass(String typeName) {
+    private Class<?> boundClass(String declaredBy, String typeName) {
         try {
-            return context.getDescriptor(typeName).typeClass();
+            return context.getDescriptor(declaredBy, typeName).typeClass();
         } catch (DataBindException | RuntimeException e) {
             return null;
         }

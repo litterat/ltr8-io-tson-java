@@ -13,7 +13,6 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
@@ -68,7 +67,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
         super(name, displayName, body,
                 ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()),
                         descriptor.keyDataClass(), annotationTypes), descriptor.keyDataClass()),
-                ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.valueType().name()),
+                ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.valueType()),
                         descriptor.valueDataClass(), annotationTypes), descriptor.valueDataClass()),
                 schemaLocation, keysAreNames);
         this.descriptor = descriptor;
@@ -126,12 +125,11 @@ final class MapBindReader extends MapAbstractReader<Object> {
      * document wrote is kept, and a {@code Map} otherwise -- making a real effort to
      * get the key/value types right: the schema's own {@code key_type}/{@code value_type} names are
      * each resolved to a real bound Java class the same way any other schema type name is (falling
-     * back to {@link String} only when a name has no real bound class at all, e.g. a synthesized,
-     * materialized entry) -- see {@link ArrayBindReader.Factory}'s own Javadoc for the identical
-     * reasoning, including why getting this right here doesn't actually change what a real consuming
-     * field ends up bound to ({@link RecordBindReader}'s own rebind step always takes over there) or
-     * what a direct read decodes (key/value narrowing never consults {@code descriptor} at all,
-     * Java's own generics being erased at runtime regardless).
+     * back to {@link String} only when a name has no real bound class at all) -- see {@link
+     * ArrayBindReader.Factory}'s own Javadoc for the identical reasoning, including why getting this right here
+     * doesn't actually change what a real consuming field ends up bound to ({@link RecordBindReader}'s own rebind
+     * step always takes over there) or what a direct read decodes (key/value narrowing never consults {@code
+     * descriptor} at all, Java's own generics being erased at runtime regardless).
      */
     public static final class Factory implements ValueReaderFactory {
 
@@ -145,10 +143,11 @@ final class MapBindReader extends MapAbstractReader<Object> {
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition instanceof MapBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition);
+                throw new IllegalStateException("'" + name + "' is not map-shaped: " + typeDefinition);
             }
-            Type keyType = resolveType(body.keyType().name());
-            Type valueType = resolveType(body.valueType().name());
+            Type keyType = resolveType(body.keyType().name(), context);
+            // A value written in place has no bound class of its own: its host type is its constructor's shape.
+            Type valueType = BindTargets.hostType(body.valueType(), value -> resolveType(value, context));
             // A value of a namespace type is a map of names, whose keys' annotations and order are part of what
             // an instance of the constructor holds (NamespaceInstanceReader).
             String terminal = AliasChain.terminal(name, context.schema().entries()::get);
@@ -165,10 +164,10 @@ final class MapBindReader extends MapAbstractReader<Object> {
                     keysAreNames(body, context), namespace);
         }
 
-        /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */
-        private Class<?> resolveType(String schemaTypeName) {
+        /** {@code schemaTypeName} has no real bound Java class only where none is bound by that name. */
+        private Class<?> resolveType(String schemaTypeName, ValueReaderContext vctx) {
             try {
-                return context.getDescriptor(schemaTypeName).typeClass();
+                return context.getDescriptor(vctx.namespaceOf(schemaTypeName), schemaTypeName).typeClass();
             } catch (DataBindException e) {
                 return String.class;
             }

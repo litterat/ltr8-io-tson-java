@@ -30,8 +30,8 @@ class DeclaredReadTest {
     private static final Map<String, String> SCHEMAS = Map.of(
             HOST, """
                     !!id:"https://example.test/declared-host.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
                     !schema {
                       note     => { body: text }
                       memo     => { body: text  urgent: boolean }
@@ -42,8 +42,8 @@ class DeclaredReadTest {
                     """,
             OTHER, """
                     !!id:"https://example.test/declared-other.tn"
-                    !!import:"https://tson.io/2026/39/m/meta.tn"
-                    !!import:"https://tson.io/2026/39/m/core.tn"
+                    !!import:"https://tson.io/2026/40/m/meta.tn"
+                    !!import:"https://tson.io/2026/40/m/core.tn"
                     !schema {
                       claim => { id: text  amount: int32 }
                     }

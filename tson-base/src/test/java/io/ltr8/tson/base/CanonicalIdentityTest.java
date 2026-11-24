@@ -12,30 +12,30 @@ class CanonicalIdentityTest {
 
     @Test
     void stripsSchemeAndDelimiterFromTheRealMetaKernelId() {
-        Assertions.assertEquals("tson.io/2026/39/m/meta.tn",
-                CanonicalIdentity.canonicalize("https://tson.io/2026/39/m/meta.tn"));
+        Assertions.assertEquals("tson.io/2026/40/m/meta.tn",
+                CanonicalIdentity.canonicalize("https://tson.io/2026/40/m/meta.tn"));
     }
 
     @Test
     void httpAndHttpsResolveToTheSameIdentity() {
-        assertEquals(CanonicalIdentity.canonicalize("https://tson.io/2026/39/m/meta.tn"),
-                CanonicalIdentity.canonicalize("http://tson.io/2026/39/m/meta.tn"));
+        assertEquals(CanonicalIdentity.canonicalize("https://tson.io/2026/40/m/meta.tn"),
+                CanonicalIdentity.canonicalize("http://tson.io/2026/40/m/meta.tn"));
     }
 
     @Test
     void queryIsDropped() {
-        assertEquals("tson.io/2026/39/m/meta.tn",
-                CanonicalIdentity.canonicalize("https://tson.io/2026/39/m/meta.tn?sha256=abc123"));
+        assertEquals("tson.io/2026/40/m/meta.tn",
+                CanonicalIdentity.canonicalize("https://tson.io/2026/40/m/meta.tn?sha256=abc123"));
     }
 
     /** A host is a host-name value, so a reference in any ASCII case names one identity; an !!id must be lowercase. */
     @Test
     void aHostComparesWithoutAsciiCase() {
-        assertEquals("tson.io/2026/39/m/meta.tn",
-                CanonicalIdentity.canonicalize("https://Tson.IO/2026/39/m/meta.tn"));
+        assertEquals("tson.io/2026/40/m/meta.tn",
+                CanonicalIdentity.canonicalize("https://Tson.IO/2026/40/m/meta.tn"));
         SchemaValidationException e = assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.validate("https://Tson.io/2026/39/m/meta.tn"));
-        assertTrue(e.getMessage().contains("write 'https://tson.io/2026/39/m/meta.tn'"), e.getMessage());
+                () -> CanonicalIdentity.validate("https://Tson.io/2026/40/m/meta.tn"));
+        assertTrue(e.getMessage().contains("write 'https://tson.io/2026/40/m/meta.tn'"), e.getMessage());
     }
 
     @Test
@@ -47,26 +47,26 @@ class CanonicalIdentityTest {
     @Test
     void rejectsUserinfo() {
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("https://user@tson.io/2026/39/m/meta.tn"));
+                () -> CanonicalIdentity.canonicalize("https://user@tson.io/2026/40/m/meta.tn"));
     }
 
     @Test
     void rejectsExplicitPort() {
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("https://tson.io:443/2026/39/m/meta.tn"));
+                () -> CanonicalIdentity.canonicalize("https://tson.io:443/2026/40/m/meta.tn"));
     }
 
     @Test
     void rejectsFragment() {
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("https://tson.io/2026/39/m/meta.tn#section"));
+                () -> CanonicalIdentity.canonicalize("https://tson.io/2026/40/m/meta.tn#section"));
     }
 
     @Test
     void rejectsPercentEncodedUnreservedCharacter() {
         // %7E decodes to '~', an unreserved character -- MUST NOT be percent-encoded.
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("https://tson.io/2026/39/m/meta%7E.tn"));
+                () -> CanonicalIdentity.canonicalize("https://tson.io/2026/40/m/meta%7E.tn"));
     }
 
     @Test
@@ -165,7 +165,7 @@ class CanonicalIdentityTest {
     @Test
     void rejectsMissingScheme() {
         assertThrows(SchemaValidationException.class,
-                () -> CanonicalIdentity.canonicalize("tson.io/2026/39/m/meta.tn"));
+                () -> CanonicalIdentity.canonicalize("tson.io/2026/40/m/meta.tn"));
     }
 
     @Test

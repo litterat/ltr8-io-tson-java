@@ -104,7 +104,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     }
 
     /**
-     * A token whose scripts the read's {@code ScriptPolicy} does not permit ([TSON-DATA] §8.2's
+     * A token whose scripts the read's {@code TokenPolicy} does not permit ([TSON-DATA] §8.2's
      * "Values", UTS #39 §5.2).
      *
      * <p><b>Here rather than on an encoding, for {@code ofLimitExceeded}'s reason:</b> it classifies
@@ -116,7 +116,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * surface can carry.
      *
      * <p><b>{@code why} names the text it judged, so this does not name it again.</b> {@code
-     * ScriptPolicy.violation} opens with the unit it refused ({@code 'аdmin' mixes the scripts ...}),
+     * TokenPolicy.violation} opens with the unit it refused ({@code 'аdmin' mixes the scripts ...}),
      * which is what makes {@code "the token " + why} read as one sentence -- the same composition {@code
      * DefaultTsonReadContext.refuse} uses for a name.
      *

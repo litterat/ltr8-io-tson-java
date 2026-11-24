@@ -18,14 +18,10 @@ import java.util.function.UnaryOperator;
  * dependency on {@code reader.TsonParserFactoryRegistry} (which is going away) or anything else in
  * {@code reader} -- deliberate, while this package's own shape is still settling.
  *
- * <p><b>{@code set} registers to the exact same {@code array} factory instance</b> -- it resolves to an
- * {@code ArrayBody} like {@code array} itself, refinement never adding or removing a field, so there is
- * no separate shape to build a distinct factory for. This is
- * a *lookup-by-constructor-name* convenience only -- it says nothing about whether an {@code
- * array}-typed position should ever dispatch to {@code !set [...]} at read time, which {@link
- * RecordBindReader.Factory}'s own Javadoc deliberately does not attempt for any composite kind but
- * {@code record}. {@code namespace} registers to the {@code map} factory on the same footing: it composes
- * {@code map} and adds no field.
+ * <p><b>{@code namespace} registers to the {@code map} factory instance</b>: it composes {@code map} and adds no
+ * field, so there is no separate shape to build a distinct factory for. This is a lookup-by-constructor-name
+ * convenience only, as {@link RecordBindReader.Factory}'s own Javadoc states for every composite kind but
+ * {@code record}.
  *
  * <p><b>{@code enum}</b> uses {@link AtomTypeReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
  * #bind} (dispatching {@code boolean} to a real {@code Boolean} via the vocabulary's own
@@ -46,9 +42,19 @@ import java.util.function.UnaryOperator;
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
     private final Map<String, ValueReaderFactory> factories;
+    private final DataBindContext binding;
 
-    private ValueReaderFactoryRegistry(Map<String, ValueReaderFactory> factories) {
+    private ValueReaderFactoryRegistry(Map<String, ValueReaderFactory> factories, DataBindContext binding) {
         this.factories = factories;
+        this.binding = binding;
+    }
+
+    /**
+     * The context object-binding mode binds with, or {@code null} for tree mode: what a boundary hands the
+     * annotations in front of a foreign value to the bound value with ({@link ExternReader}).
+     */
+    public DataBindContext binding() {
+        return binding;
     }
 
     @Override
@@ -70,7 +76,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
                 AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.VOID, UnaryOperator.identity(),
-                ChoiceReader.FACTORY));
+                ChoiceReader.FACTORY), context);
     }
 
     /**
@@ -84,7 +90,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
                 new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_VOID, AtomTreeFactory::new,
-                ChoiceReader.FACTORY));
+                ChoiceReader.FACTORY), null);
     }
 
     /** Tree mode's {@code void_type} factory: {@link VoidTreeReader} over {@link AtomTypeReader#VOID}'s reader. */
@@ -95,7 +101,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
             // meta.tn, under meta
             "numeric.integer_type", "unicode.text_type", "unicode.identifier_type", "unicode.regex_type", "net.iri_type",
-            "meta.reference_type", "binary.bytes_type",
+            "meta.ref", "binary.bytes_type",
             // numeric.tn, under numeric
             "numeric.float_type", "numeric.decimal_type", "numeric.rational_type", "numeric.complex_type",
             // temporal.tn, under temporal
@@ -113,10 +119,9 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("meta.void_type", voidFactory);
         factories.put("meta.record", RecordDispatch.over(record));
         factories.put("meta.array", array);
-        factories.put("meta.set_type", array);
         factories.put("meta.map", map);
         factories.put("meta.tuple", tuple);
-        factories.put("enum", leaf.apply(enumFactory));
+        factories.put("meta.enum_type", leaf.apply(enumFactory));
         factories.put("meta.choice", choice);
         factories.put("meta.declared_type", DeclaredReader.FACTORY);
 

@@ -11,7 +11,8 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.TemplateBody;
+
+import io.ltr8.tson.schema.meta.IncompleteEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.Type;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -41,37 +42,12 @@ import java.util.regex.Pattern;
 final class ResolvedForm {
 
     /**
-     * A synthetic entry's name ends in a content hash of its resolved binding record, and <b>that hash is
-     * not normative</b>: §8.2 keys a closed synthetic on structural equality -- one entry per distinct
-     * concrete form, schema-wide -- leaving the spelling to the implementation. Both sides reduce it to a
-     * fixed placeholder before comparing, so this stays a test of structure rather than of a hash function.
-     */
-    private static final Pattern SYNTHETIC_HASH = Pattern.compile("_[0-9a-f]{8}$");
-
-    /** The same, unanchored -- a synthetic's name appears inside a body as well as being an entry's own. */
-    private static final Pattern SYNTHETIC_HASH_ANYWHERE = Pattern.compile("_[0-9a-f]{8}\\b");
-
-    /**
      * A field's source position, which is this model's own ({@code RecordField.position} is {@code @Unbound}):
      * a field read back from a fixture carries none, so it is normalised away rather than compared.
      */
     private static final Pattern SOURCE_POSITION = Pattern.compile("position=Optional\\[Position\\[[^\\]]*\\]\\]");
 
-    /** The placeholder both sides reduce a synthetic's content hash to. */
-    static final String HASH_PLACEHOLDER = "_xxhash";
-
-
     private ResolvedForm() {
-    }
-
-    /** An entry name with its synthetic content hash, if any, reduced to {@link #HASH_PLACEHOLDER}. */
-    static String withoutHash(String name) {
-        return SYNTHETIC_HASH.matcher(name).replaceFirst(HASH_PLACEHOLDER);
-    }
-
-    /** Every synthetic content hash in {@code text} reduced to {@link #HASH_PLACEHOLDER}, wherever it stands. */
-    static String withoutHashes(String text) {
-        return SYNTHETIC_HASH_ANYWHERE.matcher(text).replaceAll(HASH_PLACEHOLDER);
     }
 
     /**
@@ -92,42 +68,44 @@ final class ResolvedForm {
     }
 
     /**
-     * A value reduced to what a comparison is about: canonicalised, then with every synthetic's content hash
-     * replaced. Compared as text rather than through {@code equals} because a synthetic's name appears at any
+     * A value reduced to what a comparison is about: canonicalised, and with this model's own source positions
+     * dropped. Compared as text rather than through {@code equals} because a position appears at any
      * depth of a body -- as the type of a field, inside an argument list -- and normalising it in place would
      * mean rebuilding every body shape here.
      */
     static String rendered(Object value) {
-        // An open entry's body is text, and [TSON-SCHEMA] §5.10 compares the *parsed* form: one spelling is
-        // required of the application, not of the whitespace around it. Both sides are reduced to their
-        // parsed application here, so a held body compares like every other body and needs no side channel.
         // A resolved form read as data holds each entry's value, and a value entry's is the value itself.
         if (SchemaPaths.isNestedMap(value)) {
             // A nested map's members are entries under their paths, each compared on its own; the map is its names.
             Object members = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
             return "!meta.schema " + ((io.ltr8.tson.schema.meta.Namespace<?>) members).keySet();
         }
-        Object entry = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
-        Object compared = entry instanceof TemplateBody held ? parsedForComparison(held) : entry;
-        String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(compared instanceof Top top ? canonical(top)
-                : compared)).replaceAll(HASH_PLACEHOLDER);
+        Object compared = value instanceof io.ltr8.tson.schema.meta.ValueEntry held ? held.value() : value;
+        String text = String.valueOf(compared instanceof Top top ? canonical(top) : compared);
         return SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty");
     }
 
     /**
-     * The entries a registered schema declares <em>itself</em>, hashes normalised -- what a resolver
-     * produced for that document, before an import merged anything else into its namespace.
+     * The entries a registered schema declares <em>itself</em> -- what a resolver
+     * produced for that document, before an import merged anything else into its namespace -- as its resolved form
+     * holds them: complete entries only, an incomplete entry and an alias of one left out.
      */
     static Map<String, Top> ownEntries(Tson tson, String id) {
         var linked = tson.bindRegistry().core().resolveLinked(id);
         String canonical = CanonicalIdentity.canonicalize(id);
         Map<String, Top> own = new LinkedHashMap<>();
         linked.schema().entries().forEach((name, definition) -> {
-            if (linked.originOf(name).equals(canonical)) {
-                own.put(withoutHash(name), contribution(name, definition, linked, canonical));
+            if (linked.originOf(name).equals(canonical) && !incomplete(name, linked)) {
+                own.put(name, contribution(name, definition, linked, canonical));
             }
         });
         return own;
+    }
+
+    /** Whether the entry {@code path} names is an incomplete entry, or an alias whose chain ends at one. */
+    private static boolean incomplete(String path, io.ltr8.tson.schema.TsonLinkedSchema linked) {
+        return io.ltr8.tson.compiler.resolver.AliasChain.terminalDefinition(path, linked.schema().entries()::get)
+                .orElse(null) instanceof IncompleteEntry;
     }
 
     /**
@@ -143,7 +121,7 @@ final class ResolvedForm {
         io.ltr8.annotation.AnnotatedMap<String, Top> own = new io.ltr8.annotation.AnnotatedMap<>();
         members.annotatedEntrySet().forEach(member -> {
             String path = name + "." + member.getKey().value();
-            if (linked.originOf(path).equals(canonical)) {
+            if (linked.originOf(path).equals(canonical) && !incomplete(path, linked)) {
                 own.put(member.getKey().value(), contribution(path, (Top) member.getValue(), linked, canonical),
                         member.getKey().annotations());
             }
@@ -152,63 +130,18 @@ final class ResolvedForm {
                 new io.ltr8.tson.schema.meta.Namespace<>(members.type(), own));
     }
 
-    /**
-     * A held body with its text replaced by the structure that text denotes.
-     *
-     * <p>[TSON-SCHEMA] §5.10's one-spelling rule is about the application, not about the whitespace around
-     * it: an open synthetic's identity is derived from its held binding record, so what must agree between
-     * two resolvers is the parsed form. Reducing both sides here is that rule applied once, and it is what
-     * lets an open entry be compared by {@link #rendered} like every other entry rather than through a
-     * second channel of its own.
-     */
-    private static Top parsedForComparison(TemplateBody held) {
-        return new TemplateBody(held.parameters(),
-                String.valueOf(new TsonDataParser(held.template()).parseDocument().root()));
-    }
-
-    /**
-     * The names a §8 resolved-schema document marks {@code @meta.synthetic} at its schema-map keys, hashes
-     * normalised -- read from the document's own <em>text</em>.
-     *
-     * <p>Text, and not the bound document every other comparison here uses, because a key-position
-     * annotation is dropped when a resolved-form document is read back. Both sides of a bound comparison
-     * would therefore render no annotations at all and agree for the wrong reason. Scanning the source is
-     * what makes §8.2's marker checkable at all before that channel exists.
-     */
-    static Set<String> markedSynthetics(String resolvedText) {
-        Set<String> marked = new TreeSet<>();
-        Matcher matcher = Pattern.compile("@meta.synthetic\\s+([A-Za-z0-9_]+)\\s*=>").matcher(resolvedText);
-        while (matcher.find()) {
-            marked.add(withoutHash(matcher.group(1)));
-        }
-        return marked;
-    }
-
-    /** The same, from this resolver: the schema's own entries whose keys carry the marker. */
-    static Set<String> ourSynthetics(Tson tson, String id) {
-        var linked = tson.bindRegistry().core().resolveLinked(id);
-        var entries = linked.schema().entries();
-        String canonical = CanonicalIdentity.canonicalize(id);
-        Set<String> marked = new TreeSet<>();
-        entries.forEach((name, definition) -> {
-            if (linked.originOf(name).equals(canonical) && entries.getAnnotations(name).has(TsonSchema.SYNTHETIC)) {
-                marked.add(withoutHash(name));
-            }
-        });
-        return marked;
-    }
 
     /**
      * Annotation names a key comparison leaves out: {@code doc}, which the resolver carries from the source and
-     * a fixture leaves out of its entries, being compared rather than read, and {@code synthetic}, which
-     * {@link #markedSynthetics} compares on its own terms.
+     * a fixture leaves out of its entries, being compared rather than read, and {@code application} and {@code
+     * completion}, which {@link #markedApplications} and {@link #markedCompletions} compare on their own terms.
      */
-    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", TsonSchema.SYNTHETIC,
-            TsonSchema.APPLICATION);
+    private static final Set<String> NOT_COMPARED_AT_KEYS = Set.of("doc", TsonSchema.APPLICATION,
+            TsonSchema.COMPLETION);
 
     /**
      * Each schema-map key's {@code @meta.application} in a §8 resolved-schema document, as the reference's canonical text,
-     * hashes normalised -- the instantiation each entry is (§8.2), read from the text parsed as data, a key
+     * -- the instantiation each entry is (§8.2), read from the text parsed as data, a key
      * annotation being dropped when the document is bound. Compared as its parsed form, so whitespace inside the
      * argument list is free.
      */
@@ -219,8 +152,8 @@ final class ResolvedForm {
             MapValue.MapEntry entry = keyed.getValue();
             entry.key().annotations().stream()
                     .filter(annotation -> annotation.name().equals(TsonSchema.APPLICATION))
-                    .forEach(annotation -> marked.put(withoutHash(name),
-                            withoutHashes(writtenApplication(annotation.value().orElseThrow().coreValue()))));
+                    .forEach(annotation -> marked.put(name,
+                            writtenApplication(annotation.value().orElseThrow().coreValue())));
         }
         return marked;
     }
@@ -233,28 +166,80 @@ final class ResolvedForm {
         linked.schema().entries().keySet().forEach(name -> {
             if (linked.originOf(name).equals(canonical)) {
                 linked.schema().applicationOf(name).ifPresent(application ->
-                        marked.put(withoutHash(name), withoutHashes(application(application))));
+                        marked.put(name, application(application)));
             }
         });
         return marked;
     }
 
-    /** A written application, the data grammar's reference, as its canonical text. */
+    /**
+     * Each schema-map key's {@code @meta.completion} in a §8 resolved-schema document, as the names it lists in order,
+     * read from the text parsed as data, as {@link #markedApplications} reads an application.
+     */
+    static Map<String, List<String>> markedCompletions(String resolvedText) {
+        Map<String, List<String>> marked = new TreeMap<>();
+        for (Map.Entry<String, MapValue.MapEntry> keyed : entries(resolvedText).entrySet()) {
+            keyed.getValue().key().annotations().stream()
+                    .filter(annotation -> annotation.name().equals(TsonSchema.COMPLETION))
+                    .forEach(annotation -> marked.put(keyed.getKey(),
+                            writtenCompletion(annotation.value().orElseThrow().coreValue())));
+        }
+        return marked;
+    }
+
+    /** The same, from this resolver: the {@code @meta.completion} on the keys of the schema's own entries. */
+    static Map<String, List<String>> ourCompletions(Tson tson, String id) {
+        var linked = tson.bindRegistry().core().resolveLinked(id);
+        String canonical = CanonicalIdentity.canonicalize(id);
+        Map<String, List<String>> marked = new TreeMap<>();
+        linked.schema().entries().keySet().forEach(name -> {
+            if (linked.originOf(name).equals(canonical)) {
+                linked.schema().completionOf(name).ifPresent(completion -> marked.put(name, completion.of()));
+            }
+        });
+        return marked;
+    }
+
+    /** A written completion, {@code { of: [capped bounded] }}, as the names it lists. */
+    private static List<String> writtenCompletion(CoreValue value) {
+        for (RecordValue.Field field : ((RecordValue) value).fields()) {
+            if (field.name().equals("of")) {
+                return ((ArrayValue) field.value().coreValue()).elements().stream()
+                        .map(element -> ((TokenValue) element.coreValue()).text()).toList();
+            }
+        }
+        throw new IllegalArgumentException("a completion states 'of': " + value);
+    }
+
+    /**
+     * A written application, {@code { head: pair  arguments: [text integer] }}, as its canonical text, {@code
+     * pair<text integer>}.
+     */
     private static String writtenApplication(CoreValue value) {
-        return value instanceof io.ltr8.tson.compiler.ast.ReferenceValue reference ? reference.reference().text()
-                : ((TokenValue) value).text();
+        RecordValue application = (RecordValue) value;
+        String head = "";
+        List<String> arguments = List.of();
+        for (RecordValue.Field field : application.fields()) {
+            if (field.name().equals("head")) {
+                head = ((TokenValue) field.value().coreValue()).text();
+            } else if (field.name().equals("arguments")) {
+                arguments = ((ArrayValue) field.value().coreValue()).elements().stream()
+                        .map(element -> ((TokenValue) element.coreValue()).text()).toList();
+            }
+        }
+        return head + "<" + String.join(" ", arguments) + ">";
     }
 
     /** A bound application as its canonical text, on the same terms. */
-    private static String application(TypeRef ref) {
-        return ref.text();
+    private static String application(io.ltr8.tson.schema.meta.ApplyBody application) {
+        return application.text();
     }
 
     /**
      * Each schema-map key's annotations in a §8 resolved-schema document, as {@code @name} or {@code
-     * @name:value}, hashes normalised -- read from the document's <em>text</em>, parsed as data.
+     * @name:value} -- read from the document's <em>text</em>, parsed as data.
      *
-     * <p>Parsed rather than bound, for {@link #markedSynthetics}' reason: a key-position annotation is dropped
+     * <p>Parsed rather than bound: a key-position annotation is dropped
      * when the document is bound, so a comparison through the value model would find none on either side.
      * Parsed rather than scanned, because an annotation value is a token and a regex over the text cannot
      * tell one from the prose inside a {@code @doc}.
@@ -264,7 +249,7 @@ final class ResolvedForm {
         for (Map.Entry<String, MapValue.MapEntry> keyed : entries(resolvedText).entrySet()) {
             String name = keyed.getKey();
             MapValue.MapEntry entry = keyed.getValue();
-            keys.put(withoutHash(name), entry.key().annotations().stream()
+            keys.put(name, entry.key().annotations().stream()
                     .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
                     .map(annotation -> "@" + annotation.name() + annotation.value()
                             .map(value -> ":" + ((TokenValue) value.coreValue()).text()).orElse(""))
@@ -280,8 +265,8 @@ final class ResolvedForm {
         String canonical = CanonicalIdentity.canonicalize(id);
         Map<String, List<String>> keys = new TreeMap<>();
         entries.forEach((name, definition) -> {
-            if (linked.originOf(name).equals(canonical)) {
-                keys.put(withoutHash(name), entries.getAnnotations(name).values().stream()
+            if (linked.originOf(name).equals(canonical) && !incomplete(name, linked)) {
+                keys.put(name, entries.getAnnotations(name).values().stream()
                         .filter(annotation -> !NOT_COMPARED_AT_KEYS.contains(annotation.name()))
                         .map(annotation -> "@" + annotation.name()
                                 + annotation.value().map(value -> ":" + value).orElse(""))
@@ -293,7 +278,7 @@ final class ResolvedForm {
 
     /**
      * Each entry's <em>value</em> annotations in a §8 resolved-schema document -- those written after {@code =>},
-     * {@code doc => @meta.annotation !alias { ... }} -- as {@code @name} or {@code @name:value}, hashes normalised,
+     * {@code doc => @meta.annotation !alias { ... }} -- as {@code @name} or {@code @name:value}, 
      * read from the document's text parsed as data. An entry's value is its body, whose Java shape has no slot for
      * them, so binding the document drops them as it drops a key's; the resolver keeps them among the entry's
      * facts.
@@ -309,7 +294,7 @@ final class ResolvedForm {
                             .map(value -> ":" + ((TokenValue) value.coreValue()).text()).orElse(""))
                     .sorted().toList();
             if (!written.isEmpty()) {
-                values.put(withoutHash(name), written);
+                values.put(name, written);
             }
         }
         return values;
@@ -330,7 +315,7 @@ final class ResolvedForm {
                             + annotation.value().map(value -> ":" + value).orElse(""))
                     .sorted().toList();
             if (!recorded.isEmpty()) {
-                values.put(withoutHash(name), recorded);
+                values.put(name, recorded);
             }
         });
         return values;

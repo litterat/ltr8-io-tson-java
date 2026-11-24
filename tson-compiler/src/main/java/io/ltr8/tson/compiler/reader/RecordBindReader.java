@@ -118,7 +118,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             // which collects a record's arguments through their bridges, is the step a schema-driven read replaces.
             TsonTypeReader<?> rebound = BindTargets.to(field.parser(), target.dataClass(),
                     "field '" + field.name() + "'", "component '" + target.name() + "'",
-                    new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches), true);
+                    new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches,
+                            written -> io.ltr8.tson.compiler.resolver.AliasChain.terminal(written,
+                                    context.schema().entries()::get)), true);
             if (rebound != field.parser()) {
                 fields.set(i, new CompiledField(field.name(), field.schema(), rebound));
             }
@@ -362,8 +364,12 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         public TsonTypeReader<?> create(String name, Top typeDefinition, ValueReaderContext context) {
             TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition instanceof RecordBody body)) {
-                throw new IllegalArgumentException(
+                throw new IllegalStateException(
                         "'" + name + "' is not record-shaped: " + typeDefinition);
+            }
+            if (context.tagOf(name).isEmpty()) {
+                // A record in place has no name a binding map holds: the component holding it says its class.
+                return new RecordInPlaceBindReader(name, body, context);
             }
             DataClass dataClass = descriptorFor(name, typeDefinition, context);
 
@@ -460,7 +466,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         private Class<?> boundClassOrNull(String schemaTypeName, ValueReaderContext vctx) {
             for (String candidate : vctx.bindingNamesFor(schemaTypeName)) {
                 try {
-                    return context.getDescriptor(candidate).typeClass();
+                    return context.getDescriptor(vctx.namespaceOf(candidate), candidate).typeClass();
                 } catch (DataBindException | RuntimeException e) {
                     // Not a member under this name; the next candidate is the entry's own.
                 }
@@ -481,9 +487,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         private DataClass descriptorFor(String name, Top definition, ValueReaderContext vctx) {
             DataBindException first = null;
             StringBuilder tried = new StringBuilder();
-            for (String candidate : vctx.bindingNamesFor(name, definition)) {
+            for (String candidate : vctx.bindingNamesFor(name)) {
                 try {
-                    return context.getDescriptor(candidate);
+                    return context.getDescriptor(vctx.namespaceOf(candidate), candidate);
                 } catch (UnboundNameException e) {
                     // Not bound under this name; the next candidate is tried, and the first is the one reported,
                     // being the name the author wrote.

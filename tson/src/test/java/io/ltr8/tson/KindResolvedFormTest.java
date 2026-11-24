@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -21,11 +21,11 @@ class KindResolvedFormTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/kind-resolved.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               stock_id    => !net.uuid_type {}
               customer_id => !net.uuid_type {}
-              any_id      => !meta.reference_type { of: net.uuid_type }
+              any_id      => !meta.ref { of: net.uuid_type }
             }""";
 
     private static Tson tson() {
@@ -35,16 +35,16 @@ class KindResolvedFormTest {
     @Test
     void theResolvedFormWritesOfAloneAndReadsBack() {
         Tson tson = tson();
-        ReferenceBody linked = assertInstanceOf(ReferenceBody.class,
+        RefBody linked = assertInstanceOf(RefBody.class,
                 tson.resolve(SCHEMA).schema().entries().get("any_id"));
         assertEquals(List.of("customer_id", "stock_id", "uuid"), linked.memberNames());
 
         String written = tson.objectWriter().toTson(linked);
-        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: net.uuid_type allow_sibling: true }",
+        assertEquals("{ chain: { parents: [] supertypes: [] subtypes: [] } of: net.uuid_type }",
                 written, "of is a reference, written unquoted");
 
-        ReferenceBody read = assertInstanceOf(ReferenceBody.class,
-                tson.objectReader().withSchema(TsonBundledSchemas.CORE_ID).readAs(written, "meta.reference_type",
+        RefBody read = assertInstanceOf(RefBody.class,
+                tson.objectReader().withSchema(TsonBundledSchemas.CORE_ID).readAs(written, "meta.ref",
                         Object.class));
         assertEquals(Optional.empty(), read.index());
         assertEquals(linked, read);

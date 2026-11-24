@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.ValueEntry;
+import io.ltr8.tson.schema.meta.ValueRef;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -97,8 +98,9 @@ final class HeldValues {
         }
         String naming = where + " is the dependent field '" + value.field() + "', typed by its sibling '"
                 + value.sibling() + "'";
-        String type = switch (ValuesByName.typeNamed(value.named().get(), value.declared(), merged)) {
+        String type = switch (ValuesByName.typeNamed(value.named().get(), merged)) {
             case DependentFieldReader.TypeNamed.Entry entry -> entry.name();
+            case DependentFieldReader.TypeNamed.InPlace inline -> inline.type().text();
             case DependentFieldReader.TypeNamed.None none -> throw new SchemaValidationException(naming
                     + ", which holds " + none.held() + " -- so its value has no type to be read against");
         };
@@ -110,7 +112,7 @@ final class HeldValues {
                     @Override
                     public void held(List<String> at, TsonSchema.SlotType slotType,
                                      io.ltr8.tson.schema.meta.TypeRef reference,
-                                     io.ltr8.tson.schema.meta.Ref<?> cell) {
+                                     ValueRef<?> cell) {
                         byName.add(new TsonSchema.ValueByName(under(slot, at), slotType, reference,
                                 Optional.ofNullable(cell)));
                     }
@@ -118,10 +120,11 @@ final class HeldValues {
                     @Override
                     public void heldAsWritten(TsonSchema.HeldValue nested) {
                         work.add(new TsonSchema.HeldValue(under(slot, nested.slot()), nested.field(), nested.sibling(),
-                                nested.declared(), nested.named(), nested.written()));
+                                nested.named(), nested.written()));
                     }
                 }, true);
-        compiled().get(type).read(ctx);
+        compiled().get(value.named().get() instanceof io.ltr8.tson.schema.meta.TypeInline inline
+                ? inline : io.ltr8.tson.schema.meta.TypeRef.of(type)).read(ctx);
         for (Diagnostic problem : problems.diagnostics()) {
             String at = problem.path().filter(path -> !path.isEmpty() && !path.equals("/"))
                     .map(path -> " at " + path).orElse("");

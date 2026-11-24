@@ -6,14 +6,14 @@ import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,8 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Sugar and the {@code !} form are the <b>only</b> two ways to build a container. A generic-application head
  * resolves in the schema's one namespace, where the kernel's {@code map} is a closed constructor taking no type
  * arguments -- so {@code map<text, text>} is refused and <code>{text =&gt; text}</code> is the spelling. What makes
- * every form work uniformly is that {@code SchemaDesugarer} rewrites each into a real {@code !C value} declaration
- * before resolution, off one fixed table.
+ * every form work uniformly is that {@code SchemaDesugarer} rewrites each into the {@code !C value} construction it
+ * denotes, in place, before resolution, off one fixed table.
  */
 class ContainerSugarEndToEndTest {
 
@@ -50,8 +49,8 @@ class ContainerSugarEndToEndTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/container-sugar.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s
                 }
@@ -67,19 +66,19 @@ class ContainerSugarEndToEndTest {
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
-    /** The entry a field's type names, which every fixture here reaches the injected declaration through. */
+    /** The type field {@code field} of {@code record} holds: the entry a name names, or a type written in place. */
     private static Top fieldTypeEntry(TsonCompiledSchema compiled, String record, String field) {
         RecordBody body = (RecordBody) compiled.schema().entries().get(record);
-        String name = body.fields().entrySet().stream().filter(f -> f.getKey().equals(field))
-                .map(java.util.Map.Entry::getValue).findFirst().orElseThrow()
-                .typeRef().name();
-        return compiled.schema().entries().get(name);
+        io.ltr8.tson.schema.meta.TypeExpr type = body.fields().get(field).typeExpr();
+        return switch (type) {
+            case io.ltr8.tson.schema.meta.TypeInline inline -> inline.of();
+            case TypeRef name -> compiled.schema().entries().get(name.name());
+        };
     }
 
     /**
-     * An entry's body with every {@code ALIAS} hop followed. How many hops an alias costs is this
-     * resolver's own bookkeeping (§8.3 flattens uses, not entries), so a fixture asserting on the body a name
-     * denotes should not also be asserting on the length of the chain to it.
+     * An entry's body with every alias hop followed: a fixture asserting on the body a name denotes should not
+     * also be asserting on the length of the chain to it.
      */
     private static Top bodyOf(TsonCompiledSchema compiled, String name) {
         Top body = compiled.schema().entries().get(name);
@@ -104,12 +103,8 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>A collection-valued slot holds an application like every other {@code meta.type_ref}-typed slot.</b>
-     * {@code variants} is a {@code [meta.type_ref]}, so a §5.10 application standing in one is spelled as its
-     * reference and rewritten to the entry it denotes one pass later -- the same route a field
-     * type, an {@code element_type} and a map's {@code key_type}/{@code value_type} already took. Refusing the
-     * variant in {@code choiceBinding} instead would leave the <em>whole</em> choice unlifted, and an unlifted
-     * sugar form at {@code DefinitionResolver} is a broken invariant, never a verdict on the author's schema.
+     * <b>A choice's variant holds an application as every type slot does</b> ([TSON-SCHEMA] §5.10): {@code
+     * box<text>} closes in place to its record, with no name, and the choice reads a brace value against it.
      */
     @Test
     void anApplicationIsAChoiceVariantLikeAnyOtherReference() {
@@ -118,14 +113,14 @@ class ContainerSugarEndToEndTest {
                   u   => ( box<text> | int32 )""");
 
         ChoiceBody choice = assertInstanceOf(ChoiceBody.class, compiled.schema().entries().get("u"));
-        String variant = choice.variants().getFirst().name();
-        assertTrue(variant.startsWith("record_v_text_"), () -> "names the expansion, not 'box': " + variant);
-        assertEquals(List.of(), choice.variants().getFirst().arguments(),
-                "and names it as a closed reference, the application having been rewritten");
-        assertInstanceOf(RecordBody.class, compiled.schema().entries().get(variant));
+        TypeInline variant = assertInstanceOf(TypeInline.class, choice.variants().getFirst());
+        RecordBody record = assertInstanceOf(RecordBody.class, variant.of());
+        assertEquals(TypeRef.of("text"), record.fields().get("v").type());
+        assertNotNull(compiled.get("u").read(TestDocuments.document("{ v: \"x\" }")));
+        assertNotNull(compiled.get("u").read(TestDocuments.document("7")));
     }
 
-    /** The tuple half of the same rule: {@code elements} is a collection of {@code meta.tuple_element} records. */
+    /** The tuple half of the same rule: an element's {@code element_type} is a type slot. */
     @Test
     void anApplicationIsATupleElementLikeAnyOtherReference() {
         TsonCompiledSchema compiled = compile("""
@@ -134,8 +129,8 @@ class ContainerSugarEndToEndTest {
 
         TupleBody tuple = assertInstanceOf(TupleBody.class, compiled.schema().entries().get("t"));
         assertEquals(TypeRef.of("text"), tuple.elements().getFirst().elementType());
-        String second = tuple.elements().get(1).elementType().name();
-        assertTrue(second.startsWith("record_v_text_"), () -> "names the expansion: " + second);
+        TypeInline second = assertInstanceOf(TypeInline.class, tuple.elements().get(1).elementType());
+        assertInstanceOf(RecordBody.class, second.of());
 
         TsonValue value = (TsonValue) compiled.get("t")
                 .read(TestDocuments.document("[\"a\" { v: \"b\" }]"));
@@ -143,34 +138,36 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * <b>The open case, which failed worse than the closed one.</b> With the variant refused, the choice was
-     * never lifted, so holding {@code w}'s body handed the un-lifted {@code ChoiceExpr} to the producer that
-     * spells a reference -- a {@code ClassCastException} out of the resolver, where the two shapes it
-     * accepts are {@code NameRef} and {@code ApplicationRef}. Lifting the choice is what keeps that producer's
-     * input to the two shapes it documents.
+     * <b>A choice is no parametric record's body</b> ([TSON-SCHEMA] §5.10): a parametric record's body is a record body.
+     * Inside one a choice over a parameter is written in place, and is judged disjoint where it is applied, once its
+     * variants are known.
      */
     @Test
-    void anApplicationIsAChoiceVariantInsideATemplateToo() {
+    void aChoiceOverAParameterIsNoBodyAndIsJudgedWhereItIsApplied() {
+        SchemaValidationException body = assertThrows(SchemaValidationException.class, () -> compile("""
+                  box => <T> { v: T }
+                  w   => <T> ( box<T> | int32 )"""));
+        assertTrue(body.getMessage().contains("a parametric record's body is a record body"), body.getMessage());
+
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
-                  w   => <T> ( box<T> | int32 )
+                  w   => <T> { c: ( box<T> | int32 ) }
                   u   => w<text>""");
-
-        ChoiceBody choice = assertInstanceOf(ChoiceBody.class, bodyOf(compiled, "u"));
-        assertTrue(choice.variants().getFirst().name().startsWith("record_v_text_"), choice::toString);
+        assertNotNull(compiled.get("u").read(TestDocuments.document("{ c: { v: \"a\" } }")));
     }
 
     /**
      * The property that says the fix is a fix rather than a new path: an application variant is the same
      * type as the bare reference to it, so §5.4's distinctness sees through the spelling. Two applications of
-     * one template are one variant, exactly as two occurrences of one name are.
+     * one parametric record are one variant, exactly as two occurrences of one name are.
      */
     @Test
-    void twoApplicationsOfOneTemplateAreOneVariant() {
+    void twoApplicationsOfOneParametricRecordAreOneVariant() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
-                          box => <T> { v: T }
-                          u   => ( box<text> | box<text> )"""));
+                          box      => <T> { v: T }
+                          box_text => box<text>
+                          u        => ( box_text | box_text )"""));
 
         assertTrue(thrown.getMessage().contains("twice"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("§5.4"), thrown.getMessage());
@@ -202,7 +199,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * {@code set} and {@code array} share a body shape, so the only thing distinguishing them is the defaults
-     * {@code set}'s own vocabulary tightens (§5.7). Binding {@code !set_type { element_type: text }} through the
+     * {@code set}'s own vocabulary tightens (§5.8). Binding {@code !set_type { element_type: text }} through the
      * compiled reader applies those schema-composed defaults, so this needs no {@code set}-specific handling
      * anywhere -- worth pinning precisely because nothing names {@code set}.
      */
@@ -221,7 +218,7 @@ class ContainerSugarEndToEndTest {
 
     /**
      * §5.3's sized sugar, end to end. The size specifier binds {@code min_items}/{@code max_items} on the
-     * {@code array} binding record directly -- there is no size template in between any more, so all three
+     * {@code array} binding record directly -- there is no size parametric record in between any more, so all three
      * array spellings land on the same shape, one bound apart
      * ({@link #everySpellingOfAnArrayDeclarationRecordsNoSupertypes}).
      */
@@ -232,8 +229,8 @@ class ContainerSugarEndToEndTest {
                   holder => { tags: tag_list }""");
 
         Top entry = compiled.schema().entries().get("tag_list");
-        assertEquals(EntryKind.PRODUCT, EntryKind.of(entry, n -> true), "the constructor's kind");
-        assertEquals(List.of(), OpenEntry.parameterNames(entry), "closed -- §5.10");
+        assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class, entry, "a construction of `array`");
+        assertEquals(List.of(), ParametricEntry.parameterNames(entry), "closed -- §5.10");
         assertEquals(List.of(), TypeChain.supertypesOf(entry),
                 "empty: this is a construction of `array`, and a constructor is not a supertype");
         assertEquals(Optional.of("meta.array"), compiled.schema().constructorOf("tag_list"),
@@ -417,30 +414,28 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * A container sugar form written over the enclosing template's own parameter: it lifts to an <b>open</b>
-     * synthetic, and applying the template closes it into the concrete container it always described.
+     * A container sugar form written over the enclosing parametric record's own parameter is held as the application it
+     * spells, and applying the parametric record closes it to the container it always described, in place.
      */
     @Test
-    void applyingATemplateWhoseBodyCarriesSugarClosesTheFormItHolds() {
+    void applyingAParametricRecordWhoseBodyCarriesSugarClosesTheFormItHolds() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: [T] }
                   holder => { b: box<text> }""");
 
         RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b"));
-        ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(box.fields().values().stream().toList().get(0).typeRef().name()));
+        TypeInline v = assertInstanceOf(TypeInline.class, box.fields().get("v").type());
+        ArrayBody array = assertInstanceOf(ArrayBody.class, v.of());
 
         assertEquals(TypeRef.of("text"), array.elementType());
     }
 
     /**
-     * §8.2's one-entry-per-form rule, across the two channels that produce one. {@code [uuid]} written
-     * directly lifts at desugar; {@code [T]} closed with {@code T := uuid} arrives from materialisation --
-     * and they are the same type, so they must be the same entry. Both are named by one function of one
-     * binding record, which is what makes it so.
+     * §8.2's structural identity, across the two routes that produce one form: {@code [uuid]} written directly and
+     * {@code [T]} closed with {@code T := uuid} are one type, each written in place with no entry.
      */
     @Test
-    void aFormClosedFromATemplateIsTheSameEntryADirectOneProduces() {
+    void aFormClosedFromAParametricRecordIsTheSameTypeADirectOneIs() {
         TsonCompiledSchema compiled = compile("""
                   box    => <T> { v: [T] }
                   holder => { b: box<uuid>  direct: [uuid] }""");
@@ -448,99 +443,53 @@ class ContainerSugarEndToEndTest {
         RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b"));
         RecordBody holder = (RecordBody) compiled.schema().entries().get("holder");
 
-        assertEquals(holder.fields().values().stream().toList().get(1).typeRef().name(),
-                box.fields().values().stream().toList().get(0).typeRef().name());
-        assertEquals(1, compiled.schema().entries().keySet().stream()
-                .filter(n -> n.startsWith("array_uuid_")).count(),
-                () -> "one array_uuid entry, shared: " + compiled.schema().entries().keySet());
+        assertEquals(holder.fields().get("direct").type(), box.fields().get("v").type());
     }
 
     /**
-     * The same rule where the lifted form's element is itself an <b>application</b> ([TSON-SCHEMA] §8.2's own
-     * example, {@code [box<text>]} written directly against {@code [box<T>]} closed with {@code T := text}).
-     *
-     * <p>This is the case the two lift channels cannot name alike on their own. Both derive a name from the
-     * binding record with every inner form reduced to its entry name -- {@code SchemaDesugarer} gets there by
-     * lifting innermost-first, {@code TemplateMaterialiser} by closing applications before it names -- but an
-     * application has no entry until materialisation, so the desugar channel names an unreduced record and
-     * the two forms land apart. §8.2 requires the merge pass that settles it: "identity settles after Pass
-     * 2 ... eagerly-lifted synthetics that become structurally identical under resolution merge into one
-     * entry".
+     * The same where the form's element is itself an <b>application</b>: {@code [box<text>]} written directly and
+     * {@code [box<T>]} closed with {@code T := text} hold equal records in place, so they are one type.
      */
     @Test
-    void aFormWhoseElementIsAnApplicationIsAlsoOneEntry() {
+    void aFormWhoseElementIsAnApplicationIsAlsoOneType() {
         TsonCompiledSchema compiled = compile("""
                   box    => <T> { v: T }
                   outer  => <T> { a: [box<T>] }
                   use    => outer<text>
                   direct => { d: [box<text>] }""");
 
-        String direct = ((RecordBody) compiled.schema().entries().get("direct"))
-                .fields().values().iterator().next().typeRef().name();
-        String closed = ((RecordBody) bodyOf(compiled, "use")).fields().values().iterator().next().typeRef().name();
-
-        assertEquals(closed, direct, () -> "one entry for one form: " + compiled.schema().entries().keySet());
-        // The closed form only: `array_box_p0_...` is the template's own open synthetic, which stays an entry
-        // of its own -- §8.2 gives open synthetics a separate identity rule and nothing merges them.
-        assertEquals(1, compiled.schema().entries().keySet().stream()
-                .filter(n -> n.startsWith("array_record_v_text")).count(),
-                () -> "one closed array of the expanded box, shared: " + compiled.schema().entries().keySet());
+        assertEquals(((RecordBody) compiled.schema().entries().get("direct")).fields().get("d").type(),
+                ((RecordBody) bodyOf(compiled, "use")).fields().get("a").type());
     }
 
     /**
-     * And the name they agree on is the one derived from the <b>reduced</b> record -- the surviving entry is
-     * named for the entry its element became, not for the application the author wrote. That is what makes
-     * the name a function of the resolved form alone, so two schemas reaching this form by different
-     * spellings agree on it (§8.2's determinism SHOULD, and what lets the import merge unify rather than
-     * collide).
+     * A choice's variants and a tuple's elements are type slots like any other, so a parameter stands there inside an
+     * parametric record and is substituted where the record is applied (§5.10).
      */
     @Test
-    void theSurvivingNameIsDerivedFromTheElementsOwnEntry() {
-        TsonCompiledSchema compiled = compile("""
-                  box    => <T> { v: T }
-                  direct => { d: [box<text>] }""");
-
-        String array = ((RecordBody) compiled.schema().entries().get("direct"))
-                .fields().values().iterator().next().typeRef().name();
-        String element = ((ArrayBody) compiled.schema().entries().get(array)).elementType().name();
-
-        assertTrue(array.contains(element),
-                () -> "'" + array + "' should be derived from its element entry '" + element + "'");
-    }
-
-    /**
-     * <b>Collection-valued slots are parameterizable</b> (§5.10). A held body is not read against the
-     * constructor's vocabulary at all until materialisation substitutes, so a parameter inside {@code
-     * choice}'s {@code variants} -- or {@code tuple}'s {@code elements} -- is a token inside an array and
-     * the form lifts like any other.
-     */
-    @Test
-    void aParameterInsideACollectionValuedSlotLiftsLikeAnyOther() {
+    void aParameterInsideACollectionValuedSlotIsSubstituted() {
         for (String body : List.of("(T | text)", "[T, text]")) {
-            TsonCompiledSchema compiled = assertDoesNotThrow(
-                    () -> compile("  odd => <T> { v: %s }\n  use => odd<int32>".formatted(body)), body);
-
-            // The closure is a real body of the constructor the sugar names, not a deferred anything -- and
-            // it is `use` itself, a declaration naming an application being that instantiation (#15).
-            RecordBody closed = assertInstanceOf(RecordBody.class,
-                    compiled.schema().entries().get("use"), body);
-            Top variant = compiled.schema().entries().get(closed.fields().values().iterator().next().typeRef().name());
-            assertTrue(variant instanceof ChoiceBody || variant instanceof TupleBody,
-                    () -> body + " closed to " + variant);
+            TsonCompiledSchema compiled = compile("  odd => <T> { v: %s }\n  use => odd<int32>".formatted(body));
+            TypeInline v = assertInstanceOf(TypeInline.class, ((RecordBody) bodyOf(compiled, "use")).fields()
+                    .get("v").type(), body);
+            assertTrue(v.text().contains("int32"), v.text());
         }
     }
 
     /**
      * A container constructor's own name at an application head resolves -- the kernel's {@code meta.map} is in
-     * every closure reaching core -- and is refused as what it is: a constructor, closed, taking no type arguments.
-     * An author writing {@code meta.map<text, text>} is told to drop the arguments, and the sugar
-     * {@code {text => text}} is the spelling.
+     * every closure reaching core -- and constructs ([TSON-SCHEMA] §5.3's construction sugar): {@code
+     * meta.map<text, text>} is {@code !meta.map { key_type: text  value_type: text }}, the construction the sugar
+     * {@code {text => text}} is spelled for, and both name one entry.
      */
     @Test
-    void aContainerConstructorsNameAtAHeadTakesNoArguments() {
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> compile("  holder => { entries: meta.map<text, text> }"));
+    void aContainerConstructorsNameAtAHeadConstructs() {
+        TsonCompiledSchema compiled = compile("  holder => { entries: meta.map<text, text>  sugar: {text => text} }");
 
-        assertTrue(thrown.getMessage().contains("'meta.map' declares no type parameters"), thrown.getMessage());
+        RecordBody holder = assertInstanceOf(RecordBody.class, compiled.schema().entries().get("holder"));
+        assertEquals(holder.fields().get("sugar").type(), holder.fields().get("entries").type());
+        MapBody map = assertInstanceOf(MapBody.class, fieldTypeEntry(compiled, "holder", "entries"));
+        assertEquals("text", map.keyType().name());
+        assertEquals("text", map.valueType().text());
     }
 }

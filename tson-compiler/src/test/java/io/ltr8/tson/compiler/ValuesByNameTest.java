@@ -46,7 +46,7 @@ class ValuesByNameTest {
     static {
         DOCUMENTS.put(META_SERVICE, """
                 !!id:"https://example.test/meta-service.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   method_name => meta.identifier
                   status_name => meta.identifier
@@ -82,7 +82,7 @@ class ValuesByNameTest {
         return """
                 !!id:"%s"
                 !!import:"https://example.test/meta-service.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order               => { sku: text  quantity: int32 }
                   place_order_request => { order: order }
@@ -118,7 +118,7 @@ class ValuesByNameTest {
                 !!id:"%s"
                 !!import:"https://example.test/meta-service.tn"
                 !!import:"https://example.test/orders.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   %s
                 }
@@ -293,11 +293,11 @@ class ValuesByNameTest {
     }
 
     @Test
-    void anOpenEntryNamesNoValue() {
+    void aParametricRecordNamesNoValue() {
         refused(api("template", """
                 box => <T> { v: T }
                 api => !interface { m => { request: box } }"""),
-                "'box' is an open entry", "denotes no value until it is applied");
+                "'box' is a parametric record", "denotes no value until it is applied");
     }
 
     @Test
@@ -318,14 +318,11 @@ class ValuesByNameTest {
                 problems.getFirst().message());
     }
 
-    /** The read refuses what is no name at a slot that holds one, before the linker is reached. */
+    /** A reference is a token's text whatever its form ([TSON-DATA] §2.4, [TSON-SCHEMA] §5.12). */
     @Test
-    void aQuotedNameIsText() {
-        List<Diagnostic> problems = problems(api("quoted", """
-                routes => !bindings { b => { method: "orders.place_order"  verb: POST  route: "/" } }"""));
-        assertEquals(1, problems.size(), problems.toString());
-        assertTrue(problems.getFirst().message().contains("expected the name of a 'method' value"),
-                problems.getFirst().message());
+    void aQuotedNameIsTheNameItsTextSpells() {
+        assertEquals(List.of(), problems(api("quoted", """
+                routes => !bindings { b => { method: "orders.place_order"  verb: POST  route: "/" } }""")));
     }
 
     // ── The binding's side ─────────────────────────────────────────────────────────────────────────
@@ -336,22 +333,26 @@ class ValuesByNameTest {
         assertMisbound("name_at_text", "text", "is not a reference");
     }
 
-    /** The grammar is the linker's: each segment between the dots is an identifier, none empty. */
+    /**
+     * The grammar is the linker's: the name splits at each dot, none empty, and each further segment is a name of the
+     * family of what it enters ([TSON-SCHEMA] §5.12), refused by that family.
+     */
     @Test
     void aMalformedNameIsRefusedWhereItIsResolved() {
         refused(api("bad-segment", """
                 routes => !bindings { b => { method: orders.1x  verb: POST  route: "/" } }"""),
-                "'routes' at /b/method holds 'orders.1x', which is no qualified name", "'1x' is not");
+                "'routes' at /b/method names 'orders.1x', and '1x' is no name of 'method_name', which names the keys "
+                        + "of 'orders'", "cannot start an identifier");
         refused(api("leading-dot", """
                 routes => !bindings { b => { method: .orders  verb: POST  route: "/" } }"""),
-                "holds '.orders', which is no qualified name", "one is empty");
+                "holds '.orders', which is no qualified name", "has an empty segment");
     }
 
     private static void assertMisbound(String constructor, String fieldType, String expected) {
         String id = "https://example.test/meta-" + constructor.replace('_', '-') + ".tn";
         DOCUMENTS.put(id, """
                 !!id:"%s"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   %s => { a: %s }
                 }
@@ -403,7 +404,7 @@ class ValuesByNameTest {
     }
 
     /**
-     * A {@code Ref} host receives the value its name reaches when the schema links: the binding's {@code method}
+     * A {@code ValueRef} host receives the value its name reaches when the schema links: the binding's {@code method}
      * is the interface's {@code place_order}, delivered into the cell the read created with the name.
      */
     @Test
@@ -466,7 +467,9 @@ class ValuesByNameTest {
                 l => !labels { x => { text: p.x.value } }""")));
     }
 
-    /** The read path's rule: a template is no type a value can be read against, so the walk has none to go on with. */
+    /**
+     * The read path's rule: no value is read against a parametric record, so the walk has none to go on with.
+     */
     @Test
     void aSiblingNamingNoTypeIsRefusedAtTheName() {
         List<Diagnostic> problems = problems(api("dependent-template", """
@@ -475,7 +478,7 @@ class ValuesByNameTest {
                 l => !labels { x => { text: d.s.value } }"""));
         assertTrue(problems.stream().anyMatch(p -> p.code() == Diagnostic.Code.SCHEMA_ERROR
                 && p.message().contains("'l' at /x/text names 'd.s.value', and 'd.s.value' is a dependent field, "
-                        + "typed by its sibling 'kind', which holds 'box', a template")), problems.toString());
+                        + "typed by its sibling 'kind', which holds 'box', a parametric record")), problems.toString());
     }
 
     /** Past a dependent field a segment selects a field of the type its sibling names, and no other. */
@@ -565,7 +568,7 @@ class ValuesByNameTest {
         refused(api("held-template", """
                 box => <T> { v: T }
                 d => !settings { s => { kind: box  value: { v: 1 } } }"""),
-                "'d' at /s/kind names 'box', and 'box' is an open entry");
+                "'d' at /s/kind names 'box', and 'box' is a parametric record");
     }
 
     /** A value by name goes on through a dependent field into the record it holds. */

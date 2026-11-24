@@ -1,8 +1,11 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
+import io.ltr8.tson.schema.meta.TypeExpr;
+import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -12,18 +15,18 @@ import java.util.Set;
 
 /**
  * What a written parent contributes to an IS-A chain ([TSON-SCHEMA] §5.8): the one rule a closed declaration's
- * chain is built by at its declaration and a record template's application's when materialisation closes it.
+ * chain is built by at its declaration and a parametric record's application's when materialisation closes it.
  *
  * <p><b>A closed parent</b> contributes itself, the end of its alias chain (§8.3: the terminal is the same
  * type under another name, so IS-A reaches it) and that entry's own chain. <b>An application</b> denotes no entry
- * at the position that writes it -- its fields are absorbed by value -- so it contributes its template's
- * ancestors, and nothing for the template's head, an applied parent reaching the entry its arguments name and never
+ * at the position that writes it -- its fields are absorbed by value -- so it contributes its head's
+ * ancestors, and nothing for the head itself, an applied parent reaching the entry its arguments name and never
  * its head (§5.8). The edge to the entry a closed application
  * denotes is {@code SchemaResolver}'s to fold, once every declaration has resolved; until then the application is
  * kept in the chain's {@code parents}, the one list that holds applications.
  *
- * <p><b>A template's ancestors are its own chain's {@code supertypes}</b>: the closed entries its written parents
- * reach, computed when it was declared ({@code TypeChain}), so an imported template yields them as a local one
+ * <p><b>A parametric record's ancestors are its own chain's {@code supertypes}</b>: the closed entries its written parents
+ * reach, computed when it was declared ({@code TypeChain}), so an imported parametric record yields them as a local one
  * does.
  */
 final class Ancestry {
@@ -49,28 +52,41 @@ final class Ancestry {
     }
 
     /**
-     * What an application of the template {@code head} contributes: the ancestors its own written parents reach,
-     * and nothing for the template itself. Empty for a head that is no template.
+     * What an application of the parametric record {@code head} contributes: the ancestors its own written parents reach,
+     * and nothing for the parametric record itself. Empty for a head that is no parametric record.
      */
-    static List<String> ofTemplate(String head, DefinitionGetter namespace) {
-        Top template = namespace.definition(head);
-        return OpenEntry.isOpen(template) ? TypeChain.supertypesOf(template) : List.of();
+    static List<String> ofApplication(String head, DefinitionGetter namespace) {
+        Top record = namespace.definition(parametricHead(head, namespace));
+        return ParametricEntry.isParametric(record) ? TypeChain.supertypesOf(record) : List.of();
+    }
+
+    /**
+     * The parametric record an application's {@code head} names: the head itself, or, where it is an alias of a parametric
+     * record ({@code pet_of => pet_box}), the parametric record at the end of its alias chain, the alias being the same
+     * entry under another name ([TSON-SCHEMA] §8.3). {@code head} itself where the chain ends at anything else.
+     */
+    static String parametricHead(String head, DefinitionGetter namespace) {
+        String terminal = AliasChain.terminal(head, namespace::definition);
+        return !terminal.equals(head) && ParametricEntry.isParametric(namespace.definition(terminal)) ? terminal : head;
     }
 
     /**
      * The chain a closed record's written parents reach: every closed parent's contribution and every
      * application's, deduplicated, with each application kept in {@code parents} for the fold.
      */
-    static TypeChain chainOf(List<TypeRef> written, DefinitionGetter namespace) {
-        List<TypeRef> applied = new ArrayList<>();
+    static TypeChain chainOf(List<TypeExpr> written, DefinitionGetter namespace) {
+        List<TypeExpr> applied = new ArrayList<>();
         Set<String> names = new LinkedHashSet<>();
-        for (TypeRef parent : written) {
-            if (!parent.arguments().isEmpty()) {
-                names.addAll(ofTemplate(parent.name(), namespace));
-                applied.add(parent);
-                continue;
+        for (TypeExpr parent : written) {
+            switch (parent) {
+                case TypeRef name -> names.addAll(ofParent(name.name(), namespace));
+                case TypeInline inline when inline.of() instanceof ApplyBody application -> {
+                    names.addAll(ofApplication(application.head().name(), namespace));
+                    applied.add(parent);
+                }
+                case TypeInline inline -> throw new IllegalStateException("a parent is a name or an application, "
+                        + "never '" + inline.text() + "'");
             }
-            names.addAll(ofParent(parent.name(), namespace));
         }
         return TypeChain.of(List.copyOf(names)).withParents(applied);
     }

@@ -38,8 +38,8 @@ class WaitOrderTest {
     private static String schema(String declarations) {
         return """
                 !!id:"https://example.test/wait.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s}
                 """.formatted(declarations);
@@ -67,11 +67,11 @@ class WaitOrderTest {
     @Test
     void aConstructorAndItsInstanceShareADocumentInEitherOrder() {
         for (String declarations : List.of("""
-                  counted => meta.array ^ { ordered?: = false }
+                  counted => !meta.array ^ { ordered: false }
                   counts  => !counted { element_type: int32 }
                 """, """
                   counts  => !counted { element_type: int32 }
-                  counted => meta.array ^ { ordered?: = false }
+                  counted => !meta.array ^ { ordered: false }
                 """)) {
             Tson tson = tson(declarations);
             assertEquals(List.of(), tson.validateSchema(schema(declarations)));

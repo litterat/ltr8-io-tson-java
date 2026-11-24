@@ -8,7 +8,6 @@ import io.ltr8.tson.compiler.consumer.Operation;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.Top;
@@ -21,7 +20,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -57,7 +55,7 @@ class ImportedVocabularyTest {
     /** (1) The vocabulary schema: an operation record, and the namespace type whose values are operations. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
             !schema {
               operation => {
                 path:     text
@@ -122,7 +120,7 @@ class ImportedVocabularyTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!import:"https://example.test/meta-http.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   search_request  => { q: text }
                   search_response => { hits: [text] }
@@ -147,11 +145,11 @@ class ImportedVocabularyTest {
         TsonLinkedSchema vocabulary = core(consumerContext()).resolveLinked(META_HTTP);
         Top operations = vocabulary.schema().entries().get("operations");
 
-        assertEquals(EntryKind.PRODUCT, vocabulary.kindOf("operations"));
-        assertEquals(List.of(), TypeChain.supertypesOf(operations), "construction transfers kind, not IS-A");
+        assertInstanceOf(io.ltr8.tson.schema.meta.NamespaceBody.class, operations);
+        assertEquals(List.of(), TypeChain.supertypesOf(operations), "construction grants no IS-A");
         assertFalse(vocabulary.isConstructor("operations", operations),
                 "a namespace type is a type: `!operations { ... }` builds a value of it");
-        assertEquals(EntryKind.PRODUCT, vocabulary.kindOf("operation"));
+        assertInstanceOf(io.ltr8.tson.schema.meta.RecordBody.class, vocabulary.schema().entries().get("operation"));
         assertFalse(vocabulary.isConstructor("operation", vocabulary.schema().entries().get("operation")),
                 "the record its values are is a type too");
     }
@@ -168,8 +166,8 @@ class ImportedVocabularyTest {
 
         assertTrue(thrown.getMessage().contains("the body is no value of the type 'meta.record_field'")
                 && thrown.getMessage().contains("unknown field 'name'"), thrown.getMessage());
-        assertEquals(EntryKind.VALUE, linked("component-value", "  good => !meta.record_field { type: text }")
-                .kindOf("good"));
+        assertInstanceOf(ValueEntry.class, linked("component-value", "  good => !meta.record_field { type: text }")
+                .schema().entries().get("good"));
     }
 
     // ── Binding the record to the consumer's class ───────────────────────────────────────────────
@@ -206,7 +204,6 @@ class ImportedVocabularyTest {
         TsonLinkedSchema schema = linked("retrieve", SEARCH);
 
         Namespace<?> api = assertInstanceOf(Namespace.class, ((ValueEntry) schema.schema().entries().get("api")).value());
-        assertEquals(EntryKind.VALUE, schema.kindOf("api"));
         assertEquals(Optional.of("operations"), schema.schema().constructorOf("api"), "§8.2 records what built it");
 
         Operation operation = assertInstanceOf(Operation.class, api.get("search"));
@@ -278,44 +275,20 @@ class ImportedVocabularyTest {
     }
 
     /**
-     * <b>A declared application mints no name, so §8.2's hygiene walk has nothing to judge.</b> {@code getOrder =>
-     * fetch<search_request>} <em>is</em> the entry the application denotes (§8.2), its facts recording the
-     * application -- so the author's punctuation ({@code "/x"}) and the author's Cyrillic never reach a derived name,
-     * because no name is derived. The schema loads.
-     *
-     * <p><b>What still mints, and is still judged, is a name nobody wrote</b>: a sugar lift, or an
-     * application some <em>use site</em> closes. {@code InternalName} keeps its rule for those -- admitted
-     * ASCII spliced, other ASCII truncated beside a hash, anything else the hash alone -- and this schema
-     * has one, {@code search_response}'s own {@code [text]}. So the claim below is the stronger one: every name in
-     * the schema is ASCII, and none carries the author's text.
+     * <b>A parametric record over a value is refused</b> ([TSON-SCHEMA] §5.10): a parametric record's body is a record body,
+     * and {@code !operations { … }} is a value of the type {@code operations}, no type. The remedy is one value per
+     * instantiation, which the message names.
      */
     @Test
-    void aDeclaredApplicationMintsNoNameForNameHygieneToJudge() {
-        for (String path : new String[] {"/x", "путь"}) {
-            String label = "minted" + Math.abs(path.hashCode());
-            TsonLinkedSchema resolved = assertDoesNotThrow(() -> linked(label, """
-                    fetch    => <T> !operations {
-                        get => { path: "%s"  method: "GET"  request: T  response: T }
-                      }
-                    getOrder => fetch<search_request>""".formatted(path)),
-                    () -> "a declared application mints nothing, so no name of its own can be refused");
+    void aParametricRecordOverAValueIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> linked("over-value", """
+                fetch    => <T> !operations {
+                    get => { path: "/x"  method: "GET"  request: T  response: T }
+                  }
+                getOrder => fetch<search_request>"""));
 
-            assertEquals(EntryKind.VALUE, resolved.kindOf("getOrder"), "the declaration is the value it denotes");
-            assertEquals("fetch", resolved.schema().applicationOf("getOrder").orElseThrow().name(),
-                    "and records the application, which is what §8.2 keys its identity on");
-
-            String own = CanonicalIdentity.canonicalize("https://example.test/api-" + label + ".tn");
-            resolved.schema().entries().forEach((name, definition) -> {
-                if (!resolved.originOf(name).equals(own)) {
-                    return;
-                }
-                assertFalse(name.contains(path),
-                        () -> "no entry name carries the author's own text: '" + name + "'");
-                assertTrue(name.chars().allMatch(character -> character < 0x80),
-                        () -> "§8.2: every name here is ASCII, which is what lets the walk judge it: '"
-                                + name + "'");
-            });
-        }
+        assertTrue(thrown.getMessage().contains("is a value of the type 'operations'")
+                && thrown.getMessage().contains("one value per instantiation"), thrown.getMessage());
     }
 
     /** A name at a kind-typed slot is recorded by the read and judged at link: one resolving to nothing is an error. */
@@ -374,8 +347,8 @@ class ImportedVocabularyTest {
     /**
      * <b>Every reference form resolves, applied or not.</b> One namespace per schema ([TSON-SCHEMA] §2.2.3): the
      * {@code !!import} target contributes its namespace, so a name the imported schema declares -- atom, record, or
-     * template -- is a type of the schema importing it, and an application of a template there is judged by its
-     * arity as any other.
+     * parametric record -- is a type of the schema importing it, and an application of a parametric record there is judged
+     * by its arity as any other.
      */
     @Test
     void anImportedNameResolvesWhetherOrNotItIsApplied() {
@@ -413,7 +386,7 @@ class ImportedVocabularyTest {
 
         String written = new TsonObjectWriter(consumerContext()).toTson(entry).replaceAll("\\s+", " ");
 
-        // `kind` is not written: it is derived at resolution and §8's output has no field for it. What
+        // No `kind` is written: §8.1's output has no field for one. What
         // identifies a namespace entry in output is its value -- the constructor's instance the entry is.
         assertFalse(written.contains("kind:"), written);
         assertTrue(written.startsWith("!operations { search => "), written);

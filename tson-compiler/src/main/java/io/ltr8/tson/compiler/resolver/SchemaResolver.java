@@ -9,7 +9,6 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.annotation.AnnotatedMap;
-import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
@@ -29,19 +28,22 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaRefusalException;
+import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.ContentHashMismatchException;
 import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.schema.meta.OpenEntry;
+import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.ParametricEntry;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
-import io.ltr8.tson.schema.meta.RecordTemplateBody;
+
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TemplateParam;
+import io.ltr8.tson.schema.meta.Param;
 import io.ltr8.tson.schema.meta.Type;
-import io.ltr8.tson.schema.meta.EntryKind;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.tson.schema.meta.ValueEntry;
 import io.ltr8.tson.schema.meta.NamespaceBody;
+import io.ltr8.tson.schema.meta.ValueRef;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -52,17 +54,18 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
+import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
  * ({@code !!id}/{@code !!import}), merging every {@code !!import}'s entries into the
  * schema's one namespace (Part 2 §3.3) through this resolver's own {@link TsonCompiledSchemaLoader}, and
  * handing each local declaration off to a {@link DefinitionResolver} for the actual, per-declaration
- * resolution work (Part 2 §4, §8's <code>{meta.type_name =&gt; top}</code> shape, an entry being its value). A
- * construction head and an annotation type are read through the compiled form of the schema that declared them
- * ({@link Vocabulary}).
+ * resolution work (Part 2 §4, §8's <code>{meta.type_name =&gt; top}</code> shape, an entry being its value). Every
+ * value the document reads is read through the readers of a checkpoint of this document ({@link Vocabulary}).
  *
  * <p>A {@link TsonCompiledSchemaLoader} is required: a document-level resolution that can't validate
  * its own {@code !!id} or reach its own imports isn't a degraded version of this job, it's a
@@ -77,15 +80,6 @@ import java.util.function.Function;
  * each newly-added entry immediately, and asking for one not yet ready makes it ready, in wait order.
  */
 public final class SchemaResolver {
-
-    /**
-     * [TSON-SCHEMA] §8.2's derived marker, attached below to the key of every entry this resolver
-     * materialised from a sugar form. Valueless -- presence at the key is the whole of the information --
-     * and built by name rather than resolved through the import closure the way an author-written annotation
-     * is: there is no author to resolve against, and §8.1 makes it derived, discarded and recomputed on
-     * ingest rather than read from a document.
-     */
-    private static final Annotations SYNTHETIC = Annotations.of(List.of(Annotation.of(TsonSchema.SYNTHETIC)));
 
     private final TsonCompiledSchemaLoader loader;
 
@@ -113,9 +107,34 @@ public final class SchemaResolver {
      * how a registry resolves the library's bundled schemas, under the defaults whatever the deployment configured.
      */
     public SchemaResolver(TsonCompiledSchemaLoader loader, LimitsPolicy limits) {
+        this(loader, limits, null);
+    }
+
+    /** {@link #SchemaResolver(TsonCompiledSchemaLoader, LimitsPolicy)} telling {@code log} what it reads. */
+    SchemaResolver(TsonCompiledSchemaLoader loader, LimitsPolicy limits, ReadLog log) {
         this.loader = Objects.requireNonNull(loader, "loader");
         this.limits = Objects.requireNonNull(limits, "limits");
+        this.log = log;
     }
+
+    /**
+     * Told each value a resolution reads at a checkpoint, and the readers of its full closure once every entry is
+     * ready, so a test can hold a read's verdict at its checkpoint to its verdict in the full closure ([TSON-SCHEMA]
+     * §3.4.1). {@code null} outside that test.
+     */
+    interface ReadLog {
+
+        /**
+         * A value read in tree mode where {@code tree} is true, giving {@code result} or failing with {@code failure};
+         * {@code again} reads it over other readers of the same mode.
+         */
+        void read(boolean tree, Function<TsonCompiledSchema, Object> again, Object result, RuntimeException failure);
+
+        /** Every entry is ready: the readers of the closure as it stands, in tree mode where the argument is true. */
+        void whole(Function<Boolean, TsonCompiledSchema> readers);
+    }
+
+    private final ReadLog log;
 
     /**
      * Resolves every declaration in {@code document}'s body in wait order (§3.4.1, {@link WaitOrder}), never source
@@ -141,7 +160,7 @@ public final class SchemaResolver {
      * then resolved via this resolver's own {@link TsonCompiledSchemaLoader} (fetched/bootstrapped on demand) and
      * its entries merged in, *before* any local declaration is resolved. That map ({@code namespace}, exposed to
      * {@link DefinitionResolver} through a {@link WaitOrder}) is where every name resolves: a construction head, a
-     * composition supertype, a refinement source, an annotation type. net.tn's own {@code net.ipv4_type =>
+     * composition supertype, an atom refinement source, an annotation type. net.tn's own {@code net.ipv4_type =>
      * meta.atom & atom.specification & {...}}, composing with two kernel entries it has only through its
      * import of meta.tn, would fail to resolve at all without this. Collision
      * handling mirrors {@code TsonSchemaLinker.mergeImports}'s own rule exactly: a name declared by
@@ -241,17 +260,25 @@ public final class SchemaResolver {
         // Which application each entry is the instantiation of (§8.2): an import's as its key states it, a local
         // one's as materialisation closes it. Keyed on the entry, whatever its kind; written on the local keys as
         // `@meta.application` where the entry map is assembled.
-        Map<String, io.ltr8.tson.schema.meta.TypeRef> applications = new LinkedHashMap<>();
-        // Which schema declared each imported entry: the compiled reader a construction head or an annotation is read
-        // through is that schema's.
+        Map<String, ApplyBody> applications = new LinkedHashMap<>();
+        // Which schema declared each imported entry: two schemas declaring one name collide, and a checkpoint's
+        // readers are compiled over this document's own entries beside the imports.
         Map<String, String> origins = new LinkedHashMap<>();
-        Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts, kernelNames, origins);
+        Map<String, List<TsonSchema.Restatement>> importedRestatements = new LinkedHashMap<>();
+        Map<String, Top> namespace = mergeImports(document, nameAnnotations, facts, kernelNames, origins,
+                importedRestatements);
         nameAnnotations.forEach((name, annotations) -> TsonSchema.applicationOf(annotations)
                 .ifPresent(application -> applications.put(name, application)));
         // The kernel's own entries are the kernel's, kinds and constructors judged by origin, and its resolution reads
         // every head through its pre-loaded stand-in (§3.4).
         boolean isKernel = TsonBundledSchemas.isKernel(id);
         Predicate<String> kernel = name -> isKernel || kernelNames.contains(name);
+        // An extern's schema joins the reference closure with the imports, before any name of this document resolves
+        // (§3.4.1); none of its names enters this namespace. A head names the kernel's constructor only where the
+        // closure holds the kernel: an import-free schema's own `meta.extern` is an ordinary entry.
+        if (!isKernel && kernelNames.contains(Externs.HEAD)) {
+            loadExterns(document.body().declarations());
+        }
 
         // Expand the sugar forms before anything reads a declaration, so resolution below only ever sees a
         // bare reference or `!C value` (§5.3/§5.6 define these as desugarings; §3.3.1 names their targets).
@@ -267,18 +294,11 @@ public final class SchemaResolver {
         // position lookup below goes through this copy, so a rewritten declaration is located like any other.
         SchemaPositions positions = declarationPositions.copy();
         Problems problems = new Problems(CanonicalIdentity.canonicalize(id), positions, receiver);
-        // A lift whose name an import already declares references the import's entry: the form it stands for is
-        // kept, to hold that entry to once resolution can read it.
-        Map<String, SchemaMap.Declaration> reused = new LinkedHashMap<>();
+        // Desugaring rewrites each sugar form in place and adds no declaration, so the declarations below are
+        // exactly the ones the author wrote.
         SchemaDocument desugared = SchemaDesugarer.desugar(document,
-                namespace.keySet(), problems.collecting() ? problems::report : null, positions, reused);
+                problems.collecting() ? problems::report : null, positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
-        // The names desugaring generated, as opposed to the ones the author wrote. These are the schema's
-        // synthetic entries (§5.3's lift rule), so they are both what carries the derived @meta.synthetic marker
-        // at its key below (§8.2) and what tells a generated head closing its own intermediate form from an
-        // authored one: an application of a generated name is machinery, an application of an authored one
-        // is a use site worth recording.
-        Set<String> generated = SchemaDesugarer.lifted(document, desugared);
 
         // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them). A schema
         // map of one path is open: this document's contribution to an imported one is no collision, its members
@@ -300,45 +320,36 @@ public final class SchemaResolver {
         }
 
         // Every declaration is made ready in wait order (§3.4.1), on demand: an entry waits on
-        // its head, its refinement source and operands, an annotation's type and every type a read of its value
+        // its head, its atom refinement source and operands, an annotation's type and every type a read of its value
         // reaches, each made ready first, whichever is written first. A name at a type position (a field's, a
         // variant's, an element's) is carried as a name, judged by the linker, and orders nothing. The imports are
-        // ready before anything starts; a value read against one of this document's own entries is read through
-        // readers compiled from the entries ready so far.
-        OnDemand onDemand = new OnDemand(declarations, Set.copyOf(namespace.keySet()), generated, problems, facts);
+        // ready before anything starts; every value the document reads is read at a checkpoint (Vocabulary).
+        OnDemand onDemand = new OnDemand(declarations, Set.copyOf(namespace.keySet()), problems, facts);
         WaitOrder waitOrder = new WaitOrder(CanonicalIdentity.canonicalize(id), namespace, declarations,
                 limits.maxWaitDepth(),
                 (pending, tree) -> loader.compileReady(readySoFar(document, namespace, origins, facts), pending,
                         tree));
         waitOrder.readyWith(onDemand);
         Vocabulary vocabulary = isKernel ? new Vocabulary(loader.loadVocabulary(id))
-                : new Vocabulary(namespace, origins, waitOrder);
+                : new Vocabulary(waitOrder);
         // Where a construction head and an annotation type resolve: the whole namespace, made ready in wait order --
         // except in the kernel, whose own resolution reads every head through its pre-loaded stand-in (§3.4).
         DefinitionGetter heads = isKernel ? vocabulary::definition : waitOrder;
-        Function<String, Optional<String>> localConstructors = name -> {
-            Optional<String> recorded = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).constructor();
-            if (recorded.isPresent()) {
-                return recorded;
-            }
-            Top local = namespace.get(name);
-            return local != null ? Optional.of(TsonSchema.constructorOf(local)) : vocabulary.constructorOf(name);
-        };
         // Each body a read produced, with the references it read by name ([TSON-SCHEMA] §5.12) and the dependent
         // fields' values it held as written (§5.2), keyed by the body itself: the read hooks know the constructor
         // and the value, not the entry, and the body is the one thing that reaches the entry unchanged.
         Map<Object, HeldInBody> heldByName = new IdentityHashMap<>();
-        // One materialiser for the whole schema, created before the driving loop because resolution itself
-        // closes applications on demand: a supertype or refinement source has to absorb the *closed* entry's
-        // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
-        // closing and a later batch closing of the same application land on one entry.
-        // A held body closes to whatever its head builds: a type where the head is a constructor, and a value entry
-        // where it is an ordinary type (`fetch => <T> !operations { ... }`, then `get_order => fetch<order>`).
+        // One materialiser for the whole schema, created before the driving loop because resolution itself asks
+        // it for applications on demand: a declaration naming an application closes into its own name as it
+        // resolves, and an absorbed operand's arguments are checked against their bounds. Sharing the instance
+        // is what lets the batch pass below see what those closings recorded.
+        // A construction builds whatever its head builds: a type where the head is a constructor, and a value entry
+        // where it is an ordinary type.
         ConstructionReader reads = new ConstructionReader() {
 
             @Override
             public Top read(String written, io.ltr8.tson.compiler.ast.DataValue value) {
-                // An alias of a constructor is applied as its target is (§3.3.1), a held body's head included.
+                // An alias of a constructor is applied as its target is (§3.3.1).
                 String type = heads.definition(written) == null ? written
                         : AliasChain.terminal(written, heads::definition);
                 if (!type.equals(written) && value.typeRef().filter(written::equals).isPresent()) {
@@ -346,20 +357,21 @@ public final class SchemaResolver {
                             value.coreValue());
                 }
                 Top head = heads.definition(type);
-                if (head != null && !EntryKind.isConstructor(type, head, kernel)) {
+                if (head != null && !TypeChain.isConstructor(type, head, kernel)) {
                     return new ValueEntry(type, readValue(type, value));
                 }
                 return constructed(type, head, value);
             }
 
             /**
-             * An instance of the constructor {@code type}: the schema model's body where the head is the kernel's
-             * or net.tn's, whose names always bind to it. Any other constructor's instance builds no body this
-             * library models, so it is held as the value it is, as a value entry's payload is ([TSON-SCHEMA] §4.1):
-             * as the object the bind context binds the head to, or, where none does, as a tree, so the schema loads
-             * and validates without host classes and a schema obtained to bind refuses it. A constructor whose
-             * instances are types is the exception: a type's body is one of the kernel's, and an instance of a
-             * constructor of types no factory backs is a gap.
+             * An instance of the constructor {@code type}: the schema model's body where the head is a bundled
+             * schema's, whose names always bind to it, or composed over one with no field added, which binds as its
+             * parent ({@link io.ltr8.tson.schema.TsonLinkedSchema#composedOver}). Any other constructor's instance
+             * builds no body this library models, so it is held as the value it is, as a value entry's payload is
+             * ([TSON-SCHEMA] §4.1): as the object the bind context binds the head to, or, where none does, as a tree,
+             * so the schema loads and validates without host classes and a schema obtained to bind refuses it. A
+             * constructor whose instances are types is the exception: a type's body is one of the kernel's, and an
+             * instance of a constructor of types no factory backs is a gap.
              */
             private Top constructed(String type, Top head, io.ltr8.tson.compiler.ast.DataValue value) {
                 Object body;
@@ -385,10 +397,13 @@ public final class SchemaResolver {
                 return vocabulary.value(type, value, names, heldByName);
             }
         };
-        TemplateMaterialiser materialiser = new TemplateMaterialiser(waitOrder, namespace::put, reads,
-                generated,
-                heads::definition, waitOrder::current, facts, applications,
-                localConstructors, vocabulary::constructorOf, kernel);
+        HeldRecursion heldRecursion = new HeldRecursion(name -> {
+            Top visible = waitOrder.definition(name);
+            return visible != null ? visible : heads.definition(name);
+        }, declarations::containsKey);
+        Restatements restatements = new Restatements(importedRestatements);
+        ParametricMaterialiser materialiser = new ParametricMaterialiser(waitOrder, heads::definition, waitOrder::current,
+                facts, applications, kernel, heldRecursion, restatements);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
@@ -396,55 +411,32 @@ public final class SchemaResolver {
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary. Its value is
                 // as opaque to the linker as a value entry's, so it is read under the policy too.
-                (type, value) -> vocabulary.annotation(type, value, names, heldByName),
+                (type, value, foreign) -> vocabulary.annotation(type, value, names, heldByName, foreign),
                 heads, waitOrder, new ApplicationCloser() {
 
+                    /** An operand absorbed by value gets the same bound check an application closing does. */
                     @Override
-                    public String closeApplication(io.ltr8.tson.schema.meta.TypeRef application) {
-                        return materialiser.closeApplication(application);
-                    }
-
-                    /** An operand absorbed by value gets the same argument-kind inference a closed one does. */
-                    @Override
-                    public List<io.ltr8.tson.schema.meta.TypeArgument> byParameterKind(String head,
-                            Top template, List<String> parameters,
-                            List<io.ltr8.tson.schema.meta.TypeArgument> arguments) {
-                        return materialiser.byParameterKind(head, template, parameters, arguments);
+                    public void checkArguments(String head, Top record,
+                            List<io.ltr8.tson.schema.meta.TypeRef> arguments) {
+                        materialiser.checkArguments(head, record, arguments);
                     }
 
                     /**
                      * A declaration naming a fully-bound application is the entry it denotes (§8.2), so the
-                     * closure happens here rather than minting a content-named entry for the declaration to
-                     * reference.
+                     * application closes here, into the declaration's own name.
                      */
                     @Override
-                    public Top closeApplicationInto(String declaredName,
-                            io.ltr8.tson.schema.meta.TypeRef application) {
+                    public Top closeApplicationInto(String declaredName, ApplyBody application) {
                         return materialiser.closeApplicationInto(declaredName, application);
                     }
-                }, positions, facts, kernel, kernel);
+                }, positions, facts, kernel, kernel, restatements);
         onDemand.resolveWith(resolver);
 
         waitOrder.readyAll(name -> false);
-        // Each imported entry a lift of this document references is a synthetic of that lift's form (§8.2): the
-        // form is resolved on its own, its facts left as the import's, and compared.
-        reused.forEach((name, declaration) -> {
-            TsonSchema.EntryFacts importedFacts = facts.getOrDefault(name, TsonSchema.EntryFacts.NONE);
-            try {
-                Top own;
-                try {
-                    own = resolver.resolve(declaration);
-                } finally {
-                    facts.put(name, importedFacts);
-                }
-                ImportedSynthetics.requireForm(name, importedFacts, namespace.get(name), origins.get(name), own);
-            } catch (SchemaValidationException collision) {
-                if (!problems.collecting()) {
-                    throw collision;
-                }
-                problems.report(declaration, collision);
-            }
-        });
+        if (log != null && !isKernel) {
+            TsonSchema whole = readySoFar(document, namespace, origins, facts);
+            log.whole(tree -> loader.compileReady(whole, Set.of(), tree));
+        }
         // Every entry is ready: the judgements that walk a name to what it names run now (§3.4.1's sixth rule).
         resolver.judgeDeferred((name, error) -> {
             if (!problems.collecting()) {
@@ -456,53 +448,59 @@ public final class SchemaResolver {
         });
 
         // §5.10 materialisation, after every declaration has resolved and before anything reads the result:
-        // a template application reaches here as a type-ref carrying arguments, and closing it needs the
-        // template's own *resolved* open form, which only exists once the driving loop above has run. The
-        // entries it produces are local to this schema and carry no source position -- they are named by
-        // derivation from the application, not declared -- so they join the map after the declared ones.
+        // an application of a parametric record reaches here as an ApplyBody written in place, and closing it needs the
+        // parametric record's own *resolved* open form, which only exists once the driving loop above has run. It adds no
+        // entry: an application closes in place, or into the declaration naming it.
         Map<String, Top> resolvedLocals = new LinkedHashMap<>();
         for (String name : declarations.keySet()) {
             resolvedLocals.put(name, namespace.get(name));
         }
 
-        // §5.10's regularity boundary, before anything closes: a template that grows its argument on every
-        // recursive step has no finite set of types to build, and catching it at the declaration means a
-        // broken template is rejected even if nobody ever applies it. Materialisation's own depth guard
-        // stays as a backstop.
-        Set<String> irregular = TemplateRegularity.check(resolvedLocals, problems.collecting()
+        // §5.10.1's regularity boundary, before anything closes: a recursive application passes each parameter
+        // through unchanged, judged at the declaration, so a parametric record refused for it is refused even if nobody
+        // ever applies it.
+        Set<String> irregular = ParametricRegularity.check(resolvedLocals, problems.collecting()
                 ? (name, error) -> problems.report(declarations.get(name), error) : null);
 
-        // A condemned template is replaced before materialisation, on the same terms as a declaration that
-        // failed to resolve: the verdict is in, and closing an application of one only reports the same
-        // defect a second time -- from the depth backstop, 64 instantiations deep, against whichever entry
-        // happened to apply it rather than the one that wrote it. Both maps, because the two are read by
+        // A condemned parametric record is replaced before materialisation, on the same terms as a declaration that
+        // failed to resolve: the verdict is in, and closing an application of one would only report its
+        // consequence against whichever entry applied it. Both maps, because the two are read by
         // different halves: `materialise` walks `resolvedLocals`, while the application's head is looked up
         // through the getter over `namespace`.
         condemn(irregular, resolvedLocals, namespace);
-        // §5.10's parameter kinds, inferred by use, before anything closes: an argument is "read by the
-        // position it lands in", and once a parameter's kind is known that position is known at the
-        // application rather than after substitution. Here because it needs every declaration resolved (a
-        // slot's declared type comes from the constructor's own vocabulary) and nothing yet closed.
-        // The declared templates' parameters are stamped here too, not only their kinds, so an application can
-        // check its arguments against them as it closes (§5.10).
-        Set<String> unkinded = new LinkedHashSet<>();
-        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written =
-                writtenParameterTypes(declarations, resolver, problems);
-        Map<String, Map<String, TemplateParam>> declaredParameters = ParameterTypes.inferAll(namespace,
-                declarations.keySet(), written, heads::definition,
+        // §5.10's parameters, before anything closes, each declaration once: that a written bound names a type, and
+        // that a parameter passed to a bounded parameter is written with a bound IS-A it. Here because a callee's
+        // bound comes from its declaration, ready only now. A refused parametric record is condemned on the same terms as an
+        // irregular one: the verdict is in, and closing an application of it only reports the consequence against
+        // whichever entry applied it.
+        Set<String> refusedParameters = ParameterTypes.check(namespace, declarations.keySet(), heads::definition,
                 (name, error) -> {
                     if (!problems.collecting()) {
                         throw error;
                     }
-                    unkinded.add(name);
                     problems.report(declarations.get(name), "'" + name + "': " + error.getMessage(), error);
                 });
-        stampParameters(declaredParameters, List.of(resolvedLocals, namespace));
-        materialiser.parameterKinds(ParameterTypes.kinds(declaredParameters));
-        // An application closed during the driving loop was checked against parameters carrying no bound yet,
-        // so its check runs again now that they are stamped (§5.10) -- before anything else closes.
-        // A declaration that already failed has its verdict, so a replayed check is not a second one.
-        materialiser.recheckEarly((name, error) -> {
+        condemn(refusedParameters, resolvedLocals, namespace);
+        // §5.10.1's held recursion, over the parametric records as the two checks above left them, each declaration once:
+        // one holding where it closes in place an application of a recursive parametric record whose recursion does not
+        // pass back through it could never be closed. Its appliers closed against its placeholder while declarations
+        // were made ready, so this is the one report, and condemning it keeps materialisation from a second.
+        heldRecursion.forget();
+        Set<String> heldRecursive = new LinkedHashSet<>();
+        for (String name : declarations.keySet()) {
+            heldRecursion.refusal(name).ifPresent(error -> {
+                if (!problems.collecting()) {
+                    throw error;
+                }
+                problems.report(declarations.get(name), error);
+                heldRecursive.add(name);
+            });
+        }
+        condemn(heldRecursive, resolvedLocals, namespace);
+        // The bound checks of the applications closed while declarations were being made ready, which an argument
+        // could not order (§3.4.1), run now that every argument is ready -- before anything else closes. A
+        // declaration that already failed has its verdict, so a check is not a second one.
+        materialiser.checkDeferred((name, error) -> {
             if (!problems.collecting()) {
                 throw error;
             }
@@ -510,76 +508,27 @@ public final class SchemaResolver {
                 problems.report(declarations.get(name), error);
             }
         });
-        // Condemned on the same terms as an irregular template: the verdict is in, and closing an application
-        // of a template whose parameters cannot be classified only reports the consequence -- the substituted
-        // body failing its constructor's vocabulary -- against whichever entry happened to apply it.
-        condemn(unkinded, resolvedLocals, namespace);
 
-        Map<String, Top> instantiations = materialiser.materialise(resolvedLocals,
+        materialiser.materialise(resolvedLocals,
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
-        republish(namespace, resolvedLocals, instantiations);
-        familyBaseEdges(namespace, resolvedLocals, generated, applications);
-        appliedParentEdges(namespace, resolvedLocals, instantiations, applications,
-                materialiser.expansionsByApplication(), materialiser.syntheticNames());
-        closeChains(namespace, resolvedLocals, instantiations);
-
-        // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
-        // have resolved". A form the desugar phase lifted with an application in a slot was named before that
-        // application had an entry to be named for; at this point every application is closed, so it
-        // re-derives to the name the other channel gives the same form. See SyntheticMerge.
-        Map<String, String> merged = SyntheticMerge.renames(declarations, generated, materialiser);
-        Map<String, String> mergedNames = new LinkedHashMap<>(merged);
-        if (!merged.isEmpty()) {
-            SyntheticMerge.rewrite(resolvedLocals, merged);
-            SyntheticMerge.rewrite(instantiations, merged);
-            SyntheticMerge.rewriteApplications(applications, merged);
-            merged.forEach((from, to) -> {
-                // Dropped where the other channel already published the form, moved where it did not: the
-                // eager name was this schema's only one for it, and an entry nothing names is not an entry.
-                Top eager = resolvedLocals.remove(from);
-                TsonSchema.EntryFacts eagerFacts = facts.remove(from);
-                namespace.remove(from);
-                generated.remove(from);
-                generated.add(to);
-                if (!namespace.containsKey(to)) {
-                    resolvedLocals.put(to, eager);
-                    if (eagerFacts != null) {
-                        facts.putIfAbsent(to, eagerFacts);
-                    }
-                }
-            });
-            republish(namespace, resolvedLocals, instantiations);
-        }
-
-        // §5.10's parameters, recorded on every open entry this schema produced -- the materialiser mints open
-        // entries of its own, which is why this runs once everything has closed as well as before. A failure was
-        // reported by the first pass against the declaration that wrote it; one here is the same verdict, and
-        // the entry keeps what it had.
-        Set<String> local = new LinkedHashSet<>(resolvedLocals.keySet());
-        local.addAll(instantiations.keySet());
-        stampParameters(ParameterTypes.inferAll(namespace, local, written, heads::definition,
-                (name, error) -> { }), List.of(resolvedLocals, instantiations, namespace));
+        republish(namespace, resolvedLocals);
+        appliedParentEdges(namespace, resolvedLocals, applications);
+        closeChains(namespace, resolvedLocals);
 
         // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
         // §3.3.3 cannot reach), and this loop runs outside the memoized getter that catches those -- so it
         // catches its own, once per name, leaving the entry intact and unannotated rather than losing the
         // whole schema to a bad @doc.
         for (String name : declarations.keySet()) {
-            // A merged form is keyed by the name it merged onto, and contributes nothing at all where that
-            // name belongs to the materialised half -- the entry is there, marked, and this is its old key.
-            String key = merged.getOrDefault(name, name);
-            if (!resolvedLocals.containsKey(key)) {
-                continue;
-            }
             try {
-                nameAnnotations.put(key, resolver.annotationsFor(name, declarations.get(name).nameAnnotations()));
+                nameAnnotations.put(name, resolver.annotationsFor(name, declarations.get(name).nameAnnotations()));
             } catch (SchemaValidationException | UnsupportedOperationException
                      | BindMismatchException e) {
                 if (!problems.collecting()) {
                     throw e;
                 }
                 problems.report(declarations.get(name), e);
-                nameAnnotations.put(key, Annotations.empty());
+                nameAnnotations.put(name, Annotations.empty());
             }
         }
 
@@ -595,53 +544,23 @@ public final class SchemaResolver {
         // written on the value are the entry's facts. Bound above; this only places them.
         AnnotatedMap<String, Top> localOnly = new AnnotatedMap<>();
         for (String name : declarations.keySet()) {
-            String key = merged.getOrDefault(name, name);
-            if (!resolvedLocals.containsKey(key)) {
-                continue;
-            }
-            // §8.2: a synthetic entry's key carries the derived @meta.synthetic marker, and a lifted declaration
-            // has nothing else at its key -- there is no source text in front of a name nobody wrote.
-            localOnly.put(key, resolvedLocals.get(key), generated.contains(key)
-                    ? SYNTHETIC : nameAnnotations.getOrDefault(key, Annotations.empty()));
+            localOnly.put(name, resolvedLocals.get(name), nameAnnotations.getOrDefault(name, Annotations.empty()));
         }
-        // An entry the materialiser minted has no declared name to carry author annotations from. The
-        // synthetic half of them still gets the derived marker: a template's open form closes into the same
-        // closed synthetic a directly-written form lifts to, and §8.2 marks it wherever it came from. An
-        // instantiation entry gets none, by the same section.
-        Set<String> minted = materialiser.syntheticNames();
-        instantiations.forEach((name, definition) -> {
-            if (minted.contains(name)) {
-                localOnly.put(name, definition, SYNTHETIC);
-            } else {
-                localOnly.put(name, definition);
-            }
-        });
-        // §8.2's second derived key annotation: every entry that closes an application, whatever its kind -- a
-        // record template's member, a namespace entry, the hop a non-record template's application closes to --
-        // carries `@meta.application` on its key, which is where resolved output states an instantiation's identity
-        // and where ingest reads it back as stated.
-        // The application is stated as written, its nested arguments unreduced: a reader and a message see the
-        // reference the author wrote, and each level resolves structurally to the entry it closed to.
+        // §8.2's derived key annotation: every entry that closes an application of a parametric record carries
+        // `@meta.application` on its key, which is where resolved output states a declared application and where
+        // ingest reads it back as stated. A construction carries none: its value states its constructor.
+        // The application is stated as written, its nested arguments unreduced.
         for (String name : List.copyOf(localOnly.keySet())) {
-            io.ltr8.tson.schema.meta.TypeRef application = materialiser.writtenApplication(name)
-                    .map(asWritten -> SyntheticMerge.renamedReference(asWritten, mergedNames))
-                    .orElse(applications.get(name));
+            ApplyBody application = materialiser.writtenApplication(name).orElse(applications.get(name));
             if (application != null) {
                 localOnly.put(name, localOnly.get(name),
                         TsonSchema.withApplication(localOnly.getAnnotations(name), application));
             }
+            // §8.1's other derived key annotation: a declared completion states the incomplete entries it closed,
+            // which are in no resolved form.
+            resolver.completionOf(name).ifPresent(completion -> localOnly.put(name, localOnly.get(name),
+                    TsonSchema.withCompletion(localOnly.getAnnotations(name), completion)));
         }
-        // Every application closed to an entry of this schema, an expansion's included, kept with the entry's facts
-        // for a data read to resolve an application by structural identity (TsonSchema.EntryFacts.closes).
-        Map<String, List<io.ltr8.tson.schema.meta.TypeRef>> closes = new LinkedHashMap<>();
-        materialiser.closedApplications().forEach((application, entry) -> closes
-                .computeIfAbsent(mergedNames.getOrDefault(entry, entry), ignored -> new ArrayList<>())
-                .add(SyntheticMerge.renamedReference(application, mergedNames)));
-        closes.forEach((name, closed) -> {
-            if (localOnly.containsKey(name)) {
-                facts.put(name, facts.getOrDefault(name, TsonSchema.EntryFacts.NONE).withCloses(closed));
-            }
-        });
         Map<String, List<TsonSchema.ValueByName>> valuesByName = new LinkedHashMap<>();
         Map<String, List<TsonSchema.HeldValue>> heldValues = new LinkedHashMap<>();
         Map<String, TsonSchema.EntryFacts> localFacts = new LinkedHashMap<>();
@@ -658,7 +577,11 @@ public final class SchemaResolver {
                 localFacts.put(name, known);
             }
         });
-        return new TsonSchema(id, document.imports(), localOnly, false, valuesByName, heldValues, localFacts);
+        // A declaration that failed has its verdict, and its restatements were made of what it could not finish.
+        Map<String, List<TsonSchema.Restatement>> restated = restatements.settled(materialiser::closedInPlace);
+        restated.keySet().removeIf(onDemand::failed);
+        return new TsonSchema(id, document.imports(), localOnly, false, valuesByName, heldValues, restated,
+                localFacts);
     }
 
     /**
@@ -711,16 +634,16 @@ public final class SchemaResolver {
 
     /**
      * Replaces each named entry with the placeholder {@link #unresolved} builds, keeping its position and its
-     * type parameters -- the same treatment a declaration that failed to resolve gets, applied to a template
+     * type parameters -- the same treatment a declaration that failed to resolve gets, applied to a parametric record
      * whose verdict is already in.
      *
      * <p><b>Both maps, because the two halves are read by different phases</b>: {@code materialise} walks the
      * locals, while an application's head is looked up through the getter over the namespace. Leaving one
-     * behind would close applications against the condemned template through whichever map was missed.
+     * behind would close applications against the condemned parametric record through whichever map was missed.
      */
     private static void condemn(Set<String> names, Map<String, Top> resolvedLocals, Map<String, Top> namespace) {
         for (String name : names) {
-            Top placeholder = unresolved(OpenEntry.parameterNames(resolvedLocals.get(name)));
+            Top placeholder = unresolved(ParametricEntry.parameterNames(resolvedLocals.get(name)));
             resolvedLocals.put(name, placeholder);
             namespace.put(name, placeholder);
         }
@@ -731,15 +654,15 @@ public final class SchemaResolver {
      * resolved, and the chains made complete through it.
      *
      * <p>Composition needs the operand's <em>fields</em> and nothing else, so a closed declaration and a closed
-     * template both keep the application in their chain's {@code parents} and mint no entry for it (§8.2). The
+     * parametric record both keep the application in their chain's {@code parents} and absorb it by value (§5.8). The
      * edge is the half that has to wait: the entry an application denotes is whichever declaration names the
      * same application, and asking that <em>during</em> materialisation would make the answer depend on
      * declaration order -- {@code text_box} declared before the composition found, declared after it not. A
      * closed chain is completed once every parent is a type, and this is that moment.
      *
      * <p><b>Nothing is created here.</b> The pass derives an index over entries that already exist, keyed on
-     * §8.2's canonical application so two spellings of one application agree -- the application each
-     * instantiation records, an imported one's included. Where no declaration names the application there is no
+     * §8.2's canonical application so two spellings of one application agree -- the application each declared
+     * application's key records, an imported one's included. Where no declaration names the application there is no
      * name to record, and that is the right answer rather than a gap: nobody declared that type, so nothing can
      * be declared as it. {@link #closeChains} then drops every application left standing.
      *
@@ -751,29 +674,18 @@ public final class SchemaResolver {
      * subtracted entry has no applied parent for this pass to find and an empty chain for it to close.
      */
     private static void appliedParentEdges(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                           Map<String, Top> instantiations,
-                                           Map<String, io.ltr8.tson.schema.meta.TypeRef> applications,
-                                           Map<String, String> expansions, Set<String> synthetics) {
-        Map<String, String> byApplication = new LinkedHashMap<>();
+                                           Map<String, ApplyBody> applications) {
+        Map<ApplyBody, String> byApplication = new LinkedHashMap<>();
         namespace.keySet().forEach(entryName -> Optional.ofNullable(applications.get(entryName))
-                .filter(application -> !application.arguments().isEmpty())
                 .ifPresent(application -> byApplication.putIfAbsent(
-                        DerivedName.canonicalApplication(application.name(), application.arguments()),
-                        entryName)));
-        // A minted expansion records no application, so the materialiser's index stands in for it: the edge an
-        // operand `& box<int32>` reaches is to the entry `box<int32>` written at a use site expanded to.
-        expansions.forEach(byApplication::putIfAbsent);
+                        CanonicalApplication.of(application.head().name(), application.arguments()), entryName)));
         // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the chains the
         // previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs `ok_of`'s own
         // edge to `result_of` to exist before `great_of` can inherit it. Bounded by the entry count: each round
         // adds at least one name to some chain or stops.
         for (int round = 0; round <= namespace.size(); round++) {
-            // Republished between the two folds as well as after them: an owner's chain grows in this same
-            // round, and `completed` reads its ancestors out of the namespace.
-            boolean changed = fold(resolvedLocals, byApplication, namespace, synthetics);
-            republish(namespace, resolvedLocals, instantiations);
-            changed |= fold(instantiations, byApplication, namespace, synthetics);
-            republish(namespace, resolvedLocals, instantiations);
+            boolean changed = fold(resolvedLocals, byApplication, namespace);
+            republish(namespace, resolvedLocals);
             if (!changed) {
                 return;
             }
@@ -781,66 +693,23 @@ public final class SchemaResolver {
     }
 
     /**
-     * §5.10's membership: a <b>declared</b> application of a family base -- {@code bt => box<int32>} over
-     * {@code box => <T> { v: T }} -- is a member, so its chain names the template (§8.2's entry shape) and the
-     * linker's inverse makes it one of {@code box}'s members. An application minted at a use site ({@code k:
-     * box<text>}) is not: it is a type, read where it was written, with no edge to the base, so it is never a
-     * candidate at a position typed {@code box} and never needs the name nobody can write. A family's members
-     * are exactly the applications some declaration names -- §5.2's "a family member is declared", kept by
-     * leaving the minted one out rather than by refusing the schema.
-     *
-     * <p>A lifted synthetic is never a member either: it was named by no declaration, which is the whole test.
-     */
-    private static void familyBaseEdges(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                        Set<String> generated,
-                                        Map<String, io.ltr8.tson.schema.meta.TypeRef> applications) {
-        for (Map.Entry<String, Top> entry : resolvedLocals.entrySet()) {
-            if (!(entry.getValue() instanceof Type member)) {
-                continue;
-            }
-            String head = Optional.ofNullable(applications.get(entry.getKey()))
-                    .filter(application -> !application.arguments().isEmpty())
-                    .map(io.ltr8.tson.schema.meta.TypeRef::name).orElse(null);
-            if (head == null || generated.contains(entry.getKey()) || member.supertypes().contains(head)) {
-                continue;
-            }
-            if (!OpenEntry.isFamilyBase(namespace.get(head))) {
-                continue;
-            }
-            List<String> chain = new ArrayList<>(member.supertypes());
-            chain.add(head);
-            chain.addAll(TypeChain.supertypesOf(namespace.get(head)));
-            Top joined = member.withSupertypes(chain.stream().distinct().toList());
-            entry.setValue(joined);
-            namespace.put(entry.getKey(), joined);
-        }
-    }
-
-    /**
      * Every closed chain with the applications the fold left standing dropped: an application no declaration
      * names denotes an entry nothing can be declared as, so it reaches no edge, and a closed type's parents are
-     * not part of it ([TSON-SCHEMA] §4.1). A template keeps its written parents.
+     * not part of it ([TSON-SCHEMA] §4.1). A parametric record keeps its written parents.
      */
-    private static void closeChains(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                    Map<String, Top> instantiations) {
-        for (Map<String, Top> entries : List.of(resolvedLocals, instantiations)) {
-            // A record template keeps the parents as written: they may still name its own parameters, and
-            // closing each application is what completes that application's chain from them.
-            entries.replaceAll((name, definition) -> definition instanceof Type type && !type.parents().isEmpty()
-                    && !OpenEntry.isOpen(definition)
-                    ? type.withChain(type.chain().withParents(List.of()))
-                    : definition);
-        }
-        republish(namespace, resolvedLocals, instantiations);
+    private static void closeChains(Map<String, Top> namespace, Map<String, Top> resolvedLocals) {
+        // A parametric record keeps the parents as written: they may still name its own parameters, and
+        // closing each application is what completes that application's chain from them.
+        resolvedLocals.replaceAll((name, definition) -> definition instanceof Type type && !type.parents().isEmpty()
+                && !ParametricEntry.isParametric(definition)
+                ? type.withChain(type.chain().withParents(List.of()))
+                : definition);
+        republish(namespace, resolvedLocals);
     }
 
-    /**
-     * One round of {@link #appliedParentEdges} over one map -- {@code true} when any chain grew. A minted
-     * expansion gains no edge: it is a member of nothing, and one whose chain would name a declared type was
-     * refused when it was minted ({@code TemplateMaterialiser}).
-     */
-    private static boolean fold(Map<String, Top> entries, Map<String, String> byApplication,
-                                 Map<String, Top> namespace, Set<String> synthetics) {
+    /** One round of {@link #appliedParentEdges} over one map -- {@code true} when any chain grew. */
+    private static boolean fold(Map<String, Top> entries, Map<ApplyBody, String> byApplication,
+                                 Map<String, Top> namespace) {
         boolean changedAny = false;
         // <b>To a fixed point within the map, not merely across rounds.</b> A pass visits entries in map
         // order while mutating them, so `great_of` can be reached before `ok_of` has grown the edge it
@@ -849,9 +718,6 @@ public final class SchemaResolver {
         for (int pass = 0; pass <= entries.size(); pass++) {
             boolean changed = false;
             for (Map.Entry<String, Top> entry : entries.entrySet()) {
-                if (synthetics.contains(entry.getKey())) {
-                    continue;
-                }
                 Top folded = completed(entry.getValue(), byApplication, namespace);
                 if (folded != entry.getValue()) {
                     entry.setValue(folded);
@@ -872,19 +738,42 @@ public final class SchemaResolver {
      * every member's own supertypes. The application stays in {@code parents} until {@link #closeChains}, so a
      * later round still finds it when the owner's chain has grown. {@code definition} itself where nothing
      * grew.
+     *
+     * <p><b>An applied parent reaches what its head's applied parents reach, substituted</b> (§5.8: an application
+     * takes its head's written parents' edges). {@code y => wrap<text> & {}} over {@code wrap => <T> box<T> & { … }}
+     * is IS-A {@code tb => box<text>} as {@code x => wrap<text>} is, though {@code y}'s own parents hold only
+     * {@code wrap<text>}; the walk goes on through each head to any depth, the application nobody declares adding
+     * no edge of its own. A composition cycle is refused at resolution, and {@code seen} ends a walk anyway.
      */
-    private static Top completed(Top definition, Map<String, String> byApplication, Map<String, Top> namespace) {
+    private static Top completed(Top definition, Map<ApplyBody, String> byApplication, Map<String, Top> namespace) {
         if (!(definition instanceof Type type)) {
             return definition;
         }
         Set<String> chain = new LinkedHashSet<>(type.supertypes());
-        for (io.ltr8.tson.schema.meta.TypeRef parent : type.parents()) {
-            if (parent.arguments().isEmpty()) {
+        List<io.ltr8.tson.schema.meta.TypeExpr> parents = new ArrayList<>(type.parents());
+        Set<ApplyBody> seen = new LinkedHashSet<>();
+        while (!parents.isEmpty()) {
+            if (!(parents.removeFirst() instanceof io.ltr8.tson.schema.meta.TypeInline inline)
+                    || !(inline.of() instanceof ApplyBody application)) {
                 continue;
             }
-            String owner = byApplication.get(DerivedName.canonicalApplication(parent.name(), parent.arguments()));
+            // A parent written through an alias of a parametric record is that parametric record's application (§8.3).
+            String head = Ancestry.parametricHead(application.head().name(), namespace::get);
+            ApplyBody canonical = CanonicalApplication.of(head, application.arguments());
+            if (!seen.add(canonical)) {
+                continue;
+            }
+            String owner = byApplication.get(canonical);
             if (owner != null) {
                 chain.add(owner);
+            }
+            if (namespace.get(head) instanceof RecordBody record && record.isParametric()
+                    && record.parameters().size() == application.arguments().size()) {
+                Map<String, io.ltr8.tson.schema.meta.TypeRef> bindings = new LinkedHashMap<>();
+                for (int i = 0; i < record.parameters().size(); i++) {
+                    bindings.put(record.parameterNames().get(i), application.arguments().get(i));
+                }
+                parents.addAll(Substitution.parents(record, bindings));
             }
         }
         for (String member : List.copyOf(chain)) {
@@ -895,53 +784,12 @@ public final class SchemaResolver {
     }
 
     /**
-     * What each declaration's parameter list wrote after a name ({@code <T: text>}), as the type-refs resolution
-     * uses, keyed by declaration then parameter.
+     * Puts the local entries back into the namespace, which every later phase and the on-demand getter both read
+     * through. Called after each pass that rewrites them: the namespace also holds the imported entries, so it
+     * cannot simply be replaced.
      */
-    private static Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> writtenParameterTypes(
-            Map<String, SchemaMap.Declaration> declarations, DefinitionResolver resolver, Problems problems) {
-        Map<String, Map<String, io.ltr8.tson.schema.meta.TypeRef>> written = new LinkedHashMap<>();
-        declarations.forEach((name, declaration) -> {
-            Map<String, io.ltr8.tson.schema.meta.TypeRef> types = new LinkedHashMap<>();
-            declaration.parameterTypes().forEach((parameter, ref) -> {
-                try {
-                    types.put(parameter, resolver.parameterType(parameter, ref));
-                } catch (SchemaValidationException e) {
-                    if (!problems.collecting()) {
-                        throw e;
-                    }
-                    problems.report(declaration, e);
-                }
-            });
-            if (!types.isEmpty()) {
-                written.put(name, types);
-            }
-        });
-        return written;
-    }
-
-    /**
-     * Stamps each local open entry's parameters ({@link ParameterTypes}) -- the entries {@code local} names -- in
-     * {@code resolvedLocals}, {@code instantiations} and {@code namespace} alike, so every view of an entry
-     * agrees.
-     */
-    private static void stampParameters(Map<String, Map<String, TemplateParam>> parameters,
-                                        List<Map<String, Top>> views) {
-        for (Map<String, Top> view : views) {
-            view.replaceAll((name, definition) -> parameters.containsKey(name)
-                    ? OpenEntry.withParameters(definition, parameters.get(name)) : definition);
-        }
-    }
-
-    /**
-     * Puts the local and materialised entries back into the namespace, which every later phase and the
-     * on-demand getter both read through. Called after each pass that rewrites either map, since the two are
-     * kept in step by hand: the namespace also holds the imported entries, so it cannot simply be replaced.
-     */
-    private static void republish(Map<String, Top> namespace, Map<String, Top> resolvedLocals,
-                                  Map<String, Top> instantiations) {
+    private static void republish(Map<String, Top> namespace, Map<String, Top> resolvedLocals) {
         namespace.putAll(resolvedLocals);
-        namespace.putAll(instantiations);
     }
 
     /**
@@ -961,7 +809,6 @@ public final class SchemaResolver {
 
         private final Map<String, SchemaMap.Declaration> declarations;
         private final Set<String> imported;
-        private final Set<String> generated;
         private final Problems problems;
         private final Map<String, TsonSchema.EntryFacts> facts;
 
@@ -970,11 +817,10 @@ public final class SchemaResolver {
 
         private DefinitionResolver resolver;
 
-        OnDemand(Map<String, SchemaMap.Declaration> declarations, Set<String> imported, Set<String> generated,
+        OnDemand(Map<String, SchemaMap.Declaration> declarations, Set<String> imported,
                  Problems problems, Map<String, TsonSchema.EntryFacts> facts) {
             this.declarations = declarations;
             this.imported = imported;
-            this.generated = generated;
             this.problems = problems;
             this.facts = facts;
         }
@@ -991,26 +837,23 @@ public final class SchemaResolver {
 
         @Override
         public Top resolve(String name, SchemaMap.Declaration declaration) {
-            if (!generated.contains(name)) {
-                refuseShadowingParameters(name, SchemaDesugarer.typeParams(declaration.typeDef()));
-            }
+            refuseShadowingParameters(name, SchemaDesugarer.typeParams(declaration.typeDef()));
             Top resolved = resolver.resolve(declaration, problems.positions().of(declaration));
             refuseHeadAbstraction(name, resolved);
             return resolved;
         }
 
         /**
-         * [TSON-SCHEMA] §5.10: within a template's body a parameter's name is read before the schema's, so a
+         * [TSON-SCHEMA] §5.10: within a parametric record's body a parameter's name is read before the schema's, so a
          * parameter spelled like an entry the schema's namespace holds -- a type or a value entry, its own or an
          * import's -- makes that entry unreachable there, and is a resolver error at the declaration rather than a
-         * silent capture. Judged by the name alone, before anything resolves, so no entry is waited on. A parameter
-         * list the desugarer wrote for a lifted form is its own renaming ({@code p0}, {@code p1}), and is not asked.
+         * silent capture. Judged by the name alone, before anything resolves, so no entry is waited on.
          */
         private void refuseShadowingParameters(String name, List<String> parameters) {
             for (String parameter : parameters) {
                 if (declarations.containsKey(parameter) || imported.contains(parameter)) {
                     throw new SchemaValidationException("'" + name + "': parameter '" + parameter + "' shadows the "
-                            + "entry '" + parameter + "' this schema's namespace holds -- inside a template a "
+                            + "entry '" + parameter + "' this schema's namespace holds -- inside a parametric record a "
                             + "parameter's name is read before the schema's, so the entry would be unreachable there "
                             + "(§5.10). Rename the parameter");
                 }
@@ -1032,8 +875,7 @@ public final class SchemaResolver {
 
     /**
      * The entries of this document ready so far, as a schema of its own over the same imports: what the readers a
-     * value read against one of them comes from are compiled over. An entry this resolution minted (an application
-     * it closed) is the document's as much as a declared one.
+     * value read against one of them comes from are compiled over.
      */
     private static TsonSchema readySoFar(SchemaDocument document, Map<String, Top> namespace,
                                          Map<String, String> origins, Map<String, TsonSchema.EntryFacts> facts) {
@@ -1056,37 +898,38 @@ public final class SchemaResolver {
     }
 
     /**
-     * An instance of {@code type}, a constructor of types the kernel and the bundled libraries do not declare: an entry
-     * it builds is a type, a type's body is one of the kernel's, and this library has no factory for the bodies it
-     * describes.
+     * An instance of {@code type}, a constructor of types no bundled schema declares and none it composes binds as
+     * ({@link io.ltr8.tson.schema.TsonLinkedSchema#composedOver}): an entry it builds is a type, a type's body is one
+     * of the kernel's, and this library has no factory for the bodies it describes.
      */
     private static UnsupportedOperationException unmodelledType(String type, RuntimeException cause) {
         return new UnsupportedOperationException("'!" + type + "' builds types, and this library models the body of "
-                + "a type built only by the bundled schemas' constructors -- an instance of a constructor of "
-                + "types no reader factory backs cannot be held as a type", cause);
+                + "a type built only by the bundled schemas' constructors, or by one composed over one of them with no "
+                + "field added -- an instance of a constructor of types no reader factory backs cannot be held as a "
+                + "type", cause);
     }
 
     /**
-     * §5.10 admits no head abstraction: a type parameter stands for a type, never for a template, so
-     * {@code <T> { v: T<text> }} is no form. Refused here, over every application the held body writes,
+     * §5.10 admits no head abstraction: a type parameter stands for a type, never for a parametric record, so
+     * {@code <T> { v: T<text> }} is no form. Refused here, over every application the parametric record writes,
      * because here is the last point at which the author's own spelling is still what fails.
      *
      * <p><b>It cannot wait for the linker</b>, which checks the rest of §5.10's arity rule off the same
      * accessor: materialisation runs first, and by then the parameter has been substituted away. What
-     * arrives at the {@code meta.type_name} head is then whatever bound it -- a bare entry name if the argument
-     * was closed, reported as an arity error against a content-derived name nobody typed, or an application if
-     * it was not. Neither names what the author did.
+     * arrives at the {@code meta.type_name} head is then whatever bound it, reported as an arity error against a
+     * type the author passed as an argument and never applied, which names nothing the author did.
      */
     private static void refuseHeadAbstraction(String name, Top resolved) {
-        if (!OpenEntry.isOpen(resolved)) {
+        if (!ParametricEntry.isParametric(resolved)) {
             return;
         }
-        List<String> parameters = OpenEntry.parameterNames(resolved);
-        for (io.ltr8.tson.schema.meta.TypeRef application : HeldBody.applicationsOf(resolved)) {
-            if (parameters.contains(application.name())) {
-                throw new SchemaValidationException("'" + name + "': '" + application.name()
+        List<String> parameters = ParametricEntry.parameterNames(resolved);
+        for (ApplyBody application : ParametricEntry.applications(resolved)) {
+            String head = application.head().name();
+            if (parameters.contains(head)) {
+                throw new SchemaValidationException("'" + name + "': '" + head
                         + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
-                        + "for a template, and §5.10 admits no head abstraction, so '" + application.name()
+                        + "for a parametric record, and §5.10 admits no head abstraction, so '" + head
                         + "<...>' is no form. Take the applied type as the parameter instead");
             }
         }
@@ -1111,7 +954,7 @@ public final class SchemaResolver {
      * the schema further, the actual fix being upstream at the declaration that failed. With the arity
      * intact the application closes against an empty body and says nothing.
      *
-     * <p><b>An empty record (an empty record template, for an open declaration), because the point is to absorb
+     * <p><b>An empty record (an empty parametric record, for a declaration with parameters), because the point is to absorb
      * rather than to be recognised</b> -- javac's model,
      * where the error type answers every question, rather than Swift's, where every questioner must first ask
      * whether it is looking at one. A dependent that composes with a failed declaration ({@code parent =>
@@ -1120,11 +963,11 @@ public final class SchemaResolver {
      * mismatch: a `Sum`-bodied placeholder makes every dependent report too, which is the cascade the
      * placeholder exists to prevent.
      */
-    private static Top unresolved(List<String> parameters) {
-        // An open placeholder is an empty record template, so it closes by the one process a template does.
+    static Top unresolved(List<String> parameters) {
+        // A placeholder with parameters is an empty parametric record, so it closes by the one process any does.
         return parameters.isEmpty() ? RecordBody.of(RecordBody.fieldMap())
-                : new RecordTemplateBody(TypeChain.EMPTY, new AnnotatedMap<>(), List.of(), RecordExtensionType.OPEN,
-                        List.of(), Optional.empty(), parameters.stream().map(TemplateParam::typeParameter).toList());
+                : new RecordBody(TypeChain.EMPTY, parameters.stream().map(Param::new).toList(), new AnnotatedMap<>(),
+                        List.of(), RecordExtensionType.OPEN, List.of(), Optional.empty());
     }
 
     /**
@@ -1155,7 +998,7 @@ public final class SchemaResolver {
                     @Override
                     public void held(List<String> slot, TsonSchema.SlotType type,
                                      io.ltr8.tson.schema.meta.TypeRef reference,
-                                     io.ltr8.tson.schema.meta.Ref<?> cell) {
+                                     ValueRef<?> cell) {
                         held.add(new TsonSchema.ValueByName(slot, type, reference, Optional.ofNullable(cell)));
                     }
 
@@ -1168,6 +1011,21 @@ public final class SchemaResolver {
                     public void reached(SchemaLocation declaration) {
                         if (waits != null) {
                             waits.reached(declaration);
+                        }
+                    }
+
+                    @Override
+                    public void typeNamed(String name) {
+                        if (waits != null) {
+                            waits.typeNamed(name);
+                        }
+                    }
+
+                    @Override
+                    public void pinsUnmatched(String base, Set<String> selectors,
+                                              BiPredicate<String, String> samePin) {
+                        if (waits != null) {
+                            waits.pinsUnmatched(base, selectors, samePin);
                         }
                     }
                 }, valueBody));
@@ -1185,71 +1043,48 @@ public final class SchemaResolver {
     }
 
     /**
-     * The compiled readers one schema's resolution reads through. For an imported entry, the compiled form of the
-     * schema that declared it ({@link TsonCompiledSchemaLoader#vocabularyOf}): one namespace per schema (§3.3,
-     * §3.3.1) puts every construction head and annotation type in the closure, and the closure is the
-     * union of the imported schemas' own, so an entry's reader, compiled over its declaring schema's closure, reads
-     * everything its body can name. Nothing is compiled per closure for those -- each declaring schema is compiled
-     * once and cached by identity, and a schema that applies only the kernel's constructors reaches exactly the
-     * kernel's.
+     * The compiled readers one schema's resolution reads through. Every value the document reads -- a construction's
+     * payload, a value entry's, an annotation's value -- is read at a checkpoint of this document ({@link
+     * WaitOrder#read}): the imports and its entries ready so far, in its own namespace, annotation names included.
      *
-     * <p>For an entry of this document, readers compiled from the entries ready so far ({@link WaitOrder#read}): the
-     * entry is made ready before the value read against it, and a read reaching another not yet ready makes that one
-     * ready first. The kernel's own resolution reads through its pre-loaded stand-in for every name, its one
-     * cycle being closed by pre-loading (§3.4).
+     * <ul>
+     *   <li><b>A read is atomic within one checkpoint.</b> One that reaches what its readers lack -- a declaration by
+     *       position, a tag or an annotation's name, a pin no member it holds states where a declaration not held may
+     *       be that member -- stops, the entry is made ready, and the read reruns. It never carries on with readers
+     *       that lack the entry, so its verdict at its checkpoint is its verdict in the full closure ([TSON-SCHEMA]
+     *       §3.4.1). A held value (a default, a pin) is held as written and orders nothing.</li>
+     *   <li><b>Readers outlive the checkpoint they were compiled at</b>, because every fact they take from the
+     *       closure is reached by a name or a pin at which a read stops. The one fact not reached that way, an entry
+     *       materialisation rewrites in place, exists only once every entry is ready, and the readers are dropped
+     *       there ({@link WaitOrder#settled}).</li>
+     *   <li><b>Never the declaring schema's compile.</b> It is a snapshot of another closure, where a position admitting
+     *       subtypes admits fewer (§3.3.4's open {@code subtypes}) and an annotation names fewer types (§3.3.3).</li>
+     * </ul>
+     *
+     * <p>The kernel's own resolution reads through its pre-loaded stand-in for every name, its one cycle being closed
+     * by pre-loading (§3.4), and its every instance binds to the schema model.
      */
     private final class Vocabulary {
 
         /** The kernel's pre-loaded stand-in, answering for every name; {@code null} for every other schema. */
         private final TsonCompiledVocabulary self;
-        private final Map<String, Top> imported;
-        private final Map<String, String> origins;
 
         /** This document's entries made ready in wait order; {@code null} for the kernel, which reads through itself. */
         private final WaitOrder local;
 
         Vocabulary(TsonCompiledVocabulary self) {
             this.self = self;
-            this.imported = self.schema().entries().entries();
-            this.origins = Map.of();
             this.local = null;
         }
 
-        /** Over the imported entries, which this resolution adds no local entry to, and this document's own. */
-        Vocabulary(Map<String, Top> namespace, Map<String, String> origins, WaitOrder local) {
+        Vocabulary(WaitOrder local) {
             this.self = null;
-            this.imported = Map.copyOf(namespace);
-            this.origins = Map.copyOf(origins);
             this.local = local;
         }
 
-        /** Whether {@code name} is read through this document's own entries rather than an import's compile. */
-        private boolean isLocal(String name) {
-            return local != null && !origins.containsKey(name);
-        }
-
-        /** The compiled schema that declared {@code name}, an imported entry. */
-        private TsonCompiledVocabulary of(String name) {
-            if (self != null) {
-                return self;
-            }
-            String origin = origins.get(name);
-            if (origin == null) {
-                throw new IllegalStateException("'" + name + "' is read against as an import, and no imported schema "
-                        + "declares it");
-            }
-            return loader.vocabularyOf(origin);
-        }
-
-        /** An imported entry, or {@code null}: where the kernel's own resolution resolves a head. */
+        /** A kernel entry: where the kernel's own resolution resolves a head. */
         Top definition(String name) {
-            return imported.get(name);
-        }
-
-        /** The constructor an imported entry's value applies, as its declaring schema recorded it. */
-        Optional<String> constructorOf(String name) {
-            return self != null ? self.schema().constructorOf(name)
-                    : Optional.ofNullable(imported.get(name)).map(TsonSchema::constructorOf);
+            return self.schema().entries().get(name);
         }
 
         /**
@@ -1258,22 +1093,35 @@ public final class SchemaResolver {
          */
         Object instance(String name, io.ltr8.tson.compiler.ast.DataValue value,
                         Map<Object, HeldInBody> heldByName, boolean tree) {
-            if (isLocal(name)) {
-                return local.read(name, tree,
-                        readers -> read(readers.get(name), value, IdentifierPolicy.none(), heldByName, false, local));
+            if (self != null) {
+                return read(tree ? unbound(name) : self.reader(name), value, IdentifierPolicy.none(), heldByName,
+                        false);
             }
-            TsonTypeReader<?> reader = tree ? loader.treeVocabularyOf(origins.get(name)).get(name)
-                    : of(name).reader(name);
-            return read(reader, value, IdentifierPolicy.none(), heldByName, false);
+            return atCheckpoint(name, tree, (readers, waits) -> read(readers.get(name), value, IdentifierPolicy.none(),
+                    heldByName, false, waits));
         }
 
-        /** An annotation's value, read against the type {@code name} under {@code names}. */
+        /**
+         * An annotation's value, read against the type {@code name} under {@code names}. Where {@code foreign}, {@code
+         * name} being an extern, the value is bound where the bind context binds the foreign schema's classes and held
+         * as a tree where it does not, as a value entry's is, so a schema loads and validates without the foreign
+         * schema's host classes.
+         */
         Object annotation(String name, io.ltr8.tson.compiler.ast.DataValue value, IdentifierPolicy names,
-                          Map<Object, HeldInBody> heldByName) {
-            if (isLocal(name)) {
-                return local.read(name, readers -> read(readers.get(name), value, names, heldByName, false, local));
+                          Map<Object, HeldInBody> heldByName, boolean foreign) {
+            if (self != null) {
+                return read(self.get(name), value, names, heldByName, false);
             }
-            return read(of(name).get(name), value, names, heldByName, false);
+            try {
+                return atCheckpoint(name, false,
+                        (readers, waits) -> read(readers.get(name), value, names, heldByName, false, waits));
+            } catch (MissingBindingException unbound) {
+                if (!foreign) {
+                    throw unbound;
+                }
+                return atCheckpoint(name, true,
+                        (readers, waits) -> read(readers.get(name), value, names, heldByName, false, waits));
+            }
         }
 
         /**
@@ -1285,26 +1133,47 @@ public final class SchemaResolver {
          * <p><b>A value is a payload the linker cannot see into</b> -- its fields' types are left behind in the
          * declaring schema -- so its keys and its identifier-typed values, a key of an identifier-keyed map among
          * them, are judged here under {@code names}, at the read, as the same values are in a data document. Nothing
-         * in one is ever lifted or minted ({@link TsonReadContext#readsValueBody()}), so a kind-typed slot holds a
-         * bare name. A constructor's payload builds the schema layer's own vocabulary, whose names [TSON-SCHEMA]
-         * §11.4's scopes cover and {@code TsonSchemaLinker} judges, and is read under no policy.
+         * in one is closed ({@link TsonReadContext#readsValueBody()}), so a kind-typed slot holds a bare name. A
+         * constructor's payload builds the schema layer's own vocabulary, whose names [TSON-SCHEMA] §11.4's scopes
+         * cover and {@code TsonSchemaLinker} judges, and is read under no policy.
          */
         Object value(String type, io.ltr8.tson.compiler.ast.DataValue value, IdentifierPolicy names,
                      Map<Object, HeldInBody> heldByName) {
-            if (isLocal(type)) {
+            if (self != null) {
                 try {
-                    return local.read(type,
-                            readers -> read(asValue(readers, type), value, names, heldByName, true, local));
+                    return read(asValue(self, type), value, names, heldByName, true);
                 } catch (MissingBindingException unbound) {
-                    return local.read(type, true,
-                            readers -> read(asValue(readers, type), value, names, heldByName, true, local));
+                    throw new IllegalStateException(unbound.getMessage(), unbound);
                 }
             }
             try {
-                return read(asValue(of(type), type), value, names, heldByName, true);
+                return atCheckpoint(type, false,
+                        (readers, waits) -> read(asValue(readers, type), value, names, heldByName, true, waits));
             } catch (MissingBindingException unbound) {
-                return read(asValue(loader.treeVocabularyOf(origins.get(type)), type), value, names, heldByName, true);
+                return atCheckpoint(type, true,
+                        (readers, waits) -> read(asValue(readers, type), value, names, heldByName, true, waits));
             }
+        }
+
+        /** {@code read} against {@code type} at a checkpoint ({@link WaitOrder#read}), told to the {@link ReadLog}. */
+        private Object atCheckpoint(String type, boolean tree, BiFunction<TsonCompiledSchema, WaitOrder, Object> read) {
+            if (log == null) {
+                return local.read(type, tree, readers -> read.apply(readers, local));
+            }
+            Function<TsonCompiledSchema, Object> again = readers -> read.apply(readers, null);
+            try {
+                Object result = local.read(type, tree, readers -> read.apply(readers, local));
+                log.read(tree, again, result, null);
+                return result;
+            } catch (RuntimeException failure) {
+                log.read(tree, again, null, failure);
+                throw failure;
+            }
+        }
+
+        /** A tree read in the kernel's own resolution, where every instance binds to the schema model. */
+        private static TsonTypeReader<?> unbound(String name) {
+            throw new IllegalStateException("'" + name + "' is a kernel constructor no schema-model class binds");
         }
 
         /** The reader for a value of {@code type}, a namespace type's delivering the {@code Namespace} it is. */
@@ -1321,18 +1190,17 @@ public final class SchemaResolver {
      * against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its transitivity and
      * its identity-based collision rule (§2.2.3), since this is the same concept applied one stage earlier: an
      * import contributes everything its namespace holds, one schema reached by
-     * several routes unifies, one synthetic minted by two documents unifies ({@link ImportedSynthetics}), and two
-     * different schemas declaring one name is the error.
+     * several routes unifies, and two different schemas declaring one name is the error.
      *
      * <p>An entry reached by several routes is kept as it first arrived, as the linker's merge keeps it. Every
      * import is already linked, so each route's copy carries the {@code subtypes} that route's own link credited
-     * over its own closure; the first copy's are kept and none is reconciled, and a synthetic minted by two
-     * documents is compared without them ({@link ImportedSynthetics}). Each entry's facts travel with it into {@code
-     * facts}, so the tag of a constructor's instance another schema declared is found here as a local one's is.
+     * over its own closure; the first copy's are kept and none is reconciled. Each entry's facts travel with it into
+     * {@code facts}, so the tag of a constructor's instance another schema declared is found here as a local one's is.
      */
     private Map<String, Top> mergeImports(SchemaDocument document,
             Map<String, Annotations> importedNameAnnotations, Map<String, TsonSchema.EntryFacts> facts,
-            Set<String> kernelNames, Map<String, String> origins) {
+            Set<String> kernelNames, Map<String, String> origins,
+            Map<String, List<TsonSchema.Restatement>> restatements) {
         Map<String, Top> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : namespaceSources(document)) {
@@ -1353,22 +1221,18 @@ public final class SchemaResolver {
                 }
                 if (incumbent != null) {
                     if (!incumbent.equals(origin)) {
-                        // One synthetic minted by two documents is one entry (§8.2), whichever declared each.
-                        TsonSchema.EntryFacts arriving = imported.schema().factsOf(name);
-                        if (!ImportedSynthetics.areOne(name, facts.get(name), merged.get(name), incumbent, arriving,
-                                entry.getValue(), origin)) {
-                            throw new SchemaValidationException("'" + name + "' is declared by two different "
-                                    + "schemas reached through !!import ('" + incumbent + "' and '" + origin
-                                    + "') -- distinct types cannot share one name in the flat namespace; import "
-                                    + "one of them, or a version of each that agrees on where '" + name
-                                    + "' is declared");
-                        }
-                        facts.put(name, ImportedSynthetics.unified(facts.get(name), arriving));
+                        throw new SchemaValidationException("'" + name + "' is declared by two different "
+                                + "schemas reached through !!import ('" + incumbent + "' and '" + origin
+                                + "') -- distinct types cannot share one name in the flat namespace; import "
+                                + "one of them, or a version of each that agrees on where '" + name
+                                + "' is declared");
                     }
                     continue;
                 }
                 merged.put(name, entry.getValue());
                 facts.put(name, imported.schema().factsOf(name));
+                Optional.ofNullable(imported.schema().restatements().get(name))
+                        .ifPresent(restated -> restatements.put(name, restated));
                 if (imported.isKernel(name)) {
                     kernelNames.add(name);
                 }
@@ -1383,6 +1247,33 @@ public final class SchemaResolver {
             }
         }
         return merged;
+    }
+
+    /**
+     * Resolves the schema each extern of the document names, as an {@code !!import} target is resolved: through the
+     * same loader, under the same source and policy, its pin verified per identity. A failure refuses this schema
+     * whole, as an import that will not load does, and says it came through the extern ([TSON-SCHEMA] §5.13).
+     */
+    private void loadExterns(Map<String, SchemaMap.Declaration> declarations) {
+        Externs.written(declarations).forEach((name, written) -> written.schema().ifPresent(uri -> {
+            String through = "'" + name + "' is an extern of '" + written.type().orElse("") + "' in '" + uri + "'";
+            try {
+                CanonicalIdentity.canonicalize(uri);
+                loader.resolveLinkedForExtern(uri, name);
+            } catch (SchemaFetchException unavailable) {
+                throw new SchemaFetchException(unavailable.uri(), unavailable.reason(), through
+                        + ", whose schema is not available: " + unavailable.getMessage(), unavailable);
+            } catch (ContentHashMismatchException mismatch) {
+                throw new ContentHashMismatchException(through + ", whose schema does not verify: "
+                        + mismatch.getMessage());
+            } catch (SchemaRefusalException refused) {
+                throw new SchemaRefusalException(refused.code(), through + ", whose schema is refused: "
+                        + refused.getMessage(), refused);
+            } catch (SchemaValidationException invalid) {
+                throw new SchemaValidationException(through + ", whose schema does not load: "
+                        + invalid.getMessage(), invalid);
+            }
+        }));
     }
 
     /** {@link TsonSchema#namespaceSources} for the document before it is resolved: the same list, from its header. */

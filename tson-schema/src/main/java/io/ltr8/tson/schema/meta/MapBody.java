@@ -25,7 +25,7 @@ import java.util.Optional;
  */
 @Typename(name = "meta.map")
 public record MapBody(TypeChain chain,
-        @Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
+        @Field("key_type") TypeRef keyType, @Field("value_type") TypeExpr valueType,
                        @Field("voidable") boolean voidable, @Field("ordered") boolean ordered,
                        @Field("min_items") Optional<Long> minItems,
                        @Field("max_items") Optional<Long> maxItems) implements Product {
@@ -36,7 +36,7 @@ public record MapBody(TypeChain chain,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public MapBody(TypeRef keyType, TypeRef valueType, boolean voidable, boolean ordered, Optional<Long> minItems,
+    public MapBody(TypeRef keyType, TypeExpr valueType, boolean voidable, boolean ordered, Optional<Long> minItems,
             Optional<Long> maxItems) {
         this(TypeChain.EMPTY, keyType, valueType, voidable, ordered, minItems, maxItems);
     }
@@ -47,7 +47,7 @@ public record MapBody(TypeChain chain,
     }
 
     /** An unconstrained map: values never void, unordered, no size bounds. */
-    public static MapBody of(TypeRef keyType, TypeRef valueType) {
+    public static MapBody of(TypeRef keyType, TypeExpr valueType) {
         return new MapBody(keyType, valueType, false, false, Optional.empty(), Optional.empty());
     }
 

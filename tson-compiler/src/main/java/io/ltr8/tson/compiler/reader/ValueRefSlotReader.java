@@ -1,0 +1,89 @@
+package io.ltr8.tson.compiler.reader;
+
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.compiler.stream.AnnotationStart;
+import io.ltr8.tson.compiler.stream.EventSkip;
+import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.compiler.stream.TypeRef;
+import io.ltr8.tson.schema.meta.ValueRef;
+
+import java.util.Optional;
+
+/**
+ * A reference-typed position ({@code meta.ref<T>}) naming values, whose bound component is a {@link ValueRef}: the value
+ * is a value's qualified name ([TSON-SCHEMA] §5.12), such as {@code orders.place_order}.
+ *
+ * <p><b>In a schema document the name is kept as written</b>, in a {@code ValueRef} the linker delivers the value into.
+ * Nothing here parses segments: the linker splits the name and judges each segment by the family of what it enters,
+ * where it also resolves them. Every name read there is recorded ({@link TsonReadContext#heldByName}) with its slot and the
+ * slot's declared type, and the linker judges that collection.
+ *
+ * <p><b>In a data document the name is judged at the read</b>, by the reference's atom bound to the component
+ * ({@code inData}): the {@code ValueRef} receives what it reaches in the governing schema's closure.
+ *
+ * <p><b>What a name is, stated once for every reader that asks</b> ({@link #nameIn}): a token's text, whatever its
+ * form ([TSON-DATA] §2.4, [TSON-SCHEMA] §5.12), so {@code "main.public api.ping"} is the name a segment outside the
+ * token profile is written as. {@link RecordAbstractReader} asks the same question to decide when §5.6's positional
+ * form loses the token in a schema document, so the readers cannot disagree about which tokens are names.
+ *
+ * <p><b>Names only.</b> The slot holds a reference and nothing else, so a braced value and a framed
+ * name ({@code @doc:"x" orders}, {@code !meta.record x}) are refused: a name's type is its referent's, and an annotation
+ * would have nowhere to go.
+ */
+final class ValueRefSlotReader implements TsonTypeReader<Object> {
+
+    /** What the position holds, as a message names it: {@code a 'method' value}. */
+    private final String expected;
+
+    /** The slot's declared type, {@code meta.ref<T>}, which each name read here is recorded with. */
+    private final TsonSchema.SlotType type;
+
+    /** The reference's atom bound to the component, which reads and judges a name a data document writes. */
+    private final TsonTypeReader<?> inData;
+
+    ValueRefSlotReader(String expected, TsonSchema.SlotType type, TsonTypeReader<?> inData) {
+        this.expected = expected;
+        this.type = type;
+        this.inData = inData;
+    }
+
+    /** The name {@code event} spells, or empty where it is no token. */
+    static Optional<String> nameIn(TsonEvent event) {
+        return event instanceof TokenEvent token ? Optional.of(token.text()) : Optional.empty();
+    }
+
+    @Override
+    public Object read(TsonReadContext ctx) {
+        TsonEvent event = ctx.peek();
+        Optional<String> name = nameIn(event);
+        if (name.isPresent() && !ctx.readsSchemaNames()) {
+            return inData.read(ctx);
+        }
+        if (name.isPresent()) {
+            ctx.next();
+            ValueRef<Object> cell = ValueRef.to(name.get());
+            ctx.heldByName(io.ltr8.tson.schema.meta.TypeRef.of(name.get()), type, cell);
+            return cell;
+        }
+        String found = found(event);
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the name of " + expected + ", found " + found
+                + " -- this position holds a value by name, its segments joined by dots", "a qualified name", found);
+        EventSkip.annotationsAndTypeRef(ctx);
+        EventSkip.coreValue(ctx);
+        return null;
+    }
+
+    /** What stood where a name was wanted, as a message says it. */
+    private static String found(TsonEvent event) {
+        return switch (event) {
+            case AnnotationStart annotation -> "the annotation '@" + annotation.name() + "', and a name carries none";
+            case TypeRef typeRef -> "the type-ref '!" + typeRef.name() + "', and a name carries none: its type is "
+                    + "its referent's";
+            default -> TypeTagCheck.describe(event);
+        };
+    }
+}

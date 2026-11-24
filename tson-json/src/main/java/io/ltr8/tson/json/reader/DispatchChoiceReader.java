@@ -6,9 +6,13 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
+import io.ltr8.tson.schema.ChoiceSelection;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.TypeChain;
 
@@ -16,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * A choice-typed position: [TSON-JSON] §8.2's discrimination predicate, which is the rule [TSON-SCHEMA] §5.4
@@ -53,50 +58,74 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
     private final List<String> variants;
     private final JsonSchemaLocation schemaLocation;
     /** §8.2's condition, decided once: the choice is {@code disjoint}, so the kind alone selects. */
-    private final Map<DiscriminationClass, String> byClass;
+    private final Map<DiscriminationClass, TypeExpr> byClass;
 
     /** {@link #byClass}'s variants, as their readers. */
     private final Map<DiscriminationClass, JsonTypeReader<?>> readerByClass;
 
     /**
-     * Every name a written {@code $type} may spell here, to where the value goes: each variant, every alias
-     * whose chain ends at one, and every subtype of one -- §8.4's "subtypes of variants" note, which holds for
-     * a tagged value at any choice: "a record whose {@code $type} names a proper subtype S of a variant
-     * validates as S". {@link #variants} stays the declared list, which is what a diagnostic names.
+     * Every name a written {@code $type} may spell here, to where the value goes ([TSON-SCHEMA] §5.4, [TSON-JSON]
+     * §8.1): each variant and every alias meaning the same type, then every type IS-A exactly one variant, which
+     * validates as itself. {@link #variants} stays the declared list, which is what a diagnostic names.
      */
     private final Map<String, Route> routes;
+
+    /** Every name IS-A more than one variant and meaning none, to those variants: it selects none. */
+    private final Map<String, List<String>> selectsNone;
+
+    /** Whether a name is one of the scope holding the choice, where its {@code $type} is read ([TSON-SCHEMA] §7.9). */
+    private final Predicate<String> inScope;
 
     private DispatchChoiceReader(String name, ChoiceBody body, ValueReaderContext context,
                                  JsonSchemaLocation schemaLocation) {
         this.name = name;
-        this.variants = body.variants().stream().map(TypeRef::name).toList();
+        this.variants = body.variants().stream().map(TypeExpr::text).toList();
         this.schemaLocation = schemaLocation;
         this.byClass = variantsByClass(context.linked(), body);
         Map<DiscriminationClass, JsonTypeReader<?>> kinds = new LinkedHashMap<>();
         byClass.forEach((kind, variant) -> kinds.put(kind, context.readers().resolve(variant)));
         this.readerByClass = Map.copyOf(kinds);
+        // A variant written in place has no name a $type can spell: it is reached by its class alone.
+        List<TypeRef> named = body.variants().stream().flatMap(variant -> TypeExpr.named(variant).stream()).toList();
+        Map<TypeRef, AliasChain.Resolved> terminals = new LinkedHashMap<>();
+        for (TypeRef variant : named) {
+            AliasChain.terminal(context.schema(), variant.name()).ifPresent(resolved -> terminals.put(variant, resolved));
+        }
+        ChoiceSelection selection = ChoiceSelection.of(context.linked(), named,
+                variant -> terminals.containsKey(variant)
+                        ? context.admitting(List.of(terminals.get(variant).name())) : List.of(),
+                variant -> terminals.containsKey(variant)
+                        ? context.admitting(TypeChain.subtypesOf(terminals.get(variant).definition())) : List.of());
+        Map<TypeRef, Route> byVariant = new LinkedHashMap<>();
+        named.forEach(variant -> byVariant.put(variant, Route.to(context, variant.name())));
         Map<String, Route> table = new LinkedHashMap<>();
-        for (String written : context.admitting(variants)) {
-            table.put(written, Route.to(context.readers().resolve(written)));
-        }
-        for (TypeRef variant : body.variants()) {
-            JsonTypeReader<?> reader = context.readers().resolve(variant.name());
-            AliasChain.terminal(context.schema(), variant.name())
-                    .ifPresent(resolved -> context.admitting(TypeChain.subtypesOf(resolved.definition()))
-                            .forEach(subtype -> table.putIfAbsent(subtype, routeBelow(reader, subtype))));
-        }
+        selection.selects().forEach((written, variant) -> {
+            Route route = byVariant.get(variant);
+            // An extern variant's boundary takes the whole tagged object and admits the subtype's name itself (§7.9).
+            boolean through = selection.named().contains(written) || context.linked().landing(variant.name())
+                    .isPresent();
+            table.put(written, through ? route
+                    : routeBelow(context, terminals.get(variant).definition(), route.entry(), written));
+        });
         this.routes = Map.copyOf(table);
+        this.selectsNone = selection.selectsNone();
+        this.inScope = context.schema().entries()::containsKey;
     }
 
     /**
-     * The route to {@code subtype} through the variant whose compiled reader is {@code variant}. A variant
-     * placed by {@code $type} already holds that route, flattened; any other -- a sealed family, whose
-     * selectors this position cannot bypass, or a reader still closing a cycle -- receives the value and
-     * places it itself.
+     * The route to {@code subtype} through the variant whose definition is {@code variant} and whose compiled reader
+     * is {@code reader}. A record variant placed by {@code $type} already holds that route, flattened; any other
+     * record variant -- a sealed family, whose selectors this position cannot bypass, or a reader still closing a
+     * cycle -- receives the value and places it itself. Below a variant that is no record the subtype's own reader
+     * reads the value, whose facets the variant's reader would not check.
      */
-    private static Route routeBelow(JsonTypeReader<?> variant, String subtype) {
-        Route route = variant instanceof DispatchTagReader dispatch ? dispatch.route(subtype) : null;
-        return route != null ? route : new Route(variant, variant);
+    private static Route routeBelow(ValueReaderContext context, Top variant, JsonTypeReader<?> reader,
+                                    String subtype) {
+        if (!(variant instanceof RecordBody)) {
+            return Route.to(context, subtype);
+        }
+        Route route = reader instanceof DispatchTagReader dispatch ? dispatch.route(subtype) : null;
+        return route != null ? route : new Route(reader, reader, false);
     }
 
     /**
@@ -113,14 +142,14 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * containing one non-disjoint, so this is unreachable in a linked schema -- and treating it as "the tag is
      * required" is the safe reading if it ever is reached.
      */
-    private static Map<DiscriminationClass, String> variantsByClass(TsonLinkedSchema linked, ChoiceBody body) {
+    private static Map<DiscriminationClass, TypeExpr> variantsByClass(TsonLinkedSchema linked, ChoiceBody body) {
         if (!body.disjoint().orElse(false)) {
             return Map.of();
         }
-        Map<DiscriminationClass, String> table = new LinkedHashMap<>();
-        for (TypeRef variant : body.variants()) {
-            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(linked, variant.name());
-            if (variantClass.isEmpty() || table.put(variantClass.get(), variant.name()) != null) {
+        Map<DiscriminationClass, TypeExpr> table = new LinkedHashMap<>();
+        for (TypeExpr variant : body.variants()) {
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(linked, variant);
+            if (variantClass.isEmpty() || table.put(variantClass.get(), variant) != null) {
                 return Map.of();
             }
         }
@@ -169,16 +198,27 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
             return null;
         }
         Route route = routes.get(tag.type());
-        if (route == null) {
-            if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.field(TagMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'$type' names '%s', which is not a variant of '%s'".formatted(tag.type(), name),
-                        String.join(" | ", variants), tag.type());
-            }
-            EventSkip.nextValue(ctx);
-            return null;
+        if (route != null) {
+            return route.read(ctx, tag);
         }
-        return route.read(ctx, tag);
+        List<String> among = selectsNone.get(tag.type());
+        if (among != null) {
+            ctx.field(TagMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+                    "'$type' names '%s', a subtype of more than one variant of '%s' -- (%s) -- and of none by name, "
+                            .formatted(tag.type(), name, String.join(" | ", among)) + "so it selects none (§8.1)",
+                    String.join(" | ", among), tag.type());
+        } else if (!NameHygiene.refuses(ctx, tag.type())) {
+            boolean resolves = inScope.test(tag.type());
+            ctx.field(TagMembers.TYPE).report(resolves ? Diagnostic.Code.TYPE_MISMATCH : Diagnostic.Code.UNKNOWN_TYPE_REF,
+                    resolves ? "'$type' names '%s', which is neither a variant of '%s' nor a subtype of exactly one"
+                            .formatted(tag.type(), name)
+                            : "'$type' names '%s', which names no type of the scope holding '%s', where its tag is "
+                            .formatted(tag.type(), name) + "read -- expected a variant or a type that IS-A exactly "
+                            + "one ([TSON-SCHEMA] §5.4, §7.9)",
+                    String.join(" | ", variants), tag.type());
+        }
+        EventSkip.nextValue(ctx);
+        return null;
     }
 
     /**

@@ -9,7 +9,7 @@ package io.ltr8.tson.schema.meta;
  * refined. {@link #ABSTRACT} has none of its own, so a value at a position typed by it is a value of some
  * subtype. {@link #FINAL} has instances and admits no subtype: no composition or refinement may name it as a
  * source. Subtraction stays admissible against a {@link #FINAL} record -- §5.9 empties {@code supertypes} and
- * mints no IS-A edge, which is the only thing {@link #FINAL} constrains.
+ * adds no IS-A edge, which is the only thing {@link #FINAL} constrains.
  *
  * <p><b>There is no SEALED member, and member dispatch is not one.</b> How a record may be realised and how
  * its members are selected are two facts: an {@link #ABSTRACT} record whose {@code discriminators} is empty

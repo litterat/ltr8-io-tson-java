@@ -72,7 +72,7 @@ public final class ProcessorConfig {                 // io.ltr8.tson.base
 
     public ProcessorConfig withProcessorPolicy(ProcessorPolicy policy);   // the whole value
     public ProcessorConfig withIdentifierPolicy(IdentifierPolicy policy); // every name, and its scopes
-    public ProcessorConfig withTokenPolicy(ScriptPolicy policy);         // every token a read pulls
+    public ProcessorConfig withTokenPolicy(TokenPolicy policy);          // every token a read pulls
     public ProcessorConfig withLimits(LimitsPolicy limits);               // §9.1's resource bounds
 
     public SchemaAccess schemaAccess();
@@ -175,19 +175,19 @@ public record SchemaLocation(…)   // io.ltr8.tson.compiler -- id + pointer + p
 
 ```java
 public record ProcessorPolicy(IdentifierPolicy identifierPolicy,    // io.ltr8.tson.base.policy
-                              ScriptPolicy tokenPolicy,
+                              TokenPolicy tokenPolicy,
                               LimitsPolicy limits,
                               String unicodeDataVersion) {
     public static ProcessorPolicy defaults();
     public static String dataVersion();                // the Unicode data version this build carries, e.g. "16.0"
-    public static ProcessorPolicy of(IdentifierPolicy identifier, ScriptPolicy token, LimitsPolicy limits);
+    public static ProcessorPolicy of(IdentifierPolicy identifier, TokenPolicy token, LimitsPolicy limits);
     public ProcessorPolicy withIdentifierPolicy(IdentifierPolicy policy);
-    public ProcessorPolicy withTokenPolicy(ScriptPolicy policy);
+    public ProcessorPolicy withTokenPolicy(TokenPolicy policy);
     public ProcessorPolicy withLimits(LimitsPolicy limits);
 }
 
 public record LimitsPolicy(int maxDepth, /* … §9.1's other ten, then §11.5's … */
-                           int maxMaterialisationDepth, int maxWaitDepth) {   // io.ltr8.tson.base.policy
+                           int maxWaitDepth) {   // io.ltr8.tson.base.policy
     public static final int DEFAULT_MAX_DEPTH = 64;
     public static final int DEFAULT_MAX_WAIT_DEPTH = 64;
     public static LimitsPolicy defaults();
@@ -196,7 +196,7 @@ public record LimitsPolicy(int maxDepth, /* … §9.1's other ten, then §11.5's
 }
 ```
 
-`LimitsPolicy` is §9.1's and §11.5's bounds, seventeen components; two are enforced. Nesting depth is counted by the
+`LimitsPolicy` is §9.1's and §11.5's bounds, sixteen components; two are enforced. Nesting depth is counted by the
 event stream, and a document past it is reported as `LIMIT_EXCEEDED` — not a verdict, the document perhaps being
 valid and readable by a processor configured for more. Wait depth is counted as a schema resolves, and a schema past
 it is refused with `LIMIT_EXCEEDED` (a `SchemaRefusalException` on a fail-fast resolve).
@@ -214,38 +214,37 @@ in order not to be refused is this record *before* it writes. `tson policy` prin
 public final class IdentifierPolicy {                       // io.ltr8.tson.base.policy -- §8.2's identifier policy
     public record Violation(Diagnostic.Code code, String reason) {}
 
-    public static IdentifierPolicy of(ScriptPolicy scripts);      // whole name, skeleton distinctness on
-    public static IdentifierPolicy defaults();                    // of(highlyRestrictive())
+    public static IdentifierPolicy of(RestrictionLevel level);    // whole name, skeleton distinctness on
+    public static IdentifierPolicy defaults();                    // of(HIGHLY_RESTRICTIVE)
     public static IdentifierPolicy none();                        // judges nothing -- a synthetic source
 
+    public IdentifierPolicy permitting(UnicodeScript... scripts);  // one more script combination admitted
     public IdentifierPolicy perSegment();                  // the level per segment, split at the profile's separators
     public IdentifierPolicy withSkeletonDistinctness(boolean on);  // mechanism 1, the look-alike rule over a scope
 
-    public ScriptPolicy scripts();
+    public RestrictionLevel level();
+    public List<Set<UnicodeScript>> permittedScripts();
     public boolean isPerSegment();
     public boolean appliesSkeletonDistinctness();
     public boolean appliesIdentifierProfile();
     public List<Violation> judge(String name, IdentifierProfile profile);   // the per-name rules; empty if none
+    // equals/hashCode are by value: two policies configured alike are equal
 }
 
-public final class ScriptPolicy {                          // the token policy, and an identifier policy's level
-    public enum Level { ASCII_ONLY, SINGLE_SCRIPT, HIGHLY_RESTRICTIVE,
-                        MODERATELY_RESTRICTIVE, MINIMALLY_RESTRICTIVE, UNRESTRICTED }
+public final class TokenPolicy {                           // §8.2's token policy: a level over whole text, no unit
+    public static TokenPolicy of(RestrictionLevel level);
+    public static TokenPolicy asciiOnly();
+    public static TokenPolicy singleScript();
+    public static TokenPolicy highlyRestrictive();
+    public static TokenPolicy moderatelyRestrictive();
+    public static TokenPolicy scriptsUnchecked();
+    public static TokenPolicy unrestricted();             // the token default
 
-    public static ScriptPolicy of(Level level);
-    public static ScriptPolicy asciiOnly();
-    public static ScriptPolicy singleScript();
-    public static ScriptPolicy highlyRestrictive();       // the identifier default
-    public static ScriptPolicy moderatelyRestrictive();
-    public static ScriptPolicy scriptsUnchecked();
-    public static ScriptPolicy unrestricted();            // the token default
+    public TokenPolicy permitting(UnicodeScript... scripts);
 
-    public ScriptPolicy permitting(UnicodeScript... scripts);
-
-    public Level level();                                      // with permittedScripts, the whole of a policy
+    public RestrictionLevel level();                           // with permittedScripts, the whole of a policy
     public List<Set<UnicodeScript>> permittedScripts();
     public boolean checksScripts();
-    public boolean appliesIdentifierProfile();
     public Optional<String> violation(String text);
     // equals/hashCode are by value: two policies configured alike are equal
 }
@@ -262,9 +261,9 @@ public final class ScriptPolicy {                          // the token policy, 
 - `io.ltr8.tson.base.io` — `ByteSource`/`ByteSink`: bytes, never characters; closing releases only what was
   acquired, and closing is not flushing.
 - `io.ltr8.unicode` (module `ltr8-unicode`) — the Unicode mechanisms beneath it, TSON-free: `RestrictionLevel`
-  (the levels a `ScriptPolicy` states), `Normalization` (`NONE`, `NFC`, `NFKC`, `NFKC_CASEFOLD`, `ASCII_CASEFOLD`;
-  `apply(text)`, `holds(text)`), `IdentifierProfile`, `ConfusableNames`, `Xid`, `Nfc.of(text)`,
-  `NfkcCasefold.apply(text)`, `IdentifierStatus`, `Confusables.skeleton(text)`, `JoiningControls`.
+  (`ASCII_ONLY` … `UNRESTRICTED`, the levels both §8.2 policies state), `Normalization` (`NONE`, `NFC`, `NFKC`,
+  `NFKC_CASEFOLD`, `ASCII_CASEFOLD`; `apply(text)`, `holds(text)`), `IdentifierProfile`, `ConfusableNames`, `Xid`,
+  `Nfc.of(text)`, `NfkcCasefold.apply(text)`, `IdentifierStatus`, `Confusables.skeleton(text)`, `JoiningControls`.
 - `io.ltr8.tson.base.diagnostics` — the rule classes whose prose and `expected` both encodings report.
 
 ---
@@ -305,7 +304,7 @@ public final class TsonTreeReader {
     public TsonTreeReader withImports(List<String> imports);  // several, read as one namespace
     public TsonTreeReader withDiagnostics(DiagnosticsReceiver receiver);
     public TsonTreeReader withProcessorPolicy(ProcessorPolicy policy);
-    public TsonTreeReader withTokenPolicy(ScriptPolicy policy);
+    public TsonTreeReader withTokenPolicy(TokenPolicy policy);
     public TsonTreeReader withIdentifierPolicy(IdentifierPolicy policy);
     public TsonTreeReader withLimits(LimitsPolicy limits);
     public TsonTreeReader preservingUnknownTypeRefs();
@@ -371,6 +370,7 @@ public final class TsonObjectWriter {
     public TsonObjectWriter();
     public TsonObjectWriter(DataBindContext context);
     public TsonObjectWriter describing(String schemaUri, String rootTypeName);   // both, always
+    public TsonObjectWriter describing(TsonLinkedSchema schema, String rootTypeName); // + tags at an extern
     public TsonObjectWriter identifiedBy(String documentId);
     public String toTson(Object|TsonObjectDocument<?> value);
     public void   write(Object|TsonObjectDocument<?> value, OutputStream|Appendable out);
@@ -458,9 +458,11 @@ import-cycle guard.
 
 ### Pipeline stages, if you need one directly
 
-`TsonSchemaParser`, `TsonSchemaResolver`, `TsonSchemaLinker`, `TsonSchemaCompiler`, `TsonDataParser`,
-`TsonDataStream`, `TsonDiagnostics` (the classifiers over this engine's exceptions).
-`TsonSchemaParser` / `TsonSchemaResolver` / `TsonSchemaLinker` each have a reporting overload that collects
+`TsonSchemaParser`, `TsonSchemaLinker`, `TsonSchemaCompiler`, `TsonDataParser`,
+`TsonDataStream`, `TsonDiagnostics` (the classifiers over this engine's exceptions). Resolution is reached through
+`TsonCompiledVocabularyRegistry.resolveAndLink(document, positions)`, which resolves and links a parsed document
+and registers nothing.
+`TsonSchemaParser`, `resolveAndLink` and `TsonSchemaLinker` each have a reporting overload that collects
 every independent problem in one pass; namespace-level failures (an unloadable `!!import`, an import cycle, the
 `!!id` cross-check) still throw even with a receiver. Compilation, and the lexer under
 everything, are fail-fast by design.
@@ -468,13 +470,13 @@ everything, are fail-fast by design.
 ### Exported sub-packages
 
 - `io.ltr8.tson.compiler.ast` — the parse-preserving AST: `Document`, `DataValue`, `CoreValue` and its
-  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `ReferenceValue`, `VoidValue`, `EmptyBrace`),
+  branches (`RecordValue`, `MapValue`, `ArrayValue`, `TokenValue`, `VoidValue`, `EmptyBrace`),
   `Annotation`,
   `TokenForm`.
 - `io.ltr8.tson.compiler.ast.schema` — `SchemaDocument` and the schema-grammar nodes.
 - `io.ltr8.tson.compiler.stream` — the Tier 2 event vocabulary: `TsonEvent` (sealed) with
   `DocumentStart`/`End`, `RecordStart`/`End`, `MapStart`/`MapArrow`/`MapEnd`, `ArrayStart`/`End`,
-  `FieldName`, `TokenEvent`, `ReferenceEvent` (an application or a sibling reference, assembled whole), `VoidEvent`,
+  `FieldName`, `TokenEvent`, `VoidEvent`,
   `EmptyBraceEvent`, `TypeRef`,
   `AnnotationStart`/`End`; `TsonEventSource`, `ListEventSource`.
 - `io.ltr8.tson.compiler.config` — `ResolverBindContext` (`defaultContext()`, `registerDefaults(builder)`: the schema
@@ -493,10 +495,9 @@ A true leaf — depends on **nothing**, not even `ltr8-annotation`.
 
 ```java
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonReference, TsonVoid, TsonMissing {
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonVoid, TsonMissing {
 
-    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isReference() / isVoid()
-            / isMissing();
+    default boolean isRecord() / isMap() / isArray() / isTuple() / isAtom() / isVoid() / isMissing();
     default boolean isContainer();
     default Optional<String> missingPath();          // the pointer up to the step that FAILED
 
@@ -523,25 +524,7 @@ public sealed interface TsonValue
 public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
         implements TsonValue { public static TsonAtom of(Object value[, String typeRef]); }
 
-// A reference the grammar alone shows to be one, read with no schema: no referent, nothing resolved.
-// A bare name is a TsonAtom holding text.
-public sealed interface TsonReference extends TsonValue
-        permits TsonApplicationReference, TsonSiblingReference {
-    String text();                                   // what it reads as: box<text>, kind!
-}
-
-// An application (map<text list<int32>>), at least one argument.
-public record TsonApplicationReference(List<String> segments, List<TsonValue> arguments, Optional<String> typeRef,
-        List<TsonAnnotation> annotations) implements TsonReference {
-    public String name();                            // segments joined by "."
-    public String text();                            // canonical: one space between arguments
-}
-
-// A sibling reference (kind!): a record field's type taken from the field `field` of the same record.
-public record TsonSiblingReference(String field, Optional<String> typeRef, List<TsonAnnotation> annotations)
-        implements TsonReference {
-    public String text();                            // field + "!"
-}
+// A name read with no schema is a TsonAtom holding its text: nothing resolves without a schema.
 
 public record TsonDocument(Optional<String> id, List<String> imports, TsonValue root) {}
 ```
@@ -559,20 +542,22 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
                          Map<String, List<ValueByName>> valuesByName, Map<String, EntryFacts> facts) {
     public List<String> namespaceSources();              // the imports, deduplicated by identity
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
-                             Optional<String> constructor, Optional<String> refines) {}
+                             Optional<String> constructor) {}
     public EntryFacts factsOf(String name);              // NONE for a name with no facts
-    public Optional<SourcePosition> positionOf(String name); // absent for an entry the resolver minted
+    public Optional<SourcePosition> positionOf(String name); // absent where no source was read
     public Optional<String> constructorOf(String name);  // the constructor tag the entry's value applies
-    public Optional<TypeRef> applicationOf(String name); // the @meta.application on its key (§8.2)
+    public Optional<ApplyBody> applicationOf(String name); // the @meta.application on its key (§8.2)
 }
 
 public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigins,
                                Map<String, Normalization> enumForms, Map<String, Top> nameTypes) {
     public String originOf(String entryName);       // which document declared it, transitively
+    public String declaringIdentity(String entryName); // originOf, canonical: what a binder is asked within
+    public List<String> dependencies();             // every schema depended on directly: imports, then externs
+    public Optional<ExternTarget.Landing> landing(String name); // the foreign entry an extern lands on, past hops
     public Normalization enumForm(String entryName); // the form an enum matches its members in; NONE if unlisted
-    public Optional<Top> nameType(String entryName); // a record's name_type, where not meta.field_name
+    public Optional<Top> nameType(String entryName); // a record's name_type, where it states one
     public boolean isKernel(String entryName);      // declared by meta.tn, judged by origin
-    public EntryKind kindOf(String entryName);       // §4.1's kind, each base kind judged by origin
     public boolean isConstructor(String name, Top value); // IS-A the kernel's meta.top
     public Optional<NamespaceBody> namespace(String entryName); // the namespace type it is, if it is one
 }
@@ -597,7 +582,7 @@ public final class TsonBundledSchemas {
 ```
 
 `policy.tn` is the processor policy's vocabulary, every entry a member of its `policy` map — `policy.restriction_level`,
-`policy.script_policy`, `policy.identifier_policy` (`level`, `per_segment`, `skeleton_distinctness`, `permitting`),
+`policy.token_policy`, `policy.identifier_policy` (`level`, `per_segment`, `skeleton_distinctness`, `permitting`),
 `policy.limit` (a positive `int64`), `policy.limits` and `policy.processor` — so a policy is stated in one shape; the
 CLI's `diagnostics.tn` imports it for its report's `policy` field. No document selects the policy it is judged under.
 
@@ -619,31 +604,30 @@ interfaces and enums, §8's `Top` and its bodies — one package per namespace i
 `DecimalType`, `FloatType`, `RationalType`, `ComplexType`), `net` (`IriType`, `UriType`, `EmailType`, `UuidType`, …),
 `binary` (`BytesType`) and `temporal` (`DateType`, `DateTimeType`, `TimeType`, `DurationType`, `PeriodType`). A schema
 map's entry is its value: a `Type` carries its own chain (`Type.chain()`, a `TypeChain` of `parents`, `supertypes` and
-`subtypes`, with accessors for each on `Type`, and `TypeChain.supertypesOf(top)` and its siblings for any
-value); the application an entry is the instantiation of is the derived
-`@meta.application` on its key (`TsonSchema.applicationOf`), stated as written, nested arguments unreduced
-(`@meta.application:pair<box<text> int32>`); and what is not part of the value — where it was declared, its
-value annotations, its constructor tag, the entry a refinement names — is in `TsonSchema.facts`. The
-host values the atoms read to
-are not here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`,
-`Alias`, `TemplateBody` and `ValueEntry`. A schema's own vocabulary is a record it declares and, where it wants a
+`subtypes`, with accessors for each on `Type`, and `TypeChain.supertypesOf(top)` and its siblings for any value); the
+application an entry is the instantiation of is the derived `@meta.application` on its key
+(`TsonSchema.applicationOf`), a `meta.apply` stated as written, each argument a name (`@meta.application:{ head: pair
+arguments: [box_text int32] }`); and what is not part of the value — where it was declared, its value annotations, its
+constructor tag — is in `TsonSchema.facts`. The host values the atoms read to are not
+here (see `tson-base`'s `atom` package and `ltr8-net`). `Top` is sealed all the way down: `Type`, `Alias`,
+`Extern`, `ValueEntry` and `IncompleteEntry`. A schema's own vocabulary is a record it declares and, where it wants a
 map of them, a namespace type (`operations => !meta.namespace { key_type: meta.identifier  value_type: operation }`, a
-`NamespaceBody`). An entry whose tag names such a type rather than a constructor, `api => !operations { search =>
-{ … } }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a
-member of no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind
-context binds one (by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its
-references. A slot
-typed by a reference (`ReferenceBody`, spelled `meta.ref<T>`) holds what its `T` decides: over a
-constructor (`request: meta.ref<meta.record>`) it binds a `TypeRef` holding a type's name (its path from the root,
-`geo.address` for a member of a nested `!schema` map) or an application the schema
-closes (`set<text>`, written unquoted), whose `referent()` is the value of the entry it names — a tree read
-delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type
-(`method: meta.ref<method>`) it binds a `Ref<T>` holding the qualified name as written (`orders.place_order`, an entry and
-then a key of its namespace value, or a field of a record value) and the value it names (`method().get()`), or a `TypeRef`
-whose `referent()` is that value, or a `String` the name. In a schema the resolver records each with its slot as it reads the
-value, and the linker judges it and delivers the value; in a data document the read judges the name in the governing schema
-(`ATOM_CONSTRAINT_VIOLATION` where it reaches nothing, a type, or a value of another type) and delivers at once. The value is
-the schema's own value entry's, bound or a tree as the schema holds it.
+`NamespaceBody`). An entry whose tag names such a type rather than a constructor, `api => !operations { search => { …
+} }` or `create => !operation { … }`, is a **`ValueEntry`** (`type()`, `value()`) — a value, never a type, a member of
+no kind — whose value is a `Namespace` for a namespace type, the consumer's own class where the bind context binds one
+(by name, or by `@Typename`), or a `TsonValue` where none does. The class declares none of its references. A slot
+typed by a reference (`RefBody`, spelled `meta.ref<T>`) holds what its `T` decides: over a constructor
+(`request: meta.ref<meta.record>`) it binds a `TypeRef` holding a type's name (its path from the root, `geo.address`
+for a member of a nested `!schema` map; an argument list, `set<text>`, is no data form and does not parse there, and a
+document names the entry the schema declares for it), whose `referent()` is the value of the entry it names — a tree
+read delivers the same `TypeRef`, and a `String` host receives its canonical text; over any other type (`method:
+meta.ref<method>`) it binds a `ValueRef<T>` holding the qualified name as written (`orders.place_order`, an entry and
+then a key of its namespace value, or a field of a record value) and the value it names (`method().get()`), or a
+`String` the name -- a tree read delivers the same `ValueRef`, and a `TypeRef` host there is a bind mismatch, a value
+being no type. In a schema the resolver records each with its slot as it
+reads the value, and the linker judges it and delivers the value; in a data document the read judges the name in the
+governing schema (`ATOM_CONSTRAINT_VIOLATION` where it reaches nothing, a type, or a value of another type) and
+delivers at once. The value is the schema's own value entry's, bound or a tree as the schema holds it.
 
 ---
 
@@ -657,10 +641,15 @@ public class DataBindContext {
     public Optional<String> profile();
     public DataClass getDescriptor(Class<?> targetClass) throws DataBindException;
     public DataClass getDescriptor(Class<?> targetClass, Type parameterizedType) throws DataBindException;
-    public DataClass getDescriptor(String schemaTypeName) throws DataBindException;
+    public DataClass getDescriptor(String schemaTypeName) throws DataBindException;   // the name alone
+    public DataClass getDescriptor(String namespace, String schemaTypeName) throws DataBindException;
     public Supplier<DataClass> componentSource(Class<?> targetClass, Type parameterizedType);
 }
 ```
+
+`DataNameBinder` has one abstract method, `resolve(String name)`; `resolve(String namespace, String name)` defaults to
+it, and the engine always asks that one, with the canonical identity of the schema declaring the type. `ofMap`,
+`orElse`, `byNamespace(Map<String, DataNameBinder>, DataNameBinder fallback)` and `DefaultDataNameBinder` build one.
 
 **Everything is fixed at `build()`** — atoms, the name binder and the profile are the builder's, and the
 built context has no mutators.
@@ -821,6 +810,3 @@ read) and is **not a verdict**. [TSON-SCHEMA] §11.5's **wait depth** is enforce
 next being ready. Token length and document size are not bounded yet; a deployment reading
 untrusted documents caps bytes before handing them to a reader. `LimitsPolicy`'s Javadoc and `BACKLOG.md`
 carry what is left.
-
-(The schema-side template materialiser carries its own depth backstop, at 64 nested instantiations — a
-resolver guard against non-regular recursion, not a document limit.)

@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * The real, published identities of the six schema documents this library bundles and pre-loads -- meta (the kernel:
@@ -38,22 +39,22 @@ public final class TsonBundledSchemas {
      * pre-loaded and bound to the software's revision, and the one this library's compiled-reader machinery is built
      * against.
      */
-    public static final String META_ID = "https://tson.io/2026/39/m/meta.tn";
+    public static final String META_ID = "https://tson.io/2026/40/m/meta.tn";
 
     /** numeric's own real, published identity -- see {@code spec/m/numeric.tn}'s own {@code !!id}. */
-    public static final String NUMERIC_ID = "https://tson.io/2026/39/m/numeric.tn";
+    public static final String NUMERIC_ID = "https://tson.io/2026/40/m/numeric.tn";
 
     /** temporal's own real, published identity -- see {@code spec/m/temporal.tn}'s own {@code !!id}. */
-    public static final String TEMPORAL_ID = "https://tson.io/2026/39/m/temporal.tn";
+    public static final String TEMPORAL_ID = "https://tson.io/2026/40/m/temporal.tn";
 
     /** net's own real, published identity -- see {@code spec/m/net.tn}'s own {@code !!id}. */
-    public static final String NET_ID = "https://tson.io/2026/39/m/net.tn";
+    public static final String NET_ID = "https://tson.io/2026/40/m/net.tn";
 
     /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
-    public static final String CORE_ID = "https://tson.io/2026/39/m/core.tn";
+    public static final String CORE_ID = "https://tson.io/2026/40/m/core.tn";
 
     /** policy's own real, published identity -- see {@code spec/m/policy.tn}'s own {@code !!id}. */
-    public static final String POLICY_ID = "https://tson.io/2026/39/m/policy.tn";
+    public static final String POLICY_ID = "https://tson.io/2026/40/m/policy.tn";
 
     /**
      * The kernel's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s own {@code
@@ -61,22 +62,22 @@ public final class TsonBundledSchemas {
      * pre-loaded schema can be verified, and so the shipped resource can be checked against its own published digest
      * ({@link #declaredSha256}).
      */
-    public static final String META_SHA256 = "c9b069b606f7cc8a043ebabe3fe91e4aaa35a9ffd814b68be0ba4bbe6d02bfb5";
+    public static final String META_SHA256 = "291ddaf37566f9f084515d09626f1855d05f2cfb9413e3ce0073323f4933ddcd";
 
     /** numeric's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/numeric.tn}'s !!id. */
-    public static final String NUMERIC_SHA256 = "dfa66c5d3775a7845776db737f07b16630824f2434f6587aface2f88b77bf0f2";
+    public static final String NUMERIC_SHA256 = "0337c18854a0e689ce53d9cae47e1cfd32bd54026acd6a3bac9abae358cb86f7";
 
     /** temporal's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/temporal.tn}'s !!id. */
-    public static final String TEMPORAL_SHA256 = "fb4ada8f238de82821e7fcf512c21980a8b73c8df9260cdf295ba0157cc3971e";
+    public static final String TEMPORAL_SHA256 = "3d516776324209f0406523dac4cc7bac85af0d530599de85a55cdc0b3ef77b20";
 
     /** net's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/net.tn}'s {@code !!id}. */
-    public static final String NET_SHA256 = "371fc20c8628b5461b56a7a28f2559a1cfde4eda718f72d60ceb1b5a007bac06";
+    public static final String NET_SHA256 = "80b8d1c1af70469b6513891498781454595202cdb3a49501b70b216b5108ea7d";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. */
-    public static final String CORE_SHA256 = "4e8d9c43cbbabf6a73548b819ac74e06e18859b573d05ce99988ae9d4d9a562e";
+    public static final String CORE_SHA256 = "00eaf2174c7ba05510ce8410a4b7577bf6fd4bf6db8f099a7c8ec02edd053241";
 
     /** policy's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/policy.tn}'s !!id. */
-    public static final String POLICY_SHA256 = "e9cb5b9305ddec62f0e18e7ee7ed3d2a087d97a243a48b411daa11f5071a496f";
+    public static final String POLICY_SHA256 = "ffcecb04bf6be35c8e2c93375bf2c1bb1d09603f874823495ed7d8cf107fb408";
 
     /**
      * The six identities in dependency order: the kernel, the three libraries importing it alone, core importing the
@@ -132,6 +133,20 @@ public final class TsonBundledSchemas {
             return false;
         }
     }
+
+    private static final Pattern KERNEL_OF_ANY_REVISION = Pattern.compile(
+            Pattern.quote(KERNEL_IDENTITY.substring(0, KERNEL_IDENTITY.indexOf('/') + 1))
+                    + "\\d{4}/\\d+" + Pattern.quote("/m/meta.tn"));
+
+    /**
+     * Whether the canonical {@code identity} names a kernel of some revision of the series, this library's or another:
+     * the kernel's identity with its year and revision free ([TSON-SCHEMA] §3.4, §10). A processor pre-loads only its
+     * own, so another is a second kernel wherever a closure reaches it.
+     */
+    public static boolean isKernelOfAnyRevision(String identity) {
+        return identity != null && KERNEL_OF_ANY_REVISION.matcher(identity).matches();
+    }
+
 
     /**
      * The published content-hash digest this library holds for {@code uri} if it names a pre-loaded

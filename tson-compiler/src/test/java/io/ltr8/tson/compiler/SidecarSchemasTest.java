@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.suite.SuiteBindings;
@@ -53,7 +54,9 @@ class SidecarSchemasTest {
         try (Stream<Path> files = Files.walk(schemasRoot)) {
             // A data fixture is there to be imported and refused (an import target must be a schema), so only the
             // schema documents are resolved here.
+            // A `cycle-` fixture is on a reference cycle with the subject naming it, which no order resolves.
             return files.filter(p -> p.getFileName().toString().endsWith(".tn"))
+                    .filter(p -> !p.getFileName().toString().startsWith("cycle-"))
                     .filter(SidecarSchemasTest::isSchemaDocument)
                     .map(p -> schemasRoot.relativize(p).toString())
                     .sorted()
@@ -79,7 +82,7 @@ class SidecarSchemasTest {
         TsonCompiledSchemaLoader loader = TsonCompiledVocabularyRegistry.withStandardLibrary(SuiteBindings.context(),
                 id -> fetch(schemasRoot, id));
 
-        TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);
+        TsonSchema resolved = new SchemaResolver(loader).resolveSchema(document);
         assertFalse(resolved.entries().isEmpty(), fileName + " resolved with no entries");
     }
 

@@ -1,0 +1,89 @@
+package io.ltr8.tson.compiler.reader;
+
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.compiler.Position;
+import io.ltr8.tson.compiler.TestDocuments;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.ast.TokenForm;
+import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.ValueRef;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * A reference written by name at a reference-typed slot ([TSON-SCHEMA] §5.12): an unquoted token, kept as written in a
+ * {@link ValueRef} in a schema document, whose link judges it and delivers into it, and read by the reference's atom
+ * in a data document.
+ */
+class ValueRefSlotReaderTest {
+
+    private static final TsonSchema.SlotType METHOD = TsonSchema.SlotType.valueName("method", null);
+
+    /** The atom a test of the schema-document path never reaches. */
+    private static final TsonTypeReader<?> NEVER = ctx -> {
+        throw new AssertionError("a schema document's name is not the atom's to read");
+    };
+
+    private static Optional<String> in(String text, TokenForm form) {
+        return ValueRefSlotReader.nameIn(new TokenEvent(text, form, new Position(1, 1, 0)));
+    }
+
+    @Test
+    void anUnquotedTokenIsAName() {
+        assertEquals(Optional.of("orders.methods.place_order"), in("orders.methods.place_order", TokenForm.UNQUOTED));
+        assertEquals(Optional.of("orders.1x"), in("orders.1x", TokenForm.UNQUOTED));
+    }
+
+    /** A reference is a token's text whatever its form ([TSON-DATA] §2.4, [TSON-SCHEMA] §5.12). */
+    @Test
+    void aQuotedTokenIsAName() {
+        assertEquals(Optional.of("orders"), in("orders", TokenForm.SINGLE_LINE_QUOTED));
+        assertEquals(Optional.of("main.public api.ping"), in("main.public api.ping", TokenForm.SINGLE_LINE_QUOTED));
+    }
+
+    /** In a schema document the name is kept as written, and handed on with its cell for the link to deliver into. */
+    @Test
+    void aSchemaDocumentsNameIsKeptAsWrittenAndHeld() {
+        List<TypeRef> held = new ArrayList<>();
+        List<ValueRef<?>> cells = new ArrayList<>();
+        Object read = new ValueRefSlotReader("a 'method' value", METHOD, NEVER).read(TestDocuments.schemaDocument(
+                "orders.methods.place_order", (slot, type, reference, cell) -> {
+                    held.add(reference);
+                    cells.add(cell);
+                }));
+        assertEquals(ValueRef.to("orders.methods.place_order"), read);
+        assertEquals(List.of(TypeRef.of("orders.methods.place_order")), held);
+        assertSame(read, cells.getFirst());
+        assertFalse(((ValueRef<?>) read).isResolved());
+    }
+
+    /** In a data document the name is the reference's atom's to read and judge. */
+    @Test
+    void aDataDocumentsNameIsReadByTheAtom() {
+        TsonTypeReader<?> atom = ctx -> "judged " + ((TokenEvent) ctx.next()).text();
+        assertEquals("judged o1", new ValueRefSlotReader("a 'method' value", METHOD, atom)
+                .read(TestDocuments.document("o1")));
+    }
+
+    @Test
+    void aBracedValueIsNoName() {
+        List<Diagnostic> reported = new ArrayList<>();
+        assertNull(new ValueRefSlotReader("a 'method' value", METHOD, NEVER)
+                .read(TestDocuments.document("{ a: 1 }", reported::add)));
+        assertEquals(1, reported.size(), reported.toString());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, reported.getFirst().code());
+        assertTrue(reported.getFirst().message().contains("expected the name of a 'method' value, found a record"),
+                reported.getFirst().message());
+    }
+}

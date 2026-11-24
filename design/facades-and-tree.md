@@ -22,7 +22,7 @@ form only; history lives in git.
   value's annotations.
 - The whole-document entry points own framing, including the `requireDocumentEnd` pull that makes the lazy
   stream check for trailing content.
-- A schemaless read checks type-refs by `TypeRefCheck`'s three rules. Rule 2 (a tag naming the bound class or
+- A schemaless read checks type-refs by `TypeTagCheck`'s three rules. Rule 2 (a tag naming the bound class or
   a union member) applies only under `withHostTypes()`; `preservingUnknownTypeRefs()` opts out of rule 3 only;
   an atom position takes `declares` (`@Typename` only), never the loose `names` match.
 - Reporting never abandons the value: a reported type-ref still yields its node and its children are read.
@@ -95,7 +95,7 @@ needs no set of already-reported positions. `wrap` returns the source unchanged 
 nothing, which is the default — an ordinary read pays not even a predicate.
 
 **A raised policy is not a per-token allocation either**, which is what makes it advisable to turn on. The
-conforming path through `ScriptPolicy.violation` scans and returns `Optional.empty()`: no substring (the scan runs
+conforming path through `TokenPolicy.violation` scans and returns `Optional.empty()`: no substring (the scan runs
 over a range, which is also how `IdentifierPolicy` judges each segment of a name), no script set (a single-script unit
 is decided without materialising one — only a genuinely mixed token builds the set `covered` and the message need), no
 stream, and `isPresent`/`get` at the call rather than a lambda that would capture three fields per token. What is left
@@ -109,7 +109,7 @@ at it. The setter is named for the surface rather than for the values it mostly 
 visible where it is configured. Document directives are not checked: an `!!import`/`!!id` token is a URI naming
 an external resource, §2.2.1 governs what an identity may be, and an IRI's scripts are the resource owner's
 business. The diagnostic (`RESTRICTED_SCRIPT`) carries a position and no `path`, which is not an omission —
-there is no path yet at the point the check runs. The token policy is a `ScriptPolicy`, which has no unit: `_`
+there is no path yet at the point the check runs. The token policy is a `TokenPolicy`, which has no unit: `_`
 and `-` are word separators by convention in a name and ordinary characters in a value, so segmenting one would
 admit UTS #39's own `Toys-Я-Us`.
 
@@ -153,7 +153,7 @@ admit UTS #39's own `Toys-Я-Us`.
   `schemaPointer`. The registry caches nothing for a schema that reported, so a second read reports again
   rather than appearing to succeed. Distinct from the bullet above: a schema that can't be *reached* (no
   such URI, malformed, wrong `!!id`) is still one diagnostic, because there is nothing to enumerate.
-- **A schemaless read checks its type-refs, and `TypeRefCheck` (in `reader`) states the rules once** for
+- **A schemaless read checks its type-refs, and `TypeTagCheck` (in `reader`) states the rules once** for
   both engines. Given `!X` on a value: (1) `X` **is** a `BuiltinTypeVocabulary` name → it must sit on a
   token (`TYPE_MISMATCH` otherwise) and that token must satisfy the atom
   (`ATOM_FORM_INVALID` for a token of the wrong form, `ATOM_CONSTRAINT_VIOLATION` for a value out of
@@ -172,18 +172,17 @@ admit UTS #39's own `Toys-Я-Us`.
   built-in names stay checked — and is what round-tripping through `TsonTreeWriter`, or reading the wire of a
   document whose `!!import` is deliberately out of scope, wants. The two controls compose, as
   `ignoringUnknownFields()` does with both.
-- **A reference is a `TypeRef` in both modes.** Under a schema a reference-typed position (a kind or a `meta.ref<…>`)
-  reads to a `schema.meta.TypeRef`, so a tree read hands back a `TsonAtom` holding one (`node.as(TypeRef.class)`)
-  and a bind delivers the same object, a `String` host receiving its canonical text. Read in data under a kind, it
-  carries its closure, so `referent()` is the value of the entry it names (`design/references.md`); read in data
-  under a reference naming values (`meta.ref<order>`), its `referent()` is the value its name reaches, and a `Ref`
-  host is delivered that value at the read. A schemaless read
-  has no closure: it keeps an application or a sibling reference as a `TsonReference` (`design/tree-model.md`) and a
-  bare name as a token.
-- **Rule 2 is looser for a container than for an atom, deliberately.** `TypeRefCheck.names` (a `@Typename`,
+- **A reference reads to one host shape in both modes.** Under a schema a kind reads to a `schema.meta.TypeRef`, so a
+  tree read hands back a `TsonAtom` holding one (`node.as(TypeRef.class)`) and a bind delivers the same object; read
+  in data it carries its closure, so `referent()` is the value of the entry it names (`design/references.md`). A
+  reference naming values (`meta.ref<order>`) reads to a `schema.meta.ValueRef` the same way, the value its name
+  reaches delivered into it at the read in data and at link in a schema document; a `TypeRef` host there is a bind
+  mismatch. A `String` host receives the name at either. A schemaless read
+  has no closure: it keeps a name as a token (`design/tree-model.md`).
+- **Rule 2 is looser for a container than for an atom, deliberately.** `TypeTagCheck.names` (a `@Typename`,
   else the simple class name case-insensitively — the same match `bindUnion` gives union members) is what
   lets `!point { x: 3  y: 4 }` bind to a Java `Point` with nothing annotated. An atom position takes
-  `TypeRefCheck.declares` (`@Typename` only), because the loose match would accept a `UUID`-targeted
+  `TypeTagCheck.declares` (`@Typename` only), because the loose match would accept a `UUID`-targeted
   `!Uuid` on the strength of the class being *called* `UUID`. Consequence worth knowing: a collection
   target answers to no wire name, so `!tags [ "a" ]` into a `List<String>` is `UNKNOWN_TYPE_REF`.
 - **Reporting never stops the read, and the facade returns nothing for a document that reported.** A

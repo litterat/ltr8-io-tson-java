@@ -1,0 +1,233 @@
+# Materialising a parametric record, and regularity
+
+§5.10's closing pass and §5.10.1's regularity check: how `ParametricMaterialiser` turns an application of a parametric record
+into an entry — identity, declared applications, operands and on-demand closing, the IS-A edges closing feeds, how `kind` is
+derived — and the static check that runs before any of it.
+
+**Invariants**
+
+- The pass order in `SchemaResolver` is fixed: the driving loop resolves every declaration, then
+  `ParametricRegularity.check`, then `ParameterTypes.check`, `HeldRecursion` and `checkDeferred`, then `materialise`,
+  then `appliedParentEdges` and `closeChains`. Every step reads what the one before it settled.
+- **Nothing is minted.** An application is closed where it stands, or closes into the declaration that names it, or
+  is reported; no entry is added under a name derived from content or from the application.
+- A parametric record that fails the regularity check, or whose parameters stand where none may, is replaced with the
+  error placeholder in **both** the entry map (which `materialise` walks) and the namespace (through which an
+  application's head resolves).
+- The pass runs over the **resolved** form through `schema.meta.TypeSlots`. In a parametric record (`parametricRewrite`) it
+  closes each application that names none of its parameters and leaves each over one for substitution.
+- **Every application it meets applies a parametric record**, or a head nothing names. A constructor's application is
+  its construction before anything is read (`ConstructionRewrite`, `design/constructor-application.md`), so
+  `meta.map<text meta.array<box<T>>>` reaches here as `{text => [box<T>]}` holding `box<T>`, and an application's
+  arguments are names or parameters, as the kernel types `meta.apply.arguments`. The explicit `{ of: !meta.apply
+  { head: meta.array  arguments: [text] } }` is rewritten the same way where its arguments are names, so nothing
+  constructs here.
+- **Where only a name may stand an application closes nowhere** (§4.2): a map's key, a reference's `of`, an alias's
+  target, a parameter's bound (`ParameterTypes.requireType`). A construction and an application
+  of a parametric record are both refused there (`nameRequired`), spelled as the author wrote them, at the declaration
+  that wrote them, naming the declaration to write. A constructor's slot that holds only a name is judged where its
+  application is rewritten (`ConstructionSugar.slotsInPlace`).
+- An application of a **parametric record** closes into the declaration that names it (`closeApplicationInto`): the
+  record itself, recorded with its application. **At a type slot it closes in place** (`instantiate`) -- at a field of
+  a closed record, or left in another record's body by closing it: the substituted record, closed, its chain dropped,
+  held as `TypeInline.closing(application, record)`, the application as written kept for messages and nowhere else.
+  Nothing is minted, nothing records it, and it is never looked up to a declaration. A nested application equal to the
+  one a declaration is closing names that declaration (`closingInto`). One at a composition operand is absorbed
+  (below).
+- **Two refusals come before closing in place** (`instantiate`): one whose record in place would be IS-A a declared
+  type (`refuseMembership`, §5.2), and a recursion with no declaration to tie to (§5.10.1). Held in a parametric record, a
+  membership is reported at the declaration whose application closed it, and a recursion at the parametric record's own
+  declaration (`HeldRecursion`: it holds a recursive record whose cycle avoids it), its appliers closing against its
+  placeholder, so the refusal at a slot is a closed record's alone.
+  - *Membership* has two halves. A parametric record's written parents reaching a declared type are judged at once. An
+    applied parent a declaration names (`dog_of => <T> animal_of<T> & { … }` beside `animal_text => animal_of<text>`) is
+    known only once every declaration has closed, so one asked while declarations are being made ready is deferred to
+    `checkDeferred` (`deferredMemberships`); asking then would depend on declaration order.
+  - *Recursion* is judged by closing, not by the parametric record's shape. `closingInPlace` is a stack of the applications
+    closing in place, keyed on the canonical application: one reached again inside its own closing, with no
+    declaration closing it, is refused, naming it and the declaration to write. Mutual recursion through records in
+    place therefore ties to the declaration being closed (`a_text => a<text>` closing `b: b<T>` in place, whose
+    `a<text>` names `a_text`), and is refused at a slot (`f: b<text>`), with or without `a_text` declared, since an
+    application at a slot is never looked up. Regularity passes each parameter through unchanged and an argument is a
+    name, so every cycle repeats an application exactly and the closing ends.
+- An argument of a parametric record's application is a name or a parameter (§5.3): a construction or an application
+  there is refused where the application is first met (`ConstructionRewrite`, `argumentNotAName`), parametric record or
+  closed, to be declared under a name and passed by it. An application's arguments are dereferenced before it is
+  closed.
+- Every instantiation records its application in the map `SchemaResolver` shares with the materialiser, in its reduced
+  form, which the applied-parent fold keys on; the entry's key carries it as `@meta.application` **as written**, each
+  argument past its alias hops (`asWritten`, `writtenApplications`).
+- A composition operand never closes, open or closed: it is absorbed by value. Which parents were applications is
+  read off the parametric record's chain `parents`; a closed type keeps no `parents` once `closeChains` has run.
+- No application is IS-A its head (§5.10): its edges are what its head's written parents reach, each closed
+  parent through `Ancestry`, and an applied parent through the fold to the declaration that application denotes.
+
+Related: `design/parametric-records.md` (what a parametric record is, where a parameter stands, bounds and argument
+checks), `design/schema-resolution.md` (chains, applied parents),
+`design/resolver-vocabulary-and-bootstrap.md` (`WireForm`, `CanonicalApplication`, `TypeSlots`, `@meta.application`),
+`design/constructor-application.md`, `design/linking-and-compilation.md`.
+
+## Materialisation (`tson-compiler/.../resolver/ParametricMaterialiser.java`)
+
+- **Arguments are dereferenced before an application closes** (`dereferenced`). A reference is a pure rename (§8.3:
+  "a reference is the same type under another name"), so `box<user_id>` over `user_id => uuid` *is* `box<uuid>`
+  and must be one application; otherwise the arguments would be interchangeable at a scalar position and the
+  applications refused one layer up. A refinement (`!uuid ^ {}`) and a fresh instance (`!net.uuid_type {}`) are
+  ordinary entries and keep their own applications, which is what makes those spellings mean something. **Identity
+  is normalised, provenance is not**: the canonical application is what identity keys on, `@meta.application` states
+  the application as written past its alias hops, and the use site still names what the author wrote, since no
+  pass rewrites use sites (§8.3). It rests on nothing that changes how
+  a value reads riding on a reference — a `bytes` alphabet is `binary.bytes_type`'s own selector (§5.5).
+  `AliasedArgumentIdentityTest` pins it. `closeApplicationInto` and `closeApplicationOfRecord` dereference the same
+  way, so a declaration and a nested application agree on the canonical application.
+- **It runs over the resolved form, not the AST.** An application arrives as a `schema.meta.TypeRef` carrying
+  `arguments`, so substitution is a walk over values, and a declared application records its application on its key.
+  That keeps `SchemaDesugarer` purely syntactic.
+- **A parametric record's body closes only what names none of its parameters.** `chain<T>` inside `chain` awaits
+  substitution; closing it would close on the literal parameter name. A field type that names no parameter at any depth
+  (`tag: meta.ref<order>`, `tags: [text]`) means the same in every application, so it is closed at the declaration
+  and every application holds the same type — which is what `FamilySelectors` reads a selector's type from.
+- **Nothing is identified by its content.** A declared application's identity is its declaring document and its
+  name, its key recording the application (`@meta.application`); a construction closed at a slot is a `TypeInline`,
+  one type with an equal one by constructor and fields (§8.2). Nothing is minted, so nothing unifies across
+  schemas, and two declarations of one application are two entries.
+- **A declaration naming the application *is* that entry** (§8.2). `text_box => box<text>` resolves to the closed
+  record under `text_box`, its key recording the application — not an `Alias` to an entry beside it.
+  `DefinitionResolver` reaches `closeApplicationInto`, which builds the body under the declared name and, while it
+  closes, registers the canonical application in `closingInto`, the knot-tie for recursion inside the closure. It
+  returns `null` — the caller keeps the reference form — for an unresolved or parameterless head and an arity
+  mismatch, both the ordinary path's to report.
+  - **Two declarations of one application are two entries**, each closing into its own name, with no privileged
+    first — as two hand-written records with identical fields are. Where they are family members §5.2's
+    pin-distinctness rule refuses them, the same verdict the hand-written pair gets.
+  - **The parent edge is derived after the fact, order-independently** (`SchemaResolver.appliedParentEdges`). The
+    entry an applied parent denotes is whichever declaration names that application, and asking during closing
+    would make the answer depend on declaration order. The fold indexes entries by their recorded canonical
+    application (`CanonicalApplication.of`) and folds each owner and its ancestors into `supertypes` to a
+    fixed point. An application no declaration names contributes no edge: nobody declared that type.
+- **An application is `meta.apply` written in place** (`ApplyBody`), closed by one walk (`TypeSlots`, the
+  materialiser's `Closing`). Its arguments are names, so closing one closes nothing inside it.
+- **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head abstraction),
+  but it may be one *among an application's arguments*, which is what recursion looks like; binding only the outer
+  name leaves `T` in `chain<T>` unbound.
+- **Knot-tying is `closingInto`**, registered before the body is substituted and keyed on the canonical
+  application: a recursive application reached during substitution finds the declaration being closed and names it.
+  One reached again inside its own closing in place, with no declaration closing it, is refused (`closingInPlace`,
+  §5.10.1), so regular recursion ties on its first repeat or stops there, and nothing nests without bound.
+- **Substitution changes no field fact, and reaches every type slot.** A field's value is never a parameter (§5.10),
+  so replacing each `ParamRef` with its argument, at any depth of types written in place, is the whole of it
+  (`Substitution`, in `closeParametricRecord`): every field's type is then closed by the same walk, each application at a
+  slot of it -- `box<T>` at a field, in `[box<T>]` or in `{ c: box<T> }` -- closed now that
+  the parameter is bound, and nothing is written out or read back. One walk serves every body kind
+  (`schema.meta.TypeSlots`), so a record in place, a container, a tuple and a choice need no case each. The result is a
+  `RecordBody` without `parameters` and, every `ParamRef` substituted by the one total walk, holding none. A value
+  that differs per application is pinned where the application is declared (`created => response<order> & { status?:
+  = 201 }`), by composition. The
+  record-level facts are kept as written too: `extension`, `discriminators`, groups and name type are each
+  application's, so an abstract parametric record's application is an abstract record, the base of the declarations composing
+  it (§5.10).
+- **A closed record is built with no subtypes.** `subtypes` is linking's, derived over the closed namespace. Taking
+  the parametric record's list would hand each instantiation the whole family and, for a parametric record imported
+  already linked, itself.
+- **An application whose head names nothing in scope is left whole, arguments and all.** The verdict is the linker's,
+  as an unresolved reference; a head stripped of its arguments would instead be faulted for supplying none, the
+  opposite of what the author wrote (`'box<some_typo>' field 'v' has an unresolved reference 'some_typo'`).
+- **Argument checking.** Arity is checked first, against the head's own `parameters`. Each argument is then
+  checked against the parameter it binds (`checkArguments`; `design/parametric-records.md` has the rule): it must
+  name a type that IS-A the parameter's bound. A literal argument (`box<3>`) never reaches here: an argument is a
+  reference, and the grammar refuses a literal token where it is written (`TsonSchemaParser`, `ReferenceGrammar`,
+  `TsonDataStream`).
+- **Failures report per entry**, through the receiver resolution uses, so two bad applications in one schema are
+  both reported against their own declarations.
+
+## Operands and on-demand closing
+
+A composition operand (§5.8) needs its *fields* while a declaration resolves, before the batch pass runs.
+
+- **A composition operand never closes, open or closed** (`DefinitionResolver.parametricOperand`): it is absorbed by
+  value (§5.8). The operand, a parametric record, is substituted on the model with
+  the arguments as written (`Substitution.fields`), an argument naming the absorbing declaration's own parameter
+  landing as that declaration's name for it, which its own record holds as its parameter in turn; the fields are
+  absorbed, the operand contributes its head's
+  ancestors (`Ancestry.ofApplication`) and not its own name, and the application is kept in the declaration's
+  `parents`, arguments and all. The arguments still need §5.10's bound check, which closing would have given them, so
+  `parametricOperand` calls `ApplicationCloser.checkArguments`, deferred like every check asked for during resolution
+  (`design/parametric-records.md`, "The call-site check").
+  - **Open** (`vip => <T> customer & box<T>`): the parametric record writes `box<T>` as a parent, and it is substituted
+    with everything else when `vip` is applied. Closing builds the chain from those parents (`Ancestry.chainOf`, in
+    `closeParametricRecord`), the fold turns `box<text>` into the edge to the entry that application denotes, and
+    `closeChains` drops the parents. A closed `vip<text>` therefore stands where `customer`, `base` and `box<text>`
+    are expected, the same entry the hand-written `customer & box<text>` reaches. The parent is carried as a
+    reference rather than as the head name §5.8 describes because the edge is to `box<text>` and not to
+    `box<int32>`. `OpenOperandCompositionTest` pins it.
+  - **Closed, on a declaration with no parameters** (`dog => pet_of<dog_type> & { kind?: = "dog" }`): the operand's
+    head's ancestors are the declaration's (`pet_of => <T> pet & { … }` makes `dog` IS-A `pet`, so a position
+    typed `pet` dispatches to it), and the application kept in the chain is folded like any other, to the entry
+    `pet_of<dog_type>` denotes where one exists. No edge is stated to the head: a parametric record is no type (§5.10).
+    A removal empties the chain whatever was put in it (§5.9). `ClosedOperandFamilyTest` pins it.
+- **An operand's head is followed past its alias hops** (`Ancestry.parametricHead`, §8.3): over `pet_of => pet_box`,
+  `pet_of<text>` at `&`, and `<T> pet_of<T> & { … }`, apply `pet_box` and are absorbed as `pet_box<text>` is.
+  The one rule serves every place an applied head is read: `parametricOperand`, `Ancestry.ofApplication` when a chain is
+  built, the materialiser's closing, and the fold, which keys a parent written through the alias on the parametric record's
+  application, so its edge still names the declaration of it. The
+  parent itself stays as written. `InlineTypeRulesTest.anApplicationThroughAnAliasIsAbsorbedAtAnOperand` pins it.
+- **The cycle guard still applies.** An operand's head resolves through the resolution's `WaitOrder`,
+  where an entry waiting on itself is refused, so a cycle reached through an application
+  (`a => b<text> & { x: text }`, `b => <T> a & { y: T }`) is reported as a wait cycle (`'a' waits on 'b' waits on
+  'a'`) rather than recursing (`ParametricRecordTest.aCycleThroughAnApplicationIsStillCaughtAsAWaitCycle`).
+- **An argument is a name or a parameter** (§5.3): an operand's argument list holds no application, refused where the
+  operand resolves (`DefinitionResolver.typeArguments`).
+- **What an operand may not be.** Each is refused at the declaration that writes it:
+  - a parameter as a head, `<T> { v: T<text> }` (`SchemaResolver.refuseHeadAbstraction`, over the parametric record's
+    applications, `ParametricEntry.applications`): §5.10 admits no head abstraction. The linker's arity check reads the
+    same references, but
+    materialisation runs first and removes the parameter, leaving a verdict against a name nobody typed;
+  - a parameter as an operand, `<T> T & { … }` or `<T> T ^ { … }` (`DefinitionResolver.refuseParameterOperand`,
+    §5.8): a parameter has no field set until applied. The check runs before the name is looked up, so a parameter
+    shadows an entry of the same name;
+  - a constructor applied to a parameter, `<T> customer & meta.array<T>` (`parametricOperand`): a construction is a
+    binding record with no fields to contribute, the verdict its closed spelling gets once it closes;
+  - a parametric record named without arguments, `x => box & { … }` (`DefinitionResolver.refuseUnappliedParametricRecord`): a
+    parametric record is no type, and has fields only once its parameters are bound. Every other bare naming of a
+    parametric record -- a field, element, map key or value, tuple position, choice variant or argument -- is the linker's
+    arity check (`TsonSchemaLinker.checkArity`), refused against the declaration that wrote it.
+
+## Base kinds
+
+- **No entry carries a kind, and nothing decides by one** (§5.5). A rule reads what it needs off the value: its
+  branch of `Top`, its tag, or the kernel base kind its chain reaches, counted only as the kernel's own entry -- a
+  schema's own `atom => { … }` composed into `payload => atom & { … }` leaves `payload` an ordinary record.
+  - **The atom-refinement test** (`DefinitionResolver`): an atom *instance's* body is an `Atom` (`integer` carries
+    `!numeric.integer_type {}`), where its constructor's is the vocabulary record describing one
+    (`numeric.integer_type` carries a `!meta.record { ... }`). So `body instanceof Atom` separates the pair, where
+    the chain does not: `numeric.integer_type`'s chain reaches `meta.atom`.
+- **A parametric record composing onto a base kind closes to a constructor.** `listed => <T> atom & { members: [T] }` makes
+  `listed<text>` a constructor whose `!meta.record` body describes its instances, its chain reaching `meta.atom` as a
+  declared constructor's does. A parametric record is never constructed, whatever its chain reaches:
+  `ConstructionSugar.constructs` excludes it, so `listed<text>` substitutes.
+
+## Regularity of a parametric record (`tson-compiler/.../resolver/ParametricRegularity.java`)
+
+§5.10.1's regularity rule, checked over the resolved entries before anything materialises: **within a parametric record's
+body, a recursive application — direct or mutual — must pass each parameter through unchanged.**
+
+- **Growth is unwritable before it runs.** An argument is a name or a parameter (§5.3), so `weird => <T> { next?:
+  weird<box<T>> }` is refused where its field resolves, and every application a closing reaches draws its arguments
+  from the schema's finitely many names: each recursion repeats an application, which ties or is refused. What the
+  rule still refuses at the declaration is a recursive application that permutes the parameters (`swap<B, A>`),
+  duplicates one (`dup<A, A>`) or passes a name for one (`c<text>` inside `c => <T> { … }`). Each would terminate:
+  closing ties it to a declaration of the repeated application or refuses it at a slot. The rule keeps
+  `HeldRecursion` sound, a cycle of heads then being a cycle of applications, so a parametric record it cannot close is
+  refused at its declaration rather than at whichever application meets it.
+- **Mutual recursion needs reachability, not a self-edge**: neither parametric record in an `a → b → a` cycle applies
+  itself, so an application is checked whenever its head can reach the declaration it sits in. The applications
+  come from the parametric record's type slots (`ParametricEntry.applications`), at any depth of a type in place
+  (`TypeSlots.applications`), so `kids?: [tree<T>]` is judged as `next?: tree<T>` is.
+- **Deliberately stricter than termination requires**: positional identity is the restriction §5.10.1 names, and an
+  over-restriction simple to state can be loosened later where the reverse cannot.
+  `ParametricRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate` pins it.
+- **Arity is not checked here**; the linker checks it over a parametric record's references (`TsonSchemaLinker`, §5.10), so
+  this compares positionally only where the arity already matches.
+- **A condemned parametric record does not reach materialisation.** `check` returns the names it rejected and
+  `SchemaResolver.condemn` replaces each with the placeholder a failed declaration leaves, in both maps, so an
+  application of it reports nothing further.

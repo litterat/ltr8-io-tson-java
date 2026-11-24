@@ -2,16 +2,17 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.ParseException;
+import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonDocumentPeek;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.ReferenceBody;
+import io.ltr8.tson.schema.meta.RefBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -39,6 +40,7 @@ import static io.ltr8.tson.suite.Sidecar.outcomeOf;
 import static io.ltr8.tson.suite.Sidecar.outcomePayload;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -89,7 +91,7 @@ class Class2ConformanceSuiteTest {
         return Vectors.in("class2", "validate", Class2ConformanceSuiteTest::checkValidateVector);
     }
 
-    private static Tson newTson() {
+    static Tson newTson() {
         // The schema.meta-resolving context, because a `schema/` vector binds a resolved-form document back
         // into the value model to compare it. It changes nothing for the other two layers. Both it and the meta
         // name binder add a host class for each record a corpus fixture's namespace types hold (SuiteBindings): a
@@ -154,17 +156,14 @@ class Class2ConformanceSuiteTest {
                 expected.forEach((name, definition) -> assertEquals(
                         ResolvedForm.rendered(definition), ResolvedForm.rendered(ours.get(name)),
                         name + " does not resolve to what the vector states"));
-                // §8.2 puts the derived @meta.synthetic marker on the key of every entry the resolver
-                // materialised from a sugar form and on no other, so the marked set is a claim in its own
-                // right -- and one a bound comparison cannot make, a key-position annotation being dropped
-                // when a resolved-form document is read back.
-                assertEquals(ResolvedForm.markedSynthetics(fieldText(outcomePayload(sidecar), "resolved")),
-                        ResolvedForm.ourSynthetics(tson, identityOf(source)),
-                        "the entries marked @meta.synthetic are not the ones the vector marks");
-                // §8.2's second key annotation: each instantiation states, on its key, the application it is.
+                // §8.2's key annotation: each declared application states, on its key, the application it is.
                 assertEquals(ResolvedForm.markedApplications(fieldText(outcomePayload(sidecar), "resolved")),
                         ResolvedForm.ourApplications(tson, identityOf(source)),
                         "the entries' @meta.application are not the ones the vector states");
+                // §8.1's other key annotation: each declared completion states the incomplete entries it closed.
+                assertEquals(ResolvedForm.markedCompletions(fieldText(outcomePayload(sidecar), "resolved")),
+                        ResolvedForm.ourCompletions(tson, identityOf(source)),
+                        "the entries' @meta.completion are not the ones the vector states");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
             case "refused" -> assertRefused(sidecar, problems, "schema");
@@ -260,14 +259,9 @@ class Class2ConformanceSuiteTest {
         var entries = linked.schema().entries();
 
         if (hasField(expected, "binds")) {
-            // Names normalised on both sides: a materialised entry's trailing content hash is not
-            // normative (§8.2, RUNNER.md rule 6), and a vector that stated one would be testing a hash
-            // function. Everything else about a name is compared as written.
-            var bound = new TreeSet<String>();
-            entries.keySet().forEach(name -> bound.add(ResolvedForm.withoutHash(name)));
+            var bound = new TreeSet<>(entries.keySet());
             for (String name : fieldTextArray(expected, "binds")) {
-                assertTrue(bound.contains(ResolvedForm.withoutHash(name)),
-                        "the linked namespace does not bind '" + name + "'; it binds " + bound);
+                assertTrue(bound.contains(name), "the linked namespace does not bind '" + name + "'; it binds " + bound);
             }
         }
         if (hasField(expected, "disjoint")) {
@@ -283,30 +277,19 @@ class Class2ConformanceSuiteTest {
         if (hasField(expected, "subtypes")) {
             for (RecordValue claim : Sidecar.fieldRecordArray(expected, "subtypes")) {
                 String name = fieldText(claim, "name");
-                // Normalised on both sides, and on both ends of the claim: a subtype family over template
-                // instantiations names minted entries at the index *and* inside it (RUNNER.md rule 6, which
-                // reaches "a list of names a sidecar states"). A family base template carries no slot of its
-                // own, so its index is the entries whose chain names it.
                 Top definition = definitionOf(entries, name);
-                assertEquals(new TreeSet<>(fieldTextArray(claim, "subtypes").stream()
-                                .map(ResolvedForm::withoutHash).toList()),
-                        new TreeSet<>(TypeChain.subtypesOf(definition).stream()
-                                .map(ResolvedForm::withoutHash).toList()),
-                        "§8.2 subtypes index of " + name);
+                assertEquals(new TreeSet<>(fieldTextArray(claim, "subtypes")),
+                        new TreeSet<>(TypeChain.subtypesOf(definition)), "§8.2 subtypes index of " + name);
             }
         }
         if (hasField(expected, "members")) {
             for (RecordValue claim : Sidecar.fieldRecordArray(expected, "members")) {
                 String name = fieldText(claim, "name");
-                // The names a reference over a constructor admits, derived at link and compared as a set,
-                // normalised as the subtypes index is: an instantiation listed carries a minted name (RUNNER.md
-                // rule 6).
-                if (!(definitionOf(entries, name) instanceof ReferenceBody kind) || !kind.namesTypes()) {
+                // The names a reference over a constructor admits, derived at link and compared as a set.
+                if (!(definitionOf(entries, name) instanceof RefBody kind) || !kind.namesTypes()) {
                     throw new AssertionError(name + " is no reference over a constructor, so it admits no members");
                 }
-                assertEquals(new TreeSet<>(fieldTextArray(claim, "members").stream()
-                                .map(ResolvedForm::withoutHash).toList()),
-                        new TreeSet<>(kind.memberNames().stream().map(ResolvedForm::withoutHash).toList()),
+                assertEquals(new TreeSet<>(fieldTextArray(claim, "members")), new TreeSet<>(kind.memberNames()),
                         "the members index of " + name);
             }
         }
@@ -314,14 +297,10 @@ class Class2ConformanceSuiteTest {
 
     private static Top definitionOf(Namespace<Top> entries, String name) {
         Top definition = entries.get(name);
-        if (definition != null) {
-            return definition;
+        if (definition == null) {
+            throw new AssertionError("the linked namespace binds no entry '" + name + "'");
         }
-        String wanted = ResolvedForm.withoutHash(name);
-        return entries.entrySet().stream()
-                .filter(entry -> ResolvedForm.withoutHash(entry.getKey()).equals(wanted))
-                .map(Map.Entry::getValue).findFirst()
-                .orElseThrow(() -> new AssertionError("the linked namespace binds no entry '" + name + "'"));
+        return definition;
     }
 
     // ── Validate-layer vectors: data against a schema that loaded ────────
@@ -346,6 +325,13 @@ class Class2ConformanceSuiteTest {
                 assertFalse(reported.isEmpty(), "the document is invalid, but nothing was reported");
                 RecordValue expected = outcomePayload(sidecar);
                 String category = fieldText(expected, "category");
+                if (category.equals("parser")) {
+                    // A Class 2 read reports a base-syntax failure under no category of its own, so the data
+                    // grammar's verdict is taken where it is made: the document fails the Class 1 parse.
+                    assertThrows(ParseException.class,
+                            () -> new TsonDataParser(new ByteArrayInputStream(raw)).parseDocument());
+                    return;
+                }
                 String path = hasField(expected, "path") ? fieldText(expected, "path") : null;
                 assertTrue(reported.stream().anyMatch(diagnostic -> matches(diagnostic, category, path)),
                         "no diagnostic is a " + category + " error"

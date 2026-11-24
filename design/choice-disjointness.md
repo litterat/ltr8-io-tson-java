@@ -11,16 +11,38 @@ and why the same table is what untagged reading dispatches on. Current form only
 - Two kinds straddle classes and have none ([TSON-SCHEMA] §5.4): an approximate atom whose `allow_nan` or
   `allow_infinity` is true, and a map whose key type, at the end of its alias chain, is not an atom other than
   `value` and `void` (enums included). A classed type's every value lands in its class in every encoding.
-- A variant classifies through its §8.3 alias chain; no class at all makes the choice `false`.
+- A variant classifies through its §8.3 alias chain, and an extern at the entry it lands on, in the namespace holding
+  it (`ExternHops`); no class at all makes the choice `false`.
 - An enum's class is its members' shared class, read off each member's spelling; every enum is over an identifier
   family, so no fact beyond the body is needed. A closed set of text values is `unicode.text_type`'s `members` facet and is
   string-class as every text atom is, whatever its members spell.
-- A reference (`reference_type`, spelled `meta.ref<T>`) is an atom whose values are names, type names or
+- A reference (`meta.ref`, spelled `meta.ref<T>`) is an atom whose values are names, type names or
   qualified value names as its `of` decides, string-class as an identifier family is. It is no sum and carries no
   `disjoint`; a choice may list one as a variant like any other atom.
+- A variant written in place (`TypeInline`, `( text | [int32] )`) classifies by its own body, as the entry it
+  would have been; a choice written in place is derived where it stands, at the slot that holds it
+  (`TsonSchemaLinker.mapInline`), as an entry's choice is. A partial link derives nothing over a variant still
+  pending: the choice keeps the fact as it stands until the whole schema links.
+- **A choice that is not disjoint has every variant a name** (`TsonSchemaLinker.checkTaggedVariantsAreNamed`): its
+  values are selected by a tag, a tag reaches a variant by a name, its own or a subtype's, and a variant written in
+  place has neither. So `(
+  [text] | [int32] )`, both bracket-class, is refused at the declaration, a choice written in place at any depth
+  included; `( [text] | text )` is disjoint and unaffected, and so is a non-disjoint choice of names. A choice whose
+  `@meta.disjoint` fails keeps that diagnostic alone, and a repeated variant is distinctness's to refuse.
+- **A variant that is a choice is disjoint** (`checkChoiceVariantsAreDisjoint`, §5.4), judged at the entry it reaches,
+  an extern followed as an alias is (§5.13, `ExternHops`): a value carries one tag, spent naming the variant
+  (`TsonReadContext.spendTypeRef`), so the nested choice reads it untagged. A choice holding a choice is never
+  disjoint, so nesting stops one deep. Lost: a nested choice standing for its variants, left to the next revision.
+- **Distinctness compares a name with a name and a construction with a construction**, never one with the other
+  (`checkVariantsAreDistinct`, §8.2): `( text_list | [text] )` over `text_list => [text]` lists two types.
 - A `void` variant is rejected outright by the linker (`checkVariantsAreNotVoid`), judged at the end of the variant's
   §8.3 alias chain.
 - `ChoiceReader.untaggedRecovery` and the derivation both go through `DiscriminationClass.of`: one fact, not two.
+- **A tag selects its variant from one table per choice, built at compile** (`ChoiceReader.selection`,
+  `DispatchChoiceReader`, §5.4): a name meaning a variant first, then each type IS-A exactly one. The variant's own
+  reader weighs the tag (§7.2), so no choice tests subsumption itself and an abstract variant's tag is refused there.
+  A type IS-A two variants and naming neither is a data error. Lost: refusing such a choice at its declaration (an
+  importer may declare the type), and an exact tag with abstract variants refused at the declaration.
 - Any change to the class table is a compatibility decision: it decides which schemas load and which documents read
   untagged.
 
@@ -28,17 +50,12 @@ Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `d
 
 ## The disjointness derivation (`ChoiceDisjointness`, `reader/DiscriminationClass`)
 
-`ChoiceDisjointness.derive` decides §5.4's question for a choice **totally and two-valued**: `disjoint` is
-`true` exactly when every variant has a *discrimination class* and no class appears twice, `false`
-otherwise — never absent, and §5.4 asks for exactly this: "a resolver MUST record exactly this — it MUST
-NOT prove more ... or less". The question the fact exists to answer is not "do the value sets intersect" but
-"can an encoding's single form-resolution pass tell the variants apart", and *that* is a total function of
-the declarations. A value-set prover (interval algebra, exact I-Regexp intersection-emptiness, record
-closure) is deliberately not what this is: it answers questions no conforming reader may
-act on — separating same-class variants takes the type-directed second inspection [TSON-DATA] §2.4
-forbids — at the price of verdicts an author cannot predict (two default-`allow_nan` floats overlap via
-NaN however far apart their ranges sit) and a conformance bar no second implementation should have to
-match.
+`ChoiceDisjointness.derive` decides §5.4's question totally and two-valued, as §5.4 asks: "it MUST NOT prove more
+... or less". The question is not "do the value sets intersect" but "can an encoding's single form-resolution pass tell
+the variants apart", a total function of the declarations. A value-set prover is deliberately not what this is: it
+answers questions no conforming reader may act on — separating same-class variants takes the type-directed second
+inspection [TSON-DATA] §2.4 forbids — at the price of verdicts an author cannot predict (two default-`allow_nan` floats
+overlap via NaN however far apart their ranges sit).
 
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
 §4's three scalar classes — `boolean`, `number` (every numeric family: an `integer` and a `decimal`
@@ -58,16 +75,16 @@ map whose key type is not "a type a single scalar token denotes by its content �
 array). This is what makes `disjoint` class-stable: every classed type's values land in its class in every encoding,
 so a choice's untagged values are one set whichever encoding reads it, and no encoding needs a second condition.
 
-A `void` variant never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`) —
-`(T | void)` confuses optionality with choice, which belongs to the position (`?`, `_`), per §5.4's "a
-variant MUST NOT resolve to `void`", judged after following the variant's alias chain (§8.3) as §5.4
-requires, so an alias of `void` is caught too.
+A `void` variant never gets that far: `(T | void)` confuses optionality, which belongs to the position (`?`, `_`),
+with choice.
 
 **`disjoint` ⇔ the tag is droppable — one fact, not two.** `ChoiceReader.untaggedRecovery` builds its
 `class → variant` dispatch map through the same `DiscriminationClass.of` the derivation classifies with,
 so the derived fact and the reader's separability can never disagree — one fact, not a derivation and a
-dispatch rule held carefully in step. Recovery still engages only when every class is *scalar* —
-a `brace`/`bracket` variant is honestly disjoint from a scalar, but recovery dispatches on a token's
-resolved class and structural recovery from an opening delimiter isn't attempted yet. **The class table is
+dispatch rule held carefully in step. Recovery covers every class §5.4 counts: a scalar token by its resolved
+class, a reference token as string-class, and a `brace`/`bracket` variant by its opening delimiter
+(`NamedDispatchReader.classOf`). That is what reads a type slot untagged: `meta.type_expr` is
+`( meta.type_ref | meta.type_inline )`, a name string-class and the `{ of: … }` wrapper brace-class. A variant written
+in place has no name a tag could spell, so it is reached by recovery alone. **The class table is
 pinned twice over**: it decides which schemas load (`@meta.disjoint` on a `false` choice is an error) and which
 documents read untagged, so any change to it is a compatibility decision, not a free improvement.

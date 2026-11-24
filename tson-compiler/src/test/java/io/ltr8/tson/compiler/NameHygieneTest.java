@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -135,7 +135,7 @@ class NameHygieneTest {
     @Test
     void thePolicyRelaxesPerSegmentWithoutAdmittingAWithinWordHomograph() {
         TsonTreeReader perSegment = new TsonTreeReader()
-                .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment());
+                .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment());
         List<Diagnostic> admitted = new ArrayList<>();
         perSegment.withDiagnostics(admitted::add).read("@url_адрес:1 2");
         assertEquals(List.of(), admitted, "a Latin abbreviation beside a name in another script");
@@ -149,7 +149,7 @@ class NameHygieneTest {
     @Test
     void thePolicyRelaxesAway() {
         List<Diagnostic> reported = new ArrayList<>();
-        new TsonTreeReader().withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.unrestricted()))
+        new TsonTreeReader().withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED))
                 .withDiagnostics(reported::add).read("@pаy:1 2");
         assertEquals(List.of(), reported);
     }
@@ -165,7 +165,7 @@ class NameHygieneTest {
     @Test
     void unrestrictedDropsTheIdentifierProfileToo() {
         List<Diagnostic> reported = new ArrayList<>();
-        new TsonTreeReader().withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.unrestricted()))
+        new TsonTreeReader().withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED))
                 .withDiagnostics(reported::add).read("@" + RESTRICTED_NAME + ":1 2");
         assertEquals(List.of(), reported, reported::toString);
     }
@@ -191,7 +191,7 @@ class NameHygieneTest {
                 wholeName.stream().map(Diagnostic::code).toList(), wholeName::toString);
 
         List<Diagnostic> perSegment = new ArrayList<>();
-        new TsonTreeReader().withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()).perSegment())
+        new TsonTreeReader().withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE).perSegment())
                 .withDiagnostics(perSegment::add).read("{ id_пользователя: 1 }");
         assertEquals(List.of(), perSegment, perSegment::toString);
     }

@@ -9,7 +9,8 @@ the wait depth are counted. Current form only; history lives in git.
 - The policy is threaded as one value; `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` each change exactly one
   component, deriving from what is already stated.
 - The two surfaces have two types: an `IdentifierPolicy` (all three §8.2 mechanisms, a unit, a skeleton switch) and a
-  token `ScriptPolicy` (a level over whole text). A per-segment token policy is unwritable, not refused.
+  `TokenPolicy` (a level over whole text). A per-segment token policy is unwritable, not refused. Each is flat, as
+  `policy.tn` states it; neither is built from the other, and the rule they share (`ScriptRule`) is package-private.
 - It is not a diagnostic component: constant for a run, needed before a document is written, and a level says more
   than a version.
 - It is read off the reader that judged, not rebuilt from a configuration object.
@@ -38,10 +39,10 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 ## `ProcessorPolicy` — the configuration, stated once
 
 **And threaded as one value.** Every constructor and derivation that needs an `IdentifierPolicy`, a
-`ScriptPolicy` and a `LimitsPolicy` takes the policy
+`TokenPolicy` and a `LimitsPolicy` takes the policy
 instead: both streams, both TSON facades, and `JsonObjectReader`. Three parameters that always travel
 together is how a caller comes to pass a bound from one policy beside a token surface from another, and a
-bare `int` beside a `ScriptPolicy` is the same hazard with less to grep for.
+bare `int` beside a `TokenPolicy` is the same hazard with less to grep for.
 
 A reader's `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` each change exactly one component, and
 `ProcessorPolicy` has the matching three so a reader's derivation is one call rather than a rebuild.
@@ -60,11 +61,14 @@ off the `ProcessorConfig` that `Tson.of(config)` takes, and a deployment stating
 places to get them wrong.
 
 **The two surfaces have two types, because they have two shapes.** `IdentifierPolicy` is §8.2's identifier
-policy: a `ScriptPolicy` level, a unit (whole name or `perSegment()`), and `withSkeletonDistinctness`, the switch
-for mechanism 1 that no level reaches — UTS #39 ties `Identifier_Status` to Unrestricted, and nothing ties a relation
-over a set to a level that judges one name. `ScriptPolicy` alone is the token policy: a level and any `permitting`
-combinations over whole text. `_` and `-` are word separators by convention in a name and ordinary characters in a
-value, so segmenting a value would admit UTS #39's own `Toys-Я-Us`; with no unit on the type, no route can state one.
+policy: a level and any `permitting` combinations, a unit (whole name or `perSegment()`), and
+`withSkeletonDistinctness`, the switch for mechanism 1 that no level reaches — UTS #39 ties `Identifier_Status` to
+Unrestricted, and nothing ties a relation over a set to a level that judges one name. `TokenPolicy` is the token
+policy: a level and any `permitting` combinations over whole text. `_` and `-` are word separators by convention in a
+name and ordinary characters in a value, so segmenting a value would admit UTS #39's own `Toys-Я-Us`; with no unit on
+the type, no route can state one. §8.2 names the two side by side, so an identifier policy built from a token policy
+would state one surface as a part of the other; what they share — the level, the combinations and the unit check with
+its messages — is `ScriptRule`.
 
 **`IdentifierPolicy.judge(name, profile)` is the one place the per-name rules are applied** — the read contexts of
 both encodings, the bind reader and the linker all call it, each reporting the violations it returns in its own
@@ -118,15 +122,13 @@ that changed one has said nothing about the other. The three arguments above tra
 sender needs it before it writes, and a number a caller can act on beats a refusal after the fact.
 
 **The whole table is stated; nesting depth and wait depth are counted.** §9.1 states its limits as one table with a
-default each — eleven on the document side — and [TSON-SCHEMA] §11.5 adds six on the schema side under the same policy
+default each — eleven on the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under the same policy
 and the same reporting surfaces.
 `LimitsPolicy` has a component per limit, in the table's order, each defaulting to the spec's value and refused below 1,
-and `policy.tn`'s `policy.limits` and `CliPolicy.CliLimits` carry the same seventeen, so `tson policy` and every
+and `policy.tn`'s `policy.limits` and `CliPolicy.CliLimits` carry the same sixteen, so `tson policy` and every
 envelope state each threshold. Nesting depth is counted at §9.1's default of 64, the tightest in common use, so a
-document that fits travels; wait depth at §11.5's default of 64 (below). The other fifteen are configured and reported
-but not counted, so nothing past one of them is refused for it; `BACKLOG.md` carries where each is counted. One of the
-schema-side six `TemplateMaterialiser.MAX_CLOSING_DEPTH` enforces as a bare constant at the default, not yet reading
-`maxMaterialisationDepth`.
+document that fits travels; wait depth at §11.5's default of 64 (below). The other fourteen are configured and reported
+but not counted, so nothing past one of them is refused for it; `BACKLOG.md` carries where each is counted.
 
 **It is a component of `ProcessorPolicy`** — `Tson.limitsPolicy()` is `processorPolicy().limits()` in one call. A
 deployment states one policy, and the CLI envelope nests `limits` under `policy`. What the grouping keeps is the

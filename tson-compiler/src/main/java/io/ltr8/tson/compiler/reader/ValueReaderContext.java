@@ -2,12 +2,10 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
@@ -53,6 +51,14 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
+     * The namespace a bind lookup asks entry {@code name} within: the canonical identity of the schema declaring it,
+     * so one entry reached through several schemas binds once, and two schemas' entries of one name bind apart.
+     */
+    public String namespaceOf(String name) {
+        return linked.declaringIdentity(name);
+    }
+
+    /**
      * The {@link SchemaLocation} the reader for entry {@code name} offers as its own declaration. The only
      * place one is built: the identity has to come from {@link TsonLinkedSchema#originOf} so that it and the
      * position are the same document's -- an imported entry's line belongs to the schema that declared it,
@@ -63,26 +69,42 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
+     * The tag a value read by entry {@code name}'s reader carries in a tree: the entry's name, or none for a type
+     * written in place, which has no entry and no name a document could write as a tag.
+     */
+    public java.util.Optional<String> tagOf(String name) {
+        return schema().entries().containsKey(name) ? java.util.Optional.of(name) : java.util.Optional.empty();
+    }
+
+    /**
      * What a message calls entry {@code name}, whose value is {@code definition}: its own name where an author
-     * wrote it, and otherwise the form that produced it ({@link EntryDisplayName}).
+     * wrote it, and otherwise the form that produced it ({@link EntryDisplayName}). A type written in place has no
+     * entry, and its reader's name is already its form as written, its constructor's application included ({@link
+     * io.ltr8.tson.schema.meta.TypeInline#text()}), which its body alone could not say.
      */
     public String displayName(String name, Top definition) {
+        if (!schema().entries().containsKey(name)) {
+            return name;
+        }
         return EntryDisplayName.of(name, definition, schema().factsOf(name), schema().applicationOf(name));
     }
 
     /**
-     * What the author wrote that names entry {@code name}, or {@code null} for a form with no spelling -- an
-     * application nothing declares, expanded to an atom instance -- whose message is the family's own, located
-     * by its position ({@link EntryDisplayName#authored}).
+     * What the author wrote that names entry {@code name} ({@link EntryDisplayName#authored}): its own name, or for
+     * an entry with no source position the form or the application its key records. A type written in place is
+     * named by its form, as {@link #displayName} names it.
      */
     public String authoredName(String name, Top definition) {
+        if (!schema().entries().containsKey(name)) {
+            return name;
+        }
         return EntryDisplayName.authored(name, definition, schema().factsOf(name), schema().applicationOf(name))
                 .orElse(null);
     }
 
     /**
-     * The entries IS-A {@code name}, whose value is {@code definition}: its chain's {@code subtypes} -- a type's,
-     * and a family base template's, whose subtypes are its members ({@link TypeChain#subtypesOf}).
+     * The entries IS-A {@code name}, whose value is {@code definition}: its chain's {@code subtypes} ({@link
+     * TypeChain#subtypesOf}), each a type, a parametric record being in no index.
      */
     public List<String> subtypesOf(String name, Top definition) {
         return TypeChain.subtypesOf(definition);
@@ -90,19 +112,16 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
 
     /**
      * The entries IS-A {@code name} that have instances of their own -- {@link #subtypesOf}, less every abstract
-     * record and every family-base template, neither of which a value can be directly. What a refusal at an
-     * abstract position names as satisfying it: naming an abstract subtype would only refuse in turn.
+     * record, which a value can never be directly. What a refusal at an abstract position names as satisfying it:
+     * naming an abstract subtype would only refuse in turn.
      */
     public List<String> instantiableSubtypesOf(String name, Top definition) {
         return subtypesOf(name, definition).stream()
                 .filter(subtype -> {
                     io.ltr8.tson.schema.meta.Top entry = schema().entries().get(subtype);
-                    // A record template is ABSTRACT by construction, and a held template is no type.
                     return switch (entry) {
                         case io.ltr8.tson.schema.meta.RecordBody record ->
                                 record.extension() != io.ltr8.tson.schema.meta.RecordExtensionType.ABSTRACT;
-                        case io.ltr8.tson.schema.meta.RecordTemplateBody ignored -> false;
-                        case io.ltr8.tson.schema.meta.TemplateBody ignored -> false;
                         case null -> false;
                         default -> true;
                     };
@@ -111,7 +130,7 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
-     * Which entries name each target through an {@code ALIAS} body, in declaration order.
+     * Which entries name each target through an alias body, in declaration order.
      *
      * <p>The inverse of the alias hop, and the index {@link #bindingNamesFor} answers from. Built once per
      * compilation for the reason {@code namesMeaning} is: it is a property of the schema, not of the entry
@@ -129,68 +148,26 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
         return Map.copyOf(fixed);
     }
 
-    /** {@link #bindingNamesFor(String, Top)} for a name whose definition this looks up itself. */
-    public List<String> bindingNamesFor(String name) {
-        Top definition = schema().entries().get(name);
-        return definition == null ? List.of(name) : bindingNamesFor(name, definition);
-    }
-
     /**
-     * The names a bind lookup for entry {@code name} tries, in order: the names an author wrote for it, the
-     * entry's own, then -- for a constructor that tightens another -- that constructor's, up its chain.
+     * The names a bind lookup for entry {@code name} tries, in order: the names an author wrote for it, then the
+     * entry's own, then, for a constructor composed over another with no field added, its parent's ({@link
+     * TsonLinkedSchema#composedOver}).
      *
-     * <p><b>A binding map is written in the names the author wrote.</b> An entry a template application
-     * materialised is named by content ([TSON-SCHEMA] §8.2 -- resolver-chosen and unreachable from source),
-     * so {@code ping => msg_of<"ping", ping_body>} reaches a bind context under {@code ping}: the hash is not
-     * knowable when the map is written, and a generator emitting one cannot invent it.
-     *
-     * <p><b>Only a derived entry is reached this way</b>, which is the same test {@code EntryDisplayName}
-     * applies: an entry with a source position was declared, so its own name is the one the author wrote and
-     * an alias naming it must never redirect its binding.
-     *
-     * <p><b>A tightened constructor binds as the one it tightens.</b> {@code set_type => array ^ { ... }} and
-     * {@code enum => enum_type ^ { name_type?: = meta.identifier }} restate fields and add none (§5.7), so their
-     * instances have the shape of the source's, and a class for the source is a class for them. Without the
-     * fallback every such constructor -- a meta layer's {@code kebab_enum => enum_type ^ { name_type?: = kebab }}
-     * included -- would need a class of its own for a shape it does not change. It is tried last, so a class
-     * mapped under the tightening's own name still wins, and it is confined to constructors: an ordinary record
-     * refining another may be bound to a narrower class, and falling back to its parent's would lose that
-     * silently.
+     * <p><b>A binding map is written in the names the author wrote.</b> Only an entry with no source position --
+     * one the kernel's bootstrap builds, or one read from a resolved form -- is also looked up under the names
+     * that reach it through an alias, which is the same test {@code EntryDisplayName} applies: an entry with a
+     * source position was declared, so its own name is the one the author wrote and an alias naming it must never
+     * redirect its binding.
      */
-    public List<String> bindingNamesFor(String name, Top definition) {
+    public List<String> bindingNamesFor(String name) {
+        if (schema().entries().get(name) == null) {
+            return List.of(name);
+        }
         List<String> written = schema().positionOf(name).isPresent()
                 ? List.of() : referrers.getOrDefault(name, List.of());
         List<String> candidates = new ArrayList<>(written);
         candidates.add(name);
-        for (String tightened = tightenedBy(name, definition); tightened != null; ) {
-            if (candidates.contains(tightened)) {
-                break;
-            }
-            candidates.add(tightened);
-            Top step = schema().entries().get(tightened);
-            tightened = step == null ? null : tightenedBy(tightened, step);
-        }
+        linked.composedOver(name).ifPresent(parent -> candidates.addAll(bindingNamesFor(parent)));
         return List.copyOf(candidates);
-    }
-
-    /**
-     * The constructor entry {@code name} tightens, or {@code null}: a constructor (IS-A the kernel's {@code top})
-     * declared by §5.7's refinement, whose one written parent -- recorded where the declaration resolved, since
-     * its chain cannot tell {@code ^} from a composition adding nothing -- is, at the end of its alias
-     * chain, a constructor too. A refinement restates fields and adds none, so its instances have its source's
-     * shape.
-     */
-    private String tightenedBy(String name, Top definition) {
-        if (!(definition instanceof RecordBody) || !linked.isConstructor(name, definition)) {
-            return null;
-        }
-        String refined = schema().factsOf(name).refines().orElse(null);
-        if (refined == null) {
-            return null;
-        }
-        String source = AliasChain.terminal(refined, schema().entries()::get);
-        boolean constructor = schema().entries().get(source) instanceof RecordBody body
-                && linked.isConstructor(source, body);
-        return constructor ? source : null;
     }
 }

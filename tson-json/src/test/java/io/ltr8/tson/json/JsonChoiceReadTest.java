@@ -37,8 +37,8 @@ class JsonChoiceReadTest {
      */
     private static final String SCHEMA = """
             !!id:"https://example.test/choice-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               scalar_or_list => ( text | int32 | boolean | [text] )
               any_json       => ( text | number | boolean | [any_json?] | {text => any_json?} )
@@ -183,13 +183,13 @@ class JsonChoiceReadTest {
                 {"a": 1, "$type": "x"}""").accepted().toString());
     }
 
-    /** The same name leading the object is the tag, and names no variant here. */
+    /** The same name leading the object is the tag, and names no type of the schema ([TSON-SCHEMA] §7.9). */
     @Test
     void aLeadingAnnotationMemberIsTheTagEvenWhereAMapCouldTakeIt() {
         Diagnostic refusal = read("any_json", """
                 {"$type": "x", "a": 1}""").refusal();
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
-        assertTrue(refusal.message().contains("not a variant"), refusal.message());
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, refusal.code());
+        assertTrue(refusal.message().contains("names no type of the scope"), refusal.message());
     }
 
     /** §8.4's note: a `$type` naming a proper subtype of a variant validates as that subtype. */

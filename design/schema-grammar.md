@@ -13,21 +13,31 @@ history lives in git.
 - `type-name = meta.identifier`: every declared name and type parameter is matched against `IdentifierProfile`; a type
   reference's head and a `!` head are each a `qualified-name`, each segment so matched, with an argument list's `<`
   adjacent to a reference's head (§12.3). Field names are the one naming position the parser leaves alone.
-- A sibling reference (`kind!`) parses wherever a type-ref does, its `!` adjacent and followed by whitespace; where it
-  may stand is §5.2's position rule, stated by the desugar phase, never by the parser.
+- `kind!` parses only as a record field's or a group member's type, its `!` adjacent and followed by whitespace; an
+  adjacent `!` after a name anywhere else is a parse error saying where the mark stands. The AST's type holds it:
+  only `FieldDef.FieldType` and `GroupDef.Member` take a `FieldTypeExpr`, every other slot a `TypeExpr`.
 - A document has one declaration map. `geo => !schema { … }` is a schema map nested as an entry: its members go into
   that map under their paths (`geo.address`), and `geo` itself is a `SchemaMapDef` of its members' own names.
 - `SchemaMap.declarations` is a `LinkedHashMap` and a duplicate name overwrites — the grammar layer doesn't dedupe.
 - No production of the schema grammar takes the full `data-value`: `instance` takes a `core-value`, `atom-refinement` a
   braced `record-def`.
-- `{` at a type position dispatches on one consumed token plus one of lookahead (§12.2); everywhere except type-def
-  position a `{` is a map and only a map.
+- `{` opening a type dispatches by one rule at every position, a declaration's body and a type slot alike: one consumed
+  token plus one of lookahead (§12.2) decide a record body or the map. At a slot the record is a `RecordExpr`.
+- `^` follows `!` and a name alone: after a bare name, an application or a parameter list at a type-def, and at a
+  slot, it is a parse error naming the composition to write, for a record and a constructor alike. Only resolution
+  knows what a name is, so a grammar that read `name ^` and let resolution refuse a constructor would carry one
+  production for two verdicts. Lost: `name ^ { … }` refining a record, which spelled a derived record two ways.
+- Nothing composes or subtracts at a slot: `&` or `-` after a slot's type, and a name before `{`, are
+  parse errors naming the declaration to write (`inPlace`). A composition operand is read by `parseTypeRef`, which
+  does not ask.
 - `abstract` and `final` are marks at the type-def head and ordinary identifiers everywhere else — the parser decides
-  on the word alone, never on what follows it.
+  on the word alone, never on what follows it. What may follow is a record body, a composition or a subtraction;
+  anything else is a parse error at the mark. The mark is `StructuralTypeDef`'s, so no `!C { … }` entry, and so no
+  resolved form, carries one.
 - A mismatch names the construct the position admits, in the author's voice, not the token class.
 
 Related: `design/schema-grammar-and-desugaring.md` (the desugaring phase that runs next),
-`design/desugaring-open-forms-and-templates.md`, `design/lexer-and-data-parsing.md` (the data grammar this imports),
+`design/desugaring-forms-over-parameters.md`, `design/lexer-and-data-parsing.md` (the data grammar this imports),
 `design/schema-side-diagnostics.md` (schema-side diagnostics and the recovering parse).
 
 ## Schema grammar (`tson-compiler/TsonSchemaParser.java`, `.../ast/schema/`)
@@ -39,13 +49,13 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **`extends TsonDataParser`, same package** — §12.1 imports Part 1's `annotation`/`data-value`/directive
   grammar directly, so `TsonSchemaParser` calls straight into package-private methods rather than
   re-implementing them, adding only the schema-only tokens (`~ ^ & | ( ) < > ? ; -`).
-- **The AST names a reference as the model does** (`ast.schema`). A reference is a `Reference`, sealed over `TypeRef`
-  and `SiblingRef`, and `TypeRef` over `NameRef` and `ApplicationRef` — the shape of `schema.meta`'s `Reference` and
-  of `meta.tn`'s `meta.type_ref`, so one name means one thing in the AST, the resolved model and the kernel. The
-  structural forms are expressions, not references: `ChoiceExpr`, `ArrayExpr`, `TupleExpr`, `MapExpr`. `TypeExpr` is
-  any of them, a reference or a structural form, and is what §12.1's `type-expr` production parses to. A slot the
-  grammar holds to a reference is typed by it: `MapExpr.keyType` and `RefinedDef.target` are a `Reference`
-  (`parseTypeRefHead`), a sibling there being the desugar phase's to refuse.
+- **The AST names a reference as the grammar writes it** (`ast.schema`). A reference is a `TypeRef`, sealed over
+  `NameRef` and `ApplicationRef`. The model's `TypeRef` is a name only: resolution turns an `ApplicationRef` into the
+  construction `meta.apply` (`ApplyBody`), since an application is sugar for it. The structural forms are expressions,
+  not references: `ChoiceExpr`, `ArrayExpr`, `TupleExpr`, `MapExpr`. `TypeExpr` is any of them, a reference or a
+  structural form, and is what §12.1's `type-expr` production parses to. A slot the grammar holds to a reference is
+  typed by it: `MapExpr.keyType` is a `TypeRef` (`parseTypeRefHead`). `kind!` is no
+  reference: a `DependentType`, a `FieldTypeExpr` beside `TypeExpr`.
 - **The header is the data grammar's; the root's tag is this parser's rule.** `SchemaDocument(id, imports, body)`
   takes its `!!id` and `!!import`s off the stream's `DocumentStart`, then reads the root's annotations and requires
   the `!schema` tag (`expectSchemaTag`) before the schema map. The tag names the pre-loaded kernel's root `schema`, an
@@ -86,33 +96,31 @@ materialization, no validation (those are the resolver's/linker's jobs).
     deliberate grammar-layer deferral, classified at a later semantic layer.
 - **A type reference's head is a `qualified-name`** (`parseTypeRefHead`, `requireQualifiedName`): `geo.address` and
   `geo.address<T>` parse, each `.`-separated segment an identifier, and the parser keeps the dotted text whole; it
-  names the entry keyed by that path (`design/schema-resolution.md`). **The `<` is adjacent to the head** (§12.3), as the
-  data grammar's is ([TSON-DATA] §7.5): `box <text>` is a parse error naming the rule; inside the list whitespace and commas
-  are free. The schema grammar keeps a parser of its own for references rather than the data stream's, because its `type-arg`
-  admits sugar (`box<[text]>`, `box<(text | int32)>`), which a data argument never holds.
-- **`sibling-ref` is a `type-expr` alternative** (§12.1; `parseTypeRefHead`,
-  `parseSiblingRef`): one token of lookahead after the name picks it, an adjacent `!` a sibling reference, an adjacent
-  `<` an application, neither a bare name. It becomes an `ast.schema.SiblingRef`, a `Reference` and so a `TypeExpr`, so
-  `[ kind! ]`, `box< kind! >`, `( kind! | text )`, `{ kind! => text }` (the brace dispatch takes an adjacent `!` after
-  the first name as a map key, as it does `<`) and `x => kind!` all parse. **The `!` is followed by whitespace**
-  (§12.3), so `[kind!]`, `kind!}`, `a!b` and `kind!?` are parse errors; the token is one identifier (`a.b!` is
-  refused), and a quoted token is never one (`"kind"!`). A `!` head is a qualified name, so `!int32!` is refused by
-  name in `parseAtomRefinementOrInstance`.
+  names the entry keyed by that path (`design/schema-resolution.md`). **The `<` is adjacent to the head** (§12.3):
+  `box <text>` is a parse error naming the rule; inside the list whitespace and commas are free. The argument list is
+  this grammar's alone, the data grammar having none ([TSON-DATA] §7.2.5).
+- **`kind!` is read where a field's type is, and refused by name everywhere else** (§5.2, §12.1; `parseFieldType`,
+  `parseTypeRefHead`). `parseFieldType` takes an adjacent `!` after the first name as the mark; `parseTypeRefHead`,
+  which every other reference position reaches, refuses one with the message naming where it stands, so `[ kind! ]`,
+  `box< kind! >`, `( kind! | text )`, `x => kind!`, a parameter's type and a field's value `~ kind!` are each that
+  error. The brace dispatch takes an adjacent `!` after the first name as a map key, as it does `<`, so `{ kind! =>
+  text }` reaches the same refusal and not a missing `:`. **The `!` is followed by whitespace** (§12.3), so `kind!}`,
+  `a!b` and `kind!?` are parse errors; the token is one identifier (`a.b!` is refused), and a quoted token is never one
+  (`"kind"!`).
 - **A parameter may write a type after its name** (`type-param = param-name [ws ":" ws type-ref]`), on every
   type-def form alike. `parseTypeParamsOpt` still returns the names the type-def records; a written type goes to
   the declaration being parsed (`SchemaMap.Declaration.parameterTypes`), because it narrows what resolution
   derives rather than shaping the type-def, and the declaration survives every desugar rewrite of its type-def.
 - **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
-  [type-params] "!" qualified-name ws core-value`) -- `vector => <T, N> !meta.array { element_type: T  min_items: N }`.
+  [type-params] "!" qualified-name ws core-value`) -- `box => <T> !meta.record { fields: { v => T } }`.
   §12.1 has one production for both, and its own note says so: "`!` opens an `instance`, with or without a
   preceding `<…>`". `Instance` carries
   the parameter list, and `parseTypeDef` reads that list *before* dispatching on `!` -- one token then
   decides.
-  - **The payload is a `core-value`, and nothing narrower.** An open entry's body is held rather than read
-    against its constructor's vocabulary until materialisation substitutes, so there is no per-slot quotation
-    to constrain it and a collection payload is as ordinary as a scalar one: `<T> !meta.choice { variants:
-    [T error] }` parses and resolves, which is §5.10's "collection-valued slots are parameterizable". The
-    kernel declares no `template_argument` or `instance_template` for a quotation to need.
+  - **The payload is a `core-value`, and nothing narrower.** Which head a parameter list may precede is the
+    resolver's question, not the grammar's: §5.10 admits `!meta.record` alone (a parametric record's explicit spelling),
+    and `DefinitionResolver.parametricInstance` refuses any other head with the remedy in the message
+    (`design/parametric-records.md`).
   - **An application is data too**: `!meta.array { element_type: box<text> }` is a `core-value`, the reference
     production being [TSON-DATA] §7.4's, and it is what the sugar `[box<text>]` expands
     to. What a payload cannot spell is sugar: `[text]` in a payload is a data array, never the array type, so a
@@ -125,6 +133,11 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **`[definition-mark]` at the type-def head** (§12.1) — `abstract` or `final`, the words that say how the type may
   be realised, read by `parseDefinitionMarkOpt` before the parameter list and lowered by the resolver into
   `record.extension`. An unmarked declaration is OPEN, so the slot is optional and OPEN has no spelling.
+  - **Sugar for a record definition's `extension`, and nothing else's.** `!meta.record { … }` states the field
+    itself, so a mark before `!` is no production rather than a rule over the two statements. Lost: admitting the
+    mark where `extension` is unwritten or agrees and refusing a contradiction — two cases the grammar needs none of.
+    A declared application is its head's substitution, its `extension` the head's (§5.10), so it takes none either;
+    one application marked alone is a composition, `abstract box<text> & {}`.
   - **One slot, not two flags.** The three ways a record may be realised are alternatives, so `x => abstract final
     { … }` is ungrammatical rather than a rule the resolver has to state and diagnose.
   - **The words are marks here unconditionally, and that is the whole of the reservation.** They stay ordinary
@@ -149,7 +162,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   of that kind.
 - **One production per container, reachable from `type-ref`** — `ArrayExpr`, `TupleExpr`, `MapExpr`, each
   admitting a size specifier after `;` and an element `?` at *every* position. §12.1 has one bracket
-  production and one map production: every form lifts to an entry (§5.3), so a sized form needs no
+  production and one map production: every form is its construction, written in place (§5.3), so a sized form needs no
   declaration-level tier to carry it, and `type-def` reaches each container through `type-ref` like anything
   else, with no tie-break between a declaration-level and an inline spelling to state.
   - **Nesting is the recursion in `ElementType`**, which holds a plain `TypeExpr` — `[[T; 2]; 3]` and
@@ -168,16 +181,16 @@ materialization, no validation (those are the resolver's/linker's jobs).
   - A map key stays `type-name ["<" type-args ">"]` and nothing else — not a paren type, not a bracket form
     — which is what holds the brace dispatch below to its lookahead budget; a composite key earns a named
     declaration and the explicit `!meta.map { key_type: … }` form.
-- **`{` at a type position dispatches by consuming one token and inspecting** (`braceTypeDef`/
+- **`{` opening a type dispatches by consuming one token and inspecting** (`parseBraceType`/
   `braceOpensMap`) — [TSON-DATA] §2.8's record/map idiom, imported wholesale into the schema grammar as
-  §12.2 asks. `}`, `(` (a leading field group) and `@` (annotations, which the map sugar admits nowhere
-  inside its braces) commit to a record; a name followed by `=>`, or by `<` opening a generic key's
-  arguments, commits to a map; a name followed by anything else is a record whose field is missing its `:`.
-  Everywhere *except* type-def position a `{` is a map and only a map, since a bare record body is not
-  spellable at a type position (§5.2) — `requireMapBrace` says which of the two constructs the author
-  reached for rather than reporting an unexpected token.
-  - **A record body stays a record body wherever the grammar already fixed one** — a refinement body, a
-    composition tail, a constructor vocabulary — so `config ^ {text => text}` fails at the `=>`, named as
+  §12.2 asks, one rule for a declaration's body and a type slot. `}`, `(` (a leading field group) and `@`
+  (annotations, which the map sugar admits nowhere inside its braces) commit to a record; a name followed by `=>`,
+  or by `<` opening a generic key's arguments, commits to a map; a name followed by anything else is a record whose
+  field is missing its `:`. A `{` or `[` after the brace is refused there, a map's key being a name. At a slot the
+  record is a `RecordExpr`, wherever a container may stand; at an argument or a parameter's bound it parses and a
+  later phase refuses it, as it does a container there.
+  - **A record body stays a record body wherever the grammar already fixed one** — a composition tail, a
+    constructor vocabulary — so `config & {text => text}` fails at the `=>`, named as
     "a record body's entries are `name: type`; `=>` begins a map type only where a type is expected".
   - **One consequence of the dispatch is worth knowing before you write the test.** `{text? => integer}` is
     `name` followed by `?`, so it commits to a *record* before the `=>` is read, and the author gets a

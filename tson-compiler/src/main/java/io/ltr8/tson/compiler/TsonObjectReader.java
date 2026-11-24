@@ -5,7 +5,7 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -204,9 +204,9 @@ public final class TsonObjectReader {
      *
      * <p>A level over the whole token, never per segment: {@code _} and {@code -} are word separators by
      * convention in a name and ordinary characters in a value, so segmenting one would admit UTS #39's own
-     * {@code Toys-Я-Us}. A {@link ScriptPolicy} has no unit to state.
+     * {@code Toys-Я-Us}. A {@link TokenPolicy} has no unit to state.
      */
-    public TsonObjectReader withTokenPolicy(ScriptPolicy tokenPolicy) {
+    public TsonObjectReader withTokenPolicy(TokenPolicy tokenPolicy) {
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
         return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUris,
                 policy.withTokenPolicy(tokenPolicy));
@@ -719,12 +719,12 @@ public final class TsonObjectReader {
         if (root == null) {
             return null;
         }
-        // Rooted at the name the author wrote, so a pointer into a template-derived type says
-        // /order_response/items rather than naming the entry the resolver minted. TsonTreeReader does the
-        // same; see TsonCompiledSchema.rootDeclaration for why the reader itself cannot know this.
+        // Rooted at the name the author wrote, so a pointer read through an alias says /pct/... rather than
+        // naming the entry it reaches. TsonTreeReader does the same; see TsonCompiledSchema.rootDeclaration for
+        // why the reader itself cannot know this.
         ctx = root.rootDeclaration().map(ctx::underDeclaration).orElse(ctx);
         TsonTypeReader<?> reader = root.reader();
-        Class<?> bound = boundClass(root.typeName());
+        Class<?> bound = boundClass(root.declaredBy(), root.typeName());
         if (type == Namespace.class && root.namespace() != null) {
             // A namespace type reads as its map; asked for the value itself, the map is an instance of the
             // constructor the root names.
@@ -776,10 +776,14 @@ public final class TsonObjectReader {
         return null;
     }
 
-    /** The bound Java class the schema type {@code typeRefName} maps to, or {@code null} if it isn't name-bound (e.g. an atom root) -- the before-read type check then falls back to the post-read cast. */
-    private Class<?> boundClass(String typeRefName) {
+    /**
+     * The bound Java class the schema type {@code typeRefName}, declared by {@code declaredBy}, maps to, or {@code
+     * null} if it isn't name-bound (e.g. an atom root) -- the before-read type check then falls back to the post-read
+     * cast.
+     */
+    private Class<?> boundClass(String declaredBy, String typeRefName) {
         try {
-            return dataBindContext.getDescriptor(typeRefName).typeClass();
+            return dataBindContext.getDescriptor(declaredBy, typeRefName).typeClass();
         } catch (DataBindException e) {
             return null;
         }
@@ -826,11 +830,15 @@ public final class TsonObjectReader {
         }
         String terminal = AliasChain.terminal(name, compiled.schema().entries()::get);
         String namespace = compiled.linkedSchema().namespace(terminal).isPresent() ? terminal : null;
-        return new RootReader(reader, name, compiled.rootDeclaration(name), namespace);
+        return new RootReader(reader, name, compiled.rootDeclaration(name), namespace,
+                compiled.linkedSchema().declaringIdentity(name));
     }
 
-    /** {@code namespace} is the namespace type the root type is, {@code null} where it is none. */
+    /**
+     * {@code namespace} is the namespace type the root type is, {@code null} where it is none; {@code declaredBy} the
+     * canonical identity of the schema declaring the root type, which its class is bound within.
+     */
     private record RootReader(TsonTypeReader<?> reader, String typeName,
-                               Optional<SchemaLocation> rootDeclaration, String namespace) {
+                               Optional<SchemaLocation> rootDeclaration, String namespace, String declaredBy) {
     }
 }

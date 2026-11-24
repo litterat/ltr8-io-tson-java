@@ -25,12 +25,12 @@ class KindMembershipByDocumentTest {
     @Test
     void aDataDocumentImportingTheKernelAloneJudgesMembershipInItsClosure() {
         assertEquals(List.of(), validate("""
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !meta.record_field { type: integer }
                 """));
 
         List<Diagnostic> problems = validate("""
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !meta.record_field { type: int32 }
                 """);
         assertEquals(1, problems.size(), problems::toString);
@@ -40,8 +40,8 @@ class KindMembershipByDocumentTest {
     @Test
     void theSameNameIsAMemberWhereTheDocumentImportsItsDeclaration() {
         assertEquals(List.of(), validate("""
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !meta.record_field { type: int32 }
                 """));
     }

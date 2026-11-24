@@ -5,7 +5,8 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
-import io.ltr8.tson.base.policy.ScriptPolicy;
+import io.ltr8.tson.base.policy.TokenPolicy;
+import io.ltr8.unicode.RestrictionLevel;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Nested;
@@ -159,29 +160,29 @@ class JsonIdentifierPolicyTest {
         void relaxing_it_admits_what_the_default_refuses() {
             // §8.2 requires a relaxation be code rather than ambient, which is what this surface is.
             JsonObjectReader relaxed = READER.withProcessorPolicy(ProcessorPolicy.defaults()
-                    .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.unrestricted())));
+                    .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED)));
             assertEquals(List.of(), refusals(relaxed, MIXED_SCRIPT, Person.class));
         }
 
         @Test
         void unrestricted_drops_the_identifier_profile_with_the_level() {
             JsonObjectReader relaxed = READER.withProcessorPolicy(ProcessorPolicy.defaults()
-                    .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.unrestricted())));
+                    .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED)));
             assertEquals(List.of(), refusals(relaxed, RESTRICTED_CHARACTER, Person.class));
         }
 
         @Test
         void naming_the_scripts_a_deployment_expects_admits_them() {
             JsonObjectReader cyrillic = READER.withProcessorPolicy(ProcessorPolicy.defaults()
-                    .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()
-                            .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC))));
+                    .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE)
+                            .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC)));
             assertEquals(List.of(), refusals(cyrillic, MIXED_SCRIPT, Person.class));
         }
 
         @Test
         void a_derived_reader_leaves_the_original_judging_as_it_did() {
             READER.withProcessorPolicy(ProcessorPolicy.defaults()
-                    .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.unrestricted())));
+                    .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.UNRESTRICTED)));
             assertTrue(codes(READER, MIXED_SCRIPT, Person.class).contains(Diagnostic.Code.RESTRICTED_SCRIPT));
         }
     }
@@ -194,8 +195,8 @@ class JsonIdentifierPolicyTest {
 
         /** Both names pass the per-name rules here, so only the set rule could have anything to say. */
         private static final ProcessorPolicy BILINGUAL = ProcessorPolicy.defaults()
-                .withIdentifierPolicy(IdentifierPolicy.of(ScriptPolicy.highlyRestrictive()
-                        .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC)));
+                .withIdentifierPolicy(IdentifierPolicy.of(RestrictionLevel.HIGHLY_RESTRICTIVE)
+                        .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC));
 
         public record Invoice(int payment) {
         }
@@ -234,7 +235,7 @@ class JsonIdentifierPolicyTest {
             // The surface that does reach a key. §8.2's identifier policy judges names; where JSON cannot
             // know a member is a name, what is left is the rule that judges data.
             JsonObjectReader strictTokens = READER.withProcessorPolicy(
-                    BILINGUAL.withTokenPolicy(ScriptPolicy.singleScript()));
+                    BILINGUAL.withTokenPolicy(TokenPolicy.singleScript()));
             assertTrue(codes(strictTokens, "{\"entries\": " + LOOK_ALIKE + "}", Ledger.class)
                     .contains(Diagnostic.Code.RESTRICTED_SCRIPT));
         }
@@ -253,7 +254,7 @@ class JsonIdentifierPolicyTest {
             assertEquals(List.of(), codes(READER, key, Scores.class));
 
             JsonObjectReader strictTokens = READER.withProcessorPolicy(ProcessorPolicy.defaults()
-                    .withTokenPolicy(ScriptPolicy.singleScript()));
+                    .withTokenPolicy(TokenPolicy.singleScript()));
             assertTrue(codes(strictTokens, key, Scores.class).contains(Diagnostic.Code.RESTRICTED_SCRIPT),
                     "a key is out of the identifier policy's reach and inside the token policy's");
         }

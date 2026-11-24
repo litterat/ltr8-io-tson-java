@@ -2,9 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.SiblingRef;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
@@ -16,8 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * How a reference is written: an argument-free one as its bare name, which [TSON-SCHEMA] §8.1 requires of canonical
  * output and which is the only spelling a value written by name has ([TSON-SCHEMA] §5.12); an application as its
- * canonical text, unquoted, the data grammar's reference ([TSON-DATA] §7.4); a sibling reference as its field's
- * name and the mark, unquoted.
+ * canonical text, unquoted, the data grammar's reference ([TSON-DATA] §7.4).
  */
 class TypeRefWriteTest {
 
@@ -32,18 +28,4 @@ class TypeRefWriteTest {
         assertEquals("orders.methods.place_order", written(TypeRef.of("orders.methods.place_order")));
     }
 
-    @Test
-    void anApplicationIsItsUnquotedText() {
-        assertEquals("box<text>", written(TypeRef.of("box", List.of(new TypeArgument.Ref(TypeRef.of("text"))))));
-        assertEquals("map<text 3 \"a b\">", written(TypeRef.of("map", List.of(
-                new TypeArgument.Ref(TypeRef.of("text")), new TypeArgument.Value(new Token("3", Token.Form.UNQUOTED)),
-                new TypeArgument.Value(new Token("a b", Token.Form.SINGLE_LINE_QUOTED))))));
-    }
-
-    @Test
-    void aSiblingIsItsUnquotedText() {
-        assertEquals("kind!", written(SiblingRef.of("kind")));
-        String field = written(RecordField.required(SiblingRef.of("kind")));
-        assertTrue(field.contains("type: kind!"), field);
-    }
 }

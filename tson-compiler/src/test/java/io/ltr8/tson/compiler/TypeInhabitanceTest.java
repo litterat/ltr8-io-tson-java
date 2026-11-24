@@ -39,8 +39,8 @@ class TypeInhabitanceTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/inhabit.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                 %s
                 }
@@ -125,43 +125,61 @@ class TypeInhabitanceTest {
     }
 
     /**
-     * A template is judged when it closes, not where it is written: its body is held until materialisation
-     * substitutes, so the bounds and element types this rule reads are tokens meaning nothing until an
-     * application supplies the arguments. The closure is an ordinary entry by the time linking runs, so
-     * §8's own {@code tree} fixture is caught the moment anything applies it -- and a template nobody applies
-     * is judged nowhere, the same answer §5.10's deferred checking gives everywhere else.
+     * A parametric record is judged at its declaration, its parameters assumed inhabited (§5.10.1): §8's {@code tree}
+     * fixture, its recursive position non-empty through an incomplete entry's completion, has no finite value whatever
+     * {@code T} is, so it is refused whether or not anything applies it, and the verdict names it rather than an applier.
      */
     @Test
-    void anUninhabitedTemplateIsRejectedWhereItCloses() {
-        rejection("""
-                  tree => <T> { value: T  children: [tree<T>; 1..] }
-                  use  => tree<text>""");
+    void anUninhabitedParametricRecordIsRejectedAtItsDeclarationAppliedOrNot() {
+        String tree = """
+                  nonempty => !meta.array ^ { min_items: 1 }
+                  tree => <T> { value: T  children: nonempty<tree<T>> }""";
+
+        assertTrue(rejection(tree).startsWith("'tree' can never be satisfied"), rejection(tree));
+        String applied = rejection(tree + "\n  use  => tree<text>");
+        assertTrue(applied.startsWith("'tree' can never be satisfied"), applied);
     }
 
     /**
-     * The chain names what the author wrote, at every link. A derived entry's name is content-derived and
-     * §8.2 makes it non-normative, so a chain reading {@code tree_text_a7f070f6 needs
-     * array_tree_text_a7f070f6_1_f3d1a035} would name two entries the author never wrote, about a recursion
-     * they did -- the same rule {@code EntryDisplayName} already applies on the read side, which is where
-     * this borrows its rendering from.
-     *
-     * <p>The chain is now one link shorter, and for the reason this test exists: {@code use} <em>is</em> the
-     * instantiation of {@code tree<text>} rather than a reference to it (§8.2), so
-     * there is no hop to render between the author's name and the recursion it names.
+     * The chain runs through the application the parametric record holds: the construction {@code
+     * nonempty<tree<T>>} closes to is written in place at {@code children}, no link of its own, and the application
+     * inside it is inhabited where its head is.
      */
     @Test
-    void theChainIsSpelledTheWayTheAuthorWroteIt() {
+    void theChainRunsThroughTheApplicationTheParametricRecordHolds() {
         String message = rejection("""
-                  tree => <T> { value: T  children: [tree<T>; 1..] }
-                  use  => tree<text>""");
+                  nonempty => !meta.array ^ { min_items: 1 }
+                  tree => <T> { value: T  children: nonempty<tree<T>> }""");
 
-        assertTrue(message.contains("use needs [use; 1..] needs use"), message);
+        assertTrue(message.contains("tree needs tree"), message);
     }
 
-    /** The other half of the same rule: unapplied, it is not judged, and that is not a warning either. */
     @Test
-    void aTemplateNobodyAppliesGetsNoVerdict() {
-        accepted("  tree => <T> { value: T  children: [tree<T>; 1..] }");
+    void anUnguardedSelfRecursionInAParametricRecordNobodyAppliesIsRejected() {
+        assertTrue(rejection("  loop => <T> { v: T  next: loop<T> }").contains("loop needs loop"));
+    }
+
+    /** A guarded recursion is productive at the declaration whether or not anything applies it. */
+    @Test
+    void aGuardedParametricRecordIsAcceptedAppliedOrNot() {
+        String records = """
+                  linked_list => <T> { value: T  next?: linked_list<T> }
+                  tree        => <T> { value: T  children?: [tree<T>] }
+                  a           => <T> { v: T  b?: b<T> }
+                  b           => <T> { w: T  a: a<T> }""";
+
+        accepted(records);
+        accepted(records + """
+
+                  ll => linked_list<text>
+                  tr => tree<int32>
+                  ab => a<text>""");
+    }
+
+    /** A parameter is assumed inhabited, so a required field typed by one demands nothing the declaration can refuse. */
+    @Test
+    void aRequiredParameterTypedFieldIsAssumedInhabited() {
+        accepted("  box => <T> { v: T  w: [T; 1..]  p: (T | text) }");
     }
 
     /** An uninhabited variant is a mistake even where the choice around it still works. */
@@ -202,18 +220,6 @@ class TypeInhabitanceTest {
     void anOptionalPositionIsABaseCase() {
         assertNotNull(compile("  pair => [pair?, text]"));
         assertNotNull(compile("  xs   => [xs?; 1..]"));
-    }
-
-    /**
-     * A bound still held by a parameter counts as possibly-empty: {@code <N> [vec<N>; N]} could be applied
-     * with {@code 0}, and refusing it would reject a template on the strength of an argument nobody has
-     * supplied. The closure that does supply one is judged on its own.
-     */
-    @Test
-    void aParameterBoundIsNotYetAFloor() {
-        assertNotNull(compile("""
-                  vec => <N> { kids: [vec<N>; N] }
-                  use => { v: vec<0> }"""));
     }
 
     /**

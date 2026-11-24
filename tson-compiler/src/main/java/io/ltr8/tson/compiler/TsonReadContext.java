@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.KernelNames;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -9,6 +8,8 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.IdentifierPolicy;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.unicode.IdentifierType;
 import io.ltr8.unicode.IdentifierProfile;
 import io.ltr8.unicode.Normalization;
@@ -19,7 +20,8 @@ import io.ltr8.tson.compiler.stream.TsonEventSource;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.BiConsumer;
+import java.util.Set;
+import java.util.function.BiPredicate;
 
 /**
  * Carried through every {@link TsonTypeReader#read(TsonReadContext)} call -- the read's own pull
@@ -205,8 +207,8 @@ public interface TsonReadContext {
      */
     record FieldNameRule(String typeName, AtomType<?> type, IdentifierProfile profile, Normalization form) {
 
-        /** The kernel's {@code meta.field_name}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
-        public static final FieldNameRule FIELD_NAME = new FieldNameRule("meta.field_name",
+        /** The kernel's {@code meta.identifier}, a record's name type where it states none: [TSON-DATA] §7.7's grammar. */
+        public static final FieldNameRule DEFAULT_NAME_TYPE = new FieldNameRule(RecordBody.DEFAULT_NAME_TYPE,
                 AtomParsers.forType(IdentifierType.IDENTIFIER).orElseThrow(), IdentifierGrammar.PROFILE,
                 Normalization.NFC);
 
@@ -222,7 +224,7 @@ public interface TsonReadContext {
          * answers without allocating, since it is asked of every field name of an ordinary document.
          */
         public Optional<String> refusal(String name) {
-            if (this == FIELD_NAME) {
+            if (this == DEFAULT_NAME_TYPE) {
                 return IdentifierGrammar.validate(name);
             }
             try {
@@ -243,7 +245,7 @@ public interface TsonReadContext {
 
     /**
      * Whether this read is of a value inside a <b>schema document</b> -- a constructor's binding record or a value
-     * entry's payload, replayed through the readers of the schema declaring its head by the resolver ({@link
+     * entry's payload, replayed through the readers of a checkpoint of that document by the resolver ({@link
      * #schemaDocument}).
      * There, and only there, a bare name at a record position is a value written by name rather than §5.6's
      * positional fill ([TSON-SCHEMA] §5.6): a schema has a namespace to resolve the name in, and a data document
@@ -262,8 +264,8 @@ public interface TsonReadContext {
 
     /**
      * Whether this reads a value body in a schema document -- a value entry's payload, a value of an ordinary type,
-     * which the resolver never lifts or mints in -- rather than a construction's binding record, where a
-     * sugar lift may leave an application in a slot for the closer to mint.
+     * where nothing is closed, so a kind-typed slot holds a bare name -- rather than a construction's binding record,
+     * where desugaring may leave an application in a slot for the materialiser to close.
      */
     boolean readsValueBody();
 
@@ -275,28 +277,28 @@ public interface TsonReadContext {
      * to judge it in.
      */
     void heldByName(io.ltr8.tson.schema.meta.TypeRef reference, TsonSchema.SlotType type,
-                    io.ltr8.tson.schema.meta.Ref<?> cell);
+                    ValueRef<?> cell);
 
     /**
      * Records the value of the dependent field this context is at, held as written in a schema document ([TSON-SCHEMA]
-     * §5.2), with the slot it fills: {@code sibling} is the field typing it, declared as {@code declared}, and {@code
-     * named} what the sibling holds in this instance, null where the read produced no reference there. {@code
+     * §5.2), with the slot it fills: {@code sibling} is the field typing it, and {@code named} the type the sibling
+     * holds in this instance, a name or a type written in place, null where the read produced none there. {@code
      * written} is the value's events ({@link #asWritten}). Only a schema document's read keeps it, handing it to the
-     * sink its factory was given ({@link #schemaDocument}), for the linker to judge against the type the sibling names
-     * in the reading schema's namespace.
+     * sink its factory was given ({@link #schemaDocument}), for the linker to judge against the type the sibling
+     * holds, a name read in the reading schema's namespace.
      */
-    void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.RecordField declared,
-                       io.ltr8.tson.schema.meta.Reference named, List<TsonEvent> written);
+    void heldAsWritten(String field, String sibling, io.ltr8.tson.schema.meta.TypeExpr named,
+                       List<TsonEvent> written);
 
     /**
      * Where a schema document's read hands each reference it produces by name: its slot, the slot's declared type,
-     * the name, and the host's {@code Ref} cell where the host holds one -- and each dependent field's value it holds
+     * the name, and the host's {@code ValueRef} cell where the host holds one -- and each dependent field's value it holds
      * as written ({@link #heldAsWritten(TsonSchema.HeldValue)}).
      */
     @FunctionalInterface
     interface HeldByName {
         void held(List<String> slot, TsonSchema.SlotType type, io.ltr8.tson.schema.meta.TypeRef reference,
-                  io.ltr8.tson.schema.meta.Ref<?> cell);
+                  ValueRef<?> cell);
 
         /** A dependent field's value the read held as written ({@link TsonReadContext#heldAsWritten}). */
         default void heldAsWritten(TsonSchema.HeldValue value) {
@@ -309,7 +311,29 @@ public interface TsonReadContext {
          */
         default void reached(SchemaLocation declaration) {
         }
+
+        /**
+         * The read is about to decide by {@code name}, written as a tag or an annotation's name. A resolution stops
+         * the read here ({@code PendingTypeReader.NotReady}) where {@code name} is a declaration of its document the
+         * readers do not hold ([TSON-SCHEMA] §3.4.1), and returns otherwise.
+         */
+        default void typeNamed(String name) {
+        }
+
+        /**
+         * The read met a value of the family {@code base} whose pins at {@code selectors} no member the readers hold
+         * states, {@code samePin} telling whether a pin written for a selector is the value's there. A resolution stops
+         * the read where a declaration the readers do not hold may be that member ([TSON-SCHEMA] §3.4.1, §5.2).
+         */
+        default void pinsUnmatched(String base, Set<String> selectors, BiPredicate<String, String> samePin) {
+        }
     }
+
+    /** {@link HeldByName#typeNamed} of a schema document's read; nothing anywhere else. */
+    void typeNamed(String name);
+
+    /** {@link HeldByName#pinsUnmatched} of a schema document's read; nothing anywhere else. */
+    void pinsUnmatched(String base, Set<String> selectors, BiPredicate<String, String> samePin);
 
     /**
      * How many problems have been reported through this read so far, counting every scoped copy since they
@@ -411,6 +435,15 @@ public interface TsonReadContext {
      */
     static List<TsonEvent> asWritten(TsonReadContext ctx) {
         return DefaultTsonReadContext.asWritten(ctx);
+    }
+
+    /**
+     * Consumes the type-ref of the data-value at {@code ctx}'s cursor and nothing else, its annotations left to be
+     * read: a tag spent naming a choice's variant that is itself a choice, where the value is read untagged
+     * ([TSON-SCHEMA] §5.4). A value with no type-ref is left as it is. Static for the reason {@link #lookingAhead} is.
+     */
+    static void spendTypeRef(TsonReadContext ctx) {
+        DefaultTsonReadContext.spendTypeRef(ctx);
     }
 
     /**

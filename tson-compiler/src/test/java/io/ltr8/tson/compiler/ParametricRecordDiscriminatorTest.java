@@ -1,0 +1,109 @@
+package io.ltr8.tson.compiler;
+
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
+import io.ltr8.tson.schema.meta.RecordBody;
+
+import io.ltr8.tson.schema.meta.RecordField;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * A selector inside a <b>parametric record's</b> body survives onto that record, and stops at the members that pin it.
+ *
+ * <p>A parametric record is a {@code RecordBody} with parameters (§5.10), so its fields and the statement of which of
+ * them a family dispatches on ({@code discriminators}) are both on it, and the pin each member writes arrives
+ * beside the fact that gives it meaning.
+ *
+ * <p>Nothing reads it back specially: {@code discriminators} is a declared kernel member, so the
+ * constructor's own reader binds it with the rest of the body, exactly as it binds the pins beside it.
+ */
+class ParametricRecordDiscriminatorTest {
+
+    private static final String ID = "https://example.test/template-discriminator.tn";
+
+    private static TsonCompiledSchema compile(String declarations) {
+        String schema = """
+                !!id:"https://example.test/template-discriminator.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
+                !schema {
+                %s
+                }
+                """.formatted(declarations);
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
+                return schema;
+            }
+            throw new IllegalStateException("unexpected fetch: " + uri);
+        };
+        TsonCompiledVocabularyRegistry core =
+                TsonCompiledVocabularyRegistry.withStandardLibrary(SchemaModelNameBinder.defaultContext(), source);
+        return TsonCompiledSchemaRegistry.tree(core).get(ID);
+    }
+
+    /**
+     * The entry {@code alias} denotes, past one alias hop: a {@code name => head<args>} declaration is itself the
+     * record its application closes to (§8.2).
+     */
+    private static String target(TsonCompiledSchema compiled, String alias) {
+        return compiled.schema().entries().get(alias) instanceof io.ltr8.tson.schema.meta.Alias ref
+                ? ref.target().name() : alias;
+    }
+
+    private static RecordBody bodyOf(TsonCompiledSchema compiled, String entry) {
+        return (RecordBody) compiled.schema().entries().get(entry);
+    }
+
+    private static RecordField fieldOf(TsonCompiledSchema compiled, String entry, String field) {
+        return bodyOf(compiled, entry).fields().entrySet().stream()
+                .filter(f -> f.getKey().equals(field)).map(java.util.Map.Entry::getValue).findFirst().orElseThrow();
+    }
+
+    private static final String FAMILY = """
+              dog_type => { breed: text }
+              pet      => <V> { type: text =?  value: V }
+              dogpet   => pet<dog_type> & { type?: = "dog" }
+            """;
+
+    /**
+     * <b>The parametric record names the selector, because the parametric record's field is the base's.</b> The author marks
+     * it {@code =?} and each member pins it where its application is declared (§5.10), so the statement belongs on the
+     * parametric record, and without it a parametric record family could never dispatch on its members, the fact having been
+     * dropped between the declaration and anything able to read it.
+     */
+    @Test
+    void theParametricRecordNamesTheSelector() {
+        TsonCompiledSchema compiled = compile(FAMILY);
+
+        RecordBody base = (RecordBody) compiled.schema().entries().get("pet");
+
+        assertEquals(List.of("type"), base.discriminators(),
+                () -> "the field the author marked survives onto the parametric record: " + base);
+    }
+
+    /**
+     * <b>And the instantiation names none, because it has pinned the selector.</b> Which field a family
+     * dispatches on is the base's statement; a member restates the selector to pin it and carries the value
+     * instead, so closing is where the statement stops (§5.2). A member naming one would fail the rule its
+     * own closing created -- {@code abstract} does not travel either.
+     */
+    @Test
+    void theClosedMemberCarriesThePinAndNamesNoSelector() {
+        TsonCompiledSchema compiled = compile(FAMILY);
+
+        String instantiation = target(compiled, "dogpet");
+        RecordField selector = fieldOf(compiled, instantiation, "type");
+
+        assertEquals("dog", selector.value().orElseThrow().text(), "the member's pin arrives");
+        assertTrue(bodyOf(compiled, instantiation).discriminators().isEmpty(),
+                () -> "and the statement stays with the base rather than being copied onto a member: "
+                        + bodyOf(compiled, instantiation));
+    }
+}

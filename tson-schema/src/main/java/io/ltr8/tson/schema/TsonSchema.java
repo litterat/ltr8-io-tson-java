@@ -6,10 +6,11 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Namespace;
-import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.ApplyBody;
+import io.ltr8.tson.schema.meta.Completion;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.schema.meta.ValueRef;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -27,9 +28,8 @@ import java.util.Optional;
  * SchemaMap.declarations}' own ordering guarantee.
  *
  * <p><b>An entry is its value</b> ([TSON-SCHEMA] §8.1): a name maps to the body it resolves to -- a {@code
- * RecordBody}, an atom family's instance, an {@code Alias}, a {@code TemplateBody}, a {@code ValueEntry} -- and a
- * type body, a record template's included, carries its own IS-A chain ({@code Type.chain}). The entry's kind is
- * its value's ({@code EntryKind.of}), judged by origin ({@link TsonLinkedSchema#kindOf}).
+ * RecordBody} (a parametric record's included), an atom family's instance, an {@code Alias}, a {@code ValueEntry} -- and a
+ * type body carries its own IS-A chain ({@code Type.chain}).
  *
  * <p><b>A schema map nested as an entry keys its members under their paths</b> ({@link SchemaPaths}): {@code
  * geo.address} is an entry of {@link #entries} beside {@code geo}, whose value, a {@code ValueEntry} of {@value
@@ -37,19 +37,17 @@ import java.util.Optional;
  * so the two never disagree.
  *
  * <p><b>{@link #facts} holds what a value's Java shape cannot</b>, per entry ({@link EntryFacts}): where it was
- * declared, the annotations written on its value, the constructor its value applies and the entry a refinement
- * names. None of it is a field of any constructor, so binding a value never fills it, and none of it is written.
+ * declared, the annotations written on its value and the constructor its value applies. None of it is a field of any
+ * constructor, so binding a value never fills it, and none of it is written.
  *
  * <p><b>An instantiation's application is a key annotation</b>, {@code @meta.application} ({@link #applicationOf}):
- * an entry of any kind can close a template application, so the fact is about the entry and sits beside it, as
- * {@code @meta.synthetic} does, where resolved output writes it and ingest reads it as stated.
+ * the entry's value is the closed record, which states its fields and its chain and not the head it was substituted
+ * from, so the fact sits beside it, where resolved output writes it and ingest reads it as stated.
  *
  * <p><b>{@code id} is required, not {@code Optional}</b> -- the grammar itself marks {@code !!id} optional (a raw
  * parsed {@code SchemaDocument} can genuinely lack one), but a {@code TsonSchema} value -- the *resolved*,
  * actually-usable thing this module represents -- always needs a real identity. A document with no {@code !!id}
- * simply never becomes a {@code TsonSchema} at all -- {@code TsonSchemaResolver}'s own document-level resolution
- * enforces this before ever constructing one (see its own Javadoc on {@code resolveSchema}'s {@code !!id}
- * validation).
+ * simply never becomes a {@code TsonSchema} at all: resolution refuses it before constructing one.
  *
  * <p><b>A record</b>, genuinely immutable: the compact constructor defensively copies every collection, and
  * convenience constructors cover the common case (fresh, non-bootstrap, nothing held by name) without every caller
@@ -90,78 +88,53 @@ import java.util.Optional;
  * <p><b>{@link #heldValues()}</b> -- for each value entry, the dependent fields' values it holds as written
  * ([TSON-SCHEMA] §5.2), which the linker judges against the type each one's sibling names in this schema's namespace
  * ({@link HeldValue}). A fact the resolver hands the linker, as {@link #valuesByName()} is.
+ *
+ * <p><b>{@link #restatements()}</b> -- for each entry, the fields restated over a source its closed chain does not
+ * reach ({@link Restatement}), judged by the linker as a restatement over a supertype is. An import's travel with its
+ * entries, so a parametric record's reach each schema that applies it. A fact the resolver hands the linker, as
+ * {@link #valuesByName()} is.
  */
 public record TsonSchema(String id, List<String> imports, Namespace<Top> entries,
                           boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
-                          Map<String, List<HeldValue>> heldValues, Map<String, EntryFacts> facts) {
+                          Map<String, List<HeldValue>> heldValues, Map<String, List<Restatement>> restatements,
+                          Map<String, EntryFacts> facts) {
 
     /**
      * An entry's facts beyond its value ({@link TsonSchema}'s own Javadoc). {@code position} is where the
-     * declaration's name sits in the schema text it was resolved from, absent for an entry the resolver minted
-     * (which is what tells a derived name from a declared one). {@code annotations} are those written after
-     * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before
-     * the name are the key's ({@link #entries}). {@code constructor} is the constructor
-     * the value applies -- the tag resolved output writes, {@code !numeric.integer_type}, {@code !enum}, {@code
-     * !meta.set_type} -- which binding erases into a class that several constructors share. {@code refines} is the
-     * entry a {@code ^} declaration's head names, as written: §5.7's refinement restates fields and adds none,
-     * which is what lets a tightened constructor bind as the one it tightens, and the chain cannot tell it from a
-     * composition adding nothing. All of it is provenance, and none of it is written ([TSON-SCHEMA] §8.1).
-     * {@code synthetic} is the key's {@code @meta.synthetic} mark as {@link #factsOf} reads it: a form no author
-     * named, which a message names by its spelling or not at all. {@code closes} is every application the resolver
-     * closed to this entry, as it met them, an expansion's among them, which carries no {@code @meta.application}: what
-     * lets a data read resolve an application by structural identity to the entry the schema closed it to
-     * ([TSON-SCHEMA] §7.4, §8.2).
+     * declaration's name sits in the schema text it was resolved from. {@code annotations} are those written after
+     * {@code =>}, on the value (§6): the value's own Java shape has no slot for them, and the ones written before the
+     * name are the key's ({@link #entries}). {@code constructor} is the constructor the value applies -- the tag
+     * resolved output writes, {@code !numeric.integer_type}, {@code !meta.enum_type}, a schema's own {@code !list_type}
+     * -- which binding erases into a class that several constructors share. All of it is provenance, and none of it is
+     * written ([TSON-SCHEMA] §8.1).
      */
     public record EntryFacts(Optional<SourcePosition> position, Annotations annotations,
-                             Optional<String> constructor, Optional<String> refines, boolean synthetic,
-                             List<TypeRef> closes) {
+                             Optional<String> constructor) {
 
-        /** An entry with none of the six. */
-        public static final EntryFacts NONE = new EntryFacts(Optional.empty(), Annotations.empty(), Optional.empty(),
-                Optional.empty(), false, List.of());
+        /** An entry with none of the three. */
+        public static final EntryFacts NONE = new EntryFacts(Optional.empty(), Annotations.empty(), Optional.empty());
 
         public EntryFacts {
             position = position == null ? Optional.empty() : position;
             annotations = annotations == null ? Annotations.empty() : annotations;
             constructor = constructor == null ? Optional.empty() : constructor;
-            refines = refines == null ? Optional.empty() : refines;
-            closes = closes == null ? List.of() : List.copyOf(closes);
-        }
-
-        /** The same facts with {@code closes} in place of these. */
-        public EntryFacts(Optional<SourcePosition> position, Annotations annotations, Optional<String> constructor,
-                          Optional<String> refines, boolean synthetic) {
-            this(position, annotations, constructor, refines, synthetic, List.of());
         }
 
         /** Whether this holds nothing at all -- the facts a schema need not record. */
         public boolean isEmpty() {
-            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty() && refines.isEmpty()
-                    && !synthetic && closes.isEmpty();
-        }
-
-        public EntryFacts withCloses(List<TypeRef> closes) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
+            return position.isEmpty() && annotations.isEmpty() && constructor.isEmpty();
         }
 
         public EntryFacts withPosition(Optional<SourcePosition> position) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
+            return new EntryFacts(position, annotations, constructor);
         }
 
         public EntryFacts withAnnotations(Annotations annotations) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
+            return new EntryFacts(position, annotations, constructor);
         }
 
         public EntryFacts withConstructor(Optional<String> constructor) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
-        }
-
-        public EntryFacts withRefines(Optional<String> refines) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
-        }
-
-        public EntryFacts withSynthetic(boolean synthetic) {
-            return new EntryFacts(position, annotations, constructor, refines, synthetic, closes);
+            return new EntryFacts(position, annotations, constructor);
         }
 
         /** An entry declared at {@code position}. */
@@ -179,11 +152,11 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * One reference a value body holds by name: {@code slot} is the path from the body to the position it
      * fills -- a field name at a record, a key at a map, an index at an array, as the read descended --, {@code
      * type} that position's declared type, as the reader that read the name knows it, and {@code reference} the
-     * reference read there, its {@code name} the qualified name as written; {@code cell} is the host's {@code Ref}
+     * reference read there, its {@code name} the qualified name as written; {@code cell} is the host's {@code ValueRef}
      * where the host holds one.
      */
     public record ValueByName(List<String> slot, SlotType type, TypeRef reference,
-                              Optional<io.ltr8.tson.schema.meta.Ref<?>> cell) {
+                              Optional<ValueRef<?>> cell) {
 
         public ValueByName {
             slot = List.copyOf(slot);
@@ -196,22 +169,39 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
      * A dependent field's value a value body holds as written ([TSON-SCHEMA] §5.2), to be judged when the schema
      * links against the type its sibling names: that type is one of the reading schema's namespace, which the readers
      * of the layer governing the document do not hold. {@code slot} is the path from the body to the value, as for
-     * {@link ValueByName}; {@code field} and {@code sibling} name the dependent field and its sibling, and {@code
-     * declared} is the sibling's declaration, whose reference resolves an application the sibling holds. {@code named}
-     * is what the sibling holds in this instance -- its pin, the value written, or its default -- and is empty where
-     * the read produced no reference there, a refusal it has reported. {@code written} is the value as written, opaque
-     * to this model: what the engine that read it replays to judge it.
+     * {@link ValueByName}; {@code field} and {@code sibling} name the dependent field and its sibling. {@code named}
+     * is the type the sibling holds in this instance -- its pin, the value written, or its default: a name, or a type
+     * written in place -- and is empty where the read produced none there, a refusal it has reported. {@code
+     * written} is the value as written, opaque to this model: what the engine that read it replays to judge it.
      */
-    public record HeldValue(List<String> slot, String field, String sibling, RecordField declared,
-                            Optional<Reference> named, Object written) {
+    public record HeldValue(List<String> slot, String field, String sibling,
+                            Optional<io.ltr8.tson.schema.meta.TypeExpr> named, Object written) {
 
         public HeldValue {
             slot = List.copyOf(slot);
             Objects.requireNonNull(field, "field");
             Objects.requireNonNull(sibling, "sibling");
-            Objects.requireNonNull(declared, "declared");
             Objects.requireNonNull(named, "named");
             Objects.requireNonNull(written, "written");
+        }
+    }
+
+    /**
+     * A field a record restates over a source no record on its closed chain is ([TSON-SCHEMA] §5.8): an application
+     * at a composition operand, which gives no edge to its head (§5.10), or an operand of a subtraction, which leaves
+     * the chain empty (§5.9). {@code source} is the operand, an application written in place or a name; {@code
+     * inherited} and {@code restated} are the field before and after the restatement. Inside a parametric record each
+     * may hold its parameters, substituted wherever the record is applied or absorbed.
+     */
+    public record Restatement(io.ltr8.tson.schema.meta.TypeExpr source, String field,
+                              io.ltr8.tson.schema.meta.RecordField inherited,
+                              io.ltr8.tson.schema.meta.RecordField restated) {
+
+        public Restatement {
+            Objects.requireNonNull(source, "source");
+            Objects.requireNonNull(field, "field");
+            Objects.requireNonNull(inherited, "inherited");
+            Objects.requireNonNull(restated, "restated");
         }
     }
 
@@ -265,6 +255,9 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
         Map<String, List<HeldValue>> asWritten = new LinkedHashMap<>();
         heldValues.forEach((name, values) -> asWritten.put(name, List.copyOf(values)));
         heldValues = Collections.unmodifiableMap(asWritten);
+        Map<String, List<Restatement>> restated = new LinkedHashMap<>();
+        restatements.forEach((name, fields) -> restated.put(name, List.copyOf(fields)));
+        restatements = Collections.unmodifiableMap(restated);
         Map<String, EntryFacts> kept = new LinkedHashMap<>();
         facts.forEach((name, fact) -> {
             if (!fact.isEmpty()) {
@@ -294,7 +287,15 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     public TsonSchema(String id, List<String> imports, AnnotatedMap<String, Top> entries,
                        boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
                        Map<String, List<HeldValue>> heldValues, Map<String, EntryFacts> facts) {
-        this(id, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, heldValues, facts);
+        this(id, imports, entries, bootstrap, valuesByName, heldValues, Map.of(), facts);
+    }
+
+    /** The same, with the fields each entry restates over a source its chain does not reach ({@link #restatements()}). */
+    public TsonSchema(String id, List<String> imports, AnnotatedMap<String, Top> entries,
+                       boolean bootstrap, Map<String, List<ValueByName>> valuesByName,
+                       Map<String, List<HeldValue>> heldValues, Map<String, List<Restatement>> restatements,
+                       Map<String, EntryFacts> facts) {
+        this(id, imports, new Namespace<>(SCHEMA, entries), bootstrap, valuesByName, heldValues, restatements, facts);
     }
 
     /**
@@ -316,7 +317,7 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     /** This schema with {@code name}'s own annotations recorded -- everything else unchanged. */
     public TsonSchema withNameAnnotations(String name, Annotations annotations) {
         return new TsonSchema(id, imports, entries.withAnnotations(name, annotations), bootstrap, valuesByName,
-                heldValues, facts);
+                heldValues, restatements, facts);
     }
 
     /**
@@ -335,45 +336,63 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
 
     /** {@code name}'s facts, {@link EntryFacts#NONE} for an entry with none or a name this schema lacks. */
     public EntryFacts factsOf(String name) {
-        EntryFacts known = facts.getOrDefault(name, EntryFacts.NONE);
-        return entries.getAnnotations(name).has(SYNTHETIC) ? known.withSynthetic(true) : known;
+        return facts.getOrDefault(name, EntryFacts.NONE);
     }
 
-    /** Where {@code name} was declared -- absent for an entry the resolver minted. */
+    /**
+     * Where {@code name} was declared -- absent where no source text was read: the kernel's bootstrap entries, a
+     * resolved form read as data, a hand-built schema.
+     */
     public Optional<SourcePosition> positionOf(String name) {
         return factsOf(name).position();
     }
 
     /**
      * The application {@code name} is the instantiation of ([TSON-SCHEMA] §8.2): the {@code @meta.application} its key
-     * carries, which the resolver writes wherever an entry closes one -- a record template's member, a namespace
-     * entry, the alias a template's application closes to. Empty for an entry that closes none.
+     * carries, which the resolver writes on a declaration that names a parametric record's application, {@code
+     * page_order => page<order>}. Empty for an entry that closes none, a construction among them.
      */
-    public Optional<TypeRef> applicationOf(String name) {
+    public Optional<ApplyBody> applicationOf(String name) {
         return applicationOf(entries.getAnnotations(name));
     }
 
     /** The application a key's {@code annotations} name, if they carry {@code @meta.application}. */
-    public static Optional<TypeRef> applicationOf(Annotations annotations) {
-        return annotations.value(APPLICATION, TypeRef.class);
+    public static Optional<ApplyBody> applicationOf(Annotations annotations) {
+        return annotations.value(APPLICATION, ApplyBody.class);
     }
 
     /** {@code annotations} with {@code @meta.application:application} added -- the key of an instantiation. */
-    public static Annotations withApplication(Annotations annotations, TypeRef application) {
+    public static Annotations withApplication(Annotations annotations, ApplyBody application) {
         List<io.ltr8.annotation.Annotation> values = new java.util.ArrayList<>(annotations.values());
         values.removeIf(annotation -> annotation.name().equals(APPLICATION));
         values.add(io.ltr8.annotation.Annotation.of(APPLICATION, application));
         return Annotations.of(values);
     }
 
+    /**
+     * The incomplete entries {@code name}'s declaration completed ([TSON-SCHEMA] §8.1): the {@code @meta.completion}
+     * its key carries. Empty for an entry that completes none, a completion written in place having no key.
+     */
+    public Optional<Completion> completionOf(String name) {
+        return entries.getAnnotations(name).value(COMPLETION, Completion.class);
+    }
+
+    /** {@code annotations} with {@code @meta.completion:completion} added -- the key of a declared completion. */
+    public static Annotations withCompletion(Annotations annotations, Completion completion) {
+        List<io.ltr8.annotation.Annotation> values = new java.util.ArrayList<>(annotations.values());
+        values.removeIf(annotation -> annotation.name().equals(COMPLETION));
+        values.add(io.ltr8.annotation.Annotation.of(COMPLETION, completion));
+        return Annotations.of(values);
+    }
+
+    /** The kernel's {@code completion} annotation, derived and never author-written (§8.1). */
+    public static final String COMPLETION = "meta.completion";
+
     /** The kernel's {@code schema}, the namespace type the schema map is a value of. */
     public static final String SCHEMA = "meta.schema";
 
     /** The kernel's {@code application} annotation, derived and never author-written (§8.2). */
     public static final String APPLICATION = "meta.application";
-
-    /** The kernel's {@code synthetic} annotation: the key of a form no author named (§8.2). */
-    public static final String SYNTHETIC = "meta.synthetic";
 
     /**
      * The constructor {@code name}'s value applies: the one its facts record, and otherwise the one its Java
@@ -386,14 +405,16 @@ public record TsonSchema(String id, List<String> imports, Namespace<Top> entries
     }
 
     /**
-     * The constructor {@code value}'s class is named for, by its {@link Typename} -- exact where one constructor
-     * has that shape, and only one of them where several share it ({@code enum_type}, {@code enum} and a meta
-     * layer's own tightening of either are one class), which is why an entry's own facts are asked first. A
-     * value entry names its own: the type it is a value of.
+     * The constructor {@code value}'s class is named for, by its {@link Typename}: the constructor past its alias
+     * hops, where an entry's own facts record the tag as written, which is why they are asked first. A
+     * value entry names its own: the type it is a value of; an incomplete entry the constructor it builds.
      */
     public static String constructorOf(Top value) {
         if (value instanceof io.ltr8.tson.schema.meta.ValueEntry entry) {
             return entry.type();
+        }
+        if (value instanceof io.ltr8.tson.schema.meta.IncompleteEntry incomplete) {
+            return incomplete.constructor();
         }
         Typename typename = value.getClass().getAnnotation(Typename.class);
         if (typename == null) {

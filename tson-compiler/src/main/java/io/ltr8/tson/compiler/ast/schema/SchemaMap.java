@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * {@code schema-map = *(annotation ws) "{" ws schema-map-entry *(separator schema-map-entry) ws
@@ -37,15 +36,14 @@ public record SchemaMap(List<Annotation> annotations, Map<String, Declaration> d
     }
 
     /**
-     * {@code schema-map-entry = *(annotation ws) type-name ws "=>" ws *(annotation ws)
-     * [definition-mark ws] type-def} -- {@code nameAnnotations} bind to the key (the {@code meta.type_name} token
-     * itself, §2.1: "the resolver does not hoist annotations from key to value"); {@code typeDefAnnotations}
-     * bind to the type definition; {@code mark} is the optional {@link DefinitionMark}, empty where the
-     * declaration writes none and the type is OPEN.
+     * {@code schema-map-entry = *(annotation ws) type-name ws "=>" ws *(annotation ws) type-def} --
+     * {@code nameAnnotations} bind to the key (the {@code meta.type_name} token itself, §2.1: "the resolver does not
+     * hoist annotations from key to value"); {@code typeDefAnnotations} bind to the type definition, whose definition
+     * mark, where it writes one, is its own ({@link StructuralTypeDef#mark}).
      */
     public record Declaration(List<Annotation> nameAnnotations, String name,
-                               List<Annotation> typeDefAnnotations, Optional<DefinitionMark> mark,
-                               TypeDef typeDef, Map<String, TypeExpr> parameterTypes) {
+                               List<Annotation> typeDefAnnotations, TypeDef typeDef,
+                               Map<String, TypeExpr> parameterTypes) {
 
         /**
          * {@code parameterTypes} is what the parameter list wrote after each name -- {@code <T: text>} -- keyed
@@ -59,15 +57,9 @@ public record SchemaMap(List<Annotation> annotations, Map<String, Declaration> d
             parameterTypes = Collections.unmodifiableMap(new LinkedHashMap<>(parameterTypes));
         }
 
-        /** A declaration whose parameter list wrote no types -- every declaration the desugar phase injects. */
-        public Declaration(List<Annotation> nameAnnotations, String name, List<Annotation> typeDefAnnotations,
-                           Optional<DefinitionMark> mark, TypeDef typeDef) {
-            this(nameAnnotations, name, typeDefAnnotations, mark, typeDef, Map.of());
-        }
-
         /** The same declaration with a rewritten type-def, its parameter list's written types kept. */
         public Declaration withTypeDef(TypeDef rewritten) {
-            return new Declaration(nameAnnotations, name, typeDefAnnotations, mark, rewritten, parameterTypes);
+            return new Declaration(nameAnnotations, name, typeDefAnnotations, rewritten, parameterTypes);
         }
     }
 }

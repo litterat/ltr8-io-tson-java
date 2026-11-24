@@ -2,24 +2,22 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ReferenceValue;
 import io.ltr8.tson.compiler.ast.schema.ApplicationRef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.FieldTypeExpr;
+import io.ltr8.tson.compiler.ast.schema.GroupDef;
+import io.ltr8.tson.compiler.ast.schema.InlineConstruction;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.NameRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
-import io.ltr8.tson.compiler.ast.schema.RecordTemplateDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.compiler.ast.schema.SiblingRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
-import io.ltr8.tson.compiler.ast.schema.TypeArg;
+import io.ltr8.tson.compiler.ast.schema.TypeExpr;
 import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
@@ -54,7 +52,7 @@ class SchemaDesugarerTest {
 
     private static SchemaDocument parse(String declarations) {
         return new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                 %s
                 }
@@ -62,27 +60,210 @@ class SchemaDesugarerTest {
     }
 
     private static SchemaDocument desugar(String declarations) {
-        return desugar(declarations, Set.of());
+        return SchemaDesugarer.desugar(parse(declarations));
     }
 
-    private static SchemaDocument desugar(String declarations, Set<String> imported) {
-        return SchemaDesugarer.desugar(parse(declarations), imported);
-    }
-
-    /** The injected declaration for the sole form in {@code document} whose derived name starts with {@code prefix}. */
-    private static SchemaMap.Declaration onlyInjected(SchemaDocument document, String prefix) {
-        List<SchemaMap.Declaration> matching = document.body().declarations().values().stream()
-                .filter(d -> d.name().startsWith(prefix + "_")).toList();
-        assertEquals(1, matching.size(), () -> "expected one injected " + prefix + " in "
-                + document.body().declarations().keySet());
-        return matching.get(0);
-    }
-
-    /** The type-ref of {@code declaration}'s first field, which every fixture here uses as the use site. */
-    private static String firstFieldType(SchemaDocument document, String declaration) {
+    /** The construction written in place at {@code declaration}'s first field, rendered ({@link #rendered}). */
+    private static String firstFieldConstruction(SchemaDocument document, String declaration) {
         StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get(declaration).typeDef();
         FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(0);
-        return ((NameRef) field.type().orElseThrow().typeRef()).name();
+        return rendered(assertInstanceOf(io.ltr8.tson.compiler.ast.schema.InlineConstruction.class,
+                field.type().orElseThrow().typeRef()).value());
+    }
+
+    /**
+     * A binding record as text, the way a resolved form writes it: a tag where the value carries one, a token as its
+     * text, a record as {@code { field: value }}, a list as {@code [a b]}.
+     */
+    private static String rendered(DataValue value) {
+        String tag = value.typeRef().map(t -> "!" + t + " ").orElse("");
+        return tag + switch (value.coreValue()) {
+            case io.ltr8.tson.compiler.ast.TokenValue token -> token.text();
+            case io.ltr8.tson.compiler.ast.RecordValue record -> record.fields().stream()
+                    .map(f -> f.name() + ": " + rendered(f.value()))
+                    .collect(java.util.stream.Collectors.joining("  ", "{ ", " }"));
+            case io.ltr8.tson.compiler.ast.ArrayValue array -> array.elements().stream()
+                    .map(SchemaDesugarerTest::rendered).collect(java.util.stream.Collectors.joining(" ", "[", "]"));
+            case io.ltr8.tson.compiler.ast.MapValue map -> map.entries().stream()
+                    .map(e -> rendered(e.key()) + " => " + rendered(e.value()))
+                    .collect(java.util.stream.Collectors.joining("  ", "{ ", " }"));
+            case io.ltr8.tson.compiler.ast.EmptyBrace ignored -> "{}";
+            default -> String.valueOf(value.coreValue());
+        };
+    }
+
+    // ── A sugar form at a field's type is the construction it denotes, in place (§5.3) ─────────────
+
+    /** No declaration is added for a form at a field: the construction stands where it is written. */
+    @Test
+    void aFieldsArrayIsTheConstructionInPlace() {
+        SchemaDocument document = desugar("  holder => { xs: [text] }");
+
+        assertEquals(Set.of("holder"), document.body().declarations().keySet());
+        assertEquals("!meta.array { element_type: text }", firstFieldConstruction(document, "holder"));
+    }
+
+    @Test
+    void aFieldsMapIsTheConstructionInPlace() {
+        assertEquals("!meta.map { key_type: text  value_type: integer }",
+                firstFieldConstruction(desugar("  holder => { entries: {text => integer} }"), "holder"));
+    }
+
+    @Test
+    void aFieldsTupleIsTheConstructionInPlace() {
+        assertEquals("!meta.tuple { elements: [{ element_type: integer } { element_type: text  voidable: true }] }",
+                firstFieldConstruction(desugar("  holder => { pair: [integer, text?] }"), "holder"));
+    }
+
+    /** A nested form is its construction in the wrapper a type written in place takes, at any depth. */
+    @Test
+    void aNestedFormIsItsConstructionInTheWrapper() {
+        assertEquals("!meta.array { element_type: { of: !meta.array { element_type: { of: !meta.array { "
+                        + "element_type: integer } } } } }",
+                instanceBody(desugar("  deep => [[[integer]]]"), "deep"));
+        assertEquals("!meta.map { key_type: text  value_type: { of: !meta.array { element_type: order  "
+                        + "min_items: 1 } } }",
+                instanceBody(desugar("  index => {text => [order; 1..]}"), "index"));
+        assertEquals("!meta.tuple { elements: [{ element_type: { of: !meta.tuple { elements: [{ element_type: "
+                        + "integer } { element_type: text }] } }  voidable: true } { element_type: boolean }] }",
+                instanceBody(desugar("  loose => [[integer, text]?, boolean]"), "loose"));
+    }
+
+    /** A map's value takes the element's {@code ?}; an unmarked one states nothing, a different construction. */
+    @Test
+    void aVoidableMapValueBindsTheVoidableField() {
+        assertEquals("!meta.map { key_type: text  value_type: integer  voidable: true }",
+                firstFieldConstruction(desugar("  holder => { m: {text => integer?} }"), "holder"));
+        assertEquals("!meta.map { key_type: text  value_type: integer }",
+                firstFieldConstruction(desugar("  holder => { m: {text => integer} }"), "holder"));
+    }
+
+    /** A concrete form inside a parametric record is written in place exactly as outside one. */
+    @Test
+    void aConcreteFormInsideAParametricRecordIsInPlace() {
+        assertEquals("!meta.array { element_type: text }",
+                firstFieldConstruction(desugar("  tmpl => <T> { tags: [text]  v: T }"), "tmpl"));
+    }
+
+    /** A form as an argument is refused: an argument is a name or a parameter (§5.10), the form declared first. */
+    @Test
+    void aFormAsAnArgumentIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> desugar("""
+                  page => <T> { items: T }
+                  orders => { p: page<[text]> }"""));
+        assertTrue(thrown.getMessage().contains("'[text]' is a construction passed as an argument"),
+                thrown.getMessage());
+    }
+
+    // ── A record body at a slot is the meta.record construction in place (§5.2) ─────────────────────
+
+    /** Each field is the {@code meta.record_field} its marks state, a fact written only where it is no default. */
+    @Test
+    void aFieldsRecordIsTheConstructionInPlace() {
+        assertEquals("!meta.record { fields: { x => { type: int32 }  y => { type: text  optional: true  voidable: true"
+                        + "  role: DEFAULT  value: a }  z => { type: int32  role: FIXED  value: 3 } } }",
+                firstFieldConstruction(desugar("  holder => { at: { x: int32  y?: text? ~ a  z: int32 = 3 } }"),
+                        "holder"));
+    }
+
+    /**
+     * A group's members are fields, optional, beside the group; a selector is the record's discriminators, and makes
+     * it abstract, as {@code =?} makes a declared record (§5.2).
+     */
+    @Test
+    void aRecordInPlaceStatesItsGroupsAndDiscriminators() {
+        assertEquals("!meta.record { fields: { kind => { type: text }  p => { type: int32  optional: true }  "
+                        + "q => { type: text  optional: true } }  groups: [{ members: [[p] [q]]  optional: true }]  "
+                        + "extension: ABSTRACT  discriminators: [kind] }",
+                firstFieldConstruction(desugar("  holder => { at: { kind: text =?  ( p: int32 | q: text )? } }"),
+                        "holder"));
+    }
+
+    @Test
+    void anEmptyBraceAtASlotIsTheEmptyRecord() {
+        assertEquals("!meta.record { fields: {} }", firstFieldConstruction(desugar("  holder => { at: {} }"), "holder"));
+    }
+
+    /** A record nested in a record or a container is its construction in the wrapper, innermost first. */
+    @Test
+    void aNestedRecordIsItsConstructionInTheWrapper() {
+        assertEquals("!meta.array { element_type: { of: !meta.record { fields: { a => { type: { of: !meta.record { "
+                        + "fields: { b => { type: int32 } } } } } } } } }",
+                firstFieldConstruction(desugar("  holder => { at: [{ a: { b: int32 } }] }"), "holder"));
+    }
+
+    /** A declaration's own choice holds a record variant in place, as it holds a container. */
+    @Test
+    void aDeclarationLevelChoiceHoldsARecordInPlace() {
+        assertEquals("{ variants: [{ of: !meta.record { fields: { a => { type: int32 } } } } text] }",
+                instanceBody(desugar("  c => ( { a: int32 } | text )"), "c").replaceFirst("^!meta.choice ", ""));
+    }
+
+    /**
+     * What a field's value cannot carry -- its annotations, which resolve in the schema's namespace, and where it was
+     * written -- is kept against it, and the value carries none.
+     */
+    @Test
+    void aFieldsAnnotationsAndPositionAreKeptAgainstItsValue() {
+        TsonSchemaParser parser = new TsonSchemaParser("""
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !schema {
+                  holder => { at: {
+                    @doc:"d" x: int32
+                  } }
+                }""");
+        SchemaDocument parsed = parser.parseSchemaDocument();
+        SchemaPositions positions = parser.schemaPositions();
+        SchemaDocument document = SchemaDesugarer.desugar(parsed, null, positions);
+        InlineConstruction at = assertInstanceOf(InlineConstruction.class, ((FieldDef) ((RecordDef) ((StructuralTypeDef)
+                document.body().declarations().get("holder").typeDef()).body()).entries().getFirst()).type()
+                .orElseThrow().typeRef());
+        var fields = (io.ltr8.tson.compiler.ast.MapValue) ((RecordValue) at.value().coreValue()).fields().getFirst()
+                .value().coreValue();
+        DataValue x = fields.entries().getFirst().value();
+        assertEquals(List.of(), x.annotations());
+        SchemaPositions.WrittenField written = positions.inPlace(x).orElseThrow();
+        assertEquals("doc", written.annotations().getFirst().name());
+        assertEquals(4, written.position().orElseThrow().line());
+    }
+
+    /** A record in place over a parameter of its parametric record is its construction, the parameter at its slot. */
+    @Test
+    void aRecordInPlaceOverAParameterIsItsConstruction() {
+        SchemaDocument document = desugar("  page => <T> { meta: { cursor: T  total: int32 } }");
+        RecordDef page = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("page").typeDef()).body();
+        InlineConstruction meta = assertInstanceOf(InlineConstruction.class,
+                ((FieldDef) page.entries().getFirst()).type().orElseThrow().typeRef());
+        assertEquals(Optional.of("meta.record"), meta.value().typeRef());
+    }
+
+    /** One that names no parameter is closed, inside a parametric record as anywhere. */
+    @Test
+    void aRecordInPlaceNamingNoParameterIsClosedInsideAParametricRecord() {
+        assertEquals("!meta.record { fields: { total => { type: int32 } } }",
+                firstFieldConstruction(desugar("  page => <T> { meta: { total: int32 }  items: [T] }"), "page"));
+    }
+
+    /** As an argument a record in place is refused, an argument being a name or a parameter (§5.10). */
+    @Test
+    void aRecordInPlaceAsAnArgumentIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> desugar("""
+                  page => <T> { items: T }
+                  orders => { p: page<{ id: text }> }"""));
+        assertTrue(thrown.getMessage().contains("'{ id: text }' is a construction passed as an argument"),
+                thrown.getMessage());
+    }
+
+    @Test
+    void aFieldRepeatedInARecordInPlaceIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> desugar("  holder => { at: { x: int32  ( x: text | y: text ) } }"));
+        assertTrue(thrown.getMessage().contains("field 'x' is declared more than once"), thrown.getMessage());
+    }
+
+    /** The body of a declaration whose body is sugar, the construction it is, rendered. */
+    private static String instanceBody(SchemaDocument document, String declaration) {
+        return rendered(instanceOf(document, declaration).value());
     }
 
     private static Instance instanceOf(SchemaDocument document, String declaration) {
@@ -99,7 +280,7 @@ class SchemaDesugarerTest {
     @Test
     void aRewrittenDeclarationKeepsItsSourcePosition() {
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   plain => { a: text }
 
@@ -108,7 +289,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = parser.parseSchemaDocument();
         SchemaPositions positions = parser.schemaPositions();
 
-        SchemaDocument desugared = SchemaDesugarer.desugar(document, Set.of(), null, positions);
+        SchemaDocument desugared = SchemaDesugarer.desugar(document, null, positions);
 
         Map<String, SchemaMap.Declaration> after = desugared.body().declarations();
         assertNotSame(document.body().declarations().get("sugared"), after.get("sugared"),
@@ -123,148 +304,10 @@ class SchemaDesugarerTest {
     void aDocumentWithNoSugarComesBackUntouched() {
         SchemaDocument document = parse("  plain => { a: text  b: integer? }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     // ── The desugar table (§5.3) ─────────────────────────────────────────
-
-    @Test
-    void aFieldsInlineArrayBecomesAnInstanceDeclarationAndAReference() {
-        SchemaDocument document = desugar("  holder => { xs: [text] }");
-
-        SchemaMap.Declaration injected = onlyInjected(document, "array");
-        assertEquals(firstFieldType(document, "holder"), injected.name(),
-                "the use site refers to the injected declaration by name");
-        Instance instance = (Instance) injected.typeDef();
-        assertEquals("meta.array", instance.target());
-        assertEquals("{ element_type: text }", instanceBody(instance));
-    }
-
-    /**
-     * The map sugar, the one form the change to type-name-only head resolution added: <code>{K =&gt; V}</code>
-     * mirrors the data notation's own {@code {k =&gt; v}} the way {@code [T]} mirrors {@code [a b]}, and it is
-     * now the only spelling for a map type -- {@code map<K, V>} resolves its head in the type-name namespace,
-     * where the kernel's {@code map} constructor is not reachable.
-     */
-    @Test
-    void aFieldsInlineMapBecomesAnInstanceDeclarationAndAReference() {
-        SchemaDocument document = desugar("  holder => { entries: {text => integer} }");
-
-        SchemaMap.Declaration injected = onlyInjected(document, "map");
-        assertEquals(firstFieldType(document, "holder"), injected.name());
-        assertTrue(injected.name().startsWith("map_text_integer_"), injected.name());
-        Instance instance = (Instance) injected.typeDef();
-        assertEquals("meta.map", instance.target());
-        assertEquals("{ key_type: text  value_type: integer }", instanceBody(instance));
-    }
-
-    /**
-     * <code>{K =&gt; V?}</code> binds {@code voidable: true} on the value, the same field {@code [T?]} binds on an
-     * element -- the {@code voidable} field the kernel gives {@code map}. The marker rides the value only; a key
-     * never admits one, so there is no second slot to fill.
-     */
-    @Test
-    void aVoidableMapValueBindsTheVoidableField() {
-        SchemaDocument document = desugar("  holder => { entries: {text => integer?} }");
-
-        Instance instance = (Instance) onlyInjected(document, "map").typeDef();
-        assertEquals("{ key_type: text  value_type: integer  voidable: true }", instanceBody(instance));
-    }
-
-    /**
-     * And an unmarked value writes no {@code voidable} at all, for the reason the array form omits an unmarked
-     * element's: false is the kernel's default, so writing it would put a field at its default value into
-     * every map ever desugared. The two spellings are therefore different entries, which is what makes
-     * {@code {text => integer}} and {@code {text => integer?}} different types.
-     */
-    @Test
-    void anUnmarkedMapValueWritesNoVoidableAndIsADifferentEntry() {
-        SchemaDocument document = desugar("  holder => { a: {text => integer}  b: {text => integer?} }");
-
-        List<SchemaMap.Declaration> maps = document.body().declarations().values().stream()
-                .filter(d -> d.name().startsWith("map_")).toList();
-        assertEquals(2, maps.size(), maps.stream().map(SchemaMap.Declaration::name).toList().toString());
-        assertEquals("{ key_type: text  value_type: integer }",
-                instanceBody((Instance) maps.get(0).typeDef()));
-        assertEquals("{ key_type: text  value_type: integer  voidable: true }",
-                instanceBody((Instance) maps.get(1).typeDef()));
-    }
-
-    @Test
-    void anInnerFormIsHoistedFirstAndReferredToByTheOuterOne() {
-        // The walk is bottom-up, so the inner array is already a plain name when the outer map is built --
-        // which is what keeps arbitrarily nested sugar working without a special case.
-        SchemaDocument document = desugar("  holder => { m: {text => [integer]} }");
-
-        String innerName = onlyInjected(document, "array").name();
-        assertEquals("{ element_type: integer }",
-                instanceBody((Instance) onlyInjected(document, "array").typeDef()));
-        assertEquals("{ key_type: text  value_type: " + innerName + " }",
-                instanceBody((Instance) onlyInjected(document, "map").typeDef()));
-    }
-
-    /**
-     * Two structurally identical forms share one declaration, wherever in the document they appear. The name
-     * is derived from the binding record itself, so this falls out of naming rather than needing a separate
-     * dedup table -- and it is what §8.2 asks for: one entry per distinct concrete form, schema-wide.
-     */
-    @Test
-    void twoStructurallyIdenticalFormsBecomeOneDeclaration() {
-        SchemaDocument document = desugar("""
-                  first => { xs: [text] }
-                  second => { ys: [text] }""");
-
-        String injected = onlyInjected(document, "array").name(); // asserts there is exactly one
-        assertEquals(injected, firstFieldType(document, "first"));
-        assertEquals(injected, firstFieldType(document, "second"));
-    }
-
-    /**
-     * Identity is the <em>resolved binding record</em>, not the spelling that produced it, so the two ways of
-     * writing an exactly-sized array land on the very same entry. That is the rule that also makes a form
-     * arising inside a materialised template collapse onto one written directly.
-     */
-    @Test
-    void twoSpellingsOfOneBindingRecordLandOnTheSameEntry() {
-        SchemaDocument document = desugar("""
-                  sized  => [[text]; 3]
-                  ranged => [[text]; 3..3]""");
-
-        assertEquals(1, document.body().declarations().values().stream()
-                .filter(d -> d.name().startsWith("array_text_")).count(),
-                "one injected inner array, shared by both spellings");
-        assertEquals(instanceBody(instanceOf(document, "sized")), instanceBody(instanceOf(document, "ranged")),
-                "[T; 3] and [T; 3..3] are one binding record, so one entry");
-    }
-
-    /**
-     * The derived names are pinned to exact strings, deliberately. They are built from a rendering the
-     * desugarer controls rather than from the AST's own {@code toString}, so renaming a component of an
-     * {@code ast.schema} record -- or a JDK that formats records differently -- must leave every injected
-     * name untouched. Both halves of the name matter: the readable prefix is what a diagnostic shows, and
-     * the hash is what an importing schema re-derives to land on an entry an import already materialised.
-     * If this test fails, the resolved form of every schema changed.
-     */
-    @Test
-    void derivedNamesDoNotRideOnTheAstsOwnStringForms() {
-        assertEquals("array_text_621f8dcb", onlyInjected(desugar("  holder => { xs: [text] }"), "array").name());
-        assertEquals("map_text_integer_d32c99ee",
-                onlyInjected(desugar("  holder => { m: {text => integer} }"), "map").name());
-    }
-
-    @Test
-    void aFormAnImportAlreadyDeclaresIsReferencedNotRedeclared() {
-        // The name is derived from the binding record, so an identical form in an imported schema has already
-        // produced this type. Redeclaring it would be rejected as a local-vs-import collision -- which is how
-        // this surfaced: meta.tn imports the kernel and repeats several of its forms.
-        String name = onlyInjected(desugar("  holder => { xs: [text] }"), "array").name();
-
-        SchemaDocument reusing = desugar("  holder => { xs: [text] }", Set.of(name));
-
-        assertEquals(name, firstFieldType(reusing, "holder"), "still refers to it");
-        assertTrue(reusing.body().declarations().keySet().stream().noneMatch(n -> n.startsWith("array_")),
-                "but declares nothing: " + reusing.body().declarations().keySet());
-    }
 
     // ── Declaration position: the form *is* the construction (§5.6) ──────
 
@@ -290,7 +333,7 @@ class SchemaDesugarerTest {
 
     /**
      * §5.3's size specifier as the {@code min_items}/{@code max_items} pair it binds -- one rule for arrays and
-     * maps alike, since both constructors declare the same two fields. There is no template in the middle any
+     * maps alike, since both constructors declare the same two fields. There is no parametric record in the middle any
      * more: the kernel's {@code array_min}/{@code array_max}/{@code array_ranged} are deleted, and the four
      * spellings land directly on {@code !array}.
      */
@@ -359,18 +402,6 @@ class SchemaDesugarerTest {
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
 
-    /** At a field position it is hoisted and referred to by name, exactly as inline {@code [T]} is. */
-    @Test
-    void anInlineTupleIsHoistedIntoItsOwnDeclarationAndReferredToByName() {
-        SchemaDocument document = desugar("  holder => { p: [integer, text] }");
-
-        SchemaMap.Declaration injected = onlyInjected(document, "tuple");
-        assertEquals(firstFieldType(document, "holder"), injected.name());
-        assertTrue(injected.name().startsWith("tuple_integer_text_"), injected.name());
-        assertEquals("[ { element_type: integer } { element_type: text } ]",
-                tupleElements(assertInstanceOf(Instance.class, injected.typeDef())));
-    }
-
     @Test
     void aDeclarationLevelChoiceBecomesTheConstructionItDenotes() {
         SchemaDocument document = desugar("  contact => (text | integer)");
@@ -394,104 +425,8 @@ class SchemaDesugarerTest {
 
     // ── Nested declaration-level forms (§5.3, §12.1) ─────────────────────
     //    Declaration-level container syntax nests inside itself, and the inner form desugars first: the
-    //    inner container is injected under its own derived name and the position that held it becomes a
-    //    bare reference -- the bottom-up hoist an inline form at a type-ref position already gets.
-
-    @Test
-    void aTuplePositionHoldingANestedSizedArrayRefersToTheInjectedInnerArray() {
-        SchemaDocument document = desugar("  grid => [[integer; 2], text]");
-
-        SchemaMap.Declaration inner = onlyInjected(document, "array_integer");
-        assertEquals("{ element_type: integer  min_items: 2  max_items: 2 }",
-                instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
-        assertEquals("[ { element_type: " + inner.name() + " } { element_type: text } ]",
-                tupleElements(instanceOf(document, "grid")));
-    }
-
-    /** The other nesting direction: a sized array <em>over</em> a nested plain array ({@code [[T]; N]}). */
-    @Test
-    void aSizedArrayOverANestedArrayRefersToTheInjectedInnerArray() {
-        SchemaDocument document = desugar("  rows => [[integer]; 3]");
-
-        SchemaMap.Declaration inner = onlyInjected(document, "array_integer");
-        assertEquals("{ element_type: integer }",
-                instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
-        assertEquals("{ element_type: " + inner.name() + "  min_items: 3  max_items: 3 }",
-                instanceBody(instanceOf(document, "rows")));
-    }
-
-    /** A map value nests the same way an array element does -- {@code map-value = container-def / type-ref}. */
-    @Test
-    void aMapValueHoldingANestedSizedArrayRefersToTheInjectedInnerArray() {
-        SchemaDocument document = desugar("  index => {text => [order; 1..]}");
-
-        SchemaMap.Declaration inner = onlyInjected(document, "array_order");
-        assertEquals("{ element_type: order  min_items: 1 }",
-                instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
-        assertEquals("{ key_type: text  value_type: " + inner.name() + " }",
-                instanceBody(instanceOf(document, "index")));
-    }
-
-    /** And a map nests inside a map, on both tiers, since {@code container-def} now includes {@code map-def}. */
-    @Test
-    void aMapValueHoldingANestedMapRefersToTheInjectedInnerMap() {
-        SchemaDocument document = desugar("  index => {text => {text => integer; 1..}}");
-
-        SchemaMap.Declaration inner = onlyInjected(document, "map_text_integer");
-        assertEquals("{ key_type: text  value_type: integer  min_items: 1 }",
-                instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
-        assertEquals("{ key_type: text  value_type: " + inner.name() + " }",
-                instanceBody(instanceOf(document, "index")));
-    }
-
-    /**
-     * Nesting is recursive, and bottom-up needs no special case for depth: {@code [[[T]]]} injects the
-     * innermost array first and the middle one refers to it, exactly as the outermost refers to the middle.
-     */
-    @Test
-    void nestingRecursesInnermostFirst() {
-        SchemaDocument document = desugar("  deep => [[[integer]]]");
-
-        SchemaMap.Declaration innermost = onlyInjected(document, "array_integer");
-        SchemaMap.Declaration middle = onlyInjected(document, "array_array_integer");
-        assertEquals("{ element_type: integer }",
-                instanceBody(assertInstanceOf(Instance.class, innermost.typeDef())));
-        assertEquals("{ element_type: " + innermost.name() + " }",
-                instanceBody(assertInstanceOf(Instance.class, middle.typeDef())));
-        assertEquals("{ element_type: " + middle.name() + " }",
-                instanceBody(instanceOf(document, "deep")));
-    }
-
-    /**
-     * A nested tuple's <em>position</em> optionality reaches the derived name. Without it {@code [T, U?]} and
-     * {@code [T, U]} derive the same name from their element types alone, and the second one written collapses
-     * onto the first one injected -- two different types on one entry, silently.
-     */
-    @Test
-    void twoNestedTuplesDifferingOnlyInPositionOptionalityGetSeparateDeclarations() {
-        SchemaDocument document = desugar("""
-                  strict  => [[integer, text], boolean]
-                  relaxed => [[integer, text?], boolean]""");
-
-        List<SchemaMap.Declaration> injected = document.body().declarations().values().stream()
-                .filter(declaration -> declaration.name().startsWith("tuple_")).toList();
-        assertEquals(2, injected.size(), () -> "expected two injected tuples, got "
-                + injected.stream().map(SchemaMap.Declaration::name).toList());
-        assertEquals("[ { element_type: integer } { element_type: text } ]",
-                tupleElements(assertInstanceOf(Instance.class, injected.get(0).typeDef())));
-        assertEquals("[ { element_type: integer } { element_type: text  voidable: true } ]",
-                tupleElements(assertInstanceOf(Instance.class, injected.get(1).typeDef())));
-    }
-
-    /** A nested position may carry its own {@code ?} as well, and that is the outer tuple's fact, not the inner's. */
-    @Test
-    void anOptionalPositionHoldingANestedFormKeepsItsOwnState() {
-        SchemaDocument document = desugar("  loose => [[integer, text]?, boolean]");
-
-        SchemaMap.Declaration inner = onlyInjected(document, "tuple");
-        assertEquals("[ { element_type: " + inner.name() + "  voidable: true } { element_type: boolean } ]",
-                tupleElements(instanceOf(document, "loose")));
-    }
+    //    inner container is the construction it denotes, held in place in the outer's binding record as
+    //    `{ of: !C { ... } }`.
 
     // ── The element `?` on an array (§5.3) ───────────────────────────────
     //    `voidable: true` on the resolved array, bound directly alongside the bounds rather than routed
@@ -513,154 +448,77 @@ class SchemaDesugarerTest {
                 instanceBody(instanceOf(desugar("  triple => [integer?; 3]"), "triple")));
     }
 
-    /**
-     * {@code voidable} reaches the derived name: without it {@code [T?]} and {@code [T]} derive the same name and the
-     * second one written collapses onto the first one injected.
-     */
-    @Test
-    void twoNestedArraysDifferingOnlyInVoidableGetSeparateDeclarations() {
-        SchemaDocument document = desugar("""
-                  loose  => [[integer?; 3], text]
-                  strict => [[integer; 3], text]""");
-
-        List<SchemaMap.Declaration> injected = document.body().declarations().values().stream()
-                .filter(declaration -> declaration.name().startsWith("array_integer_")).toList();
-        assertEquals(2, injected.size(), () -> "expected two injected arrays, got "
-                + injected.stream().map(SchemaMap.Declaration::name).toList());
-        assertEquals("{ element_type: integer  voidable: true  min_items: 3  max_items: 3 }",
-                instanceBody(assertInstanceOf(Instance.class, injected.get(0).typeDef())));
-        assertEquals("{ element_type: integer  min_items: 3  max_items: 3 }",
-                instanceBody(assertInstanceOf(Instance.class, injected.get(1).typeDef())));
-    }
-
     // ── Generic application heads (§3.3.1, §5.10) ────────────────────────
 
     /**
-     * A sugar form naming one of the enclosing declaration's own parameters lifts to an <b>open</b> synthetic
-     * -- a template of its own, over just the parameters it uses -- and the field applies it straight back.
-     * The parameters are renamed positionally, so two templates alike up to renaming land on one entry (§8.2).
+     * Inside a parametric record a form over one of its parameters is the construction it denotes anywhere, written in
+     * place with the parameter at its slot, whatever else it sets (§5.3, §5.10).
      */
     @Test
-    void aParameterBearingFormLiftsToAnOpenSynthetic() {
-        SchemaDocument document = desugar("  box => <T> { v: [T] }");
-
-        SchemaMap.Declaration lifted = document.body().declarations().values().stream()
-                .filter(declaration -> declaration.name().startsWith("array_p0_")).findFirst().orElseThrow();
-        Instance template = assertInstanceOf(Instance.class, lifted.typeDef());
-        assertEquals(List.of("p0"), template.typeParams());
-        assertEquals("meta.array", template.target());
-        // The open form is the closed form: one binding record, with the parameter simply standing where a
-        // concrete element type would. There is no per-slot quotation to assert against.
-        RecordValue payload = assertInstanceOf(RecordValue.class, template.value().coreValue());
-        assertEquals(List.of("element_type"), payload.fields().stream().map(RecordValue.Field::name).toList());
-        assertEquals(new TokenValue("p0", TokenForm.UNQUOTED),
-                payload.fields().getFirst().value().coreValue());
-
-        // `box` itself is `!record_template { ... }` by the time it leaves this phase (§5.2), so the field
-        // applying the lifted form is a reference inside its payload rather than an `ApplicationRef` in the AST.
-        RecordTemplateDef boxTemplate =
-                assertInstanceOf(RecordTemplateDef.class, document.body().declarations().get("box").typeDef());
-        assertEquals(Optional.of("meta.record_template"), boxTemplate.payload().typeRef());
-        assertEquals(applicationValue(lifted.name(), "T"), fieldSlot(boxTemplate, 0, "type"));
+    void aFormOverAParameterIsItsConstructionInPlace() {
+        for (String form : List.of("[T]", "{text => T}", "[[T]]", "[T; 1..]", "[T?]", "{text => T; ..10}",
+                "( T | text )", "[T, text]")) {
+            SchemaDocument document = desugar("  box => <T> { v: " + form + " }");
+            RecordDef box = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("box").typeDef())
+                    .body();
+            assertInstanceOf(InlineConstruction.class, ((FieldDef) box.entries().getFirst()).type().orElseThrow()
+                    .typeRef(), form);
+        }
     }
 
-    /** Two templates differing only in what they call their parameter are one template, so one entry (§8.2). */
+    /** A parametric record's body is a record body: a parameter list before anything else is refused (§5.10). */
     @Test
-    void twoOpenFormsAlikeUpToRenamingLandOnOneEntry() {
-        SchemaDocument document = desugar("""
-                  box   => <T> { v: [T] }
-                  crate => <A> { w: [A] }""");
-
-        assertEquals(1, document.body().declarations().keySet().stream()
-                .filter(name -> name.startsWith("array_p0_")).count(),
-                () -> "one open synthetic, shared: " + document.body().declarations().keySet());
-    }
-
-    /** A template's own body is the open construction, not a reference to a lifted one -- D5, one tier up. */
-    @Test
-    void aTemplatesOwnSugarBodyIsTheInstanceTemplate() {
-        SchemaDocument document = desugar("  vector => <T> [T]");
-
-        Instance template = assertInstanceOf(Instance.class,
-                document.body().declarations().get("vector").typeDef());
-        assertEquals(List.of("T"), template.typeParams(), "the declaration's own parameters, as written");
-        assertEquals("meta.array", template.target());
-    }
-
-    /** A concrete form inside a template still lifts closed: D5 has one rule, and the parameters do not enter it. */
-    @Test
-    void aConcreteFormInsideATemplateStillLiftsClosed() {
-        SchemaDocument document = desugar("  box => <T> { v: T  w: [text] }");
-
-        SchemaMap.Declaration lifted = document.body().declarations().values().stream()
-                .filter(declaration -> declaration.name().startsWith("array_text_")).findFirst().orElseThrow();
-        assertInstanceOf(Instance.class, lifted.typeDef());
+    void aParametricRecordsBodyThatIsNoRecordIsRefused() {
+        for (String body : List.of("<T> [T]", "<T> [T; 3]", "<V> {text => V}", "<T> ( T | text )", "<A, B> [A, B]",
+                "<T> T", "<B> pair<uuid, B>")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> desugar("  bad => " + body), body);
+            assertTrue(thrown.getMessage().contains("'bad': a parametric record's body is a record body"),
+                    thrown.getMessage());
+        }
     }
 
     /**
-     * A record <b>template</b> is normalised here -- §5.2's own rewrite, {@code { v: T }} into the
-     * {@code !record_template { fields: { ... }  parameters: [ ... ] }} it denotes, a whole parameter labelled while
-     * the parameters are in scope. The <b>application</b> of it still passes through untouched: substitution
-     * happens over the resolved template ({@code TemplateMaterialiser}), not over the AST, so this phase
-     * leaves {@code box<text>}'s head and arguments alone.
+     * A parametric record passes through as the record body it is written as, and the <b>application</b> of it too:
+     * substitution happens over the resolved parametric record ({@code ParametricMaterialiser}), not over the AST, so this
+     * phase leaves {@code box<text>}'s head and arguments alone.
      */
     @Test
-    void aRecordTemplateIsNormalisedAndItsApplicationLeftForMaterialisation() {
-        SchemaDocument document = desugar("""
+    void aParametricRecordAndItsApplicationPassThrough() {
+        SchemaDocument document = parse("""
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
 
-        RecordTemplateDef box = assertInstanceOf(RecordTemplateDef.class,
-                document.body().declarations().get("box").typeDef());
-        assertEquals(Optional.of("meta.record_template"), box.payload().typeRef());
-        assertEquals(List.of("T"), box.typeParams(), "the declaration's own list, as written");
-        assertEquals(new TokenValue("v", TokenForm.UNQUOTED), fieldKey(box, 0),
-                "the field's name is its key in the field map");
-        assertEquals(new TokenValue("T", TokenForm.UNQUOTED), fieldSlot(box, 0, "type_param"),
-                "a whole-type parameter is labelled where it is written");
-
-        RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
-                .typeDef()).body();
-        assertEquals(new ApplicationRef("box", List.of(new TypeArg.Ref(new NameRef("text")))),
-                ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
-                "the application is untouched");
-    }
-
-    /** A <b>closed</b> record is not normalised: only a template's body is held, so only a template is rewritten. */
-    @Test
-    void aClosedRecordIsLeftExactlyAsItWasWritten() {
-        SchemaDocument document = parse("  plain => { v: text }");
-
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     /**
-     * A template whose body writes a container sugar form passes through as well: the form lifts open, and the
-     * application closes it at materialisation. What this phase used to refuse is now the mechanism.
+     * A parametric record whose body writes a container over a parameter passes through as well: the form is the reference
+     * it spells, and the application closes it at materialisation.
      */
     @Test
-    void applyingATemplateWhoseBodyCarriesSugarPassesThroughToo() {
+    void applyingAParametricRecordWhoseBodyCarriesSugarPassesThroughToo() {
         SchemaDocument document = desugar("""
                   box => <T> { v: [T] }
                   holder => { b: box<text> }""");
 
         RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
                 .typeDef()).body();
-        assertEquals(new ApplicationRef("box", List.of(new TypeArg.Ref(new NameRef("text")))),
+        assertEquals(new ApplicationRef("box", List.of(new NameRef("text"))),
                 ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
                 "left for materialisation, arguments intact");
     }
 
     /**
      * An <em>imported</em> head passes through too, and needs no check here even though this phase is handed
-     * only the imported names. A template carrying a sugar form cannot link, so it cannot have been
-     * registered, so it cannot be imported: every imported template is sugar-free by construction.
+     * only the imported names. A parametric record carrying a sugar form cannot link, so it cannot have been
+     * registered, so it cannot be imported: every imported parametric record is sugar-free by construction.
      */
     @Test
-    void applyingAnImportedTemplateIsLeftForMaterialisationToo() {
+    void applyingAnImportedParametricRecordIsLeftForMaterialisationToo() {
         SchemaDocument document = parse("  holder => { b: elsewhere<text> }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of("elsewhere")));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     /**
@@ -672,7 +530,7 @@ class SchemaDesugarerTest {
     void aKernelConstructorNameAtAHeadIsNoLongerAnApplication() {
         SchemaDocument document = parse("  holder => { m: map<text, integer> }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     /** Applying arguments to a local declaration that takes none is the author's error, not a library gap. */
@@ -689,7 +547,7 @@ class SchemaDesugarerTest {
     void anUnknownHeadIsStillPassedThrough() {
         SchemaDocument document = parse("  holder => { b: nowhere<text> }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document));
     }
 
     // ── Rendering helpers ────────────────────────────────────────────────
@@ -723,73 +581,32 @@ class SchemaDesugarerTest {
                 .reduce((a, b) -> a + " " + b).orElse("") + "] }";
     }
 
-    /** The {@code fields} map of a record template's payload. */
-    private static MapValue heldFields(RecordTemplateDef template) {
-        RecordValue binding = (RecordValue) template.payload().coreValue();
-        return (MapValue) binding.fields().stream().filter(f -> f.name().equals("fields"))
-                .findFirst().orElseThrow().value().coreValue();
-    }
+    // ── A dependent field's type (§5.2): kind! is its construction in place ─────────────────────
 
-    /** The key -- the field's name -- of the {@code n}th entry in a record template's {@code fields}. */
-    private static CoreValue fieldKey(RecordTemplateDef template, int n) {
-        return heldFields(template).entries().get(n).key().coreValue();
-    }
-
-    /** One member of the {@code n}th field in a record template's payload. */
-    private static CoreValue fieldSlot(RecordTemplateDef template, int n, String member) {
-        RecordValue field = (RecordValue) heldFields(template).entries().get(n).value().coreValue();
-        return field.fields().stream().filter(f -> f.name().equals(member)).findFirst().orElseThrow()
-                .value().coreValue();
-    }
-
-    // ── §5.2's position rule: a sibling reference stands only at a record field's type ─────────────
-
-    /** At a record field's type, and a group member's, a sibling reference passes through as written. */
+    /** At a record field's type, and at a group member's, {@code kind!} is {@code !meta.dependent { on: kind }}. */
     @Test
-    void aSiblingReferenceAtAFieldsTypeIsKeptAsWritten() {
+    void aDependentTypeAtAFieldsTypeIsItsConstructionInPlace() {
         SchemaDocument document = desugar("  cell => { kind: meta.type_ref  v?: kind!  ( a: kind! | b: text ) }");
         StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get("cell").typeDef();
-        FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);
-        assertEquals(new SiblingRef("kind"), field.type().orElseThrow().typeRef());
+        RecordDef record = (RecordDef) typeDef.body();
+        FieldDef field = (FieldDef) record.entries().get(1);
+        assertEquals("meta.dependent", constructorOf(field.type().orElseThrow().typeRef()));
+        GroupDef group = (GroupDef) record.entries().get(2);
+        assertEquals("meta.dependent", constructorOf(group.members().getFirst().typeRef()));
     }
 
-    /** A record template's field carries it into the template's payload as the reference value it is. */
+    /** The constructor a construction in place applies, where the slot holds one. */
+    private static String constructorOf(FieldTypeExpr written) {
+        return ((InlineConstruction) written).value().typeRef().orElseThrow();
+    }
+
+    /** A parametric record's field holds it in the record body, as a closed record's does. */
     @Test
-    void aRecordTemplateFieldCarriesASiblingReference() {
-        RecordTemplateDef template = assertInstanceOf(RecordTemplateDef.class, desugar(
+    void aParametricRecordsDependentFieldIsItsConstructionInPlace() {
+        StructuralTypeDef typeDef = assertInstanceOf(StructuralTypeDef.class, desugar(
                 "  cell => <T> { kind: meta.type_ref  v?: kind!  w: T }").body().declarations().get("cell").typeDef());
-        RecordValue fields = (RecordValue) template.payload().coreValue();
-        MapValue map = (MapValue) fields.fields().get(0).value().coreValue();
-        RecordValue v = (RecordValue) map.entries().get(1).value().coreValue();
-        assertEquals(new ReferenceValue(io.ltr8.tson.schema.meta.SiblingRef.of("kind")),
-                v.fields().get(0).value().coreValue());
-    }
-
-    /** Anywhere else in sugar it is refused before any lift, naming the slot. */
-    @Test
-    void aSiblingReferenceOffAFieldsTypeIsRefusedNamingTheSlot() {
-        Map<String, String> slots = Map.of(
-                "  cell => { kind: meta.type_ref  v: [ kind! ] }", "an array's element type",
-                "  cell => { kind: meta.type_ref  v: { text => kind! } }", "a map's value type",
-                "  cell => { kind: meta.type_ref  v: { kind! => text } }", "a map's key type",
-                "  cell => { kind: meta.type_ref  v: ( kind! | text ) }", "a choice variant",
-                "  cell => { kind: meta.type_ref  v: [ kind! text ] }", "a tuple element",
-                "  box => <T> { v: T }\n  cell => { kind: meta.type_ref  v: box< kind! > }", "a template argument",
-                "  x => kind!", "an alias target",
-                "  x => kind! ^ {}", "a refinement source",
-                "  x => kind! & { note: text }", "a composition operand");
-        slots.forEach((declarations, slot) -> {
-            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> desugar(declarations), declarations);
-            assertEquals("a sibling reference ('kind!') stands only at a record field's type ([TSON-SCHEMA] §5.2), "
-                    + "not at " + slot, thrown.getMessage(), declarations);
-        });
-    }
-
-    /** An application in a slot: the data grammar's reference, {@code head<arg>}. */
-    private static CoreValue applicationValue(String head, String argument) {
-        return new ReferenceValue(io.ltr8.tson.schema.meta.TypeRef.of(head,
-                List.of(new io.ltr8.tson.schema.meta.TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(argument)))));
+        FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(1);
+        assertEquals("meta.dependent", constructorOf(field.type().orElseThrow().typeRef()));
     }
 
     private static DataValue plain(CoreValue value) {

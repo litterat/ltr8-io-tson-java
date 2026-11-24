@@ -49,8 +49,8 @@ class CrossEncodingParityTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/parity-1.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               person => {
                 name:   text
@@ -62,6 +62,10 @@ class CrossEncodingParityTest {
               unique => set<text>
               label  => text
               stamps => set<datetime>
+              after_y2k   => !date ^ { exclusive_min: 2000-01-01 }
+              before_noon => !time ^ { exclusive_max: "12:00:00Z" }
+              before_2026 => !datetime ^ { exclusive_max: "2026-01-01T00:00:00Z" }
+              window      => { d?: after_y2k  t?: before_noon  dt?: before_2026 }
               pair   => [text, int32]
               capped => {
                 value: int32
@@ -75,6 +79,12 @@ class CrossEncodingParityTest {
               employee  => person & { department: text }
               robot     => { serial: text }
               holder    => { who: person  labels: [text] }
+              in_place  => { grid: [[text]]  prices: {text => [int32]}  pair: [text, int32]  id: ( int32 | text ) }
+              ip_page   => <T> { items: [T]  size?: int32 ~ 10 }
+              ip_holder => { p: ip_page<text>  ps?: [ip_page<int32>] }
+              pair_of   => !meta.array ^ { min_items: 1  max_items: 2 }
+              refined   => { few: pair_of<int32>  many: [int32; 1..2] }
+              setting   => { kind: meta.type_expr  v?: kind! }
               scalars   => ( text | int32 | boolean )
               circle    => { radius: float64 }
               square    => { side: float64 }
@@ -104,16 +114,28 @@ class CrossEncodingParityTest {
               dog_of    => dog
               pet_of    => pet
               gallery   => { f: figure }
+              drawn     => { o: ( text | figure ) }
               garage    => { r: robot }
               outcome    => abstract <T> { code: T }
               won        => <T> outcome<T> & { prize: text }
               outcome_of => outcome<text>
               won_of     => won<text>
-              ledger     => { o: outcome<text> }
-              box        => <T> { v: T }
+              ledger     => { o: outcome_of }
+              boxed      => abstract { }
+              box        => <T> boxed & { v: T }
               int_box    => box<int32>
               text_box   => box<text>
-              crate      => { b: box }
+              crate      => { b: boxed }
+              pbase      => abstract { pk: text =?  name: text }
+              pbase_of   => <T> pbase & { pet: T }
+              pdog       => pbase_of<text> & { pk?: = "dog" }
+              pcat       => pbase_of<int32> & { pk?: = "cat" }
+              pen        => { p: pbase }
+              tpet       => abstract <B> { tk: text =?  extra?: B }
+              tdog       => tpet<text> & { tk?: = "dog"  breed: text }
+              tcat       => tpet<text> & { tk?: = "cat"  indoor: boolean }
+              tpet_of    => tpet<text>
+              tpen       => { t: tpet_of }
               local_box  => { v: meta.declared }
               fragment   => { ( include: text | name?: text  type?: text ) }
               endpoint   => { ( host: text  port: int32 | socket: text )? }
@@ -136,7 +158,7 @@ class CrossEncodingParityTest {
               ided        => { id: meta.ref<net.uuid_type> }
               typed       => { t: meta.type_ref }
               cell        => { kind: meta.type_ref  v?: kind! }
-              int_cell    => cell ^ { kind?: = int32 }
+              int_cell    => cell & { kind?: = int32 }
               defaulted   => { kind?: meta.type_ref ~ int32  v?: kind! }
               grouped     => { ( kind: meta.type_ref | name: text )  v?: kind! }
               tmpl        => <T> { item: T }
@@ -146,6 +168,18 @@ class CrossEncodingParityTest {
               c1          => !customer { name: Ada }
               order_ref   => meta.ref<order>
               order_pick  => { which: order_ref  also?: meta.ref<order> ~ o1 }
+              order_index => { m: { order_ref => int32 } }
+              reach_word  => !unicode.identifier_type { medial: " " }
+              reach_api   => !meta.namespace { key_type: meta.identifier  value_type: text }
+              reach_base  => !meta.record { name_type: reach_word  fields: {}  extension: ABSTRACT }
+              reach_site  => reach_base & { "public api": reach_api }
+              reach_main  => !reach_site { "public api": !reach_api { ping => "x" } }
+              reach_few   => !reach_api ^ { max_items: 1 }
+              few_main    => !reach_few { pong => "y" }
+              few_holder  => { calls: reach_few }
+              reach_named => !reach_api ^ { key_type: meta.type_name  max_items: 1 }
+              named_hold  => { calls: reach_named }
+              text_pick   => { which: meta.ref<text> }
               marks      => {
                 nickname?: text
                 from:      int32?
@@ -379,6 +413,19 @@ class CrossEncodingParityTest {
                 ["2026-01-01T00:00:30Z", "2026-01-01T01:00:30+01:00"]""");
     }
 
+    /** An exclusive bound refuses its own value ([TSON-SCHEMA] §5.7), through the one parser both encodings ask. */
+    @Test
+    void anExclusiveTemporalBoundRefusesItsOwnValueInBoth() {
+        sameRule("window", "{ d: 2000-01-01 }", """
+                {"d": "2000-01-01"}""");
+        sameRule("window", "{ t: \"12:00:00Z\" }", """
+                {"t": "12:00:00Z"}""");
+        sameRule("window", "{ dt: \"2026-01-01T00:00:00Z\" }", """
+                {"dt": "2026-01-01T00:00:00Z"}""");
+        bothAccept("window", "{ d: 2000-01-02  t: \"11:59:59Z\"  dt: \"2025-12-31T23:59:59Z\" }", """
+                {"d": "2000-01-02", "t": "11:59:59Z", "dt": "2025-12-31T23:59:59Z"}""");
+    }
+
     /**
      * One rule, one code, one pointer -- and JSON's prose says one thing more. [TSON-JSON] §6.1.5 puts a sealed
      * position's discriminators first, so the JSON refusal says where the member has to be; TSON text has no
@@ -454,13 +501,12 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A record template IS-A a sealed base is no member of it, though it pins the selector: it has no values,
-     * and its applications are the members. So {@code pending}'s {@code "wait"} selects nothing, and the
-     * refusal offers only the pins a document could write -- never a route to the template, whose own reader
-     * would refuse for want of a subtype, naming a type the position never offered.
+     * A parametric record composing a sealed base is no member of it, though it pins the selector: a parametric record is no
+     * type (§5.10), and only a declaration composing one of its applications is a member. So {@code pending}'s {@code
+     * "wait"} selects nothing, and the refusal offers only the pins a document could write.
      */
     @Test
-    void aRecordTemplateUnderASealedBaseIsNoMemberInBoth() {
+    void aParametricRecordUnderASealedBaseIsNoMemberInBoth() {
         sameRule("ruling", "{ v: { v_kind: \"wait\"  detail: 1 } }", """
                 {"v": {"v_kind": "wait", "detail": 1}}""");
         assertEquals(List.of("pass"), jsonDiagnostics("ruling", """
@@ -468,68 +514,91 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * The same family over a <b>template</b>: {@code outcome<text>} is abstract and {@code won<text>} is its
-     * one member. Every entry in it is minted, and §8.2 makes a minted name non-normative -- so the alias is
-     * the only name either document has for the member, and both encodings have to flatten it (§7.2's "after
-     * alias flattening of both"). TSON text did not, and the two stacks disagreed about every value in
-     * such a family.
+     * A family whose base is an <b>abstract parametric record's application</b>: {@code abstract} on {@code outcome} is
+     * each application's, so {@code outcome<text>} is abstract and {@code won<text>}, which composes it, is its
+     * one member. Both are named by declarations, and a tag naming a declaration is compared past its alias hops in
+     * both encodings (§7.2's "after alias flattening of both").
      */
     @Test
-    void anAliasOfATemplateFamilyMemberSelectsItInBoth() {
+    void anAliasOfAParametricRecordFamilyMemberSelectsItInBoth() {
         bothAccept("ledger", "{ o: !won_of { code: \"c\"  prize: \"p\" } }", """
                 {"o": {"$type": "won_of", "code": "c", "prize": "p"}}""");
     }
 
     /** And an alias of the <em>base</em> selects nothing in both, which is the other end of the same set. */
     @Test
-    void anAliasOfATemplateFamilyBaseSelectsNothingInBoth() {
+    void anAliasOfAParametricRecordFamilyBaseSelectsNothingInBoth() {
         sameRule("ledger", "{ o: !outcome_of { code: \"c\" } }", """
                 {"o": {"$type": "outcome_of", "code": "c"}}""");
     }
 
     /**
-     * The untagged case over a template family, which compares the two {@code expected} lists as well as the
+     * The untagged case over a parametric record family, which compares the two {@code expected} lists as well as the
      * prose -- so a stack flattening aliases on one side of the comparison and not the other is caught by
      * what it offers the author, not only by what it admits.
      */
     @Test
-    void anAbstractTemplatePositionRequiresItsTagInBoth() {
+    void anAbstractParametricRecordPositionRequiresItsTagInBoth() {
         sameRule("ledger", "{ o: { code: \"c\"  prize: \"p\" } }", """
                 {"o": {"code": "c", "prize": "p"}}""");
     }
 
-    // ── A bare template at a type position ──────────────────────────────
-    //    `crate => { b: box }` names the template itself, which is the family base its instantiations close
-    //    from (§5.10). The base is ABSTRACT by derivation -- a record body with no
-    //    discriminator -- so the tag is the selector in both encodings, and every member is minted, so an
-    //    alias is the only name either document has for one.
+    // ── A family declared through a parametric record ──────────────────────────────
+    //    No position names a parametric record bare (§5.10), so `crate => { b: boxed }` names the abstract record `box`
+    // composes, and each declared application of `box` is a member through that written parent. The base states no
+    //    selector, so the tag is the selector in both encodings.
 
-    /** A member named by its alias reads at the template's own position, in both encodings. */
+    /** A declared application reads at the base's position, in both encodings. */
     @Test
-    void aMemberOfABareTemplateBaseReadsInBoth() {
+    void aMemberThroughAParametricRecordsParentReadsInBoth() {
         bothAccept("crate", "{ b: !int_box { v: 1 } }", """
                 {"b": {"$type": "int_box", "v": 1}}""");
     }
 
     /** And the other member, which is what makes the dispatch a dispatch rather than a single admission. */
     @Test
-    void theOtherMemberOfABareTemplateBaseReadsInBoth() {
+    void theOtherMemberThroughAParametricRecordsParentReadsInBoth() {
         bothAccept("crate", "{ b: !text_box { v: \"x\" } }", """
                 {"b": {"$type": "text_box", "v": "x"}}""");
     }
 
     /** Untagged selects nothing: the base has no direct instances, so both encodings require the tag. */
     @Test
-    void aBareTemplateBaseRequiresItsTagInBoth() {
+    void aBaseOfAParametricRecordsApplicationsRequiresItsTagInBoth() {
         sameRule("crate", "{ b: { v: 1 } }", """
                 {"b": {"v": 1}}""");
     }
 
     /** A tag naming the base itself selects nothing either, which is the other end of the same set. */
     @Test
-    void aTagNamingTheBareTemplateBaseSelectsNothingInBoth() {
-        sameRule("crate", "{ b: !box { v: 1 } }", """
-                {"b": {"$type": "box", "v": 1}}""");
+    void aTagNamingTheBaseOfAParametricRecordsApplicationsSelectsNothingInBoth() {
+        sameRule("crate", "{ b: !boxed { v: 1 } }", """
+                {"b": {"$type": "boxed", "v": 1}}""");
+    }
+
+    /**
+     * A member composing a parametric record's application and pinning the selector there reaches the base through the
+     * parametric record's written parent (§5.8, §5.10), and is selected by its pin in both encodings.
+     */
+    @Test
+    void aMemberComposingAnApplicationIsSelectedByItsPinInBoth() {
+        bothAccept("pen", "{ p: { pk: cat  name: Tom  pet: 3 } }", """
+                {"p": {"pk": "cat", "name": "Tom", "pet": 3}}""");
+        sameRule("pen", "{ p: { pk: bird  name: Tom  pet: 3 } }", """
+                {"p": {"pk": "bird", "name": "Tom", "pet": 3}}""");
+    }
+
+    /**
+     * An abstract parametric record's application is an abstract record carrying the parametric record's selector (§5.10),
+     * so a position typed {@code tpet_of}, the declaration of {@code tpet<text>}, dispatches over the declarations composing
+     * it, in both encodings.
+     */
+    @Test
+    void anAbstractParametricRecordsApplicationDispatchesOverItsMembersInBoth() {
+        bothAccept("tpen", "{ t: { tk: cat  indoor: true } }", """
+                {"t": {"tk": "cat", "indoor": true}}""");
+        sameRule("tpen", "{ t: { tk: bird  indoor: true } }", """
+                {"t": {"tk": "bird", "indoor": true}}""");
     }
 
     // ── §8.5 declared positions: the value names its own type ────────────────
@@ -576,26 +645,25 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * A kind may hold an applied type, judged through the entry the closure closed it to: {@code unique =>
-     * set<text>} is a type, and no type built with {@code uuid_type} ([TSON-SCHEMA] §4.2, §7.4). TSON writes the
-     * reference unquoted, as data grammar; JSON, having no unquoted form, writes the same text as a string.
+     * A kind names a declared application by its entry, and a reference is a name, so an application is refused
+     * whether or not the schema closes it ([TSON-SCHEMA] §4.2): {@code unique => set<text>} is named {@code unique}.
+     * In TSON an argument list is no data grammar, so {@code set<text>} does not parse ([TSON-DATA] §7.2.5); JSON has
+     * no unquoted form, so the string reaches the kind and spells no name, refused as any string outside the kind's
+     * grammar is ([TSON-JSON] §5.6).
      */
     @Test
-    void anApplicationAtAKindIsJudgedThroughItsEntryByBoth() {
-        bothAccept("typed", "{ t: set< text > }", """
-                {"t": "set<text>"}""");
-        sameVerdict("ided", "{ id: set<text> }", """
-                {"id": "set<text>"}""");
-    }
-
-    /**
-     * An argument is compared past its alias chain ([TSON-SCHEMA] §8.2): over {@code label => text}, {@code set<label>}
-     * is {@code set<text>}, which the schema closes as {@code unique}, in either encoding.
-     */
-    @Test
-    void anAliasedArgumentAtAKindIsJudgedThroughItsEntryByBoth() {
-        bothAccept("typed", "{ t: set<label> }", """
-                {"t": "set<label>"}""");
+    void anApplicationIsNoReferenceInEitherEncoding() {
+        bothAccept("typed", "{ t: unique }", """
+                {"t": "unique"}""");
+        for (String application : List.of("set< text >", "set<label>", "set<int32>")) {
+            assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_FORM_INVALID, "/t")), json("typed", """
+                    {"t": "%s"}""".formatted(application)), application);
+            assertTrue(tson("typed", "{ t: " + application + " }")
+                    .contains(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "")), application);
+        }
+        assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_FORM_INVALID, "/id")), json("ided", """
+                {"id": "set<text>"}"""));
+        assertTrue(tson("ided", "{ id: set<text> }").contains(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "")));
     }
 
     /**
@@ -620,32 +688,80 @@ class CrossEncodingParityTest {
                 {"which": "o1", "also": "c1"}""");
     }
 
-    /** An application nothing in the closure closed names no type the schema closes, and is refused by both. */
+    /**
+     * A reference naming values is an atom, so a map keyed by one takes the object form ([TSON-JSON] §6.4) and each
+     * member name is judged as the same string at a field is: a key reaching a value of the type is admitted, and one
+     * reaching nothing, a value of another type or a type is refused by both, on the same code at the same pointer.
+     */
     @Test
-    void anUnclosedApplicationAtAKindIsRefusedByBoth() {
-        sameVerdict("typed", "{ t: set<int32> }", """
-                {"t": "set<int32>"}""");
-        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
-                tson("typed", "{ t: set<int32> }").stream().map(Verdict::code).toList());
+    void aMapKeyedByAValueReferenceIsJudgedByWhatEachKeyReachesInBoth() {
+        bothAccept("order_index", "{ m: { o1 => 1 } }", """
+                {"m": {"o1": 1}}""");
+        for (String refused : List.of("nope", "c1", "order")) {
+            sameVerdict("order_index", "{ m: { " + refused + " => 1 } }", """
+                    {"m": {"%s": 1}}""".formatted(refused));
+            assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/m/" + refused)),
+                    tson("order_index", "{ m: { " + refused + " => 1 } }"), refused);
+        }
     }
 
     /**
-     * A sibling reference is a reference value, read by the same production in both encodings: unquoted in TSON, a
-     * string holding the same text in JSON. It stands only at a record field's type, so a field typed by a type
-     * reference refuses it, on the same code at the same pointer in both.
+     * A reference is a token's text in TSON, whatever its form, and a string's in JSON, split at {@code .} before any
+     * family is consulted and each segment judged by the family of what it enters ([TSON-SCHEMA] §5.12): a field
+     * named with a space is reached by both, and a name splitting into nothing or a segment its family refuses is
+     * refused by both alike.
      */
     @Test
-    void aSiblingReferenceAtAKindIsRefusedByBoth() {
-        sameVerdict("typed", "{ t: kind! }", """
-                {"t": "kind!"}""");
-        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
-                tson("typed", "{ t: kind! }").stream().map(Verdict::code).toList());
+    void aReferencesSegmentsAreJudgedByWhatTheyEnterInBoth() {
+        bothAccept("text_pick", "{ which: \"reach_main.public api.ping\" }", """
+                {"which": "reach_main.public api.ping"}""");
+        for (String refused : List.of("reach_main..ping", "reach_main.public  api.ping", "reach_main.public api.pong",
+                "reach_main.public api.p ng")) {
+            sameVerdict("text_pick", "{ which: \"" + refused + "\" }", """
+                    {"which": "%s"}""".formatted(refused));
+        }
+    }
+
+    /**
+     * A namespace type refined by {@code ^} is a namespace type ([TSON-SCHEMA] §5.7): both encodings read a value at
+     * it under the narrowed bounds, and a qualified name enters a value of it in both (§5.12).
+     */
+    @Test
+    void aRefinedNamespaceTypeIsReadAndEnteredAlikeInBoth() {
+        bothAccept("few_holder", "{ calls: { ping => \"x\" } }", """
+                {"calls": {"ping": "x"}}""");
+        sameVerdict("few_holder", "{ calls: { ping => \"x\"  pong => \"y\" } }", """
+                {"calls": {"ping": "x", "pong": "y"}}""");
+        bothAccept("text_pick", "{ which: few_main.pong }", """
+                {"which": "few_main.pong"}""");
+        sameVerdict("text_pick", "{ which: few_main.ping }", """
+                {"which": "few_main.ping"}""");
+    }
+
+    /** A key type restated through an alias is the source's ([TSON-SCHEMA] §5.7), and both encodings read it so. */
+    @Test
+    void aSlotRestatedThroughAnAliasIsReadAlikeInBoth() {
+        bothAccept("named_hold", "{ calls: { ping => \"x\" } }", """
+                {"calls": {"ping": "x"}}""");
+        sameVerdict("named_hold", "{ calls: { ping => \"x\"  pong => \"y\" } }", """
+                {"calls": {"ping": "x", "pong": "y"}}""");
+    }
+
+    /**
+     * {@code kind!} is schema-grammar sugar and no data form in either encoding: in TSON it is the data grammar's syntax
+     * error, and in JSON a string holding it spells no reference, refused as one spelling no name.
+     */
+    @Test
+    void aMarkedNameIsNoReferenceInEitherEncoding() {
+        assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_FORM_INVALID, "/t")), json("typed", """
+                {"t": "kind!"}"""));
+        assertTrue(tson("typed", "{ t: kind! }").contains(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "")));
     }
 
     /**
      * A dependent field ([TSON-SCHEMA] §5.2) is read in both encodings against the type its sibling names in the same
      * record -- the sibling as written, its default, or its pin -- and refused alike: a value of another type, a free
-     * sibling written after it, and a sibling naming a template, which is refused at the sibling.
+     * sibling written after it, and a sibling naming a parametric record, which is refused at the sibling.
      */
     @Test
     void aDependentFieldIsReadAgainstItsSiblingByBoth() {
@@ -665,7 +781,9 @@ class CrossEncodingParityTest {
                 {"kind": "tmpl", "v": {"item": 5}}""");
         assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/v")),
                 tson("cell", "{ v: 5  kind: int32 }"));
-        assertEquals(List.of(new Verdict(Diagnostic.Code.VALIDATION_ERROR, "/kind")),
+        // No reference names a parametric record bare (§5.10), so the reference over types refuses it before the dependent
+        // field is read.
+        assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "/kind")),
                 tson("cell", "{ kind: tmpl  v: { item: 5 } }"));
     }
 
@@ -941,6 +1059,75 @@ class CrossEncodingParityTest {
         bothAccept("shaped", """
                 { outline: !circle { radius: 1.0 } }""", """
                 {"outline": {"$type": "circle", "radius": 1.0}}""");
+    }
+
+    /**
+     * A tag at a choice selects the one variant its type IS-A, and the value is read there as at a position typed by
+     * it ([TSON-SCHEMA] §5.4): the abstract variant's member reads, and the abstract variant itself is refused.
+     */
+    @Test
+    void aTagNamingASubtypeOfOneVariantSelectsItInBoth() {
+        bothAccept("drawn", """
+                { o: !disc { area: 4  side: 2 } }""", """
+                {"o": {"$type": "disc", "area": 4, "side": 2}}""");
+        sameVerdict("drawn", """
+                { o: !figure { area: 4 } }""", """
+                {"o": {"$type": "figure", "area": 4}}""");
+    }
+
+    // ── Types written in place: each read by a reader built from its construction ────────
+
+    /** Container sugar at a field is the construction in place, nested and in a choice, read alike in both. */
+    @Test
+    void typesWrittenInPlaceReadAlike() {
+        bothAccept("in_place", """
+                { grid: [[a] []]  prices: { eur => [1 2] }  pair: [x 3]  id: name }""", """
+                {"grid": [["a"], []], "prices": {"eur": [1, 2]}, "pair": ["x", 3], "id": "name"}""");
+        sameRule("in_place", """
+                { grid: []  prices: {}  pair: [x]  id: 1 }""", """
+                {"grid": [], "prices": {}, "pair": ["x"], "id": 1}""");
+    }
+
+    /**
+     * An application of a parametric record at a slot closes in place to a record with no name, read alike in both: its
+     * fields, its default, an element of a list holding one, and a field it does not declare, at one pointer.
+     */
+    @Test
+    void aRecordInPlaceReadsAlike() {
+        bothAccept("ip_holder", """
+                { p: { items: [a b] }  ps: [ { items: [1]  size: 2 } ] }""", """
+                {"p": {"items": ["a", "b"]}, "ps": [{"items": [1], "size": 2}]}""");
+        sameCodeAndPath("ip_holder", """
+                { p: { size: 1 }  ps: [ { items: []  colour: red } ] }""", """
+                {"p": {"size": 1}, "ps": [{"items": [], "colour": "red"}]}""");
+    }
+
+    /**
+     * A dependent value whose sibling holds a type written in place: a tree read in either encoding holds the sibling
+     * as the record it is written as, and says it does not yet read a value against one rather than dropping it.
+     */
+    @Test
+    void aDependentValueOverASiblingWrittenInPlaceIsNotYetReadInATree() {
+        sameCodes("setting", "{ kind: { of: !meta.array { element_type: int32 } }  v: [1 2] }", """
+                {"kind": {"of": {"$type": "meta.array", "element_type": "int32"}}, "v": [1, 2]}""");
+        assertEquals(List.of(Diagnostic.Code.NOT_IMPLEMENTED), json("setting", """
+                {"kind": {"of": {"$type": "meta.array", "element_type": "int32"}}, "v": [1, 2]}""").stream()
+                .map(Verdict::code).toList());
+    }
+
+    /**
+     * A completion in place is the construction it completes to, named alike in both encodings and alike with the
+     * sugar that writes the same construction (§5.5).
+     */
+    @Test
+    void aCompletionInPlaceIsNamedByTheConstructionItIs() {
+        sameRule("refined", "{ few: [1 2 3]  many: [1 2 3] }", """
+                {"few": [1, 2, 3], "many": [1, 2, 3]}""");
+        List<String> messages = jsonDiagnostics("refined", """
+                {"few": [1, 2, 3], "many": [1, 2, 3]}""").stream().map(Diagnostic::message).toList();
+        assertEquals(2, messages.size(), messages::toString);
+        assertTrue(messages.get(0).startsWith("'[int32; 1..2]'"), messages.get(0));
+        assertTrue(messages.get(1).startsWith("'[int32; 1..2]'"), messages.get(1));
     }
 
     // ── §6.1.5 subsumption: `!employee` in text, `$type` in JSON ────────

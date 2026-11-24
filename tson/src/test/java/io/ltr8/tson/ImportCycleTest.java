@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -12,11 +13,12 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-DATA] §2.2.3's import cycle, reported as an ordinary schema error naming the path that closes it.
+ * [TSON-SCHEMA] §2.2.3's import cycle, reported as an ordinary schema error naming the path that closes it.
  *
  * <p><b>Why a cycle cannot be found by looking in a cache.</b> A schema is registered only once it has
  * linked, so while {@code a.tn} is resolving it is in no registry at all -- {@code b.tn} importing it back
@@ -27,8 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ImportCycleTest {
 
-    private static final String META = "https://tson.io/2026/39/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
+    private static final String META = "https://tson.io/2026/40/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/40/m/core.tn";
 
     private final Map<String, String> documents = new LinkedHashMap<>();
 
@@ -123,6 +125,35 @@ class ImportCycleTest {
 
         assertTrue(message.contains("is part of an import cycle"), message);
         assertTrue(message.contains("example.test/meta-a.tn"), message);
+    }
+
+    /** A schema held as text is in flight under its own identity, so importing that identity is the same cycle. */
+    @Test
+    void aSchemaValidatedAsTextImportingItselfIsAnImportCycle() {
+        schema("https://example.test/self.tn", META, List.of("HTTPS://EXAMPLE.TEST/self.tn"),
+                "  self_type => { x: text }");
+        String text = documents.remove("https://example.test/self.tn");
+
+        List<Diagnostic> problems = tson().validateSchema(text);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("'example.test/self.tn' is part of an import cycle "
+                + "(example.test/self.tn -> example.test/self.tn)"), problems.getFirst().message());
+    }
+
+    /** Two schemas importing each other, the one held as text reached again from the other. */
+    @Test
+    void aSchemaValidatedAsTextWhoseImportImportsItBackIsAnImportCycle() {
+        schema("https://example.test/b.tn", META, List.of("https://example.test/a.tn"), "  b_type => { y: text }");
+        schema("https://example.test/a.tn", META, List.of("https://example.test/b.tn"), "  a_type => { x: b_type }");
+        String text = documents.remove("https://example.test/a.tn");
+
+        List<Diagnostic> problems = tson().validateSchema(text);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.getFirst().message().contains(
+                "example.test/a.tn -> example.test/b.tn -> example.test/a.tn"), problems.getFirst().message());
     }
 
     /**

@@ -1,5 +1,7 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.schema.ExternTarget;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.Top;
@@ -62,8 +64,7 @@ final class AliasChain {
 
     /**
      * Each of {@code names} together with every alias that means it -- the set a written tag is matched
-     * against. A materialised entry's own name is implementation-chosen (§8.2), so for a template
-     * instantiation an alias is the only name an author has to write.
+     * against, [TSON-SCHEMA] §7.2 comparing "after alias flattening of both".
      *
      * <p><b>The alias is kept rather than reduced to its target.</b> An alias entry compiles to its
      * target's reader, so dispatching on the written name runs the same reader and reports under the name
@@ -76,6 +77,25 @@ final class AliasChain {
             admitted.addAll(namesMeaning.getOrDefault(name, Set.of()));
         }
         return admitted;
+    }
+
+    /**
+     * Where a chain ends past externs as well as aliases: the entry {@code name} lands on and the linked schema whose
+     * namespace holds it, the foreign one where the chain reaches an extern ([TSON-SCHEMA] §5.13). What a question
+     * asked of the type's shape -- its class, a map key's form -- asks, the shape being the target's.
+     */
+    record Landed(TsonLinkedSchema in, String name, Top definition) {
+    }
+
+    /** {@code name}'s landing in {@code linked}, past its aliases and its extern, or empty where it reaches nothing. */
+    static Optional<Landed> landed(TsonLinkedSchema linked, String name) {
+        Optional<ExternTarget.Landing> landing = linked.landing(name);
+        if (landing.isPresent()) {
+            ExternTarget.Landing end = landing.get();
+            return Optional.of(new Landed(end.in(), end.name(), end.definition()));
+        }
+        return terminal(linked.schema(), name).map(resolved -> new Landed(linked, resolved.name(),
+                resolved.definition()));
     }
 
     /**

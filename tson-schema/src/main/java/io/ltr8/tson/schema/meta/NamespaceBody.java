@@ -12,7 +12,7 @@ import java.util.Optional;
 
 /**
  * The kernel's {@code namespace} constructor's own vocabulary, resolved ([TSON-SCHEMA] §4.1, §5.7, §8.1): a map type
- * keyed by names. {@code meta.namespace} is a refinement of {@code meta.map}, IS-A it, whose {@code key_type}
+ * keyed by names. {@code meta.namespace} composes {@code meta.map}, IS-A it, whose {@code key_type}
  * narrows to {@code meta.identifier_ref} and whose {@code voidable} is pinned false. A namespace type is an
  * instance, as a map type is one of {@code map} -- the kernel's {@code schema}, and a schema's own {@code api =>
  * !meta.namespace { key_type: meta.identifier  value_type: method }} -- and a value of it is the map its facets
@@ -33,7 +33,7 @@ import java.util.Optional;
  */
 @Typename(name = "meta.namespace")
 public record NamespaceBody(TypeChain chain, @Field("key_type") TypeRef keyType,
-                            @Field("value_type") TypeRef valueType, @Field("ordered") boolean ordered,
+                            @Field("value_type") TypeExpr valueType, @Field("ordered") boolean ordered,
                             @Field("min_items") Optional<Long> minItems,
                             @Field("max_items") Optional<Long> maxItems) implements Product {
 
@@ -51,13 +51,13 @@ public record NamespaceBody(TypeChain chain, @Field("key_type") TypeRef keyType,
     }
 
     /** This body with an empty IS-A chain -- a value no resolver has placed in one. */
-    public NamespaceBody(TypeRef keyType, TypeRef valueType, boolean ordered, Optional<Long> minItems,
+    public NamespaceBody(TypeRef keyType, TypeExpr valueType, boolean ordered, Optional<Long> minItems,
                          Optional<Long> maxItems) {
         this(TypeChain.EMPTY, keyType, valueType, ordered, minItems, maxItems);
     }
 
     /** An unbounded namespace type in no chain. */
-    public static NamespaceBody of(TypeRef keyType, TypeRef valueType, boolean ordered) {
+    public static NamespaceBody of(TypeRef keyType, TypeExpr valueType, boolean ordered) {
         return new NamespaceBody(keyType, valueType, ordered, Optional.empty(), Optional.empty());
     }
 

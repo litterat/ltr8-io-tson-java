@@ -4,11 +4,12 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaModelNameBinder;
-import io.ltr8.tson.schema.meta.Ref;
+import io.ltr8.tson.schema.meta.ValueRef;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -31,8 +33,8 @@ class ValueRefReadTest {
 
     private static final String SHOP_SCHEMA = """
             !!id:"https://example.test/shop.tn"
-            !!import:"https://tson.io/2026/39/m/meta.tn"
-            !!import:"https://tson.io/2026/39/m/core.tn"
+            !!import:"https://tson.io/2026/40/m/meta.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
             !schema {
               order      => { id: text  qty: int32 }
               rush_order => order & { by: text }
@@ -60,25 +62,25 @@ class ValueRefReadTest {
         return tson(SHOP_SCHEMA).validate("!!import:\"" + SHOP + "\"\n" + data);
     }
 
-    private static TypeRef reference(TsonValue node) {
-        return node.as(TypeRef.class).orElseThrow(() -> new AssertionError("not a reference: " + node));
+    private static ValueRef<?> reference(TsonValue node) {
+        return node.as(ValueRef.class).orElseThrow(() -> new AssertionError("not a reference: " + node));
     }
 
-    /** A tree read delivers the reference, as at a kind, and the reference finds the value its name reaches. */
+    /** A tree read delivers a {@code ValueRef}, with the value its name reaches delivered into it. */
     @Test
     void aTreeReadDeliversTheReferenceAndItsReferent() {
-        TypeRef which = reference(read("!pick { which: o1 }").get("which"));
+        ValueRef<?> which = reference(read("!pick { which: o1 }").get("which"));
 
-        assertEquals("o1", which.text());
-        TsonValue referent = (TsonValue) which.referent().orElseThrow();
+        assertEquals("o1", which.name());
+        TsonValue referent = (TsonValue) which.get();
         assertEquals("A-1", referent.get("id").asString().orElseThrow());
     }
 
     @Test
     void aValueOfASubtypeAndAKeyOfANamespaceValueAreNamed() {
         assertEquals(List.of(), problems("!pick { which: r1 }"));
-        TypeRef first = reference(read("!pick { which: book.first }").get("which"));
-        assertEquals("B-1", ((TsonValue) first.referent().orElseThrow()).get("id").asString().orElseThrow());
+        ValueRef<?> first = reference(read("!pick { which: book.first }").get("which"));
+        assertEquals("B-1", ((TsonValue) first.get()).get("id").asString().orElseThrow());
     }
 
     @Test
@@ -95,10 +97,10 @@ class ValueRefReadTest {
     /** A default written inline at the field is a value the data may omit, and finds what it names. */
     @Test
     void anInlineDefaultIsReadWhereTheDataOmitsTheField() {
-        TypeRef which = reference(read("!rpick { }").get("which"));
+        ValueRef<?> which = reference(read("!rpick { }").get("which"));
 
-        assertEquals("o1", which.text());
-        assertEquals("A-1", ((TsonValue) which.referent().orElseThrow()).get("id").asString().orElseThrow());
+        assertEquals("o1", which.name());
+        assertEquals("A-1", ((TsonValue) which.get()).get("id").asString().orElseThrow());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems("!rpick { which: c1 }").getFirst().code());
     }
 
@@ -111,7 +113,7 @@ class ValueRefReadTest {
     public record Customer(String name) {
     }
 
-    public record Pick(Ref<Order> which) {
+    public record Pick(ValueRef<Order> which) {
     }
 
     public record NamedPick(TypeRef which) {
@@ -134,7 +136,7 @@ class ValueRefReadTest {
         return binding(pick).objectReader().read("!!import:\"" + SHOP + "\"\n" + data, pick);
     }
 
-    /** A {@code Ref} host receives the value the name reaches, bound as the schema's value entry is. */
+    /** A {@code ValueRef} host receives the value the name reaches, bound as the schema's value entry is. */
     @Test
     void aRefHostReceivesTheValueTheNameReaches() {
         Pick pick = bind(Pick.class, "!pick { which: o1 }");
@@ -144,11 +146,9 @@ class ValueRefReadTest {
     }
 
     @Test
-    void aTypeRefHostReceivesTheNameCarryingItsReferent() {
-        NamedPick pick = bind(NamedPick.class, "!pick { which: book.first }");
-
-        assertEquals(TypeRef.of("book.first"), pick.which());
-        assertEquals(new Order("B-1", 3), pick.which().referent().orElseThrow());
+    void aTypeRefHostIsABindMismatch() {
+        ReadException refused = assertThrows(ReadException.class, () -> bind(NamedPick.class, "!pick { which: o1 }"));
+        assertTrue(refused.getMessage().contains("declare it ValueRef"), refused.getMessage());
     }
 
     @Test
@@ -166,8 +166,8 @@ class ValueRefReadTest {
     private static List<Diagnostic> schemaProblems(String body) {
         String schema = """
                 !!id:"https://example.test/picks.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order     => { id: text }
                   customer  => { name: text }
@@ -208,8 +208,8 @@ class ValueRefReadTest {
     void aFamilyIsDiscriminatedByAValuesName() {
         String schema = """
                 !!id:"https://example.test/family.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   order     => { id: text }
                   o1        => !order { id: A-1 }
@@ -235,7 +235,7 @@ class ValueRefReadTest {
     /**
      * A field typed by an application written inline, with a default, beside a value entry: a value entry's read
      * compiles the entries ready so far, where the field is still typed by the application, and its default is
-     * decoded there as written rather than through the template's reader, which refuses every value.
+     * decoded there as written rather than through the parametric record's reader, which refuses every value.
      */
     @Test
     void anInlineApplicationsDefaultBesideAValueEntryCompiles() {

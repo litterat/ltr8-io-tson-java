@@ -40,9 +40,9 @@ class ConstructorLevelDisciplineTest {
                 .validateSchema(source);
     }
 
-    private static final String KERNEL = "https://tson.io/2026/39/m/meta.tn";
-    private static final String META = "https://tson.io/2026/39/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/39/m/core.tn";
+    private static final String KERNEL = "https://tson.io/2026/40/m/meta.tn";
+    private static final String META = "https://tson.io/2026/40/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/40/m/core.tn";
 
     /** In any schema, deriving from a constructor is ordinary — and the result is one. */
     @Test
@@ -53,18 +53,12 @@ class ConstructorLevelDisciplineTest {
                 """));
     }
 
-    /** Refining a kernel constructor is the same case. */
-    @Test
-    void aSchemaMayRefineAConstructor() {
-        assertEquals(List.of(), problems(KERNEL, KERNEL, "  refined => meta.array ^ { ordered?: = false }"));
-    }
-
     /** The derived entry IS-A {@code top}, so it is constructor level and applicable. */
     @Test
     void theDerivedEntryIsItselfConstructorLevel() {
         String source = """
                 !!id:"https://example.test/m.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !schema {
                   c        => meta.product & { id: meta.identifier }
                   composed => c & { extra: meta.identifier }
@@ -75,6 +69,27 @@ class ConstructorLevelDisciplineTest {
         assertTrue(TypeChain.supertypesOf(entries.get("c")).contains("meta.top"), "the base-kind composition");
         assertTrue(TypeChain.supertypesOf(entries.get("composed")).contains("meta.top"),
                 "and everything deriving from it");
+    }
+
+    /**
+     * A base kind counts only as the kernel's own entry ([TSON-SCHEMA] §5.5): a schema's own {@code product} beside
+     * the kernel's {@code atom} leaves the chain reaching one.
+     */
+    @Test
+    void aSchemasOwnProductIsNoBaseKind() {
+        assertEquals(List.of(), problems(META, CORE, """
+                  product => { size: int32 }
+                  mine    => meta.atom & product & { extra: text }
+                """));
+    }
+
+    /** Two base kinds are a diamond over {@code meta.type}'s {@code chain} ([TSON-SCHEMA] §5.5, §5.8). */
+    @Test
+    void twoBaseKindsAreRefusedAsADiamond() {
+        List<Diagnostic> problems = problems(META, CORE, "  both => meta.atom & meta.product & { extra: text }");
+
+        assertEquals(1, problems.size(), problems.toString());
+        assertTrue(problems.getFirst().message().contains("chain"), problems.toString());
     }
 
     /** An ordinary schema composes a base kind: the kernel's {@code product} is in its namespace. */
@@ -89,15 +104,15 @@ class ConstructorLevelDisciplineTest {
         String libraryId = "https://example.test/lib.tn";
         String library = """
                 !!id:"https://example.test/lib.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
-                !!import:"https://tson.io/2026/39/m/core.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/core.tn"
                 !schema {
                   steps => !meta.namespace { key_type: meta.identifier  value_type: text }
                 }
                 """;
         String importer = """
                 !!id:"https://example.test/app.tn"
-                !!import:"https://tson.io/2026/39/m/meta.tn"
+                !!import:"https://tson.io/2026/40/m/meta.tn"
                 !!import:"https://example.test/lib.tn"
                 !schema {
                   plan => !steps { first => "a"  second => "b" }
@@ -117,12 +132,12 @@ class ConstructorLevelDisciplineTest {
     @Test
     void theDeclaringDocumentAppliesItsOwnConstructorInEitherOrder() {
         assertEquals(List.of(), problems(META, CORE, """
-                  my_array => meta.array ^ { ordered?: = false }
+                  my_array => !meta.array ^ { ordered: false }
                   tags     => !my_array { element_type: text }
                 """));
         assertEquals(List.of(), problems(META, CORE, """
                   tags     => !my_array { element_type: text }
-                  my_array => meta.array ^ { ordered?: = false }
+                  my_array => !meta.array ^ { ordered: false }
                 """));
     }
 
