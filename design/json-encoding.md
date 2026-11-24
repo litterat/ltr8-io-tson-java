@@ -1,306 +1,113 @@
 # The JSON encoding
 
-Design notes for `tson-json` — the implementation of [TSON-JSON] (`spec/tson-part3-json.md`), the JSON encoding of the
-TSON schema system. Current form only; history lives in git. This note is the design rationale — the shared
-configuration and atom vocabulary, the on-ramp the encoding is for, why the stack is separate all the way up, and the
-packages; the layers themselves are in the sibling notes.
+Why `tson-json` ([TSON-JSON]) is a stack of its own, what holds it to the TSON stack's verdicts, and the on-ramp it is
+for. The layers are in the sibling notes; the packages in `io.ltr8.tson.json`'s `package-info`.
 
 **Invariants**
 
 - `tson-json` does not build on `tson-compiler`'s `TsonEventSource`: it has its own lexer, structural layer, tree and
-  readers.
-- Compiling JSON readers from a `TsonLinkedSchema` adds no dependency at all, and in particular none on `tson-compiler`.
-- One `ProcessorConfig` value serves both front doors; a diagnostics receiver belongs to a read, not to a deployment.
-- JSON has no schema documents of its own: `Json` has a way to *name* a schema (`withSchemas`), never a way to author one.
-- A schema-directed tree read produces a `JsonValue`, never a `TsonValue`; `ValueReaderFactoryRegistry.atoms()` stays as
-  what the parsing contract is asserted against.
-- `CrossEncodingParityTest` asserts the same `Diagnostic.Code` and RFC 6901 pointer, never the message, over the rules that
-  are actually written twice; a legitimate divergence is asserted as a divergence, and a defect is never pinned as agreed.
-- `HostAtoms`' string-content index excludes every host class the family is not a function of, and the numeric families —
-  a class declaring `BigInteger` must not turn `"123"` into one.
+  readers, because a pull-only event source has no channel for the position to say record-or-map or what `null` is.
+- Compiling JSON readers from a `TsonLinkedSchema` adds no dependency on `tson-compiler`: the linked schema is a
+  `tson-schema` value, only its production the TSON engine's. That keeps the deferral below free.
+- One `ProcessorConfig` value serves both front doors, so a deployment states its settings once; a diagnostics receiver
+  belongs to a read, not a deployment, so neither front door has `withDiagnostics` (each reader has).
+- JSON has no schema documents of its own (§3.4 binds out of band): `Json` has a way to *name* a schema
+  (`withSchemas`), never a way to author one.
+- A schema-directed tree read produces a `JsonValue`, never a `TsonValue`; `ValueReaderFactoryRegistry.atoms()` stays
+  as what the parsing contract is asserted against.
+- `CrossEncodingParityTest` asserts the same `Diagnostic.Code` and RFC 6901 pointer, never the message, over the rules
+  that are actually written twice; a legitimate divergence is asserted as a divergence, and a defect is never pinned
+  as agreed.
 - The target is existing JSON validating **unchanged**; a converted schema outside the profile below breaks that.
 
-Related: `design/json-lexer-stream-tree.md` (JEP 540 alignment, lexer, structural layer, tree),
-`design/json-schema-directed-reading.md` (binding a document, the annotation object, the `reader` package),
-`design/json-facades-binding-writing.md` (the front door, the two readers, the writers),
-`design/json-unicode-policies.md` (the identifier and token policies), `design/readers-and-diagnostics.md`,
-`design/facades-and-tree.md`.
-
-## One configuration, two front doors
-
-`Json.standard()` and `Json.of(ProcessorConfig)` are the whole construction surface, and they are `Tson`'s to the
-letter:
-
-| | TSON text | JSON |
-|---|---|---|
-| unconfigured | `Tson.standard()` | `Json.standard()` |
-| configured | `Tson.of(config)` | `Json.of(config)` |
-| readers | `treeReader()` / `objectReader()` | `treeReader()` / `objectReader()` |
-| what it holds | `processorPolicy()` / `dataBindContext()` | `processorPolicy()` / `dataBindContext()` |
-
-**The same `ProcessorConfig` value.** What a deployment states about reading TSON — what it will admit and spend,
-where it may obtain a schema, which Java classes its types bind to — is one statement, and stating it twice
-is two places for it to differ. That is why the configuration is a value in `tson-base` and construction is
-not: `Tson.of` names the compiler's own registry and could never live there, but nothing about the
-*settings* is an encoding's.
-
-**One setting does not reach this encoding, and that is a division of labour rather than a gap.** The config's
-schema access states how schema *text* is fetched, and turning that text into a resolved schema is the TSON
-engine's — so `Json` names an already-resolved one through `withSchemas(TsonSchemaLoader)` instead, which holds a
-`JsonCompiledSchemaRegistry` over the loader (`design/json-schema-directed-reading.md`).
-
-**`Json` has no setter that restates the config.** A bind context or a policy is
-`of(config.withDataBindContext(…))` or `of(config.withProcessorPolicy(…))`, and there is no
-`Json.withDiagnostics`, as `Tson` has none: a receiver belongs to a **read**, not
-to a deployment — two endpoints of one application legitimately differ on where problems go, and both
-encodings' readers carry `withDiagnostics` for exactly that.
-
-**What stays different is deliberate.** `Json` keeps the static `parse`/`toDisplayString` that JEP 540
-defines, because a consumer arriving from the JDK's API should find it; they are the schemaless door, where
-an instance is the configured one. `Tson` keeps `resolve`, `validate` and the registries, because JSON has
-no schema documents of its own — §3.4 binds out of band — so it has a way to *name* a schema (`withSchemas`),
-never a way to author one.
-
-## One atom vocabulary, both encodings
-
-`AtomContext` lives in `tson-base`'s `bind` package, and registers the host values the built-in atoms read to;
-`tson-atom`'s `HostAtoms` is the index from the same host classes back to
-the family that produces each. Both front doors' defaults start from `AtomContext`: `Json.standard()`,
-`JsonObjectReader.standard()`, `Tson.standard()`. [TSON-JSON] §5.1 is why that is right rather than merely
-tidy: a string's content is handed to the atom's own parser exactly as a TSON quoted token's text would be,
-so *which* families a reader can bind is a property of the type system and not of the encoding that carried
-them. A consumer whose class has a `UUID` component must not have to discover that one front door treats it
-as a scalar and the other takes it apart.
-
-What the registration buys is that `ltr8-bind` treats each host type as a **scalar** — `CidrInet4Network` is a
-Java record and would otherwise bind as `{ prefix: … prefixLength: … }`, refusing the scalar `cidr4`/`cidr6`
-actually carry. None of these registrations carries a bridge, so the string-to-host-value conversion is not
-the registration's: it is the **family's**, and `HostAtoms.forStringContentHostType` is how a reader with no
-type-ref reaches it. `JsonAtoms.fromString` asks that index, as `DataClassObjectReader` does on the text
-side, so `"9f1c8e2a-…"` at a `UUID` component is `UuidParser`'s to accept or refuse under either encoding —
-which is what §5.1 means by the string rule being the whole interface.
-
-The index is deliberately **not total over the registered host types**, and what it excludes is every class
-the family is not a function of. `mac`, `email` and `regex` read to `String`, so a `String` component cannot
-say which of them (or `text`) it meant: the host class does not determine the family, picking one would be a
-guess, and a position wanting those needs a schema to say so — which is what §5–§8's decode is for. The CIDR
-pair is the same fact from the other direction: `cidr4` and `cidr6` have a host
-type each (`CidrInet4Network`, `CidrInet6Network`), so a component naming one is answered here, and only the
-sealed `CidrNetwork` supertype — which is genuinely ambiguous — stays out. The numeric families are excluded on a
-different ground and one that matters more here: they read from a JSON **number**, so admitting them to a
-*string*-content index would let a class declaring `BigInteger` turn `"123"` into one and overrule the
-encoding's own kinds.
-
-`SourcePosition`'s bridge could not travel: it names `tson-compiler`'s own `Position`, so that engine keeps
-it in `config.ResolverBindContext`, applied on top of the shared list. The split is by what needs it — the
-shared list is what a consumer's classes bind, the addition is what binding this library's own schema model
-needs.
-
-## What this is for, and what it constrains
-
-The target is an **on-ramp**: someone holds a JSON Schema or an OpenAPI contract, converts it to a TSON
-schema, and their existing JSON documents validate against it **unchanged**. Not "JSON that has been adjusted
-for TSON" — the documents already in flight, byte for byte. That is the test the encoding has to pass before
-any of its other virtues matter, because a format that asks a producer to change first has already lost the
-audience it was converting for. §1.3's principle 2 is the same commitment from the spec's side: the common
-case encodes to JSON "with no TSON-specific apparatus at all".
-
-The goal is a real constraint, not a slogan: it decides what a converted schema may contain. A converter that
-emits a schema outside the profile below produces one whose documents have to be rewritten, which is the one
-outcome the exercise exists to avoid.
-
-### What a converted schema will not contain
-
-Each of these is a shape TSON has and a converted schema cannot reach — either because JSON Schema has no
-source for it, or because reaching it would break documents already on the wire.
-
-- **Non-text map keys.** JSON Schema's `additionalProperties`/`patternProperties` are string-keyed, so
-  `{K => V}` with a compound `K` never arises. §6.4's **pairs form is therefore unreachable**, and with it one
-  of the two kinds [TSON-SCHEMA] §5.4 gives no discrimination class (§8.3).
-- **Annotations on data values.** No JSON carrier exists (§4.3) and JSON Schema has no source for one, so the
-  encode-side refusal never fires on a converted schema's data. It is `JsonObjectWriter`'s, for values bound from the
-  text encoding, and `strippingAnnotations()` is the explicit configuration that drops them instead.
-- **Approximate atoms admitting the special values.** `.nan` and the infinities encode as JSON *strings*
-  (§5.4) and no JSON document carries one, JSON having no spelling for them. A converted `type: number`
-  should narrow `allow_nan`/`allow_infinity` to false, which keeps the float's number class ([TSON-SCHEMA] §5.4),
-  so a choice listing it can be disjoint and take §8.2's untagged route.
-- **Declared positions.** `declared` requires an annotation object naming the type (§5.7, §8.5), which
-  existing JSON does not carry. `additionalProperties: true` converts to the recursive `json` choice of §5.7,
-  which is tag-free, never to `declared`.
-- **In-band root binding.** Existing JSON has no `$import`/`$type`, so the root binds by §3.4's out-of-band
-  route — "the expected production route" in the spec's own words — through `Json.withSchemas` and
-  `tson validate --schema --type`.
-
-And three shapes that look like they belong on that list and do not: **tuples** convert from `prefixItems` and
-are ordinary JSON arrays; **defaults** convert and inject on decode (§6.1.3), so a document omitting a
-defaulted member reads; and **a member name that is not an identifier** — JSON-LD's `@type`, JSON Schema's `$ref` —
-is a field name under the record's name type ([TSON-SCHEMA] §5.2): the converter declares the profile its names
-need, `json_name => !unicode.identifier_type { start_add: "@$" }`, once on a fieldless abstract base its records compose,
-and the names are judged under it with full hygiene. None is friction for the producer.
-
-### Where the on-ramp actually breaks
-
-These are the ones that cost a producer a change, ordered by how often real JSON hits them. They are the
-work.
-
-1. **Records are closed and JSON Schema's are open.** `additionalProperties` defaults to *true*, so a
-   converted record fails §6.1.1 on the first document carrying an extra member. There is no flattened tail
-   to relax it (§7.2): open-ended data is a declared map-typed field, which the producer
-   must nest. This is the largest producer-visible cost of a conversion and §6.1.1 states it outright.
-2. **An untagged `oneOf` over object schemas.** All brace class, so non-disjoint; with no OpenAPI
-   `discriminator` there is no in-band selector, and §8.2 requires the tag. JSON Schema validates such a union
-   by *trying each branch*, which §8.2 forbids in as many words ("no trying variants in order"). Existing
-   documents carry nothing to dispatch on, so this is a genuine wall: the converter finds a discriminator or
-   reports. A `oneOf` that *does* carry one converts to a sealed record family rather than to a choice —
-   §6.1.5, where member dispatch lives — which is the shape the contract already had.
-3. **Enum members must be identifiers.** `"in-progress"` converts; `"not found"` does not. The fallback is a
-   `text` refinement with a pattern, which costs the enum its discrimination class and so costs §8.2's untagged
-   route a variant it could have dispatched on.
-4. **Required-but-nullable converts; a pin beside null does not.** `required: [x]` beside `type: [X, "null"]`
-   is `x: X?` — each keyword decides one mark (§7.3). What has no spelling is `const` or a one-member `enum`
-   beside null, a pin on a voidable type. Drop-with-report, per the companion note's list D.
-5. **`format` becomes binding.** JSON Schema's `format` is advisory; the atom it converts to is not. A
-   document that passed with a malformed `format: email` value fails here. That is the point of converting and
-   still a change of behaviour, so a converter should say so rather than let it surface as a first-request
-   failure.
+Related: `design/json-lexer-stream-tree.md`, `design/json-schema-directed-reading.md`,
+`design/json-facades-binding-writing.md`, `design/json-unicode-policies.md`, `design/modules.md`,
+`design/cli-config-hashing.md`, `design/readers-and-diagnostics.md`.
 
 ## A stack of its own
 
-`tson-json` does not build on `tson-compiler`'s `TsonEventSource`. The
-argument for doing so is real — the compiled reader stack consumes that contract, so an encoding emitting those
-events would reuse resolution, linking and every compiled reader unchanged. Two disagreements between the
-formats defeat it, and both are the shape of the JSON-superset claim Revision 35 withdrew ([TSON-DATA] §1.1,
-§6): a claim that looks like reuse and is paid for at every point where the two designs differ.
+Building on `TsonEventSource` would reuse resolution, linking and every compiled reader unchanged. Two disagreements
+defeat it, both the shape of the JSON-superset claim [TSON-DATA] §1.1 withdrew: reuse paid for wherever the designs
+differ.
 
-- **A brace does not say what it is.** TSON text tells a record from a map syntactically — `a: 1` against
-  `k => v` — so `TsonDataStream` emits `RecordStart`/`FieldName` or `MapStart`/`MapArrow` and each compiled
-  reader asserts which it got. JSON's `{"a": 1}` is one syntax for both, and §4.1 makes the *position* decide,
-  never inspection of the value. A pull-only event source has no channel for the position to say so, and every
-  way of giving it one — a hint call, a schema-walking stream, readers that accept either shape — puts the
-  JSON encoding's problem inside the TSON reader stack.
-- **`null` is two things.** In a plain JSON tree it is a value, and JEP 540 has a `JsonNull` for it. Under a
-  schema it is the void sentinel and nothing else (§7). Mapping it to `VoidEvent` in the event layer
-  settles that question one layer too early, and forces the schemaless reading to inherit a schema's answer.
+- **A brace does not say what it is.** TSON text tells a record from a map syntactically, and each compiled reader
+  asserts which event it got. JSON's `{"a": 1}` is one syntax for both and §4.1 makes the *position* decide. Every way
+  of giving a pull-only source that channel — a hint call, a schema-walking stream, readers accepting either shape —
+  puts the JSON encoding's problem inside the TSON reader stack.
+- **`null` is two things**: a value in a plain JSON tree (JEP 540's `JsonNull`), the void sentinel under a schema (§7).
+  Mapping it to `VoidEvent` settles that one layer too early and makes the schemaless reading inherit a schema's answer.
 
-So: `tson-json` has its own lexer, its own structural layer, its own tree, and its own readers.
+**Above the schema the argument does not reach, so sharing there is deferred, not refused.** A compiled reader *is*
+the position, so one compiled schema over an encoding-neutral read context, with the encoding pushed into a source the
+reader drives, is a real design (TSON text's `EmptyBraceEvent` is the precedent, [TSON-DATA] §2.8). It is not taken
+because it would be designed from one implementation: the seam is found from two working stacks, and merging two
+passing implementations is cheap where unpicking a wrong shared contract is not (`BACKLOG.md`).
 
-## All the way up, and the seam is deferred rather than chosen
+**Tree mode hands back JSON.** Tree mode answers *does this document conform*, bind mode *give me the value*;
+converting an encoding is a third operation, which a `TsonValue`-producing read would disguise as the first. The read
+runs each family's parser (§5.1) and discards the host value, so a clean tree read cannot show what `date` parsed;
+`atoms()`, §5's vocabulary with no mode over it, is what `JsonAtomReadTest` compiles against to see it.
 
-The schema-directed half of §5–§8 is `tson-json`'s own on the same terms: `JsonTypeReader`,
-`JsonCompiledSchema`, `JsonSchemaCompiler` and its own factory registries, beside `tson-compiler`'s rather
-than derived from them.
+## The parity guard
 
-**The argument against the two disagreements above does not reach this layer, and that is worth saying
-plainly** — because it is the reason this decision is a deferral rather than a conclusion. Both defeat a
-*shared event source*, and both do so for one reason: a pull-only stream has no channel for the position to
-speak. Above the schema that reason is gone. §4.1 makes the position decide, and a compiled reader **is** the
-position — a record reader knows it is reading a record, a map reader a map, a reader at a `void` position
-knows what `null` means there. The codebase already contains the precedent: TSON text's `{}` reaches the
-reader as `EmptyBraceEvent` and is resolved from the position ([TSON-DATA] §2.8), not guessed at by the
-stream. So a single compiled schema over an encoding-neutral read context, with the encoding pushed down into
-a source the reader drives, is a real design and stays available.
+Two copies of the field rules can drift, and §9.4 makes one verdict across encodings an obligation. That needs
+checking, not shared code (`CrossEncodingParityTest`'s Javadoc); a local test, because the corpus cannot state a fact
+about two encodings.
 
-It is not taken now because it is an abstraction designed from one implementation. The seam between what two
-encodings genuinely share and what each owns is worth **finding** from two working stacks, not guessed at
-from one and then discovered wrong through the one consumer that has to bend around it. Consolidating two
-implementations that both pass their tests is cheap and safe; unpicking a shared contract that was wrong is
-neither. The same discipline settled `@rest`: rather than build a directive no consumer had shaped, it was
-retired (§7.2), and a member matching no declared field is §6.1.1's closure error in both
-encodings. Member dispatch over a sealed record family is built (`DispatchMemberReader`), reading the
-discriminator fields the base record declares (§5.2).
+- **Scope is what is written twice**: closure, duplicate members, §5.2's field states, injection, the FIXED check,
+  group multiplicity, container size and arity. Not the atom vocabulary — `tson-atom` is one implementation both call,
+  and asserting it here would test shared code twice.
+- **The codes most easily given differently** are what it pins: a size facet is a constraint code, never
+  `TYPE_MISMATCH`; an absent element or tuple slot is `FIELD_REQUIRED`. Where the two disagree the JSON reader moves:
+  the TSON side is the incumbent of one closed vocabulary.
+- **Both ways**: a disagreement may be the incumbent's defect (value identity was: both stacks' `ValueIdentity` keep
+  scale outside the value, [TSON-SCHEMA] §5.5, §5.3). A defect is fixed where it is; pinning it as agreed makes it
+  permanent.
+- **One divergence is by specification and asserted as one**: `name: 42` at a `text` field is a token `text` accepts
+  in TSON text, a number kind §5.6 refuses in JSON. §5.1 makes which kinds reach a parser each encoding's own (all of
+  `AtomForm`); pinning it stops a later change "fixing" it into agreement.
 
-**It also costs nothing structurally, which is what makes the deferral free.** `TsonLinkedSchema` is a record
-in `tson-schema`, a module requiring only `tson-base`, and `tson-atom` already re-exports it — so compiling
-JSON readers from a linked schema adds **no dependency at all**, and in particular no dependency on
-`tson-compiler`. The resolve → link → register pipeline that *produces* a linked schema is `tson-compiler`'s
-and stays there; what crosses to this module is its output, which is a value model.
+## One configuration, one atom vocabulary
 
-### Tree mode hands back JSON, and that settles what a schema-directed read is for
+The configuration is a `tson-base` value and construction is not: nothing about the *settings* is an encoding's.
+Its schema access does not reach `Json`, by division of labour: resolving schema text is the TSON engine's, so `Json`
+takes resolved schemas through `withSchemas(TsonSchemaLoader)`. `Json` keeps JEP 540's static `parse`/`toDisplayString`
+because a consumer arriving from the JDK's API should find them; `Tson` keeps `resolve`, `validate` and the registries.
 
-A schema-directed tree read produces a `JsonValue`, never a `TsonValue`. The read runs each family's parser —
-which **is** the validation, [TSON-JSON] §5.1's contract boundary applied — and then discards the host value
-it produced. `tson-cli` validating a JSON document against a TSON schema is the caller this exists for, and it
-keeps only the diagnostics.
+Both front doors' defaults start from `AtomContext`, because §5.1 hands a string's content to the atom's own parser as
+a TSON quoted token's text would be: which families a reader binds is the type system's property, not the encoding's,
+and a `UUID` component must not be a scalar at one door and taken apart at the other. The conversion is the family's,
+through `HostAtoms` (`design/json-facades-binding-writing.md`).
 
-That is not a limitation worked around; it is what the two modes are *for*. Tree mode answers **does this
-document conform**, and the answer is the diagnostics plus the document. Bind mode answers **give me the
-value**, and a class is what says what to build. Converting an encoding is a third operation and belongs to
-neither. A `TsonValue`-producing JSON read would be that third thing wearing the first one's clothes.
+## The on-ramp, and what it constrains
 
-It also keeps the JEP 540 alignment true of the whole module rather than only its schemaless half, and it
-keeps `TreeAtomReader` trivial: peek the event, let the family's reader consume and judge it, hand back
-the node the document carried.
+The target: a JSON Schema or OpenAPI contract converted to a TSON schema, against which the documents already in
+flight validate byte for byte (§1.3's principle 2) — a format that asks the producer to change first has lost the
+audience it was converting. So the goal decides what a converted schema may contain.
 
-**What it costs is one kind of test.** With the host value discarded, "did `date` really parse this?" is
-unobservable from a clean tree read — the evidence is only the diagnostic on a *bad* value. So
-`ValueReaderFactoryRegistry.atoms()` stays: §5's vocabulary with no mode over it, which is what
-`JsonAtomReadTest` compiles against to assert what each parser produced. It is what the modes are built over,
-not a mode of its own.
+**What a converted schema will not contain**, each because JSON Schema has no source for it or reaching it breaks
+documents on the wire:
 
-### The risk this keeps, and the guard that holds it
+- **Non-text map keys** — JSON Schema keys are strings, so §6.4's pairs form is unreachable.
+- **Annotations on data values** — no JSON carrier (§4.3); `JsonObjectWriter` refuses them unless
+  `strippingAnnotations()`.
+- **Approximate atoms admitting the specials** — no JSON document carries `.nan`; a converted `type: number` narrows
+  `allow_nan`/`allow_infinity`, keeping the number class so a choice listing it can stay disjoint (§8.3).
+- **Declared positions** — `declared` needs an annotation object (§8.5); `additionalProperties: true` converts to §5.7's
+  tag-free `json` choice.
+- **In-band root binding** — existing JSON has no `$import`/`$type`; the root binds out of band (§3.4), through
+  `Json.withSchemas` and `tson validate --schema --type`.
 
-Two copies of the field rules — §5.2's spellings read through `RecordField`'s facts, injection, the FIXED check,
-duplicate members, closure — can drift apart, and [TSON-JSON] §9.4 makes one diagnostic vocabulary across both
-encodings a **specification obligation** rather than a tidiness. Duplication here does not cost maintenance
-so much as it costs the guarantee that one schema yields one verdict over both encodings.
+Not on it: tuples (plain arrays), defaults (§6.1.3), and a member name that is no identifier (`@type`, `$ref`), a
+field name under a declared name type ([TSON-SCHEMA] §5.2).
 
-That guarantee does not need shared code. It needs to be checked, and to go red when it breaks:
-`CrossEncodingParityTest` is one schema, the equivalent document in TSON text and in JSON, asserting the same
-`Diagnostic.Code` and the same RFC 6901 pointer into the data — the two components a consumer routes on, never
-the message, which is each reader's own prose. A local test rather than a corpus vector, because the corpus has
-no way to state a fact about two encodings at all.
+**Where the on-ramp breaks**, costing a producer a change, most frequent first:
 
-**What it pins are the codes two readers most easily give differently**: a size-facet violation is a constraint
-code and never `TYPE_MISMATCH`, and an absent element or an absent tuple slot is `FIELD_REQUIRED`. Where the two
-disagree the JSON reader is the one that moves — the TSON side is the incumbent, and one closed vocabulary means
-the newcomer conforms.
-
-**Its scope is the rules that are actually written twice**, and the boundary is worth stating because it is not
-obvious. The field-state machine is duplicated: closure, duplicate members, §5.2's six states, injection, the
-FIXED check, group multiplicity, container size and arity. The **atom vocabulary is not** — `tson-atom` is one
-implementation both encodings call, so its acceptance sets and its split between contract rejection and
-constraint violation cannot drift, and asserting them here would test the shared code twice.
-
-**The guard runs both ways: a disagreement may be the incumbent's defect.** Value identity is the case the suite
-carries — [TSON-SCHEMA] §5.5 and [TSON-JSON] §5.3 both put scale outside the value, so both stacks' `ValueIdentity`
-compare the exact tier without it: a `number`-keyed map takes `1` and `1.0` as one key, a `set` of `number` as one
-element, and a field `= 1.0` admits a document writing `1`. A disagreement that is a defect is fixed on the side
-that has it and never pinned as expected divergence — pinning a defect as agreed behaviour is how it becomes
-permanent.
-
-**Between those two sits one legitimate divergence, and the test asserts it as a divergence.** JSON has six
-value *kinds* where TSON text has tokens: `name: 42` at a `text` field is the unquoted token `42`, whose
-content `text`'s contract accepts ([TSON-DATA] §5.2), while JSON's `42` is of the number kind and §5.6 admits
-only strings there. Neither reader is wrong. §5.1 makes *which kinds reach a family's parser* each encoding's
-own — it is the whole of what `AtomForm` decides — so this difference is by specification, and pinning it
-is what stops a later change quietly "fixing" it into agreement.
-
-## Packages
-
-Three exported, layered the way the module reads a document, and the split is the one `tson-compiler` and
-`tson-tree` already draw between a front door, a value model and an engine:
-
-| Package | Holds |
-|---|---|
-| `io.ltr8.tson.json` | `Json` (the front door); `JsonTreeReader`, `JsonObjectReader`; `JsonTreeWriter`, `JsonObjectWriter`, `JsonDataEmitter`; `JsonReadContext`, `JsonPosition`, `JsonSchemaLocation`, `JsonDiagnostics`; the schema-directed surface — `JsonTypeReader`, `JsonCompiledSchema`, `JsonCompiledSchemaRegistry`, `JsonSchemaCompiler` |
-| `io.ltr8.tson.json.tree` | `JsonValue` and its six node types, `JsonText`, plus `JsonValueException` |
-| `io.ltr8.tson.json.stream` | `JsonEvent`, `JsonEventSource`, `JsonStream` |
-| `io.ltr8.tson.json.reader` | internal — the two schemaless engines (`SchemalessTreeReader`, `DataClassObjectReader`); the schema-directed readers, the mode-free container loops, each over a plan and handing its slots to the mode's builder (`RecordReader`/`RecordPlan`, `ArrayReader`/`ArrayPlan`, `TupleReader`/`TuplePlan`, `MapObjectReader`/`MapPairsReader` over a `MapPlan` with `MapEntries`; `Tree*Builder`/`Bind*Builder` for each), `TreeAtomReader`, `BindTargets` binding a position to a component, `BridgedReader`, and `Slots`' markers; the dispatchers every mode shares (`DispatchFactories` over `DispatchTagReader`/`DispatchMemberReader`, `DispatchChoiceReader`, with `Route` and `ExactReader`), the extern boundary (`ExternReader`, `ForeignScope`, `ScopeCrossing`) with `AtomReader`, `AtomForm`, `VoidReader`, `DeferredTypeReader`, `ParametricRecordReader`, `ErrorReader`; the factory registries (`ValueReaderFactory`, `ValueReaderFactoryRegistry`, `ValueReaderFactoryResolver`, `ValueReaderContext`, `TypeReaderResolver`, `CompiledReaders`); and what they share — `TagMembers`, `Tags`, `NameHygiene`, `AliasChain`, `DiscriminationClass`, `ValueIdentity`, `FieldValue`, `Nodes`, `EventSkip` |
-| `io.ltr8.tson.json.writer` | internal — the two write engines, `TreeValueWriter` and `DataClassObjectWriter` |
-| `io.ltr8.tson.json.atom` | internal — `JsonAtoms`: one JSON leaf into one host value at a bound class's atom position |
-| `io.ltr8.tson.json.lexer` | internal — `JsonLexer`, `JsonToken`, `JsonTokenType`; a consumer names a value, an event or a reader, never a token or a parser |
-
-`tree` is the JSON counterpart of `io.ltr8.tson.tree` and stands in the same relation to its front door:
-`Json.parse` returns a `JsonValue` as `Tson`'s tree reader returns a `TsonValue`. `JsonObjectReader` sits
-in the front door beside `Json` for the same reason `TsonObjectReader` sits beside `Tson` — a reader is a
-front door, not a layer of one; the two writers sit there on the same terms, over the unexported `writer`
-package's engines. `atom` is unexported and holds the schemaless bind path's leaf conversion: §5.1 hands a
-string's content to the atom's own parser exactly as a TSON quoted token's text would be, which does not belong
-in a reader that walks structure. The schema-directed peer is `reader`'s `AtomReader`. `stream` is exported for
-the reason `tson-compiler` exports its own — `Json.parse` takes a `JsonEventSource`, so it is a real contract
-rather than an internal dispatch type, and JEP 540 excludes streaming as a non-goal, so a caller who needs it
-has nowhere else to go.
-
-The rendering lives on `JsonValue.toDisplayString(indent)` rather than only on `Json`, because the string
-quoting it needs is `tree`'s and package-private there. `Json.toDisplayString(value, indent)` is JEP 540's
-spelling of the same call and delegates.
+1. **Records are closed, JSON Schema's open** (`additionalProperties` defaults true): the first extra member fails
+   §6.1.1, and open-ended data must nest under a map-typed field. The largest producer-visible cost.
+2. **An untagged `oneOf` over objects**: all brace class, so not disjoint, and §8.2 forbids trying branches. The
+   converter finds a discriminator (a sealed family, §6.1.5) or reports.
+3. **Enum members must be identifiers**: `"not found"` falls back to a patterned `text`, losing a discrimination class.
+4. **A pin beside null has no spelling**: `const` or a one-member `enum` beside `"null"`; required-but-nullable
+   converts (`x: X?`, §7.3).
+5. **`format` becomes binding**: advisory in JSON Schema, an atom here, so a converter should say so.

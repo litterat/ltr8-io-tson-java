@@ -80,8 +80,6 @@ here; they are `BACKLOG.md`'s ("The rest of [TSON-DATA] §9.1's resource limits"
   declaration's syntax error in one pass, but a schema whose first problem is an unterminated multi-line token
   reports one and stops. Recovery is harder to justify here than in the parser — an unterminated token leaves
   no reliable boundary to resume on — so this wants a specific case that bites before it becomes work.
-- [ ] **The FIXED identity-diagonal invariant** (a restated fixed field's value must
-  not change) is never checked. `design/schema-resolution.md` records it as a deferred design question.
 
 ### Tier 1.5 — validate-and-rewind at structural boundaries
 

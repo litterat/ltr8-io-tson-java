@@ -87,8 +87,8 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   holding no value) stay distinct kinds.
 - **A name read with no schema is a `TsonAtom`**: a schemaless read cannot tell a name from any other token, and
   what a name names is a closure's question, which a schemaless read has none of. Under a schema a reference-typed
-  position delivers the schema model's `TypeRef`, whose `referent()` answers it (`design/references.md`,
-  `design/facades-and-tree.md`); the tree has no node of its own for it because `tson-tree` depends on nothing.
+  position delivers the schema model's `TypeRef`, whose `referent()` answers it (`design/references.md`); the tree
+  has no node of its own for it because `tson-tree` depends on nothing.
 - **There is one no-value node, `TsonVoid`, because there is one no-value spelling**: the `_` sentinel. A read that
   failed leaves no node at all — every read is all-or-nothing — so a `TsonVoid` in a tree always means the document
   wrote `_`. `null` is not one — §4 resolves boolean, number and string, so the unquoted token is a `TsonAtom` holding

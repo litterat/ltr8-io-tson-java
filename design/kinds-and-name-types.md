@@ -52,7 +52,7 @@ is why they are the linker's. Current form only; history lives in git.
   its duplicate check is two spellings that are one value of the record's name type, and nothing else.
 - `enumForms` and `nameTypes` are recorded on `TsonLinkedSchema` because no reader can recompute them.
 
-Related: `design/linking-and-compilation.md` (the link order), `design/references.md` (which slot is typed by a kind),
+Related: `design/linking-and-compilation.md` (the link order), `design/references.md` (what a reference's `of` decides),
 `design/name-hygiene.md` (the per-name rules a name type's profile feeds),
 `design/namespace-types-and-value-entries.md`.
 
