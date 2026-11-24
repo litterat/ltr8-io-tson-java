@@ -27,19 +27,19 @@ and net.tn, each with its instances at its root and its constructors under its m
 kernel's `numeric` and `net`); core.tn, importing the three and
 declaring the author annotations; and policy.tn) plus, in `spec/fixtures/`, their non-normative `*-resolved.tn`
 resolver-output fixtures (`meta-resolved.tn`, `numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn`,
-`core-resolved.tn`). On `main`, treat Parts 1 and 2 in `spec/` as a cache of the published revision, not a source of
-truth — with **two** standing exceptions. The six `.tn` schemas are **packaged from here at build time**, so they are
-the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in place**: see "Part 3 is drafted
-here" below.
+`core-resolved.tn`). Treat `spec/` as a cache, not a source of truth — with **two** standing exceptions. The six `.tn`
+schemas are **packaged from here at build time**, so they are the live copies rather than a snapshot. And
+**`spec/tson-part3-json.md` is editable in place**: see "Part 3 is drafted here" below.
 
-On `main` the bundled schemas carry **Revision 39 identities** (`https://tson.io/2026/39/m/*.tn`); on
-`r2026-40-proposal` they carry Revision 40's (`/2026/40/m/`). On `r2026-40-proposal` all three parts are
-**Revision 40's proposed text, edited in place**, with `spec/tson-rev40-changelog.md` recording the change in the
-form of the revision change logs before it: `git diff main -- spec/` is the proposal, section numbers stay stable
-because the code cites them, and every example is one the implementation accepts. §13.2's Guide row stays at the
-revision that document actually is. **§13.2 is one more pin to move** whenever the artifacts change.
-`scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins — so §13.2 is
-re-stamped by hand and is the one that silently drifts.
+On `main` the bundled schemas carry **Revision 40 identities** (`https://tson.io/2026/40/m/*.tn`); a proposal
+branch carries the next revision's from its first commit. `spec/` holds **Revision 40** of Parts 1 and 2, a cache,
+not edited here except for §13.2's artifact rows, so the table names the bytes beside it and stays checkable; its
+Part 1 and Guide rows stay at the revision those documents actually are. On a proposal branch all three parts are
+the next revision's proposed text, edited in place, with a change log beside them in the form of
+`spec/tson-rev40-changelog.md`: `git diff main -- spec/` is the proposal, section numbers stay stable because the
+code cites them, and every example is one the implementation accepts. **§13.2 is one more pin to move** whenever the
+artifacts change. `scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins —
+so §13.2 is re-stamped by hand and is the one that silently drifts.
 `tson hash spec/m/<name>.tn` is the check.
 
 The bundled schemas are the kernel's own statement of its shape. What the resolver derives rather than reads
@@ -104,20 +104,21 @@ carry none of them.
 
 ## Branches and revisions
 
-**`main` is the reference implementation of the published revision, which is Revision 39.** Each published
-revision's implementation stays reachable at the point it was the whole of `main`, by tag: `r2026-32`,
-`r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`, `r2026-38` — tagged before the next proposal merges, and in the corpus
-repo too where the pair is wanted. The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a
-sibling corpus branch of the same name and `SUITE_PIN` following it — where the register's entries state what is
-*running* rather than what is *proposed*, the branch being the argument. It merges when the spec lands and not before, since
-merging a divergence early costs `main` the one signal it exists to give. The bundled schemas carry the
-revision's own identities from the start, so a content change lands on artifacts named for the revision
-proposing it rather than being re-identified at the end.
+**`main` is the reference implementation of the published revision, which is Revision 40.** Each published revision's
+implementation stays reachable at the point it was the whole of `main`, by tag: `r2026-32`, `r2026-34`, `r2026-35`,
+`r2026-36`, `r2026-37`, `r2026-38`, `r2026-39` — tagged before the next proposal merges, and in the corpus repo too
+where the pair is wanted. The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling
+corpus branch of the same name and `SUITE_PIN` following it — where the register's entries state what is *running*
+rather than what is *proposed*, the branch being the argument. It merges when the spec lands and not before, since
+merging a divergence early costs `main` the one signal it exists to give. The bundled schemas carry the revision's own
+identities from the start, so a content change lands on artifacts named for the revision proposing it rather than being
+re-identified at the end.
 
-**The open proposal is `r2026-40-proposal`**, with its corpus twin. It carries the Revision 40 identities and version
-`0.40.0-SNAPSHOT` from its first commit. Proposal work lands through PR branches off it; work Revision 39 can carry
-still lands on `main`, which the proposal merges in to keep up. While it is open, `Closes #N` in a PR into it does not
-close the issue (GitHub fires it only on the default branch), so each is closed by hand.
+**No proposal is open.** The next, `r2026-41-proposal` with its corpus twin, opens when work the published revision
+cannot carry starts, and carries the Revision 41 identities and version `0.41.0-SNAPSHOT` from its first commit.
+Proposal work lands through PR branches off it; work the published revision can carry still lands on `main`, which
+the proposal merges in to keep up. While one is open, `Closes #N` in a PR into it does not close the issue (GitHub
+fires it only on the default branch), so each is closed by hand.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** The spec is a working
 revision, this is its first implementation, and the artifact has no published releases and no remote

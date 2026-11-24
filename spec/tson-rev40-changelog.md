@@ -1,7 +1,7 @@
 ---
 title: "TSON 2026 Revision 40 — Change Log"
 against: "TSON 2026 Revision 39 (Working Draft)"
-status: "Proposed, not adjudicated. The six normative artifacts and five resolved fixtures are at `/2026/40/` identities, each pin verified over the shipped bytes and listed in Part 2 §13.2 (§6). Parts 1, 2 and 3 are revised against them (§3.1, §3.2, §3.4); the Developer Guide is revised with them and referenced at `/2026/40/`. A verification pass over the examples and the build is recorded in §7."
+status: "Adjudicated 2026-11-24. The six normative artifacts and five resolved fixtures are at `/2026/40/` identities, each pin verified over the shipped bytes and listed in Part 2 §13.2 (§6). Parts 1, 2 and 3 are revised against them (§3.1, §3.2, §3.4); the Developer Guide is revised with them and referenced at `/2026/40/`. A verification pass over the examples and the build is recorded in §7."
 inputs:
   - "SPEC-FEEDBACK.md, the register against Revision 39, published with this revision as its close-out record (§2): entries #1–#9 registered before the revision answered them, and #10–#21 written up at its close for the design changes made in its text without a register entry"
   - "Revised companion artifacts at /2026/40/ identities: the six bundled schemas and five resolved fixtures (§1)"

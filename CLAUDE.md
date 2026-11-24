@@ -42,15 +42,14 @@ consumer-facing `README.md`, `STATUS.md` (the implemented checklist) and `CONFOR
 A from-scratch Java implementation of TSON (Typed Schema Object Notation), built directly against the TSON spec series
 (2026 revision), and the spec's first implementation:
 
-- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/39/tson-part1-data.md
-- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/39/tson-part2-schema.md
+- Part 1 — lexer, structural grammar, base type resolution, built-in types: https://tson.io/raw/2026/40/tson-part1-data.md
+- Part 2 — schema grammar, type system, resolution, linking, compilation: https://tson.io/raw/2026/40/tson-part2-schema.md
 - Part 3 — the JSON encoding, **drafted in this repo**: `spec/tson-part3-json.md`
 
 The spec is a working revision that changes without compatibility guarantees. When in doubt, **re-fetch the current URL**
-and check the revision number rather than trusting a cached copy. On this branch `spec/` holds **Revision 40's proposed
-text, edited in place**: Parts 1, 2 and 3, with `spec/tson-rev40-changelog.md` recording the change, so
-`git diff main -- spec/` is the proposal. `spec/m/{meta,numeric,temporal,net,core,policy}.tn` are packaged from here at
-build time.
+and check the revision number rather than trusting a cached copy. `spec/` is a cache of Parts 1 and 2 (Revision 40, not
+edited here) with **two exceptions that are live**: `spec/m/{meta,numeric,temporal,net,core,policy}.tn` are packaged
+from here at build time, and `spec/tson-part3-json.md` is edited in place.
 
 **Editing a bundled schema means re-stamping.** The library verifies the packaged bytes against
 `TsonBundledSchemas`' digests on every load, so one stale constant fails `Tson.standard()` and most of the suite.
@@ -58,12 +57,12 @@ build time.
 table in `spec/` is the one pin it does not write. Keep `spec/fixtures/*-resolved.tn` in step — `ResolvedFixtureTest`
 checks them. `design/process.md` has the procedure, and the rules for what a schema's `@doc` may say.
 
-**Branches.** `main` is the reference implementation of the *published* revision (39): identities `/2026/39/m/`,
-version `0.39.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`,
-`r2026-38`), each added when the next revision merges. **`r2026-40-proposal` is open**, with a corpus branch of the
-same name, for work the published spec cannot carry; it carries Revision 40 identities (`/2026/40/m/`) and version
-`0.40.0-SNAPSHOT`, and merges when the spec lands and not before. Proposal work branches off it and PRs into it; work
-Revision 39 can carry still goes to `main`. Check the branch before quoting identities or the version.
+**Branches.** `main` is the reference implementation of the *published* revision (40): identities `/2026/40/m/`,
+version `0.40.0-SNAPSHOT`. Published revisions are tags (`r2026-32`, `r2026-34`, `r2026-35`, `r2026-36`, `r2026-37`,
+`r2026-38`, `r2026-39`), each added when the next revision merges. **No proposal branch is open.** Work the published
+spec cannot carry opens `r2026-41-proposal`, with a corpus branch of the same name, carrying Revision 41 identities and
+version `0.41.0-SNAPSHOT`; it merges when the spec lands and not before. Proposal work branches off it and PRs into it;
+work the published revision can carry still goes to `main`. Check the branch before quoting identities or the version.
 `design/process.md` has the procedure.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** No published releases, every version

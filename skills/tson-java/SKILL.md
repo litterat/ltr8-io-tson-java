@@ -610,8 +610,8 @@ outstanding work, `SPEC-FEEDBACK.md` the spec issues open against Parts 1 and 2,
 
 ## Specification
 
-- Part 1 — Text Data Format: https://tson.io/raw/2026/39/tson-part1-data.md
-- Part 2 — Type System and Schema: https://tson.io/raw/2026/39/tson-part2-schema.md
+- Part 1 — Text Data Format: https://tson.io/raw/2026/40/tson-part1-data.md
+- Part 2 — Type System and Schema: https://tson.io/raw/2026/40/tson-part2-schema.md
 - Part 3 — JSON Encoding: drafted in the repository, `spec/tson-part3-json.md`
 
 Both are working revisions and change without compatibility guarantees. Re-fetch and check the revision
