@@ -1,6 +1,7 @@
 package io.ltr8.unicode;
 
 import java.text.Normalizer;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,7 +47,9 @@ public final class Confusables {
             }
             mapping.put(Integer.parseInt(entry.substring(0, arrow), 16), target.toString());
         }
-        return Map.copyOf(mapping);
+        // Kept as the HashMap it was built in. The keys run in long consecutive blocks, which an open-addressed
+        // Map.copyOf stores as equally long runs, and a miss -- nearly every lookup -- then walks a run to its end.
+        return Collections.unmodifiableMap(mapping);
     }
 
     /**

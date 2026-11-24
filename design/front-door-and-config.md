@@ -33,8 +33,8 @@ Related: `design/facades-and-tree.md` (the readers a `Tson` hands out), `design/
 
 ## Front door: `Tson` (`tson` module) and `ProcessorConfig` (`tson-base`)
 
-A small module over `tson-compiler`, the consumer entry point. `Tson.standard()` bootstraps the six bundled schemas
-(the kernel meta.tn, then numeric.tn, temporal.tn, net.tn, core.tn and policy.tn) into a governed environment and returns an
+A small module over `tson-compiler`, the consumer entry point. `Tson.standard()` registers the six bundled schemas
+(the kernel meta.tn, then numeric.tn, temporal.tn, net.tn, core.tn and policy.tn) in a governed environment and returns an
 immutable `Tson`.
 
 ```java

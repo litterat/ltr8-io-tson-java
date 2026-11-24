@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -95,6 +96,21 @@ class TsonCompiledSchemaRegistryTest {
 
         assertInstanceOf(TsonValue.class, treeValue);
         assertEquals(new MyRecord(7), bindValue);
+    }
+
+    @Test
+    void everyCoreRegistersTheSameLinkedBundledSchemas() {
+        DataBindContext consumers = ResolverBindContext.registerAbsent(DataBindContext.builder()
+                .nameBinder(MANUAL_BINDER).registerAtoms(AtomContext.hostTypes())).build();
+        TsonSchemaRegistry one = core().schemaRegistry();
+        TsonSchemaRegistry two = TsonCompiledVocabularyRegistry
+                .withStandardLibrary(consumers, SchemaSource.registeredOnly()).schemaRegistry();
+
+        for (String id : TsonBundledSchemas.IDS) {
+            String identity = CanonicalIdentity.canonicalize(id);
+            assertSame(one.getByCanonicalIdentity(identity).orElseThrow(),
+                    two.getByCanonicalIdentity(identity).orElseThrow(), id);
+        }
     }
 
     /**
