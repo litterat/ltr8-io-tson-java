@@ -44,10 +44,10 @@ import java.util.UUID;
  * an asymmetry -- {@code BACKLOG.md}'s "Binding" section carries it.
  *
  * <p><b>What is deliberately not here</b> is anything naming a type this module cannot see. Binding the
- * <em>resolved schema model</em> needs two more registrations -- {@code schema.meta.Token}, which is one
- * token on the wire where its record shape would write {@code { text: ... form: ... }}, and
+ * <em>resolved schema model</em> needs registrations of its own -- among them {@code schema.meta.Token}, which is
+ * one token on the wire where its record shape would write {@code { text: ... form: ... }}, and
  * {@code SourcePosition}, whose bridge names {@code tson-compiler}'s own {@code Position} -- and
- * {@code tson-compiler}'s {@code config.ResolverBindContext} applies both on top of this list. The split is
+ * {@code tson-compiler}'s {@code config.ResolverBindContext} applies them on top of this list. The split is
  * by what needs them: this is what a <em>consumer's</em> classes bind, and that is what binding this
  * library's own schema model additionally needs.
  */

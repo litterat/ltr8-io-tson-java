@@ -25,7 +25,7 @@ check.
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/declared-positions.md`,
 `design/record-dispatch.md`, `design/name-hygiene-read-path.md`, `design/diagnostic-model.md` (the codes,
 `Code.verdict()`, `Code.isRefusal()`), `design/diagnostic-rules-and-messages.md`, `design/processor-policy.md`,
-`design/cli-config-hashing.md` (exit codes).
+`design/cli-config-hashing.md` (the exit-code ranking).
 
 ## Schema-side diagnostics
 

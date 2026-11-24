@@ -17,7 +17,7 @@ alignment with JEP 540 does and does not claim. Current form only; history lives
 - Nesting depth is bounded in `JsonStream` against the shared `LimitsPolicy` and refused with `LimitExceededException`,
   which stays distinct from `ParseException`.
 
-Related: `design/json-encoding.md` (rationale, packages), `design/json-schema-directed-reading.md`,
+Related: `design/json-encoding.md` (rationale), `design/json-schema-directed-reading.md`,
 `design/json-facades-binding-writing.md`, `design/json-unicode-policies.md`, `design/lexer-and-data-parsing.md` (the TSON
 text counterparts).
 

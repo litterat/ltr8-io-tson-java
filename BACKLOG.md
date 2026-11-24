@@ -369,8 +369,8 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   needs is either the digest beside each linked schema or a loader that takes the reference as written.
 
 - [ ] **The JSON reader factories share their per-entry work, and the container loops their remaining rules.**
-  Every container reads through a plan, one mode-free loop and a builder per mode
-  (`design/json-schema-directed-reading.md`). What is left of that restructure:
+  Every container reads through a plan, one mode-free loop and a builder per mode (`RecordReader`, `MapPlan`,
+  `BindTargets`). What is left of that restructure:
   - **The factory layer.** Every mode registers the same constructors from one list of parts, so one added later
     cannot be missed in one of them; and each factory is handed one per-entry record (name,
     display name, definition, schema location, the names that mean it) in place of each plan recomputing

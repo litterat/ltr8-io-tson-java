@@ -57,9 +57,7 @@ import java.io.InputStream;
  * token and that token must satisfy the atom, and any other name -- having nothing to resolve against -- is
  * {@code UNKNOWN_TYPE_REF}. {@link #preservingUnknownTypeRefs} opts out of that last rule.
  *
- * <p>Wire annotations are captured on the <b>schemaless</b> path only -- a node read that way carries its
- * own {@code annotations()} (§3.1). A schema-driven read leaves them empty for now, so a document with a
- * {@code !!import} loses them unless read through {@link #readWithoutSchema}.
+ * <p>Wire annotations are captured in both modes: a node carries its own {@code annotations()} (§3.1).
  */
 public final class TsonTreeReader {
 

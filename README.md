@@ -587,8 +587,8 @@ libraries you want: a schema importing temporal.tn alone sees `date` and no `int
 `record`, `identifier`, `type_ref` and `kind` free. The
 kernel imports nothing and applies only its own constructors, a cycle closed by pre-loading a hand-written bootstrap
 (`KernelBootstrapResolver`) rather than resolving it from a document. See
-[design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,
-including how meta.tn, numeric.tn, temporal.tn, net.tn, core.tn and policy.tn are loaded and registered together.
+[design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the invariants the
+bootstrap keeps.
 
 Vocabulary of your own — a schema declaring record types or namespace types
 (`api => !meta.namespace { key_type: meta.identifier  value_type: method }`) whose values other schemas hold as entries

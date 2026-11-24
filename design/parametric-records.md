@@ -53,7 +53,7 @@ application of one closes is `design/parametric-materialisation.md`'s. Current f
 
 Related: `design/parametric-materialisation.md` (the closing pass: identity, declared applications, closing in place,
 operands, kind, regularity), `design/desugaring-forms-over-parameters.md` (forms over a parameter inside a
-parametric record, and the bodies refused), `design/schema-resolution.md` (`parametricRecord`, marks on a parametric record),
+parametric record, and the bodies refused), `design/schema-resolution.md` (marks on a parametric record),
 `design/constructor-application.md` (construction sugar, which applies a constructor by constructing it),
 `design/references.md`.
 

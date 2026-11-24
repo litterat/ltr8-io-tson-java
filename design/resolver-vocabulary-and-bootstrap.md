@@ -1,303 +1,84 @@
-# Resolver vocabulary, alias hops, `@meta.application`, and the kernel bootstrap
+# Resolver vocabulary, alias hops, derived key annotations, checkpoints and the kernel bootstrap
 
-The facts the resolver phases share rather than own: the leaf classes (`WireForm`, `CanonicalApplication`, and the
-model's `TypeSlots`), how an alias chain is kept in resolved output and walked, the two derived key annotations, the
-checkpoints a resolution reads every value at, and the special-cased bootstrap that resolves the kernel, meta.tn,
-itself. Current form only; history lives in git.
+The facts the resolver phases share rather than own: `WireForm`, `CanonicalApplication` and the model's `TypeSlots`;
+how an alias chain is kept and walked; `@meta.application` and `@meta.completion`; the checkpoints every schema
+document's values are read at; and `KernelBootstrapResolver`, which resolves meta.tn itself. The class Javadoc of each,
+and of `WaitOrder` and `SchemaResolver.Vocabulary`, carries the mechanism.
 
 **Invariants**
 
-- There is one `WireForm`: a binding record is written by the desugarer and by construction sugar, and a second
-  opinion about what a reference or an application in a slot looks like is what makes one of them wrong. A parametric
-  record is no binding record: it is built on the model and substituted there (`Substitution`).
-- `schema.meta.TypeSlots`' switch over `Top` is exhaustive with no default arm, so a new body shape fails to compile
-  there until it says which references it holds. It tells a type slot (`TypeExpr`: may take a construction in place)
-  from a slot that holds a name alone (a map's key, a reference's `of`, an alias's target), walks into a type written
-  in place, which stays in place, and never walks a chain.
-- Nothing is named by its content: every entry has an author-written name. `CanonicalApplication` is one method,
-  `of`, the comparison §8.2 keys an application on (the applied-parent fold, a recursion closing into its declaration).
-- Resolved output states the alias chain as written; the chain collapses only where `TsonSchemaCompiler` compiles an
-  alias entry. `AliasChain` is the one walk — `ParameterTypes` keeps its own loop deliberately.
-- `@meta.application` goes on the **key** of exactly the declarations that close an application of a parametric record,
-  and `@meta.completion` on the key of exactly the declarations that complete an incomplete entry; the linker
-  re-attaches both (`withNameAnnotations`), imports included; each is read as stated on ingest, and an author writing
-  either is refused.
-- A bundled document's root holds only the vocabulary an author writes; its machinery is a member of a nested map
-  and named by its path (§9): the kernel's root is `void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`,
-  `iri_reference`, `regex`, `doc`, `enum`, `set` and `schema`, and everything else it declares is under one of six maps,
-  `meta` (the type system), `atom` (the datatype properties and `atom.specification`), `numeric`, `unicode`, `net` and
-  `binary` (the kernel's atom constructors by family); each data-format library holds its instances at its root and its
-  constructors under its map (`numeric`, `temporal`, `net`, numeric.tn and net.tn adding to the kernel's), and core.tn's
-  root holds only the author annotations. A Java literal naming a member is its path, `KernelNames.of("record")` for
-  `"meta.record"`, `KernelNames.of(KernelNames.UNICODE, "identifier_type")`, never the bare member; one naming a root entry
-  is bare (`"text"`).
-- The bootstrap hand-builds exactly the pre-loaded set — the instances and the two refinements on the kernel's one
-  wait cycle (§3.4, §3.4.1 rule 4) — before anything is read, readies `meta.type_inline` and `unicode.identifier_type`
-  with it, and makes every other
-  entry ready by `WaitOrder`, the one algorithm every schema's resolution runs. The order is the waits', never source
-  order. `KernelBootstrapResolverTest` holds the set to the measured cycle and the output to the kernel's ordinary
-  resolution in any declaration order.
-- Every value a schema document reads is read at a checkpoint of that document, in its namespace, and a read is atomic
-  within one checkpoint (below). The kernel's ordinary resolution alone reads every head through its pre-loaded
-  stand-in.
-- Only a resolution in progress links with references pending or compiles with entries pending
-  (`TsonSchemaLinker.linkReady`, `TsonSchemaCompiler.compileReady`, through `TsonCompiledSchemaLoader.compileReady`).
-  The partial link reports nothing, each entry being judged when the whole schema links; a finished schema's link
-  refuses an undeclared name.
+- **One `WireForm`**: a binding record is written by the desugarer and by construction sugar, and a second opinion
+  about what a reference or an application looks like in a slot is what makes one of them wrong. A parametric record
+  is no binding record: it is built on the model and substituted there (`Substitution`).
+- **Nothing is named by its content**: every entry has an author-written name. A sugar form is written in place at
+  its slot and an application of a parametric record closes into the declaration naming it or in place, so
+  `@meta.application` and `@meta.completion` are the only derived key annotations. `CanonicalApplication.of` compares
+  an application as a value, head and arguments past their alias hops, never as text.
+- **Resolved output states the alias chain as written** (§8.3): no pass rewrites a use site onto the end of a chain,
+  and the chain collapses only where `TsonSchemaCompiler` compiles an alias entry, its reader its target's named for
+  the alias, so `pct` over `pct => small` reads and reports as `pct`. Anything needing the end walks it and says so
+  (`TsonSchemaLinker.checkFieldValue` before a `~`/`=` value). `AliasChain` is the one walk; `ParameterTypes` keeps
+  its own loop deliberately. The bootstrap rewrites no reference either, so the two routes cannot diverge on one
+  (`BootstrapReferencesTest`); `AliasChainTest` and `ResolvedFixtureTest` pin the output.
+- **Where a declared entry might stand, a chain is walked to it.** An application through an alias of a parametric
+  record applies the parametric record, so over `bx => box` the applications `bx<text>` and `box<text>` are one
+  (`ParametricMaterialiser.parametricHead`); an alias naming a parametric record bare is no unapplied use of it. An
+  atom refinement's source written as an alias refines the instance at the end (`resolveAtomRefinement`). An
+  annotation is identified by every entry on its chain, not its end (`AliasChain.annotates`/`passesThrough`):
+  `@meta.disjoint` reaches `void`, and the linker asks whether `meta.disjoint` is on the way. An alias of a
+  constructor applies its target (§3.3.1); an alias of an incomplete entry is another name for it, so the root's
+  `set => meta.set_type` makes `set<text>` the completion of `meta.set_type`.
+- **`@meta.application` goes on the key of exactly the declarations closing an application of a parametric record,
+  `@meta.completion` on the key of exactly those completing an incomplete entry** (§6, §8.1). Key, because an
+  annotation before a declared name is about the declaration; not a `meta.type_chain` field, because it is a fact
+  about the entry, the record not stating the head it was substituted from. The linker re-attaches both at the one
+  point every entry passes through (`withNameAnnotations`), imports included; each is read as stated on ingest, and an
+  author writing either is refused (`DefinitionResolver.refuseDerivedAnnotation`). `@meta.completion`'s names are
+  text, not `meta.type_ref`: the incomplete entries are in no resolved form, and a reference would dangle at link.
+- **A bundled document's root holds only the vocabulary an author writes; its machinery is a member of a nested map,
+  named by its path** (§9). A Java literal naming a member is its path, `KernelNames.of("record")` for
+  `"meta.record"`, never the bare member; one naming a root entry is bare (`"text"`).
+- **Every value a schema document reads is read at a checkpoint of that document** — its imports and its entries
+  ready so far, each pending declaration a `PendingTypeReader` — in its own namespace, annotation names included
+  (§3.3.3). A read is atomic within one checkpoint: one reaching what its readers lack stops
+  (`PendingTypeReader.NotReady`) and reruns once the entry is ready, so its verdict is its verdict in the full closure
+  (`CheckpointSoundnessTest`). A reference and a held value order nothing (§3.4.1 rule 3): held as written, judged
+  at link.
+- **The stops are choke points, not refusal sites**: a declaration by position at its `PendingTypeReader`, a tag at
+  `EventSkip.typeRefAhead`, an annotation's name in `AnnotationCapture`, a pin no held member states in
+  `RecordMemberDispatchReader` (waiting on every declaration `FamilyJoiners` says may be the member). A hook before
+  each refusal could not be shown complete, and a new reader would have to remember it.
+- **Readers outlive the checkpoint they were compiled at**, because every fact they take from the closure is reached
+  by a name or a pin at which a read stops; they are dropped once every entry is ready (`WaitOrder.settled`), when
+  materialisation starts rewriting entries in place. A checkpoint's compile defers what may depend on what it lacks:
+  a bind mismatch is the read's that reaches the entry. The restart state is `WaitOrder`'s, one per `resolveSchema`
+  call; nothing is cached in the loader.
+- **Only a resolution in progress links with references pending or compiles with entries pending**
+  (`TsonSchemaLinker.linkReady`, `TsonSchemaCompiler.compileReady`). The partial link reports nothing, each entry
+  being judged when the whole schema links; a finished schema's link refuses an undeclared name.
+- **The bootstrap hand-builds exactly the pre-loaded set** (`KernelBootstrapResolver.PRE_LOADED`: the instances and
+  the two refinements on the kernel's one wait cycle, §3.4, §3.4.1 rule 4) and makes every other entry ready by
+  `WaitOrder`, the algorithm every schema runs. `KernelBootstrapResolverTest` measures the cycle with `WaitGraph` from
+  `spec/fixtures/meta-resolved.tn` and holds the set to it, so a kernel edit that moves the cycle fails there, and
+  `theBootstrapIsTheSameInAnyOrder` holds the output to the kernel's ordinary resolution. A pre-loaded completion
+  (`boolean => !enum […]`) is merged on the written form, since resolving its incomplete entry waits on the cycle.
+- **The kernel judges kinds and constructors with a predicate admitting every name; every other schema by each name's
+  origin** (`TsonBundledSchemas.isKernel`, meta.tn alone), so a member a user schema contributes to `meta` is no
+  kernel entry. The kernel's ordinary resolution alone reads every head through its pre-loaded stand-in.
 
-Related: `design/schema-resolution.md` (definition resolution), `design/parametric-materialisation.md` and
-`design/parametric-records.md` (the callers of `WireForm` and `CanonicalApplication`), `design/constructor-application.md`,
-`design/schema-grammar-and-desugaring.md` (sugar written in place), `design/linking-and-compilation.md`.
+**Decisions that lost**
 
-## Shared vocabulary: `WireForm`, `TypeSlots`, `CanonicalApplication`
+- A use-site flattening pass, or an `@alias` marker recording where a rewritten site pointed: §8.3 keeps the chain
+  walkable anyway, so a rewrite is a second representation to keep in step, and the marker is a lossy summary of the
+  chain (in `digest_chain => digest_alias => bytes` it records the hop that carries nothing).
+- Dropping the readers on every join: it needs no argument about what readers take from the closure, and it is
+  quadratic, 21 s against 39 ms on 2,000 payloads.
+- Reading through the declaring schema's compile: a snapshot of another closure, where a position admitting
+  subtypes admits fewer (§3.3.4's open `subtypes`) and an annotation names fewer types.
+- A `@meta.completion` chain naming the incomplete entry: it made one type two entries by spelling
+  (`design/constructor-application.md`).
 
-Leaf classes the phases share. Each owns a fact that belongs to none of them individually; stated inside whichever
-phase happens to need it first, such a fact ends up stated more than once.
-
-**`WireForm`** — how schema vocabulary is spelled as data: the vocabulary member names, the `plain`/`nameField` builders
-every producer goes through, and `refValue`, which writes a reference as a bare token; an application at a slot is
-written by `SchemaDesugarer` as the `{ of: !meta.apply { … } }` construction it is. Its producers are `SchemaDesugarer`,
-writing a sugar form's binding record (a nested construction in its `{ of: … }` wrapper, `SchemaDesugarer.slotValue`),
-and `ConstructionRewrite`, writing an applied constructor's arguments at its slots. A text slot holding `"box<T>"` is
-text whatever it spells, the slot's type and not the token's form deciding. `TsonObjectWriter` cannot build a binding
-record: its output is canonical-explicit and fully quoted, a different language from the one a binding is written in.
-
-**`TypeSlots`** (`tson-schema`, beside the model it walks) — every reference a value holds, at any depth of types
-written in place, its chain left as written. It lives in the model because `RecordBody` itself needs it: a parametric
-record scopes its parameters at every slot, and `references()` is every reference at every depth. Its other callers
-are materialisation (closing an application where it stands, a parametric record's fields only where they name none of
-its parameters), `Substitution`, `HeldRecursion`, and the declaration checks over a parametric record's types in place. No
-pass rewrites a use site onto the end of an alias chain — see "References are hops" below. A walk is a `Rewrite`:
-`atName` for a reference, which gives a name back, `inPlace` for the body of a type in place before its slots, and
-`atInPlace` for one after them, which may come back as another type. Which body shape carries which references is a
-fact about the value model, stated once, where the model is walked:
-
-- A record's field types, an array's element, a map's and a namespace type's `value_type`, a tuple's elements and a
-  choice's variants are type slots; a type written in place there is walked into, each slot inside it mapped the same
-  way.
-- A map's and a namespace type's `key_type`, a reference's `of`, an alias's target and an application's head and
-  arguments hold a name: a construction has nowhere to stand there. A chain's parents are no slot: a parametric record
-  substitutes them, and linking derives the rest.
-- Nothing in any other atom (its facets are values), a declared type, a value entry, or an extern, whose `type` is a
-  name of another schema's namespace.
-
-§5.10's regularity check does not use the walk: every entry with parameters is a parametric record, and reads its
-applications off its references (`ParametricEntry.applications`).
-
-**`CanonicalApplication`** — §8.2's canonical application, `of`: an `ApplyBody` of plain names, its arguments past
-their alias chains, compared as a value (head and arguments), never as text. The applied-parent fold keys on it, and
-the materialiser asks it whether a nested application is the one a declaration is closing. Nothing is named by it.
-
-## References are hops, not rewrites (`tson-compiler/.../TsonSchemaCompiler.java`)
-
-**There is no use-site flattening pass and no `@alias` marker.** Resolved output states the chain the author
-wrote: a type position naming an alias entry keeps that name, nothing is attached to record where it
-"really" points, and the chain stays walkable through the entries themselves.
-
-**A processor collapses the chain when it compiles readers** — after linking, once per entry, where the whole
-namespace is present. `TsonSchemaCompiler`'s alias branch is that moment: an alias entry's reader
-*is* its target's reader, resolved recursively, named for the entry doing the referring, so a use site naming
-`pct` over `pct => small` reads and reports as `pct`.
-
-- **The walk is unavoidable, which is why a rewrite is not worth its price.** §8.3 requires the chain stay
-  walkable (`alias.target` is never flattened), and several passes walk one. Rewriting the output as well
-  would leave two representations to keep in step, and an `@alias` marker recording where a rewritten site
-  pointed is a *lossy* summary of the one it duplicates — it keeps only the source-site name, so in
-  `digest_chain => digest_alias => bytes` it records the hop that carries nothing.
-- **`AliasChain` is that walk, stated once** (`resolver/AliasChain.java`). The linker's choice-variant
-  distinctness and its §5.2 field-value check, `Subsumption`'s subtype naming and `DiscriminationClass`'s
-  classification all use it, because the one decision inside — *stop at a non-reference, at an
-  **argument-bearing** target (an application, which names no entry), or on a cycle*
-  — kept in four loops is four decisions that can drift. `terminal` answers with a name, `terminalDefinition` with the entry;
-  they differ only on an undeclared name and a cycle, where the first has an answer its caller wants (a type
-  parameter is its own terminal) and the second has none. **`ParameterTypes` keeps its own loop deliberately**:
-  it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the parametric
-  record being the answer there. `AliasChainWalkTest` pins all four stops.
-- **Three positions walk a chain where a declared entry might stand.** An application through an alias of a parametric record
-  applies the parametric record (`ParametricMaterialiser.parametricHead`, `checkArity`), its identity the parametric
-  record's, so over `bx => box` the applications `bx<text>` and `box<text>` are one application; an alias
-  naming a parametric record bare is no use of the parametric record without arguments (`validateBody`'s `Alias` arm). An
-  atom refinement's source written as an alias refines the instance at the end of the chain, and its chain names that
-  instance (`resolveAtomRefinement`: `!count ^ { … }` over `count => integer` IS-A `integer`). An annotation is identified by
-  the entries on its alias chain, not by its end (`AliasChain.annotates`/`passesThrough`): `@meta.disjoint` reaches
-  `meta.disjoint` and then `void`, and the linker asks whether `meta.disjoint` is on the way. An alias of a constructor is
-  applied as its target wherever it heads a body or an application (§3.3.1): over `list => meta.array`, `!list { … }`
-  applies `meta.array` (the definition reader follows the chain and retags the value). An alias of an incomplete entry
-  is another name for it, so the root's `set => meta.set_type` makes `set<text>` the completion of `meta.set_type`.
-- **Anything that needs the chain end walks it and says so.** `TsonSchemaLinker.checkFieldValue` walks to the
-  terminal before checking a `~`/`=` value, since a field typed by an alias states a value of whatever the
-  alias names; `FieldValueConformanceTest` pins both directions.
-- **§8.3 states both halves, and the walkers are several.** A processor MAY collapse after linking, when it
-  compiles for reading, and MUST NOT collapse in resolved output. The compiler, `DiscriminationClass`,
-  `TypeInhabitance` and the linker each walk a chain. A directive on an alias is applied where the alias compiles
-  (`UseSite.named`, applied by the
-  alias entry's own compile).
-- **The bootstrap route needs no special case.** Neither it nor ordinary resolution rewrites a reference, so
-  the two cannot diverge on one (`BootstrapReferencesTest`).
-- Pinned by `AliasChainTest` — the chain stated as written, a read still reaching the end of it, and a
-  diagnostic naming the hop the author wrote — and end to end by `ResolvedFixtureTest` against the spec's own
-  `spec/fixtures/*-resolved.tn`.
-
-## The derived key annotations: `@meta.application`, `@meta.completion` (`tson-compiler/.../resolver/SchemaResolver.java`)
-
-**`@meta.application`** (§6, §8.1) goes on the key of every declaration that closes an application of a parametric
-record, the application it is the instantiation of, `@meta.application:{ head: box  arguments: [int32] }`, a value of
-`meta.apply` (`ApplyBody`), its head as written and each argument a name past its alias hops
-(`ParametricMaterialiser.asWritten`). A construction carries none, its value stating its constructor and its
-arguments. It is a fact about the entry and not about its chain -- the record does not state the head it was
-substituted from -- which is why it is no field of `meta.type_chain`. The materialiser records each application in a
-map it shares with `SchemaResolver` (the applied-parent fold keys on it), and `SchemaResolver` writes it where it
-assembles the entry map; `TsonSchema.applicationOf` is the one accessor. **It is read as stated on ingest**: it is the
-one fact the entry's value does not state. An author writing it is a resolver error
-(`DefinitionResolver.refuseDerivedAnnotation`), as writing `chain` is.
-
-- **Key position, per §6.** An annotation before a declared name is metadata *about the declaration*, and a resolved
-  schema is a `{type_name => top}` — so the marker lands on the map's key, which `TsonSchema.entries()` keeps
-  reachable through `Namespace.getAnnotations(name)`, never on the entry's value.
-- **It survives linking and the import merge**: the linker rebuilds its entry map several times and re-attaches key
-  annotations at the one point every entry passes through (`withNameAnnotations`), imports included.
-- **`@meta.completion` is its sibling** (§8.1): the incomplete entries a declared completion closed, nearest first,
-  each past its alias hops (`IncompleteEntry.bases` carries the chain; `DefinitionResolver.complete` records it). The
-  names are text, not `meta.type_ref`: the entries are in no resolved form, and a reference would dangle at link. Lost:
-  a chain naming the incomplete entry, which made one type two entries by spelling (`design/constructor-application.md`).
-- **There are exactly two.** A sugar form is written in place at its slot, and an application of a parametric record closes
-  into the declaration naming it or in place at its slot, so every entry has an author-written name and nothing else
-  marks a key.
-
-## Checkpoints (`SchemaResolver.Vocabulary`, `WaitOrder`)
-
-Every value a schema document reads -- a construction's payload, a value entry's, an annotation's value and a key
-annotation's, in bind or tree mode -- is read at a **checkpoint**: the imports and the document's entries ready so far
-(`loader.compileReady(readySoFar(…), pending, tree)`), each declaration not yet ready a `PendingTypeReader`. An entry
-joins whole, when it is ready. The value is read in the reading document's namespace, annotation names included (§3.3.3).
-
-- **A read is atomic within one checkpoint.** One that reaches what its readers lack stops (`PendingTypeReader.NotReady`),
-  the entry is made ready as a wait of the entry being made ready, and the read reruns. It never carries on with readers
-  that lack the entry, so its verdict at its checkpoint is its verdict in the full closure; `CheckpointSoundnessTest`
-  rereads every value over the corpus and the bundled schemas to hold that. A held value is held as written and orders
-  nothing (§3.4.1 rule 3).
-- **The stops are choke points, not refusal sites.** A declaration by position stops at its `PendingTypeReader`; a tag at
-  `EventSkip.typeRefAhead`, which every reader deciding by a tag reads it through; an annotation's name in
-  `AnnotationCapture`, where every one is resolved; a pin no held member states in `RecordMemberDispatchReader`, the one
-  reader placing a value by its pins, which waits on every declaration `FamilyJoiners` says may be the member. A hook
-  before each refusal could not be shown complete, and a new reader would have to remember it.
-- **Readers outlive the checkpoint they were compiled at.** Every fact a reader takes from the closure -- a position's
-  subtypes, the aliases it admits, an annotation's type, a family's members -- is reached by a name or a pin at which a
-  read stops, so keeping them across a join is sound, and a read against a type they lack compiles afresh. The one fact
-  not reached that way is an entry materialisation rewrites in place, which exists only once every entry is ready, and the
-  readers are dropped there (`WaitOrder.settled`).
-- **A checkpoint's compile defers what may depend on what it lacks** (`compileReady` alone): a bind mismatch is the
-  read's that reaches the entry, and a reader that fails to build stops first at the value's tag, then at each
-  declaration that may be a subtype of its entry, since which reader a record gets depends on its subtypes.
-- **The restart state is per resolution.** The held readers and the read in progress are `WaitOrder`'s, one per
-  `resolveSchema` call on one thread; nothing is cached in the loader.
-- **Lost: dropping the readers on every join.** It needs no argument about what readers take from the closure, and it
-  is quadratic: 21 s against 39 ms on 2,000 payloads.
-- **Lost: reading through the declaring schema's compile.** It is a snapshot of another closure, where a position
-  admitting subtypes admits fewer (§3.3.4's open `subtypes`) and an annotation names fewer types, and telling when it
-  reads alike took a guess at what the value selects.
-- **A payload is a value body exactly when its head is no constructor**: a value entry's payload is read against the type,
-  under the loader's identifier policy, and closes nothing; a construction's binding record is read under no policy
-  (`SchemaResolver`'s `ConstructionReader`, `design/namespace-types-and-value-entries.md`). The value is bound where the
-  context binds its type, and otherwise read at a tree-mode checkpoint and held as a tree.
-- **The kernel reads through itself.** Its resolution is handed the pre-loaded stand-in, which answers for every
-  name, the one cycle being closed by pre-loading (§3.4).
-
-## Kernel bootstrap (`tson-compiler/.../resolver/KernelBootstrapResolver.java`)
-
-The kernel, meta.tn (`TsonBundledSchemas.META_ID`), is special: its header is its `!!id` alone. It holds the kernel's
-one wait cycle, every name the cycle's declarations reference, closed to a fixed point, so it resolves and links on its
-own, and the concepts that belong with them: `meta.map`, `meta.tuple`, `meta.choice` and `meta.tuple_element`,
-`meta.application`, `meta.ref`, `meta.extern`, `meta.disjoint`, `set`, the octet-sequence constructor
-`binary.bytes_type` with `binary.bytes_encoding` and
-`bytes`, and the classifying annotations `atom.ordering`, `atom.bounded`, `atom.exact` and `atom.numeric` the
-data-format libraries state their types with. It is the one kernel document. Its root is the thirteen names an author
-writes (`void`, `boolean`, `integer`, `int64`, `text`, `bytes`, `iri`, `iri_reference`, `regex`, `doc`, `enum`, `set`
-and `schema`; `enum` is an incomplete entry and `set` an alias of `meta.set_type`, another, so neither is in the resolved
-form, and `schema => meta.schema` is the alias every schema map's tag names); everything else is a
-member of `meta => !schema { … }`, named by its path (§9), `meta.identifier` among them. It imports
-nothing, applies only its own constructors and declares no parametric record (§3.4's one cycle, closed by pre-loading, not
-resolution); `meta.param` and `record.parameters` describe a parametric record and are applied by none. It is never resolved
-from a document, and its names reach any other schema only by import. Every name resolves from the root (#14), so an entry
-naming a sibling writes its path, and its sugar is written in place at the fields that write it. A schema importing it
-alone has every sugar form and `meta.ref`. numeric.tn, temporal.tn and net.tn each import it alone and declare their
-constructors under a map of their own, `numeric`, `temporal` and `net`, contributing nothing to `meta`
-(`design/namespace-types-and-value-entries.md` has the open-namespace merge); core.tn imports the three. Ordinary resolution
-can't bootstrap the kernel: an instance waits on its constructor being ready, and the instances on the one wait cycle wait on
-each other, so they are built by hand (§3.4), and only the wait order over what that leaves is the algorithm every schema
-runs.
-
-`KernelBootstrapResolver.kernelSchema()` (its only public method) produces the resolved kernel under
-§3.4.1's wait order: reading a value against a type waits on the type being ready, and on each type a part
-of the value is read against as the read reaches it; a reference and a held value (a default or pin) order nothing.
-Its output is what ordinary resolution of the kernel against it produces, entry for entry and constructor for
-constructor, positions included (the bootstrap resolves with the parser's positions).
-
-- **The pre-loaded set is hand-built, and is exactly the cycle.** The instances and the two refinements on the
-  kernel's one wait cycle, the one holding `meta.record`: `boolean`, `meta.field_role`, `meta.record_extension_type`,
-  `meta.enum_set`, `integer`, `numeric.count`, `text`, `void`, `meta.type_ref`, `meta.identifier_ref`, `meta.field_map`,
-  and the choice a
-  type slot is typed by, `meta.type_expr` (`PRE_LOADED`). A choice's own `variants` is `[meta.type_expr]`, so reading
-  `type_expr`'s declaration reaches `type_expr`; the hand-built choice states the `disjoint` its `@meta.disjoint`
-  asserts, a slot of the records on the cycle being read against it before the whole kernel links.
-  `record_field.value` is typed `type!`, a dependent field, whose value a schema document holds as written through a
-  reader of its own (`DependentFieldReader`), so the record waits on no entry for it. `instanceBody` covers the shapes
-  those apply — a bare `{}` (each target's unconstrained constant, `void` among them), a record of tokens (`meta.ref`
-  with its `of`, `meta.map` for `meta.field_map`, `meta.array` for `meta.enum_set`), and a record holding a token array
-  (`meta.choice`, `meta.enum_type`) — and refuses any other target; `refinedBody` merges the integer family's `min`,
-  `max` and `size`, and a reference's `of`. **A pre-loaded completion is merged on the written form**
-  (`completion`): `boolean => !enum [true false]` and `meta.enum_set => !meta.set_type { … }` take their incomplete
-  entry's fields from its declaration, since resolving `enum` reads `name_type` against `meta.identifier_ref` and
-  `meta.set_type` reads its facets against `boolean`, each of which waits on this cycle. The set is built before
-  anything is read, and `meta.type_inline`, a record read from its grammar that reads nothing, is readied with it: a
-  record's field written in place is read against `meta.type_expr`, whose untagged recovery classifies both its
-  variants. So is `unicode.identifier_type`, the `of` of `meta.identifier_ref`: whether a name read against a reference
-  is a type's is a fact about its `of`, and a partial link that lacks it reads the name as a value's. Once every entry
-  is ready the chains are closed transitively, as `SchemaResolver` closes a schema's (`completeChains`).
-  `KernelBootstrapResolverTest` measures the cycle with `WaitGraph` from `spec/fixtures/meta-resolved.tn` (the six
-  maps read as their members under their paths; a type written in place at a slot is no entry, and a read against it
-  waits on what reading its construction reaches) and asserts the hand-built names equal it, so a kernel edit that
-  moves the cycle fails there. `KernelWaitGraphTest` prints the measurement — 75 entries (64 members of the six maps
-  and 11 at the root; the maps themselves make the kernel's 81 resolved entries), one cycle of 31, longest wait chain
-  3 — and asserts the kernel contains the cycle's closure (66 entries) and the related concepts. `enum` writing
-  `name_type` puts `meta.identifier_ref` on the cycle, through every enum on it. The type slots put
-  the choice constructor on it: a record field's type is read against `meta.type_expr`, a choice asserted disjoint,
-  and a type written in place reaches every constructor's record through `meta.type`, so the disjoint assertion,
-  `void` and `meta.record_extension_type` are on it too. Of the 31, 12 are hand-built; the other 19 are records and
-  compositions resolved from their grammar.
-- **A declaration no read produces is resolved from its grammar** by `DefinitionResolver` — a record, a composition
-  (`meta.ref` among them), an alias — as `SchemaResolver` resolves one. The bootstrap readies these
-  and
-  the pre-loaded set first, so the first compile holds every head a read applies. `meta.namespace => meta.map & { … }`
-  waits on the cycle and stays off it: it waits on its parent `meta.map`, and the name its `key_type` holds orders
-  nothing, so it is no wait of the cycle's entries.
-- **Every other instance is read at a checkpoint**, as every schema's is (above), its readers compiled by
-  `TsonSchemaLinker.linkReady(ready, null, pending)` then `TsonSchemaCompiler.compileReady`. A held value binds as
-  written -- base type resolution's token, carried by the field's bridge -- and is judged when the whole kernel links:
-  so `iri` is read against `net.iri_type`, whose `spec` pin is typed by `iri` itself (rule 3).
-- **The order is computed.** The bootstrap is `WaitOrder`'s `Readiness` (`handBuilt` for the pre-loaded set,
-  `DefinitionResolver` for the rest), and the order is the `DefinitionGetter` every lookup goes through, making an
-  entry ready the first time anything asks for it. An entry waiting on itself is the `SchemaValidationException`
-  every schema gets, naming the cycle; the bootstrap rethrows every failure, since only a kernel edit can put a cycle
-  outside the pre-loaded set. The kernel is resolved under the default wait depth. The driving loop's order changes
-  how many compiles run, never the output (`theBootstrapIsTheSameInAnyOrder`): an instance whose read reaches an
-  entry not yet ready (`net.scheme_name` reaching `unicode.identifier_base` and `unicode.normalization`) forces another
-  compile. Its output's nested map `meta` is derived from the members, so the order test compares its names.
-- **Parameters are checked after every entry is ready**, through `ParameterTypes.check` as `SchemaResolver` checks a
-  schema's; a failure is a broken kernel. The kernel declares no parametric record, so the check finds nothing to judge.
-- **The partial link is contained.** It passes over a reference to a pending name, and an entry's walk stops at its
-  first one, so the rest of that entry is judged when the whole kernel links, which every bootstrap is followed by
-  (`TsonCompiledVocabularyRegistry.loadVocabulary` links and compiles the output into the stand-in).
-- **Every name the kernel holds is the kernel's own**, so `DefinitionResolver` judges kinds and constructors with a
-  predicate that admits every name (`name -> true`); ordinary resolution judges by the origin of each name in the
-  merged namespace instead, `TsonBundledSchemas.isKernel` admitting meta.tn alone, so a member a user schema
-  contributes to `meta` is no kernel entry. The same document is the pre-loaded one: the bootstrap, the stand-in every
-  head of its ordinary resolution is read through and the registry's fetch override are its. In both, a head declared
-  beside its instance is made ready in wait order.
-- **Desugaring needs no equivalent trick.** The container constructors are parameterless (§4.2), so the desugar table
-  is fixed by the sugar forms and nothing is looked up in another schema. The kernel's sugar forms are the
-  constructions written in place at the fields that write them, and every sugar target is the kernel's own.
-- **Cost.** The two partial links and compiles make a warm bootstrap about 11 ms, and it runs once per registry:
-  `loadVocabulary` builds the stand-in on the first lookup of meta.tn's identity and reuses it until the ordinarily
-  resolved kernel is registered (`registerBundled`). The whole of `Tson.standard()`, all six bundled schemas resolved
-  and registered, is about 440 ms as a fresh JVM's first call and 70 ms warm.
+Related: `design/schema-resolution.md` (definition resolution, wait order), `design/parametric-materialisation.md`
+and `design/parametric-records.md` (the callers of `WireForm` and `CanonicalApplication`),
+`design/constructor-application.md`, `design/schema-grammar-and-desugaring.md` (sugar written in place),
+`design/linking-and-compilation.md`, `design/compiled-registries.md` (the kernel's cached stand-in).

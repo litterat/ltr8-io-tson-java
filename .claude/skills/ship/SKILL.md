@@ -47,7 +47,8 @@ Run these and report the results; fix what fails.
 ## 2. Issue, branch, commit, PR
 
 1. `gh issue create` — the defect or the goal, with the reproduction. The issue is the durable record of *why*.
-2. Branch off the branch the work belongs to — `main`, unless a proposal branch (`r2026-NN-proposal`) is open for it.
+2. Branch off the open proposal branch (`r2026-NN-proposal`) when there is one, a fix `main` could carry included;
+   otherwise off `main`.
 3. One commit (or the cadence the user set); message ends `Closes #N`, then the co-author line.
 4. `git push -u origin <branch>`, then `gh pr create --base <that branch>`.
 

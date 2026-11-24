@@ -78,7 +78,7 @@ derived from without the holder losing what they stated. Construction is not her
 the compiler's registry, which is why `Tson.of(config)` lives with the engine.
 **`CanonicalIdentity` reads a reference as an IRI-reference** through `ltr8-net`'s `Iri`, so a host or path beyond
 US-ASCII is an identity; its host is a `Host` value and its path read back from its URI spelling, so every spelling of
-one identity is one string (`design/linking-and-compilation.md`). An identity with no host — path-only or
+one identity is one string. An identity with no host — path-only or
 `file:`-style — is its path, which must be absolute ([TSON-DATA] §2.2.1), so it can never equal a host-and-path
 identity: a relative `tson.io/…` would be `https://tson.io/…`'s. `SchemaReference`, the fetching sources' check, still
 requires a host: a library entry is never fetched.

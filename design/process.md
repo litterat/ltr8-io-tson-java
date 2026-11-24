@@ -1,85 +1,74 @@
-# Process: branches, the spec-feedback register, the backlog, project-owned identities
+# Process: branches, the spec-feedback register, the bundled schemas, project-owned identities
 
-The working rules `CLAUDE.md` states in brief, at full length with their reasons. Current form only; history lives in
-git.
+The reasons behind the working rules the root `CLAUDE.md` and `spec/CLAUDE.md` state, and the procedures too long for
+them. A rule stated there is not restated here.
 
 **Invariants**
 
 - `main` implements the *published* revision; a proposal branch merges when the spec lands and not before.
-- The bundled schemas carry the proposing revision's identities from the start.
+- While a proposal branch is open, all work lands on it, a fix `main` could carry included.
+- The bundled schemas carry the proposing revision's identities from the proposal's first commit.
 - A Part 3 finding is a spec edit in the same session; a Part 1/2 finding is a register entry.
 - The register holds what is open, renumbers from #1 when a revision closes, and is self-contained.
-- Cite the spec section; cite `SPEC-FEEDBACK.md #N` only while the entry is open.
-- `BACKLOG.md` holds outstanding work only — not what was done, decided against, or might matter later.
-- A project-owned schema's version is bumped on a release, not on a change.
+- Part 2 §13.2's artifact rows are the one digest pin no script writes.
+- A project-owned schema's identity is fixed by a release, not by a change.
 
-Related: `design/cli-config-hashing.md` (bundled schemas, restamping), `design/conformance-suite.md`.
+Related: `design/cli-config-hashing.md` (bundled schemas at run time), `design/conformance-suite.md`.
 
-## The spec cache and the bundled schemas
+## Branches and revisions
 
-The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
-doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
-copy. `spec/` holds local snapshots for quick reference: `spec/tson-part1-data.md`,
-`spec/tson-part2-schema.md`, and `spec/m/{meta,numeric,temporal,net,core,policy}.tn` (the spec's own bundled schema
-documents — the pre-loaded kernel, meta.tn, its machinery under six maps (`meta`, `atom`, `numeric`, `unicode`, `net`,
-`binary`); the three data-format libraries importing it alone, numeric.tn, temporal.tn
-and net.tn, each with its instances at its root and its constructors under its map (numeric.tn and net.tn adding to the
-kernel's `numeric` and `net`); core.tn, importing the three and
-declaring the author annotations; and policy.tn) plus, in `spec/fixtures/`, their non-normative `*-resolved.tn`
-resolver-output fixtures (`meta-resolved.tn`, `numeric-resolved.tn`, `temporal-resolved.tn`, `net-resolved.tn`,
-`core-resolved.tn`). Treat `spec/` as a cache, not a source of truth — with **two** standing exceptions. The six `.tn`
-schemas are **packaged from here at build time**, so they are the live copies rather than a snapshot. And
-**`spec/tson-part3-json.md` is editable in place**: see "Part 3 is drafted here" below.
+**`main` is the reference implementation of the published revision.** Each published revision stays reachable by tag
+(`r2026-NN`) at the point it was the whole of `main`, tagged just before the next proposal merges, in the corpus repo
+too. A revision's work happens on `r2026-NN-proposal`, with a corpus branch of the same name and `SUITE_PIN` following
+it. The branch is the argument: there the register's entries state what is *running*. It merges when the spec lands
+and not before, since merging a divergence early costs `main` the one signal it exists to give.
 
-On `main` the bundled schemas carry **Revision 40 identities** (`https://tson.io/2026/40/m/*.tn`); a proposal
-branch carries the next revision's from its first commit. `spec/` holds **Revision 40** of Parts 1 and 2, a cache,
-not edited here except for §13.2's artifact rows, so the table names the bytes beside it and stays checkable; its
-Part 1 and Guide rows stay at the revision those documents actually are. On a proposal branch all three parts are
-the next revision's proposed text, edited in place, with a change log beside them in the form of
-`spec/tson-rev40-changelog.md`: `git diff main -- spec/` is the proposal, section numbers stay stable because the
-code cites them, and every example is one the implementation accepts. **§13.2 is one more pin to move** whenever the
-artifacts change. `scripts/restamp-bundled-schemas.sh` does not write it — the script covers the repo's own pins —
-so §13.2 is re-stamped by hand and is the one that silently drifts.
-`tson hash spec/m/<name>.tn` is the check.
+**A proposal carries its revision's identities and version (`0.NN.0-SNAPSHOT`) from its first commit**, so a content
+change lands on artifacts named for the revision proposing it and nothing is re-identified at the end. On the branch
+all three parts in `spec/` are the proposed text, edited in place, with a change log beside them in the form of
+`spec/tson-rev40-changelog.md`: `git diff main -- spec/` is the proposal, section numbers stay stable because the code
+cites them, and every example is one the implementation accepts.
 
-The bundled schemas are the kernel's own statement of its shape. What the resolver derives rather than reads
-from them — a choice's disjointness, a parametric record's parameters — is in
-`design/schema-resolution.md` and `design/parametric-records.md`.
+**While a proposal is open, every change branches off it and PRs into it**, a defect `main` also has included.
+Splitting work between the two means merging `main` into the proposal after each fix, for a `main` nobody is releasing
+from. Two consequences: `Closes #N` in a PR into a proposal does not close the issue (GitHub fires it only on the
+default branch), so each is closed by hand; and CI runs on pull requests and on `main` only, so a commit pushed
+straight to a proposal is verified by the local build alone.
 
-**Changing a bundled schema means re-stamping every digest downstream of it, bottom-up**, moving the matching `*-resolved.tn`
-entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the published values.
-`scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in dependency order (meta.tn; numeric.tn,
-temporal.tn and net.tn; core.tn; policy.tn), plus the getting-started example, which pins core and so has a digest of its own
-that moves with it; `--check` reports staleness and writes nothing. **The digests are not a test-only concern**: the library
-verifies the packaged bytes against `TsonBundledSchemas`' held digest on every load, so one stale constant fails
-`Tson.standard()` and with it most of the suite. Restamping after each edit is what lets a schema change land across several
-commits with the integrity checks left on.
+**Correctness wins over stability** because a compatibility argument is only worth making about a real consumer, and
+there are none: no release, no remote repository, every version `-SNAPSHOT`. The one binding rule is [TSON-SCHEMA]
+§10's, which is about documents in the world, not Java signatures.
 
-**The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own `@doc` — "Parse
-the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest` does it: every entry must read
-back into `schema.meta`, have a counterpart here and resolve identically, and every schema-map key must carry the same
-annotations (`@atom.ordering`, `@atom.bounded`, `@atom.exact`, `@atom.numeric`). `@doc` is not compared: a fixture keeps
-only its header note for the reader and leaves entry docs out, since it exists to be compared and a summary of a source
-doc only drifts from it. **Key annotations are compared from the parsed text**, never through the bound document, which
-drops them, so both sides would carry none and agree for the wrong reason. They are the only external statement of what
-a conforming resolver produces. Keep them in step with the `.tn` beside them. A fixture's header is its source's and its
-root is `!schema`, the kernel root's `schema`, an alias of `meta.schema`; nothing marks it resolved, so
-`ResolvedFixtureTest` reads it as one (`parseResolvedForm()`, or `withImports(imports).readAs(text, "meta.schema")`),
-the kernel's form, which imports nothing, under the pre-loaded kernel. The kernel's form, `meta-resolved.tn`, writes its
-six maps nested, each tagged `!meta.schema`, their members inside them, and its root names at the root;
-`numeric-resolved.tn`, `temporal-resolved.tn` and `net-resolved.tn` write their library's map the same way, with its
-instances at the root, and `core-resolved.tn` core.tn's author annotations. A fixture states its own document's entries
-only, never an import's members of the same map. A library's fixture holds instances of constructors its own source
-declares (net.tn's `ipv4 => !net.ipv4_type {}`), so every fixture but the kernel's is read beside its source, a resolved
-form being read under its source's imports and not over its own entries, where [TSON-SCHEMA] §8.1 supplies nothing
-beside the document.
+## The bundled schemas
+
+**§13.2 is the pin that silently drifts.** `scripts/restamp-bundled-schemas.sh` writes every pin in the repo, in
+dependency order (meta.tn; numeric.tn, temporal.tn and net.tn; core.tn; policy.tn), and the getting-started example,
+which pins core and so has a digest that moves with it. It does not write Part 2 §13.2's artifact rows, which are
+edited by hand so the table names the bytes beside it; its Part 1 and Guide rows stay at the revision those documents
+are. `tson hash spec/m/<name>.tn` is the check. `TsonBundledSchemas`, `InitCommand` and `README.md` carry the
+published values too.
+
+**Restamp after each edit, not at the end.** The digests are verified on every load, so restamping per edit is what
+lets a schema change land across several commits with the integrity checks left on.
+
+**The `*-resolved.tn` fixtures are the only external statement of what a conforming resolver produces**, which is why
+`ResolvedFixtureTest` compares them and why they move with the `.tn` beside them. Three things about the comparison
+are easy to undo:
+
+- **Key annotations are compared from the parsed text**, never through the bound document, which drops them: both
+  sides would carry none and agree for the wrong reason.
+- **`@doc` is not compared.** A fixture keeps its header note and leaves entry docs out, since a summary of a source
+  doc only drifts from it.
+- **A fixture states its own document's entries only**, never an import's members of the same map, and every fixture
+  but the kernel's is read beside its source: a resolved form is read under its source's imports and not over its own
+  entries, where [TSON-SCHEMA] §8.1 supplies nothing beside the document.
 
 ### Writing the bundled schemas' docs
 
 **A bundled schema's `@doc` serves someone looking at that one entry, reading or writing a schema, who has not read
-[TSON-SCHEMA].** Nobody reads a schema language's specification before writing a schema, so the doc carries the
-basic case and names where the rest is. A doc that restates a rule in full has to be kept in step with the spec by
-hand and drifts: each of the six kernel docs found contradicting the kernel or the spec was such a restatement.
+[TSON-SCHEMA].** Nobody reads a schema language's specification before writing a schema, so the doc carries the basic
+case and names where the rest is. A doc that restates a rule in full has to be kept in step with the spec by hand and
+drifts.
 
 - **What it is**, in a sentence, and **how it is written in the basic case**, with one example where the spelling
   is not obvious (`age => !integer ^ { min: 0  max: 150 }`). Every example is a line that loads.
@@ -99,139 +88,40 @@ hand and drifts: each of the six kernel docs found contradicting the kernel or t
 - **Shortening a rule never changes it.** A doc that contradicts its declaration or another doc is reported, never
   silently reconciled.
 
-`TsonSchemaStripper` removes the docs for a reader that wants declarations alone. The `*-resolved.tn` fixtures
-carry none of them.
+## Spec feedback
 
-## Branches and revisions
+**Parts 1 and 2 keep a register and Part 3 does not**, because their revision is published and this implementation
+*proposes* changes to it, while [TSON-JSON] has no published revision to be behind: a finding there is a spec change
+in the same session, with git history as its record. An entry spanning Part 3 and an earlier part stays in the
+register and says which half is which.
 
-**`main` is the reference implementation of the published revision, which is Revision 40.** Each published revision's
-implementation stays reachable at the point it was the whole of `main`, by tag: `r2026-32`, `r2026-34`, `r2026-35`,
-`r2026-36`, `r2026-37`, `r2026-38`, `r2026-39` — tagged before the next proposal merges, and in the corpus repo too
-where the pair is wanted. The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling
-corpus branch of the same name and `SUITE_PIN` following it — where the register's entries state what is *running*
-rather than what is *proposed*, the branch being the argument. It merges when the spec lands and not before, since
-merging a divergence early costs `main` the one signal it exists to give. The bundled schemas carry the revision's own
-identities from the start, so a content change lands on artifacts named for the revision proposing it rather than being
-re-identified at the end.
+**The register renumbers from #1 when a revision closes** because it is an input to the next revision's adjudication:
+its numbering is what that revision's change log answers against. Entries whose resolution landed are deleted, and the
+closing revision's change log in `spec/` keeps all of them under their numbers. While a revision is open, numbers are
+not reused and gaps are left, so a citation stays valid.
 
-**No proposal is open.** The next, `r2026-41-proposal` with its corpus twin, opens when work the published revision
-cannot carry starts, and carries the Revision 41 identities and version `0.41.0-SNAPSHOT` from its first commit.
-Proposal work lands through PR branches off it; work the published revision can carry still lands on `main`, which
-the proposal merges in to keep up. While one is open, `Closes #N` in a PR into it does not close the issue (GitHub
-fires it only on the default branch), so each is closed by hand.
+**The evidence beside an entry is this implementation**, which is why an entry states what is running and why the
+shared corpus's `proposed/` bucket stays empty here: the proposal is the code, not a vector another implementation is
+asked to fail. Working design documents are not kept in `spec/`: once a design lands, the entry absorbs what survives
+of the argument and the document goes.
 
-**Nothing here is frozen, and nothing is owed to a user who does not exist.** The spec is a working
-revision, this is its first implementation, and the artifact has no published releases and no remote
-repository configured — every version carries `-SNAPSHOT`. So **correctness wins over stability, every
-time**: a wrong rule gets fixed rather than kept, a bad name gets changed rather than deprecated, a public
-method that turned out to be the wrong shape gets deleted rather than wrapped. Where the spec itself is
-wrong, `SPEC-FEEDBACK.md` is how that gets fixed too. A compatibility argument is only worth making about a
-real consumer, and there are none — the one place any of this becomes binding is §10's immutability rule for
-a *published* schema `!!id`, which is about documents in the world, not about Java signatures.
+**A resolved ambiguity is invisible again three sessions later unless written down**, which is the reason for never
+silently picking an interpretation, and the reason a claim about what the format admits is tried before it is
+written: an entry derived from the prose alone has been wrong.
 
-## Spec feedback — this is the first implementation
+## Naming, exceptions, identities
 
-This is the spec's first implementation, which makes it the first real test of whether the prose resolves
-unambiguously to one behavior — valuable to the spec author precisely because it's still a draft. Actively
-watch for and flag:
+**The `Tson` prefix exists for disambiguation at a consumer's call site** (`TsonSchema` against a domain `Schema`).
+For a new public type, ask whether a consumer would plausibly have their own class with the bare name: if so and the
+type is consumer-facing, prefix it; internal machinery stays bare.
 
-- **Ambiguity** — wording a careful reader could reasonably implement two ways.
-- **Internal inconsistency** — two sections (or a grammar production and its prose) that disagree.
-- **Underspecification** — a case the grammar/prose doesn't address where an implementation must still
-  pick something.
-- **Errors** — plain mistakes (wrong cross-reference, grammar that doesn't parse its own examples).
+**A gap is collected, not thrown past the phase.** A gap thrown out of a phase that reports per declaration takes
+every other declaration's verdict with it, so the schema pipeline reports it beside the ordinary problems and
+`Diagnostic.Code.NOT_IMPLEMENTED` keeps it apart; the exception's class is what picks the code.
+`DefinitionResolver`'s Javadoc lists the boundary.
 
-When you find one: say so in conversation, and record it in `SPEC-FEEDBACK.md` (spec section, concrete
-description, the interpretation this implementation chose and why, suggested resolution). Don't silently
-pick an interpretation — a resolved ambiguity is invisible again three sessions later unless written down.
-
-**Part 3 is drafted here, so edit `spec/tson-part3-json.md` directly as you go.** [TSON-JSON] is a very early
-draft and this implementation exists to validate it, which makes the loop tighter than for Parts 1 and 2: a
-finding becomes a **spec change in the same session**, in place, with git history as its record — not a
-register entry waiting for someone else's adjudication. Parts 1 and 2 keep the register, because their current
-revision is published and this implementation *proposes* changes to them rather than making them; Part 3 has
-no published revision to be behind, so there is nothing to propose against.
-
-What that changes in practice:
-
-- **A Part 3 finding does not go in `SPEC-FEEDBACK.md`.** Fix §N and say so in the commit. An entry spanning
-  Part 3 and an earlier part stays in the register, and says which half is which.
-- **Edit the prose, not just a note beside it.** An underspecification is closed by stating the rule; an
-  overclaim by correcting the sentence. Where the choice is genuinely open, state the rule *and* why the
-  alternative was not taken, so the author is reading a decision rather than a shrug.
-- **Cite the section, not this implementation.** The document never mentions this codebase, a Java type, or a
-  test. What running code buys is confidence that a rule is implementable and that its consequences were
-  followed; the document states the rule.
-- **The obligation runs the other way too.** Implementing a section is when its wording gets its only real
-  reading — so a section you build against and leave unedited is a section you are asserting is right.
-- **Keep it to what implementation taught you.** A Part 3 edit should trace to something the code forced a
-  decision about. Rewriting prose that no reader tripped over is churn in a document someone else is also
-  editing.
-A finding still open is cited by number (`SPEC-FEEDBACK.md` #N); once the spec carries the rule, the
-citations name the section instead.
-
-**The register holds what is open against the current revision, and renumbers from #1 when a revision
-closes.** It is an input to the next revision's adjudication, so its numbering is what that revision's
-change log will answer against. The evidence beside it is this implementation itself — an entry proposing a
-design states what is running — which is why the shared corpus's `proposed/` bucket stays empty here: the
-proposal is the code, not a vector another implementation is asked to fail. Entries whose resolution
-landed are deleted; the closing revision's change log in `spec/` keeps all of them under *their* numbers.
-**Cite the spec, not the argument that got it there.** Prose and Javadoc state the rule as built and name
-the current section that requires it; a `SPEC-FEEDBACK.md #N` citation is for an entry still open, where
-there is no section to point at yet. When
-an entry closes, the citations to it become spec citations — the reasoning has served its purpose and the
-spec now carries the rule.
-
-**The register is the as-built record, and it is self-contained.** It is what goes to the spec reviewer, so
-an entry proposing a design this implementation has built states the design, what is running, and what is
-not, rather than pointing at a design document beside it. Where an entry's recommendation is a proposal
-rather than a report, it says so at the point it makes it — a reviewer adopting a rule needs to know which
-claims are running code. Working design documents are not kept in `spec/`: once a design lands, the entry
-absorbs what survives of the argument and the document goes, git history keeping it.
-
-
-## Conventions at full length
-
-**A comment says why, never what; a design note holds what the code cannot.** The root `CLAUDE.md` states both
-rules and their test in full, and they are not restated here. The dated log lives in git.
-
-**`BACKLOG.md` is a clean list of outstanding work and nothing else.** Every entry names something someone
-could pick up and do. Three things are therefore not entries, however true: **what was done** (an item that
-ships comes out entirely — not annotated as complete, not kept as a record of how it was solved), **what was
-decided against** (a won't-do is not work), and **what might become work later** (a standing note to revisit
-something if conditions change is not actionable today, and sits in the list forever looking like a task).
-Prose inside a live entry follows the same rule — say what is left and what constrains it; recounting which
-halves already work turns an item into a status report that goes stale silently. Where one of those facts has
-to survive its entry, it belongs in the `design/` note, the Javadoc, or the test that owns the area, where the
-person who trips over it will be looking. Git history is the log.
-
-**`Tson` is a prefix, never an infix.** A class name containing `Tson` must lead with it (`TsonSchema`,
-`TsonDataParser`, `TsonCompiledSchema`) — never buried (`CompiledTsonSchema` is wrong). The prefix is
-**not** applied to every class: most internal machinery is deliberately bare (`Lexer`,
-`RecordAbstractReader`, `DeferredTypeReader`, `ChoiceDisjointness`, `SchemaResolver`,
-`DefinitionResolver`). Reserve `Tson` for types a *consumer of this library* names in their own code — its
-value is disambiguation at the call site (`TsonSchema` vs. a domain `Schema`). When adding a new public,
-developer-facing type, ask "would a consumer plausibly have their own class with this bare name?" — if yes
-and it's consumer-facing, prefix it; if it's internal machinery, leave it bare.
-
-**Exception classification is a policy, not a style choice.** Across the schema pipeline:
-`SchemaValidationException` means *the author's schema is wrong and the spec says so*;
-`UnsupportedOperationException` means *this library hasn't implemented that yet*; `IllegalStateException`
-means an internal invariant broke. The classification test: **a schema error's verdict doesn't change when
-this library improves; a gap's does.** A gap is not a verdict on the author's schema, and the CLI's exit 1
-vs. exit 70 rides on that distinction — **carried by `Diagnostic.Code.NOT_IMPLEMENTED`, not by the channel**.
-Both kinds are collected: a gap thrown out of a phase that reports per declaration took every other
-declaration's verdict with it, so the schema pipeline reports it beside the ordinary problems and the code
-keeps it apart; the exception's class is what picks the code.
-`DefinitionResolver`'s Javadoc lists the exact current boundary.
-
-**Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/40/io/ltr8/<group>/<name>.tn` — `/2026/40` is the spec revision, `io/ltr8` the publisher,
-`<group>` the subsystem (`cli`), `<name>` the schema. Between releases — while the build version carries
-`-SNAPSHOT`, so nothing has published the identity — the schema is edited in place. §10's immutability rule
-binds a *published* identity: once a release ships carrying the schema, the document under that `!!id` is fixed.
-**Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1 reserves for the eventual frozen "TSON version 1",
-which hasn't happened.
-
-**Line wrapping:** wrap both comments and code to 125 characters.
-
+**A project-owned schema's `!!id`** is `https://tson.io/2026/40/io/ltr8/<group>/<name>.tn`: `/2026/40` the spec
+revision, `io/ltr8` the publisher, `<group>` the subsystem (`cli`), `<name>` the schema. While the build version
+carries `-SNAPSHOT` nothing has published the identity, so the schema is edited in place; once a release ships
+carrying it, [TSON-SCHEMA] §10 fixes the document under that `!!id`. The extension is `.tn`: `.tn1` is a stability
+claim §7.1 reserves for a frozen "TSON version 1".
