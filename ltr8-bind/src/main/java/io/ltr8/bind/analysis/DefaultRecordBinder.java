@@ -213,8 +213,17 @@ public class DefaultRecordBinder {
 						descriptor.constructor(), descriptor.fields(),
 						descriptor.annotationsCarrier().orElse(null));
 			}
-		} catch (IllegalAccessException | NoSuchMethodException | SecurityException | DataBindException e) {
-			throw new DataBindException("Failed to resolve", e);
+		} catch (IllegalAccessException | SecurityException e) {
+			// GetSetFinder wraps the IllegalAccessException that names the member in a SecurityException saying
+			// nothing more, so the IllegalAccessException is the cause kept.
+			Throwable denied = e.getCause() != null ? e.getCause() : e;
+			throw new DataBindException(String.format(
+					"%s cannot be bound: a member it is bound through is not accessible: %s",
+					targetClass.getName(), denied.getMessage()), denied);
+		} catch (NoSuchMethodException e) {
+			throw new DataBindException(String.format(
+					"%s cannot be bound: it is bound through %s, which is not a public constructor or method",
+					targetClass.getName(), e.getMessage()), e);
 		}
 	}
 
