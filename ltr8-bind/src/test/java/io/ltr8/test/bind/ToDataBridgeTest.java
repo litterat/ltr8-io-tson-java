@@ -24,6 +24,7 @@ import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
+import io.ltr8.test.data.ToDataBridges.AbstractWithConstructor;
 import io.ltr8.test.data.ToDataBridges.Carrier;
 import io.ltr8.test.data.ToDataBridges.ConstructorTakesSubtype;
 import io.ltr8.test.data.ToDataBridges.ConstructorTakesSupertype;
@@ -185,6 +186,12 @@ class ToDataBridgeTest {
 	@Test
 	void anInterfaceDeclaringToDataIsRefused() {
 		assertNames(refusal(SkuError.class), SkuError.class.getName(), "is an interface",
+				SkuNotFound.class.getName());
+	}
+
+	@Test
+	void anAbstractClassDeclaringToDataIsRefused() {
+		assertNames(refusal(AbstractWithConstructor.class), AbstractWithConstructor.class.getName(), "is abstract",
 				SkuNotFound.class.getName());
 	}
 

@@ -152,6 +152,11 @@ public class DefaultRecordBinder {
 					"%s is an interface: a bridged class is a class with a public constructor taking its record "
 							+ "type %s", targetClass.getName(), dataType.getName()));
 		}
+		if (Modifier.isAbstract(targetClass.getModifiers())) {
+			throw new DataBindException(String.format(
+					"%s is abstract: a bridged class is built from its record type %s, and an abstract class "
+							+ "cannot be built", targetClass.getName(), dataType.getName()));
+		}
 		try {
 			return targetClass.getConstructor(dataType);
 		} catch (NoSuchMethodException e) {

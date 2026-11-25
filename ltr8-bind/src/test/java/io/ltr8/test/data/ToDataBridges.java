@@ -160,6 +160,20 @@ public final class ToDataBridges {
 		}
 	}
 
+	public abstract static class AbstractWithConstructor implements ToData<SkuNotFound> {
+
+		private final String sku;
+
+		public AbstractWithConstructor(SkuNotFound data) {
+			this.sku = data.sku();
+		}
+
+		@Override
+		public SkuNotFound toData() {
+			return new SkuNotFound(sku);
+		}
+	}
+
 	public static class Carrier<S> implements ToData<S> {
 
 		private final S data;

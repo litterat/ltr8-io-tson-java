@@ -8,4 +8,5 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
 - A cyclic type graph resolves through a deferred supplier held in `Memoized` (`RecursiveModelTest`); laziness stays
   confined to the cyclic edge.
 - A name index is built once per class (`DataClassRecordFieldIndexTest`).
-- A bridged class declares `ToData<S>` itself and has a public constructor taking exactly `S` (`ToDataBridgeTest`).
+- A bridged class is concrete, declares `ToData<S>` itself and has a public constructor taking exactly `S`
+  (`ToDataBridgeTest`).
