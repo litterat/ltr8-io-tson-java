@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ReadException;
@@ -39,6 +40,16 @@ class CollectingJsonReadTest {
     }
 
     public record Unbindable(Object anything) {
+    }
+
+    public record HoldsUnbindable(String name, List<Unbindable> held) {
+    }
+
+    static class Hidden {
+
+        @Record
+        public Hidden() {
+        }
     }
 
     private static List<Diagnostic> collected(String source, Class<?> type) {
@@ -125,6 +136,32 @@ class CollectingJsonReadTest {
             assertEquals(List.of(Diagnostic.Code.BIND_MISMATCH),
                     problems.stream().map(Diagnostic::code).toList(), problems::toString);
             assertFalse(problems.getFirst().code().verdict());
+        }
+    }
+
+    @Nested
+    class AClassThatCannotBeBound {
+
+        private static final String NO_CONVERSION =
+                "Unable to find a valid data conversion for class: class java.lang.Object";
+
+        @Test
+        void is_reported_with_the_binder_s_reason() {
+            assertEquals(Unbindable.class.getName() + " cannot be bound: " + NO_CONVERSION,
+                    collected("{\"anything\": 1}", Unbindable.class).getFirst().message());
+        }
+
+        @Test
+        void is_reported_with_the_reason_for_the_class_it_holds() {
+            assertEquals(HoldsUnbindable.class.getName() + " cannot be bound: " + NO_CONVERSION,
+                    collected("{\"name\": \"a\", \"held\": []}", HoldsUnbindable.class).getFirst().message());
+        }
+
+        @Test
+        void is_reported_with_the_binder_s_reason_where_a_reflective_failure_lies_under_it() {
+            String message = collected("{}", Hidden.class).getFirst().message();
+            assertTrue(message.startsWith(Hidden.class.getName() + " cannot be bound: " + Hidden.class.getName()
+                    + " is bound through a member that is not accessible: "), message);
         }
     }
 

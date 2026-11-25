@@ -86,7 +86,7 @@ class RecordRefusalTest {
 	private static final String PROTECTED_CONSTRUCTOR = ProtectedConstructor.class.getName()
 			+ " has no public constructor taking " + Problem.class.getName();
 
-	private static final String NOT_ACCESSIBLE = " cannot be bound: a member it is bound through is not accessible: ";
+	private static final String NOT_ACCESSIBLE = " is bound through a member that is not accessible: ";
 
 	private final DataBindContext context = DataBindContext.builder().build();
 
@@ -255,7 +255,7 @@ class RecordRefusalTest {
 	@Test
 	void aFieldBridgeWithoutANoArgumentConstructorIsRefusedNamingBothClassesWithTheCauseKept() {
 		DataBindException refused = refusal(context, BridgeNeedsArgument.class);
-		assertEquals(BridgeNeedsArgument.class.getName() + " cannot be bound: it is bound through "
+		assertEquals(BridgeNeedsArgument.class.getName() + " is bound through "
 				+ BridgeWithoutNoArgumentConstructor.class.getName() + ".<init>(), which is not a public constructor "
 				+ "or method", refused.getMessage());
 		assertInstanceOf(NoSuchMethodException.class, refused.getCause());

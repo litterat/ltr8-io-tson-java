@@ -218,11 +218,11 @@ public class DefaultRecordBinder {
 			// nothing more, so the IllegalAccessException is the cause kept.
 			Throwable denied = e.getCause() != null ? e.getCause() : e;
 			throw new DataBindException(String.format(
-					"%s cannot be bound: a member it is bound through is not accessible: %s",
+					"%s is bound through a member that is not accessible: %s",
 					targetClass.getName(), denied.getMessage()), denied);
 		} catch (NoSuchMethodException e) {
 			throw new DataBindException(String.format(
-					"%s cannot be bound: it is bound through %s, which is not a public constructor or method",
+					"%s is bound through %s, which is not a public constructor or method",
 					targetClass.getName(), e.getMessage()), e);
 		}
 	}
