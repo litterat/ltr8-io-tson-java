@@ -22,10 +22,12 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -53,49 +55,114 @@ public class DefaultRecordBinder {
 	}
 
 
-	private DataClassBridge resolveBridge(DataBindContext context, Class<?> targetClass) throws DataBindException {
-		// If the class if exporting/importing a dataclass.
-		if (!ToData.class.isAssignableFrom(targetClass)) {
-			throw new DataBindException("Unexpected");
-		}
-
+	private DataClassBridge resolveBridge(Class<?> targetClass) throws DataBindException {
+		Class<?> dataType = findToDataClass(targetClass);
+		Constructor<?> constructor = bridgeConstructor(targetClass, dataType);
 		try {
-			Class<?> dataType = findToDataClass(targetClass);
-
-			// We require that a constructor be present that takes the data class as input.
-			MethodHandle toObject = MethodHandles.publicLookup()
-					.unreflectConstructor(targetClass.getConstructor(dataType));
-
-			// The class implements ToData so get the method.
-			MethodHandle toData = MethodHandles.publicLookup()
-					.unreflect(targetClass.getMethod(TODATA_METHOD));
-
-			// The constructor and data components are copied from the data class.
+			MethodHandle toObject = MethodHandles.publicLookup().unreflectConstructor(constructor);
+			MethodHandle toData = MethodHandles.publicLookup().unreflect(targetClass.getMethod(TODATA_METHOD));
 			return new DataClassBridge(dataType, toData, toObject);
-
-		} catch (NoSuchMethodException | IllegalAccessException ex) {
+		} catch (IllegalAccessException e) {
 			throw new DataBindException(String.format(
-					"Failed to get data descriptor. Failed to find constructor for %s", targetClass.getName()));
+					"%s is not accessible through the public lookup: a bridged class is public, in a package its "
+							+ "module exports", targetClass.getName()), e);
+		} catch (NoSuchMethodException e) {
+			// ToData declares toData() public, so every class implementing it has one.
+			throw new IllegalStateException(e);
 		}
 	}
 
-	private Class<?> findToDataClass(Class<?> targetClass) throws DataBindException {
-		if (!ToData.class.isAssignableFrom(targetClass)) {
-			throw new DataBindException("Unexpected");
-		}
-
-		for (Type genericInterface : targetClass.getGenericInterfaces()) {
-
-			if (genericInterface instanceof ParameterizedType
-					&& ((ParameterizedType) genericInterface).getRawType() == ToData.class) {
-
-				// ToData has one parameter so this should be safe.
-				return (Class<?>) ((ParameterizedType) genericInterface).getActualTypeArguments()[0];
+	/**
+	 * The record type {@code targetClass} names in its own {@code implements ToData<S>}. A supertype's clause is
+	 * not followed: binding through it would need a rule for a class reaching {@code ToData} by two paths, and a
+	 * class that declares the clause itself says which record it is with no rule at all.
+	 */
+	private static Class<?> findToDataClass(Class<?> targetClass) throws DataBindException {
+		for (Type declared : targetClass.getGenericInterfaces()) {
+			if (declared == ToData.class) {
+				throw new DataBindException(String.format(
+						"%s declares ToData raw: a bridged class names its record type, so declare "
+								+ "implements ToData<S> on %1$s with S its record class", targetClass.getName()));
+			}
+			if (declared instanceof ParameterizedType parameterized && parameterized.getRawType() == ToData.class) {
+				Type recordType = parameterized.getActualTypeArguments()[0];
+				if (recordType instanceof Class<?> recordClass) {
+					return recordClass;
+				}
+				throw new DataBindException(String.format(
+						"%s declares ToData<%s>, whose record type is %s, not a class: a bridged class's record "
+								+ "type is a class", targetClass.getName(), recordType.getTypeName(),
+						kindOf(recordType)));
 			}
 		}
+		throw inheritedToData(targetClass);
+	}
 
-		throw new DataBindException(String.format(
-				"Failed to get data descriptor. Failed to find constructor for %s", targetClass.getName()));
+	private static DataBindException inheritedToData(Class<?> targetClass) {
+		Class<?> declarer = toDataDeclarer(targetClass);
+		Class<?> recordClass = declaredRecordClass(declarer);
+		String recordType = recordClass != null ? recordClass.getName() : "S";
+		String withS = recordClass != null ? "" : " with S its record class";
+		return new DataBindException(String.format(
+				"%s inherits ToData from %s: a bridged class declares ToData itself, so declare "
+						+ "implements ToData<%s> on %1$s%s", targetClass.getName(), declarer.getName(), recordType,
+				withS));
+	}
+
+	private static Class<?> toDataDeclarer(Class<?> type) {
+		if (List.of(type.getInterfaces()).contains(ToData.class)) {
+			return type;
+		}
+		Class<?> superclass = type.getSuperclass();
+		if (superclass != null && ToData.class.isAssignableFrom(superclass)) {
+			return toDataDeclarer(superclass);
+		}
+		for (Class<?> superinterface : type.getInterfaces()) {
+			if (ToData.class.isAssignableFrom(superinterface)) {
+				return toDataDeclarer(superinterface);
+			}
+		}
+		throw new IllegalStateException(type.getName() + " reaches ToData through none of its supertypes");
+	}
+
+	/** The class {@code declarer}'s own {@code ToData} clause names, or {@code null} where it names none. */
+	private static Class<?> declaredRecordClass(Class<?> declarer) {
+		for (Type declared : declarer.getGenericInterfaces()) {
+			if (declared instanceof ParameterizedType parameterized && parameterized.getRawType() == ToData.class
+					&& parameterized.getActualTypeArguments()[0] instanceof Class<?> recordClass) {
+				return recordClass;
+			}
+		}
+		return null;
+	}
+
+	private static String kindOf(Type type) {
+		return switch (type) {
+			case TypeVariable<?> _ -> "a type variable";
+			case ParameterizedType _ -> "a parameterized type";
+			case GenericArrayType _ -> "a generic array type";
+			default -> "an unrecognised type";
+		};
+	}
+
+	private static Constructor<?> bridgeConstructor(Class<?> targetClass, Class<?> dataType)
+			throws DataBindException {
+		if (targetClass.isInterface()) {
+			throw new DataBindException(String.format(
+					"%s is an interface: a bridged class is a class with a public constructor taking its record "
+							+ "type %s", targetClass.getName(), dataType.getName()));
+		}
+		if (Modifier.isAbstract(targetClass.getModifiers())) {
+			throw new DataBindException(String.format(
+					"%s is abstract: a bridged class is built from its record type %s, and an abstract class "
+							+ "cannot be built", targetClass.getName(), dataType.getName()));
+		}
+		try {
+			return targetClass.getConstructor(dataType);
+		} catch (NoSuchMethodException e) {
+			throw new DataBindException(String.format("%s has no public constructor taking %s",
+					targetClass.getName(), dataType.getName()));
+		}
 	}
 
 	/**
@@ -124,7 +191,7 @@ public class DefaultRecordBinder {
 			DataClassBridge bridge = null;
 			if (ToData.class.isAssignableFrom(targetClass)) {
 
-				bridge = resolveBridge(context, targetClass);
+				bridge = resolveBridge(targetClass);
 
 				DataClassRecord descriptor = resolveClassRecord(context, bridge.dataClass());
 
