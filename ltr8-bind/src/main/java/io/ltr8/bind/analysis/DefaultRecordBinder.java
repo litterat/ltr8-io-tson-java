@@ -683,8 +683,8 @@ public class DefaultRecordBinder {
 				.bindTo(bridge);
 
 		if (setter != null) {
-			setter = MethodHandles.collectArguments(setter, 1, bridgeToObject)
-					.asType(MethodType.methodType(info.getType(), bridgeDataClass));
+			setter = MethodHandles.filterArguments(setter, 1,
+					bridgeToObject.asType(bridgeToObject.type().changeReturnType(info.getType())));
 		}
 
 		// Use Objects.nonNull(accessor()) to check if value is present.

@@ -535,10 +535,6 @@ Where an entry says "not run", reproduce it first; one that does not reproduce c
 - [ ] **`ComponentInfo.setUnion`'s duplicate check reads as inverted.** Not run. It throws where the two unions
   are equal, and its message says "Field annotation", so `@Union` on both a constructor parameter and its
   accessor is probably refused. Refuse two that differ, accept two that agree, and name `@Union` in the message.
-- [ ] **A mutable `@Record` with a bridged field and a setter cannot be described.** Not run. Where the field has a
-  setter, `DefaultRecordBinder.resolveBridgeField` asks `asType` to turn a two-parameter handle into a
-  one-parameter one, which always throws `WrongMethodTypeException`. Cover a `@Field(bridge = …)` getter and
-  setter pair and a bridged public field, each with a round trip through both mappers.
 - [ ] **A `@Field` bridge is built twice for one field.** `DefaultRecordBinder` instantiates the bridge class once
   for `toData` and once for `toObject`, so a bridge holding state sees half the calls on each. Build it once per
   field, with a test counting instances.
