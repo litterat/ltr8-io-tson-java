@@ -22,13 +22,19 @@ import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
+import io.ltr8.test.data.GetSetClasses.BoxedSetter;
 import io.ltr8.test.data.GetSetClasses.FinalFieldBesideMutableField;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithAccessor;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithoutAccessor;
 import io.ltr8.test.data.GetSetClasses.InlineFinalField;
+import io.ltr8.test.data.GetSetClasses.ListPair;
 import io.ltr8.test.data.GetSetClasses.MutableFieldBoundByConstructor;
 import io.ltr8.test.data.GetSetClasses.MutableFields;
+import io.ltr8.test.data.GetSetClasses.OptionalField;
+import io.ltr8.test.data.GetSetClasses.OptionalPair;
+import io.ltr8.test.data.GetSetClasses.OverloadedSetter;
 import io.ltr8.test.data.GetSetClasses.PackagePrivatePair;
+import io.ltr8.test.data.GetSetClasses.PairNamedInAnotherCase;
 import io.ltr8.test.data.GetSetClasses.PrivateGetterPublicSetter;
 import io.ltr8.test.data.GetSetClasses.PrivatePairAlone;
 import io.ltr8.test.data.GetSetClasses.PrivatePairBesidePublicField;
@@ -37,15 +43,27 @@ import io.ltr8.test.data.GetSetClasses.PrivateSetterOverConstructorName;
 import io.ltr8.test.data.GetSetClasses.ProtectedPair;
 import io.ltr8.test.data.GetSetClasses.PublicGetterPrivateSetter;
 import io.ltr8.test.data.GetSetClasses.PublicPair;
+import io.ltr8.test.data.GetSetClasses.PublicPairOverConstructorName;
+import io.ltr8.test.data.GetSetClasses.Relabelled;
+import io.ltr8.test.data.GetSetClasses.Retagged;
 import io.ltr8.test.data.GetSetClasses.StaticField;
 import io.ltr8.test.data.GetSetClasses.StaticPair;
+import io.ltr8.test.data.GetSetClasses.TextHolder;
+import io.ltr8.test.data.GetSetClasses.TwoArgumentSetter;
+import io.ltr8.test.data.GetSetClasses.WiderSetter;
+import io.ltr8.test.data.GetSetClasses.WritesGrandInherited;
+import io.ltr8.test.data.GetSetClasses.WritesInherited;
+import io.ltr8.test.data.GetSetClasses.WritesInheritedBesideAccessor;
 import org.junit.jupiter.api.Test;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -137,6 +155,31 @@ class GetSetFinderTest {
 	}
 
 	@Test
+	void aPublicOptionalFieldIsWrittenThroughTheFieldWhetherPresentOrAbsent() throws Throwable {
+		DataClassRecord record = record(OptionalField.class);
+		assertEquals(List.of("note:String set"), shape(record));
+		MethodHandle setter = record.fields()[0].setter().orElseThrow();
+		assertEquals(MethodType.methodType(void.class, OptionalField.class, String.class), setter.type());
+		OptionalField written = new OptionalField();
+		record.fields()[0].set(written, "anchor");
+		assertEquals(Optional.of("anchor"), written.note);
+		record.fields()[0].set(written, null);
+		assertEquals(Optional.empty(), written.note);
+
+		OptionalField present = new OptionalField();
+		present.note = Optional.of("anchor");
+		assertEquals(Map.of("note", "anchor"), new MapMapper(context).toMap(present));
+		for (OptionalField copy : roundTrips(present)) {
+			assertEquals(Optional.of("anchor"), copy.note);
+		}
+		OptionalField absent = new OptionalField();
+		assertEquals(Map.of(), new MapMapper(context).toMap(absent));
+		for (OptionalField copy : roundTrips(absent)) {
+			assertEquals(Optional.empty(), copy.note);
+		}
+	}
+
+	@Test
 	void aStaticFieldIsNoComponent() throws Throwable {
 		DataClassRecord record = record(StaticField.class);
 		assertEquals(List.of("name:String set"), shape(record));
@@ -156,6 +199,36 @@ class GetSetFinderTest {
 		value.setValue("anchor");
 		for (PublicPair copy : roundTrips(value)) {
 			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aListPairKeepsItsElementType() throws Throwable {
+		DataClassRecord record = record(ListPair.class);
+		assertEquals(List.of("items:List set"), shape(record));
+		ListPair value = new ListPair();
+		value.setItems(List.of("anchor", "chain"));
+		for (ListPair copy : roundTrips(value)) {
+			assertEquals(List.of("anchor", "chain"), copy.getItems());
+		}
+	}
+
+	@Test
+	void anOptionalPairIsWrittenThroughTheSetterWhetherPresentOrAbsent() throws Throwable {
+		DataClassRecord record = record(OptionalPair.class);
+		assertEquals(List.of("note:String set"), shape(record));
+		assertEquals(MethodType.methodType(void.class, OptionalPair.class, String.class),
+				record.fields()[0].setter().orElseThrow().type());
+		OptionalPair present = new OptionalPair();
+		present.setNote(Optional.of("anchor"));
+		assertEquals(Map.of("note", "anchor"), new MapMapper(context).toMap(present));
+		for (OptionalPair copy : roundTrips(present)) {
+			assertEquals(Optional.of("anchor"), copy.getNote());
+		}
+		OptionalPair absent = new OptionalPair();
+		assertEquals(Map.of(), new MapMapper(context).toMap(absent));
+		for (OptionalPair copy : roundTrips(absent)) {
+			assertEquals(Optional.empty(), copy.getNote());
 		}
 	}
 
@@ -231,6 +304,97 @@ class GetSetFinderTest {
 	}
 
 	@Test
+	void aPublicPairOverTheConstructorsFieldIsTheConstructorsComponentWrittenThroughTheSetter() throws Throwable {
+		DataClassRecord record = record(PublicPairOverConstructorName.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		assertReadThroughMethod(record.fields()[0], "getName");
+		PublicPairOverConstructorName written = new PublicPairOverConstructorName("anchor");
+		record.fields()[0].set(written, "buoy");
+		assertEquals("buoy", written.getName());
+		for (PublicPairOverConstructorName copy : roundTrips(new PublicPairOverConstructorName("anchor"))) {
+			assertEquals("anchor", copy.getName());
+		}
+	}
+
+	@Test
+	void aPairWhoseNameDiffersFromTheConstructorsOnlyInCaseIsAComponentOfItsOwn() throws Throwable {
+		DataClassRecord record = record(PairNamedInAnotherCase.class);
+		assertEquals(List.of("url:String", "uRL:String set"), shape(record));
+		PairNamedInAnotherCase value = new PairNamedInAnotherCase("https://example.org/");
+		value.setURL("next");
+		for (PairNamedInAnotherCase copy : roundTrips(value)) {
+			assertEquals("https://example.org/", copy.url());
+			assertEquals("next", copy.getURL());
+		}
+	}
+
+	@Test
+	void aSubclassPairShadowingASuperClassComponentIsAComponentOfItsOwn() throws Throwable {
+		DataClassRecord record = record(Relabelled.class);
+		assertEquals(List.of("name:String", "alias:String set"), shape(record));
+		Relabelled value = new Relabelled("anchor");
+		value.setName("buoy");
+		assertEquals(Map.of("name", "anchor", "alias", "buoy"), new MapMapper(context).toMap(value));
+		for (Relabelled copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name());
+			assertEquals("buoy", copy.getName());
+		}
+	}
+
+	@Test
+	void aPairWhoseGetterIsTheAccessorOfASuperClassComponentWritesThatComponent() throws Throwable {
+		DataClassRecord record = record(WritesInherited.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		assertReadThroughMethod(record.fields()[0], "getName");
+		WritesInherited written = new WritesInherited("anchor");
+		record.fields()[0].set(written, "buoy");
+		assertEquals("buoy", written.getName());
+		assertEquals("buoy", record.fields()[0].get(written));
+		for (WritesInherited copy : roundTrips(new WritesInherited("anchor"))) {
+			assertEquals("anchor", copy.getName());
+		}
+	}
+
+	@Test
+	void aPairBesideTheSuperClassesOwnAccessorWritesTheComponentReadThroughThatAccessor() throws Throwable {
+		DataClassRecord record = record(WritesInheritedBesideAccessor.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		// The analysis reads through the super class's name(), matched after getName(): a handle on a super-class
+		// method is adapted to take the described class, so it is no direct handle, as one on getName() would be.
+		assertThrows(IllegalArgumentException.class,
+				() -> MethodHandles.lookup().revealDirect(record.fields()[0].accessor()));
+		WritesInheritedBesideAccessor written = new WritesInheritedBesideAccessor("anchor");
+		record.fields()[0].set(written, "buoy");
+		assertEquals("buoy", written.name());
+		assertEquals("buoy", record.fields()[0].get(written));
+		for (WritesInheritedBesideAccessor copy : roundTrips(new WritesInheritedBesideAccessor("anchor"))) {
+			assertEquals("anchor", copy.name());
+		}
+	}
+
+	@Test
+	void aPairWhoseGetterIsTheAccessorOfAComponentTwoClassesUpWritesThatComponent() throws Throwable {
+		DataClassRecord record = record(WritesGrandInherited.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		assertReadThroughMethod(record.fields()[0], "getName");
+		WritesGrandInherited written = new WritesGrandInherited("anchor");
+		record.fields()[0].set(written, "buoy");
+		assertEquals("buoy", written.getName());
+		for (WritesGrandInherited copy : roundTrips(new WritesGrandInherited("anchor"))) {
+			assertEquals("anchor", copy.getName());
+		}
+	}
+
+	@Test
+	void anInheritedPublicFieldTheSuperConstructorBindsIsThatConstructorsComponent() throws Throwable {
+		DataClassRecord record = record(Retagged.class);
+		assertEquals(List.of("tag:String set"), shape(record));
+		for (Retagged copy : roundTrips(new Retagged("anchor"))) {
+			assertEquals("anchor", copy.tag);
+		}
+	}
+
+	@Test
 	void aPrivatePairBesideTheConstructorsAccessorLeavesTheConstructorsComponent() throws Throwable {
 		DataClassRecord record = record(PrivatePairOverConstructorName.class);
 		assertEquals(List.of("name:String"), shape(record));
@@ -248,6 +412,73 @@ class GetSetFinderTest {
 		value.name = "anchor";
 		for (StaticPair copy : roundTrips(value)) {
 			assertEquals("anchor", copy.name);
+		}
+	}
+
+	// --- which setter pairs with a getter
+
+	@Test
+	void anOverloadedSetterPairsOnlyItsOverloadTakingTheGettersType() throws Throwable {
+		DataClassRecord record = record(OverloadedSetter.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		assertEquals(MethodType.methodType(void.class, OverloadedSetter.class, String.class),
+				record.fields()[0].setter().orElseThrow().type());
+		OverloadedSetter value = new OverloadedSetter();
+		value.setValue("anchor");
+		for (OverloadedSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aPairOverridingAGenericPairIsOneComponentAtTheOverridingType() throws Throwable {
+		DataClassRecord record = record(TextHolder.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		TextHolder value = new TextHolder();
+		value.setValue("anchor");
+		for (TextHolder copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aTwoArgumentSetterPairsWithNoGetter() throws Throwable {
+		DataClassRecord record = record(TwoArgumentSetter.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		TwoArgumentSetter value = new TwoArgumentSetter();
+		value.name = "anchor";
+		value.setValue("kept back", 1);
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+		for (TwoArgumentSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertNull(copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterTakingAWiderTypeThanItsGetterReturnsPairsWithNoGetter() throws Throwable {
+		DataClassRecord record = record(WiderSetter.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		WiderSetter value = new WiderSetter();
+		value.name = "anchor";
+		value.setValue("kept back");
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+		for (WiderSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertNull(copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterTakingTheBoxOfItsGettersPrimitivePairsWithNoGetter() throws Throwable {
+		DataClassRecord record = record(BoxedSetter.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		BoxedSetter value = new BoxedSetter();
+		value.name = "anchor";
+		value.setCount(3);
+		for (BoxedSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertEquals(0, copy.getCount());
 		}
 	}
 

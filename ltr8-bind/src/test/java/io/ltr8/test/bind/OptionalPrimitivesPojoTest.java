@@ -15,6 +15,7 @@
  */
 package io.ltr8.test.bind;
 
+import java.lang.invoke.MethodType;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -83,6 +84,32 @@ public class OptionalPrimitivesPojoTest {
 		Assertions.assertEquals(Long.class, longField.type());
 		Assertions.assertEquals(false, longField.isRequired());
 
+	}
+
+	@Test
+	public void eachSetterWritesTheFieldFromItsBoxedValueOrNull() throws Throwable {
+		DataClassField[] fields = ((DataClassRecord) context.getDescriptor(OptionalPrimitivesPojo.class)).fields();
+		Assertions.assertEquals(MethodType.methodType(void.class, OptionalPrimitivesPojo.class, Double.class),
+				fields[0].setter().orElseThrow().type());
+		Assertions.assertEquals(MethodType.methodType(void.class, OptionalPrimitivesPojo.class, Integer.class),
+				fields[1].setter().orElseThrow().type());
+		Assertions.assertEquals(MethodType.methodType(void.class, OptionalPrimitivesPojo.class, Long.class),
+				fields[2].setter().orElseThrow().type());
+
+		OptionalPrimitivesPojo written = new OptionalPrimitivesPojo();
+		fields[0].set(written, 3.0d);
+		fields[1].set(written, 1);
+		fields[2].set(written, 2L);
+		Assertions.assertEquals(OptionalDouble.of(3.0d), written.getOptionalDouble());
+		Assertions.assertEquals(OptionalInt.of(1), written.getOptionalInt());
+		Assertions.assertEquals(OptionalLong.of(2L), written.getOptionalLong());
+
+		for (DataClassField field : fields) {
+			field.set(written, null);
+		}
+		Assertions.assertEquals(OptionalDouble.empty(), written.getOptionalDouble());
+		Assertions.assertEquals(OptionalInt.empty(), written.getOptionalInt());
+		Assertions.assertEquals(OptionalLong.empty(), written.getOptionalLong());
 	}
 
 	@Test

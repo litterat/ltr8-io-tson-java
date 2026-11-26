@@ -316,6 +316,7 @@ public class ImmutableFinder implements ComponentFinder {
 
                         info.setReadMethod(readAs(MethodHandles.publicLookup().unreflect(accessorMethod),
                                 info.getType()));
+                        info.addAccessor(accessorMethod);
                         accessor = true;
                     }
                 }
@@ -407,6 +408,7 @@ public class ImmutableFinder implements ComponentFinder {
 
                 if (component.getReadMethod() != null) {
                     matched.add(name);
+                    component.addAccessor(method);
                 }
             }
         }

@@ -17,7 +17,10 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Union;
 
 import java.lang.invoke.MethodHandle;
+import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Placeholder to collect information about field details. Used as a temporary hold during the
@@ -35,6 +38,10 @@ public class ComponentInfo {
 	private MethodHandle writeMethod;
 
 	private MethodHandle readMethod;
+
+	// Every method the constructor analysis matched as this component's accessor, not only the one read through: a
+	// getter/setter pair whose getter is among them is a member of this component, whichever class declares it.
+	private final List<Method> accessors = new ArrayList<>();
 
 	private int constructorArgument;
 
@@ -119,6 +126,14 @@ public class ComponentInfo {
 
 	public void setReadMethod(MethodHandle readMethod) {
 		this.readMethod = readMethod;
+	}
+
+	public void addAccessor(Method accessor) {
+		accessors.add(accessor);
+	}
+
+	public boolean isAccessor(Method method) {
+		return accessors.contains(method);
 	}
 
 	public int getConstructorArgument() {

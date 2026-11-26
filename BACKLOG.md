@@ -515,32 +515,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a
   receiver through the emitter, not designing a second error model.
 
-## Binding (`ltr8-bind`)
-
-- [ ] **A setter is matched to its getter by name alone.** `GetSetFinder` pairs `setX` with `getX()` whatever the
-  setter's parameters, so an overloaded setter (`setValue(String)` beside `setValue(int)`), a two-argument setter and
-  a setter whose parameter type differs from the getter's return type each make `getDescriptor` throw an unchecked
-  `IllegalArgumentException`. Pair a getter only with the one-argument setter of its return type; a class with no
-  such setter has no component of that name. Pin each case in `GetSetFinderTest`, with a round trip where a
-  component remains.
-- [ ] **A getter/setter pair loses its generic type.** `GetSetFinder` reads the pair's parameterized type from the
-  setter's return type, which is `void`, so `List<String> getItems()`/`setItems(List<String>)` and an
-  `Optional<String>` pair are refused. Read it from the getter's generic return type, and round-trip a list pair
-  and an optional pair through both mappers in `GetSetFinderTest`.
-- [ ] **A setter is merged into a constructor component by name, ignoring case.** `GetSetFinder`'s merge compares
-  names with `equalsIgnoreCase` and no declaring class, so a pair named `URL` overwrites the write handle of a
-  constructor component `url`, and a subclass pair that of a super-class component it shadows. Match the name
-  exactly and by declaring class, as the `@Field` loop below it does, with a test of each.
-- [ ] **An `Optional` field with a setter throws `WrongMethodTypeException`.** With a public
-  `Optional<String> getNote()`/`setNote(Optional<String>)` pair (once the entry above reads its type) or a public
-  non-final `Optional<String>` field, `getDescriptor` throws from `DefaultRecordBinder.resolveOptionalField`: the
-  setter is given the type of a conversion, `asType(methodType(optionalType, Optional.class))`. Compose it as
-  `resolveBridgeField` does, and round-trip the class through both mappers, present and absent.
-- [ ] **`resolveOptionalNumberField` returns a conversion as the field's setter.** `DataClassField.setter()` of an
-  `OptionalInt`, `OptionalLong` or `OptionalDouble` field is the value-to-optional conversion and not a handle that
-  writes the field. Nothing calls it today. Return the composed setter, or `null` where the component has none, and
-  pin `setter()`'s type for each of the three.
-
 ## Documentation
 
 - [ ] User-facing documentation on how to use the library, in `docs/` — `README.md` and the `tson-java` skill are the

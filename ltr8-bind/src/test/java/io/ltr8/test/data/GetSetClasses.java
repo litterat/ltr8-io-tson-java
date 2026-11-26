@@ -15,7 +15,11 @@
  */
 package io.ltr8.test.data;
 
+import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
+
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Hand-written {@code @Record} classes reaching components through public fields and getter/setter pairs, one shape
@@ -104,6 +108,15 @@ public final class GetSetClasses {
 		}
 	}
 
+	public static class OptionalField {
+
+		public Optional<String> note = Optional.empty();
+
+		@Record
+		public OptionalField() {
+		}
+	}
+
 	public static class StaticField {
 
 		public static String shared;
@@ -131,6 +144,40 @@ public final class GetSetClasses {
 
 		public void setValue(String value) {
 			this.value = value;
+		}
+	}
+
+	public static class ListPair {
+
+		private List<String> items = List.of();
+
+		@Record
+		public ListPair() {
+		}
+
+		public List<String> getItems() {
+			return items;
+		}
+
+		public void setItems(List<String> items) {
+			this.items = items;
+		}
+	}
+
+	public static class OptionalPair {
+
+		private Optional<String> note = Optional.empty();
+
+		@Record
+		public OptionalPair() {
+		}
+
+		public Optional<String> getNote() {
+			return note;
+		}
+
+		public void setNote(Optional<String> note) {
+			this.note = note;
 		}
 	}
 
@@ -303,6 +350,183 @@ public final class GetSetClasses {
 		}
 	}
 
+	public static class PublicPairOverConstructorName {
+
+		private String name;
+
+		@Record
+		public PublicPairOverConstructorName(String name) {
+			this.name = name;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	/** Its pair {@code getURL}/{@code setURL} holds a value apart from the constructor's {@code url}. */
+	public static class PairNamedInAnotherCase {
+
+		private final String url;
+
+		private String link;
+
+		@Record
+		public PairNamedInAnotherCase(String url) {
+			this.url = url;
+		}
+
+		public String url() {
+			return url;
+		}
+
+		public String getURL() {
+			return link;
+		}
+
+		public void setURL(String link) {
+			this.link = link;
+		}
+	}
+
+	public static class Labelled {
+
+		private final String name;
+
+		public Labelled(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	/** Its own {@code name} shadows the super class's, and its pair is on the wire as {@code alias}. */
+	public static class Relabelled extends Labelled {
+
+		private String name;
+
+		@Record
+		public Relabelled(String name) {
+			super(name);
+		}
+
+		@Field("alias")
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class ProtectedBase {
+
+		protected String name;
+
+		public ProtectedBase(String name) {
+			this.name = name;
+		}
+	}
+
+	/** Its pair reads and writes the field its super class's constructor stores. */
+	public static class WritesInherited extends ProtectedBase {
+
+		@Record
+		public WritesInherited(String name) {
+			super(name);
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class ProtectedBaseWithAccessor {
+
+		protected String name;
+
+		public ProtectedBaseWithAccessor(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	/** Its pair and its super class's {@code name()} each read the field the super class's constructor stores. */
+	public static class WritesInheritedBesideAccessor extends ProtectedBaseWithAccessor {
+
+		@Record
+		public WritesInheritedBesideAccessor(String name) {
+			super(name);
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class PassesInherited extends ProtectedBase {
+
+		public PassesInherited(String name) {
+			super(name);
+		}
+	}
+
+	/** Its pair reads and writes the field the constructor two classes up stores. */
+	public static class WritesGrandInherited extends PassesInherited {
+
+		@Record
+		public WritesGrandInherited(String name) {
+			super(name);
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class Tagged {
+
+		public String tag;
+
+		public Tagged(String tag) {
+			this.tag = tag;
+		}
+
+		public String tag() {
+			return tag;
+		}
+	}
+
+	public static class Retagged extends Tagged {
+
+		@Record
+		public Retagged(String tag) {
+			super(tag);
+		}
+	}
+
 	public static class StaticPair {
 
 		private static String global;
@@ -319,6 +543,118 @@ public final class GetSetClasses {
 
 		public static void setGlobal(String value) {
 			global = value;
+		}
+	}
+
+	// --- which setter pairs with a getter
+
+	/** Its {@code int} setter stores the number's text, so a pair through either setter round-trips. */
+	public static class OverloadedSetter {
+
+		private String value;
+
+		@Record
+		public OverloadedSetter() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+
+		public void setValue(int value) {
+			this.value = Integer.toString(value);
+		}
+	}
+
+	public static class Holder<T> {
+
+		private T value;
+
+		public T getValue() {
+			return value;
+		}
+
+		public void setValue(T value) {
+			this.value = value;
+		}
+	}
+
+	/** Overrides both halves of its super class's pair, so it also declares a bridge of each. */
+	public static class TextHolder extends Holder<String> {
+
+		@Record
+		public TextHolder() {
+		}
+
+		@Override
+		public String getValue() {
+			return super.getValue();
+		}
+
+		@Override
+		public void setValue(String value) {
+			super.setValue(value);
+		}
+	}
+
+	public static class TwoArgumentSetter {
+
+		public String name;
+
+		private String value;
+
+		@Record
+		public TwoArgumentSetter() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value, int times) {
+			this.value = value.repeat(times);
+		}
+	}
+
+	public static class WiderSetter {
+
+		public String name;
+
+		private String value;
+
+		@Record
+		public WiderSetter() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(Object value) {
+			this.value = String.valueOf(value);
+		}
+	}
+
+	public static class BoxedSetter {
+
+		public String name;
+
+		private int count;
+
+		@Record
+		public BoxedSetter() {
+		}
+
+		public int getCount() {
+			return count;
+		}
+
+		public void setCount(Integer count) {
+			this.count = count;
 		}
 	}
 }
