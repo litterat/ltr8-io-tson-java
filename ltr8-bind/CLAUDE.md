@@ -6,7 +6,8 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
 - Constructor selection is by `@Profile`, never by matching a field set.
 - Registration is `DataBindContext.Builder`'s and closes at `build()`.
 - A cyclic type graph resolves through a deferred supplier held in `Memoized` (`RecursiveModelTest`); laziness stays
-  confined to the cyclic edge.
+  confined to the cyclic edge. A descriptor is cached only together with every descriptor its deferred edges reach,
+  so a refusal leaves nothing behind that reaches it (`RecordRefusalTest`).
 - A name index is built once per class (`DataClassRecordFieldIndexTest`).
 - A refusal's own `getMessage()` is the fact: a `DataBindException` raised while describing a class passes up
   unwrapped, however deep the class sits (`RecordRefusalTest`).

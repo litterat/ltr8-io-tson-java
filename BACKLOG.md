@@ -517,13 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A refused class on a cycle leaves its partner half-described.** With `CycleTop(CycleMember member,
-  ProtectedConstructor value)` and `CycleMember(String tag, Optional<CycleTop> top)` (`RecordRefusals`), asking for
-  `CycleTop` refuses it and leaves `CycleMember` cached, holding a deferred edge to it. `getDescriptor(CycleMember)`
-  then succeeds, and reading its `top` field's descriptor throws `IllegalStateException` ("failed to resolve the
-  deferred descriptor"); a fresh context asked for `CycleMember` first refuses it. When a resolution fails, keep no
-  descriptor that was registered during it and reaches the refused type, so the answer does not depend on the order
-  asked and `DataBindContext.componentSource`'s "it is in the cache" holds. Pin both orders in `RecordRefusalTest`.
 - [ ] **`ArrayMapper` cannot write a class whose field is read through a super-class accessor.** With `Counted extends
   Named` (`SuperConstructors`), `new ArrayMapper(context).toArray(new Counted("w", 3))` throws
   `IllegalArgumentException` ("target and test types must match") from `ArrayMapper.createProjectGetters`: the

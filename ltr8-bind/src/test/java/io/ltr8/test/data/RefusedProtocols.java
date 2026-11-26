@@ -145,6 +145,12 @@ public final class RefusedProtocols {
 		Order run(Thread request);
 	}
 
+	/** A request on a cycle whose other member is good on its own terms. */
+	public interface RefusedCycleParameter {
+
+		Order run(RecordRefusals.CycleTop request);
+	}
+
 	// --- returns
 
 	public interface ReturnsBoxedVoid {
