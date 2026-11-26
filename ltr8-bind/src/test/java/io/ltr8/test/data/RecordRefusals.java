@@ -135,7 +135,76 @@ public final class RecordRefusals {
 		}
 	}
 
+	@SuppressWarnings("rawtypes")
+	public static class RawBridge implements DataBridge {
+
+		@Override
+		public Object toData(Object b) {
+			return b;
+		}
+
+		@Override
+		public Object toObject(Object s) {
+			return s;
+		}
+	}
+
+	public abstract static class TextBridge<O> implements DataBridge<String, O> {
+	}
+
+	@SuppressWarnings("rawtypes")
+	public static class RawlyExtendedBridge extends TextBridge {
+
+		@Override
+		public String toData(Object b) {
+			return String.valueOf(b);
+		}
+
+		@Override
+		public Object toObject(Object s) {
+			return s;
+		}
+	}
+
+	public static class InheritedOpenBridge<O> extends TextBridge<O> {
+
+		@Override
+		public String toData(O b) {
+			return String.valueOf(b);
+		}
+
+		@Override
+		public O toObject(String s) {
+			return null;
+		}
+	}
+
+	public static class NestedOpenBridge<T> implements DataBridge<List<T>, String> {
+
+		@Override
+		public List<T> toData(String b) {
+			return List.of();
+		}
+
+		@Override
+		public String toObject(List<T> s) {
+			return "";
+		}
+	}
+
 	public record BridgeTypeVariable(@Field(bridge = GenericBridge.class) String value) {
+	}
+
+	public record BridgeRaw(@Field(bridge = RawBridge.class) String value) {
+	}
+
+	public record BridgeRawlyExtended(@Field(bridge = RawlyExtendedBridge.class) String value) {
+	}
+
+	public record BridgeInheritedOpen(@Field(bridge = InheritedOpenBridge.class) String value) {
+	}
+
+	public record BridgeNestedOpen(@Field(bridge = NestedOpenBridge.class) String value) {
 	}
 
 	public record BridgeObjectMismatch(@Field(bridge = StringToIntegerBridge.class) Long value) {
@@ -170,6 +239,38 @@ public final class RecordRefusals {
 		@Profile("v1")
 		public ProfileParameterUnnamed(String a) {
 			this(a, null);
+		}
+	}
+
+	public record ProfileParameterNarrower(long count, String label) {
+
+		@Profile(value = "v1", fields = { "count" })
+		public ProfileParameterNarrower(int count) {
+			this(count, null);
+		}
+	}
+
+	public record ProfileParameterUnboxed(Integer count, String label) {
+
+		@Profile(value = "v1", fields = { "count" })
+		public ProfileParameterUnboxed(int count) {
+			this(count, null);
+		}
+	}
+
+	public record ProfileParameterUnrelated(Integer count, String label) {
+
+		@Profile(value = "v1", fields = { "label" })
+		public ProfileParameterUnrelated(Integer label) {
+			this(label, null);
+		}
+	}
+
+	public record DesignatedParameterNarrower(long count) {
+
+		@Record
+		public DesignatedParameterNarrower(@Field("count") int count) {
+			this((long) count);
 		}
 	}
 

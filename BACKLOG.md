@@ -540,18 +540,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `OptionalInt`, `OptionalLong` or `OptionalDouble` field is the value-to-optional conversion and not a handle that
   writes the field. Nothing calls it today. Return the composed setter, or `null` where the component has none, and
   pin `setter()`'s type for each of the three.
-- [ ] **A `@Field` bridge that inherits `DataBridge` throws `ArrayIndexOutOfBoundsException`.** With
-  `class Upper extends AbstractTextBridge` and `AbstractTextBridge implements DataBridge<String, Name>`,
-  `@Field(bridge = Upper.class)` makes `getDescriptor` throw from `DefaultRecordBinder.fieldBridge`, which reads
-  `getGenericInterfaces()[0]`; a bridge listing another interface first reads the wrong one. Find `DataBridge`'s
-  type arguments through the super classes and interfaces, refusing a bridge that leaves them open with a
-  `CodeAnalysisException`, with a round trip of each shape in `BridgedFieldTest`.
-- [ ] **`DefaultRecordBinder` throws unchecked exceptions for components that do not match the constructor.** Handed
-  fewer or more constructor-bound components than the constructor has parameters, or one of another type,
-  `createTupleConstructor` and its siblings throw `IllegalArgumentException` or `IndexOutOfBoundsException`.
-  `ImmutableFinder` produces no such list, so this is read and not reproduced: reproduce it through a
-  `ComponentFinder` of the test's own if the binder takes one, refuse the class with a `CodeAnalysisException`
-  naming it, and say so if there is no route to it.
 
 ## Documentation
 

@@ -155,6 +155,13 @@ public class RecordComponentFinder implements ComponentFinder {
         for (int x = 0; x < parameters.length; x++) {
             String name = nameOf(clss, parameters[x], declared, x);
             RecordComponent component = componentNamed(clss, components, name);
+            // A value bound at the component's type fills the parameter unconverted.
+            if (parameters[x].getType() != component.getType()) {
+                throw new CodeAnalysisException(String.format(
+                        "Parameter %d of the selected constructor on '%s' is %s, but the component '%s' it names is "
+                                + "%s: a constructor parameter takes its component's type", x, clss.getName(),
+                        parameters[x].getType().getTypeName(), name, component.getType().getTypeName()));
+            }
             ComponentInfo info = new ComponentInfo(name, component.getType());
             info.setConstructorArgument(x);
             try {

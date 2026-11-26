@@ -22,13 +22,20 @@ import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
+import io.ltr8.test.data.BridgedFields.AbstractBaseBridge;
 import io.ltr8.test.data.BridgedFields.Constructed;
+import io.ltr8.test.data.BridgedFields.DirectBridge;
+import io.ltr8.test.data.BridgedFields.GenericInterfaceFirstBridge;
 import io.ltr8.test.data.BridgedFields.GetterSetter;
+import io.ltr8.test.data.BridgedFields.PlainInterfaceFirstBridge;
 import io.ltr8.test.data.BridgedFields.PublicField;
 import io.ltr8.test.data.BridgedFields.RecordedConstructed;
 import io.ltr8.test.data.BridgedFields.RecordedGetterSetter;
 import io.ltr8.test.data.BridgedFields.RecordedPublicField;
 import io.ltr8.test.data.BridgedFields.RecordingNumberAsText;
+import io.ltr8.test.data.BridgedFields.SubInterfaceBridge;
+import io.ltr8.test.data.BridgedFields.SubclassedBridge;
+import io.ltr8.test.data.BridgedFields.TwoHopBridge;
 import io.ltr8.test.data.BridgedFields.TwoRecordedFields;
 import org.junit.jupiter.api.Test;
 
@@ -181,6 +188,60 @@ class BridgedFieldTest {
 		DataBindContext.builder().build().getDescriptor(RecordedConstructed.class);
 		DataBindContext.builder().build().getDescriptor(RecordedConstructed.class);
 		assertEquals(2, RecordingNumberAsText.BUILT.size());
+	}
+
+	/** {@code type}'s one component, an {@code Integer count} bridged as text, round-tripped through both mappers. */
+	private void assertBridgedCountRoundTrips(Class<?> type) throws Throwable {
+		countField(type);
+		Object value = type.getConstructor(Integer.class).newInstance(42);
+		Object absent = type.getConstructor(Integer.class).newInstance((Integer) null);
+
+		MapMapper maps = new MapMapper(context);
+		assertEquals(Map.of("count", "42"), maps.toMap(value));
+		assertEquals(value, maps.toObject(type, maps.toMap(value)));
+		assertEquals(Map.of(), maps.toMap(absent));
+		assertEquals(absent, maps.toObject(type, Map.of()));
+
+		ArrayMapper arrays = new ArrayMapper(context);
+		assertArrayEquals(new Object[] { "42" }, arrays.toArray(value));
+		assertEquals(value, arrays.toObject(type, arrays.toArray(value)));
+		assertArrayEquals(new Object[] { null }, arrays.toArray(absent));
+		assertEquals(absent, arrays.toObject(type, new Object[] { null }));
+	}
+
+	@Test
+	void aBridgeImplementingDataBridgeItselfRoundTripsThroughBothMappers() throws Throwable {
+		assertBridgedCountRoundTrips(DirectBridge.class);
+	}
+
+	@Test
+	void aBridgeExtendingAnAbstractGenericBaseRoundTripsThroughBothMappers() throws Throwable {
+		assertBridgedCountRoundTrips(AbstractBaseBridge.class);
+	}
+
+	@Test
+	void aBridgeWhoseTypeArgumentsAreBoundTwoSuperClassesApartRoundTripsThroughBothMappers() throws Throwable {
+		assertBridgedCountRoundTrips(TwoHopBridge.class);
+	}
+
+	@Test
+	void aBridgeExtendingAConcreteBridgeRoundTripsThroughBothMappers() throws Throwable {
+		assertBridgedCountRoundTrips(SubclassedBridge.class);
+	}
+
+	@Test
+	void aBridgeListingAPlainInterfaceBeforeDataBridgeRoundTripsThroughBothMappers() throws Throwable {
+		assertBridgedCountRoundTrips(PlainInterfaceFirstBridge.class);
+	}
+
+	@Test
+	void aBridgeListingAGenericInterfaceBeforeDataBridgeRoundTripsThroughBothMappers() throws Throwable {
+		assertBridgedCountRoundTrips(GenericInterfaceFirstBridge.class);
+	}
+
+	@Test
+	void aBridgeImplementingASubInterfaceOfDataBridgeRoundTripsThroughBothMappers() throws Throwable {
+		assertBridgedCountRoundTrips(SubInterfaceBridge.class);
 	}
 
 	@Test

@@ -19,8 +19,10 @@ import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 
+import java.io.Serializable;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /** One {@code @Field} bridge on each way a {@code @Record} class can expose a component. */
 public final class BridgedFields {
@@ -143,5 +145,102 @@ public final class BridgedFields {
 
 	public record TwoRecordedFields(@Field(bridge = RecordingNumberAsText.class) Integer first,
 			@Field(bridge = RecordingNumberAsText.class) Integer second) {
+	}
+
+	// --- a bridge reaching DataBridge other than by naming it first among its own interfaces
+
+	public abstract static class TextBridge<O> implements DataBridge<String, O> {
+	}
+
+	public static class InheritedNumberAsText extends TextBridge<Integer> {
+
+		private final NumberAsText bridge = new NumberAsText();
+
+		@Override
+		public String toData(Integer number) {
+			return bridge.toData(number);
+		}
+
+		@Override
+		public Integer toObject(String text) {
+			return bridge.toObject(text);
+		}
+	}
+
+	/** The type parameters listed in the other order from {@code DataBridge}'s, and bound one hop apart. */
+	public abstract static class Swapped<O, D> implements DataBridge<D, O> {
+	}
+
+	public abstract static class HalfBound<O> extends Swapped<O, String> {
+	}
+
+	public static class TwoHopNumberAsText extends HalfBound<Integer> {
+
+		private final NumberAsText bridge = new NumberAsText();
+
+		@Override
+		public String toData(Integer number) {
+			return bridge.toData(number);
+		}
+
+		@Override
+		public Integer toObject(String text) {
+			return bridge.toObject(text);
+		}
+	}
+
+	public static class SubclassedNumberAsText extends NumberAsText {
+	}
+
+	public static class SerializableNumberAsText extends NumberAsText
+			implements Serializable, DataBridge<String, Integer> {
+	}
+
+	public static class FunctionNumberAsText extends NumberAsText
+			implements Function<Integer, String>, DataBridge<String, Integer> {
+
+		@Override
+		public String apply(Integer number) {
+			return toData(number);
+		}
+	}
+
+	public interface TextDataBridge<O> extends DataBridge<String, O> {
+	}
+
+	public static class SubInterfaceNumberAsText implements TextDataBridge<Integer> {
+
+		private final NumberAsText bridge = new NumberAsText();
+
+		@Override
+		public String toData(Integer number) {
+			return bridge.toData(number);
+		}
+
+		@Override
+		public Integer toObject(String text) {
+			return bridge.toObject(text);
+		}
+	}
+
+	public record DirectBridge(@Field(bridge = NumberAsText.class) Integer count) {
+	}
+
+	public record AbstractBaseBridge(@Field(bridge = InheritedNumberAsText.class) Integer count) {
+	}
+
+	public record TwoHopBridge(@Field(bridge = TwoHopNumberAsText.class) Integer count) {
+	}
+
+	public record SubclassedBridge(@Field(bridge = SubclassedNumberAsText.class) Integer count) {
+	}
+
+	public record PlainInterfaceFirstBridge(@Field(bridge = SerializableNumberAsText.class) Integer count) {
+	}
+
+	public record GenericInterfaceFirstBridge(@Field(bridge = FunctionNumberAsText.class) Integer count) {
+	}
+
+	public record SubInterfaceBridge(@Field(bridge = SubInterfaceNumberAsText.class) Integer count) {
 	}
 }
