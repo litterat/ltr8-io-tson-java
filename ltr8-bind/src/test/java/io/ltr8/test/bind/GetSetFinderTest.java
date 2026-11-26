@@ -29,6 +29,7 @@ import io.ltr8.test.data.GetSetClasses.FinalFieldWithoutAccessor;
 import io.ltr8.test.data.GetSetClasses.InlineFinalField;
 import io.ltr8.test.data.GetSetClasses.MutableFieldBoundByConstructor;
 import io.ltr8.test.data.GetSetClasses.MutableFields;
+import io.ltr8.test.data.GetSetClasses.OptionalField;
 import io.ltr8.test.data.GetSetClasses.OverloadedSetter;
 import io.ltr8.test.data.GetSetClasses.PackagePrivatePair;
 import io.ltr8.test.data.GetSetClasses.PrivateGetterPublicSetter;
@@ -46,12 +47,14 @@ import io.ltr8.test.data.GetSetClasses.TwoArgumentSetter;
 import io.ltr8.test.data.GetSetClasses.WiderSetter;
 import org.junit.jupiter.api.Test;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -133,6 +136,31 @@ class GetSetFinderTest {
 		assertEquals(List.of("name:String set"), shape(record));
 		for (MutableFieldBoundByConstructor copy : roundTrips(new MutableFieldBoundByConstructor("anchor"))) {
 			assertEquals("anchor", copy.name);
+		}
+	}
+
+	@Test
+	void aPublicOptionalFieldIsWrittenThroughTheFieldWhetherPresentOrAbsent() throws Throwable {
+		DataClassRecord record = record(OptionalField.class);
+		assertEquals(List.of("note:String set"), shape(record));
+		MethodHandle setter = record.fields()[0].setter().orElseThrow();
+		assertEquals(MethodType.methodType(void.class, OptionalField.class, String.class), setter.type());
+		OptionalField written = new OptionalField();
+		record.fields()[0].set(written, "anchor");
+		assertEquals(Optional.of("anchor"), written.note);
+		record.fields()[0].set(written, null);
+		assertEquals(Optional.empty(), written.note);
+
+		OptionalField present = new OptionalField();
+		present.note = Optional.of("anchor");
+		assertEquals(Map.of("note", "anchor"), new MapMapper(context).toMap(present));
+		for (OptionalField copy : roundTrips(present)) {
+			assertEquals(Optional.of("anchor"), copy.note);
+		}
+		OptionalField absent = new OptionalField();
+		assertEquals(Map.of(), new MapMapper(context).toMap(absent));
+		for (OptionalField copy : roundTrips(absent)) {
+			assertEquals(Optional.empty(), copy.note);
 		}
 	}
 

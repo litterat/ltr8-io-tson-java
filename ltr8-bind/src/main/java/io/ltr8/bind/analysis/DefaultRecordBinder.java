@@ -713,8 +713,8 @@ public class DefaultRecordBinder {
 				.asType(MethodType.methodType(optionalType, targetClass));
 
 		if (setter != null) {
-			setter = MethodHandles.collectArguments(setter, 1, optionalToObject)
-					.asType(MethodType.methodType(optionalType, Optional.class));
+			setter = MethodHandles.filterArguments(setter, 1,
+					optionalToObject.asType(MethodType.methodType(Optional.class, optionalType)));
 		}
 
 		// (optional) -> optional.isPresent();

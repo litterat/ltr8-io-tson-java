@@ -525,11 +525,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   names with `equalsIgnoreCase` and no declaring class, so a pair named `URL` overwrites the write handle of a
   constructor component `url`, and a subclass pair that of a super-class component it shadows. Match the name
   exactly and by declaring class, as the `@Field` loop below it does, with a test of each.
-- [ ] **An `Optional` field with a setter throws `WrongMethodTypeException`.** With a public
-  `Optional<String> getNote()`/`setNote(Optional<String>)` pair (once the entry above reads its type) or a public
-  non-final `Optional<String>` field, `getDescriptor` throws from `DefaultRecordBinder.resolveOptionalField`: the
-  setter is given the type of a conversion, `asType(methodType(optionalType, Optional.class))`. Compose it as
-  `resolveBridgeField` does, and round-trip the class through both mappers, present and absent.
 - [ ] **`resolveOptionalNumberField` returns a conversion as the field's setter.** `DataClassField.setter()` of an
   `OptionalInt`, `OptionalLong` or `OptionalDouble` field is the value-to-optional conversion and not a handle that
   writes the field. Nothing calls it today. Return the composed setter, or `null` where the component has none, and

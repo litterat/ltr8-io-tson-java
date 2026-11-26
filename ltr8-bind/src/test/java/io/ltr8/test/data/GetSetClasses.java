@@ -17,6 +17,8 @@ package io.ltr8.test.data;
 
 import io.ltr8.annotation.Record;
 
+import java.util.Optional;
+
 /**
  * Hand-written {@code @Record} classes reaching components through public fields and getter/setter pairs, one shape
  * each. A class beside the shape it tests holds a public field {@code name}, so it has a component either way.
@@ -101,6 +103,15 @@ public final class GetSetClasses {
 
 		public String name() {
 			return name;
+		}
+	}
+
+	public static class OptionalField {
+
+		public Optional<String> note = Optional.empty();
+
+		@Record
+		public OptionalField() {
 		}
 	}
 
