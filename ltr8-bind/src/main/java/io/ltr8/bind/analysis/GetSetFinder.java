@@ -82,9 +82,9 @@ public class GetSetFinder implements ComponentFinder {
 		//
 		// A pair is a component only when both halves are public instance methods. A pair that is not is no
 		// component, as a private field is not: the class is described from its other members. A getter pairs
-		// only with the one-argument setter of its return type: another overload, or a setter taking another
-		// type, is not handed the value the getter reads. A covariant override's bridge getter is skipped, so
-		// the pair is found once, at the overriding return type.
+		// only with the one-argument setter of its generic return type: another overload, or a setter taking
+		// another type, even one of the same erasure, is not handed the value the getter reads. A covariant
+		// override's bridge getter is skipped, so the pair is found once, at the overriding return type.
 		Method[] methods = clss.getDeclaredMethods();
 		for (Method getter : methods) {
 
@@ -95,7 +95,8 @@ public class GetSetFinder implements ComponentFinder {
 				try {
 					// If this throws NoSuchMethodException we ignore field.
 					Method method = clss.getDeclaredMethod("s" + getterName.substring(1), getter.getReturnType());
-					if (!isPublicInstance(method)) {
+					if (!isPublicInstance(method)
+							|| !method.getGenericParameterTypes()[0].equals(getter.getGenericReturnType())) {
 						continue;
 					}
 

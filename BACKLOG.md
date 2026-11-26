@@ -517,11 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A getter/setter pair matching only on its erased type is accepted.** `List<String> getItems()` beside
-  `setItems(List<Integer>)` is one component (`GetSetClasses`-style fixture), and a round trip hands the strings to
-  the `List<Integer>` setter. `GetSetFinder` looks the setter up by the getter's erased return type. Pair only where
-  the setter's generic parameter type equals the getter's generic return type; otherwise the class has no component
-  of that name. Pin both in `GetSetFinderTest`.
 - [ ] **A getter/setter pair a super class declares is no component.** `GetSetFinder` reads `getDeclaredMethods()`
   of the described class alone, while a public field a super class declares is a component: a class extending one
   that declares `getName`/`setName` loses `name`. Read, not run. Find the pairs of the super classes too, a generic

@@ -30,8 +30,11 @@ import io.ltr8.test.data.GetSetClasses.InlineFinalField;
 import io.ltr8.test.data.GetSetClasses.ListPair;
 import io.ltr8.test.data.GetSetClasses.MutableFieldBoundByConstructor;
 import io.ltr8.test.data.GetSetClasses.MutableFields;
+import io.ltr8.test.data.GetSetClasses.NestedArgumentPair;
 import io.ltr8.test.data.GetSetClasses.OptionalField;
 import io.ltr8.test.data.GetSetClasses.OptionalPair;
+import io.ltr8.test.data.GetSetClasses.OtherElementSetter;
+import io.ltr8.test.data.GetSetClasses.OtherNestedArgumentSetter;
 import io.ltr8.test.data.GetSetClasses.OverloadedSetter;
 import io.ltr8.test.data.GetSetClasses.PackagePrivatePair;
 import io.ltr8.test.data.GetSetClasses.PairNamedInAnotherCase;
@@ -44,6 +47,7 @@ import io.ltr8.test.data.GetSetClasses.ProtectedPair;
 import io.ltr8.test.data.GetSetClasses.PublicGetterPrivateSetter;
 import io.ltr8.test.data.GetSetClasses.PublicPair;
 import io.ltr8.test.data.GetSetClasses.PublicPairOverConstructorName;
+import io.ltr8.test.data.GetSetClasses.RawSetter;
 import io.ltr8.test.data.GetSetClasses.Relabelled;
 import io.ltr8.test.data.GetSetClasses.Retagged;
 import io.ltr8.test.data.GetSetClasses.StaticField;
@@ -466,6 +470,57 @@ class GetSetFinderTest {
 		for (WiderSetter copy : roundTrips(value)) {
 			assertEquals("anchor", copy.name);
 			assertNull(copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterTakingAnotherElementTypeThanItsGetterReturnsPairsWithNoGetter() throws Throwable {
+		DataClassRecord record = record(OtherElementSetter.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		OtherElementSetter value = new OtherElementSetter();
+		value.name = "anchor";
+		value.setItems(List.of(1, 2));
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+		for (OtherElementSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertEquals(List.of(), copy.getItems());
+		}
+	}
+
+	@Test
+	void aSetterDifferingFromItsGetterOnlyInANestedArgumentPairsWithNoGetter() throws Throwable {
+		DataClassRecord record = record(OtherNestedArgumentSetter.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		OtherNestedArgumentSetter value = new OtherNestedArgumentSetter();
+		value.name = "anchor";
+		value.setRows(List.of(List.of("kept back")));
+		for (OtherNestedArgumentSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertEquals(List.of(), copy.getRows());
+		}
+	}
+
+	@Test
+	void aRawSetterPairsWithNoParameterizedGetter() throws Throwable {
+		DataClassRecord record = record(RawSetter.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		RawSetter value = new RawSetter();
+		value.name = "anchor";
+		value.setItems(List.of("kept back"));
+		for (RawSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertEquals(List.of(), copy.getItems());
+		}
+	}
+
+	@Test
+	void aPairWhoseNestedArgumentsAgreeIsAComponent() throws Throwable {
+		DataClassRecord record = record(NestedArgumentPair.class);
+		assertEquals(List.of("rows:List set"), shape(record));
+		NestedArgumentPair value = new NestedArgumentPair();
+		value.setRows(List.of(List.of(1, 2), List.of(3)));
+		for (NestedArgumentPair copy : roundTrips(value)) {
+			assertEquals(List.of(List.of(1, 2), List.of(3)), copy.getRows());
 		}
 	}
 

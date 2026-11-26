@@ -639,6 +639,83 @@ public final class GetSetClasses {
 		}
 	}
 
+	public static class OtherElementSetter {
+
+		public String name;
+
+		private List<?> items = List.of();
+
+		@Record
+		public OtherElementSetter() {
+		}
+
+		@SuppressWarnings("unchecked")
+		public List<String> getItems() {
+			return (List<String>) items;
+		}
+
+		public void setItems(List<Integer> items) {
+			this.items = items;
+		}
+	}
+
+	public static class RawSetter {
+
+		public String name;
+
+		private List<String> items = List.of();
+
+		@Record
+		public RawSetter() {
+		}
+
+		public List<String> getItems() {
+			return items;
+		}
+
+		@SuppressWarnings({ "rawtypes", "unchecked" })
+		public void setItems(List items) {
+			this.items = items;
+		}
+	}
+
+	public static class NestedArgumentPair {
+
+		private List<List<Integer>> rows = List.of();
+
+		@Record
+		public NestedArgumentPair() {
+		}
+
+		public List<List<Integer>> getRows() {
+			return rows;
+		}
+
+		public void setRows(List<List<Integer>> rows) {
+			this.rows = rows;
+		}
+	}
+
+	public static class OtherNestedArgumentSetter {
+
+		public String name;
+
+		private List<?> rows = List.of();
+
+		@Record
+		public OtherNestedArgumentSetter() {
+		}
+
+		@SuppressWarnings("unchecked")
+		public List<List<Integer>> getRows() {
+			return (List<List<Integer>>) rows;
+		}
+
+		public void setRows(List<List<String>> rows) {
+			this.rows = rows;
+		}
+	}
+
 	public static class BoxedSetter {
 
 		public String name;
