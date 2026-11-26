@@ -25,6 +25,11 @@ import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.BridgedFields.Constructed;
 import io.ltr8.test.data.BridgedFields.GetterSetter;
 import io.ltr8.test.data.BridgedFields.PublicField;
+import io.ltr8.test.data.BridgedFields.RecordedConstructed;
+import io.ltr8.test.data.BridgedFields.RecordedGetterSetter;
+import io.ltr8.test.data.BridgedFields.RecordedPublicField;
+import io.ltr8.test.data.BridgedFields.RecordingNumberAsText;
+import io.ltr8.test.data.BridgedFields.TwoRecordedFields;
 import org.junit.jupiter.api.Test;
 
 import java.lang.invoke.MethodType;
@@ -122,6 +127,60 @@ class BridgedFieldTest {
 		assertEquals(42, arrays.toObject(PublicField.class, arrays.toArray(value)).count);
 		assertArrayEquals(new Object[] { null }, arrays.toArray(absent));
 		assertNull(arrays.toObject(PublicField.class, new Object[] { null }).count);
+	}
+
+	/** Describes {@code value}'s class in a fresh context and round-trips {@code value} through both mappers. */
+	private static void describeAndRoundTrip(Object value, int bridgedFields) throws Throwable {
+		RecordingNumberAsText.BUILT.clear();
+		RecordingNumberAsText.CONVERTED.clear();
+		DataBindContext fresh = DataBindContext.builder().build();
+
+		fresh.getDescriptor(value.getClass());
+		assertEquals(bridgedFields, RecordingNumberAsText.BUILT.size(), "one bridge per bridged field");
+		fresh.getDescriptor(value.getClass());
+		assertEquals(bridgedFields, RecordingNumberAsText.BUILT.size(), "and none for a cached descriptor");
+
+		MapMapper maps = new MapMapper(fresh);
+		assertEquals(maps.toMap(value), maps.toMap(maps.toObject(value.getClass(), maps.toMap(value))));
+		ArrayMapper arrays = new ArrayMapper(fresh);
+		assertArrayEquals(arrays.toArray(value), arrays.toArray(arrays.toObject(value.getClass(),
+				arrays.toArray(value))));
+
+		assertEquals(bridgedFields, RecordingNumberAsText.BUILT.size(), "reading and writing build none");
+		assertEquals(RecordingNumberAsText.BUILT, RecordingNumberAsText.CONVERTED,
+				"toData and toObject run on the one bridge built for the field");
+	}
+
+	@Test
+	void aBridgedGetterAndSetterPairBuildsOneBridgeForBothDirections() throws Throwable {
+		RecordedGetterSetter value = new RecordedGetterSetter();
+		value.setCount(42);
+		describeAndRoundTrip(value, 1);
+	}
+
+	@Test
+	void aBridgedPublicFieldBuildsOneBridgeForBothDirections() throws Throwable {
+		RecordedPublicField value = new RecordedPublicField();
+		value.count = 42;
+		describeAndRoundTrip(value, 1);
+	}
+
+	@Test
+	void aBridgedConstructorArgumentBuildsOneBridgeForBothDirections() throws Throwable {
+		describeAndRoundTrip(new RecordedConstructed(42), 1);
+	}
+
+	@Test
+	void eachBridgedFieldBuildsABridgeOfItsOwn() throws Throwable {
+		describeAndRoundTrip(new TwoRecordedFields(1, 2), 2);
+	}
+
+	@Test
+	void eachDescriptionBuildsItsOwnBridge() throws Throwable {
+		RecordingNumberAsText.BUILT.clear();
+		DataBindContext.builder().build().getDescriptor(RecordedConstructed.class);
+		DataBindContext.builder().build().getDescriptor(RecordedConstructed.class);
+		assertEquals(2, RecordingNumberAsText.BUILT.size());
 	}
 
 	@Test

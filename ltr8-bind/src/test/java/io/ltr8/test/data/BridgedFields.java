@@ -19,6 +19,9 @@ import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 /** One {@code @Field} bridge on each way a {@code @Record} class can expose a component. */
 public final class BridgedFields {
 
@@ -80,5 +83,65 @@ public final class BridgedFields {
 		public Integer count() {
 			return count;
 		}
+	}
+
+	/** {@link NumberAsText}, recording each instance built and each instance a conversion runs on. */
+	public static class RecordingNumberAsText implements DataBridge<String, Integer> {
+
+		public static final Set<RecordingNumberAsText> BUILT = ConcurrentHashMap.newKeySet();
+		public static final Set<RecordingNumberAsText> CONVERTED = ConcurrentHashMap.newKeySet();
+
+		private final NumberAsText bridge = new NumberAsText();
+
+		public RecordingNumberAsText() {
+			BUILT.add(this);
+		}
+
+		@Override
+		public String toData(Integer number) {
+			CONVERTED.add(this);
+			return bridge.toData(number);
+		}
+
+		@Override
+		public Integer toObject(String text) {
+			CONVERTED.add(this);
+			return bridge.toObject(text);
+		}
+	}
+
+	@Record
+	public static class RecordedGetterSetter {
+
+		private Integer count;
+
+		public RecordedGetterSetter() {
+		}
+
+		@Field(bridge = RecordingNumberAsText.class)
+		public Integer getCount() {
+			return count;
+		}
+
+		public void setCount(Integer count) {
+			this.count = count;
+		}
+	}
+
+	@Record
+	public static class RecordedPublicField {
+
+		@Field(bridge = RecordingNumberAsText.class)
+		public Integer count;
+
+		public RecordedPublicField() {
+		}
+	}
+
+	public record RecordedConstructed(@Field(bridge = RecordingNumberAsText.class) Integer count) {
+	}
+
+	public record TwoRecordedFields(@Field(bridge = RecordingNumberAsText.class) Integer first,
+			@Field(bridge = RecordingNumberAsText.class) Integer second) {
 	}
 }
