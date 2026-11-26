@@ -202,13 +202,6 @@ public class DefaultRecordBinder {
 
 				DataClassRecord descriptor = resolveClassRecord(context, targetClass, parameterizedType);
 
-				// At this point descriptor is not null but hasn't been added to context.
-				// Loop through know interfaces and if we find a union type add this descriptor to it.
-				registerUnionInterfaces(context, targetClass);
-
-				// Same applies to super classes that are abstract.
-				registerUnionSubclasses(context, targetClass);
-
 				return new DataClassRecord(descriptor.typeClass(), bridge, descriptor.isMutable(), descriptor.creator(),
 						descriptor.constructor(), descriptor.fields(),
 						descriptor.annotationsCarrier().orElse(null));
@@ -339,63 +332,42 @@ public class DefaultRecordBinder {
 	}
 
 	/**
-	 * Search through any super-classes of the target class and add this class any Union parent classes
+	 * Adds the class {@code described} describes to each open union it implements or extends: an interface it
+	 * declares, or an abstract super class, carrying {@code @Union} with no members listed and not sealed. Only a
+	 * record described by its own components joins, not one bridged through {@code ToData} or {@code @Transparent}.
 	 *
-	 * @param context DataBindContext for that the target class is being registered.
-	 * @param targetClass target class
+	 * <p>Called by {@link DataBindContext} once {@code described} is part of a component that resolved whole, and
+	 * not by {@link #resolveRecord}: a class on a cycle is described only if every class on the cycle is, so a
+	 * class joining while its own fields resolve stays listed after a class it reaches is refused.
 	 */
-	private void registerUnionSubclasses(DataBindContext context, Class<?> targetClass) {
-		Class<?> superClass = targetClass;
-		while ((superClass = superClass.getSuperclass()) != null) {
-
-			// An abstract type is a union type.
+	public static void joinUnions(DataBindContext context, DataClass described) {
+		if (!(described instanceof DataClassRecord record) || record.bridge().isPresent()) {
+			return;
+		}
+		Class<?> member = record.typeClass();
+		for (Class<?> declared : member.getInterfaces()) {
+			joinUnion(context, declared, member);
+		}
+		for (Class<?> superClass = member.getSuperclass(); superClass != null;
+				superClass = superClass.getSuperclass()) {
 			if (Modifier.isAbstract(superClass.getModifiers())) {
-				try {
-
-					// Only attempt to add children if the union doesn't have child types specified.
-					Union union = superClass
-							.getAnnotation(Union.class);
-					if (union != null && (union.value() == null || union.value().length == 0)
-							&& !superClass.isSealed()) {
-						DataClassUnion targetUnion = (DataClassUnion) context.getDescriptor(superClass);
-
-						if (!targetUnion.isMemberType(targetClass)) {
-							targetUnion.addMemberType(targetClass);
-						}
-					}
-				} catch (Throwable t) {
-					// ignore.
-				}
+				joinUnion(context, superClass, member);
 			}
 		}
 	}
 
-	/**
-	 * Search through any implemented interfaces for the target class and if a Union has been declared
-	 * add this to the member list.
-	 *
-	 * @param context DataBindContext for that the target class is being registered.
-	 * @param targetClass target class
-	 */
-	private void registerUnionInterfaces(DataBindContext context, Class<?> targetClass) {
-		Class<?>[] interfaces = targetClass.getInterfaces();
-		for (Class<?> targetInterface : interfaces) {
-			try {
-
-				// Only attempt to add children if the union doesn't have child types specified.
-				Union union = targetInterface
-						.getAnnotation(Union.class);
-				if (union != null && (union.value() == null || union.value().length == 0)
-						&& !targetInterface.isSealed()) {
-					DataClassUnion targetUnion = (DataClassUnion) context.getDescriptor(targetInterface);
-
-					if (!targetUnion.isMemberType(targetClass)) {
-						targetUnion.addMemberType(targetClass);
-					}
-				}
-			} catch (Throwable t) {
-				// ignore.
+	private static void joinUnion(DataBindContext context, Class<?> union, Class<?> member) {
+		Union annotation = union.getAnnotation(Union.class);
+		if (annotation == null || annotation.value().length > 0 || union.isSealed()) {
+			return;
+		}
+		try {
+			if (context.getDescriptor(union) instanceof DataClassUnion open) {
+				open.addMemberType(member);
 			}
+		} catch (DataBindException e) {
+			// A union this context cannot describe, or one that admits no additions, has no members for this
+			// class to join.
 		}
 	}
 

@@ -535,11 +535,6 @@ Where an entry says "not run", reproduce it first; one that does not reproduce c
 - [ ] **`ComponentInfo.setUnion`'s duplicate check reads as inverted.** Not run. It throws where the two unions
   are equal, and its message says "Field annotation", so `@Union` on both a constructor parameter and its
   accessor is probably refused. Refuse two that differ, accept two that agree, and name `@Union` in the message.
-- [ ] **A refused class can stay a member of a cached open union.** Not run. `DefaultRecordBinder` registers a class
-  with its union interfaces and super classes (`registerUnionInterfaces`, `registerUnionSubclasses`) once its own
-  fields resolve; `addMemberType` changes a union descriptor that may already be cached, and a refusal after that
-  point does not take the member back. Both also swallow every `Throwable`. Add a member only once its class is
-  described, and catch only what a missing union means.
 - [ ] **A `@Record` class with a public final field and an accessor is refused.** `GetSetFinder` calls
   `unreflectSetter` on the final field, which fails. A final field has no setter: read it, and bind it through the
   constructor.
