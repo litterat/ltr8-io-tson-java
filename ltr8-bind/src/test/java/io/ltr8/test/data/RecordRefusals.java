@@ -21,6 +21,7 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.FieldOrder;
 import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Record;
+import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 import io.ltr8.test.data.ToDataBridges.ProtectedConstructor;
 
@@ -234,6 +235,39 @@ public final class RecordRefusals {
 		}
 	}
 
+	public record ProfileNamesComponentTwice(String a, String b, String c) {
+
+		@Profile(value = "v1", fields = { "a", "a" })
+		public ProfileNamesComponentTwice(String x, String y) {
+			this(x, y, null);
+		}
+	}
+
+	public record ProfileParametersNameComponentTwice(String a, String b, String c) {
+
+		@Profile("v1")
+		public ProfileParametersNameComponentTwice(@Field("a") String x, @Field("a") String y) {
+			this(x, y, null);
+		}
+	}
+
+	public record DesignatedParametersNameComponentTwice(String a, String b, String c) {
+
+		@Record
+		public DesignatedParametersNameComponentTwice(@Field("a") String x, @Field("a") String y) {
+			this(x, y, null);
+		}
+	}
+
+	/** Its profile names two components, and {@code @Field} gives the second the first one's name. */
+	public record ProfileRenamesOntoAnother(String a, String b, String c) {
+
+		@Profile(value = "v1", fields = { "a", "b" })
+		public ProfileRenamesOntoAnother(String x, @Field("a") String y) {
+			this(x, y, null);
+		}
+	}
+
 	public record ProfileParameterUnnamed(String a, String b) {
 
 		@Profile("v1")
@@ -342,6 +376,161 @@ public final class RecordRefusals {
 		public void setValue(String value) {
 			this.value = value;
 		}
+	}
+
+	// --- two components of one wire name, and the same shapes named apart
+
+	/** A public field and a getter/setter pair over another field, both named {@code name}. */
+	public static class FieldBesidePair {
+
+		public String name;
+
+		private String label;
+
+		@Record
+		public FieldBesidePair() {
+		}
+
+		public String getName() {
+			return label;
+		}
+
+		public void setName(String label) {
+			this.label = label;
+		}
+	}
+
+	/** As {@link FieldBesidePair}, the field named apart by {@code @Field}. */
+	public static class FieldBesidePairNamedApart {
+
+		@Field("alias")
+		public String name;
+
+		private String label;
+
+		@Record
+		public FieldBesidePairNamedApart() {
+		}
+
+		public FieldBesidePairNamedApart(String name, String label) {
+			this.name = name;
+			this.label = label;
+		}
+
+		public String getName() {
+			return label;
+		}
+
+		public void setName(String label) {
+			this.label = label;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof FieldBesidePairNamedApart other && Objects.equals(name, other.name)
+					&& Objects.equals(label, other.label);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, label);
+		}
+	}
+
+	public static class NamedBase {
+
+		private final String name;
+
+		public NamedBase(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	/** Its own getter/setter pair, over its own field, takes the name of its super class's constructor component. */
+	public static class PairShadowsBaseComponent extends NamedBase {
+
+		private String own;
+
+		@Record
+		public PairShadowsBaseComponent(String name) {
+			super(name);
+		}
+
+		public String getName() {
+			return own;
+		}
+
+		public void setName(String own) {
+			this.own = own;
+		}
+	}
+
+	/** As {@link PairShadowsBaseComponent}, the pair named apart by {@code @Field}. */
+	public static class PairShadowsBaseComponentNamedApart extends NamedBase {
+
+		private String own;
+
+		@Record
+		public PairShadowsBaseComponentNamedApart(String name) {
+			super(name);
+		}
+
+		public PairShadowsBaseComponentNamedApart(String name, String own) {
+			super(name);
+			this.own = own;
+		}
+
+		@Field("own")
+		public String getName() {
+			return own;
+		}
+
+		public void setName(String own) {
+			this.own = own;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PairShadowsBaseComponentNamedApart other && Objects.equals(name(), other.name())
+					&& Objects.equals(own, other.own);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name(), own);
+		}
+	}
+
+	/** Two constructor components of one name, which {@code ImmutableFinder} refuses itself. */
+	public static class ConstructorComponentsOfOneName extends NamedBase {
+
+		private final String name;
+
+		@Record
+		public ConstructorComponentsOfOneName(String baseName, String name) {
+			super(baseName);
+			this.name = name;
+		}
+
+		public String ownName() {
+			return name;
+		}
+	}
+
+	public record ComponentsNamedAlike(@Field("x") String a, @Field("x") String b) {
+	}
+
+	public record ComponentsNamedApart(@Field("x") String a, @Field("y") String b) {
+	}
+
+	public record UnboundNamedAlike(@Field("x") String a, @Unbound @Field("x") String b) {
+	}
+
+	public record CarrierNamedAlike(@Field("annotations") String a, Annotations annotations) {
 	}
 
 	// --- a @Union constructor parameter the constructor analysis cannot match to a field
