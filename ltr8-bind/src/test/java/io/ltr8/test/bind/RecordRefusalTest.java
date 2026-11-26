@@ -28,9 +28,18 @@ import io.ltr8.bind.analysis.CodeAnalysisException;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.RecordRefusals;
 import io.ltr8.test.data.RecordRefusals.BridgeConstructorThrows;
+import io.ltr8.test.data.RecordRefusals.BridgeInheritedOpen;
 import io.ltr8.test.data.RecordRefusals.BridgeNeedsArgument;
+import io.ltr8.test.data.RecordRefusals.BridgeNestedOpen;
 import io.ltr8.test.data.RecordRefusals.BridgeObjectMismatch;
+import io.ltr8.test.data.RecordRefusals.BridgeRaw;
+import io.ltr8.test.data.RecordRefusals.BridgeRawlyExtended;
 import io.ltr8.test.data.RecordRefusals.BridgeTypeVariable;
+import io.ltr8.test.data.RecordRefusals.GenericBridge;
+import io.ltr8.test.data.RecordRefusals.InheritedOpenBridge;
+import io.ltr8.test.data.RecordRefusals.NestedOpenBridge;
+import io.ltr8.test.data.RecordRefusals.RawBridge;
+import io.ltr8.test.data.RecordRefusals.RawlyExtendedBridge;
 import io.ltr8.test.data.RecordRefusals.BridgeWithoutNoArgumentConstructor;
 import io.ltr8.test.data.RecordRefusals.ConstructorTransformsArgument;
 import io.ltr8.test.data.RecordRefusals.Counted;
@@ -175,8 +184,29 @@ class RecordRefusalTest {
 	}
 
 	@Test
-	void aFieldBridgeWhoseDataTypeIsATypeVariableIsRefused() {
-		assertEquals("Unrecognised Type", message(BridgeTypeVariable.class));
+	void aFieldBridgeLeavingATypeArgumentOpenIsRefusedNamingTheBridgeAndTheField() {
+		assertAll(
+				() -> assertBridgeRefusal(BridgeTypeVariable.class, GenericBridge.class, "implements "
+						+ "DataBridge<T, java.lang.String>, leaving its data type open"),
+				() -> assertBridgeRefusal(BridgeInheritedOpen.class, InheritedOpenBridge.class, "implements "
+						+ "DataBridge<java.lang.String, O>, leaving its object type open"),
+				() -> assertBridgeRefusal(BridgeNestedOpen.class, NestedOpenBridge.class, "implements "
+						+ "DataBridge<java.util.List<T>, java.lang.String>, leaving its data type open"));
+	}
+
+	@Test
+	void aRawFieldBridgeIsRefusedNamingTheBridgeAndTheField() {
+		assertAll(
+				() -> assertBridgeRefusal(BridgeRaw.class, RawBridge.class, "reaches DataBridge raw"),
+				() -> assertBridgeRefusal(BridgeRawlyExtended.class, RawlyExtendedBridge.class,
+						"reaches DataBridge raw"));
+	}
+
+	private void assertBridgeRefusal(Class<?> holder, Class<?> bridge, String fault) {
+		DataBindException refused = refusal(context, holder);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals(bridge.getName() + ", the @Field bridge of " + holder.getName() + "'s field 'value', " + fault
+				+ ": a field bridge names the classes it converts between, DataBridge<D, O>", refused.getMessage());
 	}
 
 	@Test
@@ -359,7 +389,8 @@ class RecordRefusalTest {
 	void noRefusalCarriesTheGenericWrapperAnywhereOnItsCauseChain() {
 		List<Class<?>> refused = List.of(ProtectedConstructor.class, TwoCarriers.class, EmptyUnion.class,
 				UnassignableUnion.class, OrderCountMismatch.class, OrderNamesNoField.class,
-				NoDesignatedConstructor.class, BridgeTypeVariable.class, BridgeObjectMismatch.class,
+				NoDesignatedConstructor.class, BridgeTypeVariable.class, BridgeInheritedOpen.class,
+				BridgeNestedOpen.class, BridgeRaw.class, BridgeRawlyExtended.class, BridgeObjectMismatch.class,
 				BridgeConstructorThrows.class, BridgeNeedsArgument.class, ConstructorTransformsArgument.class,
 				NoAccessorForArgument.class, PrivateAccessor.class, HiddenRecord.class,
 				FieldAnnotationWithoutAccessors.class, GetterAndSetterRenamedApart.class, HiddenEmpty.class,

@@ -47,7 +47,7 @@ final class TypeArguments {
         }
     }
 
-    private static Type substitute(Type type, Map<TypeVariable<?>, Type> bindings) {
+    static Type substitute(Type type, Map<TypeVariable<?>, Type> bindings) {
         if (type instanceof TypeVariable<?> variable) {
             return bindings.getOrDefault(variable, variable);
         }
