@@ -17,7 +17,6 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.reflect.Method;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
@@ -320,8 +319,6 @@ public class DefaultRecordBinder {
 					+ annotationsCarrierCount + " on " + targetClass);
 		}
 
-		// get the correct data constructor method handle. Either a constructor or a
-		// static method tagged with @Data.
 		MethodHandle dataConstructor = getDataConstructor(targetClass, context.profile().orElse(null));
 
 		// Build a MethodHandle that creates object and also calls setters with order of
@@ -942,13 +939,7 @@ public class DefaultRecordBinder {
 
 	}
 
-	/**
-	 * Returns the Constructor for the dataClass. This may be different to what is used in creating the
-	 * dataClass as a static constructor might be used instead. getDataConstructor is used to retrieve
-	 * the MethodHandle for the correct data constructor.
-	 */
-	private Constructor<?> getConstructor(Class<?> dataClass, String profile)
-			throws CodeAnalysisException, NoSuchMethodException, SecurityException {
+	private Constructor<?> getConstructor(Class<?> dataClass, String profile) throws CodeAnalysisException {
 		Constructor<?>[] declared = dataClass.getConstructors();
 		Constructor<?>[] constructors = declared;
 
@@ -985,20 +976,6 @@ public class DefaultRecordBinder {
 			}
 		}
 
-		// look for a static constructor.
-		Method[] methods = dataClass.getMethods();
-		for (Method method : methods) {
-			if (Modifier.isStatic(method.getModifiers())) {
-				Record dataAnnotation = method
-						.getAnnotation(Record.class);
-				if (dataAnnotation != null) {
-					// There must be a matching constructor that matches the parameters of the
-					// static constructor.
-					return dataClass.getConstructor(method.getParameterTypes());
-				}
-			}
-		}
-
 		// Nothing designated at all -- not even a single unprofiled constructor to fall back to. When the
 		// context named a profile, say so and list what the class does offer:
 		// the likeliest cause is a name that disagrees in one of the two places it has to match, and the
@@ -1023,7 +1000,7 @@ public class DefaultRecordBinder {
 	}
 
 	private MethodHandle getDataConstructor(Class<?> dataClass, String profile)
-			throws CodeAnalysisException, NoSuchMethodException, SecurityException, IllegalAccessException {
+			throws CodeAnalysisException, IllegalAccessException {
 		Constructor<?>[] constructors = dataClass.getConstructors();
 
 		// Same order as getConstructor above, so the handle invoked is the constructor whose parameters the
@@ -1050,18 +1027,6 @@ public class DefaultRecordBinder {
 					.getAnnotation(Record.class);
 			if (dataAnnotation != null) {
 				return MethodHandles.publicLookup().unreflectConstructor(constructor);
-			}
-		}
-
-		// look for a static constructor.
-		Method[] methods = dataClass.getMethods();
-		for (Method method : methods) {
-			if (Modifier.isStatic(method.getModifiers())) {
-				Record dataAnnotation = method
-						.getAnnotation(Record.class);
-				if (dataAnnotation != null) {
-					return MethodHandles.publicLookup().unreflect(method);
-				}
 			}
 		}
 

@@ -544,9 +544,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   accessor …": `ImmutableFinder` reads only a final field directly, and `GetSetFinder`, which reads the field, runs
   after it. Read, not run. Read the field directly as for a final one, leaving it one component that the
   constructor fills and the field's setter writes, with a round trip.
-- [ ] **The `@Record` static-factory branches are dead code.** `DefaultRecordBinder.getConstructor` and
-  `getDataConstructor`, and `DefaultClassBinder`, each look for `@Record` on a static method, which `@Record`'s
-  `@Target` does not allow. Delete the branches.
 
 ## Documentation
 
