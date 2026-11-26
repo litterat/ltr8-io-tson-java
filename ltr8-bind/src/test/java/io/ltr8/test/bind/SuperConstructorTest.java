@@ -19,14 +19,20 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.SuperConstructors.Counted;
+import io.ltr8.test.data.SuperConstructors.HoldsCounted;
 import io.ltr8.test.data.SuperConstructors.HoldsSized;
 import io.ltr8.test.data.SuperConstructors.Sized;
+import io.ltr8.test.data.SuperConstructors.TaggedCount;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -40,6 +46,13 @@ class SuperConstructorTest {
 	private static final Counted COUNTED = new Counted("widget", 3);
 
 	private static final Sized SIZED = new Sized("crate", 5_000_000_000L, 0.25);
+
+	/** Its inherited field is absent, so its writer takes the branch that leaves the slot empty. */
+	private static final Counted UNNAMED = new Counted(null, 7);
+
+	private static final List<Object> VALUES = List.of(COUNTED, SIZED, UNNAMED,
+			new TaggedCount(Optional.of("red"), 2), new TaggedCount(Optional.empty(), 4),
+			new HoldsSized("box", SIZED), new HoldsCounted(UNNAMED, 2));
 
 	private final DataBindContext context = DataBindContext.builder().build();
 
@@ -60,18 +73,37 @@ class SuperConstructorTest {
 				Arrays.stream(sized.fields()).map(field -> field.get(SIZED)).toList());
 	}
 
-	@Test
-	void roundTripsThroughAMap() throws DataBindException {
-		MapMapper mapper = new MapMapper(context);
-		assertEquals(COUNTED, mapper.toObject(Counted.class, mapper.toMap(COUNTED)));
-		assertEquals(SIZED, mapper.toObject(Sized.class, mapper.toMap(SIZED)));
+	@ParameterizedTest
+	@ValueSource(classes = { Counted.class, Sized.class, TaggedCount.class })
+	void everyFieldHandleTakesTheDescribedClass(Class<?> type) throws DataBindException {
+		DataClassRecord record = assertInstanceOf(DataClassRecord.class, context.getDescriptor(type));
+		for (DataClassField field : record.fields()) {
+			assertEquals(type, field.accessor().type().parameterType(0), field.name() + " accessor");
+			assertEquals(type, field.isPresent().type().parameterType(0), field.name() + " isPresent");
+		}
 	}
 
 	@Test
-	void roundTripsHeldAsAFieldOfARecord() throws DataBindException {
-		HoldsSized holder = new HoldsSized("box", SIZED);
+	void roundTripsThroughAnArray() throws Throwable {
+		ArrayMapper mapper = new ArrayMapper(context);
+		for (Object value : VALUES) {
+			assertEquals(value, mapper.toObject(value.getClass(), mapper.toArray(value)), value.getClass().getName());
+		}
+	}
+
+	@Test
+	void anArrayHoldsTheSuperClassFieldsFirst() throws Throwable {
+		ArrayMapper mapper = new ArrayMapper(context);
+		assertEquals(List.of("widget", 3), Arrays.asList(mapper.toArray(COUNTED)));
+		assertEquals(Arrays.asList(null, 7), Arrays.asList(mapper.toArray(UNNAMED)));
+	}
+
+	@Test
+	void roundTripsThroughAMap() throws DataBindException {
 		MapMapper mapper = new MapMapper(context);
-		assertEquals(holder, mapper.toObject(HoldsSized.class, mapper.toMap(holder)));
+		for (Object value : VALUES) {
+			assertEquals(value, mapper.toObject(value.getClass(), mapper.toMap(value)), value.getClass().getName());
+		}
 	}
 
 	private List<String> fields(Class<?> type) throws DataBindException {

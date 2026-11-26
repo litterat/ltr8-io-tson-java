@@ -269,6 +269,7 @@ public class DefaultRecordBinder {
 			// single class can mix both (see MixedImmutable in ltr8-bind's own tests).
 			new ImmutableFinder().findComponents(targetClass, ctor, components);
 			new GetSetFinder().findComponents(targetClass, ctor, components);
+			receiveTargetClass(targetClass, components);
 		}
 
 		TypeArguments.substitute(targetClass, parameterizedType, components);
@@ -392,6 +393,25 @@ public class DefaultRecordBinder {
 				}
 			} catch (Throwable t) {
 				// ignore.
+			}
+		}
+	}
+
+	/**
+	 * A member declared on a super class unreflects to a handle taking that class, and a combinator joining it to
+	 * a handle taking the described class demands the receivers match exactly. Adapted before anything is composed
+	 * from them, so every handle a {@link DataClassField} exposes, and the setters the constructor folds in, take
+	 * the described class.
+	 */
+	private static void receiveTargetClass(Class<?> targetClass, List<ComponentInfo> components) {
+		for (ComponentInfo info : components) {
+			MethodHandle read = info.getReadMethod();
+			if (read != null) {
+				info.setReadMethod(read.asType(read.type().changeParameterType(0, targetClass)));
+			}
+			MethodHandle write = info.getWriteMethod();
+			if (write != null) {
+				info.setWriteMethod(write.asType(write.type().changeParameterType(0, targetClass)));
 			}
 		}
 	}

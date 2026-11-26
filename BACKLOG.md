@@ -524,11 +524,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   deferred descriptor"); a fresh context asked for `CycleMember` first refuses it. When a resolution fails, keep no
   descriptor that was registered during it and reaches the refused type, so the answer does not depend on the order
   asked and `DataBindContext.componentSource`'s "it is in the cache" holds. Pin both orders in `RecordRefusalTest`.
-- [ ] **`ArrayMapper` cannot write a class whose field is read through a super-class accessor.** With `Counted extends
-  Named` (`SuperConstructors`), `new ArrayMapper(context).toArray(new Counted("w", 3))` throws
-  `IllegalArgumentException` ("target and test types must match") from `ArrayMapper.createProjectGetters`: the
-  field's `isPresent` handle is typed by the declaring class and is not adapted to the record's. `MapMapper` writes
-  it. Adapt the handle, and round-trip `Counted` and `Sized` through `ArrayMapper` in `SuperConstructorTest`.
 - [ ] **A super constructor's arguments are bound by position, so only leading ones bind.** With `OffsetSuper(String
   extra, String name) { super(name); this.extra = extra; }`, `getDescriptor` throws an unchecked
   `IllegalArgumentException` ("target and filter types do not match"): `ImmutableFinder.identifyArguments` keeps the
