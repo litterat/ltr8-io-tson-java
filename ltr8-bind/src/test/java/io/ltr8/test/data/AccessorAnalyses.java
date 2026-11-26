@@ -586,7 +586,7 @@ public final class AccessorAnalyses {
 		}
 	}
 
-	// --- the member that reads a constructor-bound field back: a public instance method, else a public final field
+	// --- the member that reads a constructor-bound field back: a public instance method, else a public field
 
 	public static class PackagePrivateAccessor {
 
@@ -1287,6 +1287,188 @@ public final class AccessorAnalyses {
 		@Record
 		public HiddenInheritsPublicField(String name) {
 			super(name);
+		}
+	}
+
+	// --- a public field that is not final, bound by the constructor and read and written through the field
+
+	public static class PublicMutableReference {
+
+		public String name;
+
+		@Record
+		public PublicMutableReference(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicMutableReference other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class PublicMutablePrimitives {
+
+		public int count;
+
+		public long size;
+
+		public double ratio;
+
+		public boolean flag;
+
+		@Record
+		public PublicMutablePrimitives(int count, long size, double ratio, boolean flag) {
+			this.count = count;
+			this.size = size;
+			this.ratio = ratio;
+			this.flag = flag;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicMutablePrimitives other && count == other.count && size == other.size
+					&& ratio == other.ratio && flag == other.flag;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(count, size, ratio, flag);
+		}
+	}
+
+	public static class PublicMutableList {
+
+		public List<String> items;
+
+		@Record
+		public PublicMutableList(List<String> items) {
+			this.items = items;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicMutableList other && Objects.equals(items, other.items);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(items);
+		}
+	}
+
+	public static class PublicMutableOptional {
+
+		public Optional<String> note;
+
+		@Record
+		public PublicMutableOptional(Optional<String> note) {
+			this.note = note;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicMutableOptional other && Objects.equals(note, other.note);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(note);
+		}
+	}
+
+	public static class NamedPublicMutableField {
+
+		@Field("label")
+		public String name;
+
+		@Record
+		public NamedPublicMutableField(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof NamedPublicMutableField other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class PublicMutableFieldBase {
+
+		public String name;
+
+		public PublicMutableFieldBase(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(name, ((PublicMutableFieldBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class InheritsPublicMutableField extends PublicMutableFieldBase {
+
+		private final int count;
+
+		@Record
+		public InheritsPublicMutableField(String name, int count) {
+			super(name);
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj) && count == ((InheritsPublicMutableField) obj).count;
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * super.hashCode() + count;
+		}
+	}
+
+	/** Its constructor binds one public field that is not final and leaves the other to be set after it. */
+	public static class BindsOnePublicMutableField {
+
+		public String name;
+
+		public String note;
+
+		@Record
+		public BindsOnePublicMutableField(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof BindsOnePublicMutableField other && Objects.equals(name, other.name)
+					&& Objects.equals(note, other.note);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, note);
 		}
 	}
 }

@@ -67,7 +67,7 @@ import java.util.stream.Collectors;
  *
  * <p>A component is read back through a public instance method of the class or a super class that returns its field,
  * or a public method of its name carrying {@code @Field} or {@link Union @Union}; failing both, through the field
- * itself where that is public and final. A member a super class that is not public declares is reached as the JVM
+ * itself where that is public. A member a super class that is not public declares is reached as the JVM
  * reaches it, through a public subclass: the described class or one between the two.
  *
  * <p>The class is refused, with a {@link CodeAnalysisException} naming it, when a parameter binds no component or more
@@ -154,7 +154,7 @@ public class ImmutableFinder implements ComponentFinder {
 
             for (ComponentInfo component : immutableFields) {
                 if (component.getReadMethod() == null) {
-                    readPublicFinalField(clss, component);
+                    readPublicField(clss, component);
                 }
             }
 
@@ -207,10 +207,11 @@ public class ImmutableFinder implements ComponentFinder {
     }
 
     /**
-     * A final field holds what the constructor stored for as long as the object lives, so a public one reads its
-     * component back as an accessor returning it would.
+     * Reading a public field gives what an accessor returning it gives, the value it holds when read, whether or not
+     * it is final: an accessor's field need not be final either. One that is not final is also found by
+     * {@link GetSetFinder}, which adds its setter to this component rather than describing it again.
      */
-    private static void readPublicFinalField(Class<?> clss, ComponentInfo component)
+    private static void readPublicField(Class<?> clss, ComponentInfo component)
             throws IllegalAccessException, NoSuchFieldException, CodeAnalysisException {
         String name = component.getName();
         // A parameter only @Field names has no declaring class; its name is taken as a field's, as for an accessor.
@@ -226,7 +227,7 @@ public class ImmutableFinder implements ComponentFinder {
             return;
         }
         int modifiers = field.getModifiers();
-        if (Modifier.isPublic(modifiers) && Modifier.isFinal(modifiers) && !Modifier.isStatic(modifiers)) {
+        if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers)) {
             component.setReadMethod(readAs(getter(clss, field), component.getType()));
         }
     }
