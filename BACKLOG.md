@@ -517,10 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A setter is merged into a constructor component by name, ignoring case.** `GetSetFinder`'s merge compares
-  names with `equalsIgnoreCase` and no declaring class, so a pair named `URL` overwrites the write handle of a
-  constructor component `url`, and a subclass pair that of a super-class component it shadows. Match the name
-  exactly and by declaring class, as the `@Field` loop below it does, with a test of each.
 - [ ] **`resolveOptionalNumberField` returns a conversion as the field's setter.** `DataClassField.setter()` of an
   `OptionalInt`, `OptionalLong` or `OptionalDouble` field is the value-to-optional conversion and not a handle that
   writes the field. Nothing calls it today. Return the composed setter, or `null` where the component has none, and

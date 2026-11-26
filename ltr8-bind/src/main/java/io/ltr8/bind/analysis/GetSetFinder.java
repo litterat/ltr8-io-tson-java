@@ -36,6 +36,7 @@ public class GetSetFinder implements ComponentFinder {
 			throws SecurityException, CodeAnalysisException {
 
 		List<ComponentInfo> getSetList = new ArrayList<>();
+		Map<ComponentInfo, Member> members = new IdentityHashMap<>();
 
 		Lookup lookup = MethodHandles.publicLookup();
 
@@ -69,6 +70,7 @@ public class GetSetFinder implements ComponentFinder {
 				}
 
 				getSetList.add(info);
+				members.put(info, new Member(classField.getDeclaringClass(), null));
 
 			}
 		}
@@ -127,6 +129,7 @@ public class GetSetFinder implements ComponentFinder {
 					}
 
 					getSetList.add(info);
+					members.put(info, new Member(clss, getter));
 
 				} catch (NoSuchMethodException ex) {
 					// ignore this field, no matching setter.
@@ -156,21 +159,22 @@ public class GetSetFinder implements ComponentFinder {
 			}
 		});
 
-		// merge any fields already found previously
+		// A field or pair writes a constructor's component only where it is that component's member: of the same name,
+		// and declared by the class the constructor stores it in, or a pair whose getter the constructor analysis
+		// matched as the component's accessor. A subclass's own field or pair of that name is a component of its own.
 		ListIterator<ComponentInfo> iter = getSetList.listIterator();
 		while (iter.hasNext()) {
 			ComponentInfo field = iter.next();
+			Member member = members.get(field);
 
-			for (ComponentInfo existingField : fields) {
-				if (field.getName().equalsIgnoreCase(existingField.getName())) {
-
-					// remove from list to add.
-					iter.remove();
-
-					existingField.setWriteMethod(field.getWriteMethod());
-				}
+			ComponentInfo existingField = fields.stream().filter(e -> e.getName().equals(field.getName())
+					&& (e.getDeclaringClass() == null || e.getDeclaringClass() == member.declarer()
+							|| (member.getter() != null && e.isAccessor(member.getter()))))
+					.findFirst().orElse(null);
+			if (existingField != null) {
+				iter.remove();
+				existingField.setWriteMethod(field.getWriteMethod());
 			}
-
 		}
 
 		// Add any remaining.
@@ -202,6 +206,10 @@ public class GetSetFinder implements ComponentFinder {
 			}
 		}
 
+	}
+
+	/** The class declaring a public field or getter/setter pair, and the pair's getter, or null for a field. */
+	private record Member(Class<?> declarer, Method getter) {
 	}
 
 	private static boolean isPublicInstance(Method method) {

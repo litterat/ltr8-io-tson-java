@@ -15,6 +15,7 @@
  */
 package io.ltr8.test.data;
 
+import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 
 import java.util.List;
@@ -346,6 +347,183 @@ public final class GetSetClasses {
 		@SuppressWarnings("unused")
 		private void setName(String name) {
 			this.name = name;
+		}
+	}
+
+	public static class PublicPairOverConstructorName {
+
+		private String name;
+
+		@Record
+		public PublicPairOverConstructorName(String name) {
+			this.name = name;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	/** Its pair {@code getURL}/{@code setURL} holds a value apart from the constructor's {@code url}. */
+	public static class PairNamedInAnotherCase {
+
+		private final String url;
+
+		private String link;
+
+		@Record
+		public PairNamedInAnotherCase(String url) {
+			this.url = url;
+		}
+
+		public String url() {
+			return url;
+		}
+
+		public String getURL() {
+			return link;
+		}
+
+		public void setURL(String link) {
+			this.link = link;
+		}
+	}
+
+	public static class Labelled {
+
+		private final String name;
+
+		public Labelled(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	/** Its own {@code name} shadows the super class's, and its pair is on the wire as {@code alias}. */
+	public static class Relabelled extends Labelled {
+
+		private String name;
+
+		@Record
+		public Relabelled(String name) {
+			super(name);
+		}
+
+		@Field("alias")
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class ProtectedBase {
+
+		protected String name;
+
+		public ProtectedBase(String name) {
+			this.name = name;
+		}
+	}
+
+	/** Its pair reads and writes the field its super class's constructor stores. */
+	public static class WritesInherited extends ProtectedBase {
+
+		@Record
+		public WritesInherited(String name) {
+			super(name);
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class ProtectedBaseWithAccessor {
+
+		protected String name;
+
+		public ProtectedBaseWithAccessor(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	/** Its pair and its super class's {@code name()} each read the field the super class's constructor stores. */
+	public static class WritesInheritedBesideAccessor extends ProtectedBaseWithAccessor {
+
+		@Record
+		public WritesInheritedBesideAccessor(String name) {
+			super(name);
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class PassesInherited extends ProtectedBase {
+
+		public PassesInherited(String name) {
+			super(name);
+		}
+	}
+
+	/** Its pair reads and writes the field the constructor two classes up stores. */
+	public static class WritesGrandInherited extends PassesInherited {
+
+		@Record
+		public WritesGrandInherited(String name) {
+			super(name);
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class Tagged {
+
+		public String tag;
+
+		public Tagged(String tag) {
+			this.tag = tag;
+		}
+
+		public String tag() {
+			return tag;
+		}
+	}
+
+	public static class Retagged extends Tagged {
+
+		@Record
+		public Retagged(String tag) {
+			super(tag);
 		}
 	}
 
