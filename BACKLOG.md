@@ -524,23 +524,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   deferred descriptor"); a fresh context asked for `CycleMember` first refuses it. When a resolution fails, keep no
   descriptor that was registered during it and reaches the refused type, so the answer does not depend on the order
   asked and `DataBindContext.componentSource`'s "it is in the cache" holds. Pin both orders in `RecordRefusalTest`.
-- [ ] **A super constructor's arguments are bound by position, so only leading ones bind.** With `OffsetSuper(String
-  extra, String name) { super(name); this.extra = extra; }`, `getDescriptor` throws an unchecked
-  `IllegalArgumentException` ("target and filter types do not match"): `ImmutableFinder.identifyArguments` keeps the
-  super constructor's own argument indices for the super's fields. Give each the index of the parameter passed to
-  it, with a test of the field order and a round trip.
-- [ ] **A class two super constructors deep is refused.** With `Layered extends Counted extends Named`, each passing
-  its arguments up, `getDescriptor(Layered)` is refused with "Failed to match super fields for class: …Counted":
-  the fields a super constructor's own `super(…)` call binds are added and not counted. Count them, with a test.
-- [ ] **A super constructor taking a wider type than the argument is refused.** With `NarrowsSuper(String n) {
-  super(n); }` over `public WideBase(CharSequence)`, `getDescriptor` refuses the class, naming
-  `WideBase.<init>(java.lang.String)` as not public: `ImmutableFinder` looks the super constructor up by the
-  subclass's parameter types. Look it up by the descriptor of the `invokespecial` instruction, with a test.
-- [ ] **A `@Union` parameter the constructor analysis cannot match throws `NullPointerException`.** A `@Record`
-  constructor parameter carrying `@Union` and no `@Field`, assigned through a call (`this.shape =
-  Objects.requireNonNull(shape)`), makes `getDescriptor` throw `NullPointerException` from
-  `ImmutableFinder.findComponents`, which reads the absent `@Field`. Refuse the class with a `CodeAnalysisException`
-  naming it and the parameter, with a case in `RecordRefusalTest`.
 
 ## Documentation
 
