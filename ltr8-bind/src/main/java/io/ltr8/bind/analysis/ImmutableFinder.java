@@ -33,9 +33,11 @@ import java.lang.classfile.instruction.FieldInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.ReturnInstruction;
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
+import java.lang.invoke.WrongMethodTypeException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -88,7 +90,9 @@ public class ImmutableFinder implements ComponentFinder {
                         && method.methodType().stringValue().equals(constructorDescriptor)) {
                     CodeModel code = method.code().orElse(null);
                     if (code != null) {
-                        identifyArguments(constructor, immutableFields, code);
+                        int[] own = new int[constructor.getParameterCount()];
+                        Arrays.setAll(own, x -> x);
+                        identifyArguments(constructor, constructor, own, immutableFields, code);
                     }
                     break;
                 }
@@ -117,14 +121,12 @@ public class ImmutableFinder implements ComponentFinder {
                     final int paramIndex = x;
                     ComponentInfo component = immutableFields.stream()
                             .filter(e -> e.getConstructorArgument() == paramIndex).findFirst().orElse(null);
-                    if (component != null) {
-                        component.setUnion(union);
-                    } else {
-                        component = new ComponentInfo(field.value(), params[x].getType());
-                        component.setConstructorArgument(x);
-                        component.setUnion(union);
-                        immutableFields.add(component);
+                    // A parameter @Field names already has its component, so one still without is unnamed.
+                    if (component == null) {
+                        throw new CodeAnalysisException(String.format("%s's constructor does not assign its @Union "
+                                + "parameter %d unchanged to a field, and no @Field names it", clss.getName(), x));
                     }
+                    component.setUnion(union);
                 }
             }
 
@@ -233,7 +235,8 @@ public class ImmutableFinder implements ComponentFinder {
                             info.setUnion(union);
                         }
 
-                        info.setReadMethod(MethodHandles.publicLookup().unreflect(accessorMethod));
+                        info.setReadMethod(readAs(MethodHandles.publicLookup().unreflect(accessorMethod),
+                                info.getType()));
                     }
                 }
                 // Fall through to reset -- a return ends the accessor pattern either way.
@@ -247,6 +250,23 @@ public class ImmutableFinder implements ComponentFinder {
         }
 
         return lastField;
+    }
+
+    /**
+     * A field may hold the constructor parameter converted to a wider, boxed or erased type, but the value it holds
+     * is still that parameter's, so the accessor is read as the component's type: the conversion back is exact.
+     */
+    private static MethodHandle readAs(MethodHandle accessor, Class<?> type) {
+        Class<?> returned = accessor.type().returnType();
+        if (returned == type) {
+            return accessor;
+        }
+        try {
+            MethodHandles.identity(type).asType(MethodType.methodType(returned, type));
+        } catch (WrongMethodTypeException e) {
+            return accessor;
+        }
+        return MethodHandles.explicitCastArguments(accessor, accessor.type().changeReturnType(type));
     }
 
     private void examineAccessorAnnotations(Class<?> clss, List<ComponentInfo> immutableFields, Lookup lookup)
@@ -310,15 +330,19 @@ public class ImmutableFinder implements ComponentFinder {
      * PUTFIELD y // Assign the value x to the field y on this object.
      * </pre>
      *
-     * In the case of a class that extends another class it will call the super class. This is a
-     * little more complex to work out: the super class's constructor is analysed and matched with
-     * the parameters it's called with, recursively.
+     * A super constructor call passing only this constructor's parameters, unchanged, is analysed recursively. A
+     * component is bound by the {@code top} constructor, so a field a super constructor stores takes the index and
+     * type of the {@code top} parameter that reaches it, never the super constructor's own.
+     *
+     * @param toTop for each parameter of {@code constructor}, the index of the {@code top} parameter it holds
+     * @return for each parameter of {@code constructor}, whether a field stores it, here or further up
      */
-    private int identifyArguments(Constructor<?> constructor, List<ComponentInfo> fields, CodeModel code)
-            throws CodeAnalysisException {
+    private boolean[] identifyArguments(Constructor<?> top, Constructor<?> constructor, int[] toTop,
+            List<ComponentInfo> fields, CodeModel code) throws CodeAnalysisException {
         boolean[] foundLoadThis = {false};
         boolean[] foundLoadArg = {false};
-        int[] argsFound = {0};
+        boolean[] stored = new boolean[constructor.getParameterCount()];
+        String superName = constructor.getDeclaringClass().getSuperclass().getName().replace('.', '/');
 
         Map<Integer, Integer> loadIndexToParamMap = new HashMap<>();
         Class<?>[] paramClasses = constructor.getParameterTypes();
@@ -355,10 +379,9 @@ public class ImmutableFinder implements ComponentFinder {
             } else if (element instanceof FieldInstruction field && field.opcode() == Opcode.PUTFIELD) {
                 if (foundLoadThis[0] && foundLoadArg[0] && args.size() == 1) {
                     int arg = args.get(0);
-                    Parameter param = constructor.getParameters()[arg];
-                    Class<?> fieldClass = param.getType();
-                    ComponentInfo component = new ComponentInfo(field.name().stringValue(), fieldClass);
-                    component.setConstructorArgument(arg);
+                    Parameter param = top.getParameters()[toTop[arg]];
+                    ComponentInfo component = new ComponentInfo(field.name().stringValue(), param.getType());
+                    component.setConstructorArgument(toTop[arg]);
 
                     java.lang.reflect.Type paramType = param.getParameterizedType();
                     if (paramType instanceof ParameterizedType pt) {
@@ -368,56 +391,20 @@ public class ImmutableFinder implements ComponentFinder {
                     checkFieldAnnotation(component, constructor.getDeclaringClass(), field.name().stringValue());
 
                     fields.add(component);
-                    argsFound[0]++;
+                    stored[arg] = true;
                 }
                 foundLoadThis[0] = false;
                 foundLoadArg[0] = false;
                 args.clear();
-            } else if (element instanceof InvokeInstruction invoke && invoke.opcode() == Opcode.INVOKESPECIAL) {
-                if (foundLoadThis[0] && foundLoadArg[0] && !args.isEmpty()
-                        && invoke.name().stringValue().equals("<init>")) {
-                    List<ComponentInfo> superFields = new ArrayList<>();
-
-                    Class<?> superClass = constructor.getDeclaringClass().getSuperclass();
-                    ClassModel superClassModel = parseClass(superClass);
-
-                    Class<?>[] superInitArgs = new Class<?>[args.size()];
-                    for (int x = 0; x < args.size(); x++) {
-                        int arg = args.get(x);
-                        superInitArgs[x] = constructor.getParameters()[arg].getType();
-                    }
-
-                    Constructor<?> superConstructor;
-                    try {
-                        superConstructor = superClass.getConstructor(superInitArgs);
-                    } catch (NoSuchMethodException e) {
-                        throw new CodeAnalysisException(String.format(
-                                "%s's constructor calls %s.<init>(%s), which is not a public constructor of its "
-                                        + "super class",
-                                constructor.getDeclaringClass().getName(), superClass.getName(),
-                                Arrays.stream(superInitArgs).map(Class::getTypeName).collect(Collectors.joining(", "))),
-                                e);
-                    }
-                    String superDescriptor = MethodType
-                            .methodType(void.class, superConstructor.getParameterTypes()).descriptorString();
-
-                    int superArgsFound = 0;
-                    for (MethodModel superMethod : superClassModel.methods()) {
-                        if (superMethod.methodName().stringValue().equals("<init>")
-                                && superMethod.methodType().stringValue().equals(superDescriptor)) {
-                            var superCode = superMethod.code().orElseThrow();
-                            superArgsFound = identifyArguments(superConstructor, superFields, superCode);
-                            break;
-                        }
-                    }
-
-                    if (superArgsFound != args.size()) {
-                        throw new CodeAnalysisException(String.format(
-                                "Failed to match super fields for class: %s. Add @Field annotations to assist.",
-                                superClass.getName()));
-                    }
-
-                    fields.addAll(superFields);
+            } else if (element instanceof InvokeInstruction invoke && invoke.opcode() == Opcode.INVOKESPECIAL
+                    && invoke.name().stringValue().equals("<init>")
+                    && invoke.owner().asInternalName().equals(superName)) {
+                // A call passing anything but this constructor's own parameters, unchanged, binds nothing: a
+                // constant fixes a super field that is no component, and a parameter it leaves unstored is
+                // matched by @Field or refused by findComponents' count, as without the call.
+                int parameterCount = invoke.typeSymbol().parameterCount();
+                if (parameterCount > 0 && foundLoadThis[0] && args.size() == parameterCount) {
+                    identifySuperArguments(top, constructor, toTop, invoke, args, stored, fields);
                 }
                 foundLoadThis[0] = false;
                 foundLoadArg[0] = false;
@@ -430,6 +417,63 @@ public class ImmutableFinder implements ComponentFinder {
             // Non-instruction elements (labels, line numbers, etc.) don't affect the invariant.
         }
 
-        return argsFound[0];
+        return stored;
+    }
+
+    /**
+     * @param args the parameter of {@code constructor} passed as each argument of the call
+     */
+    private void identifySuperArguments(Constructor<?> top, Constructor<?> constructor, int[] toTop,
+            InvokeInstruction invoke, List<Integer> args, boolean[] stored, List<ComponentInfo> fields)
+            throws CodeAnalysisException {
+        Class<?> superClass = constructor.getDeclaringClass().getSuperclass();
+        String descriptor = invoke.type().stringValue();
+        Class<?>[] superParameters;
+        try {
+            superParameters = MethodType.fromMethodDescriptorString(descriptor, superClass.getClassLoader())
+                    .parameterArray();
+        } catch (TypeNotPresentException e) {
+            throw new CodeAnalysisException(String.format("%s's constructor calls %s.<init>%s, naming a type that "
+                    + "cannot be loaded", constructor.getDeclaringClass().getName(), superClass.getName(),
+                    descriptor), e);
+        }
+        String call = String.format("%s's constructor calls %s.<init>(%s)", constructor.getDeclaringClass().getName(),
+                superClass.getName(),
+                Arrays.stream(superParameters).map(Class::getTypeName).collect(Collectors.joining(", ")));
+
+        Constructor<?> superConstructor;
+        try {
+            superConstructor = superClass.getConstructor(superParameters);
+        } catch (NoSuchMethodException e) {
+            throw new CodeAnalysisException(call + ", which is not a public constructor of its super class", e);
+        }
+
+        int[] superToTop = new int[args.size()];
+        for (int x = 0; x < args.size(); x++) {
+            superToTop[x] = toTop[args.get(x)];
+        }
+
+        List<ComponentInfo> superFields = new ArrayList<>();
+        boolean[] superStored = new boolean[superParameters.length];
+        for (MethodModel superMethod : parseClass(superClass).methods()) {
+            if (superMethod.methodName().stringValue().equals("<init>")
+                    && superMethod.methodType().stringValue().equals(descriptor)) {
+                superStored = identifyArguments(top, superConstructor, superToTop, superFields,
+                        superMethod.code().orElseThrow());
+                break;
+            }
+        }
+
+        for (int x = 0; x < superStored.length; x++) {
+            if (!superStored[x]) {
+                throw new CodeAnalysisException(String.format("%s, which does not store its parameter %d unchanged "
+                        + "in a field", call, x));
+            }
+        }
+
+        for (int arg : args) {
+            stored[arg] = true;
+        }
+        fields.addAll(superFields);
     }
 }

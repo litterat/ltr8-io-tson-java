@@ -26,6 +26,7 @@ import io.ltr8.test.data.ToDataBridges.ProtectedConstructor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -258,6 +259,53 @@ public final class RecordRefusals {
 		@Field("fromSetter")
 		public void setValue(String value) {
 			this.value = value;
+		}
+	}
+
+	// --- a @Union constructor parameter the constructor analysis cannot match to a field
+
+	/** Its {@code @Union} parameter reaches its field through a call, and no {@code @Field} names it. */
+	public static class UnionThroughCall {
+
+		private final Object tag;
+
+		@Record
+		public UnionThroughCall(@Union({ String.class, Integer.class }) Object tag) {
+			this.tag = Objects.requireNonNull(tag);
+		}
+
+		public Object tag() {
+			return tag;
+		}
+	}
+
+	/** As {@link UnionThroughCall}, with {@code @Field} naming the parameter: described. */
+	public static class NamedUnionThroughCall {
+
+		private final Object tag;
+
+		@Record
+		public NamedUnionThroughCall(@Field("tag") @Union({ String.class, Integer.class }) Object tag) {
+			this.tag = Objects.requireNonNull(tag);
+		}
+
+		public Object tag() {
+			return tag;
+		}
+	}
+
+	/** Assigns its {@code @Union} parameter to its field unchanged, with no {@code @Field}: described. */
+	public static class UnionAssignedUnchanged {
+
+		private final Object tag;
+
+		@Record
+		public UnionAssignedUnchanged(@Union({ String.class, Integer.class }) Object tag) {
+			this.tag = tag;
+		}
+
+		public Object tag() {
+			return tag;
 		}
 	}
 

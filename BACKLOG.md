@@ -515,26 +515,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a
   receiver through the emitter, not designing a second error model.
 
-## Binding (`ltr8-bind`)
-
-- [ ] **A super constructor's arguments are bound by position, so only leading ones bind.** With `OffsetSuper(String
-  extra, String name) { super(name); this.extra = extra; }`, `getDescriptor` throws an unchecked
-  `IllegalArgumentException` ("target and filter types do not match"): `ImmutableFinder.identifyArguments` keeps the
-  super constructor's own argument indices for the super's fields. Give each the index of the parameter passed to
-  it, with a test of the field order and a round trip.
-- [ ] **A class two super constructors deep is refused.** With `Layered extends Counted extends Named`, each passing
-  its arguments up, `getDescriptor(Layered)` is refused with "Failed to match super fields for class: …Counted":
-  the fields a super constructor's own `super(…)` call binds are added and not counted. Count them, with a test.
-- [ ] **A super constructor taking a wider type than the argument is refused.** With `NarrowsSuper(String n) {
-  super(n); }` over `public WideBase(CharSequence)`, `getDescriptor` refuses the class, naming
-  `WideBase.<init>(java.lang.String)` as not public: `ImmutableFinder` looks the super constructor up by the
-  subclass's parameter types. Look it up by the descriptor of the `invokespecial` instruction, with a test.
-- [ ] **A `@Union` parameter the constructor analysis cannot match throws `NullPointerException`.** A `@Record`
-  constructor parameter carrying `@Union` and no `@Field`, assigned through a call (`this.shape =
-  Objects.requireNonNull(shape)`), makes `getDescriptor` throw `NullPointerException` from
-  `ImmutableFinder.findComponents`, which reads the absent `@Field`. Refuse the class with a `CodeAnalysisException`
-  naming it and the parameter, with a case in `RecordRefusalTest`.
-
 ## Documentation
 
 - [ ] User-facing documentation on how to use the library, in `docs/` — `README.md` and the `tson-java` skill are the

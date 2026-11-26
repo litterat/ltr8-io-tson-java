@@ -22,7 +22,10 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataClassUnion;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.bind.analysis.CodeAnalysisException;
+import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.RecordRefusals;
 import io.ltr8.test.data.RecordRefusals.BridgeConstructorThrows;
 import io.ltr8.test.data.RecordRefusals.BridgeNeedsArgument;
@@ -56,6 +59,7 @@ import io.ltr8.test.data.RecordRefusals.LatticeTop;
 import io.ltr8.test.data.RecordRefusals.LatticeUp;
 import io.ltr8.test.data.RecordRefusals.LoopWithRefused;
 import io.ltr8.test.data.RecordRefusals.NoAccessorForArgument;
+import io.ltr8.test.data.RecordRefusals.NamedUnionThroughCall;
 import io.ltr8.test.data.RecordRefusals.NoDesignatedConstructor;
 import io.ltr8.test.data.RecordRefusals.OnlyOtherProfiles;
 import io.ltr8.test.data.RecordRefusals.OrderCountMismatch;
@@ -75,6 +79,8 @@ import io.ltr8.test.data.RecordRefusals.RingLast;
 import io.ltr8.test.data.RecordRefusals.RingMiddle;
 import io.ltr8.test.data.RecordRefusals.TwoCarriers;
 import io.ltr8.test.data.RecordRefusals.UnassignableUnion;
+import io.ltr8.test.data.RecordRefusals.UnionAssignedUnchanged;
+import io.ltr8.test.data.RecordRefusals.UnionThroughCall;
 import io.ltr8.test.data.RecordRefusals.Unconvertible;
 import io.ltr8.test.data.RecordRefusals.WildcardList;
 import io.ltr8.test.data.ToDataBridges.Problem;
@@ -216,6 +222,29 @@ class RecordRefusalTest {
 	}
 
 	@Test
+	void aUnionParameterNotAssignedUnchangedAndNotNamedIsRefusedNamingTheClassAndParameter() {
+		DataBindException refused = refusal(context, UnionThroughCall.class);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals(UnionThroughCall.class.getName() + "'s constructor does not assign its @Union parameter 0 "
+				+ "unchanged to a field, and no @Field names it", refused.getMessage());
+		assertNull(refused.getCause());
+	}
+
+	@Test
+	void aUnionParameterNamedByFieldOrAssignedUnchangedIsDescribed() {
+		assertAll(Stream.of(new NamedUnionThroughCall("named"), new UnionAssignedUnchanged(7)).map(value -> () -> {
+			DataClassRecord record = assertInstanceOf(DataClassRecord.class,
+					context.getDescriptor(value.getClass()));
+			assertEquals(1, record.fields().length);
+			DataClassField tag = record.fields()[0];
+			assertEquals("tag", tag.name());
+			assertInstanceOf(DataClassUnion.class, tag.dataClass());
+			MapMapper mapper = new MapMapper(context);
+			assertEquals(tag.get(value), tag.get(mapper.toObject(value.getClass(), mapper.toMap(value))));
+		}));
+	}
+
+	@Test
 	void anArgumentWithNoAccessorIsRefusedNamingTheClassAndField() {
 		assertEquals("Failed to match immutable field accessor for class: " + NoAccessorForArgument.class
 				+ ". Add @Field annotations to assist field 'name'", message(NoAccessorForArgument.class));
@@ -349,7 +378,7 @@ class RecordRefusalTest {
 				HoldsRefusedOptional.class, HoldsRefusedMap.class, HoldsRefusedArray.class, HoldsHolder.class,
 				HoldsTwoDeep.class, HoldsTwoCarriers.class, HoldsBridgeNeedsArgument.class,
 				HoldsUnconvertible.class, RawList.class, WildcardList.class, RawMap.class, CycleTop.class,
-				LoopWithRefused.class);
+				LoopWithRefused.class, UnionThroughCall.class);
 		List<Class<?>> refusedUnderProfile = List.of(ProfileFieldCountMismatch.class,
 				ProfileNamesNoComponent.class, ProfileParameterUnnamed.class);
 		assertAll(Stream.concat(
@@ -587,8 +616,9 @@ class RecordRefusalTest {
 				+ ".<init>(java.lang.String), which is not a public constructor of its super class";
 	}
 
-	private static String superFieldsUnmatched(Class<?> superClass) {
-		return "Failed to match super fields for class: " + superClass.getName() + ". Add @Field annotations to assist.";
+	private static String superParameterNotStored(Class<?> type, Class<?> superClass, String parameters, int index) {
+		return type.getName() + "'s constructor calls " + superClass.getName() + ".<init>(" + parameters
+				+ "), which does not store its parameter " + index + " unchanged in a field";
 	}
 
 	@Test
@@ -617,10 +647,12 @@ class RecordRefusalTest {
 		DataBindException transforms = refusal(context, RecordRefusals.CallsTransformingSuper.class);
 		DataBindException drops = refusal(context, RecordRefusals.CallsDroppingSuper.class);
 		assertAll(
-				() -> assertEquals(superFieldsUnmatched(RecordRefusals.TransformingSuperBase.class),
-						transforms.getMessage()),
+				() -> assertEquals(superParameterNotStored(RecordRefusals.CallsTransformingSuper.class,
+						RecordRefusals.TransformingSuperBase.class, "java.lang.String", 0), transforms.getMessage()),
 				() -> assertNull(transforms.getCause()),
-				() -> assertEquals(superFieldsUnmatched(RecordRefusals.DroppingSuperBase.class), drops.getMessage()),
+				() -> assertEquals(superParameterNotStored(RecordRefusals.CallsDroppingSuper.class,
+						RecordRefusals.DroppingSuperBase.class, "java.lang.String, java.lang.String", 1),
+						drops.getMessage()),
 				() -> assertNull(drops.getCause()));
 	}
 
@@ -639,7 +671,7 @@ class RecordRefusalTest {
 		assertAll(
 				() -> assertEquals(notPublic, message(RecordRefusals.HoldsCallsProtectedSuper.class)),
 				() -> assertEquals(notPublic, message(RecordRefusals.HoldsReachesProtectedSuper.class)),
-				() -> assertEquals(superFieldsUnmatched(RecordRefusals.TransformingSuperBase.class),
+				() -> assertEquals(message(RecordRefusals.CallsTransformingSuper.class),
 						message(RecordRefusals.HoldsCallsTransformingSuper.class)),
 				() -> assertEquals(message(RecordRefusals.AssignsInheritedField.class),
 						message(RecordRefusals.HoldsAssignsInheritedField.class)));
