@@ -524,11 +524,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   deferred descriptor"); a fresh context asked for `CycleMember` first refuses it. When a resolution fails, keep no
   descriptor that was registered during it and reaches the refused type, so the answer does not depend on the order
   asked and `DataBindContext.componentSource`'s "it is in the cache" holds. Pin both orders in `RecordRefusalTest`.
-- [ ] **A `@Union` parameter the constructor analysis cannot match throws `NullPointerException`.** A `@Record`
-  constructor parameter carrying `@Union` and no `@Field`, assigned through a call (`this.shape =
-  Objects.requireNonNull(shape)`), makes `getDescriptor` throw `NullPointerException` from
-  `ImmutableFinder.findComponents`, which reads the absent `@Field`. Refuse the class with a `CodeAnalysisException`
-  naming it and the parameter, with a case in `RecordRefusalTest`.
 
 ## Documentation
 

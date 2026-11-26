@@ -20,8 +20,12 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataClassUnion;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.bind.analysis.CodeAnalysisException;
+import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.RecordRefusals;
 import io.ltr8.test.data.RecordRefusals.BridgeConstructorThrows;
 import io.ltr8.test.data.RecordRefusals.BridgeNeedsArgument;
@@ -47,6 +51,7 @@ import io.ltr8.test.data.RecordRefusals.HoldsTwoDeep;
 import io.ltr8.test.data.RecordRefusals.HoldsUnconvertible;
 import io.ltr8.test.data.RecordRefusals.LoopWithRefused;
 import io.ltr8.test.data.RecordRefusals.NoAccessorForArgument;
+import io.ltr8.test.data.RecordRefusals.NamedUnionThroughCall;
 import io.ltr8.test.data.RecordRefusals.NoDesignatedConstructor;
 import io.ltr8.test.data.RecordRefusals.OnlyOtherProfiles;
 import io.ltr8.test.data.RecordRefusals.OrderCountMismatch;
@@ -60,6 +65,8 @@ import io.ltr8.test.data.RecordRefusals.RawList;
 import io.ltr8.test.data.RecordRefusals.RawMap;
 import io.ltr8.test.data.RecordRefusals.TwoCarriers;
 import io.ltr8.test.data.RecordRefusals.UnassignableUnion;
+import io.ltr8.test.data.RecordRefusals.UnionAssignedUnchanged;
+import io.ltr8.test.data.RecordRefusals.UnionThroughCall;
 import io.ltr8.test.data.RecordRefusals.Unconvertible;
 import io.ltr8.test.data.RecordRefusals.WildcardList;
 import io.ltr8.test.data.ToDataBridges.Problem;
@@ -191,6 +198,29 @@ class RecordRefusalTest {
 	void aConstructorThatTransformsItsArgumentIsRefusedNamingTheClass() {
 		assertEquals("Failed to match immutable fields for class: " + ConstructorTransformsArgument.class
 				+ ". Add @Field annotations to assist.", message(ConstructorTransformsArgument.class));
+	}
+
+	@Test
+	void aUnionParameterNotAssignedUnchangedAndNotNamedIsRefusedNamingTheClassAndParameter() {
+		DataBindException refused = refusal(context, UnionThroughCall.class);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals(UnionThroughCall.class.getName() + "'s constructor does not assign its @Union parameter 0 "
+				+ "unchanged to a field, and no @Field names it", refused.getMessage());
+		assertNull(refused.getCause());
+	}
+
+	@Test
+	void aUnionParameterNamedByFieldOrAssignedUnchangedIsDescribed() {
+		assertAll(Stream.of(new NamedUnionThroughCall("named"), new UnionAssignedUnchanged(7)).map(value -> () -> {
+			DataClassRecord record = assertInstanceOf(DataClassRecord.class,
+					context.getDescriptor(value.getClass()));
+			assertEquals(1, record.fields().length);
+			DataClassField tag = record.fields()[0];
+			assertEquals("tag", tag.name());
+			assertInstanceOf(DataClassUnion.class, tag.dataClass());
+			MapMapper mapper = new MapMapper(context);
+			assertEquals(tag.get(value), tag.get(mapper.toObject(value.getClass(), mapper.toMap(value))));
+		}));
 	}
 
 	@Test
@@ -327,7 +357,7 @@ class RecordRefusalTest {
 				HoldsRefusedOptional.class, HoldsRefusedMap.class, HoldsRefusedArray.class, HoldsHolder.class,
 				HoldsTwoDeep.class, HoldsTwoCarriers.class, HoldsBridgeNeedsArgument.class,
 				HoldsUnconvertible.class, RawList.class, WildcardList.class, RawMap.class, CycleTop.class,
-				LoopWithRefused.class);
+				LoopWithRefused.class, UnionThroughCall.class);
 		List<Class<?>> refusedUnderProfile = List.of(ProfileFieldCountMismatch.class,
 				ProfileNamesNoComponent.class, ProfileParameterUnnamed.class);
 		assertAll(Stream.concat(

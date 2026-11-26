@@ -121,14 +121,12 @@ public class ImmutableFinder implements ComponentFinder {
                     final int paramIndex = x;
                     ComponentInfo component = immutableFields.stream()
                             .filter(e -> e.getConstructorArgument() == paramIndex).findFirst().orElse(null);
-                    if (component != null) {
-                        component.setUnion(union);
-                    } else {
-                        component = new ComponentInfo(field.value(), params[x].getType());
-                        component.setConstructorArgument(x);
-                        component.setUnion(union);
-                        immutableFields.add(component);
+                    // A parameter @Field names already has its component, so one still without is unnamed.
+                    if (component == null) {
+                        throw new CodeAnalysisException(String.format("%s's constructor does not assign its @Union "
+                                + "parameter %d unchanged to a field, and no @Field names it", clss.getName(), x));
                     }
+                    component.setUnion(union);
                 }
             }
 
