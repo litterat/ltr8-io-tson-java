@@ -245,14 +245,8 @@ class ToDataBridgeTest {
 		return Arrays.stream(fields).map(field -> field.name() + ":" + field.type().getName()).toList();
 	}
 
-	/** Every message on the refusal's cause chain, since {@code resolveRecord} wraps the one that says why. */
 	private String refusal(Class<?> type) {
-		DataBindException thrown = assertThrows(DataBindException.class, () -> context.getDescriptor(type));
-		StringBuilder messages = new StringBuilder();
-		for (Throwable cause = thrown; cause != null; cause = cause.getCause()) {
-			messages.append(cause.getMessage()).append('\n');
-		}
-		return messages.toString();
+		return assertThrows(DataBindException.class, () -> context.getDescriptor(type)).getMessage();
 	}
 
 	private static void assertNames(String message, String... facts) {

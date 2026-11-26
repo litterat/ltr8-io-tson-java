@@ -390,7 +390,10 @@ public class DataBindContext {
 		}
 	}
 
-	/** Each distinct message along {@code e}'s cause chain, outermost first -- the innermost is usually the fact. */
+	/**
+	 * Each distinct message along {@code e}'s cause chain, outermost first: a wrapper saying only that something
+	 * failed ("Failed to instantiate bridge") leaves what failed to its cause.
+	 */
 	private static String reasons(Throwable e) {
 		StringBuilder reasons = new StringBuilder();
 		for (Throwable at = e; at != null; at = at.getCause() == at ? null : at.getCause()) {

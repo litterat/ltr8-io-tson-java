@@ -148,13 +148,7 @@ public final class DataClassObjectReader {
                 "a selector for the variant", "a union with none");
     }
 
-    /**
-     * {@code type}'s descriptor, or a failure naming the class and the reason under it.
-     *
-     * <p>The cause is carried and unwrapped into the message: {@code DataBindException}'s own text for an
-     * unresolvable class is "Failed to resolve", which names neither the class nor what stopped it, and a
-     * caller reading that alone has no next step.
-     */
+    /** {@code type}'s descriptor, or a failure naming the class and the binder's reason for refusing it. */
     private DataClass descriptorFor(JsonReadContext ctx, Class<?> type) {
         try {
             return context.getDescriptor(type);
@@ -162,8 +156,8 @@ public final class DataClassObjectReader {
             // BIND_MISMATCH, not a verdict: a class this context cannot analyse is a misconfiguration in
             // the reading application, and nothing about the document is being asserted by it.
             // `Code.verdict()` is false for it, which is what a caller routing on the answer needs.
-            Throwable reason = e.getCause() != null ? e.getCause() : e;
-            ctx.report(Diagnostic.Code.BIND_MISMATCH, "%s cannot be bound: %s".formatted(type.getName(), reason),
+            ctx.report(Diagnostic.Code.BIND_MISMATCH,
+                    "%s cannot be bound: %s".formatted(type.getName(), e.getMessage()),
                     type.getName(), "(unbindable)");
             return null;
         }
