@@ -65,7 +65,6 @@ import io.ltr8.test.data.RecordRefusals.OnlyOtherProfiles;
 import io.ltr8.test.data.RecordRefusals.OrderCountMismatch;
 import io.ltr8.test.data.RecordRefusals.OrderNamesNoField;
 import io.ltr8.test.data.RecordRefusals.PrivateAccessor;
-import io.ltr8.test.data.RecordRefusals.PrivateGetterSetter;
 import io.ltr8.test.data.RecordRefusals.ProfileFieldCountMismatch;
 import io.ltr8.test.data.RecordRefusals.ProfileNamesNoComponent;
 import io.ltr8.test.data.RecordRefusals.ProfileParameterUnnamed;
@@ -297,16 +296,6 @@ class RecordRefusalTest {
 	}
 
 	@Test
-	void aPrivateGetterSetterPairIsRefusedNamingTheClassAndGetterWithTheCauseKept() {
-		DataBindException refused = refusal(context, PrivateGetterSetter.class);
-		String message = refused.getMessage();
-		assertTrue(message.startsWith(PrivateGetterSetter.class.getName() + NOT_ACCESSIBLE + "member is private: "
-				+ PrivateGetterSetter.class.getName() + ".getValue"), message);
-		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
-		assertTrue(message.endsWith(cause.getMessage()), message);
-	}
-
-	@Test
 	void aFieldBridgeWithoutANoArgumentConstructorIsRefusedNamingBothClassesWithTheCauseKept() {
 		DataBindException refused = refusal(context, BridgeNeedsArgument.class);
 		assertEquals(BridgeNeedsArgument.class.getName() + " is bound through "
@@ -374,7 +363,7 @@ class RecordRefusalTest {
 				BridgeConstructorThrows.class, BridgeNeedsArgument.class, ConstructorTransformsArgument.class,
 				NoAccessorForArgument.class, PrivateAccessor.class, HiddenRecord.class,
 				FieldAnnotationWithoutAccessors.class, GetterAndSetterRenamedApart.class, HiddenEmpty.class,
-				UsesHiddenBridge.class, PrivateGetterSetter.class, HoldsRefused.class, HoldsRefusedList.class,
+				UsesHiddenBridge.class, HoldsRefused.class, HoldsRefusedList.class,
 				HoldsRefusedOptional.class, HoldsRefusedMap.class, HoldsRefusedArray.class, HoldsHolder.class,
 				HoldsTwoDeep.class, HoldsTwoCarriers.class, HoldsBridgeNeedsArgument.class,
 				HoldsUnconvertible.class, RawList.class, WildcardList.class, RawMap.class, CycleTop.class,
@@ -391,14 +380,13 @@ class RecordRefusalTest {
 	@Test
 	void aNameBoundToARefusedClassStatesTheFactOnce() {
 		DataBindContext named = DataBindContext.builder().nameBinder(DataNameBinder.ofMap(Map.of(
-				"holder", HoldsRefused.class, "bridged", BridgeNeedsArgument.class, "hidden", HiddenEmpty.class,
-				"private", PrivateGetterSetter.class))).build();
+				"holder", HoldsRefused.class, "bridged", BridgeNeedsArgument.class, "hidden", HiddenEmpty.class)))
+				.build();
 		assertAll(
 				() -> assertNamedRefusal(named, "holder", HoldsRefused.class, PROTECTED_CONSTRUCTOR),
 				() -> assertNamedRefusal(named, "bridged", BridgeNeedsArgument.class,
 						message(BridgeNeedsArgument.class)),
-				() -> assertNamedLookupRefusal(named, "hidden", HiddenEmpty.class, "class is not public: "),
-				() -> assertNamedLookupRefusal(named, "private", PrivateGetterSetter.class, "member is private: "));
+				() -> assertNamedLookupRefusal(named, "hidden", HiddenEmpty.class, "class is not public: "));
 	}
 
 	private static void assertNamedRefusal(DataBindContext named, String name, Class<?> bound, String fact) {

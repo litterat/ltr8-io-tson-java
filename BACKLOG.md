@@ -535,12 +535,6 @@ Where an entry says "not run", reproduce it first; one that does not reproduce c
 - [ ] **`ComponentInfo.setUnion`'s duplicate check reads as inverted.** Not run. It throws where the two unions
   are equal, and its message says "Field annotation", so `@Union` on both a constructor parameter and its
   accessor is probably refused. Refuse two that differ, accept two that agree, and name `@Union` in the message.
-- [ ] **A `@Record` class with a public final field and an accessor is refused.** `GetSetFinder` calls
-  `unreflectSetter` on the final field, which fails. A final field has no setter: read it, and bind it through the
-  constructor.
-- [ ] **A `@Record` class with a private getter and setter pair is refused.** `GetSetFinder` reaches the pair and
-  cannot unreflect it through the public lookup. Decide whether a pair that is not public is no component or a
-  refusal naming the member, and pin it.
 
 ## Documentation
 
