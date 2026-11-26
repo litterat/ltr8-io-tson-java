@@ -515,6 +515,52 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a
   receiver through the emitter, not designing a second error model.
 
+## Binding (`ltr8-bind`)
+
+- [ ] **A setter is matched to its getter by name alone.** `GetSetFinder` pairs `setX` with `getX()` whatever the
+  setter's parameters, so an overloaded setter (`setValue(String)` beside `setValue(int)`), a two-argument setter and
+  a setter whose parameter type differs from the getter's return type each make `getDescriptor` throw an unchecked
+  `IllegalArgumentException`. Pair a getter only with the one-argument setter of its return type; a class with no
+  such setter has no component of that name. Pin each case in `GetSetFinderTest`, with a round trip where a
+  component remains.
+- [ ] **A getter/setter pair loses its generic type.** `GetSetFinder` reads the pair's parameterized type from the
+  setter's return type, which is `void`, so `List<String> getItems()`/`setItems(List<String>)` and an
+  `Optional<String>` pair are refused. Read it from the getter's generic return type, and round-trip a list pair
+  and an optional pair through both mappers in `GetSetFinderTest`.
+- [ ] **A setter is merged into a constructor component by name, ignoring case.** `GetSetFinder`'s merge compares
+  names with `equalsIgnoreCase` and no declaring class, so a pair named `URL` overwrites the write handle of a
+  constructor component `url`, and a subclass pair that of a super-class component it shadows. Match the name
+  exactly and by declaring class, as the `@Field` loop below it does, with a test of each.
+- [ ] **An `Optional` field with a setter throws `WrongMethodTypeException`.** With a public
+  `Optional<String> getNote()`/`setNote(Optional<String>)` pair (once the entry above reads its type) or a public
+  non-final `Optional<String>` field, `getDescriptor` throws from `DefaultRecordBinder.resolveOptionalField`: the
+  setter is given the type of a conversion, `asType(methodType(optionalType, Optional.class))`. Compose it as
+  `resolveBridgeField` does, and round-trip the class through both mappers, present and absent.
+- [ ] **`resolveOptionalNumberField` returns a conversion as the field's setter.** `DataClassField.setter()` of an
+  `OptionalInt`, `OptionalLong` or `OptionalDouble` field is the value-to-optional conversion and not a handle that
+  writes the field. Nothing calls it today. Return the composed setter, or `null` where the component has none, and
+  pin `setter()`'s type for each of the three.
+- [ ] **A `@Field` bridge that inherits `DataBridge` throws `ArrayIndexOutOfBoundsException`.** With
+  `class Upper extends AbstractTextBridge` and `AbstractTextBridge implements DataBridge<String, Name>`,
+  `@Field(bridge = Upper.class)` makes `getDescriptor` throw from `DefaultRecordBinder.fieldBridge`, which reads
+  `getGenericInterfaces()[0]`; a bridge listing another interface first reads the wrong one. Find `DataBridge`'s
+  type arguments through the super classes and interfaces, refusing a bridge that leaves them open with a
+  `CodeAnalysisException`, with a round trip of each shape in `BridgedFieldTest`.
+- [ ] **`DefaultRecordBinder` throws unchecked exceptions for components that do not match the constructor.** Handed
+  fewer or more constructor-bound components than the constructor has parameters, or one of another type,
+  `createTupleConstructor` and its siblings throw `IllegalArgumentException` or `IndexOutOfBoundsException`.
+  `ImmutableFinder` produces no such list, so this is read and not reproduced: reproduce it through a
+  `ComponentFinder` of the test's own if the binder takes one, refuse the class with a `CodeAnalysisException`
+  naming it, and say so if there is no route to it.
+- [ ] **`ImmutableFinder` takes a private method as a field's accessor, and requires one for a public final field.**
+  A `@Record` class whose only method named for a constructor-bound field is private binds that method, and
+  `getDescriptor` or the first read fails on access; a class holding the value in a `public final` field with no
+  accessor is refused. Take only a public instance method, and read a public final field directly where there is
+  none, with tests of both and a round trip of the second.
+- [ ] **`ImmutableFinder`'s class Javadoc retells history.** It narrates what the analysis used to do, against the
+  conventions in `CLAUDE.md`. Rewrite it to the current contract: what a constructor must do for a parameter to
+  bind, and what is refused.
+
 ## Documentation
 
 - [ ] User-facing documentation on how to use the library, in `docs/` — `README.md` and the `tson-java` skill are the
