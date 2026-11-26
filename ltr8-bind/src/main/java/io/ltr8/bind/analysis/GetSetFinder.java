@@ -20,6 +20,7 @@ import io.ltr8.annotation.Field;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -140,7 +141,8 @@ public class GetSetFinder implements ComponentFinder {
 				MethodHandle read = lookup.unreflect(getter);
 				MethodHandle write = lookup.unreflect(setter);
 				info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
-				info.setWriteMethod(write.asType(write.type().changeParameterType(1, erasure)));
+				// A fluent setter returns its object, or another the old value; either is dropped.
+				info.setWriteMethod(write.asType(MethodType.methodType(void.class, write.type().parameterType(0), erasure)));
 			} catch (IllegalAccessException e) {
 				throw new SecurityException("Failed to unreflect field", e);
 			}

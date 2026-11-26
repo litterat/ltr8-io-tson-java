@@ -29,7 +29,9 @@ import io.ltr8.test.data.GetSetClasses.FieldBesideInheritedPair;
 import io.ltr8.test.data.GetSetClasses.FinalFieldBesideMutableField;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithAccessor;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithoutAccessor;
+import io.ltr8.test.data.GetSetClasses.FluentSetter;
 import io.ltr8.test.data.GetSetClasses.GetterOverride;
+import io.ltr8.test.data.GetSetClasses.InheritsFluentSetter;
 import io.ltr8.test.data.GetSetClasses.InheritsNamedByConstructor;
 import io.ltr8.test.data.GetSetClasses.InlineFinalField;
 import io.ltr8.test.data.GetSetClasses.ListPair;
@@ -60,9 +62,11 @@ import io.ltr8.test.data.GetSetClasses.ReadableWritten;
 import io.ltr8.test.data.GetSetClasses.Relabelled;
 import io.ltr8.test.data.GetSetClasses.RenamedOverAliasedPair;
 import io.ltr8.test.data.GetSetClasses.RenamedOverPair;
+import io.ltr8.test.data.GetSetClasses.ReportingSetter;
 import io.ltr8.test.data.GetSetClasses.Retagged;
 import io.ltr8.test.data.GetSetClasses.StaticField;
 import io.ltr8.test.data.GetSetClasses.StaticPair;
+import io.ltr8.test.data.GetSetClasses.SwappingSetter;
 import io.ltr8.test.data.GetSetClasses.TextBox;
 import io.ltr8.test.data.GetSetClasses.TextHolder;
 import io.ltr8.test.data.GetSetClasses.TextList;
@@ -624,6 +628,55 @@ class GetSetFinderTest {
 		TextHolder value = new TextHolder();
 		value.setValue("anchor");
 		for (TextHolder copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterReturningItsObjectIsWrittenDroppingWhatItReturns() throws Throwable {
+		DataClassRecord record = record(FluentSetter.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		assertEquals(MethodType.methodType(void.class, FluentSetter.class, String.class),
+				record.fields()[0].setter().orElseThrow().type());
+		FluentSetter written = new FluentSetter();
+		record.fields()[0].set(written, "buoy");
+		assertEquals("buoy", written.getValue());
+		for (FluentSetter copy : roundTrips(new FluentSetter().setValue("anchor"))) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterReturningTheOldValueIsWrittenDroppingWhatItReturns() throws Throwable {
+		DataClassRecord record = record(SwappingSetter.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		SwappingSetter value = new SwappingSetter();
+		value.setValue("anchor");
+		for (SwappingSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterReturningAPrimitiveIsWrittenDroppingWhatItReturns() throws Throwable {
+		DataClassRecord record = record(ReportingSetter.class);
+		assertEquals(List.of("count:int set"), shape(record));
+		ReportingSetter value = new ReportingSetter();
+		value.setCount(3);
+		for (ReportingSetter copy : roundTrips(value)) {
+			assertEquals(3, copy.getCount());
+		}
+	}
+
+	@Test
+	void anInheritedSetterReturningItsSuperClassIsWrittenDroppingWhatItReturns() throws Throwable {
+		DataClassRecord record = record(InheritsFluentSetter.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		assertEquals(MethodType.methodType(void.class, InheritsFluentSetter.class, String.class),
+				record.fields()[0].setter().orElseThrow().type());
+		InheritsFluentSetter value = new InheritsFluentSetter();
+		value.setValue("anchor");
+		for (InheritsFluentSetter copy : roundTrips(value)) {
 			assertEquals("anchor", copy.getValue());
 		}
 	}

@@ -517,9 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A setter that returns a value is untested and probably throws.** A pair whose setter returns `this` or the
-  old value is folded into `DefaultRecordBinder.createEmbedSetters` as it stands. Read, not run. Reproduce it, bind
-  the pair by dropping what the setter returns, and round-trip it through both mappers.
 - [ ] **A public field or pair of a super class that is not public throws `SecurityException`.** `GetSetFinder`
   unreflects a member against its declaring class, so one a public class inherits from a package-private super
   class cannot be reached through the public lookup, and the failure is rethrown unchecked. Read, not run. Reach the

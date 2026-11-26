@@ -874,6 +874,70 @@ public final class GetSetClasses {
 		}
 	}
 
+	public static class FluentSetter {
+
+		private String value;
+
+		@Record
+		public FluentSetter() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public FluentSetter setValue(String value) {
+			this.value = value;
+			return this;
+		}
+	}
+
+	public static class SwappingSetter {
+
+		private String value;
+
+		@Record
+		public SwappingSetter() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public String setValue(String value) {
+			String old = this.value;
+			this.value = value;
+			return old;
+		}
+	}
+
+	public static class ReportingSetter {
+
+		private int count;
+
+		@Record
+		public ReportingSetter() {
+		}
+
+		public int getCount() {
+			return count;
+		}
+
+		public boolean setCount(int count) {
+			boolean changed = this.count != count;
+			this.count = count;
+			return changed;
+		}
+	}
+
+	/** Its fluent setter, inherited, returns the super class. */
+	public static class InheritsFluentSetter extends FluentSetter {
+
+		@Record
+		public InheritsFluentSetter() {
+		}
+	}
+
 	public static class TwoArgumentSetter {
 
 		public String name;
