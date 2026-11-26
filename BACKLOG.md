@@ -552,11 +552,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `ImmutableFinder` produces no such list, so this is read and not reproduced: reproduce it through a
   `ComponentFinder` of the test's own if the binder takes one, refuse the class with a `CodeAnalysisException`
   naming it, and say so if there is no route to it.
-- [ ] **`ImmutableFinder` takes a private method as a field's accessor, and requires one for a public final field.**
-  A `@Record` class whose only method named for a constructor-bound field is private binds that method, and
-  `getDescriptor` or the first read fails on access; a class holding the value in a `public final` field with no
-  accessor is refused. Take only a public instance method, and read a public final field directly where there is
-  none, with tests of both and a round trip of the second.
 - [ ] **`ImmutableFinder`'s class Javadoc retells history.** It narrates what the analysis used to do, against the
   conventions in `CLAUDE.md`. Rewrite it to the current contract: what a constructor must do for a parameter to
   bind, and what is refused.

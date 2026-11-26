@@ -153,6 +153,12 @@ public class ImmutableFinder implements ComponentFinder {
                 examineAccessorAnnotations(superClass, immutableFields, lookup, matched);
             }
 
+            for (ComponentInfo component : immutableFields) {
+                if (component.getReadMethod() == null) {
+                    readPublicFinalField(clss, component, lookup);
+                }
+            }
+
             // Counting components alone would let a parameter stored in two fields hide one stored in none.
             int[] reaching = new int[constructor.getParameterCount()];
             for (ComponentInfo component : immutableFields) {
@@ -191,8 +197,37 @@ public class ImmutableFinder implements ComponentFinder {
 
             fields.addAll(immutableFields);
 
-        } catch (UncheckedIOException | NoSuchMethodException | SecurityException | IllegalAccessException e) {
+        } catch (IllegalAccessException e) {
+            // A public member the public lookup still cannot reach: its class is not public, or not exported.
+            throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: %s",
+                    clss.getName(), e.getMessage()), e);
+        } catch (UncheckedIOException | NoSuchMethodException | SecurityException e) {
             throw new CodeAnalysisException("Failed to access class", e);
+        }
+    }
+
+    /**
+     * A final field holds what the constructor stored for as long as the object lives, so a public one reads its
+     * component back as an accessor returning it would.
+     */
+    private static void readPublicFinalField(Class<?> clss, ComponentInfo component, Lookup lookup)
+            throws IllegalAccessException {
+        String name = component.getName();
+        // A parameter only @Field names has no declaring class; its name is taken as a field's, as for an accessor.
+        Class<?> declarer = component.getDeclaringClass() != null ? component.getDeclaringClass()
+                : fieldDeclarer(clss, clss.getName().replace('.', '/'), name);
+        if (declarer == null) {
+            return;
+        }
+        java.lang.reflect.Field field;
+        try {
+            field = declarer.getDeclaredField(name);
+        } catch (NoSuchFieldException e) {
+            return;
+        }
+        int modifiers = field.getModifiers();
+        if (Modifier.isPublic(modifiers) && Modifier.isFinal(modifiers) && !Modifier.isStatic(modifiers)) {
+            component.setReadMethod(readAs(lookup.unreflectGetter(field), component.getType()));
         }
     }
 
@@ -218,9 +253,10 @@ public class ImmutableFinder implements ComponentFinder {
             throws NoSuchMethodException, IllegalAccessException, SecurityException, CodeAnalysisException {
 
         for (MethodModel method : classModel.methods()) {
-            // An accessor takes no argument but the instance; in a static method slot 0 is no instance.
+            // An accessor takes no argument but the instance; in a static method slot 0 is no instance, and the
+            // public lookup reaches no method that is not public.
             if (!method.methodType().stringValue().startsWith("()") || method.flags().has(AccessFlag.STATIC)
-                    || matched.contains(method.methodName().stringValue())) {
+                    || !method.flags().has(AccessFlag.PUBLIC) || matched.contains(method.methodName().stringValue())) {
                 continue;
             }
             if (examineAccessor(clss, immutableFields, method)) {
@@ -347,7 +383,7 @@ public class ImmutableFinder implements ComponentFinder {
         for (Method method : clss.getDeclaredMethods()) {
 
             if (method.getParameterCount() > 0 || Modifier.isStatic(method.getModifiers())
-                    || matched.contains(method.getName())) {
+                    || !Modifier.isPublic(method.getModifiers()) || matched.contains(method.getName())) {
                 continue;
             }
 

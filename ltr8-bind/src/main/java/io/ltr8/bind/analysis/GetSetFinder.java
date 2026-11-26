@@ -39,9 +39,9 @@ public class GetSetFinder implements ComponentFinder {
 
 		Lookup lookup = MethodHandles.publicLookup();
 
-		// A final field has no setter: one the constructor binds is already a component, read through the
-		// accessor ImmutableFinder matched and written through the constructor, and one it does not bind is
-		// no component, since nothing can write it.
+		// A final field has no setter: one the constructor binds is already a component, read as ImmutableFinder
+		// found it and written through the constructor, and one it does not bind is no component, since nothing
+		// can write it.
 		java.lang.reflect.Field[] classFields = clss.getFields();
 		for (java.lang.reflect.Field classField : classFields) {
 			int modifiers = classField.getModifiers();
