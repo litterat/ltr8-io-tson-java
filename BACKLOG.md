@@ -515,6 +515,45 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a
   receiver through the emitter, not designing a second error model.
 
+## Binding (`ltr8-bind`)
+
+Where an entry says "not run", reproduce it first; one that does not reproduce comes out.
+
+- [ ] **A reassigned constructor parameter is accepted and changes the value.** `@Record Reassigns(String name) {
+  name = name.trim(); this.name = name; }` is described, and `" x "` comes back `"x"` from a round trip:
+  `ImmutableFinder.identifyArguments` does not see a store into a parameter's slot, before a field assignment or
+  before `super(…)`. Treat a parameter that is stored into as unmatched, so the class is refused unless `@Field`
+  names its accessor, with tests of both.
+- [ ] **A `this(…)` delegating constructor is refused, with advice that does not help.** `@Record Delegates(String
+  a, Integer b) { this(b, a); }` is refused with "Failed to match immutable fields … Add @Field annotations to
+  assist". Follow the delegate call as `ImmutableFinder` follows a `super(…)` call, or state the fact in the
+  refusal; pin which, with a round trip where it is accepted.
+- [ ] **Accessors are matched by bare field name across the class hierarchy.** Not run. A super class and a
+  subclass each declaring a private field of one name could pair a component with the other's accessor
+  (`ImmutableFinder.examineAccessor`). Match an accessor to the field of the class that declares both, with a
+  test that reads each field's own value.
+- [ ] **`ComponentInfo.setUnion`'s duplicate check reads as inverted.** Not run. It throws where the two unions
+  are equal, and its message says "Field annotation", so `@Union` on both a constructor parameter and its
+  accessor is probably refused. Refuse two that differ, accept two that agree, and name `@Union` in the message.
+- [ ] **A mutable `@Record` with a bridged field and a setter cannot be described.** Not run. Where the field has a
+  setter, `DefaultRecordBinder.resolveBridgeField` asks `asType` to turn a two-parameter handle into a
+  one-parameter one, which always throws `WrongMethodTypeException`. Cover a `@Field(bridge = …)` getter and
+  setter pair and a bridged public field, each with a round trip through both mappers.
+- [ ] **A `@Field` bridge is built twice for one field.** `DefaultRecordBinder` instantiates the bridge class once
+  for `toData` and once for `toObject`, so a bridge holding state sees half the calls on each. Build it once per
+  field, with a test counting instances.
+- [ ] **A refused class can stay a member of a cached open union.** Not run. `DefaultRecordBinder` registers a class
+  with its union interfaces and super classes (`registerUnionInterfaces`, `registerUnionSubclasses`) once its own
+  fields resolve; `addMemberType` changes a union descriptor that may already be cached, and a refusal after that
+  point does not take the member back. Both also swallow every `Throwable`. Add a member only once its class is
+  described, and catch only what a missing union means.
+- [ ] **A `@Record` class with a public final field and an accessor is refused.** `GetSetFinder` calls
+  `unreflectSetter` on the final field, which fails. A final field has no setter: read it, and bind it through the
+  constructor.
+- [ ] **A `@Record` class with a private getter and setter pair is refused.** `GetSetFinder` reaches the pair and
+  cannot unreflect it through the public lookup. Decide whether a pair that is not public is no component or a
+  refusal naming the member, and pin it.
+
 ## Documentation
 
 - [ ] User-facing documentation on how to use the library, in `docs/` — `README.md` and the `tson-java` skill are the
