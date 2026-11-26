@@ -57,21 +57,20 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Matches up the arguments of a hand-written immutable class's constructor with its accessors --
- * for classes that predate (or simply aren't) real Java records, whose parameter names Java
- * erases and whose accessor-to-field correspondence reflection alone can't recover. It relies on
- * both the accessors and constructor using simple, unmodified set/get of a field (documented as a
- * requirement on {@link ComponentFinder}; the {@code @Field} annotation is the escape hatch when a
- * constructor does more than plain assignment).
+ * Finds the components of a hand-written {@code @Record} class from the bytecode of the constructor that binds it,
+ * since reflection gives neither a parameter's name nor the field it fills.
  *
- * <p>Reads the compiled bytecode of the constructor and each zero-arg method using the JDK's own
- * {@link java.lang.classfile Class-File API} (stable since JDK 24, part of {@code java.base}) --
- * not a third-party bytecode library. This replaced an ObjectWeb ASM-based implementation doing
- * the exact same analysis: {@link LoadInstruction} is ASM's {@code VarInsnNode} (ALOAD/ILOAD/etc,
- * with {@link LoadInstruction#slot()} where ASM had {@code VarInsnNode.var}), {@link FieldInstruction}
- * is ASM's {@code FieldInsnNode}, {@link InvokeInstruction} is ASM's {@code MethodInsnNode} (used
- * here for the {@code super()} call). The instruction-walking algorithm itself is unchanged from
- * the ASM version; only the API reading the bytecode changed.
+ * <p>A parameter binds when the constructor stores it unchanged in exactly one field of the instance and never writes
+ * its local slot. A {@code super(…)} or {@code this(…)} call passing only the constructor's own parameters, unchanged,
+ * is followed into the constructor it calls, which must store each of them the same way; a super class constructor
+ * so called must be public. A parameter the analysis cannot follow, computed or passed up beside any other argument,
+ * is named with {@link Field @Field}.
+ *
+ * <p>A component is read back through a public instance method of the class or a super class that returns its field,
+ * or a public method of its name carrying {@code @Field} or {@link Union @Union}; failing both, through the field
+ * itself where that is public and final. The class is refused, with a {@link CodeAnalysisException} naming it, when a
+ * parameter binds no component or more than one, when a component has no such read, or when two components take one
+ * name.
  */
 public class ImmutableFinder implements ComponentFinder {
 

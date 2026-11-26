@@ -552,9 +552,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `ImmutableFinder` produces no such list, so this is read and not reproduced: reproduce it through a
   `ComponentFinder` of the test's own if the binder takes one, refuse the class with a `CodeAnalysisException`
   naming it, and say so if there is no route to it.
-- [ ] **`ImmutableFinder`'s class Javadoc retells history.** It narrates what the analysis used to do, against the
-  conventions in `CLAUDE.md`. Rewrite it to the current contract: what a constructor must do for a parameter to
-  bind, and what is refused.
 
 ## Documentation
 
