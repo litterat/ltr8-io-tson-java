@@ -213,25 +213,6 @@ public final class RecordRefusals {
 		}
 	}
 
-	public static class PrivateGetterSetter {
-
-		private String value;
-
-		@Record
-		public PrivateGetterSetter() {
-		}
-
-		@SuppressWarnings("unused")
-		private String getValue() {
-			return value;
-		}
-
-		@SuppressWarnings("unused")
-		private void setValue(String value) {
-			this.value = value;
-		}
-	}
-
 	public static class FieldAnnotationWithoutAccessors {
 
 		@Field("renamed")

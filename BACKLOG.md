@@ -547,9 +547,6 @@ Where an entry says "not run", reproduce it first; one that does not reproduce c
   fields resolve; `addMemberType` changes a union descriptor that may already be cached, and a refusal after that
   point does not take the member back. Both also swallow every `Throwable`. Add a member only once its class is
   described, and catch only what a missing union means.
-- [ ] **A `@Record` class with a private getter and setter pair is refused.** `GetSetFinder` reaches the pair and
-  cannot unreflect it through the public lookup. Decide whether a pair that is not public is no component or a
-  refusal naming the member, and pin it.
 
 ## Documentation
 

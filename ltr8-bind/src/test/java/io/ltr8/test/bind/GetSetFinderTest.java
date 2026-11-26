@@ -15,6 +15,7 @@
  */
 package io.ltr8.test.bind;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
@@ -27,7 +28,17 @@ import io.ltr8.test.data.GetSetClasses.FinalFieldWithoutAccessor;
 import io.ltr8.test.data.GetSetClasses.InlineFinalField;
 import io.ltr8.test.data.GetSetClasses.MutableFieldBoundByConstructor;
 import io.ltr8.test.data.GetSetClasses.MutableFields;
+import io.ltr8.test.data.GetSetClasses.PackagePrivatePair;
+import io.ltr8.test.data.GetSetClasses.PrivateGetterPublicSetter;
+import io.ltr8.test.data.GetSetClasses.PrivatePairAlone;
+import io.ltr8.test.data.GetSetClasses.PrivatePairBesidePublicField;
+import io.ltr8.test.data.GetSetClasses.PrivatePairOverConstructorName;
+import io.ltr8.test.data.GetSetClasses.PrivateSetterOverConstructorName;
+import io.ltr8.test.data.GetSetClasses.ProtectedPair;
+import io.ltr8.test.data.GetSetClasses.PublicGetterPrivateSetter;
+import io.ltr8.test.data.GetSetClasses.PublicPair;
 import io.ltr8.test.data.GetSetClasses.StaticField;
+import io.ltr8.test.data.GetSetClasses.StaticPair;
 import org.junit.jupiter.api.Test;
 
 import java.lang.invoke.MethodHandleInfo;
@@ -38,6 +49,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -125,6 +137,133 @@ class GetSetFinderTest {
 		StaticField value = new StaticField();
 		value.name = "anchor";
 		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+	}
+
+	// --- getter/setter pairs
+
+	@Test
+	void aPublicPairIsReadThroughTheGetterAndWrittenThroughTheSetter() throws Throwable {
+		DataClassRecord record = record(PublicPair.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		assertReadThroughMethod(record.fields()[0], "getValue");
+		PublicPair value = new PublicPair();
+		value.setValue("anchor");
+		for (PublicPair copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aPrivatePairIsNoComponentAndItsValueIsNotCarried() throws Throwable {
+		DataClassRecord record = record(PrivatePairBesidePublicField.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		PrivatePairBesidePublicField value = new PrivatePairBesidePublicField();
+		value.name = "anchor";
+		value.secret("kept back");
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+		for (PrivatePairBesidePublicField copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertNull(copy.secret());
+		}
+	}
+
+	@Test
+	void aPackagePrivateOrProtectedPairIsNoComponent() throws Throwable {
+		assertEquals(List.of("name:String set"), shape(record(PackagePrivatePair.class)));
+		assertEquals(List.of("name:String set"), shape(record(ProtectedPair.class)));
+		PackagePrivatePair packagePrivate = new PackagePrivatePair();
+		packagePrivate.name = "anchor";
+		for (PackagePrivatePair copy : roundTrips(packagePrivate)) {
+			assertEquals("anchor", copy.name);
+		}
+		ProtectedPair protectedPair = new ProtectedPair();
+		protectedPair.name = "anchor";
+		for (ProtectedPair copy : roundTrips(protectedPair)) {
+			assertEquals("anchor", copy.name);
+		}
+	}
+
+	@Test
+	void aPairWithEitherHalfNotPublicIsNoComponent() throws Throwable {
+		assertEquals(List.of("name:String set"), shape(record(PublicGetterPrivateSetter.class)));
+		assertEquals(List.of("name:String set"), shape(record(PrivateGetterPublicSetter.class)));
+		PublicGetterPrivateSetter readOnly = new PublicGetterPrivateSetter();
+		readOnly.name = "anchor";
+		for (PublicGetterPrivateSetter copy : roundTrips(readOnly)) {
+			assertEquals("anchor", copy.name);
+			assertNull(copy.getSecret());
+		}
+		PrivateGetterPublicSetter writeOnly = new PrivateGetterPublicSetter();
+		writeOnly.name = "anchor";
+		writeOnly.setSecret("kept back");
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(writeOnly));
+		for (PrivateGetterPublicSetter copy : roundTrips(writeOnly)) {
+			assertEquals("anchor", copy.name);
+		}
+	}
+
+	@Test
+	void aClassWhoseOnlyPairIsPrivateHasNoComponents() throws Throwable {
+		DataClassRecord record = record(PrivatePairAlone.class);
+		assertEquals(List.of(), shape(record));
+		PrivatePairAlone value = new PrivatePairAlone();
+		assertEquals(Map.of(), new MapMapper(context).toMap(value));
+		assertEquals(0, new ArrayMapper(context).toArray(value).length);
+		for (PrivatePairAlone copy : roundTrips(value)) {
+			assertInstanceOf(PrivatePairAlone.class, copy);
+		}
+	}
+
+	@Test
+	void aPrivateSetterBesideTheConstructorsAccessorLeavesTheConstructorsComponent() throws Throwable {
+		DataClassRecord record = record(PrivateSetterOverConstructorName.class);
+		assertEquals(List.of("name:String"), shape(record));
+		assertReadThroughMethod(record.fields()[0], "getName");
+		for (PrivateSetterOverConstructorName copy : roundTrips(new PrivateSetterOverConstructorName("anchor"))) {
+			assertEquals("anchor", copy.getName());
+		}
+	}
+
+	@Test
+	void aPrivateGetterTheConstructorAnalysisMatchesIsRefusedByThatAnalysis() {
+		DataBindException refused = refusal(PrivatePairOverConstructorName.class);
+		assertEquals("Failed to access class", refused.getMessage());
+		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
+		assertTrue(cause.getMessage().startsWith("member is private: "
+				+ PrivatePairOverConstructorName.class.getName() + ".getName"), cause.getMessage());
+	}
+
+	@Test
+	void aStaticPairIsNoComponent() throws Throwable {
+		DataClassRecord record = record(StaticPair.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		StaticPair value = new StaticPair();
+		value.name = "anchor";
+		for (StaticPair copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+		}
+	}
+
+	// --- a member the public lookup cannot reach
+
+	static class HiddenWithPublicField {
+
+		public String name;
+
+		@Record
+		public HiddenWithPublicField() {
+		}
+	}
+
+	@Test
+	void aPublicFieldOfAClassThePublicLookupCannotReachIsRefusedNamingTheFieldWithTheCauseKept() {
+		DataBindException refused = refusal(HiddenWithPublicField.class);
+		String message = refused.getMessage();
+		assertTrue(message.startsWith(HiddenWithPublicField.class.getName()
+				+ " is bound through a member that is not accessible: class is not public: "
+				+ HiddenWithPublicField.class.getName() + ".name"), message);
+		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
+		assertTrue(message.endsWith(cause.getMessage()), message);
 	}
 
 	// --- helpers

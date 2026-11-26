@@ -60,7 +60,6 @@ public class GetSetFinder implements ComponentFinder {
 					info.setReadMethod(lookup.unreflectGetter(classField));
 					info.setWriteMethod(lookup.unreflectSetter(classField));
 				} catch (IllegalAccessException e) {
-					// not expecting an error here.
 					throw new SecurityException("Failed to unreflect field", e);
 				}
 
@@ -78,16 +77,22 @@ public class GetSetFinder implements ComponentFinder {
 		// declared methods are in no particular order and it is not possible to discover it.
 		// Many mention byte code analysis and line number tables, but that is asking for trouble when code
 		// is compiled for production.
+		//
+		// A pair is a component only when both halves are public instance methods. A pair that is not is no
+		// component, as a private field is not: the class is described from its other members.
 		Method[] methods = clss.getDeclaredMethods();
 		for (Method method : methods) {
 
 			// find the setters.
-			if (method.getName().startsWith("set") && method.getName().length() > 3) {
+			if (isPublicInstance(method) && method.getName().startsWith("set") && method.getName().length() > 3) {
 				String getterName = "g" + method.getName().substring(1);
 
 				try {
 					// If this throws NoSuchMethodException we ignore field.
 					Method getter = clss.getDeclaredMethod(getterName);
+					if (!isPublicInstance(getter)) {
+						continue;
+					}
 
 					String fieldName = Character.toLowerCase(getterName.charAt(3)) + getterName.substring(4);
 
@@ -110,7 +115,6 @@ public class GetSetFinder implements ComponentFinder {
 						info.setReadMethod(lookup.unreflect(getter));
 						info.setWriteMethod(lookup.unreflect(method));
 					} catch (IllegalAccessException e) {
-						// not expecting an error here.
 						throw new SecurityException("Failed to unreflect field", e);
 					}
 
@@ -193,6 +197,11 @@ public class GetSetFinder implements ComponentFinder {
 			}
 		}
 
+	}
+
+	private static boolean isPublicInstance(Method method) {
+		int modifiers = method.getModifiers();
+		return Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers);
 	}
 
 }

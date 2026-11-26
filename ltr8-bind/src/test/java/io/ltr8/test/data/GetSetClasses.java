@@ -114,4 +114,211 @@ public final class GetSetClasses {
 		public StaticField() {
 		}
 	}
+
+	// --- getter/setter pairs
+
+	public static class PublicPair {
+
+		private String value;
+
+		@Record
+		public PublicPair() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+	}
+
+	/** Its {@code secret} methods let a test set and read the pair's value; they are no pair themselves. */
+	public static class PrivatePairBesidePublicField {
+
+		public String name;
+
+		private String secret;
+
+		@Record
+		public PrivatePairBesidePublicField() {
+		}
+
+		private String getSecret() {
+			return secret;
+		}
+
+		private void setSecret(String secret) {
+			this.secret = secret;
+		}
+
+		public String secret() {
+			return getSecret();
+		}
+
+		public void secret(String secret) {
+			setSecret(secret);
+		}
+	}
+
+	public static class PackagePrivatePair {
+
+		public String name;
+
+		private String secret;
+
+		@Record
+		public PackagePrivatePair() {
+		}
+
+		String getSecret() {
+			return secret;
+		}
+
+		void setSecret(String secret) {
+			this.secret = secret;
+		}
+	}
+
+	public static class ProtectedPair {
+
+		public String name;
+
+		private String secret;
+
+		@Record
+		public ProtectedPair() {
+		}
+
+		protected String getSecret() {
+			return secret;
+		}
+
+		protected void setSecret(String secret) {
+			this.secret = secret;
+		}
+	}
+
+	public static class PublicGetterPrivateSetter {
+
+		public String name;
+
+		private String secret;
+
+		@Record
+		public PublicGetterPrivateSetter() {
+		}
+
+		public String getSecret() {
+			return secret;
+		}
+
+		@SuppressWarnings("unused")
+		private void setSecret(String secret) {
+			this.secret = secret;
+		}
+	}
+
+	public static class PrivateGetterPublicSetter {
+
+		public String name;
+
+		private String secret;
+
+		@Record
+		public PrivateGetterPublicSetter() {
+		}
+
+		@SuppressWarnings("unused")
+		private String getSecret() {
+			return secret;
+		}
+
+		public void setSecret(String secret) {
+			this.secret = secret;
+		}
+	}
+
+	public static class PrivatePairAlone {
+
+		private String value;
+
+		@Record
+		public PrivatePairAlone() {
+		}
+
+		@SuppressWarnings("unused")
+		private String getValue() {
+			return value;
+		}
+
+		@SuppressWarnings("unused")
+		private void setValue(String value) {
+			this.value = value;
+		}
+	}
+
+	public static class PrivatePairOverConstructorName {
+
+		private String name;
+
+		@Record
+		public PrivatePairOverConstructorName(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		@SuppressWarnings("unused")
+		private String getName() {
+			return name;
+		}
+
+		@SuppressWarnings("unused")
+		private void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	/** Its public getter is the accessor the constructor's analysis matches; its setter is private. */
+	public static class PrivateSetterOverConstructorName {
+
+		private String name;
+
+		@Record
+		public PrivateSetterOverConstructorName(String name) {
+			this.name = name;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		@SuppressWarnings("unused")
+		private void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class StaticPair {
+
+		private static String global;
+
+		public String name;
+
+		@Record
+		public StaticPair() {
+		}
+
+		public static String getGlobal() {
+			return global;
+		}
+
+		public static void setGlobal(String value) {
+			global = value;
+		}
+	}
 }
