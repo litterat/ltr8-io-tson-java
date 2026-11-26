@@ -33,12 +33,15 @@ import io.ltr8.test.data.RecordRefusals.BridgeObjectMismatch;
 import io.ltr8.test.data.RecordRefusals.BridgeTypeVariable;
 import io.ltr8.test.data.RecordRefusals.BridgeWithoutNoArgumentConstructor;
 import io.ltr8.test.data.RecordRefusals.ConstructorTransformsArgument;
+import io.ltr8.test.data.RecordRefusals.Counted;
+import io.ltr8.test.data.RecordRefusals.CountingBridge;
 import io.ltr8.test.data.RecordRefusals.CycleMember;
 import io.ltr8.test.data.RecordRefusals.CycleTop;
 import io.ltr8.test.data.RecordRefusals.EmptyUnion;
 import io.ltr8.test.data.RecordRefusals.FieldAnnotationWithoutAccessors;
 import io.ltr8.test.data.RecordRefusals.GetterAndSetterRenamedApart;
 import io.ltr8.test.data.RecordRefusals.Good;
+import io.ltr8.test.data.RecordRefusals.GoodLoop;
 import io.ltr8.test.data.RecordRefusals.HoldsBridgeNeedsArgument;
 import io.ltr8.test.data.RecordRefusals.HoldsHolder;
 import io.ltr8.test.data.RecordRefusals.HoldsRefused;
@@ -49,6 +52,11 @@ import io.ltr8.test.data.RecordRefusals.HoldsRefusedOptional;
 import io.ltr8.test.data.RecordRefusals.HoldsTwoCarriers;
 import io.ltr8.test.data.RecordRefusals.HoldsTwoDeep;
 import io.ltr8.test.data.RecordRefusals.HoldsUnconvertible;
+import io.ltr8.test.data.RecordRefusals.LatticeLoop;
+import io.ltr8.test.data.RecordRefusals.LatticeMid;
+import io.ltr8.test.data.RecordRefusals.LatticeSide;
+import io.ltr8.test.data.RecordRefusals.LatticeTop;
+import io.ltr8.test.data.RecordRefusals.LatticeUp;
 import io.ltr8.test.data.RecordRefusals.LoopWithRefused;
 import io.ltr8.test.data.RecordRefusals.NoAccessorForArgument;
 import io.ltr8.test.data.RecordRefusals.NamedUnionThroughCall;
@@ -63,6 +71,12 @@ import io.ltr8.test.data.RecordRefusals.ProfileNamesNoComponent;
 import io.ltr8.test.data.RecordRefusals.ProfileParameterUnnamed;
 import io.ltr8.test.data.RecordRefusals.RawList;
 import io.ltr8.test.data.RecordRefusals.RawMap;
+import io.ltr8.test.data.RecordRefusals.RefusedAfterCountedField;
+import io.ltr8.test.data.RecordRefusals.RefusedLoopHoldingCounted;
+import io.ltr8.test.data.RecordRefusals.RefusedLoopHoldingGoodLoop;
+import io.ltr8.test.data.RecordRefusals.RingFirst;
+import io.ltr8.test.data.RecordRefusals.RingLast;
+import io.ltr8.test.data.RecordRefusals.RingMiddle;
 import io.ltr8.test.data.RecordRefusals.TwoCarriers;
 import io.ltr8.test.data.RecordRefusals.UnassignableUnion;
 import io.ltr8.test.data.RecordRefusals.UnionAssignedUnchanged;
@@ -73,8 +87,14 @@ import io.ltr8.test.data.ToDataBridges.Problem;
 import io.ltr8.test.data.ToDataBridges.ProtectedConstructor;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -84,6 +104,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -435,6 +456,150 @@ class RecordRefusalTest {
 		DataBindContext fresh = DataBindContext.builder().build();
 		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleMember.class));
 		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleTop.class));
+	}
+
+	@Test
+	void aCycleMemberReachingARefusedTypeIsRefusedWhenAskedForAfterIt() {
+		DataBindContext fresh = DataBindContext.builder().build();
+		assertAll(
+				() -> assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleTop.class)),
+				() -> assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleMember.class)),
+				() -> assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleTop.class)),
+				() -> assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleMember.class)));
+	}
+
+	@Test
+	void everyClassOfARingRefusedInTheMiddleIsRefusedWhicheverIsAskedFirst() {
+		List<Class<?>> ring = List.of(RingFirst.class, RingMiddle.class, RingLast.class);
+		assertEveryOrderRefused(ring);
+	}
+
+	/**
+	 * {@code LatticeSide} meets {@code LatticeLoop} after {@code LatticeMid}, which {@code LatticeLoop} closes on,
+	 * has been described: {@code LatticeLoop} then waits on {@code LatticeTop}, not on {@code LatticeMid} alone.
+	 */
+	@Test
+	void aClassHoldingAMemberOfAnUnfinishedNestedCycleIsRefusedWithIt() {
+		assertEveryOrderRefused(List.of(LatticeTop.class, LatticeMid.class, LatticeLoop.class, LatticeUp.class,
+				LatticeSide.class));
+	}
+
+	/** Each class asked first of a fresh context, then the rest of them, in the order given. */
+	private static void assertEveryOrderRefused(List<Class<?>> cycle) {
+		assertAll(cycle.stream().map(first -> () -> {
+			DataBindContext fresh = DataBindContext.builder().build();
+			assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, first), first.getName());
+			for (Class<?> then : cycle) {
+				assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, then), first.getName() + ", then " + then.getName());
+			}
+		}));
+	}
+
+	@Test
+	void aSelfReferencingRefusedClassIsRefusedAgainAndLeavesAGoodLoopDescribed() throws DataBindException {
+		DataBindContext fresh = DataBindContext.builder().build();
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, LoopWithRefused.class));
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, LoopWithRefused.class));
+		assertGoodLoop(fresh);
+	}
+
+	@Test
+	void aGoodCycleDescribedDuringARefusalStaysCachedAndWhole() throws DataBindException {
+		int before = CountingBridge.BUILT.get();
+		DataBindContext.builder().build().getDescriptor(Counted.class);
+		int describedOnce = CountingBridge.BUILT.get();
+		assertTrue(describedOnce > before);
+
+		DataBindContext fresh = DataBindContext.builder().build();
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, RefusedLoopHoldingCounted.class));
+		int described = describedOnce - before;
+		assertEquals(describedOnce + described, CountingBridge.BUILT.get(), "Counted is described on the way");
+
+		DataClassRecord counted = assertInstanceOf(DataClassRecord.class, fresh.getDescriptor(Counted.class));
+		assertEquals(describedOnce + described, CountingBridge.BUILT.get(), "and kept: asking for it reuses it");
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, RefusedLoopHoldingCounted.class));
+		assertEquals(describedOnce + described, CountingBridge.BUILT.get(), "as does asking for the refused class");
+		assertSame(counted, fresh.getDescriptor(Counted.class));
+
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, RefusedLoopHoldingGoodLoop.class));
+		assertGoodLoop(fresh);
+	}
+
+	@Test
+	void aRefusalIsNotCachedButWorkedOutAgainEachTimeItIsAsked() {
+		DataBindContext fresh = DataBindContext.builder().build();
+		int before = CountingBridge.BUILT.get();
+		String first = message(fresh, RefusedAfterCountedField.class);
+		assertEquals(before + 1, CountingBridge.BUILT.get());
+		assertEquals(first, message(fresh, RefusedAfterCountedField.class));
+		assertEquals(before + 2, CountingBridge.BUILT.get());
+	}
+
+	@Test
+	void aDescriptorCachedBeforeARefusalIsTheSameInstanceAfterIt() throws DataBindException {
+		DataBindContext fresh = DataBindContext.builder().build();
+		DataClassRecord loop = assertGoodLoop(fresh);
+		DataClassRecord good = assertInstanceOf(DataClassRecord.class, fresh.getDescriptor(Good.class));
+
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, RefusedLoopHoldingGoodLoop.class));
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleTop.class));
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleMember.class));
+
+		assertSame(loop, fresh.getDescriptor(GoodLoop.class));
+		assertSame(loop, next(loop).dataClass());
+		assertSame(good, fresh.getDescriptor(Good.class));
+	}
+
+	@Test
+	void aGoodClassAskedForFirstAfterARefusalIsDescribed() throws DataBindException {
+		DataBindContext fresh = DataBindContext.builder().build();
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleTop.class));
+		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, LatticeTop.class));
+		assertEquals(2, assertInstanceOf(DataClassRecord.class, fresh.getDescriptor(Good.class)).fields().length);
+		assertGoodLoop(fresh);
+	}
+
+	/**
+	 * One context asked from several threads at once, each walking the classes in its own order: every refusal is
+	 * the same fact, and every good descriptor any thread is handed can be walked across its cyclic edge.
+	 */
+	@Test
+	void threadsAskingOneContextAtOnceAllSeeTheSameAnswers() throws Exception {
+		List<Class<?>> refused = List.of(CycleTop.class, CycleMember.class, RingFirst.class, RingMiddle.class,
+				RingLast.class, LatticeSide.class, LatticeTop.class, LatticeLoop.class, RefusedLoopHoldingGoodLoop.class);
+		int threads = 8;
+		try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+			for (int round = 0; round < 50; round++) {
+				DataBindContext shared = DataBindContext.builder().build();
+				CyclicBarrier start = new CyclicBarrier(threads);
+				List<Future<?>> asks = new ArrayList<>();
+				for (int t = 0; t < threads; t++) {
+					List<Class<?>> order = new ArrayList<>(refused);
+					Collections.rotate(order, t);
+					asks.add(pool.submit(() -> {
+						start.await();
+						for (Class<?> type : order) {
+							assertEquals(PROTECTED_CONSTRUCTOR, message(shared, type), type.getName());
+							assertGoodLoop(shared);
+						}
+						return null;
+					}));
+				}
+				for (Future<?> ask : asks) {
+					ask.get();
+				}
+			}
+		}
+	}
+
+	private static DataClassRecord assertGoodLoop(DataBindContext context) throws DataBindException {
+		DataClassRecord loop = assertInstanceOf(DataClassRecord.class, context.getDescriptor(GoodLoop.class));
+		assertSame(context.getDescriptor(GoodLoop.class), next(loop).dataClass());
+		return loop;
+	}
+
+	private static DataClassField next(DataClassRecord loop) {
+		return Stream.of(loop.fields()).filter(field -> field.name().equals("next")).findFirst().orElseThrow();
 	}
 
 	// --- refused over the super class constructor a hand-written immutable class calls

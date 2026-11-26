@@ -21,6 +21,8 @@ import io.ltr8.test.data.Protocols.NewOrder;
 import io.ltr8.test.data.Protocols.Order;
 import io.ltr8.test.data.Protocols.OrderNotFoundException;
 import io.ltr8.test.data.Protocols.OrderRef;
+import io.ltr8.test.data.RecordRefusals.CycleMember;
+import io.ltr8.test.data.RecordRefusals.CycleTop;
 import io.ltr8.test.data.RefusedProtocols;
 import io.ltr8.test.data.RefusedProtocols.AbstractOrders;
 import io.ltr8.test.data.RefusedProtocols.AtomParameter;
@@ -44,6 +46,7 @@ import io.ltr8.test.data.RefusedProtocols.OrdersEnum;
 import io.ltr8.test.data.RefusedProtocols.OtherSkuNotFoundException;
 import io.ltr8.test.data.RefusedProtocols.Overloaded;
 import io.ltr8.test.data.RefusedProtocols.OwnTypeParameter;
+import io.ltr8.test.data.RefusedProtocols.RefusedCycleParameter;
 import io.ltr8.test.data.RefusedProtocols.ReturnsCompletableFuture;
 import io.ltr8.test.data.RefusedProtocols.ReturnsCompletionStage;
 import io.ltr8.test.data.RefusedProtocols.ReturnsFuture;
@@ -237,6 +240,14 @@ class ProtocolRefusalTest {
 		assertNames(thrown.getMessage(), UndescribableParameter.class.getName() + ".run's request",
 				"java.lang.Thread", "cannot be described", "Unable to find a valid data conversion");
 		assertCauseIsTheDescriptorsRefusal(thrown, Thread.class);
+	}
+
+	@Test
+	void aRequestOnARefusedCycleLeavesNoMemberOfTheCycleDescribed() {
+		DataBindException thrown = refused(RefusedCycleParameter.class);
+		assertCauseIsTheDescriptorsRefusal(thrown, CycleTop.class);
+		DataBindException member = assertThrows(DataBindException.class, () -> context.getDescriptor(CycleMember.class));
+		assertTrue(thrown.getMessage().endsWith(member.getMessage()), thrown.getMessage());
 	}
 
 	@Test

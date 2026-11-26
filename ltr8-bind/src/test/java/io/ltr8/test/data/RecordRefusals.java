@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Classes the record binder refuses to describe, one fault each, and good records holding them.
@@ -371,6 +372,78 @@ public final class RecordRefusals {
 
 	/** Good on its own terms, but reaches the refused {@link CycleTop}. */
 	public record CycleMember(String tag, Optional<CycleTop> top) {
+	}
+
+	/** A three-class cycle, {@code RingFirst -> RingMiddle -> RingLast -> RingFirst}, refused in the middle. */
+	public record RingFirst(String tag, RingMiddle middle) {
+	}
+
+	public record RingMiddle(RingLast last, ProtectedConstructor value) {
+	}
+
+	public record RingLast(String tag, Optional<RingFirst> first) {
+	}
+
+	/**
+	 * A cycle nested in a larger one: {@code LatticeLoop} closes on {@code LatticeMid}, {@code LatticeUp} on {@code
+	 * LatticeTop}, and {@code LatticeSide}, met after {@code LatticeMid} is described, holds {@code LatticeLoop}, which
+	 * reaches the refused {@code LatticeTop} only through {@code LatticeMid}.
+	 */
+	public record LatticeTop(LatticeMid mid, LatticeSide side, ProtectedConstructor value) {
+	}
+
+	public record LatticeMid(LatticeLoop loop, LatticeUp up) {
+	}
+
+	public record LatticeLoop(Optional<LatticeMid> mid) {
+	}
+
+	public record LatticeUp(Optional<LatticeTop> top) {
+	}
+
+	public record LatticeSide(LatticeLoop loop) {
+	}
+
+	/** A good cycle of its own. */
+	public record GoodLoop(String tag, Optional<GoodLoop> next) {
+	}
+
+	/** A refused cycle holding a good cycle that does not reach it. */
+	public record RefusedLoopHoldingGoodLoop(GoodLoop loop, Optional<RefusedLoopHoldingGoodLoop> next,
+			ProtectedConstructor value) {
+	}
+
+	/** Counts its instances: a {@code @Field} bridge is built each time the field holding it is described. */
+	public static class CountingBridge implements DataBridge<String, String> {
+
+		public static final AtomicInteger BUILT = new AtomicInteger();
+
+		public CountingBridge() {
+			BUILT.incrementAndGet();
+		}
+
+		@Override
+		public String toData(String b) {
+			return b;
+		}
+
+		@Override
+		public String toObject(String s) {
+			return s;
+		}
+	}
+
+	public record Counted(@Field(bridge = CountingBridge.class) String value) {
+	}
+
+	/** A refused cycle holding the good {@link Counted}, described before the refusal is met. */
+	public record RefusedLoopHoldingCounted(Counted counted, Optional<RefusedLoopHoldingCounted> next,
+			ProtectedConstructor value) {
+	}
+
+	/** Refused, after a field whose bridge is built while it is being described. */
+	public record RefusedAfterCountedField(@Field(bridge = CountingBridge.class) String value,
+			ProtectedConstructor refused) {
 	}
 
 	// --- refused over the super class constructor a hand-written immutable class calls

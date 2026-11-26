@@ -27,7 +27,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,16 +42,102 @@ public class DataBindContext {
 	// Resolved class information
 	private final ConcurrentHashMap<Type, DataClass> descriptors = new ConcurrentHashMap<>();
 
+	/** Held only while {@link #publish} caches a component; readers of {@link #descriptors} never take it. */
+	private final Object publishing = new Object();
+
 	private final ConcurrentHashMap<Class<?>, DataProtocol<?>> protocols = new ConcurrentHashMap<>();
 
 	private final ProtocolBinder protocolBinder = new ProtocolBinder();
 
 	/**
-	 * The types this thread is part-way through resolving, for the cycle guard in {@link #getDescriptor}.
-	 * Per thread because resolution is per thread: two threads resolving the same cyclic type each build a
-	 * complete descriptor and one of them wins the cache, exactly as for an acyclic one.
+	 * What the call now running is part-way through resolving: bound by the outermost {@link #getDescriptor} for
+	 * as long as it runs, so nothing stays on the thread after it. Scoped and not passed, because a binder calls
+	 * back into this context and not into the call. Two threads resolving the same cyclic type each bind their
+	 * own, build a complete descriptor, and one of them wins the cache, exactly as for an acyclic one.
+	 *
+	 * <p>A thread forked in a {@code StructuredTaskScope} inherits the binding and a {@link Resolution} is one
+	 * thread's, so a binder never forks a thread that calls back here.
 	 */
-	private final ThreadLocal<Set<Type>> inFlight = ThreadLocal.withInitial(HashSet::new);
+	private final ScopedValue<Resolution> resolution = ScopedValue.newInstance();
+
+	/**
+	 * The resolutions one thread has in flight, nested one per {@link #getDescriptor} call, and the descriptors
+	 * resolved beneath them that are not yet cached.
+	 *
+	 * <p><b>A descriptor enters the cache only once every descriptor its deferred edges reach is there with
+	 * it.</b> A descriptor holding a deferred edge to a type still in flight is complete only if that type's
+	 * resolution succeeds, so it is held here until then -- cached with it, or discarded with it. Cached any
+	 * earlier, a refused type would leave behind a descriptor that is handed out and then fails when its edge is
+	 * pulled, and whether a class is refused would depend on which class was asked for first. This is Tarjan's
+	 * strongly-connected-component walk: a resolution whose descriptors reach no type in flight above it closes
+	 * its component, and only then is the component cached. A descriptor reaching no cycle closes its own at once
+	 * and is cached as soon as it resolves, so holding back is confined to the cycle.
+	 *
+	 * <p>A closed component is cached whole ({@link #publish}), so another thread sees all of it or none, and
+	 * every descriptor a cached one holds is the one the cache hands out for its class.
+	 */
+	private static final class Resolution {
+
+		/** The depth of each type in flight, 0 for the one a caller asked for. */
+		private final Map<Type, Integer> depths = new HashMap<>();
+
+		/** Per depth, the shallowest depth in flight that a descriptor resolved beneath it reaches. */
+		private final List<Integer> lowLinks = new ArrayList<>();
+
+		/** Each held descriptor and the shallowest depth in flight it reaches. */
+		private final Map<Type, Held> held = new HashMap<>();
+
+		/** The held types in the order they resolved, so a resolution's own are those after its mark. */
+		private final List<Type> heldOrder = new ArrayList<>();
+
+		private record Held(DataClass descriptor, int lowLink) {
+		}
+
+		private int mark() {
+			return heldOrder.size();
+		}
+
+		private int enter(Type type) {
+			int depth = lowLinks.size();
+			depths.put(type, depth);
+			lowLinks.add(depth);
+			return depth;
+		}
+
+		private int exit(Type type) {
+			depths.remove(type);
+			return lowLinks.removeLast();
+		}
+
+		/** Records that the resolution now innermost reaches the type in flight at {@code depth}. */
+		private void reach(int depth) {
+			if (!lowLinks.isEmpty() && depth < lowLinks.getLast()) {
+				lowLinks.set(lowLinks.size() - 1, depth);
+			}
+		}
+
+		/**
+		 * Holds {@code descriptor}, and moves everything held since {@code mark} to its low link: they are
+		 * in its component now, and must not be taken as closing one of their own when met again.
+		 */
+		private void hold(int mark, Type type, DataClass descriptor, int lowLink) {
+			for (Type since : heldOrder.subList(mark, heldOrder.size())) {
+				held.put(since, new Held(held.get(since).descriptor(), lowLink));
+			}
+			held.put(type, new Held(descriptor, lowLink));
+			heldOrder.add(type);
+		}
+
+		private Map<Type, DataClass> release(int mark) {
+			List<Type> since = heldOrder.subList(mark, heldOrder.size());
+			Map<Type, DataClass> released = new LinkedHashMap<>();
+			for (Type type : since) {
+				released.put(type, held.remove(type).descriptor());
+			}
+			since.clear();
+			return released;
+		}
+	}
 
 	// default resolver
 	private final DefaultClassBinder dataClassResolver;
@@ -271,8 +358,12 @@ public class DataBindContext {
 	 *
 	 * <p>Resolution deliberately runs outside any lock: it recurses back into this method for every
 	 * component type, so holding one across it would have to be reentrant over the whole graph, and the
-	 * duplicated work on a race is one descriptor. {@code computeIfAbsent} is out for the same recursion --
+	 * duplicated work on a race is one descriptor, or one cycle's. {@code computeIfAbsent} is out for the same recursion --
 	 * it is a documented deadlock/{@code IllegalStateException} on the map being computed.
+	 *
+	 * <p><b>A refusal is not cached</b>: asking again resolves again and is refused again. Nor is any descriptor
+	 * resolved on the way that reaches the refused type, so whether a class is refused does not depend on which
+	 * class was asked for first.
 	 *
 	 * <p>{@link #register} and the {@code registerAtom} overloads stay strict: registering a type twice
 	 * <em>explicitly</em> is still a caller error.
@@ -289,8 +380,17 @@ public class DataBindContext {
 			return atom;
 		}
 
-		Set<Type> active = inFlight.get();
-		if (!active.add(parameterizedType)) {
+		if (!resolution.isBound()) {
+			return ScopedValue.where(resolution, new Resolution())
+					.call(() -> getDescriptor(targetClass, parameterizedType));
+		}
+		Resolution resolving = resolution.get();
+		Resolution.Held held = resolving.held.get(parameterizedType);
+		if (held != null) {
+			resolving.reach(held.lowLink());
+			return held.descriptor();
+		}
+		if (resolving.depths.containsKey(parameterizedType)) {
 			throw new DataBindException(String.format(
 					"Descriptor for %s is already being resolved on this thread: its type graph contains a "
 							+ "cycle, so this component must be taken through componentSource rather than "
@@ -298,19 +398,65 @@ public class DataBindContext {
 					targetClass.getName()));
 		}
 
-		DataClass resolved;
+		int mark = resolving.mark();
+		int depth = resolving.enter(parameterizedType);
+		DataClass resolved = null;
+		int lowLink;
 		try {
 			resolved = dataClassResolver.resolve(this, targetClass, parameterizedType);
 		} finally {
-			active.remove(parameterizedType);
+			lowLink = resolving.exit(parameterizedType);
+			if (resolved == null) {
+				resolving.release(mark);
+			}
 		}
 		if (resolved == null) {
 			throw new DataBindException(
 					String.format("Unable to find suitable data descriptor for class: %s", targetClass.getName()));
 		}
 
-		DataClass winner = descriptors.putIfAbsent(parameterizedType, resolved);
-		return winner != null ? winner : resolved;
+		if (lowLink < depth) {
+			resolving.hold(mark, parameterizedType, resolved, lowLink);
+			resolving.reach(lowLink);
+			return resolved;
+		}
+		DataClass published = publish(parameterizedType, resolved, resolving.release(mark));
+		return published != null ? published : getDescriptor(targetClass, parameterizedType);
+	}
+
+	/**
+	 * Caches the component {@code root} closes -- {@code root} and the {@code members} held beneath it -- all of
+	 * it or none, and returns what the cache holds for {@code root}; {@code null} where the component is dropped
+	 * and {@code root} must be resolved again.
+	 *
+	 * <p><b>All or none, because the members were built over each other.</b> Cached one at a time, two threads
+	 * closing one component could each win part of it, leaving the cache holding one thread's descriptor for a
+	 * class and the other's descriptor holding a second one. Under {@link #publishing}, which no resolve runs
+	 * inside, a component is either cached whole or not at all.
+	 *
+	 * <p>Two threads closing one component close the same members: a strongly connected component is fixed by
+	 * the type graph, not by the member a walk enters it from, and a walk builds every member not already
+	 * cached. So {@code root} cached means the whole component is, and this thread's is dropped for the cache's,
+	 * as a lost race always was. A member cached while {@code root} is not means the two walks saw different
+	 * graphs -- a failure {@code DefaultRecordBinder} swallows while registering a union member can hide an edge
+	 * from one walk. This component then holds a second descriptor for that member, so it is dropped and {@code
+	 * root} resolved again, over the cached member; each retry finds a type more in the cache, so it ends.
+	 */
+	private DataClass publish(Type root, DataClass resolved, Map<Type, DataClass> members) {
+		synchronized (publishing) {
+			DataClass cached = descriptors.get(root);
+			if (cached != null) {
+				return cached;
+			}
+			for (Type member : members.keySet()) {
+				if (descriptors.containsKey(member)) {
+					return null;
+				}
+			}
+			descriptors.putAll(members);
+			descriptors.put(root, resolved);
+			return resolved;
+		}
 	}
 
 	/**
@@ -354,7 +500,10 @@ public class DataBindContext {
 	public Supplier<DataClass> componentSource(Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
 
-		if (inFlight.get().contains(parameterizedType)) {
+		Resolution resolving = resolution.isBound() ? resolution.get() : null;
+		Integer depth = resolving != null ? resolving.depths.get(parameterizedType) : null;
+		if (depth != null) {
+			resolving.reach(depth);
 			return () -> {
 				try {
 					return getDescriptor(targetClass, parameterizedType);
