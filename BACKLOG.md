@@ -517,10 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **`resolveOptionalNumberField` returns a conversion as the field's setter.** `DataClassField.setter()` of an
-  `OptionalInt`, `OptionalLong` or `OptionalDouble` field is the value-to-optional conversion and not a handle that
-  writes the field. Nothing calls it today. Return the composed setter, or `null` where the component has none, and
-  pin `setter()`'s type for each of the three.
 - [ ] **A `@Field` bridge that inherits `DataBridge` throws `ArrayIndexOutOfBoundsException`.** With
   `class Upper extends AbstractTextBridge` and `AbstractTextBridge implements DataBridge<String, Name>`,
   `@Field(bridge = Upper.class)` makes `getDescriptor` throw from `DefaultRecordBinder.fieldBridge`, which reads

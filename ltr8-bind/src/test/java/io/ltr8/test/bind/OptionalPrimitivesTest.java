@@ -74,6 +74,14 @@ public class OptionalPrimitivesTest {
 	}
 
 	@Test
+	public void aComponentTheConstructorWritesHasNoSetter() throws Throwable {
+		DataClassRecord descriptor = (DataClassRecord) context.getDescriptor(OptionalPrimitives.class);
+		for (DataClassField field : descriptor.fields()) {
+			Assertions.assertTrue(field.setter().isEmpty(), field.name());
+		}
+	}
+
+	@Test
 	public void test1ToArray() throws Throwable {
 
 		// project to an array.

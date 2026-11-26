@@ -806,10 +806,12 @@ public class DefaultRecordBinder {
 			// (Object[]):OptionalInt -> OptionalInt.empty()
 			optionalIntEmpty = MethodHandles.dropArguments(optionalIntEmpty, 0, optionalNullableType);
 
-			// (values[]):optionalType -> if (Object.nonNull(Integer)) { return OptionalInt.of(
+			// (Integer):OptionalInt -> if (Object.nonNull(Integer)) { return OptionalInt.of(
 			// Integer.intValue(i) ) } else { return OptionalInt.empty() }
-			setter = MethodHandles.guardWithTest(checkNonNull, optionalIntOf, optionalIntEmpty);
+			MethodHandle toOptional = MethodHandles.guardWithTest(checkNonNull, optionalIntOf, optionalIntEmpty);
 
+			// (obj, Integer):void -> obj.setOptionalInt( toOptional(Integer) )
+			setter = MethodHandles.filterArguments(setter, 1, toOptional);
 		}
 
 		// (optional) -> optional.isPresent();
