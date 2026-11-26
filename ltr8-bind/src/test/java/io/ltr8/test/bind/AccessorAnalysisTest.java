@@ -19,9 +19,11 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataClassUnion;
 import io.ltr8.bind.analysis.CodeAnalysisException;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
+import io.ltr8.test.data.AccessorAnalyses.EmptyUnionOnBoth;
 import io.ltr8.test.data.AccessorAnalyses.Labelled;
 import io.ltr8.test.data.AccessorAnalyses.OverridesRenamedShadowing;
 import io.ltr8.test.data.AccessorAnalyses.OverridesShadowing;
@@ -32,6 +34,14 @@ import io.ltr8.test.data.AccessorAnalyses.ShadowsBeforeSuper;
 import io.ltr8.test.data.AccessorAnalyses.ShadowsNamedOnField;
 import io.ltr8.test.data.AccessorAnalyses.ShadowsRenamedBase;
 import io.ltr8.test.data.AccessorAnalyses.ShadowsUnnamed;
+import io.ltr8.test.data.AccessorAnalyses.UnionMembersDiffer;
+import io.ltr8.test.data.AccessorAnalyses.UnionOnAccessor;
+import io.ltr8.test.data.AccessorAnalyses.UnionOnBoth;
+import io.ltr8.test.data.AccessorAnalyses.UnionOnComputingAccessor;
+import io.ltr8.test.data.AccessorAnalyses.UnionOnFieldAndParameter;
+import io.ltr8.test.data.AccessorAnalyses.UnionOnFieldDiffers;
+import io.ltr8.test.data.AccessorAnalyses.UnionOnParameter;
+import io.ltr8.test.data.AccessorAnalyses.UnionSealingDiffers;
 import io.ltr8.test.data.AccessorAnalyses.Wraps;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A hand-written immutable class's accessor reads the component whose field it returns: the field of that name the
@@ -130,6 +141,46 @@ class AccessorAnalysisTest {
 		roundTrips(List.of(new ShadowsAfterSuper("b", "s"), new ShadowsBeforeSuper("b", "s"),
 				new ShadowsRenamedBase("b", "s"), new Labelled("tag"), new Wraps("x"), new ReadsStatically("x"),
 				new OverridesThroughSuper("v")));
+	}
+
+	// --- @Union on a constructor parameter, its field and its accessor
+
+	@Test
+	void unionsThatAgreeOrStandAloneDescribeTheUnion() {
+		assertAll(Stream.of(UnionOnBoth.class, UnionOnParameter.class, UnionOnAccessor.class,
+				UnionOnComputingAccessor.class, UnionOnFieldAndParameter.class).map(type -> () -> {
+					DataClassRecord record = assertInstanceOf(DataClassRecord.class, context.getDescriptor(type));
+					assertEquals(1, record.fields().length, type.getName());
+					DataClassField tag = record.fields()[0];
+					assertEquals("tag", tag.name());
+					DataClassUnion union = assertInstanceOf(DataClassUnion.class, tag.dataClass(), type.getName());
+					assertEquals(List.of(String.class, Integer.class), List.of(union.memberTypes()), type.getName());
+					assertTrue(union.isSealed(), type.getName());
+				}));
+	}
+
+	@Test
+	void unionsThatAgreeOrStandAloneRoundTrip() {
+		roundTrips(List.of(new UnionOnBoth("x"), new UnionOnBoth(7), new UnionOnParameter("x"),
+				new UnionOnAccessor(7), new UnionOnComputingAccessor("x"), new UnionOnFieldAndParameter(7)));
+	}
+
+	@Test
+	void unionsThatDifferAreRefusedNamingTheField() {
+		assertAll(Stream.of(UnionMembersDiffer.class, UnionSealingDiffers.class, UnionOnFieldDiffers.class)
+				.map(type -> () -> {
+					CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
+							() -> context.getDescriptor(type), type.getName());
+					assertEquals("Field 'tag' has @Union annotations that differ", refused.getMessage());
+					assertNull(refused.getCause());
+				}));
+	}
+
+	@Test
+	void emptyUnionsThatAgreeAreRefusedAsEmpty() {
+		CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
+				() -> context.getDescriptor(EmptyUnionOnBoth.class));
+		assertEquals("Union annotation must have one or more classes", refused.getMessage());
 	}
 
 	// --- helpers

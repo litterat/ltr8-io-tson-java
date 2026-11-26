@@ -367,7 +367,7 @@ public class ImmutableFinder implements ComponentFinder {
                 Union union = method.getAnnotation(Union.class);
                 if (union != null) {
                     component.setReadMethod(lookup.unreflect(method));
-                    component.setField(field);
+                    component.setUnion(union);
                 }
 
                 if (component.getReadMethod() != null) {
