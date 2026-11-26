@@ -79,18 +79,21 @@ public class GetSetFinder implements ComponentFinder {
 		// is compiled for production.
 		//
 		// A pair is a component only when both halves are public instance methods. A pair that is not is no
-		// component, as a private field is not: the class is described from its other members.
+		// component, as a private field is not: the class is described from its other members. A getter pairs
+		// only with the one-argument setter of its return type: another overload, or a setter taking another
+		// type, is not handed the value the getter reads. A covariant override's bridge getter is skipped, so
+		// the pair is found once, at the overriding return type.
 		Method[] methods = clss.getDeclaredMethods();
-		for (Method method : methods) {
+		for (Method getter : methods) {
 
-			// find the setters.
-			if (isPublicInstance(method) && method.getName().startsWith("set") && method.getName().length() > 3) {
-				String getterName = "g" + method.getName().substring(1);
+			String getterName = getter.getName();
+			if (isPublicInstance(getter) && !getter.isBridge() && getter.getParameterCount() == 0
+					&& getterName.startsWith("get") && getterName.length() > 3) {
 
 				try {
 					// If this throws NoSuchMethodException we ignore field.
-					Method getter = clss.getDeclaredMethod(getterName);
-					if (!isPublicInstance(getter)) {
+					Method method = clss.getDeclaredMethod("s" + getterName.substring(1), getter.getReturnType());
+					if (!isPublicInstance(method)) {
 						continue;
 					}
 
@@ -126,7 +129,7 @@ public class GetSetFinder implements ComponentFinder {
 					getSetList.add(info);
 
 				} catch (NoSuchMethodException ex) {
-					// ignore this field, no matching getter.
+					// ignore this field, no matching setter.
 					continue;
 				}
 			}

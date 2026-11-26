@@ -517,12 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A setter is matched to its getter by name alone.** `GetSetFinder` pairs `setX` with `getX()` whatever the
-  setter's parameters, so an overloaded setter (`setValue(String)` beside `setValue(int)`), a two-argument setter and
-  a setter whose parameter type differs from the getter's return type each make `getDescriptor` throw an unchecked
-  `IllegalArgumentException`. Pair a getter only with the one-argument setter of its return type; a class with no
-  such setter has no component of that name. Pin each case in `GetSetFinderTest`, with a round trip where a
-  component remains.
 - [ ] **A getter/setter pair loses its generic type.** `GetSetFinder` reads the pair's parameterized type from the
   setter's return type, which is `void`, so `List<String> getItems()`/`setItems(List<String>)` and an
   `Optional<String>` pair are refused. Read it from the getter's generic return type, and round-trip a list pair

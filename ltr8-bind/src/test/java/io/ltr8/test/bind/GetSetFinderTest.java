@@ -22,12 +22,14 @@ import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
+import io.ltr8.test.data.GetSetClasses.BoxedSetter;
 import io.ltr8.test.data.GetSetClasses.FinalFieldBesideMutableField;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithAccessor;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithoutAccessor;
 import io.ltr8.test.data.GetSetClasses.InlineFinalField;
 import io.ltr8.test.data.GetSetClasses.MutableFieldBoundByConstructor;
 import io.ltr8.test.data.GetSetClasses.MutableFields;
+import io.ltr8.test.data.GetSetClasses.OverloadedSetter;
 import io.ltr8.test.data.GetSetClasses.PackagePrivatePair;
 import io.ltr8.test.data.GetSetClasses.PrivateGetterPublicSetter;
 import io.ltr8.test.data.GetSetClasses.PrivatePairAlone;
@@ -39,10 +41,14 @@ import io.ltr8.test.data.GetSetClasses.PublicGetterPrivateSetter;
 import io.ltr8.test.data.GetSetClasses.PublicPair;
 import io.ltr8.test.data.GetSetClasses.StaticField;
 import io.ltr8.test.data.GetSetClasses.StaticPair;
+import io.ltr8.test.data.GetSetClasses.TextHolder;
+import io.ltr8.test.data.GetSetClasses.TwoArgumentSetter;
+import io.ltr8.test.data.GetSetClasses.WiderSetter;
 import org.junit.jupiter.api.Test;
 
 import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -241,6 +247,73 @@ class GetSetFinderTest {
 		value.name = "anchor";
 		for (StaticPair copy : roundTrips(value)) {
 			assertEquals("anchor", copy.name);
+		}
+	}
+
+	// --- which setter pairs with a getter
+
+	@Test
+	void anOverloadedSetterPairsOnlyItsOverloadTakingTheGettersType() throws Throwable {
+		DataClassRecord record = record(OverloadedSetter.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		assertEquals(MethodType.methodType(void.class, OverloadedSetter.class, String.class),
+				record.fields()[0].setter().orElseThrow().type());
+		OverloadedSetter value = new OverloadedSetter();
+		value.setValue("anchor");
+		for (OverloadedSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aPairOverridingAGenericPairIsOneComponentAtTheOverridingType() throws Throwable {
+		DataClassRecord record = record(TextHolder.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		TextHolder value = new TextHolder();
+		value.setValue("anchor");
+		for (TextHolder copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aTwoArgumentSetterPairsWithNoGetter() throws Throwable {
+		DataClassRecord record = record(TwoArgumentSetter.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		TwoArgumentSetter value = new TwoArgumentSetter();
+		value.name = "anchor";
+		value.setValue("kept back", 1);
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+		for (TwoArgumentSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertNull(copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterTakingAWiderTypeThanItsGetterReturnsPairsWithNoGetter() throws Throwable {
+		DataClassRecord record = record(WiderSetter.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		WiderSetter value = new WiderSetter();
+		value.name = "anchor";
+		value.setValue("kept back");
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+		for (WiderSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertNull(copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterTakingTheBoxOfItsGettersPrimitivePairsWithNoGetter() throws Throwable {
+		DataClassRecord record = record(BoxedSetter.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		BoxedSetter value = new BoxedSetter();
+		value.name = "anchor";
+		value.setCount(3);
+		for (BoxedSetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertEquals(0, copy.getCount());
 		}
 	}
 

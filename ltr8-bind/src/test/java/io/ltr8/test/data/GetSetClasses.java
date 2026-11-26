@@ -321,4 +321,116 @@ public final class GetSetClasses {
 			global = value;
 		}
 	}
+
+	// --- which setter pairs with a getter
+
+	/** Its {@code int} setter stores the number's text, so a pair through either setter round-trips. */
+	public static class OverloadedSetter {
+
+		private String value;
+
+		@Record
+		public OverloadedSetter() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+
+		public void setValue(int value) {
+			this.value = Integer.toString(value);
+		}
+	}
+
+	public static class Holder<T> {
+
+		private T value;
+
+		public T getValue() {
+			return value;
+		}
+
+		public void setValue(T value) {
+			this.value = value;
+		}
+	}
+
+	/** Overrides both halves of its super class's pair, so it also declares a bridge of each. */
+	public static class TextHolder extends Holder<String> {
+
+		@Record
+		public TextHolder() {
+		}
+
+		@Override
+		public String getValue() {
+			return super.getValue();
+		}
+
+		@Override
+		public void setValue(String value) {
+			super.setValue(value);
+		}
+	}
+
+	public static class TwoArgumentSetter {
+
+		public String name;
+
+		private String value;
+
+		@Record
+		public TwoArgumentSetter() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value, int times) {
+			this.value = value.repeat(times);
+		}
+	}
+
+	public static class WiderSetter {
+
+		public String name;
+
+		private String value;
+
+		@Record
+		public WiderSetter() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(Object value) {
+			this.value = String.valueOf(value);
+		}
+	}
+
+	public static class BoxedSetter {
+
+		public String name;
+
+		private int count;
+
+		@Record
+		public BoxedSetter() {
+		}
+
+		public int getCount() {
+			return count;
+		}
+
+		public void setCount(Integer count) {
+			this.count = count;
+		}
+	}
 }
