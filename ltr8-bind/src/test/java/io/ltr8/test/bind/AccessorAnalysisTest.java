@@ -26,8 +26,13 @@ import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.AccessorAnalyses.AccessorBesidePublicFinalField;
 import io.ltr8.test.data.AccessorAnalyses.EmptyUnionOnBoth;
 import io.ltr8.test.data.AccessorAnalyses.InheritsGenericPublicField;
+import io.ltr8.test.data.AccessorAnalyses;
+import io.ltr8.test.data.AccessorAnalyses.InheritsAcrossHidden;
 import io.ltr8.test.data.AccessorAnalyses.InheritsHiddenAccessor;
 import io.ltr8.test.data.AccessorAnalyses.InheritsHiddenField;
+import io.ltr8.test.data.AccessorAnalyses.InheritsHiddenNamedAccessor;
+import io.ltr8.test.data.AccessorAnalyses.InheritsHiddenTwoUp;
+import io.ltr8.test.data.AccessorAnalyses.InheritsShadowedHiddenField;
 import io.ltr8.test.data.AccessorAnalyses.InheritsPublicField;
 import io.ltr8.test.data.AccessorAnalyses.Labelled;
 import io.ltr8.test.data.AccessorAnalyses.NamedParameterOverPublicField;
@@ -70,6 +75,7 @@ import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -324,7 +330,8 @@ class AccessorAnalysisTest {
 		assertAll(Stream.of(PrivateAccessorOverPublicField.class, PublicFinalReference.class,
 				PublicFinalPrimitives.class, PublicFinalList.class, PublicFinalOptional.class,
 				NamedParameterOverPublicField.class, InheritsPublicField.class, InheritsGenericPublicField.class,
-				OverridesPublicFieldAccessor.class).map(type -> () -> {
+				OverridesPublicFieldAccessor.class, InheritsHiddenField.class, InheritsHiddenTwoUp.class,
+				InheritsAcrossHidden.class).map(type -> () -> {
 					DataClassRecord record = assertInstanceOf(DataClassRecord.class, context.getDescriptor(type));
 					for (DataClassField field : record.fields()) {
 						assertEquals(type, field.accessor().type().parameterType(0), type.getName() + " " + field.name());
@@ -332,20 +339,65 @@ class AccessorAnalysisTest {
 				}));
 	}
 
+	// --- a member of a super class that is not public: the public lookup reaches it through a public subclass
+
 	@Test
-	void aMemberOfASuperClassThePublicLookupCannotReachIsRefusedNamingTheClassAndMember() {
-		assertAll(Stream.of(InheritsHiddenField.class, InheritsHiddenAccessor.class).map(type -> () -> {
-			CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
-					() -> context.getDescriptor(type), type.getName());
-			String message = refused.getMessage();
-			assertTrue(message.startsWith(type.getName() + " is bound through a member that is not accessible: class "
-					+ "is not public: " + type.getSuperclass().getName() + ".name"), message);
-			IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
-			assertTrue(message.endsWith(cause.getMessage()), message);
-		}));
+	void aMemberOfASuperClassThatIsNotPublicIsReadThroughThePublicClassInheritingIt() {
+		assertAll(
+				() -> assertEquals(List.of("name:String"), fields(InheritsHiddenField.class)),
+				() -> assertEquals(List.of("v"), values(InheritsHiddenField.class, new InheritsHiddenField("v"))),
+				() -> assertEquals(List.of("name:String"), fields(InheritsHiddenAccessor.class)),
+				() -> assertEquals(List.of("v"), values(InheritsHiddenAccessor.class, new InheritsHiddenAccessor("v"))),
+				() -> assertEquals(List.of("label:String"), fields(InheritsHiddenNamedAccessor.class)),
+				() -> assertEquals(List.of("v"),
+						values(InheritsHiddenNamedAccessor.class, new InheritsHiddenNamedAccessor("v"))),
+				() -> assertEquals(List.of("name:String", "count:int"), fields(InheritsHiddenTwoUp.class)),
+				() -> assertEquals(List.of("n", 2), values(InheritsHiddenTwoUp.class, new InheritsHiddenTwoUp("n", 2))),
+				() -> assertEquals(List.of("name:String", "count:int", "label:String", "size:int"),
+						fields(InheritsAcrossHidden.class)),
+				() -> assertEquals(List.of("n", 2, "l", 3),
+						values(InheritsAcrossHidden.class, new InheritsAcrossHidden("n", 2, "l", 3))));
+	}
+
+	@Test
+	void classesInheritingMembersOfASuperClassThatIsNotPublicRoundTrip() {
+		roundTrips(List.of(new InheritsHiddenField("v"), new InheritsHiddenAccessor("v"),
+				new InheritsHiddenNamedAccessor("v"), new InheritsHiddenTwoUp("n", 2),
+				new InheritsAcrossHidden("n", 2, "l", 3)));
+	}
+
+	/** The public lookup resolves the field's name from the public subclass, where it names another field. */
+	@Test
+	void aFieldOfASuperClassThatIsNotPublicHiddenFromThePublicSubclassIsRefusedNamingTheClassAndField() {
+		Class<?> type = InheritsShadowedHiddenField.class;
+		CodeAnalysisException refused = assertThrows(CodeAnalysisException.class, () -> context.getDescriptor(type));
+		assertEquals(type.getName() + " is bound through field " + type.getSuperclass().getSuperclass().getName()
+				+ ".name, which a field of " + type.getSuperclass().getName() + " hides from the public lookup",
+				refused.getMessage());
+		assertNull(refused.getCause());
+	}
+
+	/** Its own members, or failing those its constructor, are reached through it alone. */
+	@Test
+	void aClassThatIsNotPublicIsRefusedNamingTheClassAndMember() {
+		assertAll(Stream.of(Map.entry("HiddenDescribed", ".name"), Map.entry("HiddenInheritsPublicField", ".<init>"))
+				.map(fixture -> () -> {
+					Class<?> type = fixture(fixture.getKey());
+					DataBindException refused = assertThrows(DataBindException.class,
+							() -> context.getDescriptor(type), type.getName());
+					String message = refused.getMessage();
+					assertTrue(message.startsWith(type.getName() + " is bound through a member that is not accessible: "
+							+ "class is not public: " + type.getName() + fixture.getValue()), message);
+					assertInstanceOf(IllegalAccessException.class, refused.getCause(), type.getName());
+				}));
 	}
 
 	// --- helpers
+
+	/** A fixture class that is not public, so this package cannot name it. */
+	private static Class<?> fixture(String simpleName) throws ClassNotFoundException {
+		return Class.forName(AccessorAnalyses.class.getName() + "$" + simpleName);
+	}
 
 	private DataClassField field(Class<?> type, int index) throws DataBindException {
 		return assertInstanceOf(DataClassRecord.class, context.getDescriptor(type)).fields()[index];

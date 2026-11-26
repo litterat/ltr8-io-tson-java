@@ -534,11 +534,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   unreflects a member against its declaring class, so one a public class inherits from a package-private super
   class cannot be reached through the public lookup, and the failure is rethrown unchecked. Read, not run. Reach the
   member through the described class, which is how the JVM resolves it, and round-trip such a class.
-- [ ] **A public accessor or public final field of a super class that is not public is refused.** With a public
-  class whose constructor-bound field and its accessor sit in a package-private super class
-  (`AccessorAnalyses.InheritsHiddenAccessor`, `InheritsHiddenField`), `getDescriptor` refuses the class as "bound
-  through a member that is not accessible": `ImmutableFinder` unreflects against the declaring class. Reach the
-  member through the described class, and turn the two pinned refusals in `AccessorAnalysisTest` into round trips.
 - [ ] **A public non-final field the constructor binds, with no accessor, is refused.** A `@Record` class storing a
   constructor parameter in a `public` field that is not `final` is refused with "Failed to match immutable field
   accessor …": `ImmutableFinder` reads only a final field directly, and `GetSetFinder`, which reads the field, runs

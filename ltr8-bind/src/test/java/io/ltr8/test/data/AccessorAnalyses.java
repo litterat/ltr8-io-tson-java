@@ -1043,7 +1043,7 @@ public final class AccessorAnalyses {
 		}
 	}
 
-	// --- a member declared on a super class the public lookup cannot reach
+	// --- a member of a super class that is not public: the public lookup reaches it through a public subclass
 
 	static class HiddenFieldBase {
 
@@ -1051,6 +1051,16 @@ public final class AccessorAnalyses {
 
 		public HiddenFieldBase(String name) {
 			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((HiddenFieldBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
 		}
 	}
 
@@ -1073,12 +1083,209 @@ public final class AccessorAnalyses {
 		public String name() {
 			return name;
 		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((HiddenAccessorBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
 	}
 
 	public static class InheritsHiddenAccessor extends HiddenAccessorBase {
 
 		@Record
 		public InheritsHiddenAccessor(String name) {
+			super(name);
+		}
+	}
+
+	/** Its accessor does more than return the field, so it is matched by its name and {@code @Field}. */
+	static class HiddenNamedAccessorBase {
+
+		private final String name;
+
+		public HiddenNamedAccessorBase(String name) {
+			this.name = name;
+		}
+
+		@Field("label")
+		public String name() {
+			return Objects.requireNonNull(name);
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(name, ((HiddenNamedAccessorBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class InheritsHiddenNamedAccessor extends HiddenNamedAccessorBase {
+
+		@Record
+		public InheritsHiddenNamedAccessor(String name) {
+			super(name);
+		}
+	}
+
+	static class HiddenGrandBase {
+
+		public final String name;
+
+		private final int count;
+
+		public HiddenGrandBase(String name, int count) {
+			this.name = name;
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((HiddenGrandBase) obj).name)
+					&& count == ((HiddenGrandBase) obj).count;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, count);
+		}
+	}
+
+	static class HiddenParent extends HiddenGrandBase {
+
+		public HiddenParent(String name, int count) {
+			super(name, count);
+		}
+	}
+
+	/** Its members sit two levels up, above another super class that is not public. */
+	public static class InheritsHiddenTwoUp extends HiddenParent {
+
+		@Record
+		public InheritsHiddenTwoUp(String name, int count) {
+			super(name, count);
+		}
+	}
+
+	public static class PublicTop {
+
+		public final String name;
+
+		private final int count;
+
+		public PublicTop(String name, int count) {
+			this.name = name;
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((PublicTop) obj).name)
+					&& count == ((PublicTop) obj).count;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, count);
+		}
+	}
+
+	static class HiddenBetween extends PublicTop {
+
+		public final String label;
+
+		private final int size;
+
+		public HiddenBetween(String name, int count, String label, int size) {
+			super(name, count);
+			this.label = label;
+			this.size = size;
+		}
+
+		public int size() {
+			return size;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj) && Objects.equals(label, ((HiddenBetween) obj).label)
+					&& size == ((HiddenBetween) obj).size;
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * super.hashCode() + Objects.hash(label, size);
+		}
+	}
+
+	/** Inherits members of a public class and of the super class that is not public between the two. */
+	public static class InheritsAcrossHidden extends HiddenBetween {
+
+		@Record
+		public InheritsAcrossHidden(String name, int count, String label, int size) {
+			super(name, count, label, size);
+		}
+	}
+
+	static class HiddenShadowedBase {
+
+		public final String name;
+
+		public HiddenShadowedBase(String name) {
+			this.name = name;
+		}
+	}
+
+	static class HiddenShadowing extends HiddenShadowedBase {
+
+		@SuppressWarnings("unused")
+		private final String name = "hidden";
+
+		public HiddenShadowing(String name) {
+			super(name);
+		}
+	}
+
+	/** Through it the name of its bound field resolves to another field, which a super class declares private. */
+	public static class InheritsShadowedHiddenField extends HiddenShadowing {
+
+		@Record
+		public InheritsShadowedHiddenField(String name) {
+			super(name);
+		}
+	}
+
+	static class HiddenDescribed {
+
+		public final String name;
+
+		@Record
+		public HiddenDescribed(String name) {
+			this.name = name;
+		}
+	}
+
+	static class HiddenInheritsPublicField extends PublicFieldBase {
+
+		@Record
+		public HiddenInheritsPublicField(String name) {
 			super(name);
 		}
 	}
