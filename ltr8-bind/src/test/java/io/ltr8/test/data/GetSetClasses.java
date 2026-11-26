@@ -17,6 +17,7 @@ package io.ltr8.test.data;
 
 import io.ltr8.annotation.Record;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -142,6 +143,40 @@ public final class GetSetClasses {
 
 		public void setValue(String value) {
 			this.value = value;
+		}
+	}
+
+	public static class ListPair {
+
+		private List<String> items = List.of();
+
+		@Record
+		public ListPair() {
+		}
+
+		public List<String> getItems() {
+			return items;
+		}
+
+		public void setItems(List<String> items) {
+			this.items = items;
+		}
+	}
+
+	public static class OptionalPair {
+
+		private Optional<String> note = Optional.empty();
+
+		@Record
+		public OptionalPair() {
+		}
+
+		public Optional<String> getNote() {
+			return note;
+		}
+
+		public void setNote(Optional<String> note) {
+			this.note = note;
 		}
 	}
 

@@ -121,7 +121,7 @@ public class GetSetFinder implements ComponentFinder {
 						throw new SecurityException("Failed to unreflect field", e);
 					}
 
-					Type returnType = method.getGenericReturnType();
+					Type returnType = getter.getGenericReturnType();
 					if (returnType instanceof ParameterizedType) {
 						info.setParamType((ParameterizedType) returnType);
 					}

@@ -27,9 +27,11 @@ import io.ltr8.test.data.GetSetClasses.FinalFieldBesideMutableField;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithAccessor;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithoutAccessor;
 import io.ltr8.test.data.GetSetClasses.InlineFinalField;
+import io.ltr8.test.data.GetSetClasses.ListPair;
 import io.ltr8.test.data.GetSetClasses.MutableFieldBoundByConstructor;
 import io.ltr8.test.data.GetSetClasses.MutableFields;
 import io.ltr8.test.data.GetSetClasses.OptionalField;
+import io.ltr8.test.data.GetSetClasses.OptionalPair;
 import io.ltr8.test.data.GetSetClasses.OverloadedSetter;
 import io.ltr8.test.data.GetSetClasses.PackagePrivatePair;
 import io.ltr8.test.data.GetSetClasses.PrivateGetterPublicSetter;
@@ -184,6 +186,36 @@ class GetSetFinderTest {
 		value.setValue("anchor");
 		for (PublicPair copy : roundTrips(value)) {
 			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aListPairKeepsItsElementType() throws Throwable {
+		DataClassRecord record = record(ListPair.class);
+		assertEquals(List.of("items:List set"), shape(record));
+		ListPair value = new ListPair();
+		value.setItems(List.of("anchor", "chain"));
+		for (ListPair copy : roundTrips(value)) {
+			assertEquals(List.of("anchor", "chain"), copy.getItems());
+		}
+	}
+
+	@Test
+	void anOptionalPairIsWrittenThroughTheSetterWhetherPresentOrAbsent() throws Throwable {
+		DataClassRecord record = record(OptionalPair.class);
+		assertEquals(List.of("note:String set"), shape(record));
+		assertEquals(MethodType.methodType(void.class, OptionalPair.class, String.class),
+				record.fields()[0].setter().orElseThrow().type());
+		OptionalPair present = new OptionalPair();
+		present.setNote(Optional.of("anchor"));
+		assertEquals(Map.of("note", "anchor"), new MapMapper(context).toMap(present));
+		for (OptionalPair copy : roundTrips(present)) {
+			assertEquals(Optional.of("anchor"), copy.getNote());
+		}
+		OptionalPair absent = new OptionalPair();
+		assertEquals(Map.of(), new MapMapper(context).toMap(absent));
+		for (OptionalPair copy : roundTrips(absent)) {
+			assertEquals(Optional.empty(), copy.getNote());
 		}
 	}
 

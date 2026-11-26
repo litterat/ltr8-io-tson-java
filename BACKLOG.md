@@ -517,10 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A getter/setter pair loses its generic type.** `GetSetFinder` reads the pair's parameterized type from the
-  setter's return type, which is `void`, so `List<String> getItems()`/`setItems(List<String>)` and an
-  `Optional<String>` pair are refused. Read it from the getter's generic return type, and round-trip a list pair
-  and an optional pair through both mappers in `GetSetFinderTest`.
 - [ ] **A setter is merged into a constructor component by name, ignoring case.** `GetSetFinder`'s merge compares
   names with `equalsIgnoreCase` and no declaring class, so a pair named `URL` overwrites the write handle of a
   constructor component `url`, and a subclass pair that of a super-class component it shadows. Match the name
