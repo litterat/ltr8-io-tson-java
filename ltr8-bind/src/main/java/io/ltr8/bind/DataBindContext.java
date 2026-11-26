@@ -17,6 +17,7 @@ package io.ltr8.bind;
 
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.bind.analysis.DefaultClassBinder;
+import io.ltr8.bind.analysis.DefaultRecordBinder;
 import io.ltr8.bind.analysis.ProtocolBinder;
 
 import java.lang.invoke.MethodHandle;
@@ -420,7 +421,14 @@ public class DataBindContext {
 			resolving.reach(lowLink);
 			return resolved;
 		}
-		DataClass published = publish(parameterizedType, resolved, resolving.release(mark));
+		Map<Type, DataClass> members = resolving.release(mark);
+		// Joined only now the component has resolved whole, so a refused class is never a union's member; and
+		// before it is cached, so the class of every cached descriptor already is.
+		DefaultRecordBinder.joinUnions(this, resolved);
+		for (DataClass member : members.values()) {
+			DefaultRecordBinder.joinUnions(this, member);
+		}
+		DataClass published = publish(parameterizedType, resolved, members);
 		return published != null ? published : getDescriptor(targetClass, parameterizedType);
 	}
 
@@ -438,9 +446,8 @@ public class DataBindContext {
 	 * the type graph, not by the member a walk enters it from, and a walk builds every member not already
 	 * cached. So {@code root} cached means the whole component is, and this thread's is dropped for the cache's,
 	 * as a lost race always was. A member cached while {@code root} is not means the two walks saw different
-	 * graphs -- a failure {@code DefaultRecordBinder} swallows while registering a union member can hide an edge
-	 * from one walk. This component then holds a second descriptor for that member, so it is dropped and {@code
-	 * root} resolved again, over the cached member; each retry finds a type more in the cache, so it ends.
+	 * graphs. This component then holds a second descriptor for that member, so it is dropped and {@code root}
+	 * resolved again, over the cached member; each retry finds a type more in the cache, so it ends.
 	 */
 	private DataClass publish(Type root, DataClass resolved, Map<Type, DataClass> members) {
 		synchronized (publishing) {
