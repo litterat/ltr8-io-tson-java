@@ -17,7 +17,6 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.reflect.Method;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
@@ -32,10 +31,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.OptionalDouble;
 import io.ltr8.annotation.Unbound;
 import java.util.OptionalInt;
@@ -223,12 +224,18 @@ public class DefaultRecordBinder {
 	}
 
 	/**
-	 * A stand-in for {@link MethodHandles#arrayElementGetter}: {@code (Object[], int) -> null}. An
-	 * {@code @Unbound} component reads from nothing, and giving it a source of the same shape means the rest
-	 * of the pipeline -- bridges, {@code Optional} wrapping, primitive boxing -- applies unchanged.
+	 * {@code (Object[], int) -> Object}, where a component's value comes from: the values array, or for a component
+	 * the class owns ({@code @Unbound}) a stand-in of the same shape returning its type's zero, so the rest of the
+	 * pipeline -- bridges, {@code Optional} wrapping, primitive unboxing -- applies unchanged. The zero rather than
+	 * {@code null}, which no primitive can take.
 	 */
-	private static MethodHandle nullSource() {
-		return MethodHandles.dropArguments(MethodHandles.constant(Object.class, null), 0,
+	private static MethodHandle valueSource(ComponentInfo field, FieldBridge bridge, int slot) {
+		if (slot >= 0) {
+			return MethodHandles.arrayElementGetter(Object[].class);
+		}
+		// A bridge converts from its data class, which is never primitive.
+		Class<?> type = bridge != null ? bridge.dataClass() : field.getType();
+		return MethodHandles.dropArguments(MethodHandles.zero(type).asType(MethodType.methodType(Object.class)), 0,
 				Object[].class, int.class);
 	}
 
@@ -268,6 +275,7 @@ public class DefaultRecordBinder {
 		}
 
 		TypeArguments.substitute(targetClass, parameterizedType, components);
+		refuseSharedNames(targetClass, components);
 
 		// Modify the order of fields if order annotation supplied.
 		FieldOrder dataOrder = targetClass.getAnnotation(FieldOrder.class);
@@ -278,7 +286,7 @@ public class DefaultRecordBinder {
 		// A component the class marked @Unbound is not on the wire: nothing fills it from a document and
 		// nothing writes it. So the values array a reader fills holds only the bound components, densely --
 		// `slots` maps a component's position to its place in that array, or -1 for one the class owns,
-		// which the constructor supplies as null. Keeping the array dense is what lets fields().length stay
+		// which the constructor supplies as its type's zero. Keeping the array dense is what lets fields().length stay
 		// the only notion of size anyone needs.
 		int[] slots = new int[components.size()];
 		int nextSlot = 0;
@@ -311,8 +319,6 @@ public class DefaultRecordBinder {
 					+ annotationsCarrierCount + " on " + targetClass);
 		}
 
-		// get the correct data constructor method handle. Either a constructor or a
-		// static method tagged with @Data.
 		MethodHandle dataConstructor = getDataConstructor(targetClass, context.profile().orElse(null));
 
 		// Build a MethodHandle that creates object and also calls setters with order of
@@ -411,6 +417,24 @@ public class DefaultRecordBinder {
 			isRequired = fieldAnnotation.required();
 		}
 		return isRequired;
+	}
+
+	/**
+	 * A name reaches one component, whichever finders found them: {@link DataClassRecord} indexes its fields by
+	 * name, so of two sharing one, a map writes and reads one value for both. An {@code @Unbound} component counts,
+	 * since a reader tells it apart by its name; the {@link Annotations} carrier does not, being filled from the
+	 * value's own annotations and never by name.
+	 */
+	private void refuseSharedNames(Class<?> targetClass, List<ComponentInfo> components)
+			throws CodeAnalysisException {
+		Set<String> names = new HashSet<>();
+		for (ComponentInfo info : components) {
+			String name = fieldName(info);
+			if (info.getType() != Annotations.class && !names.add(name)) {
+				throw new CodeAnalysisException(String.format("%s binds two components to the name '%s'; @Field on "
+						+ "one of them names it apart", targetClass.getName(), name));
+			}
+		}
 	}
 
 	private String fieldName(ComponentInfo info) {
@@ -915,13 +939,7 @@ public class DefaultRecordBinder {
 
 	}
 
-	/**
-	 * Returns the Constructor for the dataClass. This may be different to what is used in creating the
-	 * dataClass as a static constructor might be used instead. getDataConstructor is used to retrieve
-	 * the MethodHandle for the correct data constructor.
-	 */
-	private Constructor<?> getConstructor(Class<?> dataClass, String profile)
-			throws CodeAnalysisException, NoSuchMethodException, SecurityException {
+	private Constructor<?> getConstructor(Class<?> dataClass, String profile) throws CodeAnalysisException {
 		Constructor<?>[] declared = dataClass.getConstructors();
 		Constructor<?>[] constructors = declared;
 
@@ -958,20 +976,6 @@ public class DefaultRecordBinder {
 			}
 		}
 
-		// look for a static constructor.
-		Method[] methods = dataClass.getMethods();
-		for (Method method : methods) {
-			if (Modifier.isStatic(method.getModifiers())) {
-				Record dataAnnotation = method
-						.getAnnotation(Record.class);
-				if (dataAnnotation != null) {
-					// There must be a matching constructor that matches the parameters of the
-					// static constructor.
-					return dataClass.getConstructor(method.getParameterTypes());
-				}
-			}
-		}
-
 		// Nothing designated at all -- not even a single unprofiled constructor to fall back to. When the
 		// context named a profile, say so and list what the class does offer:
 		// the likeliest cause is a name that disagrees in one of the two places it has to match, and the
@@ -996,7 +1000,7 @@ public class DefaultRecordBinder {
 	}
 
 	private MethodHandle getDataConstructor(Class<?> dataClass, String profile)
-			throws CodeAnalysisException, NoSuchMethodException, SecurityException, IllegalAccessException {
+			throws CodeAnalysisException, IllegalAccessException {
 		Constructor<?>[] constructors = dataClass.getConstructors();
 
 		// Same order as getConstructor above, so the handle invoked is the constructor whose parameters the
@@ -1023,18 +1027,6 @@ public class DefaultRecordBinder {
 					.getAnnotation(Record.class);
 			if (dataAnnotation != null) {
 				return MethodHandles.publicLookup().unreflectConstructor(constructor);
-			}
-		}
-
-		// look for a static constructor.
-		Method[] methods = dataClass.getMethods();
-		for (Method method : methods) {
-			if (Modifier.isStatic(method.getModifiers())) {
-				Record dataAnnotation = method
-						.getAnnotation(Record.class);
-				if (dataAnnotation != null) {
-					return MethodHandles.publicLookup().unreflect(method);
-				}
 			}
 		}
 
@@ -1083,12 +1075,8 @@ public class DefaultRecordBinder {
 
 				int arg = field.getConstructorArgument();
 
-                // (values[],int) -> values[int]
-				// (values[],int) -> values[int], or -> null for a component the class owns (@Unbound).
-				// Substituting the source rather than special-casing downstream keeps every conversion
-				// dataArrayToObject applies -- an Optional component still arrives empty rather than null.
-				MethodHandle arrayGetter = slots[x] < 0 ? nullSource()
-						: MethodHandles.arrayElementGetter(Object[].class);
+				// An Optional component the class owns still arrives empty rather than null.
+				MethodHandle arrayGetter = valueSource(field, bridges[x], slots[x]);
 
 				// () -> inputIndex
 				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));
@@ -1137,9 +1125,7 @@ public class DefaultRecordBinder {
 				// (obj, value):void -> obj.setField( value );
 				MethodHandle fieldSetter = field.getWriteMethod();
 
-				// (value[],x):Object -> value[x], or -> null for a component the class owns (@Unbound).
-				MethodHandle arrayGetter = slots[x] < 0 ? nullSource()
-						: MethodHandles.arrayElementGetter(Object[].class);
+				MethodHandle arrayGetter = valueSource(field, bridges[x], slots[x]);
 
 				// ():int -> inputIndex
 				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));

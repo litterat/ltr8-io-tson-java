@@ -10,7 +10,8 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
   so a refusal leaves nothing behind that reaches it (`RecordRefusalTest`).
 - A class joins its open unions when its component is cached, never while it resolves
   (`OpenUnionMembershipTest`).
-- A name index is built once per class (`DataClassRecordFieldIndexTest`).
+- A name index is built once per class (`DataClassRecordFieldIndexTest`). A class's component names are distinct
+  across every finder, `@Unbound` ones included and the `Annotations` carrier not (`RecordRefusalTest`).
 - A refusal's own `getMessage()` is the fact: a `DataBindException` raised while describing a class passes up
   unwrapped, however deep the class sits (`RecordRefusalTest`).
 - A bridged class is concrete, declares `ToData<S>` itself and has a public constructor taking exactly `S`

@@ -27,7 +27,9 @@ import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Finds tuple components for a genuine Java record via {@link Class#getRecordComponents()} --
@@ -152,9 +154,17 @@ public class RecordComponentFinder implements ComponentFinder {
                     clss.getName(), declared.length, parameters.length));
         }
 
+        Map<String, Integer> named = new HashMap<>();
         for (int x = 0; x < parameters.length; x++) {
             String name = nameOf(clss, parameters[x], declared, x);
             RecordComponent component = componentNamed(clss, components, name);
+            Integer earlier = named.putIfAbsent(name, x);
+            if (earlier != null) {
+                throw new CodeAnalysisException(String.format("Parameters %d and %d of the %s on '%s' both name the "
+                        + "component '%s'; a constructor takes each component once", earlier, x,
+                        profile == null ? "selected constructor" : "constructor @Profile "
+                                + List.of(profile.value()) + " selects", clss.getName(), name));
+            }
             // A value bound at the component's type fills the parameter unconverted.
             if (parameters[x].getType() != component.getType()) {
                 throw new CodeAnalysisException(String.format(
