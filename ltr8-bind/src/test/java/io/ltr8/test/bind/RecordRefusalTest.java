@@ -57,6 +57,10 @@ import io.ltr8.test.data.RecordRefusals.CountingBridge;
 import io.ltr8.test.data.RecordRefusals.CycleMember;
 import io.ltr8.test.data.RecordRefusals.CycleTop;
 import io.ltr8.test.data.RecordRefusals.DesignatedParameterNarrower;
+import io.ltr8.test.data.RecordRefusals.DesignatedParametersNameComponentTwice;
+import io.ltr8.test.data.RecordRefusals.ProfileNamesComponentTwice;
+import io.ltr8.test.data.RecordRefusals.ProfileParametersNameComponentTwice;
+import io.ltr8.test.data.RecordRefusals.ProfileRenamesOntoAnother;
 import io.ltr8.test.data.RecordRefusals.EmptyUnion;
 import io.ltr8.test.data.RecordRefusals.FieldAnnotationWithoutAccessors;
 import io.ltr8.test.data.RecordRefusals.GetterAndSetterRenamedApart;
@@ -248,6 +252,31 @@ class RecordRefusalTest {
 		assertEquals("'" + ProfileNamesNoComponent.class.getName() + "' names no component 'z', so the selected "
 				+ "constructor's parameter has no accessor to read it back through",
 				message(profiled, ProfileNamesNoComponent.class));
+	}
+
+	@Test
+	void aProfileNamingOneComponentTwiceIsRefusedNamingTheClassTheProfileAndTheComponent() {
+		String twice = " both name the component 'a'; a constructor takes each component once";
+		assertAll(
+				() -> assertEquals("Parameters 0 and 1 of the constructor @Profile [v1] selects on '"
+						+ ProfileNamesComponentTwice.class.getName() + "'" + twice,
+						message(profiled, ProfileNamesComponentTwice.class)),
+				() -> assertEquals("Parameters 0 and 1 of the constructor @Profile [v1] selects on '"
+						+ ProfileParametersNameComponentTwice.class.getName() + "'" + twice,
+						message(profiled, ProfileParametersNameComponentTwice.class)));
+	}
+
+	@Test
+	void aDesignatedConstructorNamingOneComponentTwiceIsRefusedNamingTheClassAndTheComponent() {
+		assertEquals("Parameters 0 and 1 of the selected constructor on '"
+				+ DesignatedParametersNameComponentTwice.class.getName() + "' both name the component 'a'; a "
+				+ "constructor takes each component once", message(DesignatedParametersNameComponentTwice.class));
+	}
+
+	@Test
+	void aProfiledParameterRenamedOntoAnotherComponentsNameIsRefusedAsTwoComponentsOfOneName() {
+		assertEquals(sharedName(ProfileRenamesOntoAnother.class, "a"),
+				message(profiled, ProfileRenamesOntoAnother.class));
 	}
 
 	@Test
@@ -508,10 +537,12 @@ class RecordRefusalTest {
 				HoldsUnconvertible.class, RawList.class, WildcardList.class, RawMap.class, CycleTop.class,
 				LoopWithRefused.class, UnionThroughCall.class, DesignatedParameterNarrower.class,
 				FieldBesidePair.class, PairShadowsBaseComponent.class, ComponentsNamedAlike.class,
-				UnboundNamedAlike.class, ConstructorComponentsOfOneName.class);
+				UnboundNamedAlike.class, ConstructorComponentsOfOneName.class,
+				DesignatedParametersNameComponentTwice.class);
 		List<Class<?>> refusedUnderProfile = List.of(ProfileFieldCountMismatch.class,
 				ProfileNamesNoComponent.class, ProfileParameterUnnamed.class, ProfileParameterNarrower.class,
-				ProfileParameterUnboxed.class, ProfileParameterUnrelated.class);
+				ProfileParameterUnboxed.class, ProfileParameterUnrelated.class, ProfileNamesComponentTwice.class,
+				ProfileParametersNameComponentTwice.class, ProfileRenamesOntoAnother.class);
 		assertAll(Stream.concat(
 				refused.stream().map(type -> () -> assertNoGenericWrapper(context, type)),
 				refusedUnderProfile.stream().map(type -> () -> assertNoGenericWrapper(profiled, type))));

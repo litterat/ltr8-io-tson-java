@@ -544,10 +544,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   accessor …": `ImmutableFinder` reads only a final field directly, and `GetSetFinder`, which reads the field, runs
   after it. Read, not run. Read the field directly as for a final one, leaving it one component that the
   constructor fills and the field's setter writes, with a round trip.
-- [ ] **A `@Profile` naming one component twice is accepted.** `@Profile(value = "v1", fields = {"a", "a"})` on
-  `R(String x, String y)` of `record R(String a, String b, String c)` is described with two fields named `a`.
-  Refuse it in `RecordComponentFinder` with the other `@Profile` refusals, naming the class, the profile and the
-  component.
 - [ ] **`@Unbound` on a primitive record component fails at read.** `record UnboundPrimitive(String name, @Unbound
   int cache)` is described, then `MapMapper.toObject` throws `DataBindException` ("Failed to convert Map to
   class …") and `ArrayMapper.toObject` an unchecked `NullPointerException`: the `null` given to an unbound

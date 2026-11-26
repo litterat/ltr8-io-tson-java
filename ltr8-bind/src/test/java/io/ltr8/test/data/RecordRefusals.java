@@ -235,6 +235,39 @@ public final class RecordRefusals {
 		}
 	}
 
+	public record ProfileNamesComponentTwice(String a, String b, String c) {
+
+		@Profile(value = "v1", fields = { "a", "a" })
+		public ProfileNamesComponentTwice(String x, String y) {
+			this(x, y, null);
+		}
+	}
+
+	public record ProfileParametersNameComponentTwice(String a, String b, String c) {
+
+		@Profile("v1")
+		public ProfileParametersNameComponentTwice(@Field("a") String x, @Field("a") String y) {
+			this(x, y, null);
+		}
+	}
+
+	public record DesignatedParametersNameComponentTwice(String a, String b, String c) {
+
+		@Record
+		public DesignatedParametersNameComponentTwice(@Field("a") String x, @Field("a") String y) {
+			this(x, y, null);
+		}
+	}
+
+	/** Its profile names two components, and {@code @Field} gives the second the first one's name. */
+	public record ProfileRenamesOntoAnother(String a, String b, String c) {
+
+		@Profile(value = "v1", fields = { "a", "b" })
+		public ProfileRenamesOntoAnother(String x, @Field("a") String y) {
+			this(x, y, null);
+		}
+	}
+
 	public record ProfileParameterUnnamed(String a, String b) {
 
 		@Profile("v1")
