@@ -184,7 +184,9 @@ public class GetSetFinder implements ComponentFinder {
 				Field fieldAnnotation = classField.getAnnotation(Field.class);
 				if (fieldAnnotation != null) {
 
-					ComponentInfo info = fields.stream().filter(e -> e.getName().equals(classField.getName()))
+					// A super class may declare a field of this name too, and this annotation is not its.
+					ComponentInfo info = fields.stream().filter(e -> e.getName().equals(classField.getName())
+							&& (e.getDeclaringClass() == null || e.getDeclaringClass() == clss))
 							.findFirst().orElse(null);
 					if (info == null) {
 						throw new CodeAnalysisException(String

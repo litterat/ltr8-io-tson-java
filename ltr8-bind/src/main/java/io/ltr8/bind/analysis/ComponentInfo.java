@@ -29,6 +29,9 @@ public class ComponentInfo {
 
 	private final Class<?> type;
 
+	// Declares the field a constructor stores this component in; null where only @Field names the component.
+	private Class<?> declaringClass;
+
 	private MethodHandle writeMethod;
 
 	private MethodHandle readMethod;
@@ -68,6 +71,14 @@ public class ComponentInfo {
 		return name;
 	}
 
+	public Class<?> getDeclaringClass() {
+		return declaringClass;
+	}
+
+	public void setDeclaringClass(Class<?> declaringClass) {
+		this.declaringClass = declaringClass;
+	}
+
 	public void setField(Field field) throws CodeAnalysisException {
 		if (this.field != null && !this.field.equals(field))
 			throw new CodeAnalysisException(String.format("Field '%s' already has Field annotation", this.name));
@@ -79,25 +90,9 @@ public class ComponentInfo {
 	}
 
 	public void setUnion(Union union) throws CodeAnalysisException {
-		if (this.union != null && unionsEqual(union, this.union))
-			throw new CodeAnalysisException(String.format("Field '%s' already has Field annotation", this.name));
+		if (this.union != null && !this.union.equals(union))
+			throw new CodeAnalysisException(String.format("Field '%s' has @Union annotations that differ", this.name));
 		this.union = union;
-	}
-
-	private boolean unionsEqual(Union u1, Union u2) {
-		if (u1 == u2 || (u1 == null && u2 == null)) {
-			return true;
-		}
-
-		if (u1 == null || u2 == null) {
-			return false;
-		}
-
-		if (u1.value() == u2.value() && u1.sealed() == u2.sealed()) {
-			return true;
-		}
-
-		return false;
 	}
 
 	public Union getUnion() {
