@@ -202,13 +202,6 @@ public class DefaultRecordBinder {
 
 				DataClassRecord descriptor = resolveClassRecord(context, targetClass, parameterizedType);
 
-				// At this point descriptor is not null but hasn't been added to context.
-				// Loop through know interfaces and if we find a union type add this descriptor to it.
-				registerUnionInterfaces(context, targetClass);
-
-				// Same applies to super classes that are abstract.
-				registerUnionSubclasses(context, targetClass);
-
 				return new DataClassRecord(descriptor.typeClass(), bridge, descriptor.isMutable(), descriptor.creator(),
 						descriptor.constructor(), descriptor.fields(),
 						descriptor.annotationsCarrier().orElse(null));
@@ -292,13 +285,15 @@ public class DefaultRecordBinder {
 		}
 
 		DataClassField[] allComponents = new DataClassField[components.size()];
+		FieldBridge[] bridges = new FieldBridge[components.size()];
 		List<DataClassField> boundComponents = new ArrayList<>();
 		DataClassField annotationsCarrier = null;
 		int annotationsCarrierCount = 0;
 		for (int x = 0; x < components.size(); x++) {
 			ComponentInfo info = components.get(x);
 
-			allComponents[x] = resolveField(context, targetClass, info, slots[x] < 0 ? x : slots[x]);
+			bridges[x] = fieldBridge(info);
+			allComponents[x] = resolveField(context, targetClass, info, bridges[x], slots[x] < 0 ? x : slots[x]);
 			if (slots[x] >= 0) {
 				boundComponents.add(allComponents[x]);
 			}
@@ -320,7 +315,7 @@ public class DefaultRecordBinder {
 
 		// Build a MethodHandle that creates object and also calls setters with order of
 		// fields as defined in components.
-		MethodHandle constructor = createTupleConstructor(targetClass, components, allComponents, slots,
+		MethodHandle constructor = createTupleConstructor(targetClass, components, allComponents, bridges, slots,
 				dataConstructor);
 
 		// See if there's an empty constructor available.
@@ -337,63 +332,42 @@ public class DefaultRecordBinder {
 	}
 
 	/**
-	 * Search through any super-classes of the target class and add this class any Union parent classes
+	 * Adds the class {@code described} describes to each open union it implements or extends: an interface it
+	 * declares, or an abstract super class, carrying {@code @Union} with no members listed and not sealed. Only a
+	 * record described by its own components joins, not one bridged through {@code ToData} or {@code @Transparent}.
 	 *
-	 * @param context DataBindContext for that the target class is being registered.
-	 * @param targetClass target class
+	 * <p>Called by {@link DataBindContext} once {@code described} is part of a component that resolved whole, and
+	 * not by {@link #resolveRecord}: a class on a cycle is described only if every class on the cycle is, so a
+	 * class joining while its own fields resolve stays listed after a class it reaches is refused.
 	 */
-	private void registerUnionSubclasses(DataBindContext context, Class<?> targetClass) {
-		Class<?> superClass = targetClass;
-		while ((superClass = superClass.getSuperclass()) != null) {
-
-			// An abstract type is a union type.
+	public static void joinUnions(DataBindContext context, DataClass described) {
+		if (!(described instanceof DataClassRecord record) || record.bridge().isPresent()) {
+			return;
+		}
+		Class<?> member = record.typeClass();
+		for (Class<?> declared : member.getInterfaces()) {
+			joinUnion(context, declared, member);
+		}
+		for (Class<?> superClass = member.getSuperclass(); superClass != null;
+				superClass = superClass.getSuperclass()) {
 			if (Modifier.isAbstract(superClass.getModifiers())) {
-				try {
-
-					// Only attempt to add children if the union doesn't have child types specified.
-					Union union = superClass
-							.getAnnotation(Union.class);
-					if (union != null && (union.value() == null || union.value().length == 0)
-							&& !superClass.isSealed()) {
-						DataClassUnion targetUnion = (DataClassUnion) context.getDescriptor(superClass);
-
-						if (!targetUnion.isMemberType(targetClass)) {
-							targetUnion.addMemberType(targetClass);
-						}
-					}
-				} catch (Throwable t) {
-					// ignore.
-				}
+				joinUnion(context, superClass, member);
 			}
 		}
 	}
 
-	/**
-	 * Search through any implemented interfaces for the target class and if a Union has been declared
-	 * add this to the member list.
-	 *
-	 * @param context DataBindContext for that the target class is being registered.
-	 * @param targetClass target class
-	 */
-	private void registerUnionInterfaces(DataBindContext context, Class<?> targetClass) {
-		Class<?>[] interfaces = targetClass.getInterfaces();
-		for (Class<?> targetInterface : interfaces) {
-			try {
-
-				// Only attempt to add children if the union doesn't have child types specified.
-				Union union = targetInterface
-						.getAnnotation(Union.class);
-				if (union != null && (union.value() == null || union.value().length == 0)
-						&& !targetInterface.isSealed()) {
-					DataClassUnion targetUnion = (DataClassUnion) context.getDescriptor(targetInterface);
-
-					if (!targetUnion.isMemberType(targetClass)) {
-						targetUnion.addMemberType(targetClass);
-					}
-				}
-			} catch (Throwable t) {
-				// ignore.
+	private static void joinUnion(DataBindContext context, Class<?> union, Class<?> member) {
+		Union annotation = union.getAnnotation(Union.class);
+		if (annotation == null || annotation.value().length > 0 || union.isSealed()) {
+			return;
+		}
+		try {
+			if (context.getDescriptor(union) instanceof DataClassUnion open) {
+				open.addMemberType(member);
 			}
+		} catch (DataBindException e) {
+			// A union this context cannot describe, or one that admits no additions, has no members for this
+			// class to join.
 		}
 	}
 
@@ -460,24 +434,21 @@ public class DefaultRecordBinder {
 	 * @param context DataBindContext that the DataClassRecord is being resoled. Recursively find member DataClass.
 	 * @param targetClass target class for that the field is being found.
 	 * @param info The ComponentInfo for the field that is being created.
+	 * @param bridge The field's {@code @Field} bridge, or {@code null} where it names none.
 	 * @param index The field index
 	 * @return DataClassField for the ComponentField of the record.
 	 */
-	private DataClassField resolveField(DataBindContext context, Class<?> targetClass, ComponentInfo info, int index)
-			throws NoSuchMethodException, IllegalAccessException, DataBindException {
+	private DataClassField resolveField(DataBindContext context, Class<?> targetClass, ComponentInfo info,
+			FieldBridge bridge, int index) throws NoSuchMethodException, IllegalAccessException, DataBindException {
 
 		DataClassField component;
-
-		Field fieldAnnotation = info.getField();
 
 		if (info.getType() == Annotations.class) {
 			// The declared type is the opt-in: not bound from an authored value at all, so nothing
 			// here needs the usual context.getDescriptor() recursion. See resolveAnnotationsCarrierField.
 			component = resolveAnnotationsCarrierField(targetClass, info, index);
-		} else if (fieldAnnotation != null && fieldAnnotation.bridge() != null
-				&& fieldAnnotation.bridge() != DataBridge.class) {
-			// The field annotation has a DataBridge
-			component = resolveBridgeField(context, targetClass, info, index);
+		} else if (bridge != null) {
+			component = resolveBridgeField(context, targetClass, info, bridge, index);
 		} else if (info.getType() == Optional.class && info.getParamType() != null) {
 			// If the input is Optional wrap the isPresent
 			component = resolveOptionalField(context, targetClass, info, index);
@@ -612,52 +583,66 @@ public class DefaultRecordBinder {
 				setter);
 	}
 
-	private DataClassField resolveBridgeField(DataBindContext context, Class<?> targetClass, ComponentInfo info, int index)
-			throws DataBindException, IllegalAccessException, NoSuchMethodException, SecurityException {
+	private DataClassField resolveBridgeField(DataBindContext context, Class<?> targetClass, ComponentInfo info,
+			FieldBridge bridge, int index) throws DataBindException, IllegalAccessException, NoSuchMethodException {
 
-		Field fieldAnnotation = info.getField();
 		MethodHandle accessor = accessor(info);
 		MethodHandle setter = setter(info);
 		boolean isRequired = isRequired(info);
 		String fieldName = fieldName(info);
 
+		Supplier<DataClass> tupleData = context.componentSource(bridge.dataClass(), bridge.dataType());
+
+		accessor = MethodHandles.collectArguments(bridge.toData(), 0,
+				accessor.asType(accessor.type().changeReturnType(info.getType())));
+
+		if (setter != null) {
+			setter = MethodHandles.filterArguments(setter, 1, bridge.toObject());
+		}
+
+		// Use Objects.nonNull(accessor()) to check if value is present.
+		// Probably not hugely efficient.
+		MethodHandle isPresent = MethodHandles.publicLookup()
+				.findStatic(Objects.class, "nonNull", MethodType.methodType(boolean.class, Object.class))
+				.asType(MethodType.methodType(boolean.class, bridge.dataClass()));
+
+		isPresent = MethodHandles.filterArguments(isPresent, 0, accessor);
+
+		return new DataClassField(index, fieldName, bridge.dataClass(), tupleData, isRequired, isPresent, accessor,
+				setter);
+	}
+
+	/**
+	 * A component's {@code @Field} bridge: {@code toData} takes the field's type to {@code dataClass}, {@code
+	 * toObject} the reverse, both bound to one instance.
+	 */
+	private record FieldBridge(Class<?> dataClass, Type dataType, MethodHandle toData, MethodHandle toObject) {
+	}
+
+	/**
+	 * The bridge {@code info}'s {@code @Field} names, or {@code null} where it names none. Built once per component
+	 * and shared by the field's accessor, its setter and the constructor, so a bridge holding state sees every call
+	 * made for its field.
+	 */
+	private static FieldBridge fieldBridge(ComponentInfo info)
+			throws CodeAnalysisException, NoSuchMethodException, IllegalAccessException {
+		Field fieldAnnotation = info.getField();
+		if (fieldAnnotation == null || fieldAnnotation.bridge() == null
+				|| fieldAnnotation.bridge() == DataBridge.class) {
+			return null;
+		}
+
 		@SuppressWarnings("rawtypes")
 		Class<? extends DataBridge> bridgeClass = fieldAnnotation.bridge();
 
 		ParameterizedType bridgeTypes = (ParameterizedType) bridgeClass.getGenericInterfaces()[0];
-
-		// ToData has one parameter so this should be safe.
 		Type bridgeDataType = bridgeTypes.getActualTypeArguments()[0];
-		Type bridgeObjectType = bridgeTypes.getActualTypeArguments()[1];
-
-		Class<?> bridgeDataClass;
-		Class<?> bridgeObjectClass;
-
-		if (bridgeDataType instanceof Class) {
-			bridgeDataClass = (Class<?>) bridgeDataType;
-		} else if (bridgeDataType instanceof ParameterizedType) {
-			bridgeDataClass = (Class<?>) ((ParameterizedType) bridgeDataType).getRawType();
-		} else {
-			throw new CodeAnalysisException("Unrecognised Type");
-		}
-
-		if (bridgeObjectType instanceof Class) {
-			bridgeObjectClass = (Class<?>) bridgeObjectType;
-		} else if (bridgeObjectType instanceof ParameterizedType) {
-			bridgeObjectClass = (Class<?>) ((ParameterizedType) bridgeObjectType).getRawType();
-		} else {
-			throw new CodeAnalysisException("Unrecognised Type");
-		}
-
-		// Recursively get hold of the data class descriptor.
-		Supplier<DataClass> tupleData = context.componentSource(bridgeDataClass, bridgeDataType);
+		Class<?> bridgeDataClass = bridgeTypeClass(bridgeDataType);
+		Class<?> bridgeObjectClass = bridgeTypeClass(bridgeTypes.getActualTypeArguments()[1]);
 
 		if (!bridgeObjectClass.isAssignableFrom(info.getType())) {
 			throw new CodeAnalysisException("Bridge object type not assignable from field type");
 		}
-
-		// TODO Currently assume Bridge classes have no state. This might need to change
-		// if a bridge uses IOC framework.
 
 		@SuppressWarnings("rawtypes")
 		DataBridge bridge;
@@ -667,36 +652,24 @@ public class DefaultRecordBinder {
 			throw new CodeAnalysisException("Failed to instantiate bridge", e);
 		}
 
-		// bridge.toData(dataType):type
-		MethodHandle bridgeToData = MethodHandles.publicLookup()
+		MethodHandle toData = MethodHandles.publicLookup()
 				.findVirtual(bridgeClass, TODATA_METHOD, MethodType.methodType(bridgeDataClass, bridgeObjectClass))
 				.bindTo(bridge);
-
-		accessor = accessor.asType(accessor.type().changeReturnType(bridgeObjectClass));
-
-		// bridge.toData( targetClass.getOptional() ): optionalType
-		accessor = MethodHandles.collectArguments(bridgeToData, 0, accessor);
-
-		// bridge.toObject(type):dataType
-		MethodHandle bridgeToObject = MethodHandles.publicLookup()
+		MethodHandle toObject = MethodHandles.publicLookup()
 				.findVirtual(bridgeClass, TOOBJECT_METHOD, MethodType.methodType(bridgeObjectClass, bridgeDataClass))
 				.bindTo(bridge);
 
-		if (setter != null) {
-			setter = MethodHandles.collectArguments(setter, 1, bridgeToObject)
-					.asType(MethodType.methodType(info.getType(), bridgeDataClass));
-		}
+		return new FieldBridge(bridgeDataClass, bridgeDataType,
+				toData.asType(MethodType.methodType(bridgeDataClass, info.getType())),
+				toObject.asType(MethodType.methodType(info.getType(), bridgeDataClass)));
+	}
 
-		// Use Objects.nonNull(accessor()) to check if value is present.
-		// Probably not hugely efficient.
-		MethodHandle isPresent = MethodHandles.publicLookup()
-				.findStatic(Objects.class, "nonNull", MethodType.methodType(boolean.class, Object.class))
-				.asType(MethodType.methodType(boolean.class, bridgeDataClass));
-
-		isPresent = MethodHandles.filterArguments(isPresent, 0, accessor);
-
-		return new DataClassField(index, fieldName, bridgeDataClass, tupleData, isRequired, isPresent, accessor,
-				setter);
+	private static Class<?> bridgeTypeClass(Type type) throws CodeAnalysisException {
+		return switch (type) {
+			case Class<?> plain -> plain;
+			case ParameterizedType parameterized -> (Class<?>) parameterized.getRawType();
+			default -> throw new CodeAnalysisException("Unrecognised Type");
+		};
 	}
 
 	/**
@@ -1011,14 +984,14 @@ public class DefaultRecordBinder {
 	 * present.
 	 */
 	private MethodHandle createTupleConstructor(Class<?> dataClass, List<ComponentInfo> fields,
-			DataClassField[] dataFields, int[] slots, MethodHandle dataConstructor)
+			DataClassField[] dataFields, FieldBridge[] bridges, int[] slots, MethodHandle dataConstructor)
 			throws IllegalAccessException, NoSuchMethodException, CodeAnalysisException {
 
 		// (Object[]):serialClass -> ctor(Object[])
-		MethodHandle create = createEmbedConstructor(dataClass, dataConstructor, fields, dataFields, slots);
+		MethodHandle create = createEmbedConstructor(dataClass, dataConstructor, fields, dataFields, bridges, slots);
 
 		// (serialClass, Object[]) -> serialClass.setValues(Object[x]);
-		MethodHandle setters = createEmbedSetters(dataClass, fields, dataFields, slots);
+		MethodHandle setters = createEmbedSetters(dataClass, fields, dataFields, bridges, slots);
 
 		// (Object[], Object[]) -> ctor(Object[]).setvalues(Object[])
 		MethodHandle createAndSet = MethodHandles.collectArguments(setters, 0, create);
@@ -1035,7 +1008,7 @@ public class DefaultRecordBinder {
 	 * Passes relevant fields into the data class constructor.
 	 */
 	private MethodHandle createEmbedConstructor(Class<?> dataClass, MethodHandle dataConstructor,
-			List<ComponentInfo> fields, DataClassField[] dataFields, int[] slots)
+			List<ComponentInfo> fields, DataClassField[] dataFields, FieldBridge[] bridges, int[] slots)
 			throws NoSuchMethodException, IllegalAccessException, CodeAnalysisException {
 		MethodHandle result = dataConstructor;
 
@@ -1057,7 +1030,8 @@ public class DefaultRecordBinder {
 				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));
 
 				// (values[]) -> values[inputIndex] and maybe additional modifications to the value.
-				MethodHandle arrayIndexGetter = dataArrayToObject(field, dataFields[x], arrayGetter, index);
+				MethodHandle arrayIndexGetter = dataArrayToObject(field, dataFields[x], bridges[x], arrayGetter,
+						index);
 
 				// ()-> constructor( ..., values[inputIndex] , ... )
 				result = MethodHandles.collectArguments(result, arg, arrayIndexGetter);
@@ -1081,7 +1055,7 @@ public class DefaultRecordBinder {
 	 * Creates a MethodHandle that takes an Object[] as input and calls any field setters for mutable objects.
 	 */
 	private MethodHandle createEmbedSetters(Class<?> dataClass, List<ComponentInfo> fields,
-			DataClassField[] dataFields, int[] slots)
+			DataClassField[] dataFields, FieldBridge[] bridges, int[] slots)
 			throws IllegalAccessException, NoSuchMethodException, SecurityException, CodeAnalysisException {
 
 		// (dataClass,Object[]):dataClass -> return object;
@@ -1107,7 +1081,8 @@ public class DefaultRecordBinder {
 				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));
 
 				// (values[]) -> values[inputIndex] and maybe additional modifications to the value.
-				MethodHandle arrayIndexGetter = dataArrayToObject(field, dataFields[x], arrayGetter, index);
+				MethodHandle arrayIndexGetter = dataArrayToObject(field, dataFields[x], bridges[x], arrayGetter,
+						index);
 
 				// (obj, value[]):void -> obj.setField( value[inputIndex] );
 				MethodHandle arrayFieldSetter = MethodHandles.collectArguments(fieldSetter, 1, arrayIndexGetter);
@@ -1128,69 +1103,25 @@ public class DefaultRecordBinder {
 	 *
 	 * @param field The field information that needs to be adapted. Includes reflection information
 	 * @param dataField The DataClassField that has the data field information.
+	 * @param bridge The field's {@code @Field} bridge, or {@code null} where it names none.
 	 * @param arrayGetter MethodHandle with (value[],x):Object -> value[x]
 	 * @param index index of the field
 	 * @return MethodHandle with (values[]) -> values[inputIndex]) and can perform additional modifications.
 	 */
-	private MethodHandle dataArrayToObject(ComponentInfo field, DataClassField dataField, MethodHandle arrayGetter,
-			MethodHandle index)
+	private MethodHandle dataArrayToObject(ComponentInfo field, DataClassField dataField, FieldBridge bridge,
+			MethodHandle arrayGetter, MethodHandle index)
 			throws CodeAnalysisException, IllegalAccessException, NoSuchMethodException, SecurityException {
 
 		MethodHandle arrayIndexGetter;
 
-		Field fieldAnnotation = field.getField();
+		if (bridge != null) {
 
-		if (fieldAnnotation != null && fieldAnnotation.bridge() != null
-				&& fieldAnnotation.bridge() != DataBridge.class) {
-
-			@SuppressWarnings("rawtypes")
-			Class<? extends DataBridge> bridgeClass = fieldAnnotation.bridge();
-
-			ParameterizedType bridgeTypes = (ParameterizedType) bridgeClass.getGenericInterfaces()[0];
-
-			// ToData has one parameter so this should be safe.
-			Type bridgeDataType = bridgeTypes.getActualTypeArguments()[0];
-			Type bridgeObjectType = bridgeTypes.getActualTypeArguments()[1];
-
-			Class<?> bridgeDataClass;
-			Class<?> bridgeObjectClass;
-
-			if (bridgeDataType instanceof Class) {
-				bridgeDataClass = (Class<?>) bridgeDataType;
-			} else if (bridgeDataType instanceof ParameterizedType) {
-				bridgeDataClass = (Class<?>) ((ParameterizedType) bridgeDataType).getRawType();
-			} else {
-				throw new CodeAnalysisException("Unrecognised Type");
-			}
-
-			if (bridgeObjectType instanceof Class) {
-				bridgeObjectClass = (Class<?>) bridgeObjectType;
-			} else if (bridgeObjectType instanceof ParameterizedType) {
-				bridgeObjectClass = (Class<?>) ((ParameterizedType) bridgeObjectType).getRawType();
-			} else {
-				throw new CodeAnalysisException("Unrecognised Type");
-			}
-
-			@SuppressWarnings("rawtypes")
-			DataBridge bridge;
-			try {
-				bridge = bridgeClass.getConstructor().newInstance();
-			} catch (InstantiationException | IllegalArgumentException | InvocationTargetException e) {
-				throw new CodeAnalysisException("Failed to instantiate bridge", e);
-			}
-
-			// (values[]) -> values[inputIndex]:optionalType
+			// (values[]) -> values[inputIndex]:bridgeDataClass
 			arrayIndexGetter = MethodHandles.collectArguments(arrayGetter, 1, index)
-					.asType(MethodType.methodType(bridgeDataClass, Object[].class));
+					.asType(MethodType.methodType(bridge.dataClass(), Object[].class));
 
-			// bridge.toObject(type):dataType
-			MethodHandle bridgeToObject = MethodHandles.publicLookup().findVirtual(bridgeClass, TOOBJECT_METHOD,
-					MethodType.methodType(bridgeObjectClass, bridgeDataClass)).bindTo(bridge);
-
-			bridgeToObject = bridgeToObject.asType(bridgeToObject.type().changeReturnType(field.getType()));
-
-			// (values[]):bridgeType -> bridge.toObject( (bridgeData) values[inputIndex] ):bridgeObject
-			arrayIndexGetter = MethodHandles.collectArguments(bridgeToObject, 0, arrayIndexGetter);
+			// (values[]):fieldType -> bridge.toObject( (bridgeData) values[inputIndex] )
+			arrayIndexGetter = MethodHandles.collectArguments(bridge.toObject(), 0, arrayIndexGetter);
 
 		} else if (field.getType() == Optional.class && field.getParamType() != null) {
 
