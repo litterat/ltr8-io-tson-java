@@ -517,11 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A getter/setter pair a super class declares is no component.** `GetSetFinder` reads `getDeclaredMethods()`
-  of the described class alone, while a public field a super class declares is a component: a class extending one
-  that declares `getName`/`setName` loses `name`. Read, not run. Find the pairs of the super classes too, a generic
-  one at the type the subclass binds (`Holder<T>`'s pair in `TextHolder extends Holder<String>` is a `String`),
-  with a round trip of each through both mappers.
 - [ ] **A setter that returns a value is untested and probably throws.** A pair whose setter returns `this` or the
   old value is folded into `DefaultRecordBinder.createEmbedSetters` as it stands. Read, not run. Reproduce it, bind
   the pair by dropping what the setter returns, and round-trip it through both mappers.

@@ -601,6 +601,279 @@ public final class GetSetClasses {
 		}
 	}
 
+	public static class TextBox extends Holder<String> {
+
+		@Record
+		public TextBox() {
+		}
+	}
+
+	@SuppressWarnings("rawtypes")
+	public static class RawBox extends Holder {
+
+		@Record
+		public RawBox() {
+		}
+	}
+
+	public static class Passes<T> extends Holder<T> {
+	}
+
+	/** Binds {@link Holder}'s parameter through a generic class between them. */
+	public static class TextPassed extends Passes<String> {
+
+		@Record
+		public TextPassed() {
+		}
+	}
+
+	/** Overrides only its super class's getter, so its setter is still the super class's. */
+	public static class GetterOverride extends Holder<String> {
+
+		@Record
+		public GetterOverride() {
+		}
+
+		@Override
+		public String getValue() {
+			return super.getValue();
+		}
+	}
+
+	public static class ListHolder<T> {
+
+		private List<T> items = List.of();
+
+		public List<T> getItems() {
+			return items;
+		}
+
+		public void setItems(List<T> items) {
+			this.items = items;
+		}
+	}
+
+	public static class TextList extends ListHolder<String> {
+
+		@Record
+		public TextList() {
+		}
+	}
+
+	public static class NamedBase {
+
+		private String name;
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class Named extends NamedBase {
+
+		@Record
+		public Named() {
+		}
+	}
+
+	public static class Readable {
+
+		protected String value;
+
+		public String getValue() {
+			return value;
+		}
+	}
+
+	/** Its setter pairs with the getter its super class declares. */
+	public static class ReadableWritten extends Readable {
+
+		@Record
+		public ReadableWritten() {
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+	}
+
+	public static class Writable {
+
+		protected String value;
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+	}
+
+	/** Its getter pairs with the setter its super class declares. */
+	public static class WritableRead extends Writable {
+
+		@Record
+		public WritableRead() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+	}
+
+	public static class GenericReadable<T> {
+
+		protected T value;
+
+		public T getValue() {
+			return value;
+		}
+	}
+
+	/** Its setter takes the type its super class's getter returns at the argument it binds. */
+	public static class TextReadableWritten extends GenericReadable<String> {
+
+		@Record
+		public TextReadableWritten() {
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+	}
+
+	/** Its setter takes another type than its super class's getter returns at the argument it binds. */
+	public static class NumberReadableWritten extends GenericReadable<String> {
+
+		public String name;
+
+		@Record
+		public NumberReadableWritten() {
+		}
+
+		public void setValue(Integer value) {
+			this.value = String.valueOf(value);
+		}
+	}
+
+	/** Its super class's constructor stores the field the inherited pair reads and writes. */
+	public static class NamedByConstructor {
+
+		private String name;
+
+		public NamedByConstructor(String name) {
+			this.name = name;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class InheritsNamedByConstructor extends NamedByConstructor {
+
+		@Record
+		public InheritsNamedByConstructor(String name) {
+			super(name);
+		}
+	}
+
+	/** Its constructor stores a {@code name} of its own beside the one its super class's pair holds. */
+	public static class RenamedOverPair extends NamedBase {
+
+		private final String name;
+
+		@Record
+		public RenamedOverPair(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	public static class AliasedBase {
+
+		private String name;
+
+		@Field("alias")
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+	}
+
+	/** As {@link RenamedOverPair}, with the inherited pair on the wire as {@code alias}. */
+	public static class RenamedOverAliasedPair extends AliasedBase {
+
+		private final String name;
+
+		@Record
+		public RenamedOverAliasedPair(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	/** Its public field takes the name of the pair it inherits. */
+	public static class FieldBesideInheritedPair extends NamedBase {
+
+		public String name;
+
+		@Record
+		public FieldBesideInheritedPair() {
+		}
+	}
+
+	public interface Labelling {
+
+		String label();
+
+		void label(String label);
+
+		default String getLabel() {
+			return label();
+		}
+
+		default void setLabel(String label) {
+			label(label);
+		}
+	}
+
+	/** Its only pair is an interface's default methods. */
+	public static class DefaultPair implements Labelling {
+
+		public String name;
+
+		private String label;
+
+		@Record
+		public DefaultPair() {
+		}
+
+		@Override
+		public String label() {
+			return label;
+		}
+
+		@Override
+		public void label(String label) {
+			this.label = label;
+		}
+	}
+
 	public static class TwoArgumentSetter {
 
 		public String name;

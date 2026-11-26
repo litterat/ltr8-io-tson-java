@@ -18,19 +18,26 @@ package io.ltr8.test.bind;
 import io.ltr8.annotation.Record;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.GetSetClasses.BoxedSetter;
+import io.ltr8.test.data.GetSetClasses.DefaultPair;
+import io.ltr8.test.data.GetSetClasses.FieldBesideInheritedPair;
 import io.ltr8.test.data.GetSetClasses.FinalFieldBesideMutableField;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithAccessor;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithoutAccessor;
+import io.ltr8.test.data.GetSetClasses.GetterOverride;
+import io.ltr8.test.data.GetSetClasses.InheritsNamedByConstructor;
 import io.ltr8.test.data.GetSetClasses.InlineFinalField;
 import io.ltr8.test.data.GetSetClasses.ListPair;
 import io.ltr8.test.data.GetSetClasses.MutableFieldBoundByConstructor;
 import io.ltr8.test.data.GetSetClasses.MutableFields;
+import io.ltr8.test.data.GetSetClasses.Named;
 import io.ltr8.test.data.GetSetClasses.NestedArgumentPair;
+import io.ltr8.test.data.GetSetClasses.NumberReadableWritten;
 import io.ltr8.test.data.GetSetClasses.OptionalField;
 import io.ltr8.test.data.GetSetClasses.OptionalPair;
 import io.ltr8.test.data.GetSetClasses.OtherElementSetter;
@@ -47,14 +54,23 @@ import io.ltr8.test.data.GetSetClasses.ProtectedPair;
 import io.ltr8.test.data.GetSetClasses.PublicGetterPrivateSetter;
 import io.ltr8.test.data.GetSetClasses.PublicPair;
 import io.ltr8.test.data.GetSetClasses.PublicPairOverConstructorName;
+import io.ltr8.test.data.GetSetClasses.RawBox;
 import io.ltr8.test.data.GetSetClasses.RawSetter;
+import io.ltr8.test.data.GetSetClasses.ReadableWritten;
 import io.ltr8.test.data.GetSetClasses.Relabelled;
+import io.ltr8.test.data.GetSetClasses.RenamedOverAliasedPair;
+import io.ltr8.test.data.GetSetClasses.RenamedOverPair;
 import io.ltr8.test.data.GetSetClasses.Retagged;
 import io.ltr8.test.data.GetSetClasses.StaticField;
 import io.ltr8.test.data.GetSetClasses.StaticPair;
+import io.ltr8.test.data.GetSetClasses.TextBox;
 import io.ltr8.test.data.GetSetClasses.TextHolder;
+import io.ltr8.test.data.GetSetClasses.TextList;
+import io.ltr8.test.data.GetSetClasses.TextPassed;
+import io.ltr8.test.data.GetSetClasses.TextReadableWritten;
 import io.ltr8.test.data.GetSetClasses.TwoArgumentSetter;
 import io.ltr8.test.data.GetSetClasses.WiderSetter;
+import io.ltr8.test.data.GetSetClasses.WritableRead;
 import io.ltr8.test.data.GetSetClasses.WritesGrandInherited;
 import io.ltr8.test.data.GetSetClasses.WritesInherited;
 import io.ltr8.test.data.GetSetClasses.WritesInheritedBesideAccessor;
@@ -416,6 +432,173 @@ class GetSetFinderTest {
 		value.name = "anchor";
 		for (StaticPair copy : roundTrips(value)) {
 			assertEquals("anchor", copy.name);
+		}
+	}
+
+	// --- pairs a super class declares
+
+	@Test
+	void aPairASuperClassDeclaresIsAComponent() throws Throwable {
+		DataClassRecord record = record(Named.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		Named value = new Named();
+		value.setName("anchor");
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+		for (Named copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getName());
+		}
+	}
+
+	@Test
+	void aGenericPairASuperClassDeclaresIsAComponentAtTheTypeTheSubclassBinds() throws Throwable {
+		DataClassRecord record = record(TextBox.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		assertEquals(MethodType.methodType(String.class, TextBox.class), record.fields()[0].accessor().type());
+		TextBox value = new TextBox();
+		value.setValue("anchor");
+		for (TextBox copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aGenericPairOfASuperClassExtendedRawIsAtItsErasure() {
+		assertEquals("Unable to find a valid data conversion for class: class java.lang.Object",
+				message(RawBox.class));
+	}
+
+	@Test
+	void aGenericPairIsBoundThroughAGenericClassBetween() throws Throwable {
+		DataClassRecord record = record(TextPassed.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		TextPassed value = new TextPassed();
+		value.setValue("anchor");
+		for (TextPassed copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aGenericListPairASuperClassDeclaresKeepsTheElementTypeTheSubclassBinds() throws Throwable {
+		DataClassRecord record = record(TextList.class);
+		assertEquals(List.of("items:List set"), shape(record));
+		assertEquals(String.class, assertInstanceOf(DataClassArray.class, record.fields()[0].dataClass())
+				.arrayDataClass().typeClass());
+		TextList value = new TextList();
+		value.setItems(List.of("anchor", "chain"));
+		for (TextList copy : roundTrips(value)) {
+			assertEquals(List.of("anchor", "chain"), copy.getItems());
+		}
+	}
+
+	@Test
+	void aSuperClassPairWhoseGetterAloneIsOverriddenIsOneComponentAtTheOverridingType() throws Throwable {
+		DataClassRecord record = record(GetterOverride.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		assertReadThroughMethod(record.fields()[0], "getValue");
+		GetterOverride value = new GetterOverride();
+		value.setValue("anchor");
+		for (GetterOverride copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterPairsWithTheGetterItsSuperClassDeclares() throws Throwable {
+		DataClassRecord record = record(ReadableWritten.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		ReadableWritten value = new ReadableWritten();
+		value.setValue("anchor");
+		for (ReadableWritten copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aGetterPairsWithTheSetterItsSuperClassDeclares() throws Throwable {
+		DataClassRecord record = record(WritableRead.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		WritableRead value = new WritableRead();
+		value.setValue("anchor");
+		for (WritableRead copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterPairsWithAGenericSuperClassGetterAtTheTypeTheSubclassBinds() throws Throwable {
+		DataClassRecord record = record(TextReadableWritten.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		TextReadableWritten value = new TextReadableWritten();
+		value.setValue("anchor");
+		for (TextReadableWritten copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterTakingAnotherTypeThanTheBoundSuperClassGetterPairsWithNoGetter() throws Throwable {
+		DataClassRecord record = record(NumberReadableWritten.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		NumberReadableWritten value = new NumberReadableWritten();
+		value.name = "anchor";
+		value.setValue(3);
+		for (NumberReadableWritten copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertNull(copy.getValue());
+		}
+	}
+
+	@Test
+	void anInheritedPairOverTheSuperConstructorsFieldIsThatConstructorsComponentWrittenThroughTheSetter()
+			throws Throwable {
+		DataClassRecord record = record(InheritsNamedByConstructor.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		InheritsNamedByConstructor written = new InheritsNamedByConstructor("anchor");
+		record.fields()[0].set(written, "buoy");
+		assertEquals("buoy", written.getName());
+		for (InheritsNamedByConstructor copy : roundTrips(new InheritsNamedByConstructor("anchor"))) {
+			assertEquals("anchor", copy.getName());
+		}
+	}
+
+	@Test
+	void anInheritedPairTakingTheNameOfTheConstructorsOwnComponentIsRefused() {
+		assertEquals(RenamedOverPair.class.getName() + " has two components named 'name', one the pair "
+				+ "NamedBase.getName and NamedBase.setName it inherits; @Field on the pair names one apart",
+				message(RenamedOverPair.class));
+	}
+
+	@Test
+	void anInheritedPairTakingTheNameOfAPublicFieldIsRefused() {
+		assertEquals(FieldBesideInheritedPair.class.getName() + " has two components named 'name', one the pair "
+				+ "NamedBase.getName and NamedBase.setName it inherits; @Field on the pair names one apart",
+				message(FieldBesideInheritedPair.class));
+	}
+
+	@Test
+	void anInheritedPairRenamedApartFromTheConstructorsOwnComponentIsAComponentOfItsOwn() throws Throwable {
+		DataClassRecord record = record(RenamedOverAliasedPair.class);
+		assertEquals(List.of("name:String", "alias:String set"), shape(record));
+		RenamedOverAliasedPair value = new RenamedOverAliasedPair("anchor");
+		value.setName("buoy");
+		assertEquals(Map.of("name", "anchor", "alias", "buoy"), new MapMapper(context).toMap(value));
+		for (RenamedOverAliasedPair copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name());
+			assertEquals("buoy", copy.getName());
+		}
+	}
+
+	@Test
+	void aPairOfAnInterfacesDefaultMethodsIsNoComponent() throws Throwable {
+		DataClassRecord record = record(DefaultPair.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		DefaultPair value = new DefaultPair();
+		value.name = "anchor";
+		value.setLabel("kept back");
+		for (DefaultPair copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertNull(copy.getLabel());
 		}
 	}
 
