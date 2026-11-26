@@ -48,6 +48,8 @@ module has a real `module-info.java`; module names mirror each module's root exp
   described at (`TypeArguments`, `DefaultRecordBinder.resolveRecord(context, class, parameterizedType)`), so
   `Namespace<RecordField>` binds `entries` as a map of `RecordField`; a type variable left in place has no
   descriptor, so a raw generic record is still not describable.
+  **It also describes an interface**, as a `DataProtocol` of `DataExchange`s whose requests, responses and errors are
+  its descriptors, so a call arriving as data is dispatched to a method; it knows no schema and carries no transport.
 - **`tson-schema`** — the resolved-schema *value* model — pure records/sealed interfaces/enums, §8's `Top` and its
   bodies, `TsonSchema`; `Top` is sealed all the way down, a schema's value entry arriving as a `ValueEntry` whose value
   binds to the consumer's classes or is held as a tree. One package per namespace its entries are declared in, so a
