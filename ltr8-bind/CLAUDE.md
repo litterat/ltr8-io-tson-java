@@ -12,3 +12,4 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
   unwrapped, however deep the class sits (`RecordRefusalTest`).
 - A bridged class is concrete, declares `ToData<S>` itself and has a public constructor taking exactly `S`
   (`ToDataBridgeTest`).
+- Also describes an interface (`getProtocol`); an exchange's invoker catches and wraps no throwable (`ExchangeHandlerTest`).

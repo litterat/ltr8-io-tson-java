@@ -17,6 +17,7 @@ package io.ltr8.bind;
 
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.bind.analysis.DefaultClassBinder;
+import io.ltr8.bind.analysis.ProtocolBinder;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -39,6 +40,10 @@ public class DataBindContext {
 
 	// Resolved class information
 	private final ConcurrentHashMap<Type, DataClass> descriptors = new ConcurrentHashMap<>();
+
+	private final ConcurrentHashMap<Class<?>, DataProtocol<?>> protocols = new ConcurrentHashMap<>();
+
+	private final ProtocolBinder protocolBinder = new ProtocolBinder();
 
 	/**
 	 * The types this thread is part-way through resolving, for the cycle guard in {@link #getDescriptor}.
@@ -306,6 +311,29 @@ public class DataBindContext {
 
 		DataClass winner = descriptors.putIfAbsent(parameterizedType, resolved);
 		return winner != null ? winner : resolved;
+	}
+
+	/**
+	 * The interface {@code type} described as the exchanges a call arriving as data is dispatched to: its abstract
+	 * instance methods, inherited ones included, other than those with the signature of {@code equals}, {@code
+	 * hashCode} or {@code toString}. Each takes one record or nothing, returns a value this context describes or
+	 * nothing, and declares as errors only classes that implement {@code ToData<S>} with a public constructor
+	 * taking {@code S}. Analysed whole on the first call and cached, so every call for one interface returns the
+	 * same instance; a lost race returns the winner's, as {@link #getDescriptor(Class, Type)} does.
+	 *
+	 * @param type a public interface, in a package its module exports to every module
+	 * @throws DataBindException where {@code type} is not such an interface, or a method of it is not an exchange;
+	 *                           the message names the interface, the method and what is wrong
+	 */
+	@SuppressWarnings("unchecked")
+	public <T> DataProtocol<T> getProtocol(Class<T> type) throws DataBindException {
+		DataProtocol<?> known = protocols.get(Objects.requireNonNull(type, "type"));
+		if (known != null) {
+			return (DataProtocol<T>) known;
+		}
+		DataProtocol<T> built = new DataProtocol<>(type, protocolBinder.resolve(this, type));
+		DataProtocol<?> winner = protocols.putIfAbsent(type, built);
+		return winner != null ? (DataProtocol<T>) winner : built;
 	}
 
 	/**

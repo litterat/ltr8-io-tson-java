@@ -1,6 +1,7 @@
 package io.ltr8.bind;
 
 import java.lang.invoke.MethodHandle;
+import java.lang.reflect.UndeclaredThrowableException;
 
 public class DataClassBridge {
 
@@ -42,6 +43,44 @@ public class DataClassBridge {
      */
     public MethodHandle toData() {
         return toData;
+    }
+
+    /**
+     * {@code object} converted to its data form through {@link #toData()}.
+     *
+     * @param object an instance of the bridged class
+     * @return its data form, an instance of {@link #dataClass()}
+     * @throws ClassCastException           where {@code object} is not an instance of the bridged class
+     * @throws UndeclaredThrowableException carrying a checked throwable the conversion threw; an unchecked one
+     *                                      passes through as itself
+     */
+    public Object toData(Object object) {
+        try {
+            return toData.invoke(object);
+        } catch (RuntimeException | Error e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new UndeclaredThrowableException(e);
+        }
+    }
+
+    /**
+     * {@code data} converted to the bridged class through {@link #toObject()}.
+     *
+     * @param data an instance of {@link #dataClass()}
+     * @return an instance of the bridged class
+     * @throws ClassCastException           where {@code data} is not an instance of {@link #dataClass()}
+     * @throws UndeclaredThrowableException carrying a checked throwable the conversion threw; an unchecked one
+     *                                      passes through as itself
+     */
+    public Object toObject(Object data) {
+        try {
+            return toObject.invoke(data);
+        } catch (RuntimeException | Error e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new UndeclaredThrowableException(e);
+        }
     }
 
     @Override
