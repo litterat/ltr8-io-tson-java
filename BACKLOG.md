@@ -517,11 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **`ArrayMapper` cannot write a class whose field is read through a super-class accessor.** With `Counted extends
-  Named` (`SuperConstructors`), `new ArrayMapper(context).toArray(new Counted("w", 3))` throws
-  `IllegalArgumentException` ("target and test types must match") from `ArrayMapper.createProjectGetters`: the
-  field's `isPresent` handle is typed by the declaring class and is not adapted to the record's. `MapMapper` writes
-  it. Adapt the handle, and round-trip `Counted` and `Sized` through `ArrayMapper` in `SuperConstructorTest`.
 - [ ] **A super constructor's arguments are bound by position, so only leading ones bind.** With `OffsetSuper(String
   extra, String name) { super(name); this.extra = extra; }`, `getDescriptor` throws an unchecked
   `IllegalArgumentException` ("target and filter types do not match"): `ImmutableFinder.identifyArguments` keeps the
