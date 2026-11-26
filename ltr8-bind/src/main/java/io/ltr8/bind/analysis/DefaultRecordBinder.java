@@ -225,12 +225,18 @@ public class DefaultRecordBinder {
 	}
 
 	/**
-	 * A stand-in for {@link MethodHandles#arrayElementGetter}: {@code (Object[], int) -> null}. An
-	 * {@code @Unbound} component reads from nothing, and giving it a source of the same shape means the rest
-	 * of the pipeline -- bridges, {@code Optional} wrapping, primitive boxing -- applies unchanged.
+	 * {@code (Object[], int) -> Object}, where a component's value comes from: the values array, or for a component
+	 * the class owns ({@code @Unbound}) a stand-in of the same shape returning its type's zero, so the rest of the
+	 * pipeline -- bridges, {@code Optional} wrapping, primitive unboxing -- applies unchanged. The zero rather than
+	 * {@code null}, which no primitive can take.
 	 */
-	private static MethodHandle nullSource() {
-		return MethodHandles.dropArguments(MethodHandles.constant(Object.class, null), 0,
+	private static MethodHandle valueSource(ComponentInfo field, FieldBridge bridge, int slot) {
+		if (slot >= 0) {
+			return MethodHandles.arrayElementGetter(Object[].class);
+		}
+		// A bridge converts from its data class, which is never primitive.
+		Class<?> type = bridge != null ? bridge.dataClass() : field.getType();
+		return MethodHandles.dropArguments(MethodHandles.zero(type).asType(MethodType.methodType(Object.class)), 0,
 				Object[].class, int.class);
 	}
 
@@ -281,7 +287,7 @@ public class DefaultRecordBinder {
 		// A component the class marked @Unbound is not on the wire: nothing fills it from a document and
 		// nothing writes it. So the values array a reader fills holds only the bound components, densely --
 		// `slots` maps a component's position to its place in that array, or -1 for one the class owns,
-		// which the constructor supplies as null. Keeping the array dense is what lets fields().length stay
+		// which the constructor supplies as its type's zero. Keeping the array dense is what lets fields().length stay
 		// the only notion of size anyone needs.
 		int[] slots = new int[components.size()];
 		int nextSlot = 0;
@@ -1104,12 +1110,8 @@ public class DefaultRecordBinder {
 
 				int arg = field.getConstructorArgument();
 
-                // (values[],int) -> values[int]
-				// (values[],int) -> values[int], or -> null for a component the class owns (@Unbound).
-				// Substituting the source rather than special-casing downstream keeps every conversion
-				// dataArrayToObject applies -- an Optional component still arrives empty rather than null.
-				MethodHandle arrayGetter = slots[x] < 0 ? nullSource()
-						: MethodHandles.arrayElementGetter(Object[].class);
+				// An Optional component the class owns still arrives empty rather than null.
+				MethodHandle arrayGetter = valueSource(field, bridges[x], slots[x]);
 
 				// () -> inputIndex
 				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));
@@ -1158,9 +1160,7 @@ public class DefaultRecordBinder {
 				// (obj, value):void -> obj.setField( value );
 				MethodHandle fieldSetter = field.getWriteMethod();
 
-				// (value[],x):Object -> value[x], or -> null for a component the class owns (@Unbound).
-				MethodHandle arrayGetter = slots[x] < 0 ? nullSource()
-						: MethodHandles.arrayElementGetter(Object[].class);
+				MethodHandle arrayGetter = valueSource(field, bridges[x], slots[x]);
 
 				// ():int -> inputIndex
 				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));
