@@ -29,10 +29,13 @@ import java.lang.classfile.CodeModel;
 import java.lang.classfile.Instruction;
 import java.lang.classfile.MethodModel;
 import java.lang.classfile.Opcode;
+import java.lang.classfile.TypeKind;
 import java.lang.classfile.instruction.FieldInstruction;
+import java.lang.classfile.instruction.IncrementInstruction;
 import java.lang.classfile.instruction.InvokeInstruction;
 import java.lang.classfile.instruction.LoadInstruction;
 import java.lang.classfile.instruction.ReturnInstruction;
+import java.lang.classfile.instruction.StoreInstruction;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
@@ -357,6 +360,7 @@ public class ImmutableFinder implements ComponentFinder {
             }
         }
         int maxVarLoadSlot = paramCounter;
+        boolean[] assigned = assignedParameters(code, paramClasses);
 
         List<Integer> args = new ArrayList<>();
 
@@ -373,8 +377,15 @@ public class ImmutableFinder implements ComponentFinder {
                     }
                 }
                 if (foundLoadThis[0] && load.slot() > 0 && load.slot() <= maxVarLoadSlot) {
+                    int param = loadIndexToParamMap.get(load.slot());
+                    if (assigned[param]) {
+                        foundLoadThis[0] = false;
+                        foundLoadArg[0] = false;
+                        args.clear();
+                        continue;
+                    }
                     foundLoadArg[0] = true;
-                    args.add(loadIndexToParamMap.get(load.slot()));
+                    args.add(param);
                 }
             } else if (element instanceof FieldInstruction field && field.opcode() == Opcode.PUTFIELD) {
                 if (foundLoadThis[0] && foundLoadArg[0] && args.size() == 1) {
@@ -418,6 +429,40 @@ public class ImmutableFinder implements ComponentFinder {
         }
 
         return stored;
+    }
+
+    /**
+     * A parameter the constructor assigns anywhere is read as its argument nowhere: bytecode order is not execution
+     * order once the code branches, so a load ahead of the assignment is not known to see the argument either.
+     *
+     * @return for each parameter, whether the code stores into or increments one of its local slots
+     */
+    private static boolean[] assignedParameters(CodeModel code, Class<?>[] parameters) {
+        int[] firstSlot = new int[parameters.length + 1];
+        firstSlot[0] = 1;
+        for (int x = 0; x < parameters.length; x++) {
+            firstSlot[x + 1] = firstSlot[x] + TypeKind.from(parameters[x]).slotSize();
+        }
+        boolean[] assigned = new boolean[parameters.length];
+        for (CodeElement element : code) {
+            int slot;
+            int width;
+            if (element instanceof StoreInstruction store) {
+                slot = store.slot();
+                width = store.typeKind().slotSize();
+            } else if (element instanceof IncrementInstruction increment) {
+                slot = increment.slot();
+                width = 1;
+            } else {
+                continue;
+            }
+            for (int x = 0; x < parameters.length; x++) {
+                if (slot < firstSlot[x + 1] && firstSlot[x] < slot + width) {
+                    assigned[x] = true;
+                }
+            }
+        }
+        return assigned;
     }
 
     /**
