@@ -421,8 +421,9 @@ class RecordRefusalTest {
 				+ ".<init>(java.lang.String), which is not a public constructor of its super class";
 	}
 
-	private static String superFieldsUnmatched(Class<?> superClass) {
-		return "Failed to match super fields for class: " + superClass.getName() + ". Add @Field annotations to assist.";
+	private static String superParameterNotStored(Class<?> type, Class<?> superClass, String parameters, int index) {
+		return type.getName() + "'s constructor calls " + superClass.getName() + ".<init>(" + parameters
+				+ "), which does not store its parameter " + index + " unchanged in a field";
 	}
 
 	@Test
@@ -451,10 +452,12 @@ class RecordRefusalTest {
 		DataBindException transforms = refusal(context, RecordRefusals.CallsTransformingSuper.class);
 		DataBindException drops = refusal(context, RecordRefusals.CallsDroppingSuper.class);
 		assertAll(
-				() -> assertEquals(superFieldsUnmatched(RecordRefusals.TransformingSuperBase.class),
-						transforms.getMessage()),
+				() -> assertEquals(superParameterNotStored(RecordRefusals.CallsTransformingSuper.class,
+						RecordRefusals.TransformingSuperBase.class, "java.lang.String", 0), transforms.getMessage()),
 				() -> assertNull(transforms.getCause()),
-				() -> assertEquals(superFieldsUnmatched(RecordRefusals.DroppingSuperBase.class), drops.getMessage()),
+				() -> assertEquals(superParameterNotStored(RecordRefusals.CallsDroppingSuper.class,
+						RecordRefusals.DroppingSuperBase.class, "java.lang.String, java.lang.String", 1),
+						drops.getMessage()),
 				() -> assertNull(drops.getCause()));
 	}
 
@@ -473,7 +476,7 @@ class RecordRefusalTest {
 		assertAll(
 				() -> assertEquals(notPublic, message(RecordRefusals.HoldsCallsProtectedSuper.class)),
 				() -> assertEquals(notPublic, message(RecordRefusals.HoldsReachesProtectedSuper.class)),
-				() -> assertEquals(superFieldsUnmatched(RecordRefusals.TransformingSuperBase.class),
+				() -> assertEquals(message(RecordRefusals.CallsTransformingSuper.class),
 						message(RecordRefusals.HoldsCallsTransformingSuper.class)),
 				() -> assertEquals(message(RecordRefusals.AssignsInheritedField.class),
 						message(RecordRefusals.HoldsAssignsInheritedField.class)));
