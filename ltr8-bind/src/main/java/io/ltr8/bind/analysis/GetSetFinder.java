@@ -39,11 +39,14 @@ public class GetSetFinder implements ComponentFinder {
 
 		Lookup lookup = MethodHandles.publicLookup();
 
-		// Look for public non-transient fields.
+		// A final field has no setter: one the constructor binds is already a component, read through the
+		// accessor ImmutableFinder matched and written through the constructor, and one it does not bind is
+		// no component, since nothing can write it.
 		java.lang.reflect.Field[] classFields = clss.getFields();
 		for (java.lang.reflect.Field classField : classFields) {
 			int modifiers = classField.getModifiers();
-			if (Modifier.isPublic(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)) {
+			if (Modifier.isPublic(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)
+					&& !Modifier.isFinal(modifiers)) {
 
 				ComponentInfo info = new ComponentInfo(classField.getName(), classField.getType());
 
