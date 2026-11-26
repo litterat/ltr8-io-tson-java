@@ -31,13 +31,18 @@ import io.ltr8.test.data.GetSetClasses.FinalFieldWithAccessor;
 import io.ltr8.test.data.GetSetClasses.FinalFieldWithoutAccessor;
 import io.ltr8.test.data.GetSetClasses.FluentSetter;
 import io.ltr8.test.data.GetSetClasses.GetterOverride;
+import io.ltr8.test.data.GetSetClasses.HidesNamedField;
 import io.ltr8.test.data.GetSetClasses.InheritsFluentSetter;
+import io.ltr8.test.data.GetSetClasses.InheritsHiddenField;
+import io.ltr8.test.data.GetSetClasses.InheritsHiddenGenericPair;
+import io.ltr8.test.data.GetSetClasses.InheritsHiddenPair;
 import io.ltr8.test.data.GetSetClasses.InheritsNamedByConstructor;
 import io.ltr8.test.data.GetSetClasses.InlineFinalField;
 import io.ltr8.test.data.GetSetClasses.ListPair;
 import io.ltr8.test.data.GetSetClasses.MutableFieldBoundByConstructor;
 import io.ltr8.test.data.GetSetClasses.MutableFields;
 import io.ltr8.test.data.GetSetClasses.Named;
+import io.ltr8.test.data.GetSetClasses.NamedFieldBase;
 import io.ltr8.test.data.GetSetClasses.NestedArgumentPair;
 import io.ltr8.test.data.GetSetClasses.NumberReadableWritten;
 import io.ltr8.test.data.GetSetClasses.OptionalField;
@@ -76,6 +81,7 @@ import io.ltr8.test.data.GetSetClasses.TwoArgumentSetter;
 import io.ltr8.test.data.GetSetClasses.WiderSetter;
 import io.ltr8.test.data.GetSetClasses.WritableRead;
 import io.ltr8.test.data.GetSetClasses.WritesGrandInherited;
+import io.ltr8.test.data.GetSetClasses.WritesHiddenGetter;
 import io.ltr8.test.data.GetSetClasses.WritesInherited;
 import io.ltr8.test.data.GetSetClasses.WritesInheritedBesideAccessor;
 import org.junit.jupiter.api.Test;
@@ -791,6 +797,95 @@ class GetSetFinderTest {
 		assertTrue(message.startsWith(HiddenWithPublicField.class.getName()
 				+ " is bound through a member that is not accessible: class is not public: "
 				+ HiddenWithPublicField.class.getName() + ".name"), message);
+		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
+		assertTrue(message.endsWith(cause.getMessage()), message);
+	}
+
+	@Test
+	void aPublicFieldASuperClassThatIsNotPublicDeclaresIsReachedThroughTheDescribedClass() throws Throwable {
+		DataClassRecord record = record(InheritsHiddenField.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		InheritsHiddenField written = new InheritsHiddenField();
+		record.fields()[0].set(written, "buoy");
+		assertEquals("buoy", written.name);
+		InheritsHiddenField value = new InheritsHiddenField();
+		value.name = "anchor";
+		for (InheritsHiddenField copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+		}
+	}
+
+	@Test
+	void aPublicFieldAnotherHidesIsReadAndWrittenApartFromIt() throws Throwable {
+		DataClassRecord record = record(HidesNamedField.class);
+		assertEquals(List.of("name:String set", "own:String set"), shape(record));
+		HidesNamedField value = new HidesNamedField();
+		value.name = "own";
+		((NamedFieldBase) value).name = "inherited";
+		assertEquals(Map.of("name", "inherited", "own", "own"), new MapMapper(context).toMap(value));
+		for (HidesNamedField copy : roundTrips(value)) {
+			assertEquals("own", copy.name);
+			assertEquals("inherited", ((NamedFieldBase) copy).name);
+		}
+	}
+
+	@Test
+	void aPairASuperClassThatIsNotPublicDeclaresIsReachedThroughTheDescribedClass() throws Throwable {
+		DataClassRecord record = record(InheritsHiddenPair.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		InheritsHiddenPair value = new InheritsHiddenPair();
+		value.setValue("anchor");
+		for (InheritsHiddenPair copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aGenericPairASuperClassThatIsNotPublicDeclaresIsAtTheTypeTheSubclassBinds() throws Throwable {
+		DataClassRecord record = record(InheritsHiddenGenericPair.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		InheritsHiddenGenericPair value = new InheritsHiddenGenericPair();
+		value.setValue("anchor");
+		for (InheritsHiddenGenericPair copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	@Test
+	void aSetterPairsWithTheGetterASuperClassThatIsNotPublicDeclares() throws Throwable {
+		DataClassRecord record = record(WritesHiddenGetter.class);
+		assertEquals(List.of("value:String set"), shape(record));
+		WritesHiddenGetter value = new WritesHiddenGetter();
+		value.setValue("anchor");
+		for (WritesHiddenGetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getValue());
+		}
+	}
+
+	static class HiddenWithPublicPair {
+
+		private String value;
+
+		@Record
+		public HiddenWithPublicPair() {
+		}
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+	}
+
+	@Test
+	void aPairOfAClassThePublicLookupCannotReachIsRefusedNamingThePairWithTheCauseKept() {
+		DataBindException refused = refusal(HiddenWithPublicPair.class);
+		String message = refused.getMessage();
+		assertTrue(message.startsWith(HiddenWithPublicPair.class.getName()
+				+ " is bound through a member that is not accessible: class is not public: "
+				+ HiddenWithPublicPair.class.getName() + ".getValue"), message);
 		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
 		assertTrue(message.endsWith(cause.getMessage()), message);
 	}

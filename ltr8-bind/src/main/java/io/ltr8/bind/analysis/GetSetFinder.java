@@ -35,7 +35,7 @@ public class GetSetFinder implements ComponentFinder {
 
 	@Override
 	public void findComponents(Class<?> clss, Constructor<?> constructor, List<ComponentInfo> fields)
-			throws SecurityException, CodeAnalysisException {
+			throws CodeAnalysisException {
 
 		List<ComponentInfo> getSetList = new ArrayList<>();
 		Map<ComponentInfo, Member> members = new IdentityHashMap<>();
@@ -59,12 +59,7 @@ public class GetSetFinder implements ComponentFinder {
 					info.setField(fieldAnnotation);
 				}
 
-				try {
-					info.setReadMethod(lookup.unreflectGetter(classField));
-					info.setWriteMethod(lookup.unreflectSetter(classField));
-				} catch (IllegalAccessException e) {
-					throw new SecurityException("Failed to unreflect field", e);
-				}
+				reachField(lookup, clss, classField, info);
 
 				Type returnType = classField.getGenericType();
 				if (returnType instanceof ParameterizedType) {
@@ -137,15 +132,11 @@ public class GetSetFinder implements ComponentFinder {
 				info.setField(setterField);
 			}
 
-			try {
-				MethodHandle read = lookup.unreflect(getter);
-				MethodHandle write = lookup.unreflect(setter);
-				info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
-				// A fluent setter returns its object, or another the old value; either is dropped.
-				info.setWriteMethod(write.asType(MethodType.methodType(void.class, write.type().parameterType(0), erasure)));
-			} catch (IllegalAccessException e) {
-				throw new SecurityException("Failed to unreflect field", e);
-			}
+			MethodHandle read = reachMethod(lookup, clss, getter);
+			MethodHandle write = reachMethod(lookup, clss, setter);
+			info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
+			// A fluent setter returns its object, or another the old value; either is dropped.
+			info.setWriteMethod(write.asType(MethodType.methodType(void.class, write.type().parameterType(0), erasure)));
 
 			if (type instanceof ParameterizedType parameterized) {
 				info.setParamType(parameterized);
@@ -247,6 +238,54 @@ public class GetSetFinder implements ComponentFinder {
 	 * setter, or null for a field.
 	 */
 	private record Member(Class<?> declarer, Method getter, Method setter) {
+	}
+
+	/**
+	 * A public member of a super class that is not public is reached through the described class, as the JVM
+	 * resolves it; unreflected, it is checked against the class declaring it. A field is reached so only where the
+	 * described class resolves its name and type to that field and not to one hiding it.
+	 */
+	private static void reachField(Lookup lookup, Class<?> clss, java.lang.reflect.Field field, ComponentInfo info)
+			throws CodeAnalysisException {
+		try {
+			try {
+				MethodHandle read = lookup.findGetter(clss, field.getName(), field.getType());
+				if (MethodHandles.reflectAs(java.lang.reflect.Field.class, read).equals(field)) {
+					info.setReadMethod(read);
+					info.setWriteMethod(lookup.findSetter(clss, field.getName(), field.getType()));
+					return;
+				}
+			} catch (NoSuchFieldException | IllegalAccessException e) {
+				// Reached from its own class, or not at all, where the refusal names the field.
+			}
+			info.setReadMethod(lookup.unreflectGetter(field));
+			info.setWriteMethod(lookup.unreflectSetter(field));
+		} catch (IllegalAccessException e) {
+			throw notAccessible(clss, e);
+		}
+	}
+
+	/**
+	 * Reached as {@link #reachField} is, and with no check of what the described class resolves: a call dispatches
+	 * to the same override whichever declaration it names.
+	 */
+	private static MethodHandle reachMethod(Lookup lookup, Class<?> clss, Method method) throws CodeAnalysisException {
+		try {
+			try {
+				return lookup.findVirtual(clss, method.getName(),
+						MethodType.methodType(method.getReturnType(), method.getParameterTypes()));
+			} catch (NoSuchMethodException | IllegalAccessException e) {
+				// Reached from its own class, or not at all, where the refusal names the method.
+			}
+			return lookup.unreflect(method);
+		} catch (IllegalAccessException e) {
+			throw notAccessible(clss, e);
+		}
+	}
+
+	private static CodeAnalysisException notAccessible(Class<?> clss, IllegalAccessException e) {
+		return new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: %s",
+				clss.getName(), e.getMessage()), e);
 	}
 
 	private static String wireName(ComponentInfo component) {

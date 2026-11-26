@@ -517,10 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A public field or pair of a super class that is not public throws `SecurityException`.** `GetSetFinder`
-  unreflects a member against its declaring class, so one a public class inherits from a package-private super
-  class cannot be reached through the public lookup, and the failure is rethrown unchecked. Read, not run. Reach the
-  member through the described class, which is how the JVM resolves it, and round-trip such a class.
 - [ ] **A public accessor or public final field of a super class that is not public is refused.** With a public
   class whose constructor-bound field and its accessor sit in a package-private super class
   (`AccessorAnalyses.InheritsHiddenAccessor`, `InheritsHiddenField`), `getDescriptor` refuses the class as "bound

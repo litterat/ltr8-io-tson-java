@@ -546,6 +546,97 @@ public final class GetSetClasses {
 		}
 	}
 
+	// --- members of a super class that is not public
+
+	static class HiddenFieldBase {
+
+		public String name;
+	}
+
+	public static class InheritsHiddenField extends HiddenFieldBase {
+
+		@Record
+		public InheritsHiddenField() {
+		}
+	}
+
+	public static class NamedFieldBase {
+
+		public String name;
+	}
+
+	/** Its public field hides its super class's of the same name and type, and is on the wire as {@code own}. */
+	public static class HidesNamedField extends NamedFieldBase {
+
+		@Field("own")
+		public String name;
+
+		@Record
+		public HidesNamedField() {
+		}
+	}
+
+	static class HiddenPairBase {
+
+		private String value;
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+	}
+
+	public static class InheritsHiddenPair extends HiddenPairBase {
+
+		@Record
+		public InheritsHiddenPair() {
+		}
+	}
+
+	static class HiddenGenericPairBase<T> {
+
+		private T value;
+
+		public T getValue() {
+			return value;
+		}
+
+		public void setValue(T value) {
+			this.value = value;
+		}
+	}
+
+	public static class InheritsHiddenGenericPair extends HiddenGenericPairBase<String> {
+
+		@Record
+		public InheritsHiddenGenericPair() {
+		}
+	}
+
+	static class HiddenGetterBase {
+
+		protected String value;
+
+		public String getValue() {
+			return value;
+		}
+	}
+
+	/** Its setter pairs with the getter a super class that is not public declares. */
+	public static class WritesHiddenGetter extends HiddenGetterBase {
+
+		@Record
+		public WritesHiddenGetter() {
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+	}
+
 	// --- which setter pairs with a getter
 
 	/** Its {@code int} setter stores the number's text, so a pair through either setter round-trips. */
