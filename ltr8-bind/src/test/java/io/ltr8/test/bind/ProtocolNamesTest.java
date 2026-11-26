@@ -24,6 +24,7 @@ import io.ltr8.test.data.Protocols.OrderRef;
 import io.ltr8.test.data.Protocols.Orders;
 import io.ltr8.test.data.Protocols.Snake;
 import io.ltr8.test.data.Protocols.SnakeService;
+import io.ltr8.test.data.Protocols.Underscored;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -90,6 +91,16 @@ class ProtocolNamesTest {
 		assertTrue(orders.exchange("_place_order").isEmpty(), "the leading _ upper-cases the p");
 		assertSame(orders.exchange("placeOrder").orElseThrow(), orders.exchange("place__order").orElseThrow());
 		assertSame(orders.exchange("placeOrder").orElseThrow(), orders.exchange("placeOrder_").orElseThrow());
+	}
+
+	@Test
+	void aLeadingOrTrailingUnderscoreInAMethodNameIsReadAsAnyOther() throws DataBindException {
+		DataProtocol<Underscored> underscored = context.getProtocol(Underscored.class);
+
+		assertEquals(List.of("_lead", "trail_"), underscored.exchanges().stream().map(DataExchange::name).toList());
+		assertSame(underscored.exchange("_lead").orElseThrow(), underscored.exchange("Lead").orElseThrow());
+		assertSame(underscored.exchange("trail_").orElseThrow(), underscored.exchange("trail").orElseThrow());
+		assertTrue(underscored.exchange("lead").isEmpty());
 	}
 
 	@Test

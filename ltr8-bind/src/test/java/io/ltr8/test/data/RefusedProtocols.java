@@ -221,6 +221,12 @@ public final class RefusedProtocols {
 		Order getOrder(OrderRef request) throws IOException;
 	}
 
+	/** Inherits {@code close() throws Exception}, a class no author can make a bridge. */
+	public interface InheritsClose extends AutoCloseable {
+
+		Order getOrder(OrderRef request);
+	}
+
 	public static class ProblemException extends Exception implements ToData<Problem> {
 
 		private final Problem problem;

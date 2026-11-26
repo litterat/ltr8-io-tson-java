@@ -65,7 +65,9 @@ public final class DataProtocol<T> {
 	/**
 	 * The exchange whose name is one with {@code name} once each {@code _} is removed and the character after it
 	 * upper-cased: {@code place_order} and {@code placeOrder} both find a method spelt either way, and {@code
-	 * PlaceOrder} finds neither.
+	 * PlaceOrder} finds neither. Every {@code _} is read so wherever it sits: a doubled or trailing one changes no
+	 * more than one does, and a leading one upper-cases the first character, so {@code Lead} finds a method named
+	 * {@code _lead}.
 	 *
 	 * @param name a name as the data spells it, not {@code null}
 	 * @return the exchange, or empty where the protocol has none of that name

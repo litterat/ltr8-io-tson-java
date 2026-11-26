@@ -196,6 +196,27 @@ public final class Protocols {
 	public interface FromGeneric extends Generic<Order> {
 	}
 
+	public interface Store<T, R> {
+
+		T fetch(R request);
+	}
+
+	/** Redeclares the generic method with its types fixed. */
+	public interface OrderStore extends Store<Order, OrderRef> {
+
+		@Override
+		Order fetch(OrderRef request);
+	}
+
+	/** Redeclares {@code close} without the {@code throws Exception} it inherits. */
+	public interface Closes extends AutoCloseable {
+
+		@Override
+		void close();
+
+		Order getOrder(OrderRef request);
+	}
+
 	public sealed interface Sealed permits SealedService {
 
 		Order getOrder(OrderRef request);
@@ -248,6 +269,14 @@ public final class Protocols {
 		public Order placeOrder(NewOrder request) {
 			return new Order("camel " + request.sku(), request.quantity());
 		}
+	}
+
+	/** Names a {@code _} leads or trails. */
+	public interface Underscored {
+
+		Order _lead(OrderRef request);
+
+		Order trail_(OrderRef request);
 	}
 
 	/** What a {@code Trigger}'s {@code what} asks {@link Thrower} to throw. */

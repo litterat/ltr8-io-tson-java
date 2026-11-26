@@ -216,8 +216,7 @@ public final class ProtocolBinder {
 			}
 			if (!ToData.class.isAssignableFrom(thrown)) {
 				throw new DataBindException(String.format(
-						"%s throws %s, which does not implement ToData: a declared error bridges to its record, "
-								+ "so declare implements ToData<S> on %2$s with a public constructor taking S",
+						"%s throws %s, which does not implement ToData: a declared error bridges to its record",
 						at, thrown.getName()));
 			}
 			for (Class<?> other : declared) {

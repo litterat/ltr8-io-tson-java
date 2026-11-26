@@ -28,6 +28,7 @@ import io.ltr8.test.data.RefusedProtocols.Collides;
 import io.ltr8.test.data.RefusedProtocols.CollidesInherited;
 import io.ltr8.test.data.RefusedProtocols.Crud;
 import io.ltr8.test.data.RefusedProtocols.InheritedProblemException;
+import io.ltr8.test.data.RefusedProtocols.InheritsClose;
 import io.ltr8.test.data.RefusedProtocols.Inherited;
 import io.ltr8.test.data.RefusedProtocols.InheritsOneReturnTwice;
 import io.ltr8.test.data.RefusedProtocols.InheritsTwoReturns;
@@ -284,7 +285,14 @@ class ProtocolRefusalTest {
 				"throws " + IllegalArgumentException.class.getName(), "does not implement ToData");
 	}
 
-	/** Pending the {@code resolveRecord} fix: until then the reason reads "Failed to resolve". */
+	@Test
+	void anInheritedThrowsClauseIsRefusedWithoutAdviceToChangeTheThrownClass() {
+		String message = refusal(InheritsClose.class);
+		assertNames(message, InheritsClose.class.getName() + ".close", "throws java.lang.Exception",
+				"does not implement ToData");
+		assertFalse(message.contains("declare implements"), message);
+	}
+
 	@Test
 	void aThrowsTypeInheritingToDataIsRefusedWithTheBridgesReason() {
 		DataBindException thrown = refused(ThrowsInheritingToData.class);
@@ -294,7 +302,6 @@ class ProtocolRefusalTest {
 		assertCauseIsTheDescriptorsRefusal(thrown, InheritedProblemException.class);
 	}
 
-	/** Pending the {@code resolveRecord} fix: until then the reason reads "Failed to resolve". */
 	@Test
 	void aThrowsTypeWithoutAConstructorTakingItsRecordIsRefusedWithTheBridgesReason() {
 		DataBindException thrown = refused(ThrowsWithoutConstructor.class);

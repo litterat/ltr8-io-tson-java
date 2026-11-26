@@ -26,6 +26,7 @@ import io.ltr8.bind.DataExchange;
 import io.ltr8.bind.DataProtocol;
 import io.ltr8.test.data.Protocols.Base;
 import io.ltr8.test.data.Protocols.Catalogue;
+import io.ltr8.test.data.Protocols.Closes;
 import io.ltr8.test.data.Protocols.Empty;
 import io.ltr8.test.data.Protocols.FromGeneric;
 import io.ltr8.test.data.Protocols.NewOrder;
@@ -35,6 +36,7 @@ import io.ltr8.test.data.Protocols.OrderNotFound;
 import io.ltr8.test.data.Protocols.OrderNotFoundException;
 import io.ltr8.test.data.Protocols.OrderPage;
 import io.ltr8.test.data.Protocols.OrderRef;
+import io.ltr8.test.data.Protocols.OrderStore;
 import io.ltr8.test.data.Protocols.Orders;
 import io.ltr8.test.data.Protocols.OverPackagePrivate;
 import io.ltr8.test.data.Protocols.OverPackagePrivateService;
@@ -197,6 +199,25 @@ class ProtocolExchangesTest {
 		DataBindException thrown = assertThrows(DataBindException.class, () -> context.getProtocol(Base.class));
 		assertTrue(thrown.getMessage().contains(Base.class.getName() + ".get's response java.lang.Object"),
 				thrown.getMessage());
+	}
+
+	@Test
+	void aGenericMethodRedeclaredWithItsTypesFixedIsOneExchangeTheRedeclaration() throws Throwable {
+		DataProtocol<OrderStore> protocol = context.getProtocol(OrderStore.class);
+		assertEquals(List.of("fetch"), names(protocol));
+
+		DataExchange fetch = protocol.exchanges().get(0);
+		assertSame(context.getDescriptor(OrderRef.class), fetch.request().orElseThrow());
+		assertSame(context.getDescriptor(Order.class), fetch.response().orElseThrow());
+
+		OrderStore store = request -> new Order("stored " + request.id(), 1);
+		assertEquals(new Order("stored 4", 1), protocol.handler(store).handle(fetch, new OrderRef("4")));
+	}
+
+	@Test
+	void aRedeclarationWithoutTheInheritedThrowsClauseDeclaresNoErrors() throws DataBindException {
+		assertEquals(List.of("close", "getOrder"), names(context.getProtocol(Closes.class)));
+		assertEquals(List.of(), exchange(Closes.class, "close").errors());
 	}
 
 	@Test
