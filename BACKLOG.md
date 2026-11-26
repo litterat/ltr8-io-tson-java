@@ -519,10 +519,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 Where an entry says "not run", reproduce it first; one that does not reproduce comes out.
 
-- [ ] **A `this(…)` delegating constructor is refused, with advice that does not help.** `@Record Delegates(String
-  a, Integer b) { this(b, a); }` is refused with "Failed to match immutable fields … Add @Field annotations to
-  assist". Follow the delegate call as `ImmutableFinder` follows a `super(…)` call, or state the fact in the
-  refusal; pin which, with a round trip where it is accepted.
 - [ ] **Accessors are matched by bare field name across the class hierarchy.** Not run. A super class and a
   subclass each declaring a private field of one name could pair a component with the other's accessor
   (`ImmutableFinder.examineAccessor`). Match an accessor to the field of the class that declares both, with a

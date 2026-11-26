@@ -22,7 +22,15 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.analysis.CodeAnalysisException;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
+import io.ltr8.test.data.ConstructorAnalyses.DelegateRepeats;
+import io.ltr8.test.data.ConstructorAnalyses.Delegates;
+import io.ltr8.test.data.ConstructorAnalyses.DelegatesConstant;
+import io.ltr8.test.data.ConstructorAnalyses.DelegatesToSuper;
+import io.ltr8.test.data.ConstructorAnalyses.DelegatesToTransforming;
+import io.ltr8.test.data.ConstructorAnalyses.DelegatesTwice;
+import io.ltr8.test.data.ConstructorAnalyses.DelegatesWide;
 import io.ltr8.test.data.ConstructorAnalyses.Increments;
+import io.ltr8.test.data.ConstructorAnalyses.NamedDelegatesConstant;
 import io.ltr8.test.data.ConstructorAnalyses.NamedReassigns;
 import io.ltr8.test.data.ConstructorAnalyses.NamedReassignsBeforeStore;
 import io.ltr8.test.data.ConstructorAnalyses.NamedReassignsOne;
@@ -33,6 +41,8 @@ import io.ltr8.test.data.ConstructorAnalyses.ReassignsAndDrops;
 import io.ltr8.test.data.ConstructorAnalyses.ReassignsBeforeStore;
 import io.ltr8.test.data.ConstructorAnalyses.ReassignsOne;
 import io.ltr8.test.data.ConstructorAnalyses.ReassignsWide;
+import io.ltr8.test.data.ConstructorAnalyses.StoresRepeated;
+import io.ltr8.test.data.ConstructorAnalyses.SuperRepeats;
 import io.ltr8.test.data.ConstructorAnalyses.TrimmingBase;
 import org.junit.jupiter.api.Test;
 
@@ -101,6 +111,87 @@ class ConstructorAnalysisTest {
 		List<Object> padded = List.of(new NamedReassigns(" x "), new NamedReassignsBeforeStore(" x "),
 				new NamedReassignsOne(" x ", 2));
 		roundTrips(padded, trimmed);
+	}
+
+	// --- a constructor that delegates with this(…)
+
+	@Test
+	void aDelegateCallPassingOnlyOwnParametersBindsEachToTheFieldItsDelegateStores() {
+		assertAll(
+				() -> assertEquals(List.of("a:String", "b:Integer"), fields(Delegates.class)),
+				() -> assertEquals(List.of("x", 2), values(Delegates.class, new Delegates("x", 2))),
+				() -> assertEquals(List.of("name:String", "size:long", "ratio:double"), fields(DelegatesWide.class)),
+				() -> assertEquals(List.of("bin", 7_000_000_000L, 0.5),
+						values(DelegatesWide.class, new DelegatesWide(0.5, 7_000_000_000L, "bin"))));
+	}
+
+	@Test
+	void aDelegateThatCallsSuperBindsTheSuperFieldsFirst() {
+		assertAll(
+				() -> assertEquals(List.of("name:String", "count:int"), fields(DelegatesToSuper.class)),
+				() -> assertEquals(List.of("rug", 3), values(DelegatesToSuper.class, new DelegatesToSuper(3, "rug"))));
+	}
+
+	/** A component takes the type of the designated constructor's parameter, not the delegate's. */
+	@Test
+	void aDelegateTwoDeepBindsTheDesignatedConstructorParameterTypes() {
+		assertAll(
+				() -> assertEquals(List.of("a:String", "b:Integer"), fields(DelegatesTwice.class)),
+				() -> assertEquals(List.of("x", 2), values(DelegatesTwice.class, new DelegatesTwice("x", 2))));
+	}
+
+	@Test
+	void everyFieldHandleOfADelegatingClassTakesThatClass() {
+		assertAll(Stream.of(Delegates.class, DelegatesToSuper.class, DelegatesTwice.class).map(type -> () -> {
+			DataClassRecord record = assertInstanceOf(DataClassRecord.class, context.getDescriptor(type));
+			for (DataClassField field : record.fields()) {
+				assertEquals(type, field.accessor().type().parameterType(0), field.name() + " accessor");
+				assertEquals(type, field.isPresent().type().parameterType(0), field.name() + " isPresent");
+			}
+		}));
+	}
+
+	@Test
+	void aDelegateCallPassingAConstantBindsNothing() {
+		CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
+				() -> context.getDescriptor(DelegatesConstant.class));
+		assertEquals(unmatched(DelegatesConstant.class), refused.getMessage());
+		assertNull(refused.getCause());
+		assertAll(
+				() -> assertEquals(List.of("name:String"), fields(NamedDelegatesConstant.class)),
+				() -> assertEquals(List.of("x"),
+						values(NamedDelegatesConstant.class, new NamedDelegatesConstant("x"))));
+	}
+
+	@Test
+	void aDelegateThatDoesNotStoreAnArgumentItIsPassedIsRefusedNamingTheCall() {
+		CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
+				() -> context.getDescriptor(DelegatesToTransforming.class));
+		String name = DelegatesToTransforming.class.getName();
+		assertEquals(name + "'s constructor calls " + name + ".<init>(java.lang.CharSequence), which does not store "
+				+ "its parameter 0 unchanged in a field", refused.getMessage());
+		assertNull(refused.getCause());
+	}
+
+	@Test
+	void aDelegatingClassRoundTrips() {
+		List<Object> values = List.of(new Delegates("x", 2), new Delegates(null, null),
+				new DelegatesWide(0.5, 7_000_000_000L, "bin"), new DelegatesToSuper(3, "rug"),
+				new DelegatesTwice("x", 2), new NamedDelegatesConstant("x"));
+		roundTrips(values, values);
+	}
+
+	// --- each parameter reaches exactly one field
+
+	@Test
+	void aParameterStoredInTwoFieldsIsRefusedNamingTheParameter() {
+		assertAll(Stream.of(SuperRepeats.class, DelegateRepeats.class, StoresRepeated.class).map(type -> () -> {
+			CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
+					() -> context.getDescriptor(type), type.getName());
+			assertEquals(type.getName() + "'s constructor stores its parameter 0 in more than one field",
+					refused.getMessage());
+			assertNull(refused.getCause());
+		}));
 	}
 
 	// --- helpers

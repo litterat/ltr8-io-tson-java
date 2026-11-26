@@ -251,4 +251,312 @@ public final class ConstructorAnalyses {
 			super(name);
 		}
 	}
+
+	// --- a constructor that delegates to another of its class with this(…)
+
+	public static class Delegates {
+
+		private final String a;
+
+		private final Integer b;
+
+		@Record
+		public Delegates(String a, Integer b) {
+			this(b, a);
+		}
+
+		private Delegates(Integer b, String a) {
+			this.a = a;
+			this.b = b;
+		}
+
+		public String a() {
+			return a;
+		}
+
+		public Integer b() {
+			return b;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof Delegates other && Objects.equals(a, other.a) && Objects.equals(b, other.b);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(a, b);
+		}
+	}
+
+	/** Reorders arguments of different widths into a public delegate. */
+	public static class DelegatesWide {
+
+		private final String name;
+
+		private final long size;
+
+		private final double ratio;
+
+		@Record
+		public DelegatesWide(double ratio, long size, String name) {
+			this(name, size, ratio);
+		}
+
+		public DelegatesWide(String name, long size, double ratio) {
+			this.name = name;
+			this.size = size;
+			this.ratio = ratio;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		public long size() {
+			return size;
+		}
+
+		public double ratio() {
+			return ratio;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof DelegatesWide other && Objects.equals(name, other.name) && size == other.size
+					&& ratio == other.ratio;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, size, ratio);
+		}
+	}
+
+	/** Its delegate stores its own field and passes the other up to the super constructor. */
+	public static class DelegatesToSuper extends Named {
+
+		private final int count;
+
+		@Record
+		public DelegatesToSuper(int count, String name) {
+			this(name, count);
+		}
+
+		private DelegatesToSuper(String name, int count) {
+			super(name);
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj) && count == ((DelegatesToSuper) obj).count;
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * super.hashCode() + count;
+		}
+	}
+
+	/** Two delegates deep, the last storing a wider type than the parameter. */
+	public static class DelegatesTwice {
+
+		private final CharSequence a;
+
+		private final Integer b;
+
+		@Record
+		public DelegatesTwice(String a, Integer b) {
+			this(b, a);
+		}
+
+		private DelegatesTwice(Integer b, String a) {
+			this(b, (CharSequence) a);
+		}
+
+		private DelegatesTwice(Integer b, CharSequence a) {
+			this.a = a;
+			this.b = b;
+		}
+
+		public CharSequence a() {
+			return a;
+		}
+
+		public Integer b() {
+			return b;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof DelegatesTwice other && Objects.equals(a, other.a) && Objects.equals(b, other.b);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(a, b);
+		}
+	}
+
+	public static class DelegatesConstant {
+
+		private final String name;
+
+		private final int count;
+
+		@Record
+		public DelegatesConstant(String name) {
+			this(name, 0);
+		}
+
+		private DelegatesConstant(String name, int count) {
+			this.name = name;
+			this.count = count;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		public int count() {
+			return count;
+		}
+	}
+
+	public static class NamedDelegatesConstant {
+
+		private final String name;
+
+		private final int count;
+
+		@Record
+		public NamedDelegatesConstant(@Field("name") String name) {
+			this(name, 0);
+		}
+
+		private NamedDelegatesConstant(String name, int count) {
+			this.name = name;
+			this.count = count;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof NamedDelegatesConstant other && Objects.equals(name, other.name)
+					&& count == other.count;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, count);
+		}
+	}
+
+	/** Its delegate stores the argument it is passed only after changing it. */
+	public static class DelegatesToTransforming {
+
+		private final String name;
+
+		@Record
+		public DelegatesToTransforming(String name) {
+			this((CharSequence) name);
+		}
+
+		private DelegatesToTransforming(CharSequence name) {
+			this.name = name.toString().trim();
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	// --- a call passing one parameter as two arguments, so another parameter is never bound
+
+	public static class PairBase {
+
+		private final String first;
+
+		private final String second;
+
+		public PairBase(String first, String second) {
+			this.first = first;
+			this.second = second;
+		}
+
+		public String first() {
+			return first;
+		}
+
+		public String second() {
+			return second;
+		}
+	}
+
+	public static class SuperRepeats extends PairBase {
+
+		@Record
+		public SuperRepeats(String first, String ignored) {
+			super(first, first);
+		}
+	}
+
+	public static class DelegateRepeats {
+
+		private final CharSequence first;
+
+		private final CharSequence second;
+
+		@Record
+		public DelegateRepeats(String first, String ignored) {
+			this(first, (CharSequence) first);
+		}
+
+		private DelegateRepeats(CharSequence first, CharSequence second) {
+			this.first = first;
+			this.second = second;
+		}
+
+		public CharSequence first() {
+			return first;
+		}
+
+		public CharSequence second() {
+			return second;
+		}
+	}
+
+	/** Stores one parameter in two fields and the other in none. */
+	public static class StoresRepeated {
+
+		private final String first;
+
+		private final String second;
+
+		@Record
+		public StoresRepeated(String first, String ignored) {
+			this.first = first;
+			this.second = first;
+		}
+
+		public String first() {
+			return first;
+		}
+
+		public String second() {
+			return second;
+		}
+	}
 }
