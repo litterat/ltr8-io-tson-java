@@ -324,4 +324,129 @@ public final class RecordRefusals {
 	/** Good on its own terms, but reaches the refused {@link CycleTop}. */
 	public record CycleMember(String tag, Optional<CycleTop> top) {
 	}
+
+	// --- refused over the super class constructor a hand-written immutable class calls
+
+	public static class ProtectedSuperBase {
+
+		private final String name;
+
+		protected ProtectedSuperBase(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	public static class CallsProtectedSuper extends ProtectedSuperBase {
+
+		@Record
+		public CallsProtectedSuper(String name) {
+			super(name);
+		}
+	}
+
+	public static class PackagePrivateSuperBase {
+
+		private final String name;
+
+		PackagePrivateSuperBase(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	public static class CallsPackagePrivateSuper extends PackagePrivateSuperBase {
+
+		@Record
+		public CallsPackagePrivateSuper(String name) {
+			super(name);
+		}
+	}
+
+	/** Its own super constructor is public; the one beneath that is not. */
+	public static class ReachesProtectedSuper extends CallsProtectedSuper {
+
+		@Record
+		public ReachesProtectedSuper(String name) {
+			super(name);
+		}
+	}
+
+	public static class TransformingSuperBase {
+
+		private final String name;
+
+		public TransformingSuperBase(String name) {
+			this.name = name.trim();
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	public static class CallsTransformingSuper extends TransformingSuperBase {
+
+		@Record
+		public CallsTransformingSuper(String name) {
+			super(name);
+		}
+	}
+
+	public static class DroppingSuperBase {
+
+		private final String name;
+
+		public DroppingSuperBase(String name, String ignored) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	public static class CallsDroppingSuper extends DroppingSuperBase {
+
+		@Record
+		public CallsDroppingSuper(String name, String ignored) {
+			super(name, ignored);
+		}
+	}
+
+	public static class InheritedFieldBase {
+
+		protected String name;
+
+		public String name() {
+			return name;
+		}
+	}
+
+	/** Assigns a field its super class declares, so the field is not among its own. */
+	public static class AssignsInheritedField extends InheritedFieldBase {
+
+		@Record
+		public AssignsInheritedField(String name) {
+			this.name = name;
+		}
+	}
+
+	public record HoldsCallsProtectedSuper(String name, CallsProtectedSuper value) {
+	}
+
+	public record HoldsCallsTransformingSuper(String name, CallsTransformingSuper value) {
+	}
+
+	public record HoldsAssignsInheritedField(String name, AssignsInheritedField value) {
+	}
+
+	public record HoldsReachesProtectedSuper(String name, List<ReachesProtectedSuper> values) {
+	}
 }

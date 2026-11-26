@@ -41,9 +41,11 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Matches up the arguments of a hand-written immutable class's constructor with its accessors --
@@ -84,7 +86,10 @@ public class ImmutableFinder implements ComponentFinder {
             for (MethodModel method : classModel.methods()) {
                 if (method.methodName().stringValue().equals("<init>")
                         && method.methodType().stringValue().equals(constructorDescriptor)) {
-                    method.code().ifPresent(code -> identifyArguments(constructor, immutableFields, code));
+                    CodeModel code = method.code().orElse(null);
+                    if (code != null) {
+                        identifyArguments(constructor, immutableFields, code);
+                    }
                     break;
                 }
             }
@@ -287,8 +292,10 @@ public class ImmutableFinder implements ComponentFinder {
                 info.setUnion(union);
             }
 
-        } catch (NoSuchFieldException | SecurityException e1) {
-            throw new RuntimeException("unexepected exception", e1);
+        } catch (NoSuchFieldException e) {
+            throw new CodeAnalysisException(String.format(
+                    "%s's constructor assigns field '%s', which the class does not declare",
+                    clss.getName(), fieldName), e);
         }
     }
 
@@ -307,7 +314,8 @@ public class ImmutableFinder implements ComponentFinder {
      * little more complex to work out: the super class's constructor is analysed and matched with
      * the parameters it's called with, recursively.
      */
-    private int identifyArguments(Constructor<?> constructor, List<ComponentInfo> fields, CodeModel code) {
+    private int identifyArguments(Constructor<?> constructor, List<ComponentInfo> fields, CodeModel code)
+            throws CodeAnalysisException {
         boolean[] foundLoadThis = {false};
         boolean[] foundLoadArg = {false};
         int[] argsFound = {0};
@@ -357,11 +365,7 @@ public class ImmutableFinder implements ComponentFinder {
                         component.setParamType(pt);
                     }
 
-                    try {
-                        checkFieldAnnotation(component, constructor.getDeclaringClass(), field.name().stringValue());
-                    } catch (CodeAnalysisException e) {
-                        throw new RuntimeException(e);
-                    }
+                    checkFieldAnnotation(component, constructor.getDeclaringClass(), field.name().stringValue());
 
                     fields.add(component);
                     argsFound[0]++;
@@ -383,31 +387,37 @@ public class ImmutableFinder implements ComponentFinder {
                         superInitArgs[x] = constructor.getParameters()[arg].getType();
                     }
 
+                    Constructor<?> superConstructor;
                     try {
-                        Constructor<?> superConstructor = superClass.getConstructor(superInitArgs);
-                        String superDescriptor = MethodType
-                                .methodType(void.class, superConstructor.getParameterTypes()).descriptorString();
-
-                        int superArgsFound = 0;
-                        for (MethodModel superMethod : superClassModel.methods()) {
-                            if (superMethod.methodName().stringValue().equals("<init>")
-                                    && superMethod.methodType().stringValue().equals(superDescriptor)) {
-                                var superCode = superMethod.code().orElseThrow();
-                                superArgsFound = identifyArguments(superConstructor, superFields, superCode);
-                                break;
-                            }
-                        }
-
-                        if (superArgsFound != args.size()) {
-                            throw new CodeAnalysisException(String.format(
-                                    "Failed to match super fields for class: %s. Add @Field annotations to assist.",
-                                    superClass.getName()));
-                        }
-
-                        fields.addAll(superFields);
-                    } catch (NoSuchMethodException | CodeAnalysisException e) {
-                        throw new RuntimeException(e);
+                        superConstructor = superClass.getConstructor(superInitArgs);
+                    } catch (NoSuchMethodException e) {
+                        throw new CodeAnalysisException(String.format(
+                                "%s's constructor calls %s.<init>(%s), which is not a public constructor of its "
+                                        + "super class",
+                                constructor.getDeclaringClass().getName(), superClass.getName(),
+                                Arrays.stream(superInitArgs).map(Class::getTypeName).collect(Collectors.joining(", "))),
+                                e);
                     }
+                    String superDescriptor = MethodType
+                            .methodType(void.class, superConstructor.getParameterTypes()).descriptorString();
+
+                    int superArgsFound = 0;
+                    for (MethodModel superMethod : superClassModel.methods()) {
+                        if (superMethod.methodName().stringValue().equals("<init>")
+                                && superMethod.methodType().stringValue().equals(superDescriptor)) {
+                            var superCode = superMethod.code().orElseThrow();
+                            superArgsFound = identifyArguments(superConstructor, superFields, superCode);
+                            break;
+                        }
+                    }
+
+                    if (superArgsFound != args.size()) {
+                        throw new CodeAnalysisException(String.format(
+                                "Failed to match super fields for class: %s. Add @Field annotations to assist.",
+                                superClass.getName()));
+                    }
+
+                    fields.addAll(superFields);
                 }
                 foundLoadThis[0] = false;
                 foundLoadArg[0] = false;

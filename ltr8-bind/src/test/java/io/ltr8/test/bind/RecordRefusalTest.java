@@ -22,6 +22,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.test.data.RecordRefusals;
 import io.ltr8.test.data.RecordRefusals.BridgeConstructorThrows;
 import io.ltr8.test.data.RecordRefusals.BridgeNeedsArgument;
 import io.ltr8.test.data.RecordRefusals.BridgeObjectMismatch;
@@ -71,9 +72,11 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -402,6 +405,99 @@ class RecordRefusalTest {
 		DataBindContext fresh = DataBindContext.builder().build();
 		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleMember.class));
 		assertEquals(PROTECTED_CONSTRUCTOR, message(fresh, CycleTop.class));
+	}
+
+	// --- refused over the super class constructor a hand-written immutable class calls
+
+	private static final List<Class<?>> SUPER_REFUSALS = List.of(RecordRefusals.CallsProtectedSuper.class,
+			RecordRefusals.CallsPackagePrivateSuper.class, RecordRefusals.ReachesProtectedSuper.class,
+			RecordRefusals.CallsTransformingSuper.class, RecordRefusals.CallsDroppingSuper.class,
+			RecordRefusals.AssignsInheritedField.class, RecordRefusals.HoldsCallsProtectedSuper.class,
+			RecordRefusals.HoldsReachesProtectedSuper.class, RecordRefusals.HoldsCallsTransformingSuper.class,
+			RecordRefusals.HoldsAssignsInheritedField.class);
+
+	private static String superNotPublic(Class<?> type, Class<?> superClass) {
+		return type.getName() + "'s constructor calls " + superClass.getName()
+				+ ".<init>(java.lang.String), which is not a public constructor of its super class";
+	}
+
+	private static String superFieldsUnmatched(Class<?> superClass) {
+		return "Failed to match super fields for class: " + superClass.getName() + ". Add @Field annotations to assist.";
+	}
+
+	@Test
+	void aNonPublicSuperConstructorIsRefusedNamingTheClassTheSuperClassAndTheConstructorWithTheCauseKept() {
+		assertAll(
+				() -> assertSuperNotPublic(RecordRefusals.CallsProtectedSuper.class,
+						RecordRefusals.ProtectedSuperBase.class),
+				() -> assertSuperNotPublic(RecordRefusals.CallsPackagePrivateSuper.class,
+						RecordRefusals.PackagePrivateSuperBase.class));
+	}
+
+	private void assertSuperNotPublic(Class<?> type, Class<?> superClass) {
+		DataBindException refused = refusal(context, type);
+		assertEquals(superNotPublic(type, superClass), refused.getMessage());
+		assertInstanceOf(NoSuchMethodException.class, refused.getCause());
+	}
+
+	@Test
+	void aNonPublicSuperConstructorBeneathAPublicOneIsRefusedNamingTheClassThatCallsIt() {
+		assertEquals(superNotPublic(RecordRefusals.CallsProtectedSuper.class, RecordRefusals.ProtectedSuperBase.class),
+				message(RecordRefusals.ReachesProtectedSuper.class));
+	}
+
+	@Test
+	void aSuperConstructorThatTransformsOrDropsAnArgumentIsRefusedAsItself() {
+		DataBindException transforms = refusal(context, RecordRefusals.CallsTransformingSuper.class);
+		DataBindException drops = refusal(context, RecordRefusals.CallsDroppingSuper.class);
+		assertAll(
+				() -> assertEquals(superFieldsUnmatched(RecordRefusals.TransformingSuperBase.class),
+						transforms.getMessage()),
+				() -> assertNull(transforms.getCause()),
+				() -> assertEquals(superFieldsUnmatched(RecordRefusals.DroppingSuperBase.class), drops.getMessage()),
+				() -> assertNull(drops.getCause()));
+	}
+
+	@Test
+	void aConstructorAssigningAnInheritedFieldIsRefusedNamingTheClassAndFieldWithTheCauseKept() {
+		DataBindException refused = refusal(context, RecordRefusals.AssignsInheritedField.class);
+		assertEquals(RecordRefusals.AssignsInheritedField.class.getName() + "'s constructor assigns field 'name', "
+				+ "which the class does not declare", refused.getMessage());
+		assertInstanceOf(NoSuchFieldException.class, refused.getCause());
+	}
+
+	@Test
+	void aSuperConstructorRefusalHeldAsAFieldIsTheMessage() {
+		String notPublic = superNotPublic(RecordRefusals.CallsProtectedSuper.class,
+				RecordRefusals.ProtectedSuperBase.class);
+		assertAll(
+				() -> assertEquals(notPublic, message(RecordRefusals.HoldsCallsProtectedSuper.class)),
+				() -> assertEquals(notPublic, message(RecordRefusals.HoldsReachesProtectedSuper.class)),
+				() -> assertEquals(superFieldsUnmatched(RecordRefusals.TransformingSuperBase.class),
+						message(RecordRefusals.HoldsCallsTransformingSuper.class)),
+				() -> assertEquals(message(RecordRefusals.AssignsInheritedField.class),
+						message(RecordRefusals.HoldsAssignsInheritedField.class)));
+	}
+
+	@Test
+	void aSuperConstructorRefusalCarriesNoUncheckedExceptionAnywhereOnItsCauseChain() {
+		assertAll(SUPER_REFUSALS.stream().map(type -> () -> {
+			assertNoGenericWrapper(context, type);
+			for (Throwable at = refusal(context, type); at != null; at = at.getCause()) {
+				assertFalse(at instanceof RuntimeException, type.getName() + ": " + at);
+			}
+		}));
+	}
+
+	@Test
+	void aSuperConstructorRefusalIsRepeatableAndLeavesTheContextDescribingGoodClasses() throws DataBindException {
+		DataBindContext fresh = DataBindContext.builder().build();
+		assertAll(SUPER_REFUSALS.stream().map(type -> () -> {
+			String first = message(fresh, type);
+			assertEquals(first, message(fresh, type));
+			assertEquals(first, message(DataBindContext.builder().build(), type));
+		}));
+		assertEquals(2, assertInstanceOf(DataClassRecord.class, fresh.getDescriptor(Good.class)).fields().length);
 	}
 
 	// --- classes the public lookup cannot reach
