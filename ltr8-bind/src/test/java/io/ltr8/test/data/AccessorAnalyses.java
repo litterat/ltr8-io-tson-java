@@ -19,7 +19,9 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Union;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Hand-written immutable classes whose accessors the analysis must pair with the right field.
@@ -581,6 +583,503 @@ public final class AccessorAnalyses {
 
 		public String label() {
 			return label;
+		}
+	}
+
+	// --- the member that reads a constructor-bound field back: a public instance method, else a public final field
+
+	public static class PackagePrivateAccessor {
+
+		private final String name;
+
+		@Record
+		public PackagePrivateAccessor(String name) {
+			this.name = name;
+		}
+
+		String name() {
+			return name;
+		}
+	}
+
+	public static class ProtectedAccessor {
+
+		private final String name;
+
+		@Record
+		public ProtectedAccessor(String name) {
+			this.name = name;
+		}
+
+		protected String name() {
+			return name;
+		}
+	}
+
+	public static class StaticMethodNamedForField {
+
+		@SuppressWarnings("unused")
+		private final String name;
+
+		@Record
+		public StaticMethodNamedForField(String name) {
+			this.name = name;
+		}
+
+		public static String name() {
+			return "static";
+		}
+	}
+
+	public static class PrivateAccessorOverPublicField {
+
+		public final String name;
+
+		@Record
+		public PrivateAccessorOverPublicField(String name) {
+			this.name = name;
+		}
+
+		@SuppressWarnings("unused")
+		private String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PrivateAccessorOverPublicField other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class PackagePrivateAccessorOverPublicField {
+
+		public final String name;
+
+		@Record
+		public PackagePrivateAccessorOverPublicField(String name) {
+			this.name = name;
+		}
+
+		String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PackagePrivateAccessorOverPublicField other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class ProtectedAccessorOverPublicField {
+
+		public final String name;
+
+		@Record
+		public ProtectedAccessorOverPublicField(String name) {
+			this.name = name;
+		}
+
+		protected String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof ProtectedAccessorOverPublicField other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class StaticMethodOverPublicField {
+
+		public final String name;
+
+		@Record
+		public StaticMethodOverPublicField(String name) {
+			this.name = name;
+		}
+
+		public static String name() {
+			return "static";
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof StaticMethodOverPublicField other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	/** Its private method returning the field comes before its public accessor in the class file. */
+	public static class PrivateAccessorBeforePublicAccessor {
+
+		private final String name;
+
+		@Record
+		public PrivateAccessorBeforePublicAccessor(String name) {
+			this.name = name;
+		}
+
+		@SuppressWarnings("unused")
+		private String secretName() {
+			return name;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PrivateAccessorBeforePublicAccessor other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class PublicFinalReference {
+
+		public final String name;
+
+		@Record
+		public PublicFinalReference(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicFinalReference other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	/** Its {@code long} and {@code double} parameters each take two local slots. */
+	public static class PublicFinalPrimitives {
+
+		public final int count;
+
+		public final long size;
+
+		public final double ratio;
+
+		public final boolean flag;
+
+		@Record
+		public PublicFinalPrimitives(int count, long size, double ratio, boolean flag) {
+			this.count = count;
+			this.size = size;
+			this.ratio = ratio;
+			this.flag = flag;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicFinalPrimitives other && count == other.count && size == other.size
+					&& ratio == other.ratio && flag == other.flag;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(count, size, ratio, flag);
+		}
+	}
+
+	public static class PublicFinalList {
+
+		public final List<String> items;
+
+		@Record
+		public PublicFinalList(List<String> items) {
+			this.items = items;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicFinalList other && Objects.equals(items, other.items);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(items);
+		}
+	}
+
+	public static class PublicFinalOptional {
+
+		public final Optional<String> note;
+
+		@Record
+		public PublicFinalOptional(Optional<String> note) {
+			this.note = note;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicFinalOptional other && Objects.equals(note, other.note);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(note);
+		}
+	}
+
+	public static class AccessorBesidePublicFinalField {
+
+		public final String name;
+
+		@Record
+		public AccessorBesidePublicFinalField(String name) {
+			this.name = name;
+		}
+
+		@Field("label")
+		public String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof AccessorBesidePublicFinalField other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class NamedPublicFinalField {
+
+		@Field("label")
+		public final String name;
+
+		@Record
+		public NamedPublicFinalField(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof NamedPublicFinalField other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	/** Its constructor stores a computed value, so {@code @Field} names the parameter. */
+	public static class NamedParameterOverPublicField {
+
+		public final String name;
+
+		@Record
+		public NamedParameterOverPublicField(@Field("name") String name) {
+			this.name = name.strip();
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof NamedParameterOverPublicField other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	// --- a public final field a super class declares, bound through super(…)
+
+	public static class PublicFieldBase {
+
+		public final String name;
+
+		public PublicFieldBase(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((PublicFieldBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class InheritsPublicField extends PublicFieldBase {
+
+		private final int count;
+
+		@Record
+		public InheritsPublicField(String name, int count) {
+			super(name);
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj) && count == ((InheritsPublicField) obj).count;
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * super.hashCode() + count;
+		}
+	}
+
+	public static class GenericPublicFieldBase<T> {
+
+		public final T value;
+
+		public GenericPublicFieldBase(T value) {
+			this.value = value;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(value, ((GenericPublicFieldBase<?>) obj).value);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(value);
+		}
+	}
+
+	/** Its inherited field holds a {@code String} as the erased {@code Object}. */
+	public static class InheritsGenericPublicField extends GenericPublicFieldBase<String> {
+
+		@Record
+		public InheritsGenericPublicField(String value) {
+			super(value);
+		}
+	}
+
+	public static class PublicFieldAccessorBase {
+
+		public final String value;
+
+		public PublicFieldAccessorBase(String value) {
+			this.value = value;
+		}
+
+		public String value() {
+			return value;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(value, ((PublicFieldAccessorBase) obj).value);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(value);
+		}
+	}
+
+	/** Its override returns its own field, so the super class's accessor would not read the super class's field. */
+	public static class OverridesPublicFieldAccessor extends PublicFieldAccessorBase {
+
+		private final String value;
+
+		@Record
+		public OverridesPublicFieldAccessor(String baseValue, String value) {
+			super(baseValue);
+			this.value = value;
+		}
+
+		@Override
+		@Field("own")
+		public String value() {
+			return value;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj) && Objects.equals(value, ((OverridesPublicFieldAccessor) obj).value);
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * super.hashCode() + Objects.hashCode(value);
+		}
+	}
+
+	// --- a member declared on a super class the public lookup cannot reach
+
+	static class HiddenFieldBase {
+
+		public final String name;
+
+		public HiddenFieldBase(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class InheritsHiddenField extends HiddenFieldBase {
+
+		@Record
+		public InheritsHiddenField(String name) {
+			super(name);
+		}
+	}
+
+	static class HiddenAccessorBase {
+
+		private final String name;
+
+		public HiddenAccessorBase(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	public static class InheritsHiddenAccessor extends HiddenAccessorBase {
+
+		@Record
+		public InheritsHiddenAccessor(String name) {
+			super(name);
 		}
 	}
 }

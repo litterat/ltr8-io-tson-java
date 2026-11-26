@@ -540,14 +540,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `OptionalInt`, `OptionalLong` or `OptionalDouble` field is the value-to-optional conversion and not a handle that
   writes the field. Nothing calls it today. Return the composed setter, or `null` where the component has none, and
   pin `setter()`'s type for each of the three.
-- [ ] **`ImmutableFinder` takes a private method as a field's accessor, and requires one for a public final field.**
-  A `@Record` class whose only method named for a constructor-bound field is private binds that method, and
-  `getDescriptor` or the first read fails on access; a class holding the value in a `public final` field with no
-  accessor is refused. Take only a public instance method, and read a public final field directly where there is
-  none, with tests of both and a round trip of the second.
-- [ ] **`ImmutableFinder`'s class Javadoc retells history.** It narrates what the analysis used to do, against the
-  conventions in `CLAUDE.md`. Rewrite it to the current contract: what a constructor must do for a parameter to
-  bind, and what is refused.
 
 ## Documentation
 
