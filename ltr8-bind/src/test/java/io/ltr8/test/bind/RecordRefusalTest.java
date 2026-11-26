@@ -250,10 +250,11 @@ class RecordRefusalTest {
 	}
 
 	@Test
-	void aPrivateAccessorIsRefused() {
+	void anArgumentWhoseOnlyAccessorIsPrivateIsRefusedNamingTheClassAndField() {
 		DataBindException refused = refusal(context, PrivateAccessor.class);
-		assertEquals("Failed to access class", refused.getMessage());
-		assertInstanceOf(IllegalAccessException.class, refused.getCause());
+		assertEquals("Failed to match immutable field accessor for class: " + PrivateAccessor.class
+				+ ". Add @Field annotations to assist field 'name'", refused.getMessage());
+		assertNull(refused.getCause());
 	}
 
 	@Test
