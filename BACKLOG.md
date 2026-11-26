@@ -540,12 +540,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `OptionalInt`, `OptionalLong` or `OptionalDouble` field is the value-to-optional conversion and not a handle that
   writes the field. Nothing calls it today. Return the composed setter, or `null` where the component has none, and
   pin `setter()`'s type for each of the three.
-- [ ] **`DefaultRecordBinder` throws unchecked exceptions for components that do not match the constructor.** Handed
-  fewer or more constructor-bound components than the constructor has parameters, or one of another type,
-  `createTupleConstructor` and its siblings throw `IllegalArgumentException` or `IndexOutOfBoundsException`.
-  `ImmutableFinder` produces no such list, so this is read and not reproduced: reproduce it through a
-  `ComponentFinder` of the test's own if the binder takes one, refuse the class with a `CodeAnalysisException`
-  naming it, and say so if there is no route to it.
 - [ ] **`ImmutableFinder` takes a private method as a field's accessor, and requires one for a public final field.**
   A `@Record` class whose only method named for a constructor-bound field is private binds that method, and
   `getDescriptor` or the first read fails on access; a class holding the value in a `public final` field with no

@@ -46,6 +46,7 @@ import io.ltr8.test.data.RecordRefusals.Counted;
 import io.ltr8.test.data.RecordRefusals.CountingBridge;
 import io.ltr8.test.data.RecordRefusals.CycleMember;
 import io.ltr8.test.data.RecordRefusals.CycleTop;
+import io.ltr8.test.data.RecordRefusals.DesignatedParameterNarrower;
 import io.ltr8.test.data.RecordRefusals.EmptyUnion;
 import io.ltr8.test.data.RecordRefusals.FieldAnnotationWithoutAccessors;
 import io.ltr8.test.data.RecordRefusals.GetterAndSetterRenamedApart;
@@ -76,7 +77,10 @@ import io.ltr8.test.data.RecordRefusals.OrderNamesNoField;
 import io.ltr8.test.data.RecordRefusals.PrivateAccessor;
 import io.ltr8.test.data.RecordRefusals.ProfileFieldCountMismatch;
 import io.ltr8.test.data.RecordRefusals.ProfileNamesNoComponent;
+import io.ltr8.test.data.RecordRefusals.ProfileParameterNarrower;
+import io.ltr8.test.data.RecordRefusals.ProfileParameterUnboxed;
 import io.ltr8.test.data.RecordRefusals.ProfileParameterUnnamed;
+import io.ltr8.test.data.RecordRefusals.ProfileParameterUnrelated;
 import io.ltr8.test.data.RecordRefusals.RawList;
 import io.ltr8.test.data.RecordRefusals.RawMap;
 import io.ltr8.test.data.RecordRefusals.RefusedAfterCountedField;
@@ -245,6 +249,27 @@ class RecordRefusalTest {
 	}
 
 	@Test
+	void aSelectedConstructorParameterOfAnotherTypeThanItsComponentIsRefusedNamingTheClass() {
+		assertAll(
+				() -> assertParameterTypeRefusal(profiled, ProfileParameterNarrower.class, "int", "count", "long"),
+				() -> assertParameterTypeRefusal(profiled, ProfileParameterUnboxed.class, "int", "count",
+						"java.lang.Integer"),
+				() -> assertParameterTypeRefusal(profiled, ProfileParameterUnrelated.class, "java.lang.Integer",
+						"label", "java.lang.String"),
+				() -> assertParameterTypeRefusal(context, DesignatedParameterNarrower.class, "int", "count",
+						"long"));
+	}
+
+	private static void assertParameterTypeRefusal(DataBindContext context, Class<?> type, String parameterType,
+			String component, String componentType) {
+		DataBindException refused = refusal(context, type);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals("Parameter 0 of the selected constructor on '" + type.getName() + "' is " + parameterType
+				+ ", but the component '" + component + "' it names is " + componentType + ": a constructor "
+				+ "parameter takes its component's type", refused.getMessage());
+	}
+
+	@Test
 	void aConstructorThatTransformsItsArgumentIsRefusedNamingTheClass() {
 		assertEquals("Failed to match immutable fields for class: " + ConstructorTransformsArgument.class
 				+ ". Add @Field annotations to assist.", message(ConstructorTransformsArgument.class));
@@ -398,9 +423,10 @@ class RecordRefusalTest {
 				HoldsRefusedOptional.class, HoldsRefusedMap.class, HoldsRefusedArray.class, HoldsHolder.class,
 				HoldsTwoDeep.class, HoldsTwoCarriers.class, HoldsBridgeNeedsArgument.class,
 				HoldsUnconvertible.class, RawList.class, WildcardList.class, RawMap.class, CycleTop.class,
-				LoopWithRefused.class, UnionThroughCall.class);
+				LoopWithRefused.class, UnionThroughCall.class, DesignatedParameterNarrower.class);
 		List<Class<?>> refusedUnderProfile = List.of(ProfileFieldCountMismatch.class,
-				ProfileNamesNoComponent.class, ProfileParameterUnnamed.class);
+				ProfileNamesNoComponent.class, ProfileParameterUnnamed.class, ProfileParameterNarrower.class,
+				ProfileParameterUnboxed.class, ProfileParameterUnrelated.class);
 		assertAll(Stream.concat(
 				refused.stream().map(type -> () -> assertNoGenericWrapper(context, type)),
 				refusedUnderProfile.stream().map(type -> () -> assertNoGenericWrapper(profiled, type))));

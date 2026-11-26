@@ -242,6 +242,38 @@ public final class RecordRefusals {
 		}
 	}
 
+	public record ProfileParameterNarrower(long count, String label) {
+
+		@Profile(value = "v1", fields = { "count" })
+		public ProfileParameterNarrower(int count) {
+			this(count, null);
+		}
+	}
+
+	public record ProfileParameterUnboxed(Integer count, String label) {
+
+		@Profile(value = "v1", fields = { "count" })
+		public ProfileParameterUnboxed(int count) {
+			this(count, null);
+		}
+	}
+
+	public record ProfileParameterUnrelated(Integer count, String label) {
+
+		@Profile(value = "v1", fields = { "label" })
+		public ProfileParameterUnrelated(Integer label) {
+			this(label, null);
+		}
+	}
+
+	public record DesignatedParameterNarrower(long count) {
+
+		@Record
+		public DesignatedParameterNarrower(@Field("count") int count) {
+			this((long) count);
+		}
+	}
+
 	public static class ConstructorTransformsArgument {
 
 		private final String name;
