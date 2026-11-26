@@ -29,6 +29,9 @@ public class ComponentInfo {
 
 	private final Class<?> type;
 
+	// Declares the field a constructor stores this component in; null where only @Field names the component.
+	private Class<?> declaringClass;
+
 	private MethodHandle writeMethod;
 
 	private MethodHandle readMethod;
@@ -66,6 +69,14 @@ public class ComponentInfo {
 
 	public String getName() {
 		return name;
+	}
+
+	public Class<?> getDeclaringClass() {
+		return declaringClass;
+	}
+
+	public void setDeclaringClass(Class<?> declaringClass) {
+		this.declaringClass = declaringClass;
 	}
 
 	public void setField(Field field) throws CodeAnalysisException {

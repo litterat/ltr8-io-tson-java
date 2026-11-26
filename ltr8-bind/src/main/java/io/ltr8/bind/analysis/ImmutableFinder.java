@@ -41,15 +41,19 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.WrongMethodTypeException;
+import java.lang.reflect.AccessFlag;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -134,8 +138,9 @@ public class ImmutableFinder implements ComponentFinder {
             }
 
             // Find the matching accessor methods. Must have already found fields in constructor.
-            examineAccessorMethods(clss, immutableFields, classModel);
-            examineAccessorAnnotations(clss, immutableFields, lookup);
+            Set<String> matched = new HashSet<>();
+            examineAccessorMethods(clss, immutableFields, classModel, matched);
+            examineAccessorAnnotations(clss, immutableFields, lookup, matched);
 
             Class<?> superClass = clss;
             while ((superClass = superClass.getSuperclass()) != null) {
@@ -144,8 +149,8 @@ public class ImmutableFinder implements ComponentFinder {
                 }
                 ClassModel superClassModel = parseClass(superClass);
 
-                examineAccessorMethods(superClass, immutableFields, superClassModel);
-                examineAccessorAnnotations(superClass, immutableFields, lookup);
+                examineAccessorMethods(superClass, immutableFields, superClassModel, matched);
+                examineAccessorAnnotations(superClass, immutableFields, lookup, matched);
             }
 
             // Counting components alone would let a parameter stored in two fields hide one stored in none.
@@ -173,6 +178,17 @@ public class ImmutableFinder implements ComponentFinder {
                 }
             }
 
+            // A super class and a subclass may each declare a field of one name.
+            Set<String> names = new HashSet<>();
+            for (ComponentInfo component : immutableFields) {
+                Field field = component.getField();
+                String name = field != null && !field.value().isBlank() ? field.value() : component.getName();
+                if (!names.add(name)) {
+                    throw new CodeAnalysisException(String.format("%s has two fields named '%s'; @Field on an "
+                            + "accessor names one apart", clss.getName(), name));
+                }
+            }
+
             fields.addAll(immutableFields);
 
         } catch (UncheckedIOException | NoSuchMethodException | SecurityException | IllegalAccessException e) {
@@ -194,31 +210,42 @@ public class ImmutableFinder implements ComponentFinder {
         }
     }
 
-    private void examineAccessorMethods(Class<?> clss, List<ComponentInfo> immutableFields, ClassModel classModel)
+    /**
+     * @param matched as for {@link #examineAccessorAnnotations}
+     */
+    private void examineAccessorMethods(Class<?> clss, List<ComponentInfo> immutableFields, ClassModel classModel,
+            Set<String> matched)
             throws NoSuchMethodException, IllegalAccessException, SecurityException, CodeAnalysisException {
 
         for (MethodModel method : classModel.methods()) {
-            // Only interested in accessors: zero-arg methods.
-            if (!method.methodType().stringValue().startsWith("()")) {
+            // An accessor takes no argument but the instance; in a static method slot 0 is no instance.
+            if (!method.methodType().stringValue().startsWith("()") || method.flags().has(AccessFlag.STATIC)
+                    || matched.contains(method.methodName().stringValue())) {
                 continue;
             }
-            examineAccessor(clss, immutableFields, method);
+            if (examineAccessor(clss, immutableFields, method)) {
+                matched.add(method.methodName().stringValue());
+            }
         }
     }
 
     /**
      * Looks through a zero-arg method's instructions for the ALOAD-GETFIELD-RETURN pattern that
-     * identifies a simple accessor. The field name used in the GETFIELD instruction must already
+     * identifies a simple accessor. The field used in the GETFIELD instruction must already
      * have been discovered via the constructor (in {@code fields}).
+     *
+     * @return whether the method is the accessor of a component
      */
-    private String examineAccessor(Class<?> clss, List<ComponentInfo> fields, MethodModel method)
+    private boolean examineAccessor(Class<?> clss, List<ComponentInfo> fields, MethodModel method)
             throws NoSuchMethodException, IllegalAccessException, SecurityException, CodeAnalysisException {
         boolean foundLoadThis = false;
         String lastField = null;
+        Class<?> lastDeclarer = null;
+        boolean accessor = false;
 
         CodeModel code = method.code().orElse(null);
         if (code == null) {
-            return null;
+            return false;
         }
 
         for (CodeElement element : code) {
@@ -229,12 +256,16 @@ public class ImmutableFinder implements ComponentFinder {
             } else if (element instanceof FieldInstruction field && field.opcode() == Opcode.GETFIELD) {
                 if (foundLoadThis) {
                     lastField = field.name().stringValue();
+                    lastDeclarer = fieldDeclarer(clss, field.owner().asInternalName(), lastField);
                 }
             } else if (element instanceof ReturnInstruction) {
                 if (foundLoadThis && lastField != null) {
                     final String fieldName = lastField;
-                    ComponentInfo info = fields.stream().filter(e -> e.getName().equals(fieldName)).findFirst()
-                            .orElse(null);
+                    final Class<?> declarer = lastDeclarer;
+                    ComponentInfo info = declarer == null ? null : fields.stream()
+                            .filter(e -> e.getName().equals(fieldName)
+                                    && (e.getDeclaringClass() == null || e.getDeclaringClass() == declarer))
+                            .findFirst().orElse(null);
                     if (info != null) {
                         Method accessorMethod = clss.getDeclaredMethod(method.methodName().stringValue());
 
@@ -250,6 +281,7 @@ public class ImmutableFinder implements ComponentFinder {
 
                         info.setReadMethod(readAs(MethodHandles.publicLookup().unreflect(accessorMethod),
                                 info.getType()));
+                        accessor = true;
                     }
                 }
                 // Fall through to reset -- a return ends the accessor pattern either way.
@@ -262,7 +294,29 @@ public class ImmutableFinder implements ComponentFinder {
             // Non-instruction elements (labels, line numbers, etc.) don't affect the invariant.
         }
 
-        return lastField;
+        return accessor;
+    }
+
+    /**
+     * Resolves a field reference as the JVM does, from the class it names upward. The name alone does not say which
+     * field an accessor returns: a super class may declare a private field of the same name.
+     *
+     * @return the class declaring the field, or null where {@code owner} is not {@code clss} or a super class of it
+     */
+    private static Class<?> fieldDeclarer(Class<?> clss, String owner, String name) {
+        Class<?> from = clss;
+        while (from != null && !from.getName().replace('.', '/').equals(owner)) {
+            from = from.getSuperclass();
+        }
+        for (Class<?> declarer = from; declarer != null; declarer = declarer.getSuperclass()) {
+            try {
+                declarer.getDeclaredField(name);
+                return declarer;
+            } catch (NoSuchFieldException e) {
+                // Inherited: declared further up.
+            }
+        }
+        return null;
     }
 
     /**
@@ -282,20 +336,28 @@ public class ImmutableFinder implements ComponentFinder {
         return MethodHandles.explicitCastArguments(accessor, accessor.type().changeReturnType(type));
     }
 
-    private void examineAccessorAnnotations(Class<?> clss, List<ComponentInfo> immutableFields, Lookup lookup)
-            throws IllegalAccessException, CodeAnalysisException {
+    /**
+     * @param matched the accessor names matched so far, in subclasses of {@code clss}: a handle on a method a
+     *        subclass overrides dispatches to the override, which reads the field the override returns
+     */
+    private void examineAccessorAnnotations(Class<?> clss, List<ComponentInfo> immutableFields, Lookup lookup,
+            Set<String> matched) throws IllegalAccessException, CodeAnalysisException {
         // Possibly failed to find accessor through invariant byte code analysis.
         // Fallback on @Field annotation or method name.
         for (Method method : clss.getDeclaredMethods()) {
 
-            if (method.getParameterCount() > 0) {
+            if (method.getParameterCount() > 0 || Modifier.isStatic(method.getModifiers())
+                    || matched.contains(method.getName())) {
                 continue;
             }
 
             final String name = method.getName();
-            ComponentInfo component = immutableFields.stream().filter(e -> e.getName().equals(name)).findFirst()
-                    .orElse(null);
-            if (component != null && component.getReadMethod() == null) {
+            // A method sees only fields its own class or a super class of it declares.
+            ComponentInfo component = immutableFields.stream().filter(e -> e.getName().equals(name)
+                    && e.getReadMethod() == null
+                    && (e.getDeclaringClass() == null || e.getDeclaringClass().isAssignableFrom(clss)))
+                    .findFirst().orElse(null);
+            if (component != null) {
                 Field field = method.getAnnotation(Field.class);
                 if (field != null) {
                     component.setReadMethod(lookup.unreflect(method));
@@ -306,6 +368,10 @@ public class ImmutableFinder implements ComponentFinder {
                 if (union != null) {
                     component.setReadMethod(lookup.unreflect(method));
                     component.setField(field);
+                }
+
+                if (component.getReadMethod() != null) {
+                    matched.add(name);
                 }
             }
         }
@@ -404,6 +470,7 @@ public class ImmutableFinder implements ComponentFinder {
                     Parameter param = top.getParameters()[toTop[arg]];
                     ComponentInfo component = new ComponentInfo(field.name().stringValue(), param.getType());
                     component.setConstructorArgument(toTop[arg]);
+                    component.setDeclaringClass(constructor.getDeclaringClass());
 
                     java.lang.reflect.Type paramType = param.getParameterizedType();
                     if (paramType instanceof ParameterizedType pt) {

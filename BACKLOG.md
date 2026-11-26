@@ -519,10 +519,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 Where an entry says "not run", reproduce it first; one that does not reproduce comes out.
 
-- [ ] **Accessors are matched by bare field name across the class hierarchy.** Not run. A super class and a
-  subclass each declaring a private field of one name could pair a component with the other's accessor
-  (`ImmutableFinder.examineAccessor`). Match an accessor to the field of the class that declares both, with a
-  test that reads each field's own value.
 - [ ] **`ComponentInfo.setUnion`'s duplicate check reads as inverted.** Not run. It throws where the two unions
   are equal, and its message says "Field annotation", so `@Union` on both a constructor parameter and its
   accessor is probably refused. Refuse two that differ, accept two that agree, and name `@Union` in the message.
