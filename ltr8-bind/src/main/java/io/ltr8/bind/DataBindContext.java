@@ -50,11 +50,15 @@ public class DataBindContext {
 	private final ProtocolBinder protocolBinder = new ProtocolBinder();
 
 	/**
-	 * What this thread is part-way through resolving. Per thread because resolution is per thread: two threads
-	 * resolving the same cyclic type each build a complete descriptor and one of them wins the cache, exactly as
-	 * for an acyclic one.
+	 * What the call now running is part-way through resolving: bound by the outermost {@link #getDescriptor} for
+	 * as long as it runs, so nothing stays on the thread after it. Scoped and not passed, because a binder calls
+	 * back into this context and not into the call. Two threads resolving the same cyclic type each bind their
+	 * own, build a complete descriptor, and one of them wins the cache, exactly as for an acyclic one.
+	 *
+	 * <p>A thread forked in a {@code StructuredTaskScope} inherits the binding and a {@link Resolution} is one
+	 * thread's, so a binder never forks a thread that calls back here.
 	 */
-	private final ThreadLocal<Resolution> resolution = ThreadLocal.withInitial(Resolution::new);
+	private final ScopedValue<Resolution> resolution = ScopedValue.newInstance();
 
 	/**
 	 * The resolutions one thread has in flight, nested one per {@link #getDescriptor} call, and the descriptors
@@ -376,6 +380,10 @@ public class DataBindContext {
 			return atom;
 		}
 
+		if (!resolution.isBound()) {
+			return ScopedValue.where(resolution, new Resolution())
+					.call(() -> getDescriptor(targetClass, parameterizedType));
+		}
 		Resolution resolving = resolution.get();
 		Resolution.Held held = resolving.held.get(parameterizedType);
 		if (held != null) {
@@ -492,8 +500,8 @@ public class DataBindContext {
 	public Supplier<DataClass> componentSource(Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
 
-		Resolution resolving = resolution.get();
-		Integer depth = resolving.depths.get(parameterizedType);
+		Resolution resolving = resolution.isBound() ? resolution.get() : null;
+		Integer depth = resolving != null ? resolving.depths.get(parameterizedType) : null;
 		if (depth != null) {
 			resolving.reach(depth);
 			return () -> {

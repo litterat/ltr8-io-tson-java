@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
@@ -135,6 +136,13 @@ public class RecursiveModelTest {
 		DataClassRecord node = (DataClassRecord) context.getDescriptor(Node.class);
 
 		Assertions.assertSame(context.getDescriptor(Node.class), fieldNamed(node, "next").dataClass());
+	}
+
+	@Test
+	public void aComponentSourceAskedForOutsideAnyResolutionIsResolvedAtOnce() throws DataBindException {
+		DataClass source = context.componentSource(Node.class, Node.class).get();
+
+		Assertions.assertSame(context.getDescriptor(Node.class), source);
 	}
 
 	/**
