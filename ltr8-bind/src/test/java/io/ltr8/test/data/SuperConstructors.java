@@ -18,6 +18,7 @@ package io.ltr8.test.data;
 import io.ltr8.annotation.Record;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Hand-written immutable classes whose constructors hand arguments, unchanged, to a public super class constructor.
@@ -109,5 +110,56 @@ public final class SuperConstructors {
 	}
 
 	public record HoldsSized(String label, Sized value) {
+	}
+
+	public record HoldsCounted(Counted value, int copies) {
+	}
+
+	public static class Tagged {
+
+		private final Optional<String> tag;
+
+		public Tagged(Optional<String> tag) {
+			this.tag = tag;
+		}
+
+		public Optional<String> tag() {
+			return tag;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && tag.equals(((Tagged) obj).tag);
+		}
+
+		@Override
+		public int hashCode() {
+			return tag.hashCode();
+		}
+	}
+
+	public static class TaggedCount extends Tagged {
+
+		private final int count;
+
+		@Record
+		public TaggedCount(Optional<String> tag, int count) {
+			super(tag);
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj) && count == ((TaggedCount) obj).count;
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * super.hashCode() + count;
+		}
 	}
 }
