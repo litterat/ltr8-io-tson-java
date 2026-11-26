@@ -29,7 +29,9 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -292,7 +294,7 @@ public class DefaultRecordBinder {
 		for (int x = 0; x < components.size(); x++) {
 			ComponentInfo info = components.get(x);
 
-			bridges[x] = fieldBridge(info);
+			bridges[x] = fieldBridge(targetClass, info);
 			allComponents[x] = resolveField(context, targetClass, info, bridges[x], slots[x] < 0 ? x : slots[x]);
 			if (slots[x] >= 0) {
 				boundComponents.add(allComponents[x]);
@@ -624,7 +626,7 @@ public class DefaultRecordBinder {
 	 * and shared by the field's accessor, its setter and the constructor, so a bridge holding state sees every call
 	 * made for its field.
 	 */
-	private static FieldBridge fieldBridge(ComponentInfo info)
+	private static FieldBridge fieldBridge(Class<?> targetClass, ComponentInfo info)
 			throws CodeAnalysisException, NoSuchMethodException, IllegalAccessException {
 		Field fieldAnnotation = info.getField();
 		if (fieldAnnotation == null || fieldAnnotation.bridge() == null
@@ -635,10 +637,23 @@ public class DefaultRecordBinder {
 		@SuppressWarnings("rawtypes")
 		Class<? extends DataBridge> bridgeClass = fieldAnnotation.bridge();
 
-		ParameterizedType bridgeTypes = (ParameterizedType) bridgeClass.getGenericInterfaces()[0];
-		Type bridgeDataType = bridgeTypes.getActualTypeArguments()[0];
+		Type[] bridgeTypes = dataBridgeArguments(bridgeClass, Map.of());
+		String bridgeOf = String.format("%s, the @Field bridge of %s's field '%s', ", bridgeClass.getName(),
+				targetClass.getName(), info.getName());
+		String converts = ": a field bridge names the classes it converts between, DataBridge<D, O>";
+		if (bridgeTypes == null) {
+			throw new CodeAnalysisException(bridgeOf + "reaches DataBridge raw" + converts);
+		}
+		boolean dataOpen = isOpen(bridgeTypes[0]);
+		boolean objectOpen = isOpen(bridgeTypes[1]);
+		if (dataOpen || objectOpen) {
+			throw new CodeAnalysisException(String.format("%simplements DataBridge<%s, %s>, leaving its %s type open%s",
+					bridgeOf, bridgeTypes[0].getTypeName(), bridgeTypes[1].getTypeName(),
+					dataOpen && objectOpen ? "data and object" : dataOpen ? "data" : "object", converts));
+		}
+		Type bridgeDataType = bridgeTypes[0];
 		Class<?> bridgeDataClass = bridgeTypeClass(bridgeDataType);
-		Class<?> bridgeObjectClass = bridgeTypeClass(bridgeTypes.getActualTypeArguments()[1]);
+		Class<?> bridgeObjectClass = bridgeTypeClass(bridgeTypes[1]);
 
 		if (!bridgeObjectClass.isAssignableFrom(info.getType())) {
 			throw new CodeAnalysisException("Bridge object type not assignable from field type");
@@ -662,6 +677,53 @@ public class DefaultRecordBinder {
 		return new FieldBridge(bridgeDataClass, bridgeDataType,
 				toData.asType(MethodType.methodType(bridgeDataClass, info.getType())),
 				toObject.asType(MethodType.methodType(info.getType(), bridgeDataClass)));
+	}
+
+	/**
+	 * {@code DataBridge}'s two type arguments as {@code type} binds them, with {@code bindings} giving its own type
+	 * parameters, or {@code null} where it reaches {@code DataBridge} through a raw type: a raw type's supertypes are
+	 * erased (JLS 4.8). Unlike {@code ToData}'s, the clause may be inherited. Java lets a class reach one generic
+	 * interface by two paths only with the same arguments, so the first path found answers for every path.
+	 */
+	private static Type[] dataBridgeArguments(Class<?> type, Map<TypeVariable<?>, Type> bindings) {
+		List<Type> supertypes = new ArrayList<>(List.of(type.getGenericInterfaces()));
+		if (type.getGenericSuperclass() != null) {
+			supertypes.addFirst(type.getGenericSuperclass());
+		}
+		for (Type supertype : supertypes) {
+			Class<?> raw = rawTypeOf(supertype);
+			if (!DataBridge.class.isAssignableFrom(raw)) {
+				continue;
+			}
+			if (!(supertype instanceof ParameterizedType parameterized)) {
+				return raw == DataBridge.class || raw.getTypeParameters().length > 0 ? null
+						: dataBridgeArguments(raw, Map.of());
+			}
+			Type[] arguments = parameterized.getActualTypeArguments();
+			for (int x = 0; x < arguments.length; x++) {
+				arguments[x] = TypeArguments.substitute(arguments[x], bindings);
+			}
+			if (raw == DataBridge.class) {
+				return arguments;
+			}
+			Map<TypeVariable<?>, Type> inherited = new HashMap<>();
+			TypeVariable<?>[] parameters = raw.getTypeParameters();
+			for (int x = 0; x < parameters.length; x++) {
+				inherited.put(parameters[x], arguments[x]);
+			}
+			return dataBridgeArguments(raw, inherited);
+		}
+		throw new IllegalStateException(type.getName() + " reaches DataBridge through none of its supertypes");
+	}
+
+	/** Whether {@code type} names a type variable, itself or as an argument at any depth. */
+	private static boolean isOpen(Type type) {
+		return switch (type) {
+			case TypeVariable<?> _ -> true;
+			case ParameterizedType parameterized ->
+					Arrays.stream(parameterized.getActualTypeArguments()).anyMatch(DefaultRecordBinder::isOpen);
+			default -> false;
+		};
 	}
 
 	private static Class<?> bridgeTypeClass(Type type) throws CodeAnalysisException {

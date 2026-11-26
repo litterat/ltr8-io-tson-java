@@ -28,15 +28,25 @@ import io.ltr8.bind.analysis.CodeAnalysisException;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.RecordRefusals;
 import io.ltr8.test.data.RecordRefusals.BridgeConstructorThrows;
+import io.ltr8.test.data.RecordRefusals.BridgeInheritedOpen;
 import io.ltr8.test.data.RecordRefusals.BridgeNeedsArgument;
+import io.ltr8.test.data.RecordRefusals.BridgeNestedOpen;
 import io.ltr8.test.data.RecordRefusals.BridgeObjectMismatch;
+import io.ltr8.test.data.RecordRefusals.BridgeRaw;
+import io.ltr8.test.data.RecordRefusals.BridgeRawlyExtended;
 import io.ltr8.test.data.RecordRefusals.BridgeTypeVariable;
+import io.ltr8.test.data.RecordRefusals.GenericBridge;
+import io.ltr8.test.data.RecordRefusals.InheritedOpenBridge;
+import io.ltr8.test.data.RecordRefusals.NestedOpenBridge;
+import io.ltr8.test.data.RecordRefusals.RawBridge;
+import io.ltr8.test.data.RecordRefusals.RawlyExtendedBridge;
 import io.ltr8.test.data.RecordRefusals.BridgeWithoutNoArgumentConstructor;
 import io.ltr8.test.data.RecordRefusals.ConstructorTransformsArgument;
 import io.ltr8.test.data.RecordRefusals.Counted;
 import io.ltr8.test.data.RecordRefusals.CountingBridge;
 import io.ltr8.test.data.RecordRefusals.CycleMember;
 import io.ltr8.test.data.RecordRefusals.CycleTop;
+import io.ltr8.test.data.RecordRefusals.DesignatedParameterNarrower;
 import io.ltr8.test.data.RecordRefusals.EmptyUnion;
 import io.ltr8.test.data.RecordRefusals.FieldAnnotationWithoutAccessors;
 import io.ltr8.test.data.RecordRefusals.GetterAndSetterRenamedApart;
@@ -67,7 +77,10 @@ import io.ltr8.test.data.RecordRefusals.OrderNamesNoField;
 import io.ltr8.test.data.RecordRefusals.PrivateAccessor;
 import io.ltr8.test.data.RecordRefusals.ProfileFieldCountMismatch;
 import io.ltr8.test.data.RecordRefusals.ProfileNamesNoComponent;
+import io.ltr8.test.data.RecordRefusals.ProfileParameterNarrower;
+import io.ltr8.test.data.RecordRefusals.ProfileParameterUnboxed;
 import io.ltr8.test.data.RecordRefusals.ProfileParameterUnnamed;
+import io.ltr8.test.data.RecordRefusals.ProfileParameterUnrelated;
 import io.ltr8.test.data.RecordRefusals.RawList;
 import io.ltr8.test.data.RecordRefusals.RawMap;
 import io.ltr8.test.data.RecordRefusals.RefusedAfterCountedField;
@@ -175,8 +188,29 @@ class RecordRefusalTest {
 	}
 
 	@Test
-	void aFieldBridgeWhoseDataTypeIsATypeVariableIsRefused() {
-		assertEquals("Unrecognised Type", message(BridgeTypeVariable.class));
+	void aFieldBridgeLeavingATypeArgumentOpenIsRefusedNamingTheBridgeAndTheField() {
+		assertAll(
+				() -> assertBridgeRefusal(BridgeTypeVariable.class, GenericBridge.class, "implements "
+						+ "DataBridge<T, java.lang.String>, leaving its data type open"),
+				() -> assertBridgeRefusal(BridgeInheritedOpen.class, InheritedOpenBridge.class, "implements "
+						+ "DataBridge<java.lang.String, O>, leaving its object type open"),
+				() -> assertBridgeRefusal(BridgeNestedOpen.class, NestedOpenBridge.class, "implements "
+						+ "DataBridge<java.util.List<T>, java.lang.String>, leaving its data type open"));
+	}
+
+	@Test
+	void aRawFieldBridgeIsRefusedNamingTheBridgeAndTheField() {
+		assertAll(
+				() -> assertBridgeRefusal(BridgeRaw.class, RawBridge.class, "reaches DataBridge raw"),
+				() -> assertBridgeRefusal(BridgeRawlyExtended.class, RawlyExtendedBridge.class,
+						"reaches DataBridge raw"));
+	}
+
+	private void assertBridgeRefusal(Class<?> holder, Class<?> bridge, String fault) {
+		DataBindException refused = refusal(context, holder);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals(bridge.getName() + ", the @Field bridge of " + holder.getName() + "'s field 'value', " + fault
+				+ ": a field bridge names the classes it converts between, DataBridge<D, O>", refused.getMessage());
 	}
 
 	@Test
@@ -215,6 +249,27 @@ class RecordRefusalTest {
 	}
 
 	@Test
+	void aSelectedConstructorParameterOfAnotherTypeThanItsComponentIsRefusedNamingTheClass() {
+		assertAll(
+				() -> assertParameterTypeRefusal(profiled, ProfileParameterNarrower.class, "int", "count", "long"),
+				() -> assertParameterTypeRefusal(profiled, ProfileParameterUnboxed.class, "int", "count",
+						"java.lang.Integer"),
+				() -> assertParameterTypeRefusal(profiled, ProfileParameterUnrelated.class, "java.lang.Integer",
+						"label", "java.lang.String"),
+				() -> assertParameterTypeRefusal(context, DesignatedParameterNarrower.class, "int", "count",
+						"long"));
+	}
+
+	private static void assertParameterTypeRefusal(DataBindContext context, Class<?> type, String parameterType,
+			String component, String componentType) {
+		DataBindException refused = refusal(context, type);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals("Parameter 0 of the selected constructor on '" + type.getName() + "' is " + parameterType
+				+ ", but the component '" + component + "' it names is " + componentType + ": a constructor "
+				+ "parameter takes its component's type", refused.getMessage());
+	}
+
+	@Test
 	void aConstructorThatTransformsItsArgumentIsRefusedNamingTheClass() {
 		assertEquals("Failed to match immutable fields for class: " + ConstructorTransformsArgument.class
 				+ ". Add @Field annotations to assist.", message(ConstructorTransformsArgument.class));
@@ -250,10 +305,11 @@ class RecordRefusalTest {
 	}
 
 	@Test
-	void aPrivateAccessorIsRefused() {
+	void anArgumentWhoseOnlyAccessorIsPrivateIsRefusedNamingTheClassAndField() {
 		DataBindException refused = refusal(context, PrivateAccessor.class);
-		assertEquals("Failed to access class", refused.getMessage());
-		assertInstanceOf(IllegalAccessException.class, refused.getCause());
+		assertEquals("Failed to match immutable field accessor for class: " + PrivateAccessor.class
+				+ ". Add @Field annotations to assist field 'name'", refused.getMessage());
+		assertNull(refused.getCause());
 	}
 
 	@Test
@@ -359,7 +415,8 @@ class RecordRefusalTest {
 	void noRefusalCarriesTheGenericWrapperAnywhereOnItsCauseChain() {
 		List<Class<?>> refused = List.of(ProtectedConstructor.class, TwoCarriers.class, EmptyUnion.class,
 				UnassignableUnion.class, OrderCountMismatch.class, OrderNamesNoField.class,
-				NoDesignatedConstructor.class, BridgeTypeVariable.class, BridgeObjectMismatch.class,
+				NoDesignatedConstructor.class, BridgeTypeVariable.class, BridgeInheritedOpen.class,
+				BridgeNestedOpen.class, BridgeRaw.class, BridgeRawlyExtended.class, BridgeObjectMismatch.class,
 				BridgeConstructorThrows.class, BridgeNeedsArgument.class, ConstructorTransformsArgument.class,
 				NoAccessorForArgument.class, PrivateAccessor.class, HiddenRecord.class,
 				FieldAnnotationWithoutAccessors.class, GetterAndSetterRenamedApart.class, HiddenEmpty.class,
@@ -367,9 +424,10 @@ class RecordRefusalTest {
 				HoldsRefusedOptional.class, HoldsRefusedMap.class, HoldsRefusedArray.class, HoldsHolder.class,
 				HoldsTwoDeep.class, HoldsTwoCarriers.class, HoldsBridgeNeedsArgument.class,
 				HoldsUnconvertible.class, RawList.class, WildcardList.class, RawMap.class, CycleTop.class,
-				LoopWithRefused.class, UnionThroughCall.class);
+				LoopWithRefused.class, UnionThroughCall.class, DesignatedParameterNarrower.class);
 		List<Class<?>> refusedUnderProfile = List.of(ProfileFieldCountMismatch.class,
-				ProfileNamesNoComponent.class, ProfileParameterUnnamed.class);
+				ProfileNamesNoComponent.class, ProfileParameterUnnamed.class, ProfileParameterNarrower.class,
+				ProfileParameterUnboxed.class, ProfileParameterUnrelated.class);
 		assertAll(Stream.concat(
 				refused.stream().map(type -> () -> assertNoGenericWrapper(context, type)),
 				refusedUnderProfile.stream().map(type -> () -> assertNoGenericWrapper(profiled, type))));

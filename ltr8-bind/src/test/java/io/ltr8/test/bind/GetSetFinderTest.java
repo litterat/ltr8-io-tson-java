@@ -108,9 +108,15 @@ class GetSetFinderTest {
 	}
 
 	@Test
-	void aPublicFinalFieldTheConstructorBindsWithoutAnAccessorIsRefusedByTheConstructorAnalysis() {
-		assertEquals("Failed to match immutable field accessor for class: " + FinalFieldWithoutAccessor.class
-				+ ". Add @Field annotations to assist field 'name'", message(FinalFieldWithoutAccessor.class));
+	void aPublicFinalFieldTheConstructorBindsWithoutAnAccessorIsOneComponentReadFromTheField() throws Throwable {
+		DataClassRecord record = record(FinalFieldWithoutAccessor.class);
+		assertEquals(List.of("name:String"), shape(record));
+		MethodHandleInfo read = MethodHandles.lookup().revealDirect(record.fields()[0].accessor());
+		assertEquals(MethodHandleInfo.REF_getField, read.getReferenceKind());
+		assertEquals("name", read.getName());
+		for (FinalFieldWithoutAccessor copy : roundTrips(new FinalFieldWithoutAccessor("anchor"))) {
+			assertEquals("anchor", copy.name);
+		}
 	}
 
 	@Test
@@ -389,12 +395,13 @@ class GetSetFinderTest {
 	}
 
 	@Test
-	void aPrivateGetterTheConstructorAnalysisMatchesIsRefusedByThatAnalysis() {
-		DataBindException refused = refusal(PrivatePairOverConstructorName.class);
-		assertEquals("Failed to access class", refused.getMessage());
-		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
-		assertTrue(cause.getMessage().startsWith("member is private: "
-				+ PrivatePairOverConstructorName.class.getName() + ".getName"), cause.getMessage());
+	void aPrivatePairBesideTheConstructorsAccessorLeavesTheConstructorsComponent() throws Throwable {
+		DataClassRecord record = record(PrivatePairOverConstructorName.class);
+		assertEquals(List.of("name:String"), shape(record));
+		assertReadThroughMethod(record.fields()[0], "name");
+		for (PrivatePairOverConstructorName copy : roundTrips(new PrivatePairOverConstructorName("anchor"))) {
+			assertEquals("anchor", copy.name());
+		}
 	}
 
 	@Test
