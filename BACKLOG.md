@@ -544,12 +544,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   accessor …": `ImmutableFinder` reads only a final field directly, and `GetSetFinder`, which reads the field, runs
   after it. Read, not run. Read the field directly as for a final one, leaving it one component that the
   constructor fills and the field's setter writes, with a round trip.
-- [ ] **Two components of one wire name are not refused.** A public field `name` beside a public
-  `getName`/`setName` pair, and a subclass pair shadowing a super-class constructor component with no `@Field`
-  rename, are each described with two fields named `name`; `DataClassRecord`'s name index keeps the last and
-  `MapMapper` writes one key, so a value is lost. `ImmutableFinder` refuses the same within its own components.
-  Refuse any class whose components, from whichever finder, take one wire name, with a `CodeAnalysisException`
-  naming the class and the name, and a case of each in `RecordRefusalTest`.
 - [ ] **A `@Profile` naming one component twice is accepted.** `@Profile(value = "v1", fields = {"a", "a"})` on
   `R(String x, String y)` of `record R(String a, String b, String c)` is described with two fields named `a`.
   Refuse it in `RecordComponentFinder` with the other `@Profile` refusals, naming the class, the profile and the

@@ -25,8 +25,18 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.bind.analysis.CodeAnalysisException;
+import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.RecordRefusals;
+import io.ltr8.test.data.RecordRefusals.CarrierNamedAlike;
+import io.ltr8.test.data.RecordRefusals.ComponentsNamedAlike;
+import io.ltr8.test.data.RecordRefusals.ComponentsNamedApart;
+import io.ltr8.test.data.RecordRefusals.ConstructorComponentsOfOneName;
+import io.ltr8.test.data.RecordRefusals.FieldBesidePair;
+import io.ltr8.test.data.RecordRefusals.FieldBesidePairNamedApart;
+import io.ltr8.test.data.RecordRefusals.PairShadowsBaseComponent;
+import io.ltr8.test.data.RecordRefusals.PairShadowsBaseComponentNamedApart;
+import io.ltr8.test.data.RecordRefusals.UnboundNamedAlike;
 import io.ltr8.test.data.RecordRefusals.BridgeConstructorThrows;
 import io.ltr8.test.data.RecordRefusals.BridgeInheritedOpen;
 import io.ltr8.test.data.RecordRefusals.BridgeNeedsArgument;
@@ -329,6 +339,78 @@ class RecordRefusalTest {
 		assertEquals("Field 'value' already has Field annotation", message(GetterAndSetterRenamedApart.class));
 	}
 
+	// --- two components of one wire name
+
+	private static String sharedName(Class<?> type, String name) {
+		return type.getName() + " binds two components to the name '" + name + "'; @Field on one of them names it "
+				+ "apart";
+	}
+
+	@Test
+	void aPublicFieldBesideAPairOfItsNameIsRefusedNamingTheClassAndTheName() {
+		DataBindException refused = refusal(context, FieldBesidePair.class);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals(sharedName(FieldBesidePair.class, "name"), refused.getMessage());
+		assertNull(refused.getCause());
+	}
+
+	@Test
+	void aPairTakingTheNameOfASuperClassConstructorComponentIsRefusedNamingTheClassAndTheName() {
+		DataBindException refused = refusal(context, PairShadowsBaseComponent.class);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals(sharedName(PairShadowsBaseComponent.class, "name"), refused.getMessage());
+	}
+
+	@Test
+	void recordComponentsGivenOneNameByFieldAreRefusedNamingTheClassAndTheName() {
+		assertEquals(sharedName(ComponentsNamedAlike.class, "x"), message(ComponentsNamedAlike.class));
+	}
+
+	/** {@code RecordBindReader} in {@code tson-compiler} tells an unbound component by its name. */
+	@Test
+	void anUnboundComponentSharingABoundComponentsNameIsRefused() {
+		assertEquals(sharedName(UnboundNamedAlike.class, "x"), message(UnboundNamedAlike.class));
+	}
+
+	@Test
+	void twoConstructorComponentsOfOneNameKeepTheConstructorAnalysisRefusal() {
+		assertEquals(ConstructorComponentsOfOneName.class.getName() + " has two fields named 'name'; @Field on an "
+				+ "accessor names one apart", message(ConstructorComponentsOfOneName.class));
+	}
+
+	/** The carrier is no field of the wire: it is filled from the value's own annotations, never by name. */
+	@Test
+	void theAnnotationsCarrierMayShareAFieldsName() throws DataBindException {
+		DataClassRecord record = assertInstanceOf(DataClassRecord.class,
+				context.getDescriptor(CarrierNamedAlike.class));
+		assertEquals(List.of("annotations", "annotations"), Stream.of(record.fields()).map(DataClassField::name)
+				.toList());
+		assertEquals(Map.of("annotations", 0), record.fieldIndex());
+	}
+
+	@Test
+	void theSameShapesNamedApartAreDescribedAndRoundTripThroughBothMappers() {
+		assertAll(
+				() -> assertNames(FieldBesidePairNamedApart.class, "alias", "name"),
+				() -> assertNames(PairShadowsBaseComponentNamedApart.class, "name", "own"),
+				() -> assertNames(ComponentsNamedApart.class, "x", "y"),
+				() -> assertRoundTrips(new FieldBesidePairNamedApart("field", "pair")),
+				() -> assertRoundTrips(new PairShadowsBaseComponentNamedApart("base", "pair")),
+				() -> assertRoundTrips(new ComponentsNamedApart("a", "b")));
+	}
+
+	private void assertNames(Class<?> type, String... names) throws DataBindException {
+		DataClassRecord record = assertInstanceOf(DataClassRecord.class, context.getDescriptor(type));
+		assertEquals(List.of(names), Stream.of(record.fields()).map(DataClassField::name).toList());
+	}
+
+	private void assertRoundTrips(Object value) throws Throwable {
+		MapMapper maps = new MapMapper(context);
+		ArrayMapper arrays = new ArrayMapper(context);
+		assertEquals(value, maps.toObject(value.getClass(), maps.toMap(value)), "map");
+		assertEquals(value, arrays.toObject(value.getClass(), arrays.toArray(value)), "array");
+	}
+
 	// --- refused directly: the reflective failures resolveRecord turns into a refusal
 
 	@Test
@@ -424,7 +506,9 @@ class RecordRefusalTest {
 				HoldsRefusedOptional.class, HoldsRefusedMap.class, HoldsRefusedArray.class, HoldsHolder.class,
 				HoldsTwoDeep.class, HoldsTwoCarriers.class, HoldsBridgeNeedsArgument.class,
 				HoldsUnconvertible.class, RawList.class, WildcardList.class, RawMap.class, CycleTop.class,
-				LoopWithRefused.class, UnionThroughCall.class, DesignatedParameterNarrower.class);
+				LoopWithRefused.class, UnionThroughCall.class, DesignatedParameterNarrower.class,
+				FieldBesidePair.class, PairShadowsBaseComponent.class, ComponentsNamedAlike.class,
+				UnboundNamedAlike.class, ConstructorComponentsOfOneName.class);
 		List<Class<?>> refusedUnderProfile = List.of(ProfileFieldCountMismatch.class,
 				ProfileNamesNoComponent.class, ProfileParameterUnnamed.class, ProfileParameterNarrower.class,
 				ProfileParameterUnboxed.class, ProfileParameterUnrelated.class);

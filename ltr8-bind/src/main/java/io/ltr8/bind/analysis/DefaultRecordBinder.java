@@ -32,10 +32,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.OptionalDouble;
 import io.ltr8.annotation.Unbound;
 import java.util.OptionalInt;
@@ -268,6 +270,7 @@ public class DefaultRecordBinder {
 		}
 
 		TypeArguments.substitute(targetClass, parameterizedType, components);
+		refuseSharedNames(targetClass, components);
 
 		// Modify the order of fields if order annotation supplied.
 		FieldOrder dataOrder = targetClass.getAnnotation(FieldOrder.class);
@@ -411,6 +414,24 @@ public class DefaultRecordBinder {
 			isRequired = fieldAnnotation.required();
 		}
 		return isRequired;
+	}
+
+	/**
+	 * A name reaches one component, whichever finders found them: {@link DataClassRecord} indexes its fields by
+	 * name, so of two sharing one, a map writes and reads one value for both. An {@code @Unbound} component counts,
+	 * since a reader tells it apart by its name; the {@link Annotations} carrier does not, being filled from the
+	 * value's own annotations and never by name.
+	 */
+	private void refuseSharedNames(Class<?> targetClass, List<ComponentInfo> components)
+			throws CodeAnalysisException {
+		Set<String> names = new HashSet<>();
+		for (ComponentInfo info : components) {
+			String name = fieldName(info);
+			if (info.getType() != Annotations.class && !names.add(name)) {
+				throw new CodeAnalysisException(String.format("%s binds two components to the name '%s'; @Field on "
+						+ "one of them names it apart", targetClass.getName(), name));
+			}
+		}
 	}
 
 	private String fieldName(ComponentInfo info) {
