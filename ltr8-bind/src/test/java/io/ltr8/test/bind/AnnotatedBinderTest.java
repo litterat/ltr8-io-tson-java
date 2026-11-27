@@ -27,6 +27,8 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.mapper.ArrayMapper;
+import io.ltr8.bind.mapper.MapMapper;
 
 public class AnnotatedBinderTest {
 
@@ -103,6 +105,27 @@ public class AnnotatedBinderTest {
 
 		java.util.Map<Annotated<String>, Integer> byName = java.util.Map.of(Annotated.of("a", note), 1);
 		Assertions.assertEquals(1, byName.get(Annotated.of("a")));
+	}
+
+	/** A box is written as its value, so a read gives the value back with no annotations. */
+	@Test
+	public void aBoxedFieldCarriesItsValueThroughBothMappers() throws Throwable {
+		Annotations note = Annotations.of(java.util.List.of(Annotation.of("doc", "x")));
+		Boxed boxed = new Boxed(Annotated.of("n", note), 2);
+		Boxed absent = new Boxed(null, 2);
+		ArrayMapper arrays = new ArrayMapper(context);
+		MapMapper maps = new MapMapper(context);
+		Boxed fromArray = arrays.toObject(Boxed.class, arrays.toArray(boxed));
+		Boxed fromMap = (Boxed) maps.toObject(Boxed.class, maps.toMap(boxed));
+		Assertions.assertAll(
+				() -> Assertions.assertArrayEquals(new Object[] { "n", 2 }, arrays.toArray(boxed)),
+				() -> Assertions.assertEquals(java.util.Map.of("name", "n", "count", 2), maps.toMap(boxed)),
+				() -> Assertions.assertEquals(Annotated.of("n"), fromArray.name()),
+				() -> Assertions.assertEquals(Annotated.of("n"), fromMap.name()),
+				() -> Assertions.assertTrue(fromArray.name().annotations().isEmpty()),
+				() -> Assertions.assertTrue(fromMap.name().annotations().isEmpty()),
+				() -> Assertions.assertEquals(absent, arrays.toObject(Boxed.class, arrays.toArray(absent))),
+				() -> Assertions.assertEquals(absent, maps.toObject(Boxed.class, maps.toMap(absent))));
 	}
 
 	@Test
