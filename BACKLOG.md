@@ -517,9 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **`ArrayMapper.toObject` given an array shorter than the class's fields throws unchecked.** A record of three
-  fields read from a two-element array throws `ArrayIndexOutOfBoundsException`. Refuse the read with a
-  `DataBindException` naming the class and both counts, with a test of a short and a long array.
 - [ ] **`ArrayMapper` cannot read back an absent `Optional<List<String>>`.** `toArray` writes the empty optional
   and `toObject` throws `DataBindException` ("Failed to convert array"): `ArrayToObjectBridge.toObject` dereferences
   the `null` of the absent component. `MapMapper` round-trips it. Pass the absence through, with a round trip of an

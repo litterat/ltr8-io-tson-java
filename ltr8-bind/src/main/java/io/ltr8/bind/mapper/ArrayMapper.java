@@ -50,6 +50,17 @@ import java.util.Objects;
  */
 public class ArrayMapper {
 
+	private static final MethodHandle CHECKED_LENGTH;
+
+	static {
+		try {
+			CHECKED_LENGTH = MethodHandles.lookup().findStatic(ArrayMapper.class, "checkedLength",
+					MethodType.methodType(Object[].class, DataClassRecord.class, Object[].class));
+		} catch (NoSuchMethodException | IllegalAccessException e) {
+			throw new ExceptionInInitializerError(e);
+		}
+	}
+
 	private final DataBindContext context;
 
 	private final Map<DataClass, ArrayFunctions> functionCache;
@@ -200,6 +211,7 @@ public class ArrayMapper {
 
                 }
 
+                result = MethodHandles.filterArguments(result, 0, CHECKED_LENGTH.bindTo(dataClassRecord));
                 result = result.asType(result.type().changeReturnType(dataClass.dataClass()));
             }
             case DataClassArray dataArrayClass -> {
@@ -264,6 +276,18 @@ public class ArrayMapper {
 		}
 
 		return result;
+	}
+
+	/**
+	 * A record's values line up with its fields by position, so an array of any other length leaves a field
+	 * without a value or a value without a field.
+	 */
+	private static Object[] checkedLength(DataClassRecord record, Object[] values) throws DataBindException {
+		if (values.length != record.fields().length) {
+			throw new DataBindException(String.format("%s has %d fields but the array has length %d",
+					record.typeClass().getName(), record.fields().length, values.length));
+		}
+		return values;
 	}
 
 	/**
