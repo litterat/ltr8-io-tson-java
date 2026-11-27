@@ -19,8 +19,6 @@ import io.ltr8.annotation.Field;
 import io.ltr8.bind.analysis.ComponentInfo.Role;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.*;
 import java.util.*;
@@ -41,8 +39,6 @@ public class GetSetFinder implements ComponentFinder {
 		List<ComponentInfo> getSetList = new ArrayList<>();
 		Map<ComponentInfo, Member> members = new IdentityHashMap<>();
 
-		Lookup lookup = MethodHandles.publicLookup();
-
 		// A member a super class declares is typed at the arguments the described class binds.
 		Map<TypeVariable<?>, Type> bindings = TypeArguments.inherited(clss);
 
@@ -61,9 +57,9 @@ public class GetSetFinder implements ComponentFinder {
 				ComponentInfo info = new ComponentInfo(classField.getName(), erasure);
 				info.addMember(Role.PUBLIC_FIELD, classField);
 
-				reachField(lookup, clss, classField, info);
-				MethodHandle read = info.getReadMethod();
-				MethodHandle write = info.getWriteMethod();
+				Members.FieldHandles handles = Members.fieldDescribedFirst(clss, classField);
+				MethodHandle read = handles.read();
+				MethodHandle write = handles.write();
 				info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
 				info.setWriteMethod(write.asType(write.type().changeParameterType(1, erasure)));
 
@@ -128,8 +124,8 @@ public class GetSetFinder implements ComponentFinder {
 			info.addMember(Role.GETTER, getter);
 			info.addMember(Role.SETTER, setter);
 
-			MethodHandle read = reachMethod(lookup, clss, getter);
-			MethodHandle write = reachMethod(lookup, clss, setter);
+			MethodHandle read = Members.virtualDescribedFirst(clss, getter);
+			MethodHandle write = Members.virtualDescribedFirst(clss, setter);
 			info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
 			// A fluent setter returns its object, or another the old value; either is dropped.
 			info.setWriteMethod(write.asType(MethodType.methodType(void.class, write.type().parameterType(0), erasure)));
@@ -238,54 +234,6 @@ public class GetSetFinder implements ComponentFinder {
 	 * setter, or null for a field.
 	 */
 	private record Member(Class<?> declarer, Method getter, Method setter) {
-	}
-
-	/**
-	 * A public member of a super class that is not public is reached through the described class, as the JVM
-	 * resolves it; unreflected, it is checked against the class declaring it. A field is reached so only where the
-	 * described class resolves its name and type to that field and not to one hiding it.
-	 */
-	private static void reachField(Lookup lookup, Class<?> clss, java.lang.reflect.Field field, ComponentInfo info)
-			throws CodeAnalysisException {
-		try {
-			try {
-				MethodHandle read = lookup.findGetter(clss, field.getName(), field.getType());
-				if (MethodHandles.reflectAs(java.lang.reflect.Field.class, read).equals(field)) {
-					info.setReadMethod(read);
-					info.setWriteMethod(lookup.findSetter(clss, field.getName(), field.getType()));
-					return;
-				}
-			} catch (NoSuchFieldException | IllegalAccessException e) {
-				// Reached from its own class, or not at all, where the refusal names the field.
-			}
-			info.setReadMethod(lookup.unreflectGetter(field));
-			info.setWriteMethod(lookup.unreflectSetter(field));
-		} catch (IllegalAccessException e) {
-			throw notAccessible(clss, e);
-		}
-	}
-
-	/**
-	 * Reached as {@link #reachField} is, and with no check of what the described class resolves: a call dispatches
-	 * to the same override whichever declaration it names.
-	 */
-	private static MethodHandle reachMethod(Lookup lookup, Class<?> clss, Method method) throws CodeAnalysisException {
-		try {
-			try {
-				return lookup.findVirtual(clss, method.getName(),
-						MethodType.methodType(method.getReturnType(), method.getParameterTypes()));
-			} catch (NoSuchMethodException | IllegalAccessException e) {
-				// Reached from its own class, or not at all, where the refusal names the method.
-			}
-			return lookup.unreflect(method);
-		} catch (IllegalAccessException e) {
-			throw notAccessible(clss, e);
-		}
-	}
-
-	private static CodeAnalysisException notAccessible(Class<?> clss, IllegalAccessException e) {
-		return new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: %s",
-				clss.getName(), e.getMessage()), e);
 	}
 
 	private static String wireName(ComponentInfo component) {
