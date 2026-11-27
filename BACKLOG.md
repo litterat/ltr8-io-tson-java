@@ -535,10 +535,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   variable and a parameterized type's arguments, so `T[] getItems()` and `List<? extends T> getItems()` in
   `Holder<T>` keep `T` for `TextHolder extends Holder<String>`. Read, not run. Substitute inside both, with a round
   trip of each shape as a pair and as a public field.
-- [ ] **A constructor storing a parameter in a field it inherits is refused.** `Sub(String name) { this.name = name;
-  }` over a `protected String name` its super class declares is refused with "…constructor assigns field 'name',
-  which the class does not declare": `ImmutableFinder` looks the field up on the described class alone. Look it up
-  through the super classes, with the accessor and the public-field read each finding it, and a round trip.
 - [ ] **`ArrayMapper` cannot write a map component.** For a record with a `Map<String, Integer>` component,
   `new ArrayMapper(context).toArray(…)` throws `DataBindException` ("unexpected data class type"); `MapMapper`
   writes it. Give a map a place in `ArrayMapper`'s write and read, with a round trip of a map of atoms and a map of

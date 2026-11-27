@@ -113,6 +113,14 @@ import io.ltr8.test.data.ToDataBridges.Problem;
 import io.ltr8.test.data.ToDataBridges.ProtectedConstructor;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.lang.classfile.Annotation;
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.attribute.RuntimeVisibleAnnotationsAttribute;
+import java.lang.constant.ClassDesc;
+import java.lang.constant.ConstantDescs;
+import java.lang.constant.MethodTypeDesc;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -768,9 +776,8 @@ class RecordRefusalTest {
 	private static final List<Class<?>> SUPER_REFUSALS = List.of(RecordRefusals.CallsProtectedSuper.class,
 			RecordRefusals.CallsPackagePrivateSuper.class, RecordRefusals.ReachesProtectedSuper.class,
 			RecordRefusals.CallsTransformingSuper.class, RecordRefusals.CallsDroppingSuper.class,
-			RecordRefusals.AssignsInheritedField.class, RecordRefusals.HoldsCallsProtectedSuper.class,
-			RecordRefusals.HoldsReachesProtectedSuper.class, RecordRefusals.HoldsCallsTransformingSuper.class,
-			RecordRefusals.HoldsAssignsInheritedField.class);
+			RecordRefusals.HoldsCallsProtectedSuper.class, RecordRefusals.HoldsReachesProtectedSuper.class,
+			RecordRefusals.HoldsCallsTransformingSuper.class);
 
 	private static String superNotPublic(Class<?> type, Class<?> superClass) {
 		return type.getName() + "'s constructor calls " + superClass.getName()
@@ -817,12 +824,14 @@ class RecordRefusalTest {
 				() -> assertNull(drops.getCause()));
 	}
 
+	/** No compiler writes such a store, so the class is generated; the JVM resolves the field only when it runs. */
 	@Test
-	void aConstructorAssigningAnInheritedFieldIsRefusedNamingTheClassAndFieldWithTheCauseKept() {
-		DataBindException refused = refusal(context, RecordRefusals.AssignsInheritedField.class);
-		assertEquals(RecordRefusals.AssignsInheritedField.class.getName() + "'s constructor assigns field 'name', "
-				+ "which the class does not declare", refused.getMessage());
-		assertInstanceOf(NoSuchFieldException.class, refused.getCause());
+	void aConstructorStoringIntoAFieldThatResolvesToNoneIsRefusedNamingTheClassAndField() throws Exception {
+		Class<?> type = StoresIntoMissingField.define();
+		DataBindException refused = refusal(context, type);
+		assertEquals(type.getName() + "'s constructor assigns field " + type.getName() + ".missing, which resolves "
+				+ "to no field of the class or a super class", refused.getMessage());
+		assertNull(refused.getCause());
 	}
 
 	@Test
@@ -833,9 +842,7 @@ class RecordRefusalTest {
 				() -> assertEquals(notPublic, message(RecordRefusals.HoldsCallsProtectedSuper.class)),
 				() -> assertEquals(notPublic, message(RecordRefusals.HoldsReachesProtectedSuper.class)),
 				() -> assertEquals(message(RecordRefusals.CallsTransformingSuper.class),
-						message(RecordRefusals.HoldsCallsTransformingSuper.class)),
-				() -> assertEquals(message(RecordRefusals.AssignsInheritedField.class),
-						message(RecordRefusals.HoldsAssignsInheritedField.class)));
+						message(RecordRefusals.HoldsCallsTransformingSuper.class)));
 	}
 
 	@Test
@@ -857,6 +864,48 @@ class RecordRefusalTest {
 			assertEquals(first, message(DataBindContext.builder().build(), type));
 		}));
 		assertEquals(2, assertInstanceOf(DataClassRecord.class, fresh.getDescriptor(Good.class)).fields().length);
+	}
+
+	/** Loads the one class it generates and serves its class file, which the analysis reads. */
+	private static final class StoresIntoMissingField extends ClassLoader {
+
+		private static final String NAME = "generated.StoresIntoMissingField";
+
+		private static final ClassDesc SELF = ClassDesc.of(NAME);
+
+		private final byte[] bytes = ClassFile.of().build(SELF, type -> type
+				.withFlags(ClassFile.ACC_PUBLIC | ClassFile.ACC_SUPER)
+				.withMethod(ConstantDescs.INIT_NAME, MethodTypeDesc.of(ConstantDescs.CD_void, ConstantDescs.CD_String),
+						ClassFile.ACC_PUBLIC, constructor -> constructor
+								.with(RuntimeVisibleAnnotationsAttribute.of(Annotation.of(Record.class.describeConstable()
+										.orElseThrow())))
+								.withCode(code -> code.aload(0)
+										.invokespecial(ConstantDescs.CD_Object, ConstantDescs.INIT_NAME,
+												ConstantDescs.MTD_void)
+										.aload(0).aload(1).putfield(SELF, "missing", ConstantDescs.CD_String)
+										.return_())));
+
+		private StoresIntoMissingField() {
+			super(RecordRefusalTest.class.getClassLoader());
+		}
+
+		static Class<?> define() throws ClassNotFoundException {
+			return new StoresIntoMissingField().loadClass(NAME);
+		}
+
+		@Override
+		protected Class<?> findClass(String name) throws ClassNotFoundException {
+			if (!name.equals(NAME)) {
+				throw new ClassNotFoundException(name);
+			}
+			return defineClass(name, bytes, 0, bytes.length);
+		}
+
+		@Override
+		public InputStream getResourceAsStream(String name) {
+			return name.equals(NAME.replace('.', '/') + ".class") ? new ByteArrayInputStream(bytes)
+					: super.getResourceAsStream(name);
+		}
 	}
 
 	// --- classes the public lookup cannot reach

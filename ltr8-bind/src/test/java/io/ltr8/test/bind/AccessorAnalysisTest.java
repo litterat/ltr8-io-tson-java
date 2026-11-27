@@ -65,6 +65,15 @@ import io.ltr8.test.data.AccessorAnalyses.ShadowsNamedOnField;
 import io.ltr8.test.data.AccessorAnalyses.ShadowsRenamedBase;
 import io.ltr8.test.data.AccessorAnalyses.ShadowsUnnamed;
 import io.ltr8.test.data.AccessorAnalyses.StaticMethodNamedForField;
+import io.ltr8.test.data.AccessorAnalyses.StoresAnnotatedInheritedFields;
+import io.ltr8.test.data.AccessorAnalyses.StoresBothFieldsOfOneName;
+import io.ltr8.test.data.AccessorAnalyses.StoresHiddenInheritedField;
+import io.ltr8.test.data.AccessorAnalyses.StoresHiddenInheritedPublicField;
+import io.ltr8.test.data.AccessorAnalyses.StoresHiddenSuperField;
+import io.ltr8.test.data.AccessorAnalyses.StoresInheritedField;
+import io.ltr8.test.data.AccessorAnalyses.StoresInheritedFieldReadBySubclass;
+import io.ltr8.test.data.AccessorAnalyses.StoresInheritedFieldTwoUp;
+import io.ltr8.test.data.AccessorAnalyses.StoresInheritedPublicField;
 import io.ltr8.test.data.AccessorAnalyses.StaticMethodOverPublicField;
 import io.ltr8.test.data.AccessorAnalyses.UnionMembersDiffer;
 import io.ltr8.test.data.AccessorAnalyses.UnionOnAccessor;
@@ -464,6 +473,60 @@ class AccessorAnalysisTest {
 				() -> assertTrue(field(BindsOnePublicMutableField.class, 1).setter().isPresent()),
 				() -> assertEquals(Arrays.asList("v", "n"), values(BindsOnePublicMutableField.class, noted)),
 				() -> roundTrips(List.of(noted, new BindsOnePublicMutableField("v"))));
+	}
+
+	// --- a field a super class declares, which the subclass's own constructor stores
+
+	@Test
+	void anInheritedFieldTheConstructorStoresIsReadThroughTheAccessorReturningIt() {
+		assertAll(Stream.of(new StoresInheritedField("v"), new StoresInheritedFieldTwoUp("v"),
+				new StoresInheritedFieldReadBySubclass("v"), new StoresHiddenInheritedField("v")).map(value -> () -> {
+					Class<?> type = value.getClass();
+					assertEquals(List.of("name:String"), fields(type), type.getName());
+					assertEquals(type, field(type, 0).accessor().type().parameterType(0), type.getName());
+					assertEquals(List.of("v"), values(type, value), type.getName());
+				}));
+	}
+
+	@Test
+	void anInheritedPublicFieldTheConstructorStoresIsReadDirectly() {
+		assertAll(Stream.of(new StoresInheritedPublicField("v"), new StoresHiddenInheritedPublicField("v"))
+				.map(value -> () -> {
+					Class<?> type = value.getClass();
+					assertEquals(List.of("name:String"), fields(type), type.getName());
+					assertEquals(type, field(type, 0).accessor().type().parameterType(0), type.getName());
+					assertTrue(field(type, 0).setter().isPresent(), type.getName());
+					assertEquals(List.of("v"), values(type, value), type.getName());
+				}));
+	}
+
+	@Test
+	void theAnnotationsOnAnInheritedFieldTheConstructorStoresApply() throws DataBindException {
+		assertEquals(List.of("label:String", "tag:Object"), fields(StoresAnnotatedInheritedFields.class));
+		DataClassUnion union = assertInstanceOf(DataClassUnion.class,
+				field(StoresAnnotatedInheritedFields.class, 1).dataClass());
+		assertEquals(List.of(String.class, Integer.class), List.of(union.memberTypes()));
+		assertTrue(union.isSealed());
+	}
+
+	/** The field a store names is the one its owner reaches, not the described class's field of that name. */
+	@Test
+	void aStoreIntoASuperClassFieldThatASubclassFieldHidesBindsTheSuperClassField() {
+		assertAll(
+				() -> assertEquals(List.of("name:String"), fields(StoresHiddenSuperField.class)),
+				() -> assertEquals(List.of("v"), values(StoresHiddenSuperField.class, new StoresHiddenSuperField("v"))),
+				() -> assertEquals(List.of("name:String", "own:String"), fields(StoresBothFieldsOfOneName.class)),
+				() -> assertEquals(List.of("b", "s"),
+						values(StoresBothFieldsOfOneName.class, new StoresBothFieldsOfOneName("b", "s"))));
+	}
+
+	@Test
+	void classesStoringInheritedFieldsRoundTrip() {
+		roundTrips(List.of(new StoresInheritedField("v"), new StoresInheritedFieldTwoUp("v"),
+				new StoresInheritedFieldReadBySubclass("v"), new StoresInheritedPublicField("v"),
+				new StoresHiddenInheritedField("v"), new StoresHiddenInheritedPublicField("v"),
+				new StoresAnnotatedInheritedFields("n", "x"), new StoresAnnotatedInheritedFields("n", 7),
+				new StoresHiddenSuperField("v"), new StoresBothFieldsOfOneName("b", "s")));
 	}
 
 	// --- helpers

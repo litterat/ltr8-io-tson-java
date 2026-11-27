@@ -1471,4 +1471,246 @@ public final class AccessorAnalyses {
 			return Objects.hash(name, note);
 		}
 	}
+
+	// --- a field a super class declares, which the subclass's own constructor stores
+
+	public static class ProtectedNameBase {
+
+		protected String name;
+
+		public String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((ProtectedNameBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	/** Read back through its super class's accessor. */
+	public static class StoresInheritedField extends ProtectedNameBase {
+
+		@Record
+		public StoresInheritedField(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class ProtectedNameMiddle extends ProtectedNameBase {
+	}
+
+	public static class StoresInheritedFieldTwoUp extends ProtectedNameMiddle {
+
+		@Record
+		public StoresInheritedFieldTwoUp(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class ProtectedFieldBase {
+
+		protected String name;
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((ProtectedFieldBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	/** Its own accessor returns the field its super class declares. */
+	public static class StoresInheritedFieldReadBySubclass extends ProtectedFieldBase {
+
+		@Record
+		public StoresInheritedFieldReadBySubclass(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	public static class UnsetPublicFieldBase {
+
+		public String name;
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(name, ((UnsetPublicFieldBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	/** No accessor: the inherited field is read directly. */
+	public static class StoresInheritedPublicField extends UnsetPublicFieldBase {
+
+		@Record
+		public StoresInheritedPublicField(String name) {
+			this.name = name;
+		}
+	}
+
+	static class HiddenProtectedNameBase {
+
+		protected String name;
+
+		public String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(name, ((HiddenProtectedNameBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class StoresHiddenInheritedField extends HiddenProtectedNameBase {
+
+		@Record
+		public StoresHiddenInheritedField(String name) {
+			this.name = name;
+		}
+	}
+
+	static class HiddenPublicMutableFieldBase {
+
+		public String name;
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(name, ((HiddenPublicMutableFieldBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class StoresHiddenInheritedPublicField extends HiddenPublicMutableFieldBase {
+
+		@Record
+		public StoresHiddenInheritedPublicField(String name) {
+			this.name = name;
+		}
+	}
+
+	public static class AnnotatedFieldBase {
+
+		@Field("label")
+		protected String name;
+
+		@Union({ String.class, Integer.class })
+		protected Object tag;
+
+		public String name() {
+			return name;
+		}
+
+		public Object tag() {
+			return tag;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(name, ((AnnotatedFieldBase) obj).name)
+					&& Objects.equals(tag, ((AnnotatedFieldBase) obj).tag);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, tag);
+		}
+	}
+
+	public static class StoresAnnotatedInheritedFields extends AnnotatedFieldBase {
+
+		@Record
+		public StoresAnnotatedInheritedFields(String name, Object tag) {
+			this.name = name;
+			this.tag = tag;
+		}
+	}
+
+	public static class HidingBase {
+
+		protected String name;
+
+		public String baseName() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((HidingBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	/** Stores its argument in the super class's field that its own field of that name hides. */
+	public static class StoresHiddenSuperField extends HidingBase {
+
+		@SuppressWarnings("unused")
+		private String name = "own";
+
+		@Record
+		public StoresHiddenSuperField(String name) {
+			super.name = name;
+		}
+	}
+
+	/** Stores one argument in the super class's field and one in its own field hiding it. */
+	public static class StoresBothFieldsOfOneName extends HidingBase {
+
+		private String name;
+
+		@Record
+		public StoresBothFieldsOfOneName(String base, String own) {
+			super.name = base;
+			this.name = own;
+		}
+
+		@Field("own")
+		public String ownName() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj) && Objects.equals(name, ((StoresBothFieldsOfOneName) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * super.hashCode() + Objects.hashCode(name);
+		}
+	}
 }
