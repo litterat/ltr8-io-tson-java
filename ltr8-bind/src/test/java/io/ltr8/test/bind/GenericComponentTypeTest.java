@@ -38,17 +38,18 @@ public class GenericComponentTypeTest {
 				RecNested: CodeAnalysisException: Unrecognized parameterized type
 				RecNested<String>: RecNested(value:List [[String]])
 				RecBare: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				RecBare<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				RecBare<String>: RecBare(value:String String)
 				RecArray: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				RecArray<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				RecArray<String>: RecArray(value:String[] [String])
 				RecWild: CodeAnalysisException: Unrecognized parameterized type
 				RecWild<String>: CodeAnalysisException: Unrecognized parameterized type
-				RecOpt: ClassCastException
+				RecOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$RecOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				RecOpt<String>: RecOpt(value:String String)
 				RecOptList: CodeAnalysisException: Unrecognized parameterized type
 				RecOptList<String>: RecOptList(value:List [String])
 				RecBridged: CodeAnalysisException: Bridge object type not assignable from field type
-				RecBridged<String>: CodeAnalysisException: Bridge object type not assignable from field type
+				RecBridged<String>: RecBridged(value:String String)
 				HoldsRec: HoldsRec(held:RecList RecList(value:List [String]))
 				""", table("Rec", null, SHAPES, false));
 	}
@@ -63,17 +64,18 @@ public class GenericComponentTypeTest {
 				ProfNested: CodeAnalysisException: Unrecognized parameterized type
 				ProfNested<String>: ProfNested(value:List [[String]])
 				ProfBare: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				ProfBare<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				ProfBare<String>: ProfBare(value:String String)
 				ProfArray: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				ProfArray<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				ProfArray<String>: ProfArray(value:String[] [String])
 				ProfWild: CodeAnalysisException: Unrecognized parameterized type
 				ProfWild<String>: CodeAnalysisException: Unrecognized parameterized type
-				ProfOpt: ClassCastException
+				ProfOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$ProfOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				ProfOpt<String>: ProfOpt(value:String String)
 				ProfOptList: CodeAnalysisException: Unrecognized parameterized type
 				ProfOptList<String>: ProfOptList(value:List [String])
 				ProfBridged: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				ProfBridged<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				ProfBridged<String>: ProfBridged(value:String String)
 				HoldsProf: HoldsProf(held:ProfList ProfList(value:List [String]))
 				""", table("Prof", "p", SHAPES, false));
 	}
@@ -91,22 +93,23 @@ public class GenericComponentTypeTest {
 				CtorNested<String>: CtorNested(value:List [[String]])
 				TextCtorNested: TextCtorNested(value:List [[String]])
 				CtorBare: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				CtorBare<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				CtorBare<String>: CtorBare(value:String String)
 				TextCtorBare: TextCtorBare(value:String String)
 				CtorArray: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				CtorArray<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				CtorArray<String>: CtorArray(value:String[] [String])
 				TextCtorArray: TextCtorArray(value:String[] [String])
 				CtorWild: CodeAnalysisException: Unrecognized parameterized type
 				CtorWild<String>: CodeAnalysisException: Unrecognized parameterized type
 				TextCtorWild: CodeAnalysisException: Unrecognized parameterized type
-				CtorOpt: ClassCastException
+				CtorOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$CtorOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				CtorOpt<String>: CtorOpt(value:String String)
 				TextCtorOpt: TextCtorOpt(value:String String)
 				CtorOptList: CodeAnalysisException: Unrecognized parameterized type
 				CtorOptList<String>: CtorOptList(value:List [String])
 				TextCtorOptList: TextCtorOptList(value:List [String])
 				CtorBridged: CodeAnalysisException: Bridge object type not assignable from field type
-				CtorBridged<String>: CodeAnalysisException: Bridge object type not assignable from field type
+				CtorBridged<String>: CtorBridged(value:String String)
 				TextCtorBridged: TextCtorBridged(value:String String)
 				HoldsCtor: HoldsCtor(held:CtorList CtorList(value:List [String]))
 				""", table("Ctor", null, SHAPES, true));
@@ -115,15 +118,16 @@ public class GenericComponentTypeTest {
 	@Test
 	void aConstructorNamingItsParameter() {
 		assertEquals("""
-				NamedList: CodeAnalysisException: Collection must provide parameterized type information
-				NamedList<String>: CodeAnalysisException: Collection must provide parameterized type information
-				NamedMap: CodeAnalysisException: Map must provide parameterized type information
-				NamedMap<String>: CodeAnalysisException: Map must provide parameterized type information
+				NamedList: CodeAnalysisException: Unrecognized parameterized type
+				NamedList<String>: NamedList(value:List [String])
+				NamedMap: CodeAnalysisException: Unrecognized parameterized type for map key/value
+				NamedMap<String>: NamedMap(value:Map {String=String})
 				NamedBare: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				NamedBare<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				NamedOpt: DataBindException: Unable to find a valid data conversion for class: class java.util.Optional
-				NamedOpt<String>: DataBindException: Unable to find a valid data conversion for class: class java.util.Optional
-				HoldsNamed: CodeAnalysisException: Collection must provide parameterized type information
+				NamedBare<String>: NamedBare(value:String String)
+				NamedOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$NamedOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
+				NamedOpt<String>: NamedOpt(value:String String)
+				HoldsNamed: HoldsNamed(held:NamedList NamedList(value:List [String]))
 				""", table("Named", null, new String[] { "List", "Map", "Bare", "Opt" }, false));
 	}
 
@@ -140,22 +144,23 @@ public class GenericComponentTypeTest {
 				PubNested<String>: PubNested(value:List set [[String]])
 				TextPubNested: TextPubNested(value:List set [[String]])
 				PubBare: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				PubBare<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				PubBare<String>: PubBare(value:String set String)
 				TextPubBare: TextPubBare(value:String set String)
 				PubArray: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				PubArray<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				PubArray<String>: PubArray(value:String[] set [String])
 				TextPubArray: TextPubArray(value:String[] set [String])
 				PubWild: CodeAnalysisException: Unrecognized parameterized type
 				PubWild<String>: CodeAnalysisException: Unrecognized parameterized type
 				TextPubWild: CodeAnalysisException: Unrecognized parameterized type
-				PubOpt: ClassCastException
+				PubOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$PubOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				PubOpt<String>: PubOpt(value:String set String)
 				TextPubOpt: TextPubOpt(value:String set String)
 				PubOptList: CodeAnalysisException: Unrecognized parameterized type
 				PubOptList<String>: PubOptList(value:List set [String])
 				TextPubOptList: TextPubOptList(value:List set [String])
 				PubBridged: CodeAnalysisException: Bridge object type not assignable from field type
-				PubBridged<String>: CodeAnalysisException: Bridge object type not assignable from field type
+				PubBridged<String>: PubBridged(value:String set String)
 				TextPubBridged: TextPubBridged(value:String set String)
 				HoldsPub: HoldsPub(held:PubList PubList(value:List set [String]))
 				""", table("Pub", null, SHAPES, true));
@@ -174,22 +179,23 @@ public class GenericComponentTypeTest {
 				PairNested<String>: PairNested(value:List set [[String]])
 				TextPairNested: TextPairNested(value:List set [[String]])
 				PairBare: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				PairBare<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				PairBare<String>: PairBare(value:String set String)
 				TextPairBare: TextPairBare(value:String set String)
 				PairArray: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				PairArray<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				PairArray<String>: PairArray(value:String[] set [String])
 				TextPairArray: TextPairArray(value:String[] set [String])
 				PairWild: CodeAnalysisException: Unrecognized parameterized type
 				PairWild<String>: CodeAnalysisException: Unrecognized parameterized type
 				TextPairWild: CodeAnalysisException: Unrecognized parameterized type
-				PairOpt: ClassCastException
+				PairOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$PairOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				PairOpt<String>: PairOpt(value:String set String)
 				TextPairOpt: TextPairOpt(value:String set String)
 				PairOptList: CodeAnalysisException: Unrecognized parameterized type
 				PairOptList<String>: PairOptList(value:List set [String])
 				TextPairOptList: TextPairOptList(value:List set [String])
 				PairBridged: CodeAnalysisException: Bridge object type not assignable from field type
-				PairBridged<String>: CodeAnalysisException: Bridge object type not assignable from field type
+				PairBridged<String>: PairBridged(value:String set String)
 				TextPairBridged: TextPairBridged(value:String set String)
 				HoldsPair: HoldsPair(held:PairList PairList(value:List set [String]))
 				""", table("Pair", null, SHAPES, true));
@@ -208,22 +214,23 @@ public class GenericComponentTypeTest {
 				MergedNested<String>: MergedNested(value:List set [[String]])
 				TextMergedNested: TextMergedNested(value:List set [[String]])
 				MergedBare: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				MergedBare<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				MergedBare<String>: MergedBare(value:String set String)
 				TextMergedBare: TextMergedBare(value:String set String)
 				MergedArray: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				MergedArray<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				MergedArray<String>: MergedArray(value:String[] set [String])
 				TextMergedArray: TextMergedArray(value:String[] set [String])
 				MergedWild: CodeAnalysisException: Unrecognized parameterized type
 				MergedWild<String>: CodeAnalysisException: Unrecognized parameterized type
 				TextMergedWild: CodeAnalysisException: Unrecognized parameterized type
-				MergedOpt: ClassCastException
+				MergedOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$MergedOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				MergedOpt<String>: MergedOpt(value:String set String)
 				TextMergedOpt: TextMergedOpt(value:String set String)
 				MergedOptList: CodeAnalysisException: Unrecognized parameterized type
 				MergedOptList<String>: MergedOptList(value:List set [String])
 				TextMergedOptList: TextMergedOptList(value:List set [String])
 				MergedBridged: CodeAnalysisException: Bridge object type not assignable from field type
-				MergedBridged<String>: CodeAnalysisException: Bridge object type not assignable from field type
+				MergedBridged<String>: MergedBridged(value:String set String)
 				TextMergedBridged: TextMergedBridged(value:String set String)
 				HoldsMerged: HoldsMerged(held:MergedList MergedList(value:List set [String]))
 				""", table("Merged", null, SHAPES, true));
@@ -232,8 +239,13 @@ public class GenericComponentTypeTest {
 	@Test
 	void theRest() {
 		assertEquals("""
-				RecOptWild: ClassCastException
-				PairOptWild: ClassCastException
+				RecOptWild: CodeAnalysisException: io.ltr8.test.data.GenericComponents$RecOptWild's component 'value' \
+				is an Optional of ? extends java.lang.Number, neither a class nor a parameterized type
+				PairOptWild: CodeAnalysisException: io.ltr8.test.data.GenericComponents$PairOptWild's component 'value' \
+				is an Optional of ? extends java.lang.Number, neither a class nor a parameterized type
+				RecOptArray: CodeAnalysisException: io.ltr8.test.data.GenericComponents$RecOptArray's component 'value' \
+				is an Optional of T[], neither a class nor a parameterized type
+				RecOptArray<String>: RecOptArray(value:String[] [String])
 				PairSetterAtArgument: PairSetterAtArgument()
 				PairSetterAtArgument<String>: PairSetterAtArgument()
 				PassedCtorList: CodeAnalysisException: Unrecognized parameterized type
@@ -245,9 +257,12 @@ public class GenericComponentTypeTest {
 				ListPubBare: ListPubBare(value:List set [String])
 				ListPairBare: ListPairBare(value:List set [String])
 				RawCtorTextSetter: CodeAnalysisException: Collection must provide parameterized type information
+				PlainNamedList: PlainNamedList(value:List [String])
 				""", lines(
 				line("RecOptWild", null, null),
 				line("PairOptWild", null, null),
+				line("RecOptArray", null, null),
+				at("RecOptArray", null),
 				line("PairSetterAtArgument", null, null),
 				at("PairSetterAtArgument", null),
 				line("PassedCtorList", null, null),
@@ -258,7 +273,8 @@ public class GenericComponentTypeTest {
 				at("PassedPairList", null),
 				line("ListPubBare", null, null),
 				line("ListPairBare", null, null),
-				line("RawCtorTextSetter", null, null)));
+				line("RawCtorTextSetter", null, null),
+				line("PlainNamedList", null, null)));
 	}
 
 	// --- helpers

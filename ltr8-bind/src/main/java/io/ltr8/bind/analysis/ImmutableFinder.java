@@ -93,7 +93,7 @@ public class ImmutableFinder implements ComponentFinder {
             Parameter[] params = constructor.getParameters();
             Type[] types = new Type[params.length];
             for (int x = 0; x < params.length; x++) {
-                types[x] = TypeArguments.resolve(params[x].getParameterizedType(), params[x].getType(), bindings);
+                types[x] = TypeArguments.resolve(params[x].getParameterizedType(), bindings);
             }
 
             // First try and identify the constructor arguments via bytecode inspection.
@@ -119,7 +119,7 @@ public class ImmutableFinder implements ComponentFinder {
                         .filter(e -> e.getConstructorArgument() == paramIndex).toList();
                 Field field = params[x].getAnnotation(Field.class);
                 if (storing.isEmpty() && field != null) {
-                    ComponentInfo component = new ComponentInfo(field.value(), params[x].getType());
+                    ComponentInfo component = new ComponentInfo(field.value(), types[x]);
                     component.setConstructorArgument(x);
                     immutableFields.add(component);
                     storing = List.of(component);
@@ -383,7 +383,7 @@ public class ImmutableFinder implements ComponentFinder {
                     .findFirst().orElse(null);
             if (component != null
                     && (method.isAnnotationPresent(Field.class) || method.isAnnotationPresent(Union.class))) {
-                component.setReadMethod(Members.virtualDeclarerFirst(described, method));
+                component.setReadMethod(readAs(Members.virtualDeclarerFirst(described, method), component.getType()));
                 component.addMember(Role.ACCESSOR, method);
                 matched.add(name);
                 component.addAccessor(method);

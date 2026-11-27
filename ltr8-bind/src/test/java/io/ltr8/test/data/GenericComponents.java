@@ -83,6 +83,9 @@ public final class GenericComponents {
 	public record RecOptWild(Optional<? extends Number> value) {
 	}
 
+	public record RecOptArray<T>(Optional<T[]> value) {
+	}
+
 	public record HoldsRec(RecList<String> held) {
 	}
 
@@ -402,7 +405,24 @@ public final class GenericComponents {
 		}
 	}
 
+	public static class PlainNamedList {
+		private final List<String> value;
+
+		@Record
+		public PlainNamedList(@Field("value") List<String> value) {
+			this.value = List.copyOf(value);
+		}
+
+		public List<String> getValue() {
+			return value;
+		}
+	}
+
 	public record HoldsNamed(NamedList<String> held) {
+	}
+
+	public record HoldsAllNamed(NamedList<String> list, NamedMap<String> map, NamedBare<String> bare,
+			NamedOpt<String> opt, PlainNamedList plain) {
 	}
 
 	// --- a public field
@@ -1030,5 +1050,31 @@ public final class GenericComponents {
 	}
 
 	public record HoldsMerged(MergedList<String> held) {
+	}
+
+	// --- a bare type variable, and an array of one, at an argument
+
+	/** An accessor the constructor analysis cannot follow, found by its {@code @Field}. */
+	public static class FieldAccessorBare<T> {
+		private final T value;
+
+		@Record
+		public FieldAccessorBare(T value) {
+			this.value = value;
+		}
+
+		@Field
+		public T value() {
+			return java.util.Objects.requireNonNull(value);
+		}
+	}
+
+	public record HoldsBares(RecBare<String> rec, RecArray<String> recArray, CtorBare<String> ctor,
+			CtorArray<String> ctorArray, FieldAccessorBare<String> fieldAccessor, PubBare<String> pub,
+			PubArray<String> pubArray, PairBare<String> pair, PairArray<String> pairArray, MergedBare<String> merged,
+			MergedArray<String> mergedArray, PubBare<List<String>> pubList) {
+	}
+
+	public record HoldsProfBares(ProfBare<String> bare, ProfArray<String> array) {
 	}
 }

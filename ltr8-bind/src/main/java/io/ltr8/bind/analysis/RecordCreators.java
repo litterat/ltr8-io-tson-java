@@ -97,6 +97,9 @@ final class RecordCreators {
 						: dataArrayToObject(field, dataFields[x], bridges[x],
 								MethodHandles.arrayElementGetter(Object[].class),
 								MethodHandles.constant(int.class, slots[x]));
+				// A parameter of a type variable takes its erasure, where the component may be held at an argument.
+				arrayIndexGetter = arrayIndexGetter.asType(
+						arrayIndexGetter.type().changeReturnType(result.type().parameterType(arg)));
 
 				// ()-> constructor( ..., values[inputIndex] , ... )
 				result = MethodHandles.collectArguments(result, arg, arrayIndexGetter);
