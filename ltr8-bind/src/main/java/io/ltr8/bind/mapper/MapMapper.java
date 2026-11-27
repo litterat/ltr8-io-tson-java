@@ -44,6 +44,10 @@ import java.util.Objects;
  * among them, is its value in this form: the form has no place for annotations, so it reads back without them. For
  * the same reason a record's {@code Annotations} carrier has no key, and reads back holding none.
  * <p>
+ * A read refuses a union value whose class name names a class that cannot be a member before that class is
+ * initialised or described: a class the union lists can be, and so can a class of the union's type where the union
+ * admits additions.
+ * <p>
  * A read or a write missing a required field, or a tuple's read of an array of the wrong length or missing a
  * primitive element, throws the {@link DataBindException} that says so, however deep the value sits: no enclosing
  * record, list, map or union wraps it.
@@ -260,7 +264,7 @@ public class MapMapper {
                         // A tagged union uses "type" for the class name.
                         String type = (String) map.get("type");
 
-                        DataClass instantType = context.getDescriptor(Class.forName(type));
+                        DataClass instantType = context.getDescriptor(Checks.candidate(unionClass, type));
                         if (!unionClass.isMemberType(instantType.typeClass())) {
                             throw new DataBindException(String.format("instance type '%s' not of expected union type '%s'",
                                     instantType.typeClass().getName(), unionClass.typeClass().getName()));

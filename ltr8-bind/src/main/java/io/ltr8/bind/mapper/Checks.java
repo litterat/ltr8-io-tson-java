@@ -20,6 +20,7 @@ import io.ltr8.bind.DataClassElement;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
+import io.ltr8.bind.DataClassUnion;
 
 /** The refusals both mappers make, so that each refuses the same value in the same words. */
 final class Checks {
@@ -31,6 +32,29 @@ final class Checks {
 	static DataBindException missingField(DataClassRecord record, DataClassField field) {
 		return new DataBindException(String.format("%s is missing its required field '%s'",
 				record.typeClass().getName(), field.name()));
+	}
+
+	/**
+	 * The class a union value's data names, loaded without being initialised and refused before anything describes
+	 * it unless it can be a member: one {@code union} lists, or, where the union admits additions, a class of its
+	 * type. Data supplies the name, and must not be able to run a class's static initialiser, or have it described,
+	 * by naming it. A sealed union admits nothing it does not list ({@link DataClassUnion#isMemberType}), so a class
+	 * of its type that it does not list is refused here too.
+	 *
+	 * @throws ClassNotFoundException where the name resolves to no class
+	 */
+	static Class<?> candidate(DataClassUnion union, String name) throws DataBindException, ClassNotFoundException {
+		Class<?> candidate = Class.forName(name, false, Checks.class.getClassLoader());
+		for (Class<?> member : union.memberTypes()) {
+			if (member == candidate) {
+				return candidate;
+			}
+		}
+		if (!union.isSealed() && union.typeClass().isAssignableFrom(candidate)) {
+			return candidate;
+		}
+		throw new DataBindException(String.format("'%s' is not a member of union %s", name,
+				union.typeClass().getName()));
 	}
 
 	/**

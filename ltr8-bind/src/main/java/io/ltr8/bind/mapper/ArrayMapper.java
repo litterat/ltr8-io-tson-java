@@ -50,6 +50,10 @@ import java.util.Objects;
  * no place for annotations, so it reads back without them. For the same reason a record's {@code Annotations}
  * carrier takes no place in its array, and reads back holding none.
  * <p>
+ * A union value is a {@code [name, value]} pair of its class's name and its value in this form. A read refuses a name
+ * of a class that cannot be a member before that class is initialised or described: a class the union lists can be,
+ * and so can a class of the union's type where the union admits additions.
+ * <p>
  * A read refused for a record's or a tuple's own shape -- its array's length, or the absence of a required field or
  * a primitive element -- and a write of a record holding no value for a required field, throw the
  * {@link DataBindException} that says so, however deep the value sits: no enclosing list, map or union wraps it.
@@ -831,7 +835,7 @@ public class ArrayMapper {
 					ArrayFunctions function = typeMap.get(unionType);
 					if (function == null) {
 
-						DataClass dataClass = context.getDescriptor(Class.forName(unionType));
+						DataClass dataClass = context.getDescriptor(Checks.candidate(unionClass, unionType));
 						if (!unionClass.isMemberType(dataClass.typeClass())) {
 							throw new DataBindException("Class not of union type");
 						}
