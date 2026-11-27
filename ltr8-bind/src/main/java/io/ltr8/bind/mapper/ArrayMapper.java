@@ -51,8 +51,8 @@ import java.util.Objects;
  * carrier takes no place in its array, and reads back holding none.
  * <p>
  * A read refused for a record's or a tuple's own shape -- its array's length, or the absence of a required field or
- * a primitive element -- throws the {@link DataBindException} that says so, however deep the value sits: no
- * enclosing list, map or union wraps it.
+ * a primitive element -- and a write of a record holding no value for a required field, throw the
+ * {@link DataBindException} that says so, however deep the value sits: no enclosing list, map or union wraps it.
  *
  * <ul>
  * <li>TODO add try/catch/throw around conversions
@@ -66,10 +66,14 @@ public class ArrayMapper {
 
 	private static final MethodHandle PART;
 
+	private static final MethodHandle ABSENT;
+
 	static {
 		try {
 			CHECKED = MethodHandles.lookup().findStatic(ArrayMapper.class, "checked",
 					MethodType.methodType(Object[].class, DataClassRecord.class, Object[].class));
+			ABSENT = MethodHandles.lookup().findStatic(ArrayMapper.class, "absent",
+					MethodType.methodType(void.class, DataClassRecord.class, DataClassField.class));
 			PART = MethodHandles.lookup().findStatic(ArrayMapper.class, "part",
 					MethodType.methodType(Object.class, MethodHandle.class, Object.class));
 		} catch (NoSuchMethodException | IllegalAccessException e) {
@@ -340,8 +344,7 @@ public class ArrayMapper {
 			}
 			Object value = values[position++];
 			if (value == null && fields[x].isRequired()) {
-				throw new DataBindException(String.format("%s is missing its required field '%s'",
-						record.typeClass().getName(), fields[x].name()));
+				throw Checks.missingField(record, fields[x]);
 			}
 			construct[x] = value;
 		}
@@ -350,6 +353,11 @@ public class ArrayMapper {
 
 	private static int wireLength(DataClassRecord record) {
 		return record.fields().length - (record.annotationsCarrier().isPresent() ? 1 : 0);
+	}
+
+	/** A write of a record holding no value for a required field, which a read of what it wrote would refuse. */
+	private static void absent(DataClassRecord record, DataClassField field) throws DataBindException {
+		throw Checks.missingField(record, field);
 	}
 
 	/**
@@ -542,11 +550,14 @@ public class ArrayMapper {
 			// ():void -> void;
 			MethodHandle noop = MethodHandles.constant(Void.class, null).asType(MethodType.methodType(void.class));
 
-			// (value[],object):void -> void;
-			MethodHandle noopElse = MethodHandles.dropArguments(noop, 0, Object[].class, dataClass.dataClass());
+			// ():void -> void, or absent(record, field) for a required field
+			MethodHandle orElse = field.isRequired() ? MethodHandles.insertArguments(ABSENT, 0, dataClass, field) : noop;
+
+			// (value[],object):void -> orElse();
+			orElse = MethodHandles.dropArguments(orElse, 0, Object[].class, dataClass.dataClass());
 
 			// (value[],object):void -> if(isPresent(object)) { value[inputIndex] = toData( object.getter() ) }
-			MethodHandle checkAndSet = MethodHandles.guardWithTest(isPresentTest, arrayValueSetter, noopElse);
+			MethodHandle checkAndSet = MethodHandles.guardWithTest(isPresentTest, arrayValueSetter, orElse);
 
 			// add to list of getters.
 			result = MethodHandles.foldArguments(result, checkAndSet);
@@ -584,6 +595,8 @@ public class ArrayMapper {
 
 				return outputArray;
 
+			} catch (DataBindException e) {
+				throw e;
 			} catch (Throwable e) {
 				throw new DataBindException("Failed to convert array", e);
 			}
@@ -627,6 +640,8 @@ public class ArrayMapper {
 
 				try {
 					unionPair[1] = function.toArray.invoke(v);
+				} catch (DataBindException e) {
+					throw e;
 				} catch (Throwable e) {
 					throw new DataBindException("Failed to convert class", e);
 				}
@@ -745,6 +760,8 @@ public class ArrayMapper {
 							part(valueToData, mapClass.value().invoke(entry)) };
 				}
 				return entries;
+			} catch (DataBindException e) {
+				throw e;
 			} catch (Throwable e) {
 				throw new DataBindException("Failed to convert map", e);
 			}

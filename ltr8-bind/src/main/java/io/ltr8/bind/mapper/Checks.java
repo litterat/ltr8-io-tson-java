@@ -17,12 +17,20 @@ package io.ltr8.bind.mapper;
 
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassElement;
+import io.ltr8.bind.DataClassField;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 
 /** The refusals both mappers make, so that each refuses the same value in the same words. */
 final class Checks {
 
 	private Checks() {
+	}
+
+	/** Thrown alike for a read with no value for a required field and a write of a record holding none. */
+	static DataBindException missingField(DataClassRecord record, DataClassField field) {
+		return new DataBindException(String.format("%s is missing its required field '%s'",
+				record.typeClass().getName(), field.name()));
 	}
 
 	/**

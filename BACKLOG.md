@@ -526,10 +526,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `@Profile` are each dropped. Read each annotation from every member of a component, taking each `@Field`
   attribute from whichever member states it and refusing two members that state one differently, with a test of
   each annotation on each member of each class kind.
-- [ ] **A `null` required reference writes and then does not read.** `Marked(@Field(required = true) String name)`
-  holding `null` writes `{}` from `MapMapper` and a `null` slot from `ArrayMapper`, and the read of either is
-  refused as missing its required field (`MissingRequiredFieldMapperTest`). Refuse the write too, naming the class
-  and the field, in both mappers.
 - [ ] **A union read loads a class the data names before checking it is a member.** Both mappers' union reads
   call `Class.forName` on the type name in the data and then ask the union whether it is a member. Read, not run.
   Resolve the name among the union's members, with a test that a name outside them loads nothing.

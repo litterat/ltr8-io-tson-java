@@ -44,9 +44,9 @@ import java.util.Objects;
  * among them, is its value in this form: the form has no place for annotations, so it reads back without them. For
  * the same reason a record's {@code Annotations} carrier has no key, and reads back holding none.
  * <p>
- * A read missing a required field, or a tuple's read of an array of the wrong length or missing a primitive element,
- * throws the {@link DataBindException} that says so, however deep the value sits: no enclosing record, list, map or
- * union wraps it.
+ * A read or a write missing a required field, or a tuple's read of an array of the wrong length or missing a
+ * primitive element, throws the {@link DataBindException} that says so, however deep the value sits: no enclosing
+ * record, list, map or union wraps it.
  */
 public class MapMapper {
 
@@ -92,10 +92,15 @@ public class MapMapper {
                     for (fieldIndex = 0; fieldIndex < fields.length; fieldIndex++) {
                         DataClassField field = fields[fieldIndex];
 
-                        if (field != carrier && field.isPresent(object)) {
+                        if (field == carrier) {
+                            continue;
+                        }
+                        if (field.isPresent(object)) {
                             DataClass fieldDataClass = field.dataClass();
                             Object fv = toMap(fieldDataClass, field.get(object));
                             map.put(field.name(), fv);
+                        } else if (field.isRequired()) {
+                            throw Checks.missingField(dataRecord, field);
                         }
                     }
 
@@ -155,6 +160,8 @@ public class MapMapper {
                 case null, default -> throw new IllegalArgumentException("Unknown data class");
             }
 			return v;
+		} catch (DataBindException e) {
+			throw e;
 		} catch (Throwable t) {
             throw new DataBindException(String.format("Failed to convert %s to Map", dataClass.typeClass()), t);
 		}
@@ -202,8 +209,7 @@ public class MapMapper {
                         if (fv != null) {
                             fv = toObject(field.dataClass(), fv);
                         } else if (field.isRequired()) {
-                            throw new DataBindException(String.format("%s is missing its required field '%s'",
-                                    dataRecord.typeClass().getName(), field.name()));
+                            throw Checks.missingField(dataRecord, field);
                         }
                         construct[fieldIndex] = fv;
                     }

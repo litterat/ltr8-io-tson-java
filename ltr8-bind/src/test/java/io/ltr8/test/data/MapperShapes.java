@@ -118,6 +118,9 @@ public final class MapperShapes {
 	public record ListOfRequired(List<Required> items) {
 	}
 
+	public record MapOfRequired(Map<String, Required> items) {
+	}
+
 	public record ListOfTriples(List<Triple> triples) {
 	}
 
