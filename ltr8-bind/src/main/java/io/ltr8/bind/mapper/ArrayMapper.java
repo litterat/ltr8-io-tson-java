@@ -33,8 +33,10 @@ import io.ltr8.bind.DataClassUnion;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -72,8 +74,15 @@ public class ArrayMapper {
 
 	private static final MethodHandle ABSENT;
 
+	private static final MethodHandle DEFERRED_TO_DATA;
+
+	private static final MethodHandle DEFERRED_TO_OBJECT;
+
 	static {
 		try {
+			MethodType convert = MethodType.methodType(Object.class, Object.class);
+			DEFERRED_TO_DATA = MethodHandles.lookup().findVirtual(Deferred.class, "toData", convert);
+			DEFERRED_TO_OBJECT = MethodHandles.lookup().findVirtual(Deferred.class, "toObject", convert);
 			CHECKED = MethodHandles.lookup().findStatic(ArrayMapper.class, "checked",
 					MethodType.methodType(Object[].class, DataClassRecord.class, Object[].class));
 			ABSENT = MethodHandles.lookup().findStatic(ArrayMapper.class, "absent",
@@ -118,8 +127,8 @@ public class ArrayMapper {
 		ArrayFunctions af = functionCache.get(dataClass);
 		if (af == null) {
 
-			MethodHandle toArray = createToDataFunction(dataClass);
-			MethodHandle toObject = createToObjectFunction(dataClass);
+			MethodHandle toArray = toDataFunction(dataClass, new HashSet<>());
+			MethodHandle toObject = toObjectFunction(dataClass, new HashSet<>());
 
 			ArrayFunctions built = new ArrayFunctions(toArray, toObject);
 			af = functionCache.putIfAbsent(dataClass, built);
@@ -128,6 +137,57 @@ public class ArrayMapper {
 			}
 		}
 		return af;
+	}
+
+	/**
+	 * {@code building} holds the classes this walk is building functions for, from its root down: a class reached
+	 * again among them closes a cycle, so the edge back is {@link Deferred} instead of being built without end.
+	 */
+	private MethodHandle toDataFunction(DataClass dataClass, Set<DataClass> building) throws DataBindException {
+		if (!building.add(dataClass)) {
+			return DEFERRED_TO_DATA.bindTo(new Deferred(dataClass))
+					.asType(MethodType.methodType(Object.class, dataClass.typeClass()));
+		}
+		try {
+			return createToDataFunction(dataClass, building);
+		} finally {
+			building.remove(dataClass);
+		}
+	}
+
+	private MethodHandle toObjectFunction(DataClass dataClass, Set<DataClass> building) throws DataBindException {
+		if (!building.add(dataClass)) {
+			return DEFERRED_TO_OBJECT.bindTo(new Deferred(dataClass))
+					.asType(MethodType.methodType(dataClass.typeClass(), Object.class));
+		}
+		try {
+			return createToObjectFunction(dataClass, building);
+		} finally {
+			building.remove(dataClass);
+		}
+	}
+
+	/**
+	 * The edge back to a class whose functions are still being built. It looks them up when a value reaches it, by
+	 * when they exist -- or builds them then, where the walk that met the cycle was building another class's.
+	 */
+	private final class Deferred {
+
+		private final DataClass dataClass;
+
+		Deferred(DataClass dataClass) {
+			this.dataClass = dataClass;
+		}
+
+		@SuppressWarnings("unused")
+		public Object toData(Object value) throws Throwable {
+			return getFunctions(dataClass).toArray.invoke(value);
+		}
+
+		@SuppressWarnings("unused")
+		public Object toObject(Object value) throws Throwable {
+			return getFunctions(dataClass).toObject.invoke(value);
+		}
 	}
 
 	/**
@@ -180,7 +240,8 @@ public class ArrayMapper {
 	 * <p>
 	 * // calls the embed function on the object. return toObject( t );
 	 */
-	private MethodHandle createToObjectFunction(DataClass dataClass) throws DataBindException {
+	private MethodHandle createToObjectFunction(DataClass dataClass, Set<DataClass> building)
+			throws DataBindException {
 
 		// return MethodHandles.collectArguments(dataClass.toObject(), 0, create);
 		MethodHandle result = null;
@@ -199,8 +260,8 @@ public class ArrayMapper {
 			}
             case DataClassAnnotated annotated -> {
                 // (Object):box -> box(part(toObject, value), no annotations)
-                MethodHandle valueToObject = MethodHandles.insertArguments(PART, 0, createToObjectFunction(
-                        annotated.valueClass()).asType(MethodType.methodType(Object.class, Object.class)));
+                MethodHandle valueToObject = MethodHandles.insertArguments(PART, 0, toObjectFunction(
+                        annotated.valueClass(), building).asType(MethodType.methodType(Object.class, Object.class)));
                 result = MethodHandles.filterArguments(
                         MethodHandles.insertArguments(annotated.constructor(), 1, Annotations.empty()), 0,
                         valueToObject);
@@ -228,8 +289,8 @@ public class ArrayMapper {
                     MethodHandle arrayIndexGetter = MethodHandles.collectArguments(arrayGetter, 1, index);
 
 					// (Object):Object -> value == null ? null : toObject(value)
-					MethodHandle fieldToObject = MethodHandles.insertArguments(PART, 0, createToObjectFunction(
-							fieldDataClass).asType(MethodType.methodType(Object.class, Object.class)));
+					MethodHandle fieldToObject = MethodHandles.insertArguments(PART, 0, toObjectFunction(
+							fieldDataClass, building).asType(MethodType.methodType(Object.class, Object.class)));
 
                     // (values[]):Object -> part(toObject, values[x])
                     arrayIndexGetter = MethodHandles.filterReturnValue(arrayIndexGetter, fieldToObject);
@@ -259,7 +320,7 @@ public class ArrayMapper {
                 DataClassElement[] elements = tuple.elements();
                 MethodHandle[] elementsToObject = new MethodHandle[elements.length];
                 for (int x = 0; x < elements.length; x++) {
-                    elementsToObject[x] = createToObjectFunction(elements[x].dataClass());
+                    elementsToObject[x] = toObjectFunction(elements[x].dataClass(), building);
                 }
                 try {
                     result = MethodHandles.lookup().findVirtual(ArrayToTupleBridge.class, "toObject",
@@ -275,7 +336,7 @@ public class ArrayMapper {
                 // toObject( Object[] ):<array>
                 try {
 
-                    MethodHandle valueToData = createToObjectFunction(dataArrayClass.arrayDataClass());
+                    MethodHandle valueToData = toObjectFunction(dataArrayClass.arrayDataClass(), building);
 
                     ArrayToObjectBridge bridge = new ArrayToObjectBridge(dataArrayClass, valueToData);
 
@@ -291,8 +352,8 @@ public class ArrayMapper {
             case DataClassMap dataMapClass -> {
                 try {
                     EntriesToMapBridge bridge = new EntriesToMapBridge(dataMapClass,
-                            createToObjectFunction(dataMapClass.keyDataClass()),
-                            createToObjectFunction(dataMapClass.valueDataClass()));
+                            toObjectFunction(dataMapClass.keyDataClass(), building),
+                            toObjectFunction(dataMapClass.valueDataClass(), building));
 
                     result = MethodHandles.lookup().findVirtual(EntriesToMapBridge.class, "toObject",
                             MethodType.methodType(Object.class, Object[].class)).bindTo(bridge);
@@ -383,7 +444,8 @@ public class ArrayMapper {
 	 * // Call the various accessors to fill in the array and return values. return getter.invoke(e,
 	 * values );
 	 */
-	private MethodHandle createToDataFunction(DataClass dataClass) throws DataBindException {
+	private MethodHandle createToDataFunction(DataClass dataClass, Set<DataClass> building)
+			throws DataBindException {
 
 		MethodHandle toDataMethod = null;
 
@@ -395,7 +457,7 @@ public class ArrayMapper {
 			case DataClassAnnotated annotated -> {
 				// (box):Object -> part(toData, box.value())
 				toDataMethod = MethodHandles.filterReturnValue(annotated.value(),
-						MethodHandles.insertArguments(PART, 0, createToDataFunction(annotated.valueClass())
+						MethodHandles.insertArguments(PART, 0, toDataFunction(annotated.valueClass(), building)
 								.asType(MethodType.methodType(Object.class, Object.class))));
 			}
             case DataClassRecord dataClassRecord -> {
@@ -410,7 +472,7 @@ public class ArrayMapper {
                 MethodHandle arrayCreate = MethodHandles.collectArguments(createArray, 0, index);
 
                 // (Object[],serialClass):void -> getters(Object[],serialClass)
-                MethodHandle getters = createProjectGetters(dataClassRecord);
+                MethodHandle getters = createProjectGetters(dataClassRecord, building);
 
                 // (Object[],targetClass):void -> getters(Object[], project(targetClass))
                 //MethodHandle projectGetters = MethodHandles.collectArguments(getters, 1, dataClassRecord.toData());
@@ -422,10 +484,7 @@ public class ArrayMapper {
                 DataClassElement[] elements = tuple.elements();
                 MethodHandle[] elementsToData = new MethodHandle[elements.length];
                 for (int x = 0; x < elements.length; x++) {
-                    if (elements[x].dataClass().typeClass() == tuple.typeClass()) {
-                        throw new IllegalArgumentException("Recursive structures not yet supported for array mapper");
-                    }
-                    elementsToData[x] = createToDataFunction(elements[x].dataClass());
+                    elementsToData[x] = toDataFunction(elements[x].dataClass(), building);
                 }
                 try {
                     toDataMethod = MethodHandles.lookup().findVirtual(TupleToArrayBridge.class, "toData",
@@ -442,7 +501,7 @@ public class ArrayMapper {
 
                     DataClassArray arrayClass = (DataClassArray) dataClass;
 
-                    MethodHandle arrayToData = createToDataFunction(arrayClass.arrayDataClass());
+                    MethodHandle arrayToData = toDataFunction(arrayClass.arrayDataClass(), building);
 
                     ObjectToArrayBridge bridge = new ObjectToArrayBridge(arrayClass, arrayToData);
 
@@ -458,8 +517,8 @@ public class ArrayMapper {
             case DataClassMap dataClassMap -> {
                 try {
                     MapToEntriesBridge bridge = new MapToEntriesBridge(dataClassMap,
-                            createToDataFunction(dataClassMap.keyDataClass()),
-                            createToDataFunction(dataClassMap.valueDataClass()));
+                            toDataFunction(dataClassMap.keyDataClass(), building),
+                            toDataFunction(dataClassMap.valueDataClass(), building));
 
                     MethodHandle bridgeToData = MethodHandles.lookup().findVirtual(MapToEntriesBridge.class, "toData",
                             MethodType.methodType(Object[].class, Object.class)).bindTo(bridge);
@@ -507,7 +566,8 @@ public class ArrayMapper {
 	 * object[] and the record object, and for each field check if a value is present and if available,
 	 * calls the accessor and sets the field.
 	 */
-	private MethodHandle createProjectGetters(DataClassRecord dataClass) throws DataBindException {
+	private MethodHandle createProjectGetters(DataClassRecord dataClass, Set<DataClass> building)
+			throws DataBindException {
 
 		// (object[]):object[] -> return object[];
 		MethodHandle identity = MethodHandles.identity(Object[].class);
@@ -539,12 +599,8 @@ public class ArrayMapper {
 			// (<targettype>):<fieldtype> -> (Object) object.getter()
 			MethodHandle fieldBox = field.accessor();
 
-			if (field.dataClass().typeClass() == dataClass.typeClass()) {
-				throw new IllegalArgumentException("Recursive structures not yet supported for array mapper");
-			}
-
 			// ( typeClass ):dataClass -> (dataClass) toData(typeClass)
-			MethodHandle toDataFunction = createToDataFunction(fieldDataClass);
+			MethodHandle toDataFunction = toDataFunction(fieldDataClass, building);
 
 			// (<targettype>):<fieldtype> -> toData( object.getter() );
 			fieldBox = MethodHandles.collectArguments(toDataFunction, 0, fieldBox)

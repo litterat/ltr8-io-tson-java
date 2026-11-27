@@ -542,10 +542,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **A Java `sealed` type is described as a union that is not sealed.** `DefaultUnionBinder` builds its
   `DataClassUnion` with `isSealed` false, whatever the hierarchy permits. Read, not run. Describe it as sealed
   where no permitted class is `non-sealed`, with a test that such a union admits no class it does not list.
-- [ ] **`ArrayMapper` overflows the stack on a type that cycles through a container.** `record Node(String name,
-  List<Node> children)` throws `StackOverflowError` from `ArrayMapper`: its one guard is for a class holding itself
-  directly ("Recursive structures not yet supported…"). `MapMapper` round-trips it. Build a cyclic type's functions
-  lazily, with a round trip of a class cycling through a list, a map, an optional and itself.
 - [ ] **`MapMapper.toMap(Object)` casts its result to a `Map`.** A tuple or a list at the root throws
   `ClassCastException`, where `toMap(DataClass, Object)` writes it. Give the root its form whatever it is, with a
   round trip of a tuple and a list at the root.
