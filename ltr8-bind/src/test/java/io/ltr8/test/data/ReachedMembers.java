@@ -88,6 +88,39 @@ public final class ReachedMembers {
 		}
 	}
 
+	/** Its private field of the same name and type hides the public field of its super class that is not public. */
+	public static class HidesHiddenFinalField extends HiddenNameBase {
+
+		@SuppressWarnings("unused")
+		private final String name = "own";
+
+		@Record
+		public HidesHiddenFinalField(String name) {
+			super(name);
+		}
+	}
+
+	/** Its private field of the same name and another type stands beside the public field it inherits. */
+	public static class HidesHiddenFinalFieldByType extends HiddenNameBase {
+
+		@SuppressWarnings("unused")
+		private final int name = 7;
+
+		@Record
+		public HidesHiddenFinalFieldByType(String name) {
+			super(name);
+		}
+	}
+
+	/** Neither it nor the super class declaring its bound field is public. */
+	static class HiddenInheritsHiddenField extends HiddenNameBase {
+
+		@Record
+		public HiddenInheritsHiddenField(String name) {
+			super(name);
+		}
+	}
+
 	public static class PublicNameBase {
 
 		public final String name;
@@ -166,6 +199,41 @@ public final class ReachedMembers {
 
 		@Record
 		public HidesHiddenMutableFieldByType() {
+		}
+	}
+
+	static class OtherTypedMutableNameBetween extends HiddenMutableNameBase {
+
+		@SuppressWarnings("unused")
+		private int name = 7;
+	}
+
+	/** The name of its public field reaches, from the class between, a field of that name and another type. */
+	public static class InheritsOtherTypedMutableShadow extends OtherTypedMutableNameBetween {
+
+		@Record
+		public InheritsOtherTypedMutableShadow() {
+		}
+	}
+
+	static class HiddenPairBase {
+
+		private String value;
+
+		public String getValue() {
+			return value;
+		}
+
+		public void setValue(String value) {
+			this.value = value;
+		}
+	}
+
+	/** Neither it nor the super class declaring its pair is public. */
+	static class HiddenInheritsHiddenPair extends HiddenPairBase {
+
+		@Record
+		public HiddenInheritsHiddenPair() {
 		}
 	}
 

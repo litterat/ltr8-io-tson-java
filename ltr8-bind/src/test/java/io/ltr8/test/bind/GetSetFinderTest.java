@@ -810,12 +810,10 @@ class GetSetFinderTest {
 	@Test
 	void aPublicFieldOfAClassThePublicLookupCannotReachIsRefusedNamingTheFieldWithTheCauseKept() {
 		DataBindException refused = refusal(HiddenWithPublicField.class);
-		String message = refused.getMessage();
-		assertTrue(message.startsWith(HiddenWithPublicField.class.getName()
-				+ " is bound through a member that is not accessible: class is not public: "
-				+ HiddenWithPublicField.class.getName() + ".name"), message);
-		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
-		assertTrue(message.endsWith(cause.getMessage()), message);
+		assertEquals(HiddenWithPublicField.class.getName() + " is bound through a member that is not accessible: field "
+				+ HiddenWithPublicField.class.getName() + ".name, through no class the public lookup can access",
+				refused.getMessage());
+		assertInstanceOf(IllegalAccessException.class, refused.getCause());
 	}
 
 	@Test
@@ -899,12 +897,10 @@ class GetSetFinderTest {
 	@Test
 	void aPairOfAClassThePublicLookupCannotReachIsRefusedNamingThePairWithTheCauseKept() {
 		DataBindException refused = refusal(HiddenWithPublicPair.class);
-		String message = refused.getMessage();
-		assertTrue(message.startsWith(HiddenWithPublicPair.class.getName()
-				+ " is bound through a member that is not accessible: class is not public: "
-				+ HiddenWithPublicPair.class.getName() + ".getValue"), message);
-		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
-		assertTrue(message.endsWith(cause.getMessage()), message);
+		assertEquals(HiddenWithPublicPair.class.getName() + " is bound through a member that is not accessible: method "
+				+ HiddenWithPublicPair.class.getName() + ".getValue, through no class the public lookup can access",
+				refused.getMessage());
+		assertInstanceOf(IllegalAccessException.class, refused.getCause());
 	}
 
 	// --- generic public fields of a super class

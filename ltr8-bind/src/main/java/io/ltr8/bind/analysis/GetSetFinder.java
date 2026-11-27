@@ -58,7 +58,7 @@ public class GetSetFinder implements ComponentFinder {
 						bindings));
 				info.addMember(Role.PUBLIC_FIELD, classField);
 
-				Members.FieldHandles handles = Members.fieldDescribedFirst(clss, classField);
+				Members.FieldHandles handles = Members.getterAndSetter(clss, classField);
 				MethodHandle read = handles.read();
 				MethodHandle write = handles.write();
 				info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
@@ -121,8 +121,8 @@ public class GetSetFinder implements ComponentFinder {
 			info.addMember(Role.GETTER, getter);
 			info.addMember(Role.SETTER, setter);
 
-			MethodHandle read = Members.virtualDescribedFirst(clss, getter);
-			MethodHandle write = Members.virtualDescribedFirst(clss, setter);
+			MethodHandle read = Members.virtual(clss, getter);
+			MethodHandle write = Members.virtual(clss, setter);
 			info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
 			// A fluent setter returns its object, or another the old value; either is dropped.
 			info.setWriteMethod(write.asType(MethodType.methodType(void.class, write.type().parameterType(0), erasure)));

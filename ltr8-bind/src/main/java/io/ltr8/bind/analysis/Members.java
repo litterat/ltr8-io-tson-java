@@ -26,13 +26,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Handles on a public member of a described class, reached as the JVM reaches it. The JVM resolves a public member
- * of a class that is not public through a public subclass, but unreflecting resolves it against its declaring class
- * alone, so a member a super class that is not public declares is looked up through a class below it.
+ * Handles on a public member of a described class, reached as the JVM reaches it: looked up by name and type through
+ * the first class from its declarer down to the described class that the public lookup can access. The JVM resolves
+ * a public member of a class that is not public through a public subclass, but unreflecting resolves it against its
+ * declaring class alone.
  *
- * <p>{@link ImmutableFinder} reaches a member <em>declarer first</em>: unreflected, then looked up through each class
- * below its declarer, nearest the declarer first. {@link GetSetFinder} reaches one <em>described first</em>: looked up
- * through the described class, then unreflected. The two differ in what they refuse and how, and each keeps its own.
+ * <p>A field is refused as hidden where, from a class it would be looked up through, its name and type resolve to
+ * another field: the JVM resolves them so from every class further down too. A method needs no such check, since a
+ * call dispatches to the same override whichever declaration it resolves to. A member no such class reaches is
+ * refused, with the lookup's refusal as the cause: its message names a method's type by identity, so differs from
+ * run to run.
  */
 final class Members {
 
@@ -41,119 +44,87 @@ final class Members {
 	private Members() {
 	}
 
-	/**
-	 * @throws IllegalAccessException where no class from the declarer down reaches the field: the unreflected
-	 *         lookup's own refusal
-	 * @throws CodeAnalysisException where, from a class it is looked up through, the field's name reaches another
-	 *         field first
-	 */
-	static MethodHandle getterDeclarerFirst(Class<?> described, Field field)
-			throws IllegalAccessException, NoSuchFieldException, CodeAnalysisException {
-		try {
-			return LOOKUP.unreflectGetter(field);
-		} catch (IllegalAccessException unreachable) {
-			for (Class<?> through : subclassesDownTo(described, field)) {
-				Field reached = resolveField(through, field.getName());
-				Class<?> resolved = reached == null ? null : reached.getDeclaringClass();
-				if (resolved != field.getDeclaringClass()) {
-					// Resolved from any class further down, the name reaches this other field first too.
-					throw new CodeAnalysisException(String.format("%s is bound through field %s.%s, which a field "
-							+ "of %s hides from the public lookup", described.getName(),
-							field.getDeclaringClass().getName(), field.getName(), resolved.getName()));
-				}
-				try {
-					return LOOKUP.findGetter(through, field.getName(), field.getType());
-				} catch (IllegalAccessException e) {
-					// Not public either: try the class below it.
-				}
-			}
-			throw unreachable;
-		}
-	}
-
-	/** @throws IllegalAccessException as for {@link #getterDeclarerFirst} */
-	static MethodHandle virtualDeclarerFirst(Class<?> described, Method method)
-			throws IllegalAccessException, NoSuchMethodException {
-		try {
-			return LOOKUP.unreflect(method);
-		} catch (IllegalAccessException unreachable) {
-			for (Class<?> through : subclassesDownTo(described, method)) {
-				try {
-					return LOOKUP.findVirtual(through, method.getName(),
-							MethodType.methodType(method.getReturnType(), method.getParameterTypes()));
-				} catch (IllegalAccessException e) {
-					// Not public either: try the class below it.
-				}
-			}
-			throw unreachable;
-		}
-	}
-
 	record FieldHandles(MethodHandle read, MethodHandle write) {
 	}
 
-	/**
-	 * A field is reached through the described class only where that class resolves its name and type to it and not
-	 * to one hiding it; otherwise it is unreflected. Read and write are reached together, through one class or the
-	 * other.
-	 */
-	static FieldHandles fieldDescribedFirst(Class<?> described, Field field) throws CodeAnalysisException {
-		try {
-			try {
-				MethodHandle read = LOOKUP.findGetter(described, field.getName(), field.getType());
-				if (MethodHandles.reflectAs(Field.class, read).equals(field)) {
-					return new FieldHandles(read, LOOKUP.findSetter(described, field.getName(), field.getType()));
+	static MethodHandle getter(Class<?> described, Field field) throws CodeAnalysisException {
+		return reach(described, field, through -> LOOKUP.findGetter(through, field.getName(), field.getType()));
+	}
+
+	/** Read and write are reached together, through one class. */
+	static FieldHandles getterAndSetter(Class<?> described, Field field) throws CodeAnalysisException {
+		return reach(described, field, through -> new FieldHandles(
+				LOOKUP.findGetter(through, field.getName(), field.getType()),
+				LOOKUP.findSetter(through, field.getName(), field.getType())));
+	}
+
+	static MethodHandle virtual(Class<?> described, Method method) throws CodeAnalysisException {
+		return reach(described, method, through -> LOOKUP.findVirtual(through, method.getName(),
+				MethodType.methodType(method.getReturnType(), method.getParameterTypes())));
+	}
+
+	private interface Reach<T> {
+		T through(Class<?> through) throws ReflectiveOperationException;
+	}
+
+	private static <T> T reach(Class<?> described, Member member, Reach<T> reach) throws CodeAnalysisException {
+		IllegalAccessException refused = null;
+		for (Class<?> through : declarerDownTo(described, member)) {
+			if (member instanceof Field field) {
+				Field resolved = resolveField(through, field.getName(), field.getType());
+				if (!field.equals(resolved)) {
+					throw new CodeAnalysisException(String.format("%s is bound through field %s.%s, which a field "
+							+ "of %s hides from the public lookup", described.getName(),
+							field.getDeclaringClass().getName(), field.getName(),
+							resolved.getDeclaringClass().getName()));
 				}
-			} catch (NoSuchFieldException | IllegalAccessException e) {
-				// Reached from its own class, or not at all, where the refusal names the field.
 			}
-			return new FieldHandles(LOOKUP.unreflectGetter(field), LOOKUP.unreflectSetter(field));
-		} catch (IllegalAccessException e) {
-			throw notAccessible(described, e);
+			try {
+				return reach.through(through);
+			} catch (IllegalAccessException e) {
+				// The member resolved is public, so the class it is resolved from is what the lookup cannot access.
+				if (refused == null) {
+					refused = e;
+				}
+			} catch (ReflectiveOperationException e) {
+				throw new IllegalStateException(String.format("%s.%s resolves from %s to no member",
+						member.getDeclaringClass().getName(), member.getName(), through.getName()), e);
+			}
 		}
+		throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: %s %s.%s, "
+				+ "through no class the public lookup can access", described.getName(),
+				member instanceof Field ? "field" : "method", member.getDeclaringClass().getName(), member.getName()),
+				refused);
 	}
 
 	/**
-	 * Reached as {@link #fieldDescribedFirst} is, and with no check of what the described class resolves: a call
-	 * dispatches to the same override whichever declaration it names.
+	 * Resolves a field reference as the JVM does (JVMS 5.4.3.2): a field the class declares, then one its super
+	 * interfaces resolve, then one its super class resolves.
+	 *
+	 * @return the field, or null where none of this name and type is reached
 	 */
-	static MethodHandle virtualDescribedFirst(Class<?> described, Method method) throws CodeAnalysisException {
-		try {
-			try {
-				return LOOKUP.findVirtual(described, method.getName(),
-						MethodType.methodType(method.getReturnType(), method.getParameterTypes()));
-			} catch (NoSuchMethodException | IllegalAccessException e) {
-				// Reached from its own class, or not at all, where the refusal names the method.
-			}
-			return LOOKUP.unreflect(method);
-		} catch (IllegalAccessException e) {
-			throw notAccessible(described, e);
-		}
-	}
-
-	static CodeAnalysisException notAccessible(Class<?> described, IllegalAccessException e) {
-		return new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: %s",
-				described.getName(), e.getMessage()), e);
-	}
-
-	/** @return the field of this name {@code from} or its nearest super class declares, or null where none does */
-	static Field resolveField(Class<?> from, String name) {
-		for (Class<?> declarer = from; declarer != null; declarer = declarer.getSuperclass()) {
-			try {
-				return declarer.getDeclaredField(name);
-			} catch (NoSuchFieldException e) {
-				// Inherited: declared further up.
+	private static Field resolveField(Class<?> from, String name, Class<?> type) {
+		for (Field field : from.getDeclaredFields()) {
+			if (field.getName().equals(name) && field.getType() == type) {
+				return field;
 			}
 		}
-		return null;
+		for (Class<?> superInterface : from.getInterfaces()) {
+			Field field = resolveField(superInterface, name, type);
+			if (field != null) {
+				return field;
+			}
+		}
+		return from.getSuperclass() == null ? null : resolveField(from.getSuperclass(), name, type);
 	}
 
-	/** @return the classes below {@code member}'s declarer down to {@code described}, nearest the declarer first */
-	private static List<Class<?>> subclassesDownTo(Class<?> described, Member member) {
+	/** @return {@code member}'s declarer and the classes below it down to {@code described}, the declarer first */
+	private static List<Class<?>> declarerDownTo(Class<?> described, Member member) {
 		List<Class<?>> through = new ArrayList<>();
 		for (Class<?> c = described; c != member.getDeclaringClass(); c = c.getSuperclass()) {
 			through.addFirst(c);
 		}
+		through.addFirst(member.getDeclaringClass());
 		return through;
 	}
 }

@@ -22,10 +22,13 @@ import io.ltr8.bind.analysis.CodeAnalysisException;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.ReachedMembers;
+import io.ltr8.test.data.ReachedMembers.HidesHiddenFinalField;
+import io.ltr8.test.data.ReachedMembers.HidesHiddenFinalFieldByType;
 import io.ltr8.test.data.ReachedMembers.HidesHiddenMutableField;
 import io.ltr8.test.data.ReachedMembers.HidesHiddenMutableFieldByType;
 import io.ltr8.test.data.ReachedMembers.HidesPublicFinalField;
 import io.ltr8.test.data.ReachedMembers.HidesPublicMutableField;
+import io.ltr8.test.data.ReachedMembers.InheritsOtherTypedMutableShadow;
 import io.ltr8.test.data.ReachedMembers.InheritsOtherTypedShadow;
 import io.ltr8.test.data.ReachedMembers.PublicMutableNameBase;
 import io.ltr8.test.data.ReachedMembers.ReadsHiddenSetter;
@@ -41,44 +44,59 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * How {@code ImmutableFinder} and {@code GetSetFinder} each reach a member through the described class: a member
- * of a super class that is not public, a field another of its name hides, and a member reached through no public
- * class. The two finders reach members apart, and each case here holds what one of them does.
+ * How {@code ImmutableFinder} and {@code GetSetFinder} reach a member through the described class: a member of a
+ * super class that is not public, a field another of its name hides, and a member reached through no public class.
+ * Both finders reach a member by one rule, so each situation is held through each.
  */
 class ReachedMembersTest {
-
-	private static final String NOT_ACCESSIBLE = " is bound through a member that is not accessible: ";
 
 	private final DataBindContext context = DataBindContext.builder().build();
 
 	// --- read through the constructor's analysis
 
+	/** The message is the same on every run: the lookup's own text, which names an array by identity, is the cause. */
 	@Test
 	void anAccessorOfAClassThatIsNotPublicIsRefusedNamingTheClassAndAccessor() {
 		assertAll(Stream.of("HiddenWithAccessor", "HiddenWithNamedAccessor").map(name -> () -> {
 			Class<?> type = fixture(name);
-			CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
-					() -> context.getDescriptor(type), name);
-			String message = refused.getMessage();
-			assertTrue(message.startsWith(type.getName() + NOT_ACCESSIBLE + "class is not public: " + type.getName()
-					+ ".name"), message);
-			IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause(), name);
-			assertTrue(message.endsWith(cause.getMessage()), message);
+			assertUnreachable(type, "method " + type.getName() + ".name");
 		}));
 	}
 
-	/** A name alone reaches the field between, whatever its type. */
 	@Test
-	void aConstructorFieldHiddenByAFieldOfAnotherTypeBetweenIsRefusedAsHidden() {
-		Class<?> type = InheritsOtherTypedShadow.class;
-		CodeAnalysisException refused = assertThrows(CodeAnalysisException.class, () -> context.getDescriptor(type));
-		assertEquals(type.getName() + " is bound through field " + type.getSuperclass().getSuperclass().getName()
-				+ ".name, which a field of " + type.getSuperclass().getName() + " hides from the public lookup",
-				refused.getMessage());
-		assertNull(refused.getCause());
+	void aConstructorFieldOfAClassThatIsNotPublicInheritedFromAnotherIsRefusedNamingItsDeclarer() throws Exception {
+		Class<?> type = fixture("HiddenInheritsHiddenField");
+		assertUnreachable(type, "field " + type.getSuperclass().getName() + ".name");
+	}
+
+	/** The name and type resolve past the field between, as the JVM resolves them. */
+	@Test
+	void aConstructorFieldBesideAFieldOfAnotherTypeBetweenIsReadFromTheFieldItNames() throws Throwable {
+		InheritsOtherTypedShadow value = new InheritsOtherTypedShadow("v");
+		DataClassRecord record = record(InheritsOtherTypedShadow.class);
+		assertEquals(List.of("name:String"), shape(record));
+		assertEquals("v", record.fields()[0].get(value));
+		for (Object copy : roundTrips(value)) {
+			assertEquals("v", record.fields()[0].get(copy));
+		}
+	}
+
+	@Test
+	void aConstructorFieldOfASuperClassThatIsNotPublicBesideAPrivateFieldOfAnotherTypeIsRead() throws Throwable {
+		HidesHiddenFinalFieldByType value = new HidesHiddenFinalFieldByType("v");
+		DataClassRecord record = record(HidesHiddenFinalFieldByType.class);
+		assertEquals(List.of("name:String"), shape(record));
+		assertEquals("v", record.fields()[0].get(value));
+		for (Object copy : roundTrips(value)) {
+			assertEquals("v", record.fields()[0].get(copy));
+		}
+	}
+
+	@Test
+	void aConstructorFieldOfASuperClassThatIsNotPublicHiddenByAPrivateFieldIsRefusedAsHidden() {
+		assertHidden(HidesHiddenFinalField.class);
 	}
 
 	@Test
@@ -106,16 +124,29 @@ class ReachedMembersTest {
 		}
 	}
 
+	@Test
+	void aPairOfAClassThatIsNotPublicInheritedFromAnotherIsRefusedNamingItsDeclarer() throws Exception {
+		Class<?> type = fixture("HiddenInheritsHiddenPair");
+		assertUnreachable(type, "method " + type.getSuperclass().getName() + ".getValue");
+	}
+
 	/** The described class resolves the name and type to its own private field, so the field is reached nowhere. */
 	@Test
-	void aPublicFieldOfASuperClassThatIsNotPublicHiddenByAPrivateFieldIsRefusedAsNotAccessible() {
-		Class<?> type = HidesHiddenMutableField.class;
-		CodeAnalysisException refused = assertThrows(CodeAnalysisException.class, () -> context.getDescriptor(type));
-		String message = refused.getMessage();
-		assertTrue(message.startsWith(type.getName() + NOT_ACCESSIBLE + "class is not public: "
-				+ type.getSuperclass().getName() + ".name"), message);
-		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
-		assertTrue(message.endsWith(cause.getMessage()), message);
+	void aPublicFieldOfASuperClassThatIsNotPublicHiddenByAPrivateFieldIsRefusedAsHidden() {
+		assertHidden(HidesHiddenMutableField.class);
+	}
+
+	/** The name and type resolve past the field between, as the JVM resolves them. */
+	@Test
+	void aPublicFieldBesideAFieldOfAnotherTypeBetweenIsReadAndWritten() throws Throwable {
+		DataClassRecord record = record(InheritsOtherTypedMutableShadow.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		InheritsOtherTypedMutableShadow value = new InheritsOtherTypedMutableShadow();
+		record.fields()[0].set(value, "buoy");
+		assertEquals("buoy", record.fields()[0].get(value));
+		for (Object copy : roundTrips(value)) {
+			assertEquals("buoy", record.fields()[0].get(copy));
+		}
 	}
 
 	/** The described class resolves a name and type, and a field of another type does not take the name. */
@@ -144,6 +175,22 @@ class ReachedMembersTest {
 	}
 
 	// --- helpers
+
+	private void assertUnreachable(Class<?> type, String member) {
+		CodeAnalysisException refused = assertThrows(CodeAnalysisException.class, () -> context.getDescriptor(type),
+				type.getName());
+		assertEquals(type.getName() + " is bound through a member that is not accessible: " + member
+				+ ", through no class the public lookup can access", refused.getMessage());
+		assertInstanceOf(IllegalAccessException.class, refused.getCause(), type.getName());
+	}
+
+	/** {@code type}'s own private field hides the public field of the same name its super class declares. */
+	private void assertHidden(Class<?> type) {
+		CodeAnalysisException refused = assertThrows(CodeAnalysisException.class, () -> context.getDescriptor(type));
+		assertEquals(type.getName() + " is bound through field " + type.getSuperclass().getName()
+				+ ".name, which a field of " + type.getName() + " hides from the public lookup", refused.getMessage());
+		assertNull(refused.getCause());
+	}
 
 	/** A fixture class that is not public, so this package cannot name it. */
 	private static Class<?> fixture(String simpleName) throws ClassNotFoundException {

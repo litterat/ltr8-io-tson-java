@@ -91,7 +91,6 @@ import java.lang.invoke.MethodHandleInfo;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -396,16 +395,20 @@ class AccessorAnalysisTest {
 	/** Its own members, or failing those its constructor, are reached through it alone. */
 	@Test
 	void aClassThatIsNotPublicIsRefusedNamingTheClassAndMember() {
-		assertAll(Stream.of(Map.entry("HiddenDescribed", ".name"), Map.entry("HiddenInheritsPublicField", ".<init>"))
-				.map(fixture -> () -> {
-					Class<?> type = fixture(fixture.getKey());
-					DataBindException refused = assertThrows(DataBindException.class,
-							() -> context.getDescriptor(type), type.getName());
-					String message = refused.getMessage();
-					assertTrue(message.startsWith(type.getName() + " is bound through a member that is not accessible: "
-							+ "class is not public: " + type.getName() + fixture.getValue()), message);
-					assertInstanceOf(IllegalAccessException.class, refused.getCause(), type.getName());
-				}));
+		assertAll(() -> {
+			Class<?> type = fixture("HiddenDescribed");
+			DataBindException refused = assertThrows(DataBindException.class, () -> context.getDescriptor(type));
+			assertEquals(type.getName() + " is bound through a member that is not accessible: field " + type.getName()
+					+ ".name, through no class the public lookup can access", refused.getMessage());
+			assertInstanceOf(IllegalAccessException.class, refused.getCause(), type.getName());
+		}, () -> {
+			Class<?> type = fixture("HiddenInheritsPublicField");
+			DataBindException refused = assertThrows(DataBindException.class, () -> context.getDescriptor(type));
+			String message = refused.getMessage();
+			assertTrue(message.startsWith(type.getName() + " is bound through a member that is not accessible: "
+					+ "class is not public: " + type.getName() + ".<init>"), message);
+			assertInstanceOf(IllegalAccessException.class, refused.getCause(), type.getName());
+		});
 	}
 
 	// --- a public field that is not final the constructor binds: one component, read and written through the field
