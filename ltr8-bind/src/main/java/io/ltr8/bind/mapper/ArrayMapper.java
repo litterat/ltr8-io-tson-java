@@ -23,9 +23,11 @@ import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
+import io.ltr8.bind.DataClassElement;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 
 import java.lang.invoke.MethodHandle;
@@ -42,12 +44,14 @@ import java.util.Objects;
  * for each type. This is the method likely to be used by serialization libraries to improve
  * performance.
  * <p>
- * A map is an array of {@code [key, value]} entries, each part in this form, in the order the map iterates in. An
- * annotated value, an {@code AnnotatedMap}'s key among them, is its value in this form: the form has no place for
- * annotations, so it reads back without them.
+ * A record and a {@code @Tuple} record are each an array of their values, one per field or element in order, each
+ * in this form. A map is an array of {@code [key, value]} entries, each part in this form, in the order the map
+ * iterates in. An annotated value, an {@code AnnotatedMap}'s key among them, is its value in this form: the form has
+ * no place for annotations, so it reads back without them.
  * <p>
- * A read refused for a record's own shape -- its array's length, or a required field's absence -- throws the
- * {@link DataBindException} that says so, however deep the record sits: no enclosing list, map or union wraps it.
+ * A read refused for a record's or a tuple's own shape -- its array's length, or the absence of a required field or
+ * a primitive element -- throws the {@link DataBindException} that says so, however deep the value sits: no
+ * enclosing list, map or union wraps it.
  *
  * <ul>
  * <li>TODO add try/catch/throw around conversions
@@ -230,6 +234,21 @@ public class ArrayMapper {
                 result = MethodHandles.filterArguments(result, 0, CHECKED.bindTo(dataClassRecord));
                 result = result.asType(result.type().changeReturnType(dataClass.dataClass()));
             }
+            case DataClassTuple tuple -> {
+                DataClassElement[] elements = tuple.elements();
+                MethodHandle[] elementsToObject = new MethodHandle[elements.length];
+                for (int x = 0; x < elements.length; x++) {
+                    elementsToObject[x] = createToObjectFunction(elements[x].dataClass());
+                }
+                try {
+                    result = MethodHandles.lookup().findVirtual(ArrayToTupleBridge.class, "toObject",
+                            MethodType.methodType(Object.class, Object[].class))
+                            .bindTo(new ArrayToTupleBridge(tuple, elementsToObject));
+                } catch (NoSuchMethodException | IllegalAccessException e) {
+                    throw new DataBindException("failed to build bridge for tuple", e);
+                }
+                result = result.asType(MethodType.methodType(tuple.typeClass(), Object.class));
+            }
             case DataClassArray dataArrayClass -> {
 
                 // toObject( Object[] ):<array>
@@ -359,6 +378,24 @@ public class ArrayMapper {
 
                 // (Object):Object[] -> return getters(new Object[fields.length], serialiClass);
                 toDataMethod = MethodHandles.collectArguments(getters, 0, arrayCreate);
+            }
+            case DataClassTuple tuple -> {
+                DataClassElement[] elements = tuple.elements();
+                MethodHandle[] elementsToData = new MethodHandle[elements.length];
+                for (int x = 0; x < elements.length; x++) {
+                    if (elements[x].dataClass().typeClass() == tuple.typeClass()) {
+                        throw new IllegalArgumentException("Recursive structures not yet supported for array mapper");
+                    }
+                    elementsToData[x] = createToDataFunction(elements[x].dataClass());
+                }
+                try {
+                    toDataMethod = MethodHandles.lookup().findVirtual(TupleToArrayBridge.class, "toData",
+                            MethodType.methodType(Object[].class, Object.class))
+                            .bindTo(new TupleToArrayBridge(tuple, elementsToData))
+                            .asType(MethodType.methodType(Object.class, tuple.typeClass()));
+                } catch (NoSuchMethodException | IllegalAccessException e) {
+                    throw new DataBindException("failed to build tuple bridge", e);
+                }
             }
             case DataClassArray dataClassArray -> {
 
@@ -607,6 +644,54 @@ public class ArrayMapper {
 			} catch (Throwable e) {
 				throw new DataBindException("Failed to convert array", e);
 			}
+		}
+	}
+
+	private static class TupleToArrayBridge {
+
+		private final DataClassElement[] elements;
+		private final MethodHandle[] elementsToData;
+
+		TupleToArrayBridge(DataClassTuple tuple, MethodHandle[] elementsToData) {
+			this.elements = tuple.elements();
+			this.elementsToData = new MethodHandle[elementsToData.length];
+			for (int x = 0; x < elementsToData.length; x++) {
+				this.elementsToData[x] = elementsToData[x].asType(MethodType.methodType(Object.class, Object.class));
+			}
+		}
+
+		@SuppressWarnings("unused")
+		public Object[] toData(Object tuple) throws Throwable {
+			Object[] values = new Object[elements.length];
+			for (int x = 0; x < elements.length; x++) {
+				values[x] = part(elementsToData[x], elements[x].accessor().invoke(tuple));
+			}
+			return values;
+		}
+	}
+
+	private static class ArrayToTupleBridge {
+
+		private final DataClassTuple tuple;
+		private final MethodHandle[] elementsToObject;
+
+		ArrayToTupleBridge(DataClassTuple tuple, MethodHandle[] elementsToObject) {
+			this.tuple = tuple;
+			this.elementsToObject = new MethodHandle[elementsToObject.length];
+			for (int x = 0; x < elementsToObject.length; x++) {
+				this.elementsToObject[x] =
+						elementsToObject[x].asType(MethodType.methodType(Object.class, Object.class));
+			}
+		}
+
+		@SuppressWarnings("unused")
+		public Object toObject(Object[] values) throws Throwable {
+			Checks.tuple(tuple, values);
+			Object[] elements = new Object[values.length];
+			for (int x = 0; x < values.length; x++) {
+				elements[x] = part(elementsToObject[x], values[x]);
+			}
+			return tuple.constructor().invoke(elements);
 		}
 	}
 

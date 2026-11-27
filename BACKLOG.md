@@ -526,9 +526,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `@Profile` are each dropped. Read each annotation from every member of a component, taking each `@Field`
   attribute from whichever member states it and refusing two members that state one differently, with a test of
   each annotation on each member of each class kind.
-- [ ] **`ArrayMapper` cannot write a `@Tuple` record.** `toArray` throws `DataBindException` ("unexpected data
-  class type"): it has no case for `DataClassTuple`. `MapMapper` is untested. Carry a tuple through both mappers,
-  with a round trip.
 - [ ] **A record with an `Annotations` carrier breaks both mappers.** For `record Item(Annotations meta, String
   name)`, `ArrayMapper.toArray` throws `NullPointerException` and `MapMapper.toMap` a `DataBindException` wrapping
   one: neither skips `annotationsCarrier()`, whose descriptor is null. Write the record without the carrier and

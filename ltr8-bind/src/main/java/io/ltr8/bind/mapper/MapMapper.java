@@ -23,9 +23,11 @@ import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
+import io.ltr8.bind.DataClassElement;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 
 import java.util.HashMap;
@@ -36,12 +38,14 @@ import java.util.Objects;
 /**
  * Sample showing how to use the library to convert an Object to/from {@code Map<String, Object>}. Each key
  * in the returned map has the name of the field. Union types have an extra field called "type" which
- * provides the class name of the type of value recorded. A map component is a map of its keys and values, each in
- * this form, in the order the component's map iterates in. An annotated value, an {@code AnnotatedMap}'s key among
- * them, is its value in this form: the form has no place for annotations, so it reads back without them.
+ * provides the class name of the type of value recorded. A {@code @Tuple} record is an array of its elements, in
+ * order, as a list is an array of its elements, each in this form. A map component is a map of its keys and values,
+ * each in this form, in the order the component's map iterates in. An annotated value, an {@code AnnotatedMap}'s key
+ * among them, is its value in this form: the form has no place for annotations, so it reads back without them.
  * <p>
- * A read missing a required field throws the {@link DataBindException} that names the record and the field,
- * however deep the record sits: no enclosing record, list, map or union wraps it.
+ * A read missing a required field, or a tuple's read of an array of the wrong length or missing a primitive element,
+ * throws the {@link DataBindException} that says so, however deep the value sits: no enclosing record, list, map or
+ * union wraps it.
  */
 public class MapMapper {
 
@@ -94,6 +98,14 @@ public class MapMapper {
                     }
 
                     v = map;
+                }
+                case DataClassTuple tuple -> {
+                    DataClassElement[] elements = tuple.elements();
+                    Object[] values = new Object[elements.length];
+                    for (int x = 0; x < elements.length; x++) {
+                        values[x] = partToMap(elements[x].dataClass(), elements[x].accessor().invoke(object));
+                    }
+                    v = values;
                 }
                 case DataClassArray arrayClass -> {
 
@@ -192,6 +204,15 @@ public class MapMapper {
 
                     v = dataRecord.constructor().invoke(construct);
                     // v = dataRecord.toObject().invoke(v);
+                }
+                case DataClassTuple tuple -> {
+                    Object[] values = Checks.tuple(tuple, (Object[]) data);
+                    DataClassElement[] elements = tuple.elements();
+                    Object[] construct = new Object[elements.length];
+                    for (int x = 0; x < elements.length; x++) {
+                        construct[x] = partToObject(elements[x].dataClass(), values[x]);
+                    }
+                    v = tuple.constructor().invoke(construct);
                 }
                 case DataClassArray arrayClass -> {
 

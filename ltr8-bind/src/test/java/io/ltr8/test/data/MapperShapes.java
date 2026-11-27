@@ -16,6 +16,7 @@
 package io.ltr8.test.data;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Tuple;
 import io.ltr8.test.data.union.SealedInterfaceUnion;
 
 import java.util.Arrays;
@@ -118,5 +119,19 @@ public final class MapperShapes {
 	}
 
 	public record ListOfTriples(List<Triple> triples) {
+	}
+
+	@Tuple
+	public record Pair(String name, int count) {
+	}
+
+	@Tuple
+	public record NestedPair(Pair inner, long id) {
+	}
+
+	public record HoldsPair(String label, Pair pair) {
+	}
+
+	public record ListOfPairs(List<Pair> pairs) {
 	}
 }
