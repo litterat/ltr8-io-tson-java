@@ -525,9 +525,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   header's `@Field` or `@Union` beside an explicit accessor, and `@Field(bridge = …)` on a record bound through
   `@Profile` are each dropped, and `GetSetFinder` reads a private field of the described class alone, never one a
   super class declares behind a pair the class inherits. Read each annotation from every member of a component,
-  taking each `@Field`
-  attribute from whichever member states it and refusing two members that state one differently, with a test of
-  each annotation on each member of each class kind.
+  taking each `@Field` attribute from whichever member states it and refusing two members that state one
+  differently, with a test of each annotation on each member of each class kind.
 - [ ] **A wildcard argument binds a bare type variable and not a parameterized one.** `Box<? extends Integer>` as a
   component binds `T value` at the upper bound `Integer`, where `List<T> items` at the same argument is refused
   with "Unrecognized parameterized type" (`GenericComponentRoundTripTest`'s fixtures; reproduced in a scratch
