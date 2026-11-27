@@ -18,6 +18,7 @@ package io.ltr8.bind.analysis;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.analysis.ComponentInfo.Role;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -107,38 +108,24 @@ public class ImmutableFinder implements ComponentFinder {
             // If byte code analysis failed or if user supplies @Field annotations.
             Parameter[] params = constructor.getParameters();
             for (int x = 0; x < params.length; x++) {
+                final int paramIndex = x;
+                List<ComponentInfo> storing = immutableFields.stream()
+                        .filter(e -> e.getConstructorArgument() == paramIndex).toList();
                 Field field = params[x].getAnnotation(Field.class);
-                if (field != null) {
-                    final int paramIndex = x;
-                    ComponentInfo component = immutableFields.stream()
-                            .filter(e -> e.getConstructorArgument() == paramIndex).findFirst().orElse(null);
-                    if (component != null) {
-                        component.setField(field);
-                    } else {
-                        component = new ComponentInfo(field.value(), params[x].getType());
-                        component.setConstructorArgument(x);
-                        component.setField(field);
-                        immutableFields.add(component);
-                    }
+                if (storing.isEmpty() && field != null) {
+                    ComponentInfo component = new ComponentInfo(field.value(), params[x].getType());
+                    component.setConstructorArgument(x);
+                    immutableFields.add(component);
+                    storing = List.of(component);
                 }
-
-                Union union = params[x].getAnnotation(Union.class);
-                if (union != null) {
-                    final int paramIndex = x;
-                    ComponentInfo component = immutableFields.stream()
-                            .filter(e -> e.getConstructorArgument() == paramIndex).findFirst().orElse(null);
-                    // A parameter @Field names already has its component, so one still without is unnamed.
-                    if (component == null) {
-                        throw new CodeAnalysisException(String.format("%s's constructor does not assign its @Union "
-                                + "parameter %d unchanged to a field, and no @Field names it", clss.getName(), x));
-                    }
-                    component.setUnion(union);
+                // A parameter @Field names already has its component, so one still without is unnamed.
+                if (storing.isEmpty() && params[x].isAnnotationPresent(Union.class)) {
+                    throw new CodeAnalysisException(String.format("%s's constructor does not assign its @Union "
+                            + "parameter %d unchanged to a field, and no @Field names it", clss.getName(), x));
                 }
-
-                for (ComponentInfo component : immutableFields) {
-                    if (component.getConstructorArgument() == x) {
-                        component.readUnbound(params[x]);
-                    }
+                for (ComponentInfo component : storing) {
+                    component.addMember(component == storing.getFirst() ? Role.PARAMETER : Role.SHARED_PARAMETER,
+                            params[x]);
                 }
             }
 
@@ -192,7 +179,7 @@ public class ImmutableFinder implements ComponentFinder {
             // A super class and a subclass may each declare a field of one name.
             Set<String> names = new HashSet<>();
             for (ComponentInfo component : immutableFields) {
-                Field field = component.getField();
+                Field field = ComponentAnnotations.field(component);
                 String name = field != null && !field.value().isBlank() ? field.value() : component.getName();
                 if (!names.add(name)) {
                     throw new CodeAnalysisException(String.format("%s has two fields named '%s'; @Field on an "
@@ -367,18 +354,7 @@ public class ImmutableFinder implements ComponentFinder {
                             .findFirst().orElse(null);
                     if (info != null) {
                         Method accessorMethod = clss.getDeclaredMethod(method.methodName().stringValue());
-
-                        Field field = accessorMethod.getAnnotation(Field.class);
-                        if (field != null) {
-                            info.setField(field);
-                        }
-
-                        Union union = accessorMethod.getAnnotation(Union.class);
-                        if (union != null) {
-                            info.setUnion(union);
-                        }
-
-                        info.readUnbound(accessorMethod);
+                        info.addMember(Role.ACCESSOR, accessorMethod);
                         info.setReadMethod(readAs(virtual(described, accessorMethod), info.getType()));
                         info.addAccessor(accessorMethod);
                         accessor = true;
@@ -461,41 +437,14 @@ public class ImmutableFinder implements ComponentFinder {
                     && e.getReadMethod() == null
                     && (e.getDeclaringClass() == null || e.getDeclaringClass().isAssignableFrom(clss)))
                     .findFirst().orElse(null);
-            if (component != null) {
-                Field field = method.getAnnotation(Field.class);
-                if (field != null) {
-                    component.setReadMethod(virtual(described, method));
-                    component.setField(field);
-                }
-
-                Union union = method.getAnnotation(Union.class);
-                if (union != null) {
-                    component.setReadMethod(virtual(described, method));
-                    component.setUnion(union);
-                }
-
-                if (component.getReadMethod() != null) {
-                    matched.add(name);
-                    component.readUnbound(method);
-                    component.addAccessor(method);
-                }
+            if (component != null
+                    && (method.isAnnotationPresent(Field.class) || method.isAnnotationPresent(Union.class))) {
+                component.setReadMethod(virtual(described, method));
+                component.addMember(Role.ACCESSOR, method);
+                matched.add(name);
+                component.addAccessor(method);
             }
         }
-    }
-
-    private static void readFieldAnnotations(ComponentInfo info, java.lang.reflect.Field declared)
-            throws CodeAnalysisException {
-        Field field = declared.getAnnotation(Field.class);
-        if (field != null) {
-            info.setField(field);
-        }
-
-        Union union = declared.getAnnotation(Union.class);
-        if (union != null) {
-            info.setUnion(union);
-        }
-
-        info.readUnbound(declared);
     }
 
     /**
@@ -585,7 +534,7 @@ public class ImmutableFinder implements ComponentFinder {
                         component.setParamType(pt);
                     }
 
-                    readFieldAnnotations(component, target);
+                    component.addMember(Role.STORED_FIELD, target);
 
                     fields.add(component);
                     stored[arg] = true;

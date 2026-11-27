@@ -16,6 +16,7 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.bind.analysis.ComponentInfo.Role;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -58,13 +59,7 @@ public class GetSetFinder implements ComponentFinder {
 				Class<?> erasure = type == classField.getGenericType() ? classField.getType()
 						: TypeArguments.erasure(type);
 				ComponentInfo info = new ComponentInfo(classField.getName(), erasure);
-
-				Field fieldAnnotation = classField.getAnnotation(Field.class);
-				if (fieldAnnotation != null) {
-					// Found a matching setter/getter pair, so add to fields.
-					info.setField(fieldAnnotation);
-				}
-				info.readUnbound(classField);
+				info.addMember(Role.PUBLIC_FIELD, classField);
 
 				reachField(lookup, clss, classField, info);
 				MethodHandle read = info.getReadMethod();
@@ -130,18 +125,8 @@ public class GetSetFinder implements ComponentFinder {
 			Class<?> erasure = type == getter.getGenericReturnType() ? getter.getReturnType()
 					: TypeArguments.erasure(type);
 			ComponentInfo info = new ComponentInfo(fieldName, erasure);
-
-			Field getterField = getter.getAnnotation(Field.class);
-			if (getterField != null) {
-				info.setField(getterField);
-			}
-
-			Field setterField = setter.getAnnotation(Field.class);
-			if (setterField != null) {
-				info.setField(setterField);
-			}
-			info.readUnbound(getter);
-			info.readUnbound(setter);
+			info.addMember(Role.GETTER, getter);
+			info.addMember(Role.SETTER, setter);
 
 			MethodHandle read = reachMethod(lookup, clss, getter);
 			MethodHandle write = reachMethod(lookup, clss, setter);
@@ -165,13 +150,15 @@ public class GetSetFinder implements ComponentFinder {
 			public int compare(ComponentInfo o1, ComponentInfo o2) {
 
 				String o1Name = o1.getName();
-				if (o1.getField() != null && !o1.getField().value().strip().equals("")) {
-					o1Name = o1.getField().value();
+				Field o1Field = ComponentAnnotations.field(o1);
+				if (o1Field != null && !o1Field.value().strip().equals("")) {
+					o1Name = o1Field.value();
 				}
 
 				String o2Name = o2.getName();
-				if (o2.getField() != null && !o2.getField().value().strip().equals("")) {
-					o2Name = o2.getField().value();
+				Field o2Field = ComponentAnnotations.field(o2);
+				if (o2Field != null && !o2Field.value().strip().equals("")) {
+					o2Name = o2Field.value();
 				}
 
 				return o1Name.compareTo(o2Name);
@@ -194,8 +181,8 @@ public class GetSetFinder implements ComponentFinder {
 			if (existingField != null) {
 				iter.remove();
 				existingField.setWriteMethod(field.getWriteMethod());
-				if (field.isUnbound()) {
-					existingField.setUnbound(true);
+				for (ComponentInfo.Member merged : field.members()) {
+					existingField.addMember(merged.role().merged(), merged.element());
 				}
 			}
 		}
@@ -216,20 +203,14 @@ public class GetSetFinder implements ComponentFinder {
 						&& (e.getDeclaringClass() == null || e.getDeclaringClass() == clss))
 						.findFirst().orElse(null);
 
-				Field fieldAnnotation = classField.getAnnotation(Field.class);
-				if (fieldAnnotation != null) {
-					if (info == null) {
-						throw new CodeAnalysisException(String
-								.format("Could not find matching getter/setter for field '%s'", classField.getName()));
-					}
-
-					// Found a matching setter/getter pair, so add to fields.
-					info.setField(fieldAnnotation);
+				if (info == null && classField.isAnnotationPresent(Field.class)) {
+					throw new CodeAnalysisException(String
+							.format("Could not find matching getter/setter for field '%s'", classField.getName()));
 				}
 
 				// A private field of no component is off the wire already.
 				if (info != null) {
-					info.readUnbound(classField);
+					info.addMember(Role.PRIVATE_FIELD, classField);
 				}
 			}
 		}
@@ -308,7 +289,7 @@ public class GetSetFinder implements ComponentFinder {
 	}
 
 	private static String wireName(ComponentInfo component) {
-		Field field = component.getField();
+		Field field = ComponentAnnotations.field(component);
 		return field != null && !field.value().isBlank() ? field.value() : component.getName();
 	}
 

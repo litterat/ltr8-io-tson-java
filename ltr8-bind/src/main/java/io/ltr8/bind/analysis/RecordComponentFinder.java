@@ -17,7 +17,7 @@ package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Profile;
-import io.ltr8.annotation.Union;
+import io.ltr8.bind.analysis.ComponentInfo.Role;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
@@ -35,13 +35,6 @@ import java.util.Map;
  * the JDK's own authoritative record introspection API (stable since Java 16), not a heuristic.
  * Each record component maps directly to one canonical-constructor argument, by position, and to
  * its own accessor method. Records have no setters; they're immutable by construction.
- *
- * <p>{@code @Field}/{@code @Union} are read from the accessor method, not
- * {@code RecordComponent} itself: none of the three annotations' {@code @Target} lists {@code
- * ElementType.RECORD_COMPONENT}, so per JLS 8.10.3 an annotation written on a record header
- * parameter propagates to the field, the constructor parameter, and (for a compiler-synthesized
- * accessor) the accessor method -- but not to the {@code RecordComponent} object itself, so {@code
- * component.getAnnotation(...)} would always return {@code null} here.
  */
 public class RecordComponentFinder implements ComponentFinder {
 
@@ -85,20 +78,9 @@ public class RecordComponentFinder implements ComponentFinder {
                 info.setParamType(parameterizedType);
             }
 
-            info.readUnbound(component);
-            info.readUnbound(accessor);
-            info.readUnbound(constructor.getParameters()[x]);
-
-            Field fieldAnnotation = accessor.getAnnotation(Field.class);
-            if (fieldAnnotation != null) {
-                info.setField(fieldAnnotation);
-            }
-
-            Union unionAnnotation = accessor.getAnnotation(Union.class);
-            if (unionAnnotation != null) {
-                info.setUnion(unionAnnotation);
-            }
-
+            info.addMember(Role.RECORD_COMPONENT, component);
+            info.addMember(Role.RECORD_ACCESSOR, accessor);
+            info.addMember(Role.RECORD_PARAMETER, constructor.getParameters()[x]);
 
             fields.add(info);
         }
@@ -181,13 +163,9 @@ public class RecordComponentFinder implements ComponentFinder {
             if (component.getGenericType() instanceof ParameterizedType parameterizedType) {
                 info.setParamType(parameterizedType);
             }
-            Field renamed = parameters[x].getAnnotation(Field.class);
-            if (renamed != null) {
-                info.setField(renamed);
-            }
-            info.readUnbound(component);
-            info.readUnbound(component.getAccessor());
-            info.readUnbound(parameters[x]);
+            info.addMember(Role.PROFILED_PARAMETER, parameters[x]);
+            info.addMember(Role.RECORD_COMPONENT, component);
+            info.addMember(Role.PROFILED_ACCESSOR, component.getAccessor());
             fields.add(info);
         }
     }
