@@ -269,6 +269,7 @@ public class DefaultRecordBinder {
 			new GetSetFinder().findComponents(targetClass, ctor, components);
 			receiveTargetClass(targetClass, components);
 		}
+		ComponentAnnotations.read(components);
 
 		TypeArguments.substitute(targetClass, parameterizedType, components);
 		refuseSharedNames(targetClass, components);

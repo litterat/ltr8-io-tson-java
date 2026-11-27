@@ -14,7 +14,6 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Field;
-import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 
 import java.lang.invoke.MethodHandle;
@@ -49,6 +48,10 @@ public class ComponentInfo {
 
 	private ParameterizedType paramType;
 
+	private final List<Member> members = new ArrayList<>();
+
+	private boolean annotated;
+
 	private Field field;
 
 	private Union union;
@@ -64,17 +67,84 @@ public class ComponentInfo {
 		this.constructorArgument = -1;
 	}
 
+	/**
+	 * What a member is to its component, and the finder and path that found it: {@link ComponentAnnotations} reads
+	 * the annotations a member gives by its role.
+	 */
+	enum Role {
+		/** A record component, on either of {@link RecordComponentFinder}'s paths. */
+		RECORD_COMPONENT,
+		/** A record's accessor, bound through its canonical constructor. */
+		RECORD_ACCESSOR,
+		/** A canonical constructor's parameter. */
+		RECORD_PARAMETER,
+		/** A record's accessor, bound through a {@code @Profile} constructor. */
+		PROFILED_ACCESSOR,
+		/** A {@code @Profile} constructor's parameter. */
+		PROFILED_PARAMETER,
+		/** The field {@link ImmutableFinder} found a constructor parameter stored in. */
+		STORED_FIELD,
+		/** A {@code @Record} constructor's parameter, of the first component storing it. */
+		PARAMETER,
+		/** A {@code @Record} constructor's parameter, of a further component storing it. */
+		SHARED_PARAMETER,
+		/** A method {@link ImmutableFinder} matched as the component's accessor. */
+		ACCESSOR,
+		/** {@link GetSetFinder}'s public field. */
+		PUBLIC_FIELD,
+		/** {@link GetSetFinder}'s getter. */
+		GETTER,
+		/** {@link GetSetFinder}'s setter. */
+		SETTER,
+		/** A private field of the described class whose name is the component's. */
+		PRIVATE_FIELD,
+		/** A public field that writes a constructor's component. */
+		MERGED_PUBLIC_FIELD,
+		/** The getter of a pair that writes a constructor's component. */
+		MERGED_GETTER,
+		/** The setter of a pair that writes a constructor's component. */
+		MERGED_SETTER;
+
+		Role merged() {
+			return switch (this) {
+				case PUBLIC_FIELD -> MERGED_PUBLIC_FIELD;
+				case GETTER -> MERGED_GETTER;
+				case SETTER -> MERGED_SETTER;
+				default -> throw new IllegalStateException(this + " is no member of a pair or public field");
+			};
+		}
+	}
+
+	record Member(Role role, AnnotatedElement element) {
+	}
+
+	/** Refuses {@code element} as {@link ComponentAnnotations#admit} does. */
+	void addMember(Role role, AnnotatedElement element) throws CodeAnalysisException {
+		Member member = new Member(role, element);
+		ComponentAnnotations.admit(this, member);
+		members.add(member);
+	}
+
+	List<Member> members() {
+		return members;
+	}
+
+	void annotate(Field field, Union union, boolean unbound) {
+		this.field = field;
+		this.union = union;
+		this.unbound = unbound;
+		this.annotated = true;
+	}
+
 	public boolean isUnbound() {
+		requireAnnotated();
 		return unbound;
 	}
 
-	/** Marks the component where {@code member} carries {@code @Unbound}: any one of its members marks it. */
-	public void readUnbound(AnnotatedElement member) {
-		unbound |= member.isAnnotationPresent(Unbound.class);
-	}
-
-	public void setUnbound(boolean unbound) {
-		this.unbound = unbound;
+	private void requireAnnotated() {
+		if (!annotated) {
+			throw new IllegalStateException(String.format("Component '%s' is read before its annotations are", name));
+		}
 	}
 
 	public void setName(String name) {
@@ -93,23 +163,13 @@ public class ComponentInfo {
 		this.declaringClass = declaringClass;
 	}
 
-	public void setField(Field field) throws CodeAnalysisException {
-		if (this.field != null && !this.field.equals(field))
-			throw new CodeAnalysisException(String.format("Field '%s' already has Field annotation", this.name));
-		this.field = field;
-	}
-
 	public Field getField() {
+		requireAnnotated();
 		return this.field;
 	}
 
-	public void setUnion(Union union) throws CodeAnalysisException {
-		if (this.union != null && !this.union.equals(union))
-			throw new CodeAnalysisException(String.format("Field '%s' has @Union annotations that differ", this.name));
-		this.union = union;
-	}
-
 	public Union getUnion() {
+		requireAnnotated();
 		return this.union;
 	}
 
