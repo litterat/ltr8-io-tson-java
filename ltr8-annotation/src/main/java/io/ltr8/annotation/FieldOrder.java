@@ -21,13 +21,19 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Allows setting the data order for any @Data class. By default, immutable classes will use the
- * order of parameters in the constructor. POJO classes will use alphabetical order of fields
- * detected. The DataOrder annotation must list all fields found in the class in the expected order.
- * If any fields are missing or names do not match a runtime error will be returned.
+ * The order of a class's components on the wire: every component named once, by its Java name and not its
+ * {@link Field} name, an {@link Unbound} one included. An order that does not is refused when the class is
+ * described.
+ *
+ * <p>Without it, the components a constructor takes come first, in parameter order, then the public fields and the
+ * getter and setter pairs by wire name.
+ *
+ * <p>It orders a class described by its own components. On a {@link Tuple}, a {@link Transparent} class or one
+ * bridged through {@link ToData} it has no effect.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.TYPE })
 public @interface FieldOrder {
+
 	String[] value();
 }

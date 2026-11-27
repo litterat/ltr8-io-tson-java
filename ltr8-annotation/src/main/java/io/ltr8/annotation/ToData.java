@@ -15,7 +15,13 @@
  */
 package io.ltr8.annotation;
 
+/**
+ * A class whose data form is another type: it writes as what {@link #toData} returns, and reads back through its
+ * public constructor taking exactly {@code S}.
+ *
+ * @param <S> the data form
+ */
 public interface ToData<S> {
 
-	public S toData();
+	S toData();
 }

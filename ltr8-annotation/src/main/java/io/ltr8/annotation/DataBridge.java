@@ -15,9 +15,16 @@
  */
 package io.ltr8.annotation;
 
+/**
+ * The crossing between one component's Java type and its data type, named by {@link Field#bridge}. An
+ * implementation has a public constructor taking no arguments.
+ *
+ * @param <D> the data type the wire carries
+ * @param <T> the component's Java type
+ */
 public interface DataBridge<D, T> {
 
-	D toData(T b);
+	D toData(T object);
 
-	T toObject(D s);
+	T toObject(D data);
 }
