@@ -33,9 +33,9 @@ import io.ltr8.bind.DataClassUnion;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Sample showing how to use the Litterat bind library to convert an Object to/from Object[]
@@ -105,10 +105,15 @@ public class ArrayMapper {
 
 	public ArrayMapper(DataBindContext context) {
 		this.context = context;
-		this.functionCache = new HashMap<>();
+		this.functionCache = new ConcurrentHashMap<>();
 
 	}
 
+	/**
+	 * A mapper may be shared by threads, so the cache is concurrent and a lost race keeps the winner's functions, as
+	 * {@link DataBindContext#getDescriptor(Class, java.lang.reflect.Type)} does. Built outside the map rather than in
+	 * {@code computeIfAbsent}, which would hold a lock for a walk of the whole type graph.
+	 */
 	private ArrayFunctions getFunctions(DataClass dataClass) throws DataBindException {
 		ArrayFunctions af = functionCache.get(dataClass);
 		if (af == null) {
@@ -116,8 +121,11 @@ public class ArrayMapper {
 			MethodHandle toArray = createToDataFunction(dataClass);
 			MethodHandle toObject = createToObjectFunction(dataClass);
 
-			af = new ArrayFunctions(toArray, toObject);
-			functionCache.put(dataClass, af);
+			ArrayFunctions built = new ArrayFunctions(toArray, toObject);
+			af = functionCache.putIfAbsent(dataClass, built);
+			if (af == null) {
+				af = built;
+			}
 		}
 		return af;
 	}
@@ -615,7 +623,7 @@ public class ArrayMapper {
 
 		public ObjectToUnionBridge(DataClassUnion unionClass) {
 			this.unionClass = unionClass;
-			this.typeMap = new HashMap<>();
+			this.typeMap = new ConcurrentHashMap<>();
 		}
 
 		@SuppressWarnings("unused")
@@ -635,11 +643,7 @@ public class ArrayMapper {
 					}
 
 					function = getFunctions(dataClass);
-					if (function != null) {
-						typeMap.put(v.getClass(), function);
-					} else {
-						throw new DataBindException("no descriptor for class");
-					}
+					typeMap.put(v.getClass(), function);
 				}
 
 				try {
@@ -815,7 +819,7 @@ public class ArrayMapper {
 
 		public UnionToObjectBridge(DataClassUnion unionClass) {
 			this.unionClass = unionClass;
-			this.typeMap = new HashMap<>();
+			this.typeMap = new ConcurrentHashMap<>();
 		}
 
 		@SuppressWarnings("unused")
@@ -841,11 +845,7 @@ public class ArrayMapper {
 						}
 
 						function = getFunctions(dataClass);
-						if (function != null) {
-							typeMap.put(unionType, function);
-						} else {
-							throw new DataBindException("no descriptor for class");
-						}
+						typeMap.put(unionType, function);
 					}
 
 					value = function.toObject.invoke(unionValue);
