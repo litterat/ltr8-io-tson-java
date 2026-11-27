@@ -23,7 +23,7 @@ import io.ltr8.annotation.Record;
  *
  */
 
-@Record(isMutable = true)
+@Record
 public class SimplePojo {
 
 	private int x;

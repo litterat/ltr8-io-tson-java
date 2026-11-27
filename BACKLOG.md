@@ -541,8 +541,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   loop over `descriptor.fields()`, which holds no unbound component. Read, not run. Take the answer from the
   descriptor, or delete the sets if nothing reaches them, with a bind read of an `@Unbound` constructor parameter
   in each stack.
-- [ ] **`Unbound`'s Javadoc says a `null` arrives.** In `ltr8-annotation`: a primitive component receives its zero
-  value (`UnboundComponentTest`). Say "its type's zero value" in both paragraphs.
 
 ## Documentation
 

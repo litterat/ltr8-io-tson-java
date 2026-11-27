@@ -15,8 +15,8 @@
  */
 
 /**
- * Annotations for the type library add additional metadata to a class to provide enough
- * information to generate the correct metadata from the class to create a schema. This is required
- * where the bind library can't get enough information from the class alone.
+ * What a class states about its own data form where the class alone does not say it: the annotations a binding
+ * engine reads, the two interfaces a class or a component crosses to its data type through, and the carriers of
+ * the annotations a value was written with.
  */
 package io.ltr8.annotation;
