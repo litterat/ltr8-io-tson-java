@@ -429,6 +429,11 @@ final class RecordFields {
 		// field whose type carries min_items: 1). The raw type is what the method handles are typed
 		// against; the full type is what the component is resolved from, so the element type survives.
 		Type optionalArgument = optionalArgument(info);
+		if (!(optionalArgument instanceof Class<?> || optionalArgument instanceof ParameterizedType)) {
+			throw new CodeAnalysisException(String.format("%s's component '%s' is an Optional of %s, neither a class "
+					+ "nor a parameterized type", targetClass.getName(), info.getName(),
+					optionalArgument.getTypeName()));
+		}
 		Class<?> optionalType = rawTypeOf(optionalArgument);
 
 		Supplier<DataClass> dataClass = context.componentSource(optionalType, optionalArgument);

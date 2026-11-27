@@ -526,36 +526,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `@Profile` are each dropped. Read each annotation from every member of a component, taking each `@Field`
   attribute from whichever member states it and refusing two members that state one differently, with a test of
   each annotation on each member of each class kind.
-- [ ] **An `@Unbound` component is analysed as a bound one is.** `record(String name, @Unbound Thread cache)` is
-  refused with "Unable to find a valid data conversion for class: class java.lang.Thread", and an `@Unbound`
-  constructor parameter of a hand-written `@Record` class with no accessor is refused with "Failed to match
-  immutable field accessor …". Nothing reads or writes either. Describe neither, with a read of each through both
-  mappers in `UnboundComponentTest`.
-- [ ] **An `Optional` whose argument is no class throws `ClassCastException`.** `Optional<? extends Number>` on a
-  record, and `Optional<T>` on a generic class described raw, on every finder path, make `getDescriptor` throw it
-  unchecked from the record binder's `rawTypeOf` (`GenericComponentTypeTest` pins the exception). Refuse the class
-  with a `CodeAnalysisException` naming it and the component, as a `List<? extends Number>` component is refused.
-- [ ] **A bare type variable of a class described at a parameterization stays `Object`.** For `Box<T>` with a
-  component `T value` or `T[] items`, described as `Box<String>`, the component is held at its erasure and refused
-  as `Object`: `TypeArguments` gives the description's arguments to a parameterized component alone
-  (`GenericComponentTypeTest`). Resolve a bare variable and an array of one too, with a round trip of each shape
-  for a record, a constructor class and a pair.
-- [ ] **A constructor parameter named only by `@Field` loses its generic type.** Where `ImmutableFinder` cannot
-  match a parameter to a field and `@Field` names its component, the component takes the parameter's class, so
-  `@Field("x") List<T>` on `NamedList<T>` is refused with "Collection must provide parameterized type information"
-  even described as `NamedList<String>` (`GenericComponentTypeTest`); a plain `List<String>` parameter is read, not
-  run. Give the component the parameter's generic type, with a round trip of a list, a map and an optional.
-- [ ] **A constructor parameter whose `@Field` names nothing makes a component named "".** An unmatched parameter
-  carrying `@Field` with an empty `value`, to mark it required or bridged, names its component by that value. Read,
-  not run. Refuse the class, naming it and the parameter, with a case in `RecordRefusalTest`.
-- [ ] **A Java record with a second public constructor is refused.** `record Two(String a, String b)` with a
-  public `Two(String a)` and no `@Record` or `@Profile` is refused with "Could not find constructor: class …":
-  constructor selection takes a lone constructor or a marked one. Take a record's canonical constructor where none
-  is marked, with a round trip.
-- [ ] **`@FieldOrder` is ignored on a class not described by its own components.** On a `@Tuple` record, a
-  `@Transparent` record and a class bridged through `ToData` it is accepted and has no effect, even naming no
-  component (`@FieldOrder({"nothing"})`). Refuse it on each, naming the class and why an order does not apply,
-  with a case of each in `RecordRefusalTest`.
 - [ ] **`ArrayMapper` cannot write a `@Tuple` record.** `toArray` throws `DataBindException` ("unexpected data
   class type"): it has no case for `DataClassTuple`. `MapMapper` is untested. Carry a tuple through both mappers,
   with a round trip.

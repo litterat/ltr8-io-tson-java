@@ -559,4 +559,481 @@ public final class UnboundComponents {
 			return name + "," + count + "," + note;
 		}
 	}
+
+	// --- marked on a component whose type no context describes: Thread
+
+	public record UnboundUndescribed(String name, @Unbound Thread cache) {
+	}
+
+	public record UnboundUndescribedOptional(String name, @Unbound Optional<Thread> cache) {
+	}
+
+	public record UndescribedCanonicalParameters(String name, Thread cache) {
+
+		public UndescribedCanonicalParameters(String name, @Unbound Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+	}
+
+	public record UndescribedProfileParameters(String name, Thread cache, String tier) {
+
+		@Profile(value = "p", fields = { "name", "cache" })
+		public UndescribedProfileParameters(String name, @Unbound Thread cache) {
+			this(name, cache, "t");
+		}
+	}
+
+	public record UndescribedProfileComponents(String name, @Unbound Thread cache, String tier) {
+
+		@Profile(value = "p", fields = { "name", "cache" })
+		public UndescribedProfileComponents(String name, Thread cache) {
+			this(name, cache, "t");
+		}
+	}
+
+	public static final class UndescribedConstructorParameters {
+
+		private final String name;
+
+		private final Thread cache;
+
+		@Record
+		public UndescribedConstructorParameters(String name, @Unbound Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		public Thread cache() {
+			return cache;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UndescribedConstructorParameters other && Objects.equals(name, other.name)
+					&& cache == other.cache;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, cache);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + cache;
+		}
+	}
+
+	public static final class UndescribedConstructorFields {
+
+		private final String name;
+
+		@Unbound
+		private final Thread cache;
+
+		@Record
+		public UndescribedConstructorFields(String name, Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		public Thread cache() {
+			return cache;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UndescribedConstructorFields other && Objects.equals(name, other.name)
+					&& cache == other.cache;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, cache);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + cache;
+		}
+	}
+
+	public static final class UndescribedConstructorAccessors {
+
+		private final String name;
+
+		private final Thread cache;
+
+		@Record
+		public UndescribedConstructorAccessors(String name, Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		@Unbound
+		public Thread cache() {
+			return cache;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UndescribedConstructorAccessors other && Objects.equals(name, other.name)
+					&& cache == other.cache;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, cache);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + cache;
+		}
+	}
+
+	public static final class UndescribedConstructorSetters {
+
+		private final String name;
+
+		private Thread cache;
+
+		@Record
+		public UndescribedConstructorSetters(String name, Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		public Thread getCache() {
+			return cache;
+		}
+
+		@Unbound
+		public void setCache(Thread cache) {
+			this.cache = cache;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UndescribedConstructorSetters other && Objects.equals(name, other.name)
+					&& cache == other.cache;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, cache);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + cache;
+		}
+	}
+
+	public static final class UndescribedPublicFields {
+
+		public String name;
+
+		@Unbound
+		public Thread cache;
+
+		@Record
+		public UndescribedPublicFields() {
+		}
+
+		public UndescribedPublicFields(String name, Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UndescribedPublicFields other && Objects.equals(name, other.name)
+					&& cache == other.cache;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, cache);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + cache;
+		}
+	}
+
+	public static final class UndescribedGetters {
+
+		private String name;
+
+		private Thread cache;
+
+		@Record
+		public UndescribedGetters() {
+		}
+
+		public UndescribedGetters(String name, Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+
+		@Unbound
+		public Thread getCache() {
+			return cache;
+		}
+
+		public void setCache(Thread cache) {
+			this.cache = cache;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UndescribedGetters other && Objects.equals(name, other.name) && cache == other.cache;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, cache);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + cache;
+		}
+	}
+
+	public static final class UndescribedSetters {
+
+		private String name;
+
+		private Thread cache;
+
+		@Record
+		public UndescribedSetters() {
+		}
+
+		public UndescribedSetters(String name, Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+
+		public Thread getCache() {
+			return cache;
+		}
+
+		@Unbound
+		public void setCache(Thread cache) {
+			this.cache = cache;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UndescribedSetters other && Objects.equals(name, other.name) && cache == other.cache;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, cache);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + cache;
+		}
+	}
+
+	public static final class UndescribedPairFields {
+
+		private String name;
+
+		@Unbound
+		private Thread cache;
+
+		@Record
+		public UndescribedPairFields() {
+		}
+
+		public UndescribedPairFields(String name, Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+
+		public Thread getCache() {
+			return cache;
+		}
+
+		public void setCache(Thread cache) {
+			this.cache = cache;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UndescribedPairFields other && Objects.equals(name, other.name)
+					&& cache == other.cache;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, cache);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + cache;
+		}
+	}
+
+	// --- marked on a constructor's component that no accessor reads back
+
+	/** Marked on the parameters, the class reading neither component back. */
+	public static final class UnboundParametersUnread {
+
+		private final String name;
+
+		private final int count;
+
+		private final String note;
+
+		@Record
+		public UnboundParametersUnread(String name, @Unbound int count, @Unbound String note) {
+			this.name = name;
+			this.count = count;
+			this.note = note;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UnboundParametersUnread other && Objects.equals(name, other.name)
+					&& count == other.count && Objects.equals(note, other.note);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, count, note);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + count + "," + note;
+		}
+	}
+
+	/** Marked on the parameter, the class not reading it back. */
+	public static final class UndescribedParametersUnread {
+
+		private final String name;
+
+		private final Thread cache;
+
+		@Record
+		public UndescribedParametersUnread(String name, @Unbound Thread cache) {
+			this.name = name;
+			this.cache = cache;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UndescribedParametersUnread other && Objects.equals(name, other.name)
+					&& cache == other.cache;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, cache);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + cache;
+		}
+	}
+
+	/** Marked on the fields the constructor stores in, the class reading neither back. */
+	public static final class UnboundFieldsUnread {
+
+		private final String name;
+
+		@Unbound
+		private final int count;
+
+		@Unbound
+		private final String note;
+
+		@Record
+		public UnboundFieldsUnread(String name, int count, String note) {
+			this.name = name;
+			this.count = count;
+			this.note = note;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof UnboundFieldsUnread other && Objects.equals(name, other.name)
+					&& count == other.count && Objects.equals(note, other.note);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, count, note);
+		}
+
+		@Override
+		public String toString() {
+			return name + "," + count + "," + note;
+		}
+	}
 }

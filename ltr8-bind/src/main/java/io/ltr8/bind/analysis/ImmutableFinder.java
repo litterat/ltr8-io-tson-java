@@ -73,8 +73,8 @@ import java.util.stream.Collectors;
  * reaches it, through a public subclass: the described class or one between the two.
  *
  * <p>The class is refused, with a {@link CodeAnalysisException} naming it, when a parameter binds no component or more
- * than one, when a component has no such read, when its read is reached as {@link Members} refuses, or when two
- * components take one name.
+ * than one, when a bound component has no such read, when its read is reached as {@link Members} refuses, or when
+ * two components take one name.
  */
 public class ImmutableFinder implements ComponentFinder {
 
@@ -93,7 +93,7 @@ public class ImmutableFinder implements ComponentFinder {
             Parameter[] params = constructor.getParameters();
             Type[] types = new Type[params.length];
             for (int x = 0; x < params.length; x++) {
-                types[x] = TypeArguments.resolve(params[x].getParameterizedType(), params[x].getType(), bindings);
+                types[x] = TypeArguments.resolve(params[x].getParameterizedType(), bindings);
             }
 
             // First try and identify the constructor arguments via bytecode inspection.
@@ -119,7 +119,7 @@ public class ImmutableFinder implements ComponentFinder {
                         .filter(e -> e.getConstructorArgument() == paramIndex).toList();
                 Field field = params[x].getAnnotation(Field.class);
                 if (storing.isEmpty() && field != null) {
-                    ComponentInfo component = new ComponentInfo(field.value(), params[x].getType());
+                    ComponentInfo component = new ComponentInfo(field.value(), types[x]);
                     component.setConstructorArgument(x);
                     immutableFields.add(component);
                     storing = List.of(component);
@@ -173,9 +173,9 @@ public class ImmutableFinder implements ComponentFinder {
                         "Failed to match immutable fields for class: %s. Add @Field annotations to assist.", clss));
             }
 
-            // Check all params have valid information.
+            // Nothing writes an unbound component, so it needs no read.
             for (ComponentInfo component : immutableFields) {
-                if (component.getReadMethod() == null) {
+                if (component.getReadMethod() == null && !ComponentAnnotations.unbound(component)) {
                     throw new CodeAnalysisException(String.format(
                             "Failed to match immutable field accessor for class: %s. Add @Field annotations to assist field '%s'",
                             clss, component.getName()));
@@ -385,7 +385,7 @@ public class ImmutableFinder implements ComponentFinder {
                     .findFirst().orElse(null);
             if (component != null
                     && (method.isAnnotationPresent(Field.class) || method.isAnnotationPresent(Union.class))) {
-                component.setReadMethod(Members.virtual(described, method));
+                component.setReadMethod(readAs(Members.virtual(described, method), component.getType()));
                 component.addMember(Role.ACCESSOR, method);
                 matched.add(name);
                 component.addAccessor(method);

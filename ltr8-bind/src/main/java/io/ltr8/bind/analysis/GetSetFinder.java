@@ -51,12 +51,10 @@ public class GetSetFinder implements ComponentFinder {
 			if (Modifier.isPublic(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)
 					&& !Modifier.isFinal(modifiers)) {
 
-				Type type = TypeArguments.substitute(classField.getGenericType(), inherited);
-				Class<?> erasure = type == classField.getGenericType() ? classField.getType()
-						: TypeArguments.erasure(type);
-				ComponentInfo info = new ComponentInfo(classField.getName(), TypeArguments.resolve(type, erasure,
-						bindings));
+				ComponentInfo info = new ComponentInfo(classField.getName(),
+						TypeArguments.resolve(TypeArguments.substitute(classField.getGenericType(), inherited), bindings));
 				info.addMember(Role.PUBLIC_FIELD, classField);
+				Class<?> erasure = info.getType();
 
 				Members.FieldHandles handles = Members.getterAndSetter(clss, classField);
 				MethodHandle read = handles.read();
@@ -115,11 +113,10 @@ public class GetSetFinder implements ComponentFinder {
 			}
 
 			String fieldName = Character.toLowerCase(getterName.charAt(3)) + getterName.substring(4);
-			Class<?> erasure = type == getter.getGenericReturnType() ? getter.getReturnType()
-					: TypeArguments.erasure(type);
-			ComponentInfo info = new ComponentInfo(fieldName, TypeArguments.resolve(type, erasure, bindings));
+			ComponentInfo info = new ComponentInfo(fieldName, TypeArguments.resolve(type, bindings));
 			info.addMember(Role.GETTER, getter);
 			info.addMember(Role.SETTER, setter);
+			Class<?> erasure = info.getType();
 
 			MethodHandle read = Members.virtual(clss, getter);
 			MethodHandle write = Members.virtual(clss, setter);

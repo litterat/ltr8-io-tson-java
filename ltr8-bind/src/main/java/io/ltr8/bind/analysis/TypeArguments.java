@@ -18,9 +18,8 @@ import java.util.Map;
  * {@code List<String>}, which is what lets a generic value class -- a map of names whose value type is the
  * parameter -- be a component of another class at all: a type variable left in place has no descriptor.
  *
- * <p>Only a component whose type is parameterised takes the arguments, at any depth of its own. A component whose
- * type is a bare type variable, or an array of one, is held at its erasure, and a parameter the description does
- * not supply (a raw class) is left unreplaced.
+ * <p>A parameter the description does not supply (a raw class) is left unreplaced, and a component whose type is
+ * then still no class or parameterised type is held at its erasure.
  */
 final class TypeArguments {
 
@@ -48,9 +47,10 @@ final class TypeArguments {
         return bindings;
     }
 
-    /** The type a component of declared {@code type}, erasing to {@code erasure}, is held at under {@code bindings}. */
-    static Type resolve(Type type, Class<?> erasure, Map<TypeVariable<?>, Type> bindings) {
-        return type instanceof ParameterizedType parameterized ? substitute(parameterized, bindings) : erasure;
+    /** The type a component of declared {@code type} is held at under {@code bindings}. */
+    static Type resolve(Type type, Map<TypeVariable<?>, Type> bindings) {
+        Type resolved = substitute(type, bindings);
+        return resolved instanceof Class<?> || resolved instanceof ParameterizedType ? resolved : erasure(resolved);
     }
 
     /**
