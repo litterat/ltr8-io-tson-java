@@ -22,49 +22,112 @@ import io.ltr8.annotation.Union;
 import io.ltr8.bind.analysis.ComponentInfo.Member;
 import io.ltr8.bind.analysis.ComponentInfo.Role;
 
+import java.lang.reflect.Executable;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.lang.reflect.RecordComponent;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * A component's {@link Field @Field}, {@link Union @Union} and {@link Unbound @Unbound}, read from the members its
- * finder recorded. A member's {@link Role} decides which of the three it gives: every member can mark its component
- * unbound, and the members a {@code @Field} (or {@code @Union}) is read from must carry equal ones.
+ * A component's {@link Field @Field}, {@link Union @Union} and {@link Unbound @Unbound}, read from every member its
+ * finder recorded.
  *
- * <p>A record's component is read for {@code @Unbound} alone, since neither {@code @Field} nor {@code @Union} targets
- * {@code RECORD_COMPONENT}: written on a record header, they reach the field, the canonical constructor's parameter
- * and, where the compiler declares it, the accessor (JLS 8.10.3), but never the {@code RecordComponent}.
+ * <p>{@code @Field} is read attribute by attribute: an attribute at its default is not stated, since an annotation
+ * cannot tell a default from a value written equal to it, so {@code required} is true where any member states it. A
+ * {@code @Profile} constructor's parameter {@linkplain Role#prevails() prevails}: an attribute it states, and a
+ * {@code @Union} it carries, is the component's whatever the record's own members carry, since a profile binds
+ * another shape than the record's header describes.
  */
 final class ComponentAnnotations {
 
 	private ComponentAnnotations() {
 	}
 
+	private enum Attribute {
+		VALUE {
+			@Override
+			Object stated(Field field) {
+				return field.value().isBlank() ? null : field.value();
+			}
+
+			@Override
+			String show(Object value) {
+				return "value = \"" + value + "\"";
+			}
+		},
+		REQUIRED {
+			@Override
+			Object stated(Field field) {
+				return field.required() ? Boolean.TRUE : null;
+			}
+
+			@Override
+			String show(Object value) {
+				return "required = " + value;
+			}
+		},
+		BRIDGE {
+			@Override
+			Object stated(Field field) {
+				return field.bridge() == DataBridge.class ? null : field.bridge();
+			}
+
+			@Override
+			String show(Object value) {
+				return "bridge = " + ((Class<?>) value).getName() + ".class";
+			}
+		};
+
+		/** The value {@code field} states, or null where it leaves this attribute at its default. */
+		abstract Object stated(Field field);
+
+		abstract String show(Object value);
+	}
+
 	/** Settles each component's annotations, once every finder has recorded its members. */
 	static void read(List<ComponentInfo> components) {
 		for (ComponentInfo component : components) {
-			Field field = field(component);
-			Class<?> bridge = field == null || field.bridge() == DataBridge.class ? null : field.bridge();
-			component.annotate(wireName(component), field != null && field.required(), bridge, union(component),
-					unbound(component));
+			component.annotate(wireName(component), stated(component, Attribute.REQUIRED) != null,
+					(Class<?>) stated(component, Attribute.BRIDGE), union(component), unbound(component));
 		}
 	}
 
 	/**
-	 * Refuses {@code member} where the {@code @Field} or {@code @Union} it gives differs from one {@code component}'s
-	 * members already give. Refused as the member is found, so a class with another fault besides is refused for
-	 * whichever the finders meet first.
+	 * Refuses {@code member} where it states a {@code @Field} attribute, or carries a {@code @Union}, that differs
+	 * from one a member of {@code component} already recorded gives. Refused as the member is found, so a class with
+	 * another fault besides is refused for whichever the finders meet first; a finder records a prevailing member
+	 * before the members it prevails over.
 	 */
 	static void admit(ComponentInfo component, Member member) throws CodeAnalysisException {
-		Field field = fieldOf(member);
-		Field held = field(component);
-		if (field != null && held != null && !held.equals(field)) {
-			throw new CodeAnalysisException(
-					String.format("Field '%s' already has Field annotation", component.getName()));
+		if (member.role().prevails()) {
+			return;
 		}
-		Union union = unionOf(member);
-		Union heldUnion = union(component);
-		if (union != null && heldUnion != null && !heldUnion.equals(union)) {
-			throw new CodeAnalysisException(
-					String.format("Field '%s' has @Union annotations that differ", component.getName()));
+		Field field = member.element().getAnnotation(Field.class);
+		if (field != null) {
+			for (Attribute attribute : Attribute.values()) {
+				Object value = attribute.stated(field);
+				if (value == null || prevailing(component, attribute) != null) {
+					continue;
+				}
+				for (Member held : component.members()) {
+					Object other = stated(held, attribute);
+					if (other != null && !other.equals(value)) {
+						throw differ(component, "@Field(" + attribute.show(other) + ")", held,
+								"@Field(" + attribute.show(value) + ")", member);
+					}
+				}
+			}
+		}
+		Union union = member.element().getAnnotation(Union.class);
+		if (union != null && prevailingUnion(component) == null) {
+			for (Member held : component.members()) {
+				Union other = held.element().getAnnotation(Union.class);
+				if (other != null && !other.equals(union)) {
+					throw differ(component, show(other), held, show(union), member);
+				}
+			}
 		}
 	}
 
@@ -73,28 +136,8 @@ final class ComponentAnnotations {
 	 * settles them.
 	 */
 	static String wireName(ComponentInfo component) {
-		Field field = field(component);
-		return field != null && !field.value().isBlank() ? field.value() : component.getName();
-	}
-
-	private static Field field(ComponentInfo component) {
-		for (Member member : component.members()) {
-			Field field = fieldOf(member);
-			if (field != null) {
-				return field;
-			}
-		}
-		return null;
-	}
-
-	private static Union union(ComponentInfo component) {
-		for (Member member : component.members()) {
-			Union union = unionOf(member);
-			if (union != null) {
-				return union;
-			}
-		}
-		return null;
+		Object value = stated(component, Attribute.VALUE);
+		return value != null ? (String) value : component.getName();
 	}
 
 	/**
@@ -105,20 +148,90 @@ final class ComponentAnnotations {
 		return component.members().stream().anyMatch(member -> member.element().isAnnotationPresent(Unbound.class));
 	}
 
-	private static Field fieldOf(Member member) {
-		return switch (member.role()) {
-			case RECORD_ACCESSOR, PROFILED_PARAMETER, STORED_FIELD, PARAMETER, ACCESSOR, PUBLIC_FIELD, GETTER, SETTER,
-					PRIVATE_FIELD -> member.element().getAnnotation(Field.class);
-			case RECORD_COMPONENT, RECORD_PARAMETER, PROFILED_ACCESSOR, SHARED_PARAMETER, MERGED_PUBLIC_FIELD,
-					MERGED_GETTER, MERGED_SETTER -> null;
+	private static Object stated(ComponentInfo component, Attribute attribute) {
+		Object prevailing = prevailing(component, attribute);
+		if (prevailing != null) {
+			return prevailing;
+		}
+		for (Member member : component.members()) {
+			Object value = stated(member, attribute);
+			if (value != null) {
+				return value;
+			}
+		}
+		return null;
+	}
+
+	private static Object prevailing(ComponentInfo component, Attribute attribute) {
+		for (Member member : component.members()) {
+			if (member.role().prevails()) {
+				return stated(member, attribute);
+			}
+		}
+		return null;
+	}
+
+	private static Object stated(Member member, Attribute attribute) {
+		Field field = member.element().getAnnotation(Field.class);
+		return field == null ? null : attribute.stated(field);
+	}
+
+	private static Union union(ComponentInfo component) {
+		Union prevailing = prevailingUnion(component);
+		if (prevailing != null) {
+			return prevailing;
+		}
+		for (Member member : component.members()) {
+			Union union = member.element().getAnnotation(Union.class);
+			if (union != null) {
+				return union;
+			}
+		}
+		return null;
+	}
+
+	private static Union prevailingUnion(ComponentInfo component) {
+		for (Member member : component.members()) {
+			if (member.role().prevails()) {
+				return member.element().getAnnotation(Union.class);
+			}
+		}
+		return null;
+	}
+
+	private static CodeAnalysisException differ(ComponentInfo component, String held, Member heldBy, String given,
+			Member givenBy) {
+		return new CodeAnalysisException(String.format("%s's component '%s' has %s on %s but %s on %s",
+				component.getDescribed().getName(), component.getName(), held, describe(heldBy), given,
+				describe(givenBy)));
+	}
+
+	private static String show(Union union) {
+		String members = Arrays.stream(union.value()).map(member -> member.getName() + ".class")
+				.collect(Collectors.joining(", ", "{", "}"));
+		return union.sealed() ? "@Union(" + members + ")" : "@Union(value = " + members + ", sealed = false)";
+	}
+
+	private static String describe(Member member) {
+		return switch (member.element()) {
+			case java.lang.reflect.Field field -> "the " + member.role().noun() + " "
+					+ field.getDeclaringClass().getSimpleName() + "." + field.getName();
+			case Method method -> "the " + member.role().noun() + " " + method.getDeclaringClass().getSimpleName()
+					+ "." + method.getName() + parameters(method);
+			case Parameter parameter -> {
+				Executable executable = parameter.getDeclaringExecutable();
+				yield "parameter " + List.of(executable.getParameters()).indexOf(parameter) + " of the "
+						+ member.role().noun() + " " + executable.getDeclaringClass().getSimpleName()
+						+ parameters(executable);
+			}
+			case RecordComponent component -> "the " + member.role().noun() + " "
+					+ component.getDeclaringRecord().getSimpleName() + "." + component.getName();
+			default -> throw new IllegalStateException(member.element() + " is no member of a component");
 		};
 	}
 
-	private static Union unionOf(Member member) {
-		return switch (member.role()) {
-			case RECORD_ACCESSOR, STORED_FIELD, PARAMETER, ACCESSOR -> member.element().getAnnotation(Union.class);
-			case RECORD_COMPONENT, RECORD_PARAMETER, PROFILED_ACCESSOR, PROFILED_PARAMETER, SHARED_PARAMETER,
-					PUBLIC_FIELD, GETTER, SETTER, PRIVATE_FIELD, MERGED_PUBLIC_FIELD, MERGED_GETTER, MERGED_SETTER -> null;
-		};
+	private static String parameters(Executable executable) {
+		return Arrays.stream(executable.getParameterTypes()).map(Class::getSimpleName)
+				.collect(Collectors.joining(", ", "(", ")"));
 	}
 }

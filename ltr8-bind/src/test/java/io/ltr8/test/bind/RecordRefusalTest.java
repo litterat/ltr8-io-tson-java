@@ -457,8 +457,11 @@ class RecordRefusalTest {
 	}
 
 	@Test
-	void aGetterAndSetterRenamedApartAreRefusedNamingTheField() {
-		assertEquals("Field 'value' already has Field annotation", message(GetterAndSetterRenamedApart.class));
+	void aGetterAndSetterRenamedApartAreRefusedNamingTheFieldAndBoth() {
+		assertEquals(GetterAndSetterRenamedApart.class.getName() + "'s component 'value' has @Field(value = "
+				+ "\"fromGetter\") on the getter GetterAndSetterRenamedApart.getValue() but "
+				+ "@Field(value = \"fromSetter\") on the setter GetterAndSetterRenamedApart.setValue(String)",
+				message(GetterAndSetterRenamedApart.class));
 	}
 
 	// --- two components of one wire name

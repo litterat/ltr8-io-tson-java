@@ -106,7 +106,7 @@ public class ImmutableFinder implements ComponentFinder {
                     if (code != null) {
                         int[] own = new int[constructor.getParameterCount()];
                         Arrays.setAll(own, x -> x);
-                        identifyArguments(types, constructor, own, immutableFields, code);
+                        identifyArguments(clss, types, constructor, own, immutableFields, code);
                     }
                     break;
                 }
@@ -119,7 +119,7 @@ public class ImmutableFinder implements ComponentFinder {
                         .filter(e -> e.getConstructorArgument() == paramIndex).toList();
                 Field field = params[x].getAnnotation(Field.class);
                 if (storing.isEmpty() && field != null) {
-                    ComponentInfo component = new ComponentInfo(field.value(), types[x]);
+                    ComponentInfo component = new ComponentInfo(clss, field.value(), types[x]);
                     component.setConstructorArgument(x);
                     immutableFields.add(component);
                     storing = List.of(component);
@@ -129,9 +129,9 @@ public class ImmutableFinder implements ComponentFinder {
                     throw new CodeAnalysisException(String.format("%s's constructor does not assign its @Union "
                             + "parameter %d unchanged to a field, and no @Field names it", clss.getName(), x));
                 }
-                for (ComponentInfo component : storing) {
-                    component.addMember(component == storing.getFirst() ? Role.PARAMETER : Role.SHARED_PARAMETER,
-                            params[x]);
+                // A parameter stored in more than one field is refused below, whatever its annotations.
+                if (!storing.isEmpty()) {
+                    storing.getFirst().addMember(Role.PARAMETER, params[x]);
                 }
             }
 
@@ -407,11 +407,12 @@ public class ImmutableFinder implements ComponentFinder {
      * recursively. A component is bound by the top constructor, so a field a called constructor stores takes the
      * index and type of the top parameter that reaches it, never the called constructor's own.
      *
+     * @param described the class the top constructor builds
      * @param types the type of each parameter of the top constructor
      * @param toTop for each parameter of {@code constructor}, the index of the top parameter it holds
      * @return for each parameter of {@code constructor}, whether a field stores it, here or further up
      */
-    private boolean[] identifyArguments(Type[] types, Constructor<?> constructor, int[] toTop,
+    private boolean[] identifyArguments(Class<?> described, Type[] types, Constructor<?> constructor, int[] toTop,
             List<ComponentInfo> fields, CodeModel code) throws CodeAnalysisException {
         boolean[] foundLoadThis = {false};
         boolean[] foundLoadArg = {false};
@@ -470,7 +471,7 @@ public class ImmutableFinder implements ComponentFinder {
                                 + "resolves to no field of the class or a super class",
                                 constructor.getDeclaringClass().getName(), owner.replace('/', '.'), name));
                     }
-                    ComponentInfo component = new ComponentInfo(name, types[toTop[arg]]);
+                    ComponentInfo component = new ComponentInfo(described, name, types[toTop[arg]]);
                     component.setConstructorArgument(toTop[arg]);
                     component.setDeclaringClass(target.getDeclaringClass());
                     component.addMember(Role.STORED_FIELD, target);
@@ -490,7 +491,7 @@ public class ImmutableFinder implements ComponentFinder {
                 // @Field or refused by findComponents' coverage check, as without the call.
                 int parameterCount = invoke.typeSymbol().parameterCount();
                 if (parameterCount > 0 && foundLoadThis[0] && args.size() == parameterCount) {
-                    identifyCallArguments(types, constructor, toTop, invoke, args, stored, fields);
+                    identifyCallArguments(described, types, constructor, toTop, invoke, args, stored, fields);
                 }
                 foundLoadThis[0] = false;
                 foundLoadArg[0] = false;
@@ -546,7 +547,7 @@ public class ImmutableFinder implements ComponentFinder {
      *
      * @param args the parameter of {@code constructor} passed as each argument of the call
      */
-    private void identifyCallArguments(Type[] types, Constructor<?> constructor, int[] toTop,
+    private void identifyCallArguments(Class<?> described, Type[] types, Constructor<?> constructor, int[] toTop,
             InvokeInstruction invoke, List<Integer> args, boolean[] stored, List<ComponentInfo> fields)
             throws CodeAnalysisException {
         Class<?> ownClass = constructor.getDeclaringClass();
@@ -584,7 +585,7 @@ public class ImmutableFinder implements ComponentFinder {
         for (MethodModel calledMethod : parseClass(calledClass).methods()) {
             if (calledMethod.methodName().stringValue().equals("<init>")
                     && calledMethod.methodType().stringValue().equals(descriptor)) {
-                calledStored = identifyArguments(types, called, calledToTop, calledFields,
+                calledStored = identifyArguments(described, types, called, calledToTop, calledFields,
                         calledMethod.code().orElseThrow());
                 break;
             }

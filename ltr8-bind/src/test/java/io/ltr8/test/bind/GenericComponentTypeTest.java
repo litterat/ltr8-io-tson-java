@@ -94,7 +94,7 @@ public class GenericComponentTypeTest {
 				ProfOptList: CodeAnalysisException: Unrecognized parameterized type
 				ProfOptList<String>: ProfOptList(value:List [String])
 				ProfOptList<? extends String>: ProfOptList(value:List [String])
-				ProfBridged: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
+				ProfBridged: CodeAnalysisException: Bridge object type not assignable from field type
 				ProfBridged<String>: ProfBridged(value:String String)
 				ProfBridged<? extends String>: ProfBridged(value:String String)
 				HoldsProf: HoldsProf(held:ProfList ProfList(value:List [String]))
