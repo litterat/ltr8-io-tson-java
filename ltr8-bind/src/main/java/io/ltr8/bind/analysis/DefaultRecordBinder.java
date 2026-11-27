@@ -1117,7 +1117,8 @@ public class DefaultRecordBinder {
 
 			ComponentInfo field = fields.get(x);
 
-            if (field.getWriteMethod() != null && field.getConstructorArgument() < 0) {
+            // An unbound component keeps what the class gave it rather than a zero no document supplied.
+            if (field.getWriteMethod() != null && field.getConstructorArgument() < 0 && !field.isUnbound()) {
 
 				// (obj, value):void -> obj.setField( value );
 				MethodHandle fieldSetter = field.getWriteMethod();

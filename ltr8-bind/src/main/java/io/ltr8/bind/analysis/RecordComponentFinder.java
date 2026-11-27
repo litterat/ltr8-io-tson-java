@@ -17,7 +17,6 @@ package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Profile;
-import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 
 import java.lang.invoke.MethodHandles;
@@ -86,10 +85,9 @@ public class RecordComponentFinder implements ComponentFinder {
                 info.setParamType(parameterizedType);
             }
 
-            // §The class's own, not the wire's. Read from the accessor and the component alike: the marker
-            // targets both, and which one carries it depends on where the author wrote it.
-            info.setUnbound(accessor.isAnnotationPresent(Unbound.class)
-                    || component.isAnnotationPresent(Unbound.class));
+            info.readUnbound(component);
+            info.readUnbound(accessor);
+            info.readUnbound(constructor.getParameters()[x]);
 
             Field fieldAnnotation = accessor.getAnnotation(Field.class);
             if (fieldAnnotation != null) {
@@ -187,6 +185,9 @@ public class RecordComponentFinder implements ComponentFinder {
             if (renamed != null) {
                 info.setField(renamed);
             }
+            info.readUnbound(component);
+            info.readUnbound(component.getAccessor());
+            info.readUnbound(parameters[x]);
             fields.add(info);
         }
     }
