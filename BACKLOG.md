@@ -517,16 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **`@Unbound` is honoured on a record's own components alone.** `RecordComponentFinder` reads it for a record
-  bound through its canonical constructor; on a record bound through a `@Profile` constructor, and on a hand-written
-  `@Record` class's constructor parameter, field or accessor, it is ignored and the component is on the wire. A
-  public field or a getter/setter pair carrying it is untested. Honour it in every finder, with a write and a read
-  of each shape through both mappers showing the component off the wire and filled with its type's zero.
-- [ ] **`@FieldOrder` on a class with two components of one Java name throws `IllegalStateException`.** A public
-  field `name` beside a `getName`/`setName` pair, named apart on the wire by `@Field`, is a class of two components
-  named `name`; `DefaultRecordBinder.reorderFields` keys its map by that name and `Collectors.toMap` throws
-  "Duplicate key". Read, not run. Refuse the class with a `CodeAnalysisException` naming it and the name, with a
-  case in `RecordRefusalTest`.
 - [ ] **A constructor storing a parameter in a field it inherits is refused.** `Sub(String name) { this.name = name;
   }` over a `protected String name` its super class declares is refused with "…constructor assigns field 'name',
   which the class does not declare": `ImmutableFinder` looks the field up on the described class alone. Look it up
