@@ -15,6 +15,11 @@
  */
 package io.ltr8.test.data;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
 /**
  * Records read and written by both mappers, for the shapes a read can be handed that the class does not fit.
  */
@@ -30,5 +35,40 @@ public final class MapperShapes {
 	}
 
 	public record HoldsTriple(String name, Triple triple) {
+	}
+
+	public record OptionalList(Optional<List<String>> names) {
+	}
+
+	public record OptionalArray(Optional<String[]> names) {
+
+		@Override
+		public boolean equals(Object other) {
+			return other instanceof OptionalArray(Optional<String[]> those)
+					&& names.isPresent() == those.isPresent()
+					&& (names.isEmpty() || Arrays.equals(names.get(), those.get()));
+		}
+
+		@Override
+		public int hashCode() {
+			return names.map(Arrays::hashCode).orElse(0);
+		}
+	}
+
+	public record OptionalRecord(Optional<Point> point) {
+	}
+
+	public record NullableComponents(List<String> names, int[] counts, Point point) {
+
+		@Override
+		public boolean equals(Object other) {
+			return other instanceof NullableComponents(List<String> n, int[] c, Point p)
+					&& Objects.equals(names, n) && Arrays.equals(counts, c) && Objects.equals(point, p);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(names, Arrays.hashCode(counts), point);
+		}
 	}
 }

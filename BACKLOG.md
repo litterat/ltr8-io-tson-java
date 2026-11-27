@@ -517,10 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **`ArrayMapper` cannot read back an absent `Optional<List<String>>`.** `toArray` writes the empty optional
-  and `toObject` throws `DataBindException` ("Failed to convert array"): `ArrayToObjectBridge.toObject` dereferences
-  the `null` of the absent component. `MapMapper` round-trips it. Pass the absence through, with a round trip of an
-  absent optional list, array and record through both mappers.
 - [ ] **A `null` element of a list of records fails in both mappers.** `List<Point>` holding a `null` throws
   "Failed to convert array" from `ArrayMapper` and "Failed to convert interface java.util.List to Map" from
   `MapMapper`, where a map component passes a `null` key or value through (`MapComponentMapperTest`). Pass a `null`

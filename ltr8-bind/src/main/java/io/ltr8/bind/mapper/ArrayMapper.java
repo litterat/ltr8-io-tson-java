@@ -52,10 +52,14 @@ public class ArrayMapper {
 
 	private static final MethodHandle CHECKED_LENGTH;
 
+	private static final MethodHandle PART;
+
 	static {
 		try {
 			CHECKED_LENGTH = MethodHandles.lookup().findStatic(ArrayMapper.class, "checkedLength",
 					MethodType.methodType(Object[].class, DataClassRecord.class, Object[].class));
+			PART = MethodHandles.lookup().findStatic(ArrayMapper.class, "part",
+					MethodType.methodType(Object.class, MethodHandle.class, Object.class));
 		} catch (NoSuchMethodException | IllegalAccessException e) {
 			throw new ExceptionInInitializerError(e);
 		}
@@ -183,15 +187,12 @@ public class ArrayMapper {
                     // (Object[]):Object -> (values[inputIndex]):Object
                     MethodHandle arrayIndexGetter = MethodHandles.collectArguments(arrayGetter, 1, index);
 
-					// (dataClass):typeClass -> toObject(dataClass):typeClass
-					MethodHandle fieldToObject = createToObjectFunction(fieldDataClass);
+					// (Object):Object -> value == null ? null : toObject(value)
+					MethodHandle fieldToObject = MethodHandles.insertArguments(PART, 0, createToObjectFunction(
+							fieldDataClass).asType(MethodType.methodType(Object.class, Object.class)));
 
-					// (values[]) -> (values[inputIndex)):dataType
-					MethodType arrayIndexGetterType = arrayIndexGetter.type().changeReturnType(fieldToObject.type().parameterType(0));
-					MethodHandle typedArrayIndexGetter = arrayIndexGetter.asType(arrayIndexGetterType);
-
-                    // (values[]):fieldType -> toObject(values[x])
-                    arrayIndexGetter = MethodHandles.collectArguments(fieldToObject, 0, typedArrayIndexGetter);
+                    // (values[]):Object -> part(toObject, values[x])
+                    arrayIndexGetter = MethodHandles.filterReturnValue(arrayIndexGetter, fieldToObject);
 
                     // (values[],int,Object):void -> values[int] = Object;
                     MethodHandle arraySetter = MethodHandles.arrayElementSetter(Object[].class);
@@ -201,7 +202,7 @@ public class ArrayMapper {
 
                     // (values[],Object[]):void -> values[x] = toObject(values[x]);
                     MethodHandle arrayValueSetter = MethodHandles.collectArguments(arrayIndexSetter, 1,
-                            arrayIndexGetter.asType(MethodType.methodType(Object.class, Object[].class)));
+                            arrayIndexGetter);
 
                     int[] permuteInput = new int[2];
                     MethodHandle combined = MethodHandles.permuteArguments(arrayValueSetter,
@@ -659,7 +660,7 @@ public class ArrayMapper {
 		}
 	}
 
-	/** A map may hold a null key or value, which no conversion takes. */
+	/** An absent component, and a map's null key or value, is a null that no conversion takes. */
 	private static Object part(MethodHandle convert, Object value) throws Throwable {
 		return value == null ? null : convert.invoke(value);
 	}
