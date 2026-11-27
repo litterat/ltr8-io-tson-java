@@ -535,10 +535,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **An array of a parameterized type is held at its erasure.** A `List<String>[]` component, and `T[]` described
   at `List<String>`, are held as `List[]` and refused with "Collection must provide parameterized type
   information". Keep the element's type arguments, with a round trip of each.
-- [ ] **The refusal for a constructor the public lookup cannot reach changes from run to run.** It embeds the
-  JDK's `IllegalAccessException` text, which carries an identity hash (`…X.<init>[Ljava.lang.Object;@…`). Read, not
-  run. Name the class and its constructor, keep the exception as the cause, and assert the whole message in
-  `RecordRefusalTest`.
 - [ ] **A Java `sealed` type is described as a union that is not sealed.** `UnionBinder` builds its
   `DataClassUnion` with `isSealed` false, whatever the hierarchy permits. Read, not run. Describe it as sealed
   where no permitted class is `non-sealed`, with a test that such a union admits no class it does not list.

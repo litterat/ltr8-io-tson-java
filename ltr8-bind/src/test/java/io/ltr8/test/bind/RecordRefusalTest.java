@@ -18,6 +18,7 @@ package io.ltr8.test.bind;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
+import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
@@ -537,21 +538,42 @@ class RecordRefusalTest {
 	@Test
 	void aClassThePublicLookupCannotReachIsRefusedNamingTheClassWithTheCauseKept() {
 		DataBindException refused = refusal(context, HiddenEmpty.class);
-		String message = refused.getMessage();
-		assertTrue(message.startsWith(HiddenEmpty.class.getName() + NOT_ACCESSIBLE + "class is not public: "
-				+ HiddenEmpty.class.getName() + ".<init>"), message);
-		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
-		assertTrue(message.endsWith(cause.getMessage()), message);
+		assertEquals(HiddenEmpty.class.getName() + NOT_ACCESSIBLE + "constructor " + HiddenEmpty.class.getName()
+				+ "(), of a class the public lookup cannot access", refused.getMessage());
+		assertInstanceOf(IllegalAccessException.class, refused.getCause());
+	}
+
+	@Test
+	void aConstructorThePublicLookupCannotReachIsNamedWithItsParameterTypes() {
+		DataBindException refused = refusal(context, HiddenTakingArguments.class);
+		assertEquals(HiddenTakingArguments.class.getName() + NOT_ACCESSIBLE + "constructor "
+				+ HiddenTakingArguments.class.getName() + "(java.lang.String, int, java.lang.String[]), of a class "
+				+ "the public lookup cannot access", refused.getMessage());
+		assertInstanceOf(IllegalAccessException.class, refused.getCause());
 	}
 
 	@Test
 	void aFieldBridgeThePublicLookupCannotReachIsRefusedNamingBothClassesWithTheCauseKept() {
 		DataBindException refused = refusal(context, UsesHiddenBridge.class);
-		String message = refused.getMessage();
-		assertTrue(message.startsWith(UsesHiddenBridge.class.getName() + NOT_ACCESSIBLE), message);
-		assertTrue(message.contains(HiddenBridge.class.getName()), message);
-		IllegalAccessException cause = assertInstanceOf(IllegalAccessException.class, refused.getCause());
-		assertTrue(message.endsWith(cause.getMessage()), message);
+		assertEquals(UsesHiddenBridge.class.getName() + NOT_ACCESSIBLE + HiddenBridge.class.getName()
+				+ ", the @Field bridge of " + UsesHiddenBridge.class.getName() + "'s field 'value', is a class the "
+				+ "public lookup cannot access", refused.getMessage());
+		assertInstanceOf(IllegalAccessException.class, refused.getCause());
+	}
+
+	@Test
+	void aRefusalOfWhatThePublicLookupCannotReachReadsTheSameInEveryContext() {
+		DataBindContext named = DataBindContext.builder()
+				.nameBinder(DataNameBinder.ofMap(Map.of("hidden", HiddenEmpty.class))).build();
+		DataBindContext again = DataBindContext.builder()
+				.nameBinder(DataNameBinder.ofMap(Map.of("hidden", HiddenEmpty.class))).build();
+		DataBindContext fresh = DataBindContext.builder().build();
+		assertAll(
+				() -> assertEquals(message(context, HiddenEmpty.class), message(fresh, HiddenEmpty.class)),
+				() -> assertEquals(message(context, HiddenTakingArguments.class),
+						message(fresh, HiddenTakingArguments.class)),
+				() -> assertEquals(message(context, UsesHiddenBridge.class), message(fresh, UsesHiddenBridge.class)),
+				() -> assertEquals(namedRefusal(named, "hidden"), namedRefusal(again, "hidden")));
 	}
 
 	@Test
@@ -651,23 +673,18 @@ class RecordRefusalTest {
 				() -> assertNamedRefusal(named, "holder", HoldsRefused.class, PROTECTED_CONSTRUCTOR),
 				() -> assertNamedRefusal(named, "bridged", BridgeNeedsArgument.class,
 						message(BridgeNeedsArgument.class)),
-				() -> assertNamedLookupRefusal(named, "hidden", HiddenEmpty.class, "class is not public: "));
+				() -> assertNamedRefusal(named, "hidden", HiddenEmpty.class, reasons(refusal(context, HiddenEmpty.class))));
+	}
+
+	/** A refusal's message, then its cause's: the name binder states each distinct message on the chain. */
+	private static String reasons(DataBindException refused) {
+		return refused.getMessage() + ": " + refused.getCause().getMessage();
 	}
 
 	private static void assertNamedRefusal(DataBindContext named, String name, Class<?> bound, String fact) {
 		String message = namedRefusal(named, name);
 		assertEquals("'" + name + "' binds " + bound.getName() + ", which cannot be analysed: " + fact, message);
 		assertOnce(message, fact);
-	}
-
-	/** Checked by its parts: the public lookup's own text names an array by identity, so no two runs match. */
-	private static void assertNamedLookupRefusal(DataBindContext named, String name, Class<?> bound,
-			String lookupFact) {
-		String message = namedRefusal(named, name);
-		assertTrue(message.startsWith("'" + name + "' binds " + bound.getName() + ", which cannot be analysed: "
-				+ bound.getName() + NOT_ACCESSIBLE + lookupFact), message);
-		assertOnce(message, NOT_ACCESSIBLE);
-		assertOnce(message, lookupFact);
 	}
 
 	private static String namedRefusal(DataBindContext named, String name) {
@@ -998,6 +1015,20 @@ class RecordRefusalTest {
 
 		@Record
 		public HiddenEmpty() {
+		}
+	}
+
+	static class HiddenTakingArguments {
+
+		private final String text;
+		private final int count;
+		private final String[] lines;
+
+		@Record
+		public HiddenTakingArguments(@Unbound String text, @Unbound int count, @Unbound String[] lines) {
+			this.text = text;
+			this.count = count;
+			this.lines = lines;
 		}
 	}
 

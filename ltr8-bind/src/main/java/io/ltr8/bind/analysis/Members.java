@@ -19,11 +19,14 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Handles on a public member of a described class, reached as the JVM reaches it: looked up by name and type through
@@ -33,9 +36,10 @@ import java.util.List;
  *
  * <p>A field is refused as hidden where, from a class it would be looked up through, its name and type resolve to
  * another field: the JVM resolves them so from every class further down too. A method needs no such check, since a
- * call dispatches to the same override whichever declaration it resolves to. A member no such class reaches is
- * refused, with the lookup's refusal as the cause: its message names a method's type by identity, so differs from
- * run to run.
+ * call dispatches to the same override whichever declaration it resolves to. A constructor is not inherited, so is
+ * reached through its own class alone. A member no such class reaches is refused naming the member, with the
+ * lookup's refusal as the cause. Each is looked up by name and type rather than unreflected: an unreflected member's
+ * refusal names its type by identity, so differs from run to run.
  */
 final class Members {
 
@@ -61,6 +65,20 @@ final class Members {
 	static MethodHandle virtual(Class<?> described, Method method) throws CodeAnalysisException {
 		return reach(described, method, through -> LOOKUP.findVirtual(through, method.getName(),
 				MethodType.methodType(method.getReturnType(), method.getParameterTypes())));
+	}
+
+	static MethodHandle constructor(Class<?> described, Constructor<?> constructor) throws CodeAnalysisException {
+		Class<?> declarer = constructor.getDeclaringClass();
+		try {
+			return LOOKUP.findConstructor(declarer, MethodType.methodType(void.class, constructor.getParameterTypes()));
+		} catch (IllegalAccessException e) {
+			throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: "
+					+ "constructor %s(%s), of a class the public lookup cannot access", described.getName(),
+					declarer.getName(), Arrays.stream(constructor.getParameterTypes()).map(Class::getTypeName)
+							.collect(Collectors.joining(", "))), e);
+		} catch (NoSuchMethodException e) {
+			throw new IllegalStateException(declarer.getName() + "'s constructor is not found by its own type", e);
+		}
 	}
 
 	private interface Reach<T> {
