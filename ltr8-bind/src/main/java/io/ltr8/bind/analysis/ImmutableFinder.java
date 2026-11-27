@@ -192,8 +192,7 @@ public class ImmutableFinder implements ComponentFinder {
         } catch (IllegalAccessException e) {
             // A public member the public lookup reaches through no class: none between it and the described class is
             // public, or exported.
-            throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: %s",
-                    clss.getName(), e.getMessage()), e);
+            throw Members.notAccessible(clss, e);
         } catch (UncheckedIOException | NoSuchMethodException | NoSuchFieldException | SecurityException e) {
             throw new CodeAnalysisException("Failed to access class", e);
         }
@@ -221,62 +220,7 @@ public class ImmutableFinder implements ComponentFinder {
         }
         int modifiers = field.getModifiers();
         if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers)) {
-            component.setReadMethod(readAs(getter(clss, field), component.getType()));
-        }
-    }
-
-    /**
-     * The JVM resolves a public member of a class that is not public through a public subclass, but unreflecting
-     * resolves it against its declaring class alone, so a member unreflecting cannot reach is looked up through each
-     * class below its declarer in turn, down to {@code clss}.
-     *
-     * @return the classes below {@code member}'s declarer down to {@code clss}, nearest the declarer first
-     */
-    private static List<Class<?>> subclassesDownTo(Class<?> clss, java.lang.reflect.Member member) {
-        List<Class<?>> through = new ArrayList<>();
-        for (Class<?> c = clss; c != member.getDeclaringClass(); c = c.getSuperclass()) {
-            through.addFirst(c);
-        }
-        return through;
-    }
-
-    private static MethodHandle getter(Class<?> clss, java.lang.reflect.Field field)
-            throws IllegalAccessException, NoSuchFieldException, CodeAnalysisException {
-        try {
-            return MethodHandles.publicLookup().unreflectGetter(field);
-        } catch (IllegalAccessException unreachable) {
-            for (Class<?> through : subclassesDownTo(clss, field)) {
-                Class<?> resolved = fieldDeclarer(through, through.getName().replace('.', '/'), field.getName());
-                if (resolved != field.getDeclaringClass()) {
-                    // Resolved from any class further down, the name reaches this other field first too.
-                    throw new CodeAnalysisException(String.format("%s is bound through field %s.%s, which a field "
-                            + "of %s hides from the public lookup", clss.getName(),
-                            field.getDeclaringClass().getName(), field.getName(), resolved.getName()));
-                }
-                try {
-                    return MethodHandles.publicLookup().findGetter(through, field.getName(), field.getType());
-                } catch (IllegalAccessException e) {
-                    // Not public either: try the class below it.
-                }
-            }
-            throw unreachable;
-        }
-    }
-
-    private static MethodHandle virtual(Class<?> clss, Method method)
-            throws IllegalAccessException, NoSuchMethodException {
-        try {
-            return MethodHandles.publicLookup().unreflect(method);
-        } catch (IllegalAccessException unreachable) {
-            for (Class<?> through : subclassesDownTo(clss, method)) {
-                try {
-                    return MethodHandles.publicLookup().findVirtual(through, method.getName(),
-                            MethodType.methodType(method.getReturnType(), method.getParameterTypes()));
-                } catch (IllegalAccessException e) {
-                    // Not public either: try the class below it.
-                }
-            }
-            throw unreachable;
+            component.setReadMethod(readAs(Members.getterDeclarerFirst(clss, field), component.getType()));
         }
     }
 
@@ -355,7 +299,8 @@ public class ImmutableFinder implements ComponentFinder {
                     if (info != null) {
                         Method accessorMethod = clss.getDeclaredMethod(method.methodName().stringValue());
                         info.addMember(Role.ACCESSOR, accessorMethod);
-                        info.setReadMethod(readAs(virtual(described, accessorMethod), info.getType()));
+                        info.setReadMethod(
+                                readAs(Members.virtualDeclarerFirst(described, accessorMethod), info.getType()));
                         info.addAccessor(accessorMethod);
                         accessor = true;
                     }
@@ -389,14 +334,7 @@ public class ImmutableFinder implements ComponentFinder {
         while (from != null && !from.getName().replace('.', '/').equals(owner)) {
             from = from.getSuperclass();
         }
-        for (Class<?> declarer = from; declarer != null; declarer = declarer.getSuperclass()) {
-            try {
-                return declarer.getDeclaredField(name);
-            } catch (NoSuchFieldException e) {
-                // Inherited: declared further up.
-            }
-        }
-        return null;
+        return Members.resolveField(from, name);
     }
 
     /**
@@ -439,7 +377,7 @@ public class ImmutableFinder implements ComponentFinder {
                     .findFirst().orElse(null);
             if (component != null
                     && (method.isAnnotationPresent(Field.class) || method.isAnnotationPresent(Union.class))) {
-                component.setReadMethod(virtual(described, method));
+                component.setReadMethod(Members.virtualDeclarerFirst(described, method));
                 component.addMember(Role.ACCESSOR, method);
                 matched.add(name);
                 component.addAccessor(method);
