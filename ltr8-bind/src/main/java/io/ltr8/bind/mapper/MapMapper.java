@@ -22,17 +22,20 @@ import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
 import io.ltr8.bind.DataClassField;
+import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
 /**
  * Sample showing how to use the library to convert an Object to/from {@code Map<String, Object>}. Each key
  * in the returned map has the name of the field. Union types have an extra field called "type" which
- * provides the class name of the type of value recorded.
+ * provides the class name of the type of value recorded. A map component is a map of its keys and values, each in
+ * this form, in the order the component's map iterates in.
  */
 public class MapMapper {
 
@@ -96,6 +99,16 @@ public class MapMapper {
                     }
 
                     v = outputArray;
+                }
+                case DataClassMap mapClass -> {
+                    Map<Object, Object> map = new LinkedHashMap<>();
+                    Object iterator = mapClass.iterator().invoke(object);
+                    Object entry;
+                    while ((entry = mapClass.next().invoke(iterator)) != null) {
+                        map.put(entryToMap(mapClass.keyDataClass(), mapClass.key().invoke(entry)),
+                                entryToMap(mapClass.valueDataClass(), mapClass.value().invoke(entry)));
+                    }
+                    v = map;
                 }
                 case DataClassUnion unionClass -> {
 
@@ -183,6 +196,15 @@ public class MapMapper {
 
                     v = arrayData;
                 }
+                case DataClassMap mapClass -> {
+                    Map<Object, Object> input = (Map<Object, Object>) data;
+                    Object map = mapClass.constructor().invoke(input.size());
+                    for (Map.Entry<Object, Object> entry : input.entrySet()) {
+                        mapClass.put().invoke(map, entryToObject(mapClass.keyDataClass(), entry.getKey()),
+                                entryToObject(mapClass.valueDataClass(), entry.getValue()));
+                    }
+                    v = map;
+                }
                 case DataClassUnion unionClass -> {
 
                     if (data instanceof Map) {
@@ -217,5 +239,14 @@ public class MapMapper {
 			throw new DataBindException(String.format("Failed to convert Map to %s.", dataClass.typeClass()), t);
 		}
 
+	}
+
+	/** A map may hold a null key or value, which no data class converts. */
+	private Object entryToMap(DataClass dataClass, Object part) throws DataBindException {
+		return part == null ? null : toMap(dataClass, part);
+	}
+
+	private Object entryToObject(DataClass dataClass, Object part) throws DataBindException {
+		return part == null ? null : toObject(dataClass, part);
 	}
 }

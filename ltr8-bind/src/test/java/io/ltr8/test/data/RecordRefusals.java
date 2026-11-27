@@ -873,31 +873,10 @@ public final class RecordRefusals {
 		}
 	}
 
-	public static class InheritedFieldBase {
-
-		protected String name;
-
-		public String name() {
-			return name;
-		}
-	}
-
-	/** Assigns a field its super class declares, so the field is not among its own. */
-	public static class AssignsInheritedField extends InheritedFieldBase {
-
-		@Record
-		public AssignsInheritedField(String name) {
-			this.name = name;
-		}
-	}
-
 	public record HoldsCallsProtectedSuper(String name, CallsProtectedSuper value) {
 	}
 
 	public record HoldsCallsTransformingSuper(String name, CallsTransformingSuper value) {
-	}
-
-	public record HoldsAssignsInheritedField(String name, AssignsInheritedField value) {
 	}
 
 	public record HoldsReachesProtectedSuper(String name, List<ReachesProtectedSuper> values) {

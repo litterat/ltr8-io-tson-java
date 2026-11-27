@@ -397,21 +397,25 @@ public class ImmutableFinder implements ComponentFinder {
         return accessor;
     }
 
+    private static Class<?> fieldDeclarer(Class<?> clss, String owner, String name) {
+        java.lang.reflect.Field field = resolveField(clss, owner, name);
+        return field == null ? null : field.getDeclaringClass();
+    }
+
     /**
      * Resolves a field reference as the JVM does, from the class it names upward. The name alone does not say which
-     * field an accessor returns: a super class may declare a private field of the same name.
+     * field an accessor returns or a constructor stores: a super class may declare a field of the same name.
      *
-     * @return the class declaring the field, or null where {@code owner} is not {@code clss} or a super class of it
+     * @return the field, or null where {@code owner} is not {@code clss} or a super class of it
      */
-    private static Class<?> fieldDeclarer(Class<?> clss, String owner, String name) {
+    private static java.lang.reflect.Field resolveField(Class<?> clss, String owner, String name) {
         Class<?> from = clss;
         while (from != null && !from.getName().replace('.', '/').equals(owner)) {
             from = from.getSuperclass();
         }
         for (Class<?> declarer = from; declarer != null; declarer = declarer.getSuperclass()) {
             try {
-                declarer.getDeclaredField(name);
-                return declarer;
+                return declarer.getDeclaredField(name);
             } catch (NoSuchFieldException e) {
                 // Inherited: declared further up.
             }
@@ -479,27 +483,19 @@ public class ImmutableFinder implements ComponentFinder {
         }
     }
 
-    private void checkFieldAnnotation(ComponentInfo info, Class<?> clss, String fieldName)
+    private static void readFieldAnnotations(ComponentInfo info, java.lang.reflect.Field declared)
             throws CodeAnalysisException {
-        try {
-            java.lang.reflect.Field clssField = clss.getDeclaredField(fieldName);
-            Field field = clssField.getAnnotation(Field.class);
-            if (field != null) {
-                info.setField(field);
-            }
-
-            Union union = clssField.getAnnotation(Union.class);
-            if (union != null) {
-                info.setUnion(union);
-            }
-
-            info.readUnbound(clssField);
-
-        } catch (NoSuchFieldException e) {
-            throw new CodeAnalysisException(String.format(
-                    "%s's constructor assigns field '%s', which the class does not declare",
-                    clss.getName(), fieldName), e);
+        Field field = declared.getAnnotation(Field.class);
+        if (field != null) {
+            info.setField(field);
         }
+
+        Union union = declared.getAnnotation(Union.class);
+        if (union != null) {
+            info.setUnion(union);
+        }
+
+        info.readUnbound(declared);
     }
 
     /**
@@ -572,16 +568,24 @@ public class ImmutableFinder implements ComponentFinder {
                 if (foundLoadThis[0] && foundLoadArg[0] && args.size() == 1) {
                     int arg = args.get(0);
                     Parameter param = top.getParameters()[toTop[arg]];
-                    ComponentInfo component = new ComponentInfo(field.name().stringValue(), param.getType());
+                    String name = field.name().stringValue();
+                    String owner = field.owner().asInternalName();
+                    java.lang.reflect.Field target = resolveField(constructor.getDeclaringClass(), owner, name);
+                    if (target == null) {
+                        throw new CodeAnalysisException(String.format("%s's constructor assigns field %s.%s, which "
+                                + "resolves to no field of the class or a super class",
+                                constructor.getDeclaringClass().getName(), owner.replace('/', '.'), name));
+                    }
+                    ComponentInfo component = new ComponentInfo(name, param.getType());
                     component.setConstructorArgument(toTop[arg]);
-                    component.setDeclaringClass(constructor.getDeclaringClass());
+                    component.setDeclaringClass(target.getDeclaringClass());
 
                     java.lang.reflect.Type paramType = param.getParameterizedType();
                     if (paramType instanceof ParameterizedType pt) {
                         component.setParamType(pt);
                     }
 
-                    checkFieldAnnotation(component, constructor.getDeclaringClass(), field.name().stringValue());
+                    readFieldAnnotations(component, target);
 
                     fields.add(component);
                     stored[arg] = true;
