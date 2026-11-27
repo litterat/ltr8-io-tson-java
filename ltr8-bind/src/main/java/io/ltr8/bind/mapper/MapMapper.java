@@ -65,11 +65,22 @@ public class MapMapper {
 		this.context = context;
 	}
 
+	/**
+	 * Writes {@code object} as described by its own class.
+	 *
+	 * @throws DataBindException where it is written as anything but a map, a tuple or an array among them, which
+	 *                           {@link #toMap(DataClass, Object)} writes
+	 */
 	@SuppressWarnings("unchecked")
 	public Map<String, Object> toMap(Object object) throws DataBindException {
 		Objects.requireNonNull(object);
 
-		return (Map<String, Object>) toMap(context.getDescriptor(object.getClass()), object);
+		Object written = toMap(context.getDescriptor(object.getClass()), object);
+		if (!(written instanceof Map)) {
+			throw new DataBindException(String.format("%s is not written as a map: write it with "
+					+ "toMap(DataClass, Object), which returns a value in any form", object.getClass().getTypeName()));
+		}
+		return (Map<String, Object>) written;
 	}
 
 	@SuppressWarnings("unchecked")

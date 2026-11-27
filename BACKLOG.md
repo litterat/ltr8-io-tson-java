@@ -542,9 +542,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **A Java `sealed` type is described as a union that is not sealed.** `DefaultUnionBinder` builds its
   `DataClassUnion` with `isSealed` false, whatever the hierarchy permits. Read, not run. Describe it as sealed
   where no permitted class is `non-sealed`, with a test that such a union admits no class it does not list.
-- [ ] **`MapMapper.toMap(Object)` casts its result to a `Map`.** A tuple or a list at the root throws
-  `ClassCastException`, where `toMap(DataClass, Object)` writes it. Give the root its form whatever it is, with a
-  round trip of a tuple and a list at the root.
 - [ ] **`MapMapper` tags a union value only where the member writes as a map.** A member written as a list or a
   tuple has no tag and cannot be read back, and a member that is a map has the `type` key mixed into its entries;
   a union read of a value that is no map describes `data.getClass()` and never asks the union whether it is a
