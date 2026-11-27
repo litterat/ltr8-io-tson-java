@@ -8,7 +8,6 @@ import io.ltr8.bind.DataClassElement;
 import io.ltr8.bind.DataClassTuple;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.RecordComponent;
 import java.util.function.Supplier;
@@ -42,7 +41,6 @@ public class TupleBinder {
 		}
 
 		RecordComponent[] components = targetClass.getRecordComponents();
-		MethodHandles.Lookup lookup = MethodHandles.lookup();
 
 		try {
 			DataClassElement[] elements = new DataClassElement[components.length];
@@ -53,7 +51,12 @@ public class TupleBinder {
 
 				Supplier<DataClass> elementDataClass =
 						context.componentSource(component.getType(), component.getGenericType());
-				MethodHandle accessor = lookup.unreflect(component.getAccessor());
+				MethodHandle accessor;
+				try {
+					accessor = Members.virtual(targetClass, component.getAccessor());
+				} catch (CodeAnalysisException e) {
+					throw refused(targetClass, e);
+				}
 
 				elements[i] = new DataClassElement(i, elementDataClass, accessor);
 			}
@@ -62,14 +65,24 @@ public class TupleBinder {
 			// types, in order -- getDeclaredConstructor(componentTypes) finds it unambiguously
 			// even if the record also declares other (non-canonical) constructors.
 			Constructor<?> canonical = targetClass.getDeclaredConstructor(componentTypes);
-			MethodHandle rawConstructor = lookup.unreflectConstructor(canonical);
+			MethodHandle rawConstructor;
+			try {
+				rawConstructor = Members.constructor(targetClass, canonical);
+			} catch (CodeAnalysisException e) {
+				throw refused(targetClass, e);
+			}
 			MethodHandle constructor = rawConstructor.asSpreader(Object[].class, components.length);
 
 			return new DataClassTuple(targetClass, constructor, elements);
 
-		} catch (IllegalAccessException | NoSuchMethodException | SecurityException e) {
-			throw new CodeAnalysisException("Failed to get tuple descriptor for " + targetClass, e);
+		} catch (NoSuchMethodException | SecurityException e) {
+			// Not every CodeAnalysisException: an element's own refusal, from componentSource, passes up unwrapped.
+			throw refused(targetClass, e);
 		}
+	}
+
+	private static CodeAnalysisException refused(Class<?> targetClass, Exception cause) {
+		return new CodeAnalysisException("Failed to get tuple descriptor for " + targetClass, cause);
 	}
 
 }

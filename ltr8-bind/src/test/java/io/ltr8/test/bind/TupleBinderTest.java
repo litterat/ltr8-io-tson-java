@@ -96,6 +96,23 @@ public class TupleBinderTest {
 		Assertions.assertThrows(DataBindException.class, () -> context.getDescriptor(TupleOnAPlainClass.class));
 	}
 
+	private static final class PrivateHolder {
+
+		@Tuple
+		public record HeldPoint(int x, int y) {
+		}
+	}
+
+	/** A class's own access, not its enclosing class's, is what the public lookup asks of it. */
+	@Test
+	public void aPublicTupleInAPrivateClassIsDescribedAndRoundTrips() throws Throwable {
+		DataClassTuple tupleClass = (DataClassTuple) context.getDescriptor(PrivateHolder.HeldPoint.class);
+
+		Object tuple = tupleClass.constructor().invoke(new Object[] { 3, 4 });
+		Assertions.assertEquals(new PrivateHolder.HeldPoint(3, 4), tuple);
+		Assertions.assertEquals(4, (int) tupleClass.elements()[1].accessor().invoke(tuple));
+	}
+
 	@Test
 	public void plainJavaRecordWithoutAnnotationBindsAsAnOrdinaryRecordNotATuple() throws Throwable {
 		// NotATuple has no @Tuple -- it should resolve via the ordinary named-field record path,

@@ -22,6 +22,7 @@ import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Transparent;
+import io.ltr8.annotation.Tuple;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -628,6 +629,16 @@ class RecordRefusalTest {
 				atom + NOT_ACCESSIBLE + "method " + atom + ".code, which is not public");
 	}
 
+	/** A tuple is refused where a record of its visibility is ({@link HiddenRecord}), and alike. */
+	@Test
+	void aTupleThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
+		String tuple = HiddenTuple.class.getName();
+		assertRefusedAlike(DataBindContext::builder, HiddenTuple.class,
+				"Failed to get tuple descriptor for " + HiddenTuple.class,
+				unreachable(HiddenTuple.class, "method " + tuple + ".text"),
+				"symbolic reference class is not accessible: class " + tuple + ", from public Lookup");
+	}
+
 	@Test
 	void aTransparentRecordThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
 		String record = HiddenTransparent.class.getName();
@@ -724,6 +735,11 @@ class RecordRefusalTest {
 	@Test
 	void aRefusedArrayElementIsTheMessage() {
 		assertEquals(PROTECTED_CONSTRUCTOR, message(HoldsRefusedArray.class));
+	}
+
+	@Test
+	void aRefusedTupleElementIsTheMessage() {
+		assertEquals(message(OrderCountMismatch.class), message(TupleHoldsRefused.class));
 	}
 
 	@Test
@@ -1252,6 +1268,17 @@ class RecordRefusalTest {
 		String code() {
 			return code;
 		}
+	}
+
+	@Tuple
+	private record HiddenTuple(String text) {
+
+		public HiddenTuple {
+		}
+	}
+
+	@Tuple
+	public record TupleHoldsRefused(OrderCountMismatch value) {
 	}
 
 	@Transparent

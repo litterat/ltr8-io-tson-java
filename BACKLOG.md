@@ -542,10 +542,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   anonymous body class alone, and its other constants are no member. Read, not run, beyond a probe of the JDK's
   answer for the enum. List a sealed class that can be instantiated beside the classes it permits, with a round trip
   of a concrete sealed root and of each constant of such an enum.
-- [ ] **`TupleBinder` reaches a record through `ltr8-bind`'s own lookup.** It uses `MethodHandles.lookup()` where
-  every other binder uses the public lookup, so what a `@Tuple` record may hide differs from what a record may.
-  Read, not run. Reach its constructor and accessors through `Members`, with a case in `RecordRefusalTest` for a
-  `@Tuple` record the public lookup cannot reach.
 - [ ] **A `@Field` bridge inheriting a generic `toData` may be refused.** `RecordFields.fieldBridge` looks up
   `toData` and `toObject` on the bridge class at the resolved types, and a bridge that inherits both from a generic
   super class (`IntegerBridge extends AbstractBridge<Integer>`) declares only the erased signatures. Read, not run.
