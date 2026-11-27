@@ -41,7 +41,8 @@ import java.util.Objects;
  * provides the class name of the type of value recorded. A {@code @Tuple} record is an array of its elements, in
  * order, as a list is an array of its elements, each in this form. A map component is a map of its keys and values,
  * each in this form, in the order the component's map iterates in. An annotated value, an {@code AnnotatedMap}'s key
- * among them, is its value in this form: the form has no place for annotations, so it reads back without them.
+ * among them, is its value in this form: the form has no place for annotations, so it reads back without them. For
+ * the same reason a record's {@code Annotations} carrier has no key, and reads back holding none.
  * <p>
  * A read missing a required field, or a tuple's read of an array of the wrong length or missing a primitive element,
  * throws the {@link DataBindException} that says so, however deep the value sits: no enclosing record, list, map or
@@ -87,10 +88,11 @@ public class MapMapper {
                     //Object data = dataRecord.toData().invoke(object);
                     Map<String, Object> map = new HashMap<>();
                     DataClassField[] fields = dataRecord.fields();
+                    DataClassField carrier = dataRecord.annotationsCarrier().orElse(null);
                     for (fieldIndex = 0; fieldIndex < fields.length; fieldIndex++) {
                         DataClassField field = fields[fieldIndex];
 
-                        if (field.isPresent(object)) {
+                        if (field != carrier && field.isPresent(object)) {
                             DataClass fieldDataClass = field.dataClass();
                             Object fv = toMap(fieldDataClass, field.get(object));
                             map.put(field.name(), fv);
@@ -190,12 +192,16 @@ public class MapMapper {
                     DataClassField carrier = dataRecord.annotationsCarrier().orElse(null);
                     for (fieldIndex = 0; fieldIndex < dataRecord.fields().length; fieldIndex++) {
                         DataClassField field = fields[fieldIndex];
+                        if (field == carrier) {
+                            construct[fieldIndex] = Annotations.empty();
+                            continue;
+                        }
 
                         Object fv = map.get(field.name());
 
                         if (fv != null) {
                             fv = toObject(field.dataClass(), fv);
-                        } else if (field.isRequired() && field != carrier) {
+                        } else if (field.isRequired()) {
                             throw new DataBindException(String.format("%s is missing its required field '%s'",
                                     dataRecord.typeClass().getName(), field.name()));
                         }

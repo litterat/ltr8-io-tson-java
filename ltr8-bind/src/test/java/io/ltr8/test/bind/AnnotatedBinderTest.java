@@ -44,6 +44,13 @@ public class AnnotatedBinderTest {
 	public record NoCarrier(String name) {
 	}
 
+	/** A carrier between two fields, so a value's position in an array differs from its field's index. */
+	public record Inside(String a, Annotations meta, int b) {
+	}
+
+	public record HoldsInside(Inside inside) {
+	}
+
 	/** A boxed position: the annotations ride with the value, since a String has nowhere to hold them. */
 	public record Boxed(Annotated<String> name, int count) {
 	}
@@ -126,6 +133,55 @@ public class AnnotatedBinderTest {
 				() -> Assertions.assertTrue(fromMap.name().annotations().isEmpty()),
 				() -> Assertions.assertEquals(absent, arrays.toObject(Boxed.class, arrays.toArray(absent))),
 				() -> Assertions.assertEquals(absent, maps.toObject(Boxed.class, maps.toMap(absent))));
+	}
+
+	/** The carrier is not on the wire: both mappers write the record without it and read it back empty. */
+	@Test
+	public void aCarrierIsLeftOutOfBothMappersForms() throws Throwable {
+		Annotations note = Annotations.of(java.util.List.of(Annotation.of("doc", "x")));
+		ArrayMapper arrays = new ArrayMapper(context);
+		MapMapper maps = new MapMapper(context);
+		Assertions.assertAll(
+				() -> Assertions.assertArrayEquals(new Object[] { "n" }, arrays.toArray(new Item(note, "n"))),
+				() -> Assertions.assertArrayEquals(new Object[] { "a", 2 }, arrays.toArray(new Inside("a", note, 2))),
+				() -> Assertions.assertArrayEquals(new Object[] { new Object[] { "a", 2 } },
+						arrays.toArray(new HoldsInside(new Inside("a", note, 2)))),
+				() -> Assertions.assertEquals(java.util.Map.of("name", "n"), maps.toMap(new Item(note, "n"))),
+				() -> Assertions.assertEquals(java.util.Map.of("a", "a", "b", 2), maps.toMap(new Inside("a", note, 2))),
+				() -> Assertions.assertEquals(java.util.Map.of("inside", java.util.Map.of("a", "a", "b", 2)),
+						maps.toMap(new HoldsInside(new Inside("a", note, 2)))));
+	}
+
+	@Test
+	public void aCarrierReadsBackEmptyFromBothMappers() throws Throwable {
+		Annotations note = Annotations.of(java.util.List.of(Annotation.of("doc", "x")));
+		ArrayMapper arrays = new ArrayMapper(context);
+		MapMapper maps = new MapMapper(context);
+		Item item = new Item(Annotations.empty(), "n");
+		Inside inside = new Inside("a", Annotations.empty(), 2);
+		HoldsInside holds = new HoldsInside(inside);
+		Assertions.assertAll(
+				() -> Assertions.assertEquals(item, arrays.toObject(Item.class, arrays.toArray(new Item(note, "n")))),
+				() -> Assertions.assertEquals(inside,
+						arrays.toObject(Inside.class, arrays.toArray(new Inside("a", note, 2)))),
+				() -> Assertions.assertEquals(holds,
+						arrays.toObject(HoldsInside.class, arrays.toArray(new HoldsInside(new Inside("a", note, 2))))),
+				() -> Assertions.assertEquals(item, maps.toObject(Item.class, maps.toMap(new Item(note, "n")))),
+				() -> Assertions.assertEquals(inside, maps.toObject(Inside.class, maps.toMap(new Inside("a", note, 2)))),
+				() -> Assertions.assertEquals(holds,
+						maps.toObject(HoldsInside.class, maps.toMap(new HoldsInside(new Inside("a", note, 2))))),
+				() -> Assertions.assertEquals(item,
+						maps.toObject(Item.class, java.util.Map.of("name", "n", "meta", "matched against nothing"))));
+	}
+
+	/** An array holds one value per field on the wire, so its length leaves the carrier out. */
+	@Test
+	public void anArrayHoldingAValueForTheCarrierIsRefused() {
+		ArrayMapper arrays = new ArrayMapper(context);
+		DataBindException refused = Assertions.assertThrows(DataBindException.class,
+				() -> arrays.toObject(Inside.class, new Object[] { "a", null, 2 }));
+		Assertions.assertEquals(Inside.class.getName() + " has 2 fields but the array has length 3",
+				refused.getMessage());
 	}
 
 	@Test

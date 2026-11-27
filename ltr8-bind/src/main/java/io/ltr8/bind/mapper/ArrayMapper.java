@@ -47,7 +47,8 @@ import java.util.Objects;
  * A record and a {@code @Tuple} record are each an array of their values, one per field or element in order, each
  * in this form. A map is an array of {@code [key, value]} entries, each part in this form, in the order the map
  * iterates in. An annotated value, an {@code AnnotatedMap}'s key among them, is its value in this form: the form has
- * no place for annotations, so it reads back without them.
+ * no place for annotations, so it reads back without them. For the same reason a record's {@code Annotations}
+ * carrier takes no place in its array, and reads back holding none.
  * <p>
  * A read refused for a record's or a tuple's own shape -- its array's length, or the absence of a required field or
  * a primitive element -- throws the {@link DataBindException} that says so, however deep the value sits: no
@@ -194,7 +195,11 @@ public class ArrayMapper {
                 result = dataClassRecord.constructor();
 
                 DataClassField[] fields = dataClassRecord.fields();
+                DataClassField carrier = dataClassRecord.annotationsCarrier().orElse(null);
                 for (int fieldIndex = 0; fieldIndex < dataClassRecord.fields().length; fieldIndex++) {
+                    if (fields[fieldIndex] == carrier) {
+                        continue;
+                    }
 					DataClass fieldDataClass = fields[fieldIndex].dataClass();
 
                     // (Object[],int) -> values[int]:Object
@@ -314,24 +319,37 @@ public class ArrayMapper {
 	}
 
 	/**
-	 * A record's values line up with its fields by position, so an array of any other length leaves a field
-	 * without a value or a value without a field. A null is an absent value, which a required field refuses. The
-	 * fields are converted in place in the array returned, so it is a copy: the caller's array is left as it was.
+	 * A record's values line up by position with its fields on the wire -- every field but the annotations
+	 * carrier, which the form has no place for -- so an array of any other length leaves a field without a value or
+	 * a value without a field. A null is an absent value, which a required field refuses. Returns the values at
+	 * their fields' indexes, the carrier holding no annotations, in a new array the fields are converted in: the
+	 * caller's array is left as it was.
 	 */
 	private static Object[] checked(DataClassRecord record, Object[] values) throws DataBindException {
 		DataClassField[] fields = record.fields();
-		if (values.length != fields.length) {
-			throw new DataBindException(String.format("%s has %d fields but the array has length %d",
-					record.typeClass().getName(), fields.length, values.length));
-		}
 		DataClassField carrier = record.annotationsCarrier().orElse(null);
-		for (int x = 0; x < fields.length; x++) {
-			if (values[x] == null && fields[x].isRequired() && fields[x] != carrier) {
+		if (values.length != wireLength(record)) {
+			throw new DataBindException(String.format("%s has %d fields but the array has length %d",
+					record.typeClass().getName(), wireLength(record), values.length));
+		}
+		Object[] construct = new Object[fields.length];
+		for (int x = 0, position = 0; x < fields.length; x++) {
+			if (fields[x] == carrier) {
+				construct[x] = Annotations.empty();
+				continue;
+			}
+			Object value = values[position++];
+			if (value == null && fields[x].isRequired()) {
 				throw new DataBindException(String.format("%s is missing its required field '%s'",
 						record.typeClass().getName(), fields[x].name()));
 			}
+			construct[x] = value;
 		}
-		return values.clone();
+		return construct;
+	}
+
+	private static int wireLength(DataClassRecord record) {
+		return record.fields().length - (record.annotationsCarrier().isPresent() ? 1 : 0);
 	}
 
 	/**
@@ -365,10 +383,10 @@ public class ArrayMapper {
                 // (int):Object[] -> new Object[int]
                 MethodHandle createArray = MethodHandles.arrayConstructor(Object[].class);
 
-                // (int):length -> fields.length
-                MethodHandle index = MethodHandles.constant(int.class, dataClassRecord.fields().length);
+                // (int):length -> wireLength
+                MethodHandle index = MethodHandles.constant(int.class, wireLength(dataClassRecord));
 
-                // ():Object[] -> new Object[fields.length]
+                // ():Object[] -> new Object[wireLength]
                 MethodHandle arrayCreate = MethodHandles.collectArguments(createArray, 0, index);
 
                 // (Object[],serialClass):void -> getters(Object[],serialClass)
@@ -377,7 +395,7 @@ public class ArrayMapper {
                 // (Object[],targetClass):void -> getters(Object[], project(targetClass))
                 //MethodHandle projectGetters = MethodHandles.collectArguments(getters, 1, dataClassRecord.toData());
 
-                // (Object):Object[] -> return getters(new Object[fields.length], serialiClass);
+                // (Object):Object[] -> return getters(new Object[wireLength], serialiClass);
                 toDataMethod = MethodHandles.collectArguments(getters, 0, arrayCreate);
             }
             case DataClassTuple tuple -> {
@@ -478,16 +496,20 @@ public class ArrayMapper {
 		MethodHandle result = MethodHandles.dropArguments(identity, 1, dataClass.dataClass());
 
 		DataClassField[] fields = dataClass.fields();
+		DataClassField carrier = dataClass.annotationsCarrier().orElse(null);
+		int outputIndex = 0;
 		for (int x = 0; x < fields.length; x++) {
 
 			DataClassField field = fields[x];
-			int outputIndex = x;
+			if (field == carrier) {
+				continue;
+			}
 
 			// (value[],x, v) -> value[x] = v
 			MethodHandle arraySetter = MethodHandles.arrayElementSetter(Object[].class);
 
 			// () -> outputIndex
-			MethodHandle index = MethodHandles.constant(int.class, outputIndex);
+			MethodHandle index = MethodHandles.constant(int.class, outputIndex++);
 
 			// (value[],v) -> value[inputIndex] = v
 			MethodHandle arrayIndexSetter = MethodHandles.collectArguments(arraySetter, 1, index);
