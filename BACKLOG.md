@@ -517,6 +517,52 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
+- [ ] **`ArrayMapper.toObject` given an array shorter than the class's fields throws unchecked.** A record of three
+  fields read from a two-element array throws `ArrayIndexOutOfBoundsException`. Refuse the read with a
+  `DataBindException` naming the class and both counts, with a test of a short and a long array.
+- [ ] **`ArrayMapper` cannot read back an absent `Optional<List<String>>`.** `toArray` writes the empty optional
+  and `toObject` throws `DataBindException` ("Failed to convert array"): `ArrayToObjectBridge.toObject` dereferences
+  the `null` of the absent component. `MapMapper` round-trips it. Pass the absence through, with a round trip of an
+  absent optional list, array and record through both mappers.
+- [ ] **A `null` element of a list of records fails in both mappers.** `List<Point>` holding a `null` throws
+  "Failed to convert array" from `ArrayMapper` and "Failed to convert interface java.util.List to Map" from
+  `MapMapper`, where a map component passes a `null` key or value through (`MapComponentMapperTest`). Pass a `null`
+  element through in both, for a list, an array and a set, with a round trip of each.
+- [ ] **A map read missing a required field does not say which.** `MapMapper.toObject` on a map with no key for a
+  primitive component throws `DataBindException` ("Failed to convert Map to class …") caused by a
+  `NullPointerException`; what a missing required reference component does is untested. Refuse the read naming the
+  class and the field, for a primitive and a reference, with an optional component absent beside them reading as
+  empty.
+- [ ] **A map component typed `AnnotatedMap` is untested in both mappers.** `DefaultMapBinder` iterates its entries
+  as boxes, so the map write may carry the box and not the key. Read, not run. Round-trip one through both mappers
+  and carry the key.
+- [ ] **A `@FieldOrder` repeating a name is accepted.** `@FieldOrder({"a", "a"})` on `record(a, b)` passes the
+  length and presence checks of `DefaultRecordBinder.reorderFields` and gives the order `[b, a]`. Refuse an order
+  that does not name each component once, naming the class and the name, with a case in `RecordRefusalTest`.
+- [ ] **`@Field` on the setter of a constructor component is dropped.** For a class whose constructor binds `name`
+  and which also declares `@Field("label") setName`, `GetSetFinder`'s merge carries the write method across and not
+  the annotation, so the write gives `{name=n}`. Read the annotation from every member of a component, with a test
+  of `@Field` on each of the parameter, field, accessor and setter.
+- [ ] **An `@Unbound` component is analysed as a bound one is.** `record(String name, @Unbound Thread cache)` is
+  refused with "Unable to find a valid data conversion for class: class java.lang.Thread", and an `@Unbound`
+  constructor parameter of a hand-written `@Record` class with no accessor is refused with "Failed to match
+  immutable field accessor …". Nothing reads or writes either. Describe neither, with a read of each through both
+  mappers in `UnboundComponentTest`.
+- [ ] **`Optional<? extends Number>` on a record throws `ClassCastException`.** `getDescriptor` throws it unchecked
+  from `DefaultRecordBinder.rawTypeOf` in `resolveOptionalField`. Refuse the class with a `CodeAnalysisException`
+  naming it and the component, as a `List<? extends Number>` component is refused, with a case in
+  `RecordRefusalTest`.
+- [ ] **A bare type variable of a class described at a parameterization stays `Object`.** For `Box<T>` with a
+  component `T value` or `T[] items`, described as `Box<String>`, `TypeArguments.substitute(targetClass,
+  parameterizedType, components)` rewrites a component's `paramType` alone, so the component is refused as
+  `Object`. Read, not run. Resolve the component's class too, with a round trip of each shape for a record, a
+  constructor class and a pair.
+- [ ] **The bind readers compute the `@Unbound` components again, from fewer members.**
+  `RecordBindReader.unboundComponents` (`tson-compiler`) and `BindRecordBuilder.unboundComponents` (`tson-json`)
+  reflect over a record component and its accessor, where `ltr8-bind` reads the marker from every member, and both
+  loop over `descriptor.fields()`, which holds no unbound component. Read, not run. Take the answer from the
+  descriptor, or delete the sets if nothing reaches them, with a bind read of an `@Unbound` constructor parameter
+  in each stack.
 - [ ] **`Unbound`'s Javadoc says a `null` arrives.** In `ltr8-annotation`: a primitive component receives its zero
   value (`UnboundComponentTest`). Say "its type's zero value" in both paragraphs.
 
