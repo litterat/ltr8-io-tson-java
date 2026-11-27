@@ -43,7 +43,8 @@ public class GenericComponentTypeTest {
 				RecArray<String>: RecArray(value:String[] [String])
 				RecWild: CodeAnalysisException: Unrecognized parameterized type
 				RecWild<String>: CodeAnalysisException: Unrecognized parameterized type
-				RecOpt: ClassCastException
+				RecOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$RecOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				RecOpt<String>: RecOpt(value:String String)
 				RecOptList: CodeAnalysisException: Unrecognized parameterized type
 				RecOptList<String>: RecOptList(value:List [String])
@@ -68,7 +69,8 @@ public class GenericComponentTypeTest {
 				ProfArray<String>: ProfArray(value:String[] [String])
 				ProfWild: CodeAnalysisException: Unrecognized parameterized type
 				ProfWild<String>: CodeAnalysisException: Unrecognized parameterized type
-				ProfOpt: ClassCastException
+				ProfOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$ProfOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				ProfOpt<String>: ProfOpt(value:String String)
 				ProfOptList: CodeAnalysisException: Unrecognized parameterized type
 				ProfOptList<String>: ProfOptList(value:List [String])
@@ -99,7 +101,8 @@ public class GenericComponentTypeTest {
 				CtorWild: CodeAnalysisException: Unrecognized parameterized type
 				CtorWild<String>: CodeAnalysisException: Unrecognized parameterized type
 				TextCtorWild: CodeAnalysisException: Unrecognized parameterized type
-				CtorOpt: ClassCastException
+				CtorOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$CtorOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				CtorOpt<String>: CtorOpt(value:String String)
 				TextCtorOpt: TextCtorOpt(value:String String)
 				CtorOptList: CodeAnalysisException: Unrecognized parameterized type
@@ -148,7 +151,8 @@ public class GenericComponentTypeTest {
 				PubWild: CodeAnalysisException: Unrecognized parameterized type
 				PubWild<String>: CodeAnalysisException: Unrecognized parameterized type
 				TextPubWild: CodeAnalysisException: Unrecognized parameterized type
-				PubOpt: ClassCastException
+				PubOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$PubOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				PubOpt<String>: PubOpt(value:String set String)
 				TextPubOpt: TextPubOpt(value:String set String)
 				PubOptList: CodeAnalysisException: Unrecognized parameterized type
@@ -182,7 +186,8 @@ public class GenericComponentTypeTest {
 				PairWild: CodeAnalysisException: Unrecognized parameterized type
 				PairWild<String>: CodeAnalysisException: Unrecognized parameterized type
 				TextPairWild: CodeAnalysisException: Unrecognized parameterized type
-				PairOpt: ClassCastException
+				PairOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$PairOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				PairOpt<String>: PairOpt(value:String set String)
 				TextPairOpt: TextPairOpt(value:String set String)
 				PairOptList: CodeAnalysisException: Unrecognized parameterized type
@@ -216,7 +221,8 @@ public class GenericComponentTypeTest {
 				MergedWild: CodeAnalysisException: Unrecognized parameterized type
 				MergedWild<String>: CodeAnalysisException: Unrecognized parameterized type
 				TextMergedWild: CodeAnalysisException: Unrecognized parameterized type
-				MergedOpt: ClassCastException
+				MergedOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$MergedOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
 				MergedOpt<String>: MergedOpt(value:String set String)
 				TextMergedOpt: TextMergedOpt(value:String set String)
 				MergedOptList: CodeAnalysisException: Unrecognized parameterized type
@@ -232,8 +238,13 @@ public class GenericComponentTypeTest {
 	@Test
 	void theRest() {
 		assertEquals("""
-				RecOptWild: ClassCastException
-				PairOptWild: ClassCastException
+				RecOptWild: CodeAnalysisException: io.ltr8.test.data.GenericComponents$RecOptWild's component 'value' \
+				is an Optional of ? extends java.lang.Number, neither a class nor a parameterized type
+				PairOptWild: CodeAnalysisException: io.ltr8.test.data.GenericComponents$PairOptWild's component 'value' \
+				is an Optional of ? extends java.lang.Number, neither a class nor a parameterized type
+				RecOptArray: CodeAnalysisException: io.ltr8.test.data.GenericComponents$RecOptArray's component 'value' \
+				is an Optional of T[], neither a class nor a parameterized type
+				RecOptArray<String>: RecOptArray(value:String[] [String])
 				PairSetterAtArgument: PairSetterAtArgument()
 				PairSetterAtArgument<String>: PairSetterAtArgument()
 				PassedCtorList: CodeAnalysisException: Unrecognized parameterized type
@@ -248,6 +259,8 @@ public class GenericComponentTypeTest {
 				""", lines(
 				line("RecOptWild", null, null),
 				line("PairOptWild", null, null),
+				line("RecOptArray", null, null),
+				at("RecOptArray", null),
 				line("PairSetterAtArgument", null, null),
 				at("PairSetterAtArgument", null),
 				line("PassedCtorList", null, null),

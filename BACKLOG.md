@@ -531,10 +531,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   constructor parameter of a hand-written `@Record` class with no accessor is refused with "Failed to match
   immutable field accessor …". Nothing reads or writes either. Describe neither, with a read of each through both
   mappers in `UnboundComponentTest`.
-- [ ] **An `Optional` whose argument is no class throws `ClassCastException`.** `Optional<? extends Number>` on a
-  record, and `Optional<T>` on a generic class described raw, on every finder path, make `getDescriptor` throw it
-  unchecked from the record binder's `rawTypeOf` (`GenericComponentTypeTest` pins the exception). Refuse the class
-  with a `CodeAnalysisException` naming it and the component, as a `List<? extends Number>` component is refused.
 - [ ] **A constructor parameter named only by `@Field` loses its generic type.** Where `ImmutableFinder` cannot
   match a parameter to a field and `@Field` names its component, the component takes the parameter's class, so
   `@Field("x") List<T>` on `NamedList<T>` is refused with "Collection must provide parameterized type information"

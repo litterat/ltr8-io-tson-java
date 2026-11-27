@@ -83,6 +83,9 @@ public final class GenericComponents {
 	public record RecOptWild(Optional<? extends Number> value) {
 	}
 
+	public record RecOptArray<T>(Optional<T[]> value) {
+	}
+
 	public record HoldsRec(RecList<String> held) {
 	}
 
