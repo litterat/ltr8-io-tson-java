@@ -95,7 +95,7 @@ public class ComponentInfo {
 		GETTER,
 		/** {@link GetSetFinder}'s setter. */
 		SETTER,
-		/** A private field of the described class whose name is the component's. */
+		/** A private field of the described class whose name is that of a component the class declares. */
 		PRIVATE_FIELD,
 		/** A public field that writes a constructor's component. */
 		MERGED_PUBLIC_FIELD,

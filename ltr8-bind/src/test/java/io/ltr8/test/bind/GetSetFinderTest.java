@@ -41,6 +41,8 @@ import io.ltr8.test.data.GetSetClasses.InheritsHiddenGenericPair;
 import io.ltr8.test.data.GetSetClasses.InheritsHiddenPair;
 import io.ltr8.test.data.GetSetClasses.InheritsNamedByConstructor;
 import io.ltr8.test.data.GetSetClasses.InlineFinalField;
+import io.ltr8.test.data.GetSetClasses.LabelledFieldBesideInheritedPair;
+import io.ltr8.test.data.GetSetClasses.LabelledFieldBesideOverriddenGetter;
 import io.ltr8.test.data.GetSetClasses.ListPair;
 import io.ltr8.test.data.GetSetClasses.MutableFieldBoundByConstructor;
 import io.ltr8.test.data.GetSetClasses.MutableFields;
@@ -94,6 +96,8 @@ import io.ltr8.test.data.GetSetClasses.TextWildcard;
 import io.ltr8.test.data.GetSetClasses.TextWildcardFields;
 import io.ltr8.test.data.GetSetClasses.TextWildcardGetter;
 import io.ltr8.test.data.GetSetClasses.TwoArgumentSetter;
+import io.ltr8.test.data.GetSetClasses.UnboundFieldBesideInheritedPair;
+import io.ltr8.test.data.GetSetClasses.UnboundFieldBesideInheritedPublicField;
 import io.ltr8.test.data.GetSetClasses.WiderSetter;
 import io.ltr8.test.data.GetSetClasses.WritableRead;
 import io.ltr8.test.data.GetSetClasses.WritesGrandInherited;
@@ -613,6 +617,50 @@ class GetSetFinderTest {
 		for (RenamedOverAliasedPair copy : roundTrips(value)) {
 			assertEquals("anchor", copy.name());
 			assertEquals("buoy", copy.getName());
+		}
+	}
+
+	/** A private field of the described class belongs to no component a super class declares. */
+	@Test
+	void anUnboundPrivateFieldNamedAsAnInheritedPairLeavesThePairBound() throws Throwable {
+		DataClassRecord record = record(UnboundFieldBesideInheritedPair.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		UnboundFieldBesideInheritedPair value = new UnboundFieldBesideInheritedPair();
+		value.setName("anchor");
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+		for (UnboundFieldBesideInheritedPair copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getName());
+		}
+	}
+
+	@Test
+	void anUnboundPrivateFieldNamedAsAnInheritedPublicFieldLeavesTheFieldBound() throws Throwable {
+		DataClassRecord record = record(UnboundFieldBesideInheritedPublicField.class);
+		assertEquals(List.of("name:String set"), shape(record));
+		UnboundFieldBesideInheritedPublicField value = new UnboundFieldBesideInheritedPublicField();
+		((NamedFieldBase) value).name = "anchor";
+		assertEquals(Map.of("name", "anchor"), new MapMapper(context).toMap(value));
+		for (UnboundFieldBesideInheritedPublicField copy : roundTrips(value)) {
+			assertEquals("anchor", ((NamedFieldBase) copy).name);
+		}
+	}
+
+	@Test
+	void aPrivateFieldNamedAsAnInheritedPairWithFieldIsRefusedAsMatchingNoPair() {
+		assertEquals("Could not find matching getter/setter for field 'name'",
+				message(LabelledFieldBesideInheritedPair.class));
+	}
+
+	/** A pair is declared by the class declaring its getter. */
+	@Test
+	void aPrivateFieldNamedAsAPairWhoseGetterTheClassOverridesNamesThePair() throws Throwable {
+		DataClassRecord record = record(LabelledFieldBesideOverriddenGetter.class);
+		assertEquals(List.of("label:String set"), shape(record));
+		LabelledFieldBesideOverriddenGetter value = new LabelledFieldBesideOverriddenGetter();
+		value.setName("anchor");
+		assertEquals(Map.of("label", "anchor"), new MapMapper(context).toMap(value));
+		for (LabelledFieldBesideOverriddenGetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.getName());
 		}
 	}
 

@@ -552,9 +552,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   public `Two(String a)` and no `@Record` or `@Profile` is refused with "Could not find constructor: class …":
   constructor selection takes a lone constructor or a marked one. Take a record's canonical constructor where none
   is marked, with a round trip.
-- [ ] **`GetSetFinder` matches a private field to a component by name alone.** It sets no declaring class on its
-  components, so a subclass's `private int name` is taken as a member of a super class's `String name` component
-  and its annotations apply to it. Read, not run. Match on the declaring class, with a test of each.
 - [ ] **`@FieldOrder` is ignored on a class not described by its own components.** On a `@Tuple` record, a
   `@Transparent` record and a class bridged through `ToData` it is accepted and has no effect, even naming no
   component (`@FieldOrder({"nothing"})`). Refuse it on each, naming the class and why an order does not apply,

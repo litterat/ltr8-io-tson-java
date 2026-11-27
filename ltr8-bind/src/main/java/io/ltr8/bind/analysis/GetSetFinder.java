@@ -187,9 +187,9 @@ public class GetSetFinder implements ComponentFinder {
 			int modifiers = classField.getModifiers();
 			if (Modifier.isPrivate(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)) {
 
-				// A super class may declare a field of this name too, and this annotation is not its.
+				// A super class may declare a field or pair of this name too, and this annotation is not its.
 				ComponentInfo info = fields.stream().filter(e -> e.getName().equals(classField.getName())
-						&& (e.getDeclaringClass() == null || e.getDeclaringClass() == clss))
+						&& (declarer(e, members) == null || declarer(e, members) == clss))
 						.findFirst().orElse(null);
 
 				if (info == null && classField.isAnnotationPresent(Field.class)) {
@@ -227,6 +227,15 @@ public class GetSetFinder implements ComponentFinder {
 	 * setter, or null for a field.
 	 */
 	private record Member(Class<?> declarer, Method getter, Method setter) {
+	}
+
+	/**
+	 * @return the class declaring {@code component}'s field or pair, or null for a constructor's component only
+	 *         {@code @Field} names
+	 */
+	private static Class<?> declarer(ComponentInfo component, Map<ComponentInfo, Member> members) {
+		Member member = members.get(component);
+		return member != null ? member.declarer() : component.getDeclaringClass();
 	}
 
 	private static String wireName(ComponentInfo component) {
