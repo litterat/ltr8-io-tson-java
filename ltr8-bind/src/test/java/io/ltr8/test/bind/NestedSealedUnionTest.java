@@ -18,12 +18,14 @@ package io.ltr8.test.bind;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
@@ -72,6 +74,53 @@ public class NestedSealedUnionTest {
 
 		// Branch is itself sealed, not directly instantiable -- it must never appear as a member.
 		Assertions.assertFalse(members.contains(Branch.class));
+	}
+
+	@Test
+	public void aHierarchyWithNoNonSealedClassIsASealedUnion() throws Throwable {
+		Assertions.assertTrue(((DataClassUnion) context.getDescriptor(Shape.class)).isSealed());
+	}
+
+	@Test
+	public void aNonSealedClassBelowASealedBranchLeavesTheUnionOpen() throws Throwable {
+		DataClassUnion union = (DataClassUnion) context.getDescriptor(DeepOpenShape.class);
+		Assertions.assertFalse(union.isSealed());
+		Assertions.assertEquals(Set.of(DeepPoint.class, DeepOpen.class), Set.of(union.memberTypes()));
+		Assertions.assertTrue(union.isMemberType(DeepOpenCircle.class), "an implementation of the open class");
+	}
+
+	/** Neither a sealed branch nor the root is listed, so each is refused by name before it is described. */
+	@Test
+	public void aSealedUnionAdmitsNoClassOfItsTypeThatItDoesNotList() {
+		Assertions.assertAll(Stream.of(Branch.class, Shape.class).map(unlisted -> () -> {
+			String refusal = "'" + unlisted.getName() + "' is not a member of union " + Shape.class.getName();
+			Object[] array = { new Object[] { new Object[] { unlisted.getName(), new Object[] { 3 } } },
+					new Object[0] };
+			Map<String, Object> map = Map.of("list", new Object[] { Map.of("type", unlisted.getName(), "a", 3) },
+					"array", new Object[0]);
+			Assertions.assertAll(
+					() -> Assertions.assertEquals(refusal, Assertions.assertThrows(DataBindException.class,
+							() -> new ArrayMapper(context).toObject(ShapeList.class, array)).getMessage()),
+					() -> Assertions.assertEquals(refusal, Assertions.assertThrows(DataBindException.class,
+							() -> new MapMapper(context).toObject(ShapeList.class, map)).getMessage()),
+					() -> Assertions.assertFalse(((DataClassUnion) context.getDescriptor(Shape.class))
+							.isMemberType(unlisted)));
+		}));
+	}
+
+	public sealed interface DeepOpenShape permits DeepPoint, DeepBranch {
+	}
+
+	public record DeepPoint(int x) implements DeepOpenShape {
+	}
+
+	public sealed interface DeepBranch extends DeepOpenShape permits DeepOpen {
+	}
+
+	public non-sealed interface DeepOpen extends DeepBranch {
+	}
+
+	public record DeepOpenCircle(int radius) implements DeepOpen {
 	}
 
 	@Test

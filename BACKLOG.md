@@ -535,9 +535,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **An array of a parameterized type is held at its erasure.** A `List<String>[]` component, and `T[]` described
   at `List<String>`, are held as `List[]` and refused with "Collection must provide parameterized type
   information". Keep the element's type arguments, with a round trip of each.
-- [ ] **A Java `sealed` type is described as a union that is not sealed.** `UnionBinder` builds its
-  `DataClassUnion` with `isSealed` false, whatever the hierarchy permits. Read, not run. Describe it as sealed
-  where no permitted class is `non-sealed`, with a test that such a union admits no class it does not list.
 - [ ] **The two mappers are examples shipped as API.** `MapMapper` and `ArrayMapper` show two ways to walk the
   descriptors, a plain descent and `MethodHandle`s built over them; nothing outside `ltr8-bind` uses them, and its
   own tests use them as the round-trip harness. They sit in `src/main` and the module exports `io.ltr8.bind.mapper`.
