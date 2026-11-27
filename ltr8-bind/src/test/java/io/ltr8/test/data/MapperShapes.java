@@ -15,10 +15,14 @@
  */
 package io.ltr8.test.data;
 
+import io.ltr8.test.data.union.SealedInterfaceUnion;
+
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Records read and written by both mappers, for the shapes a read can be handed that the class does not fit.
@@ -70,5 +74,36 @@ public final class MapperShapes {
 		public int hashCode() {
 			return Objects.hash(names, Arrays.hashCode(counts), point);
 		}
+	}
+
+	public record ListOfRecords(List<Point> points) {
+	}
+
+	public record ArrayOfRecords(Point[] points) {
+
+		@Override
+		public boolean equals(Object other) {
+			return other instanceof ArrayOfRecords(Point[] those) && Arrays.equals(points, those);
+		}
+
+		@Override
+		public int hashCode() {
+			return Arrays.hashCode(points);
+		}
+	}
+
+	public record SetOfRecords(Set<Point> points) {
+	}
+
+	public record ListOfText(List<String> names) {
+	}
+
+	public record ListOfLists(List<List<String>> rows) {
+	}
+
+	public record ListOfMaps(List<Map<String, Integer>> counts) {
+	}
+
+	public record ListOfUnion(List<SealedInterfaceUnion> shapes) {
 	}
 }

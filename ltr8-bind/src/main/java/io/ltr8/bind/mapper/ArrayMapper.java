@@ -473,15 +473,11 @@ public class ArrayMapper {
 	private static class ObjectToArrayBridge {
 
 		private final DataClassArray arrayClass;
-		private final MethodHandle dataToObject;
+		private final MethodHandle elementToData;
 
-		public ObjectToArrayBridge(DataClassArray fieldDataClass, MethodHandle dataToObject) {
+		public ObjectToArrayBridge(DataClassArray fieldDataClass, MethodHandle elementToData) {
 			this.arrayClass = fieldDataClass;
-
-			this.dataToObject = MethodHandles.collectArguments(
-					dataToObject
-							.asType(dataToObject.type().changeParameterType(0, arrayClass.get().type().returnType())),
-					0, arrayClass.get());
+			this.elementToData = elementToData.asType(MethodType.methodType(Object.class, Object.class));
 		}
 
 		@SuppressWarnings("unused")
@@ -493,10 +489,8 @@ public class ArrayMapper {
 				Object[] outputArray = new Object[length];
 				Object iterator = arrayClass.iterator().invoke(arrayData);
 
-				DataClass arrayDataClass = arrayClass.arrayDataClass();
-
 				for (int x = 0; x < length; x++) {
-					outputArray[x] = dataToObject.invoke(arrayData, iterator);
+					outputArray[x] = part(elementToData, arrayClass.get().invoke(arrayData, iterator));
 				}
 
 				return outputArray;
@@ -562,13 +556,7 @@ public class ArrayMapper {
 
 		public ArrayToObjectBridge(DataClassArray arrayClass, MethodHandle arrayToObject) {
 			this.arrayClass = arrayClass;
-			this.arrayToObject = arrayToObject;
-
-			// TODO revisit this. Difficult to align types correctly. Might need a explicit
-			// cast.
-			// this.arrayToObject = MethodHandles.collectArguments(arrayClass.put(), 2,
-			// arrayToObject.asType(MethodType.methodType(Object.class,
-			// arrayToObject.type().parameterType(0))));
+			this.arrayToObject = arrayToObject.asType(MethodType.methodType(Object.class, Object.class));
 		}
 
 		@SuppressWarnings("unused")
@@ -580,14 +568,8 @@ public class ArrayMapper {
 				Object arrayData = arrayClass.constructor().invoke(length);
 				Object iterator = arrayClass.iterator().invoke(arrayData);
 
-				DataClass arrayDataClass = arrayClass.arrayDataClass();
-
 				for (int x = 0; x < length; x++) {
-
-					Object v = arrayToObject.invoke(inputArray[x]);
-
-					arrayClass.put().invoke(arrayData, iterator, v);
-
+					arrayClass.put().invoke(arrayData, iterator, part(arrayToObject, inputArray[x]));
 				}
 
 				return arrayData;
@@ -660,7 +642,7 @@ public class ArrayMapper {
 		}
 	}
 
-	/** An absent component, and a map's null key or value, is a null that no conversion takes. */
+	/** An absent component, a null element and a map's null key or value are each a null no conversion takes. */
 	private static Object part(MethodHandle convert, Object value) throws Throwable {
 		return value == null ? null : convert.invoke(value);
 	}

@@ -95,7 +95,7 @@ public class MapMapper {
                     DataClass arrayDataClass = arrayClass.arrayDataClass();
                     for (int x = 0; x < length; x++) {
                         Object av = arrayClass.get().invoke(object, iterator);
-                        outputArray[x] = toMap(arrayDataClass, av);
+                        outputArray[x] = partToMap(arrayDataClass, av);
                     }
 
                     v = outputArray;
@@ -105,8 +105,8 @@ public class MapMapper {
                     Object iterator = mapClass.iterator().invoke(object);
                     Object entry;
                     while ((entry = mapClass.next().invoke(iterator)) != null) {
-                        map.put(entryToMap(mapClass.keyDataClass(), mapClass.key().invoke(entry)),
-                                entryToMap(mapClass.valueDataClass(), mapClass.value().invoke(entry)));
+                        map.put(partToMap(mapClass.keyDataClass(), mapClass.key().invoke(entry)),
+                                partToMap(mapClass.valueDataClass(), mapClass.value().invoke(entry)));
                     }
                     v = map;
                 }
@@ -191,7 +191,7 @@ public class MapMapper {
                     DataClass arrayDataClass = arrayClass.arrayDataClass();
 
                     for (Object o : inputArray) {
-                        arrayClass.put().invoke(arrayData, iterator, toObject(arrayDataClass, o));
+                        arrayClass.put().invoke(arrayData, iterator, partToObject(arrayDataClass, o));
                     }
 
                     v = arrayData;
@@ -200,8 +200,8 @@ public class MapMapper {
                     Map<Object, Object> input = (Map<Object, Object>) data;
                     Object map = mapClass.constructor().invoke(input.size());
                     for (Map.Entry<Object, Object> entry : input.entrySet()) {
-                        mapClass.put().invoke(map, entryToObject(mapClass.keyDataClass(), entry.getKey()),
-                                entryToObject(mapClass.valueDataClass(), entry.getValue()));
+                        mapClass.put().invoke(map, partToObject(mapClass.keyDataClass(), entry.getKey()),
+                                partToObject(mapClass.valueDataClass(), entry.getValue()));
                     }
                     v = map;
                 }
@@ -241,12 +241,12 @@ public class MapMapper {
 
 	}
 
-	/** A map may hold a null key or value, which no data class converts. */
-	private Object entryToMap(DataClass dataClass, Object part) throws DataBindException {
+	/** A null element and a map's null key or value are each a null that no data class converts. */
+	private Object partToMap(DataClass dataClass, Object part) throws DataBindException {
 		return part == null ? null : toMap(dataClass, part);
 	}
 
-	private Object entryToObject(DataClass dataClass, Object part) throws DataBindException {
+	private Object partToObject(DataClass dataClass, Object part) throws DataBindException {
 		return part == null ? null : toObject(dataClass, part);
 	}
 }

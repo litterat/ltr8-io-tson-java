@@ -517,10 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A `null` element of a list of records fails in both mappers.** `List<Point>` holding a `null` throws
-  "Failed to convert array" from `ArrayMapper` and "Failed to convert interface java.util.List to Map" from
-  `MapMapper`, where a map component passes a `null` key or value through (`MapComponentMapperTest`). Pass a `null`
-  element through in both, for a list, an array and a set, with a round trip of each.
 - [ ] **A map read missing a required field does not say which.** `MapMapper.toObject` on a map with no key for a
   primitive component throws `DataBindException` ("Failed to convert Map to class …") caused by a
   `NullPointerException`; what a missing required reference component does is untested. Refuse the read naming the
