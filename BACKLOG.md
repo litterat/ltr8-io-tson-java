@@ -531,9 +531,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   constructor parameter of a hand-written `@Record` class with no accessor is refused with "Failed to match
   immutable field accessor …". Nothing reads or writes either. Describe neither, with a read of each through both
   mappers in `UnboundComponentTest`.
-- [ ] **A constructor parameter whose `@Field` names nothing makes a component named "".** An unmatched parameter
-  carrying `@Field` with an empty `value`, to mark it required or bridged, names its component by that value. Read,
-  not run. Refuse the class, naming it and the parameter, with a case in `RecordRefusalTest`.
 - [ ] **A Java record with a second public constructor is refused.** `record Two(String a, String b)` with a
   public `Two(String a)` and no `@Record` or `@Profile` is refused with "Could not find constructor: class …":
   constructor selection takes a lone constructor or a marked one. Take a record's canonical constructor where none
