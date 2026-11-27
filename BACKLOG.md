@@ -523,9 +523,38 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   a getter/setter pair; and nothing but `@Unbound` from a member merged into a constructor component
   (`ComponentAnnotationPrecedenceTest`). So `@Field("label")` on the setter of a constructor component, a record
   header's `@Field` or `@Union` beside an explicit accessor, and `@Field(bridge = …)` on a record bound through
-  `@Profile` are each dropped. Read each annotation from every member of a component, taking each `@Field`
+  `@Profile` are each dropped, and `GetSetFinder` reads a private field of the described class alone, never one a
+  super class declares behind a pair the class inherits. Read each annotation from every member of a component,
+  taking each `@Field`
   attribute from whichever member states it and refusing two members that state one differently, with a test of
   each annotation on each member of each class kind.
+- [ ] **A wildcard argument binds a bare type variable and not a parameterized one.** `Box<? extends Integer>` as a
+  component binds `T value` at the upper bound `Integer`, where `List<T> items` at the same argument is refused
+  with "Unrecognized parameterized type" (`GenericComponentRoundTripTest`'s fixtures; reproduced in a scratch
+  test). Take a wildcard argument's upper bound wherever it is substituted, with a round trip of each shape, and
+  keep `?` and `? super X` refused.
+- [ ] **An array of a parameterized type is held at its erasure.** A `List<String>[]` component, and `T[]` described
+  at `List<String>`, are held as `List[]` and refused with "Collection must provide parameterized type
+  information". Keep the element's type arguments, with a round trip of each.
+- [ ] **The refusal for a constructor the public lookup cannot reach changes from run to run.** It embeds the
+  JDK's `IllegalAccessException` text, which carries an identity hash (`…X.<init>[Ljava.lang.Object;@…`). Read, not
+  run. Name the class and its constructor, keep the exception as the cause, and assert the whole message in
+  `RecordRefusalTest`.
+- [ ] **A Java `sealed` type is described as a union that is not sealed.** `DefaultUnionBinder` builds its
+  `DataClassUnion` with `isSealed` false, whatever the hierarchy permits. Read, not run. Describe it as sealed
+  where no permitted class is `non-sealed`, with a test that such a union admits no class it does not list.
+- [ ] **`ArrayMapper` overflows the stack on a type that cycles through a container.** `record Node(String name,
+  List<Node> children)` throws `StackOverflowError` from `ArrayMapper`: its one guard is for a class holding itself
+  directly ("Recursive structures not yet supported…"). `MapMapper` round-trips it. Build a cyclic type's functions
+  lazily, with a round trip of a class cycling through a list, a map, an optional and itself.
+- [ ] **`MapMapper.toMap(Object)` casts its result to a `Map`.** A tuple or a list at the root throws
+  `ClassCastException`, where `toMap(DataClass, Object)` writes it. Give the root its form whatever it is, with a
+  round trip of a tuple and a list at the root.
+- [ ] **`MapMapper` tags a union value only where the member writes as a map.** A member written as a list or a
+  tuple has no tag and cannot be read back, and a member that is a map has the `type` key mixed into its entries;
+  a union read of a value that is no map describes `data.getClass()` and never asks the union whether it is a
+  member. Read, not run. Reproduce each and give every member a form that carries its tag, as a member with a field
+  named `type` has (`UnionTagMapperTest`).
 - [ ] **The bind readers compute the `@Unbound` components again, from fewer members.**
   `RecordBindReader.unboundComponents` (`tson-compiler`) and `BindRecordBuilder.unboundComponents` (`tson-json`)
   reflect over a record component and its accessor, where `ltr8-bind` reads the marker from every member, and both
@@ -538,6 +567,13 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   a context takes no other binder. Rename each to its bare name, as `TransparentBinder` and `ProtocolBinder` are,
   with the comments that cite them in `tson-compiler`, `tson-schema`, `design/`, `ltr8-bind/README.md` and the
   `tson-java` skill. `tson-compiler` has an `AtomBinder` of its own, in another package.
+- [ ] **Prose outside `ltr8-bind` states rules the binder has changed.** `FieldOrder`'s Javadoc (`ltr8-annotation`)
+  says it has no effect on a `@Tuple`, a `@Transparent` class or one bridged through `ToData`, where it is refused.
+  `tson-schema/CLAUDE.md`, `skills/tson-java/references/bindings.md` and `IntegerType`'s Javadoc (`tson-schema`)
+  say a class with more than one public constructor needs `@Record` on the canonical one, which a Java record does
+  not; the last also cites `DefaultRecordBinder.getConstructor`, which is `RecordConstructors.getConstructor`. A
+  comment in `tson-compiler`'s `DataClassObjectReader` says a class joins its union as it is analysed, where it
+  joins once its component is cached. Correct each.
 
 ## Documentation
 
