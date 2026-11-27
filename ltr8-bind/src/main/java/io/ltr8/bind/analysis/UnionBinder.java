@@ -10,9 +10,9 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
-public class DefaultUnionBinder {
+public class UnionBinder {
 
-	public DefaultUnionBinder() {
+	public UnionBinder() {
 	}
 
 	public DataClassUnion resolveUnion(DataBindContext context, Class<?> targetClass, Type parameterizedType)

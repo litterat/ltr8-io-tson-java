@@ -20,7 +20,7 @@ import java.util.List;
 /**
  * A two-level sealed hierarchy: {@code Shape} permits one directly-concrete member ({@code
  * DirectPoint}) and one further-sealed member ({@code Branch}), which itself permits two concrete
- * leaves. Exercises {@code DefaultUnionBinder}'s recursive flattening -- {@code Shape}'s own union
+ * leaves. Exercises {@code UnionBinder}'s recursive flattening -- {@code Shape}'s own union
  * members must resolve to {@code DirectPoint}/{@code LeafA}/{@code LeafB}, never {@code Branch}
  * itself, which isn't directly instantiable.
  */

@@ -12,7 +12,7 @@ package io.ltr8.tson.schema.meta;
  * through {@code type}) becomes {@link Alias} implementing this interface directly. Lets a consumer
  * test base-kind ancestry with an ordinary {@code instanceof Type}/{@code instanceof Product}, and also lets
  * {@code ltr8-bind}'s generic writer/reader dispatch on this same sealed hierarchy directly for {@code
- * !meta.record}/{@code !meta.array}/etc. type-refs -- {@code DefaultUnionBinder} recurses through a
+ * !meta.record}/{@code !meta.array}/etc. type-refs -- {@code UnionBinder} recurses through a
  * multi-level sealed hierarchy like this one (a permitted
  * subclass that's itself sealed is flattened, not left as an unusable "member"), which is what
  * makes binding straight against {@code Top}/{@link Atom} practical at all (see {@code ltr8-bind}'s

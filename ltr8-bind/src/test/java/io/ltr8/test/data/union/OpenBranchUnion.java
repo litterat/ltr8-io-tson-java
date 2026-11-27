@@ -17,7 +17,7 @@ package io.ltr8.test.data.union;
 
 /**
  * A sealed union with one closed leaf and one <b>non-sealed</b> branch -- the shape
- * {@code DefaultUnionBinder.collectSealedMembers} keeps as a member in its own right rather than walking
+ * {@code UnionBinder.collectSealedMembers} keeps as a member in its own right rather than walking
  * into, because its implementations cannot be known at analysis time.
  */
 public sealed interface OpenBranchUnion permits OpenBranchUnionPoint, OpenBranchUnionShape {

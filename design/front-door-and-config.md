@@ -9,7 +9,7 @@ the registries a `Tson` holds, and `validate`. Current form only; history lives 
 - The schema-to-class agreement check has no opt-out; `@Unbound` and a `@Profile` constructor are the two
   narrow answers.
 - A `DataBindContext`'s configuration closes when it is built; `registerAtom(Class)` asks
-  `DefaultClassBinder.atomForm` first and falls back to a bare `DataClassAtom` — the order is the point.
+  `ClassBinder.atomForm` first and falls back to a bare `DataClassAtom` — the order is the point.
 - Both schema sources deny by default and match a host exactly; the file source checks containment after
   `toRealPath`, the HTTP one never follows redirects and caps bytes delivered.
 - A source signals "cannot supply this" with `SchemaFetchException` and nothing else; a `null` return is a
@@ -71,7 +71,7 @@ class is the different question `ignoringUnknownFields` asks, per reader, at rea
   tested, is memoization: `getDescriptor` resolving one class on two threads does the work twice and
   `putIfAbsent` settles which answer everyone sees. Duplicated work, never duplicated state.
   - **What makes an atom an atom is a bridge to a type the wire can carry**, and `registerAtom(Class)` finds
-    the one the class declares rather than replacing it: it asks `DefaultClassBinder.atomForm` first —
+    the one the class declares rather than replacing it: it asks `ClassBinder.atomForm` first —
     `@Atom` on a constructor or static factory, or a plain enum's own `name()` crossing — and falls back to
     a bare `DataClassAtom` only for a class that declares none. The bare form asserts "one scalar" and
     supplies nothing that makes it one, so it is right exactly for a class the *encoding* already knows: the

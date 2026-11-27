@@ -130,7 +130,7 @@ public final class DataClassObjectWriter {
      * litterat-json}'s {@code JsonMapper.toJson} handles both uniformly -- {@code dataClass} itself
      * is reused unchanged afterward, not re-resolved, since a bridged {@code DataClassRecord}'s
      * fields are already resolved against the bridge's own data type (see {@code
-     * DefaultRecordBinder#resolveRecord}), not the original wrapper type. Then dispatches on
+     * RecordBinder#resolveRecord}), not the original wrapper type. Then dispatches on
      * {@code dataClass}'s own kind.
      */
     private void write(Object value, DataClass dataClass, TsonDataEmitter writer) throws DataBindException {

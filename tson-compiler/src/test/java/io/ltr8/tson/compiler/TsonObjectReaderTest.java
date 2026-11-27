@@ -513,7 +513,7 @@ class TsonObjectReaderTest {
 
     @Test
     void enumWithoutAtomAnnotationBindsViaEnumStringBridge() throws DataBindException {
-        // DefaultClassBinder auto-detects Class#isEnum() the same way it does isRecord()/isArray()
+        // ClassBinder auto-detects Class#isEnum() the same way it does isRecord()/isArray()
         // -- no @Atom needed, same default EnumStringBridge (by name()) as an annotated enum gets.
         UnannotatedColorHolder h = mapper.read("{ color: RED }", UnannotatedColorHolder.class);
         assertEquals(UnannotatedColor.RED, h.color());
@@ -1197,7 +1197,7 @@ class TsonObjectReaderTest {
 
     @Test
     void directBindingToByteArrayFailsWithoutTsonObjectReadersDefaultPreRegistration() throws DataBindException {
-        // byte[].isArray() is true, so DefaultClassBinder's array auto-detection would claim it
+        // byte[].isArray() is true, so ClassBinder's array auto-detection would claim it
         // ahead of the atom/vocabulary path -- the same shape of collision Rational/Complex have
         // with record auto-detection, just against arrays instead of records -- on a bare context
         // that hasn't pre-registered byte[].class the way TsonObjectReader's own default
@@ -1228,7 +1228,7 @@ class TsonObjectReaderTest {
 
     @Test
     void directBindingToTsonsOwnRationalDoesNotWork() throws DataBindException {
-        // Rational is itself a Java record (numerator, denominator) -- DefaultClassBinder auto-
+        // Rational is itself a Java record (numerator, denominator) -- ClassBinder auto-
         // detects real records ahead of anything atom-related, so a target of Rational.class gets
         // treated as a 2-field record, not routed through RationalParser at all. The value's core is
         // a token ("2/3"), not a record, so binding fails outright. This is exactly why the

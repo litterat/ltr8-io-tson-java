@@ -25,9 +25,9 @@ import java.util.List;
  * return the Record definition. The binder registers the DataClassRecord to the TypeContext, and
  * the caller adds the definition to the TypeLibrary.
  */
-public class DefaultRecordBinder {
+public class RecordBinder {
 
-	public DefaultRecordBinder() {
+	public RecordBinder() {
 	}
 
 	/**

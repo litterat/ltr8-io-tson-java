@@ -91,7 +91,7 @@ public class TupleBinderTest {
 	@Test
 	public void tupleAnnotationOnANonRecordClassFails() {
 		// @Tuple's own @Target is ElementType.TYPE, so it compiles on a plain class too --
-		// DefaultTupleBinder guards against that misuse explicitly rather than doing something
+		// TupleBinder guards against that misuse explicitly rather than doing something
 		// odd, since only a genuine Java record has record components to resolve positionally.
 		Assertions.assertThrows(DataBindException.class, () -> context.getDescriptor(TupleOnAPlainClass.class));
 	}

@@ -20,7 +20,7 @@ import java.lang.reflect.RecordComponent;
  * <p><b>No descriptor kind of its own.</b> Transparency is a statement about representation -- "my wire form
  * is my component's" -- and that is what a bridge already says. So the result is an ordinary
  * {@link DataClassRecord} or {@link DataClassAtom} whose shape is the <em>component's</em> and whose
- * {@code typeClass} is the wrapper, exactly the arrangement {@code DefaultRecordBinder}'s {@code ToData} path
+ * {@code typeClass} is the wrapper, exactly the arrangement {@code RecordBinder}'s {@code ToData} path
  * produces. Everything that already unwraps a bridge -- the schemaless reader, the object writer -- handles a
  * transparent class with no case of its own, and nothing is added to the set of {@code DataClass} kinds.
  *

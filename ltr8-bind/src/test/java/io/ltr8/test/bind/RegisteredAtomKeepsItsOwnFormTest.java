@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and supplies nothing that makes it one -- so it is usable only for a class the <em>encoding</em> already
  * knows, which is the JDK scalars and the built-in vocabulary's host types.
  *
- * <p>So {@code Builder.registerAtom(Class)} asks {@code DefaultClassBinder.atomForm} first and keeps the
+ * <p>So {@code Builder.registerAtom(Class)} asks {@code ClassBinder.atomForm} first and keeps the
  * bare form as the fallback. Without that the explicit registration was strictly worse than none: it writes
  * into the descriptor cache, so it short-circuits analysis for that class permanently, and a class that
  * would have bound through its own bridge became unreadable and unwritable instead.

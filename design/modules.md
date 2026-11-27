@@ -45,7 +45,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` →
   `DataValue`), which is what lets a value carrying a parsed AST be written at all. **A generic record is described at its
   arguments**: a component's declared type has the class's type parameters replaced by the arguments it is
-  described at (`TypeArguments`, `DefaultRecordBinder.resolveRecord(context, class, parameterizedType)`), so
+  described at (`TypeArguments`, `RecordBinder.resolveRecord(context, class, parameterizedType)`), so
   `Namespace<RecordField>` binds `entries` as a map of `RecordField`; a type variable left in place has no
   descriptor, so a raw generic record is still not describable.
   **It also describes an interface**, as a `DataProtocol` of `DataExchange`s whose requests, responses and errors are
