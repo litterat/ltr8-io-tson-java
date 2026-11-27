@@ -223,6 +223,128 @@ public final class BridgedFields {
 		}
 	}
 
+	// --- a bridge inheriting toData and toObject, so declaring them only at their erased types
+
+	public abstract static class ParsedText<O> implements DataBridge<String, O> {
+
+		private final Function<String, O> parse;
+
+		protected ParsedText(Function<String, O> parse) {
+			this.parse = parse;
+		}
+
+		@Override
+		public String toData(O object) {
+			return object == null ? null : object.toString();
+		}
+
+		@Override
+		public O toObject(String text) {
+			return text == null ? null : parse.apply(text);
+		}
+	}
+
+	public static class ParsedNumber extends ParsedText<Integer> {
+
+		public ParsedNumber() {
+			super(Integer::valueOf);
+		}
+	}
+
+	public abstract static class ParsedTextBelow<O> extends ParsedText<O> {
+
+		protected ParsedTextBelow(Function<String, O> parse) {
+			super(parse);
+		}
+	}
+
+	public static class TwoLevelsParsedNumber extends ParsedTextBelow<Integer> {
+
+		public TwoLevelsParsedNumber() {
+			super(Integer::valueOf);
+		}
+	}
+
+	/** Not public, so its methods are reached through the public bridge extending it. */
+	abstract static class HiddenParsedText<O> extends ParsedText<O> {
+
+		HiddenParsedText(Function<String, O> parse) {
+			super(parse);
+		}
+	}
+
+	public static class HiddenBaseParsedNumber extends HiddenParsedText<Integer> {
+
+		public HiddenBaseParsedNumber() {
+			super(Integer::valueOf);
+		}
+	}
+
+	public interface DefaultText<O> extends DataBridge<String, O> {
+
+		O parse(String text);
+
+		@Override
+		default String toData(O object) {
+			return object == null ? null : object.toString();
+		}
+
+		@Override
+		default O toObject(String text) {
+			return text == null ? null : parse(text);
+		}
+	}
+
+	public static class DefaultNumber implements DefaultText<Integer> {
+
+		@Override
+		public Integer parse(String text) {
+			return Integer.valueOf(text);
+		}
+	}
+
+	/** The data type a boxed primitive, bounded so that it erases to {@code Number} rather than {@code Object}. */
+	public abstract static class NumberWire<D extends Number> implements DataBridge<D, Integer> {
+
+		private final Function<Integer, D> widen;
+
+		protected NumberWire(Function<Integer, D> widen) {
+			this.widen = widen;
+		}
+
+		@Override
+		public D toData(Integer number) {
+			return number == null ? null : widen.apply(number);
+		}
+
+		@Override
+		public Integer toObject(D wire) {
+			return wire == null ? null : wire.intValue();
+		}
+	}
+
+	public static class LongWire extends NumberWire<Long> {
+
+		public LongWire() {
+			super(Integer::longValue);
+		}
+	}
+
+	public record ParsedNumberBridge(@Field(bridge = ParsedNumber.class) Integer count) {
+	}
+
+	public record TwoLevelsParsedNumberBridge(@Field(bridge = TwoLevelsParsedNumber.class) Integer count) {
+	}
+
+	public record HiddenBaseParsedNumberBridge(@Field(bridge = HiddenBaseParsedNumber.class) Integer count) {
+	}
+
+	public record DefaultNumberBridge(@Field(bridge = DefaultNumber.class) Integer count) {
+	}
+
+	public record LongWireBridge(@Field(bridge = LongWire.class) Integer count) {
+	}
+
 	public record DirectBridge(@Field(bridge = NumberAsText.class) Integer count) {
 	}
 

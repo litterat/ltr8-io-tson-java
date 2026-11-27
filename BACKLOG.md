@@ -553,11 +553,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   every other binder uses the public lookup, so what a `@Tuple` record may hide differs from what a record may.
   Read, not run. Reach its constructor and accessors through `Members`, with a case in `RecordRefusalTest` for a
   `@Tuple` record the public lookup cannot reach.
-- [ ] **A `@Field` bridge inheriting a generic `toData` may be refused.** `RecordFields.fieldBridge` looks up
-  `toData` and `toObject` on the bridge class at the resolved types, and a bridge that inherits both from a generic
-  super class (`IntegerBridge extends AbstractBridge<Integer>`) declares only the erased signatures. Read, not run.
-  Reproduce it, find the methods at their erased types and adapt the handles, with a round trip in
-  `BridgedFieldTest`.
 - [ ] **`ArrayMapper.toArray` casts its result to an array.** An atom at the root throws `ClassCastException`
   ("Cannot cast java.lang.String to [Ljava.lang.Object;") from both overloads. Refuse it naming the class, as
   `MapMapper.toMap(Object)` refuses a root that is no map (`MapMapperRootTest`).
