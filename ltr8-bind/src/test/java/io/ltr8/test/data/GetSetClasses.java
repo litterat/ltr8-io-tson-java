@@ -19,6 +19,7 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -1160,6 +1161,90 @@ public final class GetSetClasses {
 
 		public void setCount(Integer count) {
 			this.count = count;
+		}
+	}
+
+	// --- generic public fields of a super class
+
+	public static class FieldBase<T> {
+
+		public T value;
+
+		public List<T> items = List.of();
+	}
+
+	public static class TextFields extends FieldBase<String> {
+
+		@Record
+		public TextFields() {
+		}
+	}
+
+	public static class FieldMid<U> extends FieldBase<List<U>> {
+	}
+
+	/** Binds {@link FieldBase}'s parameter to {@code List<String>} through a generic class between them. */
+	public static class TextListFields extends FieldMid<String> {
+
+		@Record
+		public TextListFields() {
+		}
+	}
+
+	public static class MapFieldBase<T> {
+
+		public Map<String, T> counts = Map.of();
+	}
+
+	public static class CountFields extends MapFieldBase<Integer> {
+
+		@Record
+		public CountFields() {
+		}
+	}
+
+	@SuppressWarnings("rawtypes")
+	public static class RawFields extends FieldBase {
+
+		@Record
+		public RawFields() {
+		}
+	}
+
+	public static class ValueBase<T> {
+
+		public T value;
+	}
+
+	public static class TextValue extends ValueBase<String> {
+
+		@Record
+		public TextValue() {
+		}
+	}
+
+	@SuppressWarnings("rawtypes")
+	public static class RawValue extends ValueBase {
+
+		@Record
+		public RawValue() {
+		}
+	}
+
+	/** Leaves {@link MapFieldBase}'s parameter open, bound only where the class is described at an argument. */
+	public static class OpenCounts<T> extends MapFieldBase<T> {
+
+		@Record
+		public OpenCounts() {
+		}
+	}
+
+	public static class HoldsOpenCounts {
+
+		public OpenCounts<Integer> held;
+
+		@Record
+		public HoldsOpenCounts() {
 		}
 	}
 }
