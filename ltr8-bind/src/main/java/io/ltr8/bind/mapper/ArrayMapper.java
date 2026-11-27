@@ -22,6 +22,7 @@ import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
 import io.ltr8.bind.DataClassField;
+import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 
@@ -38,7 +39,9 @@ import java.util.Objects;
  * This is intentionally using MethodHandles throughout to demonstrate pre-building method handles
  * for each type. This is the method likely to be used by serialization libraries to improve
  * performance.
- * 
+ * <p>
+ * A map is an array of {@code [key, value]} entries, each part in this form, in the order the map iterates in.
+ *
  * <ul>
  * <li>TODO add try/catch/throw around conversions
  * </ul>
@@ -217,6 +220,20 @@ public class ArrayMapper {
                     throw new DataBindException("failed to build bridge for array", e);
                 }
             }
+            case DataClassMap dataMapClass -> {
+                try {
+                    EntriesToMapBridge bridge = new EntriesToMapBridge(dataMapClass,
+                            createToObjectFunction(dataMapClass.keyDataClass()),
+                            createToObjectFunction(dataMapClass.valueDataClass()));
+
+                    result = MethodHandles.lookup().findVirtual(EntriesToMapBridge.class, "toObject",
+                            MethodType.methodType(Object.class, Object[].class)).bindTo(bridge);
+
+                    result = result.asType(MethodType.methodType(dataMapClass.typeClass(), Object.class));
+                } catch (NoSuchMethodException | IllegalAccessException e) {
+                    throw new DataBindException("failed to build bridge for map", e);
+                }
+            }
             case DataClassUnion dataUnionClass -> {
 
                 // toObject( Object[] ):<array>
@@ -306,6 +323,20 @@ public class ArrayMapper {
                     // fieldBox = MethodHandles.collectArguments(bridgeToData, 0, fieldBox);
                 } catch (NoSuchMethodException | IllegalAccessException e) {
                     throw new DataBindException("failed to build array bridge", e);
+                }
+            }
+            case DataClassMap dataClassMap -> {
+                try {
+                    MapToEntriesBridge bridge = new MapToEntriesBridge(dataClassMap,
+                            createToDataFunction(dataClassMap.keyDataClass()),
+                            createToDataFunction(dataClassMap.valueDataClass()));
+
+                    MethodHandle bridgeToData = MethodHandles.lookup().findVirtual(MapToEntriesBridge.class, "toData",
+                            MethodType.methodType(Object[].class, Object.class)).bindTo(bridge);
+
+                    toDataMethod = bridgeToData.asType(MethodType.methodType(Object.class, dataClass.typeClass()));
+                } catch (NoSuchMethodException | IllegalAccessException e) {
+                    throw new DataBindException("failed to build map bridge", e);
                 }
             }
             case DataClassUnion dataClassUnion -> {
@@ -539,6 +570,74 @@ public class ArrayMapper {
 				throw new DataBindException("Failed to convert array", e);
 			}
 		}
+	}
+
+	/**
+	 * A map is an array of {@code [key, value]} entries rather than a {@code Map}: a key in array form may itself be
+	 * an array, which hashes by identity, and {@link #toArray(DataClass, Object)} returns an array.
+	 */
+	private static class MapToEntriesBridge {
+
+		private final DataClassMap mapClass;
+		private final MethodHandle keyToData;
+		private final MethodHandle valueToData;
+
+		MapToEntriesBridge(DataClassMap mapClass, MethodHandle keyToData, MethodHandle valueToData) {
+			this.mapClass = mapClass;
+			this.keyToData = keyToData;
+			this.valueToData = valueToData;
+		}
+
+		@SuppressWarnings("unused")
+		public Object[] toData(Object map) throws DataBindException {
+			try {
+				Object[] entries = new Object[(int) mapClass.size().invoke(map)];
+				Object iterator = mapClass.iterator().invoke(map);
+				Object entry;
+				for (int x = 0; (entry = mapClass.next().invoke(iterator)) != null; x++) {
+					entries[x] = new Object[] { part(keyToData, mapClass.key().invoke(entry)),
+							part(valueToData, mapClass.value().invoke(entry)) };
+				}
+				return entries;
+			} catch (Throwable e) {
+				throw new DataBindException("Failed to convert map", e);
+			}
+		}
+	}
+
+	private static class EntriesToMapBridge {
+
+		private final DataClassMap mapClass;
+		private final MethodHandle keyToObject;
+		private final MethodHandle valueToObject;
+
+		EntriesToMapBridge(DataClassMap mapClass, MethodHandle keyToObject, MethodHandle valueToObject) {
+			this.mapClass = mapClass;
+			this.keyToObject = keyToObject;
+			this.valueToObject = valueToObject;
+		}
+
+		@SuppressWarnings("unused")
+		public Object toObject(Object[] entries) throws DataBindException {
+			if (entries == null) {
+				return null;
+			}
+			try {
+				Object map = mapClass.constructor().invoke(entries.length);
+				for (Object entry : entries) {
+					Object[] pair = (Object[]) entry;
+					mapClass.put().invoke(map, part(keyToObject, pair[0]), part(valueToObject, pair[1]));
+				}
+				return map;
+			} catch (Throwable e) {
+				throw new DataBindException("Failed to convert map", e);
+			}
+		}
+	}
+
+	/** A map may hold a null key or value, which no conversion takes. */
+	private static Object part(MethodHandle convert, Object value) throws Throwable {
+		return value == null ? null : convert.invoke(value);
 	}
 
 	private class UnionToObjectBridge {

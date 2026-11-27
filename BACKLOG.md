@@ -535,10 +535,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   variable and a parameterized type's arguments, so `T[] getItems()` and `List<? extends T> getItems()` in
   `Holder<T>` keep `T` for `TextHolder extends Holder<String>`. Read, not run. Substitute inside both, with a round
   trip of each shape as a pair and as a public field.
-- [ ] **`ArrayMapper` cannot write a map component.** For a record with a `Map<String, Integer>` component,
-  `new ArrayMapper(context).toArray(…)` throws `DataBindException` ("unexpected data class type"); `MapMapper`
-  writes it. Give a map a place in `ArrayMapper`'s write and read, with a round trip of a map of atoms and a map of
-  records.
 - [ ] **`Unbound`'s Javadoc says a `null` arrives.** In `ltr8-annotation`: a primitive component receives its zero
   value (`UnboundComponentTest`). Say "its type's zero value" in both paragraphs.
 
