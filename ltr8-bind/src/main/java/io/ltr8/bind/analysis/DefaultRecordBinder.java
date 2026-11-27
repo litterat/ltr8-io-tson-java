@@ -126,7 +126,7 @@ public class DefaultRecordBinder {
 					+ annotationsCarrierCount + " on " + targetClass);
 		}
 
-		MethodHandle dataConstructor = RecordConstructors.getDataConstructor(targetClass, context.profile().orElse(null));
+		MethodHandle dataConstructor = MethodHandles.publicLookup().unreflectConstructor(ctor);
 
 		// Build a MethodHandle that creates object and also calls setters with order of
 		// fields as defined in components.

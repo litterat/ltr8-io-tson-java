@@ -18,8 +18,6 @@ package io.ltr8.bind.analysis;
 import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Record;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
@@ -90,41 +88,6 @@ final class RecordConstructors {
 		}
 
 		throw new CodeAnalysisException("Could not find constructor: " + dataClass);
-
-	}
-
-	static MethodHandle getDataConstructor(Class<?> dataClass, String profile)
-			throws CodeAnalysisException, IllegalAccessException {
-		Constructor<?>[] constructors = dataClass.getConstructors();
-
-		// Same order as getConstructor above, so the handle invoked is the constructor whose parameters the
-		// components were built from -- the two picking differently would fill the right names into the
-		// wrong slots.
-		if (profile != null) {
-			for (Constructor<?> constructor : constructors) {
-				Profile annotation = constructor.getAnnotation(Profile.class);
-				if (annotation != null && List.of(annotation.value()).contains(profile)) {
-					return MethodHandles.publicLookup().unreflectConstructor(constructor);
-				}
-			}
-		}
-		constructors = unprofiled(constructors, profile != null);
-
-		// only one custructor. this must be it.
-		if (constructors.length == 1) {
-			return MethodHandles.publicLookup().unreflectConstructor(constructors[0]);
-		}
-
-		// Does it have an annotation?
-		for (Constructor<?> constructor : constructors) {
-			Record dataAnnotation = constructor
-					.getAnnotation(Record.class);
-			if (dataAnnotation != null) {
-				return MethodHandles.publicLookup().unreflectConstructor(constructor);
-			}
-		}
-
-		throw new CodeAnalysisException("Could not find constructor");
 
 	}
 
