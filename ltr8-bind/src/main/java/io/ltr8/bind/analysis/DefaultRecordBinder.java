@@ -909,36 +909,35 @@ public class DefaultRecordBinder {
 	private void reorderFields(Class<?> targetClass, FieldOrder dataOrder, List<ComponentInfo> components)
 			throws CodeAnalysisException {
 
-		// Check lengths are ok.
-		String[] fieldOrder = dataOrder.value();
-		if (fieldOrder == null || fieldOrder.length != components.size()) {
-			throw new CodeAnalysisException(
-					"DataOrder annotation has different field count to components found in data");
+		List<String> fieldOrder = List.of(dataOrder.value());
+		if (fieldOrder.size() != components.size()) {
+			throw new CodeAnalysisException(String.format("%s has %d components but its @FieldOrder names %d: it "
+					+ "names each component once", targetClass.getName(), components.size(), fieldOrder.size()));
 		}
 
-		Map<String, ComponentInfo> componentMap = new HashMap<>();
+		Set<String> componentNames = new HashSet<>();
 		for (ComponentInfo component : components) {
-			if (componentMap.putIfAbsent(component.getName(), component) != null) {
+			if (!componentNames.add(component.getName())) {
 				throw new CodeAnalysisException(String.format("%s has two components named '%s', which @FieldOrder "
 						+ "cannot tell apart: it names a component by its Java name", targetClass.getName(),
 						component.getName()));
 			}
 		}
 
-		// check all fields are present.
-		List<String> fieldOrderList = List.of(dataOrder.value());
-		for (String field : fieldOrderList) {
-			if (!componentMap.containsKey(field)) {
-				throw new CodeAnalysisException(
-						String.format("DataOrder annotation had no corresponding field '%s'", field));
+		// With the counts equal, each name a component and none given twice, the order is a permutation.
+		Set<String> named = new HashSet<>();
+		for (String name : fieldOrder) {
+			if (!componentNames.contains(name)) {
+				throw new CodeAnalysisException(String.format("%s has no component named '%s', which its @FieldOrder "
+						+ "names: it names a component by its Java name", targetClass.getName(), name));
+			}
+			if (!named.add(name)) {
+				throw new CodeAnalysisException(String.format("%s has a @FieldOrder naming '%s' twice: it names each "
+						+ "component once", targetClass.getName(), name));
 			}
 		}
 
-		// sort the list.
-		components.sort(Comparator.comparing((ComponentInfo v) -> {
-			return fieldOrderList.indexOf(v.getName());
-		}));
-
+		components.sort(Comparator.comparingInt((ComponentInfo component) -> fieldOrder.indexOf(component.getName())));
 	}
 
 	private Constructor<?> getConstructor(Class<?> dataClass, String profile) throws CodeAnalysisException {

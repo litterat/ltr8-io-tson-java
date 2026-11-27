@@ -58,6 +58,18 @@ public final class RecordRefusals {
 	public record OrderNamesNoField(String a, String b) {
 	}
 
+	@FieldOrder({ "a", "a" })
+	public record OrderNamesComponentTwice(String a, String b) {
+	}
+
+	@FieldOrder({ "y", "z" })
+	public record OrderNamesWireName(@Field("z") String first, @Field("y") String second) {
+	}
+
+	@FieldOrder({ "name" })
+	public record OrderOmitsUnbound(String name, @Unbound int cache) {
+	}
+
 	@Record
 	public static class NoDesignatedConstructor {
 

@@ -536,9 +536,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **A map component typed `AnnotatedMap` is untested in both mappers.** `DefaultMapBinder` iterates its entries
   as boxes, so the map write may carry the box and not the key. Read, not run. Round-trip one through both mappers
   and carry the key.
-- [ ] **A `@FieldOrder` repeating a name is accepted.** `@FieldOrder({"a", "a"})` on `record(a, b)` passes the
-  length and presence checks of `DefaultRecordBinder.reorderFields` and gives the order `[b, a]`. Refuse an order
-  that does not name each component once, naming the class and the name, with a case in `RecordRefusalTest`.
 - [ ] **`@Field` on the setter of a constructor component is dropped.** For a class whose constructor binds `name`
   and which also declares `@Field("label") setName`, `GetSetFinder`'s merge carries the write method across and not
   the annotation, so the write gives `{name=n}`. Read the annotation from every member of a component, with a test

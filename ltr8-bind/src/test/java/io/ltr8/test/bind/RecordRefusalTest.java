@@ -90,7 +90,10 @@ import io.ltr8.test.data.RecordRefusals.OrderCountMismatch;
 import io.ltr8.test.data.RecordRefusals.OrderedConstructorComponentsOfOneName;
 import io.ltr8.test.data.RecordRefusals.OrderedFieldBesidePair;
 import io.ltr8.test.data.RecordRefusals.OrderedPairShadowsBaseComponent;
+import io.ltr8.test.data.RecordRefusals.OrderNamesComponentTwice;
 import io.ltr8.test.data.RecordRefusals.OrderNamesNoField;
+import io.ltr8.test.data.RecordRefusals.OrderNamesWireName;
+import io.ltr8.test.data.RecordRefusals.OrderOmitsUnbound;
 import io.ltr8.test.data.RecordRefusals.PrivateAccessor;
 import io.ltr8.test.data.RecordRefusals.ProfileFieldCountMismatch;
 import io.ltr8.test.data.RecordRefusals.ProfileNamesNoComponent;
@@ -184,9 +187,17 @@ class RecordRefusalTest {
 	}
 
 	@Test
-	void aFieldOrderOfTheWrongLengthIsRefused() {
-		assertEquals("DataOrder annotation has different field count to components found in data",
-				message(OrderCountMismatch.class));
+	void aFieldOrderOfTheWrongLengthIsRefusedNamingTheClass() {
+		DataBindException refused = refusal(context, OrderCountMismatch.class);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals(OrderCountMismatch.class.getName() + " has 2 components but its @FieldOrder names 1: it names "
+				+ "each component once", refused.getMessage());
+	}
+
+	@Test
+	void aFieldOrderLeavingOutAnUnboundComponentIsRefused() {
+		assertEquals(OrderOmitsUnbound.class.getName() + " has 2 components but its @FieldOrder names 1: it names "
+				+ "each component once", message(OrderOmitsUnbound.class));
 	}
 
 	@Test
@@ -202,8 +213,25 @@ class RecordRefusalTest {
 	}
 
 	@Test
-	void aFieldOrderNamingNoComponentIsRefused() {
-		assertEquals("DataOrder annotation had no corresponding field 'c'", message(OrderNamesNoField.class));
+	void aFieldOrderNamingNoComponentIsRefusedNamingTheClassAndTheName() {
+		DataBindException refused = refusal(context, OrderNamesNoField.class);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals(OrderNamesNoField.class.getName() + " has no component named 'c', which its @FieldOrder names: "
+				+ "it names a component by its Java name", refused.getMessage());
+	}
+
+	@Test
+	void aFieldOrderNamingAComponentByItsWireNameIsRefused() {
+		assertEquals(OrderNamesWireName.class.getName() + " has no component named 'y', which its @FieldOrder names: "
+				+ "it names a component by its Java name", message(OrderNamesWireName.class));
+	}
+
+	@Test
+	void aFieldOrderNamingAComponentTwiceIsRefusedNamingTheClassAndTheName() {
+		DataBindException refused = refusal(context, OrderNamesComponentTwice.class);
+		assertInstanceOf(CodeAnalysisException.class, refused);
+		assertEquals(OrderNamesComponentTwice.class.getName() + " has a @FieldOrder naming 'a' twice: it names each "
+				+ "component once", refused.getMessage());
 	}
 
 	@Test
@@ -548,7 +576,7 @@ class RecordRefusalTest {
 	@Test
 	void noRefusalCarriesTheGenericWrapperAnywhereOnItsCauseChain() {
 		List<Class<?>> refused = List.of(ProtectedConstructor.class, TwoCarriers.class, EmptyUnion.class,
-				UnassignableUnion.class, OrderCountMismatch.class, OrderNamesNoField.class,
+				UnassignableUnion.class, OrderCountMismatch.class, OrderNamesNoField.class, OrderNamesComponentTwice.class,
 				NoDesignatedConstructor.class, BridgeTypeVariable.class, BridgeInheritedOpen.class,
 				BridgeNestedOpen.class, BridgeRaw.class, BridgeRawlyExtended.class, BridgeObjectMismatch.class,
 				BridgeConstructorThrows.class, BridgeNeedsArgument.class, ConstructorTransformsArgument.class,
