@@ -542,11 +542,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **A Java `sealed` type is described as a union that is not sealed.** `DefaultUnionBinder` builds its
   `DataClassUnion` with `isSealed` false, whatever the hierarchy permits. Read, not run. Describe it as sealed
   where no permitted class is `non-sealed`, with a test that such a union admits no class it does not list.
-- [ ] **`MapMapper` tags a union value only where the member writes as a map.** A member written as a list or a
-  tuple has no tag and cannot be read back, and a member that is a map has the `type` key mixed into its entries;
-  a union read of a value that is no map describes `data.getClass()` and never asks the union whether it is a
-  member. Read, not run. Reproduce each and give every member a form that carries its tag, as a member with a field
-  named `type` has (`UnionTagMapperTest`).
 - [ ] **The two mappers are examples shipped as API.** `MapMapper` and `ArrayMapper` show two ways to walk the
   descriptors, a plain descent and `MethodHandle`s built over them; nothing outside `ltr8-bind` uses them, and its
   own tests use them as the round-trip harness. They sit in `src/main` and the module exports `io.ltr8.bind.mapper`.

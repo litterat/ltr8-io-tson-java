@@ -16,7 +16,9 @@
 package io.ltr8.test.data;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Transparent;
 import io.ltr8.annotation.Tuple;
+import io.ltr8.annotation.Union;
 import io.ltr8.test.data.union.InterfaceUnion;
 import io.ltr8.test.data.union.OpenBranchUnion;
 import io.ltr8.test.data.union.SealedInterfaceUnion;
@@ -131,6 +133,42 @@ public final class MapperShapes {
 	}
 
 	public record ListOfLabelled(List<Labelled> items) {
+	}
+
+	/** A union with a member written as a map of its fields, as an array of its elements, and as an atom. */
+	public sealed interface Member permits Plain, Span, Label, Colour {
+	}
+
+	public record Plain(int size) implements Member {
+	}
+
+	@Tuple
+	public record Span(int from, int to) implements Member {
+	}
+
+	@Transparent
+	public record Label(String text) implements Member {
+	}
+
+	public enum Colour implements Member {
+		RED, GREEN
+	}
+
+	public record ListOfMembers(List<Member> members) {
+	}
+
+	/** A union with a member written as a list, which only an array class can be: it implements no interface. */
+	public record TextsOrCount(@Union({ String[].class, Integer.class }) Object value) {
+
+		@Override
+		public boolean equals(Object other) {
+			return other instanceof TextsOrCount(Object those) && Objects.deepEquals(value, those);
+		}
+
+		@Override
+		public int hashCode() {
+			return Arrays.deepHashCode(new Object[] { value });
+		}
 	}
 
 	public record Required(int count, @Field(required = true) String name, Optional<String> note, String label) {
