@@ -134,6 +134,12 @@ public class ImmutableFinder implements ComponentFinder {
                     }
                     component.setUnion(union);
                 }
+
+                for (ComponentInfo component : immutableFields) {
+                    if (component.getConstructorArgument() == x) {
+                        component.readUnbound(params[x]);
+                    }
+                }
             }
 
             // Find the matching accessor methods. Must have already found fields in constructor.
@@ -372,6 +378,7 @@ public class ImmutableFinder implements ComponentFinder {
                             info.setUnion(union);
                         }
 
+                        info.readUnbound(accessorMethod);
                         info.setReadMethod(readAs(virtual(described, accessorMethod), info.getType()));
                         info.addAccessor(accessorMethod);
                         accessor = true;
@@ -469,6 +476,7 @@ public class ImmutableFinder implements ComponentFinder {
 
                 if (component.getReadMethod() != null) {
                     matched.add(name);
+                    component.readUnbound(method);
                     component.addAccessor(method);
                 }
             }
@@ -486,6 +494,8 @@ public class ImmutableFinder implements ComponentFinder {
         if (union != null) {
             info.setUnion(union);
         }
+
+        info.readUnbound(declared);
     }
 
     /**

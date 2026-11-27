@@ -14,9 +14,11 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 
 import java.lang.invoke.MethodHandle;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
@@ -51,8 +53,8 @@ public class ComponentInfo {
 
 	private Union union;
 
-	// Marked @Unbound: the component belongs to the class, not the wire. It keeps its constructor slot and
-	// arrives as null, but no schema field fills it and nothing writes it.
+	// Marked @Unbound: the component belongs to the class, not the wire, so nothing reads it from a document or writes
+	// it to one. Its constructor slot takes its type's zero, and its setter is never called.
 	private boolean unbound;
 
 
@@ -64,6 +66,11 @@ public class ComponentInfo {
 
 	public boolean isUnbound() {
 		return unbound;
+	}
+
+	/** Marks the component where {@code member} carries {@code @Unbound}: any one of its members marks it. */
+	public void readUnbound(AnnotatedElement member) {
+		unbound |= member.isAnnotationPresent(Unbound.class);
 	}
 
 	public void setUnbound(boolean unbound) {

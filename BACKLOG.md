@@ -517,24 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **`@Unbound` is honoured on a record's own components alone.** `RecordComponentFinder` reads it for a record
-  bound through its canonical constructor; on a record bound through a `@Profile` constructor, and on a hand-written
-  `@Record` class's constructor parameter, field or accessor, it is ignored and the component is on the wire. A
-  public field or a getter/setter pair carrying it is untested. Honour it in every finder, with a write and a read
-  of each shape through both mappers showing the component off the wire and filled with its type's zero.
-- [ ] **`@FieldOrder` on a class with two components of one Java name throws `IllegalStateException`.** A public
-  field `name` beside a `getName`/`setName` pair, named apart on the wire by `@Field`, is a class of two components
-  named `name`; `DefaultRecordBinder.reorderFields` keys its map by that name and `Collectors.toMap` throws
-  "Duplicate key". Read, not run. Refuse the class with a `CodeAnalysisException` naming it and the name, with a
-  case in `RecordRefusalTest`.
-- [ ] **A generic public field of a super class is not resolved.** With `public List<T> items` in `FieldBase<T>`,
-  `TextFields extends FieldBase<String>` is refused with "Unrecognized parameterized type": `GetSetFinder` takes a
-  field's generic type as declared, where a pair's goes through `TypeArguments.inherited`. Resolve a field's type
-  the same way, a bare `public T value` included, with a round trip of each through both mappers.
-- [ ] **A type variable inside an array or a wildcard is not substituted.** `TypeArguments.substitute` rewrites a
-  variable and a parameterized type's arguments, so `T[] getItems()` and `List<? extends T> getItems()` in
-  `Holder<T>` keep `T` for `TextHolder extends Holder<String>`. Read, not run. Substitute inside both, with a round
-  trip of each shape as a pair and as a public field.
 - [ ] **`Unbound`'s Javadoc says a `null` arrives.** In `ltr8-annotation`: a primitive component receives its zero
   value (`UnboundComponentTest`). Say "its type's zero value" in both paragraphs.
 

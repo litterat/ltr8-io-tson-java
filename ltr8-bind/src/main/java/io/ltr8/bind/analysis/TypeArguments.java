@@ -7,6 +7,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,22 +74,29 @@ final class TypeArguments {
      */
     static boolean sameType(Type a, Type b) {
         if (a instanceof ParameterizedType pa && b instanceof ParameterizedType pb) {
-            Type[] x = pa.getActualTypeArguments();
-            Type[] y = pb.getActualTypeArguments();
-            if (pa.getRawType() != pb.getRawType() || x.length != y.length) {
-                return false;
-            }
-            for (int i = 0; i < x.length; i++) {
-                if (!sameType(x[i], y[i])) {
-                    return false;
-                }
-            }
-            return true;
+            return pa.getRawType() == pb.getRawType()
+                    && sameTypes(pa.getActualTypeArguments(), pb.getActualTypeArguments());
         }
         if (a instanceof GenericArrayType ga && b instanceof GenericArrayType gb) {
             return sameType(ga.getGenericComponentType(), gb.getGenericComponentType());
         }
+        if (a instanceof WildcardType wa && b instanceof WildcardType wb) {
+            return sameTypes(wa.getUpperBounds(), wb.getUpperBounds())
+                    && sameTypes(wa.getLowerBounds(), wb.getLowerBounds());
+        }
         return a.equals(b);
+    }
+
+    private static boolean sameTypes(Type[] x, Type[] y) {
+        if (x.length != y.length) {
+            return false;
+        }
+        for (int i = 0; i < x.length; i++) {
+            if (!sameType(x[i], y[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static Class<?> erasure(Type type) {
@@ -102,20 +110,101 @@ final class TypeArguments {
         };
     }
 
+    /**
+     * {@code type} with each variable {@code bindings} binds replaced, at any depth. An array whose component becomes
+     * a class is that array's {@link Class}, as the JDK reflects {@code String[]}.
+     */
     static Type substitute(Type type, Map<TypeVariable<?>, Type> bindings) {
-        if (type instanceof TypeVariable<?> variable) {
-            return bindings.getOrDefault(variable, variable);
-        }
-        if (type instanceof ParameterizedType parameterized) {
-            Type[] arguments = parameterized.getActualTypeArguments();
-            boolean changed = false;
-            for (int i = 0; i < arguments.length; i++) {
-                Type replaced = substitute(arguments[i], bindings);
-                changed |= replaced != arguments[i];
-                arguments[i] = replaced;
+        return switch (type) {
+            case TypeVariable<?> variable -> bindings.getOrDefault(variable, variable);
+            case ParameterizedType parameterized -> {
+                Type[] arguments = parameterized.getActualTypeArguments();
+                yield substitute(arguments, bindings)
+                        ? new DataParameterizedType(parameterized.getRawType(), arguments) : parameterized;
             }
-            return changed ? new DataParameterizedType(parameterized.getRawType(), arguments) : parameterized;
+            case GenericArrayType array -> {
+                Type component = substitute(array.getGenericComponentType(), bindings);
+                if (component == array.getGenericComponentType()) {
+                    yield array;
+                }
+                yield component instanceof Class<?> plain ? plain.arrayType() : new ArrayOf(component);
+            }
+            case WildcardType wildcard -> {
+                Type[] upper = wildcard.getUpperBounds();
+                Type[] lower = wildcard.getLowerBounds();
+                boolean changed = substitute(upper, bindings);
+                changed |= substitute(lower, bindings);
+                yield changed ? new Wildcard(upper, lower) : wildcard;
+            }
+            default -> type;
+        };
+    }
+
+    /** Replaces each of {@code types} in place, answering whether any changed. */
+    private static boolean substitute(Type[] types, Map<TypeVariable<?>, Type> bindings) {
+        boolean changed = false;
+        for (int i = 0; i < types.length; i++) {
+            Type replaced = substitute(types[i], bindings);
+            changed |= replaced != types[i];
+            types[i] = replaced;
         }
-        return type;
+        return changed;
+    }
+
+    /** Equal to the JDK's of the same component. */
+    private record ArrayOf(Type component) implements GenericArrayType {
+
+        @Override
+        public Type getGenericComponentType() {
+            return component;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof GenericArrayType that && component.equals(that.getGenericComponentType());
+        }
+
+        @Override
+        public int hashCode() {
+            return component.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return component.getTypeName() + "[]";
+        }
+    }
+
+    /** Equal to the JDK's of the same bounds. */
+    private record Wildcard(Type[] upper, Type[] lower) implements WildcardType {
+
+        @Override
+        public Type[] getUpperBounds() {
+            return upper.clone();
+        }
+
+        @Override
+        public Type[] getLowerBounds() {
+            return lower.clone();
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof WildcardType that && Arrays.equals(upper, that.getUpperBounds())
+                    && Arrays.equals(lower, that.getLowerBounds());
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(upper) ^ Arrays.hashCode(lower);
+        }
+
+        @Override
+        public String toString() {
+            if (lower.length > 0) {
+                return "? super " + lower[0].getTypeName();
+            }
+            return upper[0] == Object.class ? "?" : "? extends " + upper[0].getTypeName();
+        }
     }
 }

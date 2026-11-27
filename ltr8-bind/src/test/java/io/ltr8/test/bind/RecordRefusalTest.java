@@ -87,6 +87,9 @@ import io.ltr8.test.data.RecordRefusals.NamedUnionThroughCall;
 import io.ltr8.test.data.RecordRefusals.NoDesignatedConstructor;
 import io.ltr8.test.data.RecordRefusals.OnlyOtherProfiles;
 import io.ltr8.test.data.RecordRefusals.OrderCountMismatch;
+import io.ltr8.test.data.RecordRefusals.OrderedConstructorComponentsOfOneName;
+import io.ltr8.test.data.RecordRefusals.OrderedFieldBesidePair;
+import io.ltr8.test.data.RecordRefusals.OrderedPairShadowsBaseComponent;
 import io.ltr8.test.data.RecordRefusals.OrderNamesNoField;
 import io.ltr8.test.data.RecordRefusals.PrivateAccessor;
 import io.ltr8.test.data.RecordRefusals.ProfileFieldCountMismatch;
@@ -184,6 +187,18 @@ class RecordRefusalTest {
 	void aFieldOrderOfTheWrongLengthIsRefused() {
 		assertEquals("DataOrder annotation has different field count to components found in data",
 				message(OrderCountMismatch.class));
+	}
+
+	@Test
+	void aFieldOrderOverTwoComponentsOfOneJavaNameIsRefusedNamingTheClassAndTheName() {
+		assertAll(Stream.of(OrderedFieldBesidePair.class, OrderedPairShadowsBaseComponent.class,
+				OrderedConstructorComponentsOfOneName.class).map(type -> () -> {
+					DataBindException refused = refusal(context, type);
+					assertInstanceOf(CodeAnalysisException.class, refused, type.getName());
+					assertEquals(type.getName() + " has two components named 'name', which @FieldOrder cannot tell "
+							+ "apart: it names a component by its Java name", refused.getMessage());
+					assertNull(refused.getCause());
+				}));
 	}
 
 	@Test
