@@ -554,6 +554,11 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   a union read of a value that is no map describes `data.getClass()` and never asks the union whether it is a
   member. Read, not run. Reproduce each and give every member a form that carries its tag, as a member with a field
   named `type` has (`UnionTagMapperTest`).
+- [ ] **The two mappers are examples shipped as API.** `MapMapper` and `ArrayMapper` show two ways to walk the
+  descriptors, a plain descent and `MethodHandle`s built over them; nothing outside `ltr8-bind` uses them, and its
+  own tests use them as the round-trip harness. They sit in `src/main` and the module exports `io.ltr8.bind.mapper`.
+  Move them out of the main sources, to the test sources or an examples source set the tests depend on, drop the
+  export, and correct the `tson-java` skill's `api.md`, which lists it.
 - [ ] **The bind readers compute the `@Unbound` components again, from fewer members.**
   `RecordBindReader.unboundComponents` (`tson-compiler`) and `BindRecordBuilder.unboundComponents` (`tson-json`)
   reflect over a record component and its accessor, where `ltr8-bind` reads the marker from every member, and both
