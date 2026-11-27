@@ -41,6 +41,9 @@ import java.util.Objects;
  * performance.
  * <p>
  * A map is an array of {@code [key, value]} entries, each part in this form, in the order the map iterates in.
+ * <p>
+ * A read refused for a record's own shape -- its array's length, or a required field's absence -- throws the
+ * {@link DataBindException} that says so, however deep the record sits: no enclosing list, map or union wraps it.
  *
  * <ul>
  * <li>TODO add try/catch/throw around conversions
@@ -50,13 +53,13 @@ import java.util.Objects;
  */
 public class ArrayMapper {
 
-	private static final MethodHandle CHECKED_LENGTH;
+	private static final MethodHandle CHECKED;
 
 	private static final MethodHandle PART;
 
 	static {
 		try {
-			CHECKED_LENGTH = MethodHandles.lookup().findStatic(ArrayMapper.class, "checkedLength",
+			CHECKED = MethodHandles.lookup().findStatic(ArrayMapper.class, "checked",
 					MethodType.methodType(Object[].class, DataClassRecord.class, Object[].class));
 			PART = MethodHandles.lookup().findStatic(ArrayMapper.class, "part",
 					MethodType.methodType(Object.class, MethodHandle.class, Object.class));
@@ -212,7 +215,7 @@ public class ArrayMapper {
 
                 }
 
-                result = MethodHandles.filterArguments(result, 0, CHECKED_LENGTH.bindTo(dataClassRecord));
+                result = MethodHandles.filterArguments(result, 0, CHECKED.bindTo(dataClassRecord));
                 result = result.asType(result.type().changeReturnType(dataClass.dataClass()));
             }
             case DataClassArray dataArrayClass -> {
@@ -281,12 +284,20 @@ public class ArrayMapper {
 
 	/**
 	 * A record's values line up with its fields by position, so an array of any other length leaves a field
-	 * without a value or a value without a field.
+	 * without a value or a value without a field. A null is an absent value, which a required field refuses.
 	 */
-	private static Object[] checkedLength(DataClassRecord record, Object[] values) throws DataBindException {
-		if (values.length != record.fields().length) {
+	private static Object[] checked(DataClassRecord record, Object[] values) throws DataBindException {
+		DataClassField[] fields = record.fields();
+		if (values.length != fields.length) {
 			throw new DataBindException(String.format("%s has %d fields but the array has length %d",
-					record.typeClass().getName(), record.fields().length, values.length));
+					record.typeClass().getName(), fields.length, values.length));
+		}
+		DataClassField carrier = record.annotationsCarrier().orElse(null);
+		for (int x = 0; x < fields.length; x++) {
+			if (values[x] == null && fields[x].isRequired() && fields[x] != carrier) {
+				throw new DataBindException(String.format("%s is missing its required field '%s'",
+						record.typeClass().getName(), fields[x].name()));
+			}
 		}
 		return values;
 	}
@@ -573,6 +584,8 @@ public class ArrayMapper {
 				}
 
 				return arrayData;
+			} catch (DataBindException e) {
+				throw e;
 			} catch (Throwable e) {
 				throw new DataBindException("Failed to convert array", e);
 			}
@@ -636,6 +649,8 @@ public class ArrayMapper {
 					mapClass.put().invoke(map, part(keyToObject, pair[0]), part(valueToObject, pair[1]));
 				}
 				return map;
+			} catch (DataBindException e) {
+				throw e;
 			} catch (Throwable e) {
 				throw new DataBindException("Failed to convert map", e);
 			}
@@ -687,6 +702,8 @@ public class ArrayMapper {
 					}
 
 					value = function.toObject.invoke(unionValue);
+				} catch (DataBindException e) {
+					throw e;
 				} catch (Throwable e) {
 					throw new DataBindException("Failed to convert class", e);
 				}

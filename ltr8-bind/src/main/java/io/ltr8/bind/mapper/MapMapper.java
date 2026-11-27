@@ -36,6 +36,9 @@ import java.util.Objects;
  * in the returned map has the name of the field. Union types have an extra field called "type" which
  * provides the class name of the type of value recorded. A map component is a map of its keys and values, each in
  * this form, in the order the component's map iterates in.
+ * <p>
+ * A read missing a required field throws the {@link DataBindException} that names the record and the field,
+ * however deep the record sits: no enclosing record, list, map or union wraps it.
  */
 public class MapMapper {
 
@@ -162,17 +165,17 @@ public class MapMapper {
                     Map<String, Object> map = (Map<String, Object>) data;
                     DataClassField[] fields = dataRecord.fields();
                     Object[] construct = new Object[fields.length];
+                    DataClassField carrier = dataRecord.annotationsCarrier().orElse(null);
                     for (fieldIndex = 0; fieldIndex < dataRecord.fields().length; fieldIndex++) {
                         DataClassField field = fields[fieldIndex];
 
                         Object fv = map.get(field.name());
 
-                        // Recursively convert maps back to objects.
                         if (fv != null) {
-                            DataClass fieldDataClass = field.dataClass();
-
-                            fv = toObject(fieldDataClass, fv);
-
+                            fv = toObject(field.dataClass(), fv);
+                        } else if (field.isRequired() && field != carrier) {
+                            throw new DataBindException(String.format("%s is missing its required field '%s'",
+                                    dataRecord.typeClass().getName(), field.name()));
                         }
                         construct[fieldIndex] = fv;
                     }
@@ -235,6 +238,8 @@ public class MapMapper {
             }
 
             return v;
+		} catch (DataBindException e) {
+			throw e;
 		} catch (Throwable t) {
 			throw new DataBindException(String.format("Failed to convert Map to %s.", dataClass.typeClass()), t);
 		}

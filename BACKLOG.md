@@ -517,11 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A map read missing a required field does not say which.** `MapMapper.toObject` on a map with no key for a
-  primitive component throws `DataBindException` ("Failed to convert Map to class …") caused by a
-  `NullPointerException`; what a missing required reference component does is untested. Refuse the read naming the
-  class and the field, for a primitive and a reference, with an optional component absent beside them reading as
-  empty.
 - [ ] **A map component typed `AnnotatedMap` is untested in both mappers.** `DefaultMapBinder` iterates its entries
   as boxes, so the map write may carry the box and not the key. Read, not run. Round-trip one through both mappers
   and carry the key.
