@@ -73,8 +73,8 @@ import java.util.stream.Collectors;
  * reaches it, through a public subclass: the described class or one between the two.
  *
  * <p>The class is refused, with a {@link CodeAnalysisException} naming it, when a parameter binds no component or more
- * than one, when a component has no such read, when its read is reached through no public class or its field's name
- * reaches another field from each, or when two components take one name.
+ * than one, when a bound component has no such read, when its read is reached through no public class or its field's
+ * name reaches another field from each, or when two components take one name.
  */
 public class ImmutableFinder implements ComponentFinder {
 
@@ -173,9 +173,9 @@ public class ImmutableFinder implements ComponentFinder {
                         "Failed to match immutable fields for class: %s. Add @Field annotations to assist.", clss));
             }
 
-            // Check all params have valid information.
+            // Nothing writes an unbound component, so it needs no read.
             for (ComponentInfo component : immutableFields) {
-                if (component.getReadMethod() == null) {
+                if (component.getReadMethod() == null && !ComponentAnnotations.unbound(component)) {
                     throw new CodeAnalysisException(String.format(
                             "Failed to match immutable field accessor for class: %s. Add @Field annotations to assist field '%s'",
                             clss, component.getName()));

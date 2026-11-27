@@ -45,6 +45,22 @@ import io.ltr8.test.data.UnboundComponents.UnboundSettableInitialised;
 import io.ltr8.test.data.UnboundComponents.UnboundSetters;
 import io.ltr8.test.data.UnboundComponents.UnboundShort;
 import io.ltr8.test.data.UnboundComponents.UnboundText;
+import io.ltr8.test.data.UnboundComponents.UnboundFieldsUnread;
+import io.ltr8.test.data.UnboundComponents.UnboundParametersUnread;
+import io.ltr8.test.data.UnboundComponents.UnboundUndescribed;
+import io.ltr8.test.data.UnboundComponents.UnboundUndescribedOptional;
+import io.ltr8.test.data.UnboundComponents.UndescribedCanonicalParameters;
+import io.ltr8.test.data.UnboundComponents.UndescribedConstructorAccessors;
+import io.ltr8.test.data.UnboundComponents.UndescribedConstructorFields;
+import io.ltr8.test.data.UnboundComponents.UndescribedConstructorParameters;
+import io.ltr8.test.data.UnboundComponents.UndescribedConstructorSetters;
+import io.ltr8.test.data.UnboundComponents.UndescribedGetters;
+import io.ltr8.test.data.UnboundComponents.UndescribedPairFields;
+import io.ltr8.test.data.UnboundComponents.UndescribedParametersUnread;
+import io.ltr8.test.data.UnboundComponents.UndescribedProfileComponents;
+import io.ltr8.test.data.UnboundComponents.UndescribedProfileParameters;
+import io.ltr8.test.data.UnboundComponents.UndescribedPublicFields;
+import io.ltr8.test.data.UnboundComponents.UndescribedSetters;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -83,7 +99,10 @@ class UnboundComponentTest {
 			new Object[] { new UnboundText("n", null), new UnboundText("n", "cached") },
 			new Object[] { new UnboundOptional("n", Optional.empty()), new UnboundOptional("n", Optional.of("c")) },
 			new Object[] { new UnboundOptionalInt("n", OptionalInt.empty()), new UnboundOptionalInt("n",
-					OptionalInt.of(7)) });
+					OptionalInt.of(7)) },
+			new Object[] { new UnboundUndescribed("n", null), new UnboundUndescribed("n", Thread.currentThread()) },
+			new Object[] { new UnboundUndescribedOptional("n", Optional.empty()),
+					new UnboundUndescribedOptional("n", Optional.of(Thread.currentThread())) });
 
 	@Test
 	void anUnboundComponentIsNoFieldOfTheWire() {
@@ -157,11 +176,48 @@ class UnboundComponentTest {
 			new Shape(DataBindContext.builder().build(), new UnboundSetters("n", 0, null),
 					new UnboundSetters("n", 7, "x")),
 			new Shape(DataBindContext.builder().build(), new UnboundPairFields("n", 0, null),
-					new UnboundPairFields("n", 7, "x")));
+					new UnboundPairFields("n", 7, "x")),
+			new Shape(DataBindContext.builder().build(), new UnboundParametersUnread("n", 0, null),
+					new UnboundParametersUnread("n", 7, "x")),
+			new Shape(DataBindContext.builder().build(), new UnboundFieldsUnread("n", 0, null),
+					new UnboundFieldsUnread("n", 7, "x")));
+
+	private static final Thread SET = Thread.currentThread();
+
+	/** Each shape again, marking a component whose type no context describes. */
+	private static final List<Shape> UNDESCRIBED_SHAPES = List.of(
+			new Shape(DataBindContext.builder().build(), new UndescribedCanonicalParameters("n", null),
+					new UndescribedCanonicalParameters("n", SET)),
+			new Shape(PROFILED, new UndescribedProfileParameters("n", null, "t"),
+					new UndescribedProfileParameters("n", SET, "t")),
+			new Shape(PROFILED, new UndescribedProfileComponents("n", null, "t"),
+					new UndescribedProfileComponents("n", SET, "t")),
+			new Shape(DataBindContext.builder().build(), new UndescribedConstructorParameters("n", null),
+					new UndescribedConstructorParameters("n", SET)),
+			new Shape(DataBindContext.builder().build(), new UndescribedConstructorFields("n", null),
+					new UndescribedConstructorFields("n", SET)),
+			new Shape(DataBindContext.builder().build(), new UndescribedConstructorAccessors("n", null),
+					new UndescribedConstructorAccessors("n", SET)),
+			new Shape(DataBindContext.builder().build(), new UndescribedConstructorSetters("n", null),
+					new UndescribedConstructorSetters("n", SET)),
+			new Shape(DataBindContext.builder().build(), new UndescribedPublicFields("n", null),
+					new UndescribedPublicFields("n", SET)),
+			new Shape(DataBindContext.builder().build(), new UndescribedGetters("n", null),
+					new UndescribedGetters("n", SET)),
+			new Shape(DataBindContext.builder().build(), new UndescribedSetters("n", null),
+					new UndescribedSetters("n", SET)),
+			new Shape(DataBindContext.builder().build(), new UndescribedPairFields("n", null),
+					new UndescribedPairFields("n", SET)),
+			new Shape(DataBindContext.builder().build(), new UndescribedParametersUnread("n", null),
+					new UndescribedParametersUnread("n", SET)));
+
+	private static Stream<Shape> everyShape() {
+		return Stream.concat(SHAPES.stream(), UNDESCRIBED_SHAPES.stream());
+	}
 
 	@Test
 	void anUnboundComponentOfEveryShapeIsNoFieldOfTheWire() {
-		assertAll(SHAPES.stream().map(shape -> () -> {
+		assertAll(everyShape().map(shape -> () -> {
 			DataClassRecord record = assertInstanceOf(DataClassRecord.class,
 					shape.context().getDescriptor(shape.read().getClass()));
 			assertEquals(List.of("name"), Stream.of(record.fields()).map(DataClassField::name).toList(),
@@ -171,7 +227,7 @@ class UnboundComponentTest {
 
 	@Test
 	void aReadThroughEitherMapperGivesAnUnboundComponentOfEveryShapeItsTypesZero() {
-		assertAll(SHAPES.stream().flatMap(shape -> {
+		assertAll(everyShape().flatMap(shape -> {
 			Object read = shape.read();
 			Class<?> type = read.getClass();
 			return Stream.of(
@@ -184,7 +240,7 @@ class UnboundComponentTest {
 
 	@Test
 	void aWriteThroughEitherMapperLeavesAnUnboundComponentOfEveryShapeOut() {
-		assertAll(SHAPES.stream().flatMap(shape -> {
+		assertAll(everyShape().flatMap(shape -> {
 			Object set = shape.set();
 			return Stream.of(
 					() -> assertEquals(Map.of("name", "n"), new MapMapper(shape.context()).toMap(set),

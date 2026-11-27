@@ -1,5 +1,6 @@
 package io.ltr8.bind.analysis;
 
+import io.ltr8.annotation.FieldOrder;
 import io.ltr8.annotation.Transparent;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -34,6 +35,7 @@ import java.lang.reflect.RecordComponent;
  * <li><b>A component that is itself bridged</b> (an {@code enum}, or a type with a registered bridge) -- two
  *     bridges over one position would have to compose into one, and a single {@link DataClassBridge} cannot
  *     hold both conversions.</li>
+ * <li><b>A {@code @FieldOrder}</b> -- the wrapper has no fields of its own for an order to arrange.</li>
  * </ul>
  *
  * <p><b>A wrapper on a cycle in the type graph cannot work</b>, and does not need its own check: the
@@ -46,6 +48,10 @@ final class TransparentBinder {
     /** The descriptor for {@code targetClass}: its component's shape, wearing its own class and a bridge. */
     DataClass resolve(DataBindContext context, Class<?> targetClass) throws DataBindException {
         RecordComponent component = onlyComponent(targetClass);
+        if (targetClass.isAnnotationPresent(FieldOrder.class)) {
+            throw new DataBindException(targetClass.getName() + " carries @FieldOrder, but is @Transparent, written "
+                    + "as its one component; an order applies only to a class described by its own components");
+        }
         DataClassBridge bridge = bridge(targetClass, component);
         DataClass wrapped = context.getDescriptor(component.getType(), component.getGenericType());
         if (wrapped.bridge().isPresent()) {

@@ -108,12 +108,14 @@ public class DefaultRecordBinder {
 		int annotationsCarrierCount = 0;
 		for (int x = 0; x < components.size(); x++) {
 			ComponentInfo info = components.get(x);
+			// Never read from a document nor written to one, so nothing needs its descriptor or its bridge.
+			if (info.isUnbound()) {
+				continue;
+			}
 
 			bridges[x] = RecordFields.fieldBridge(targetClass, info);
-			allComponents[x] = RecordFields.resolveField(context, targetClass, info, bridges[x], slots[x] < 0 ? x : slots[x]);
-			if (slots[x] >= 0) {
-				boundComponents.add(allComponents[x]);
-			}
+			allComponents[x] = RecordFields.resolveField(context, targetClass, info, bridges[x], slots[x]);
+			boundComponents.add(allComponents[x]);
 			if (info.getType() == Annotations.class) {
 				annotationsCarrier = allComponents[x];
 				annotationsCarrierCount++;

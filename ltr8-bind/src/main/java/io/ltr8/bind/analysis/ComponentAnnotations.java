@@ -88,7 +88,11 @@ final class ComponentAnnotations {
 		return null;
 	}
 
-	private static boolean unbound(ComponentInfo component) {
+	/**
+	 * Whether a member {@code component}'s finder has recorded so far marks it {@code @Unbound}, for a finder
+	 * judging components before {@link #read} settles them.
+	 */
+	static boolean unbound(ComponentInfo component) {
 		return component.members().stream().anyMatch(member -> member.element().isAnnotationPresent(Unbound.class));
 	}
 

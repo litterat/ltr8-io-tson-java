@@ -1,5 +1,6 @@
 package io.ltr8.bind.analysis;
 
+import io.ltr8.annotation.FieldOrder;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -33,6 +34,11 @@ public class DefaultTupleBinder {
 			// check: only a genuine Java record has record components / a canonical constructor
 			// to resolve positionally in the first place.
 			throw new CodeAnalysisException("@Tuple can only be applied to a genuine Java record: " + targetClass);
+		}
+		if (targetClass.isAnnotationPresent(FieldOrder.class)) {
+			throw new CodeAnalysisException(targetClass.getName() + " carries @FieldOrder, but is a @Tuple, whose "
+					+ "elements are its record components in declared order; an order applies only to a class "
+					+ "described by its own components");
 		}
 
 		RecordComponent[] components = targetClass.getRecordComponents();
