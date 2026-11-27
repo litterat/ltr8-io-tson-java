@@ -527,14 +527,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   super class declares behind a pair the class inherits. Read each annotation from every member of a component,
   taking each `@Field` attribute from whichever member states it and refusing two members that state one
   differently, with a test of each annotation on each member of each class kind.
-- [ ] **A wildcard argument binds a bare type variable and not a parameterized one.** `Box<? extends Integer>` as a
-  component binds `T value` at the upper bound `Integer`, where `List<T> items` at the same argument is refused
-  with "Unrecognized parameterized type" (`GenericComponentRoundTripTest`'s fixtures; reproduced in a scratch
-  test). Take a wildcard argument's upper bound wherever it is substituted, with a round trip of each shape, and
-  keep `?` and `? super X` refused.
-- [ ] **An array of a parameterized type is held at its erasure.** A `List<String>[]` component, and `T[]` described
-  at `List<String>`, are held as `List[]` and refused with "Collection must provide parameterized type
-  information". Keep the element's type arguments, with a round trip of each.
 - [ ] **The refusal for a constructor the public lookup cannot reach changes from run to run.** It embeds the
   JDK's `IllegalAccessException` text, which carries an identity hash (`…X.<init>[Ljava.lang.Object;@…`). Read, not
   run. Name the class and its constructor, keep the exception as the cause, and assert the whole message in

@@ -195,7 +195,7 @@ final class RecordCreators {
 			// The method handles are typed against the raw class, so an Optional whose own argument is
 			// parameterized -- Optional<List<X>> -- erases to the collection interface here. Only the
 			// component resolution needs the full type, and that happened in resolveOptionalField.
-			Class<?> optionalType = RecordFields.rawTypeOf(RecordFields.optionalArgument(field));
+			Class<?> optionalType = TypeArguments.erasure(RecordFields.optionalArgument(field));
 
 			// (values[]) -> values[inputIndex]:optionalType
 			arrayIndexGetter = MethodHandles.collectArguments(arrayGetter, 1, index)

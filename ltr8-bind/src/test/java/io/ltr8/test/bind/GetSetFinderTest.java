@@ -1076,11 +1076,25 @@ class GetSetFinderTest {
 		}
 	}
 
-	/** As a record's array of a parameterized type is: the binder carries no generic array type. */
 	@Test
-	void aSuperClassPairOfAGenericArrayWhoseGetterAloneIsOverriddenIsRefusedAsAGenericArrayComponentIs() {
-		assertEquals("Collection must provide parameterized type information", message(ListArrayRecord.class));
-		assertEquals(message(ListArrayRecord.class), message(TextListArrayGetter.class));
+	void aSuperClassPairOfAGenericArrayWhoseGetterAloneIsOverriddenKeepsTheElementTypeAsARecordDoes()
+			throws Throwable {
+		DataClassRecord record = record(TextListArrayGetter.class);
+		assertEquals(List.of("name:String set", "rows:List[] set"), shape(record));
+		DataClassArray rows = assertInstanceOf(DataClassArray.class, record.fields()[1].dataClass());
+		assertEquals(String.class, assertInstanceOf(DataClassArray.class, rows.arrayDataClass()).arrayDataClass()
+				.typeClass());
+		assertEquals(List.of("rows:List[]"), shape(record(ListArrayRecord.class)));
+		TextListArrayGetter value = new TextListArrayGetter();
+		value.name = "anchor";
+		@SuppressWarnings("unchecked")
+		List<String>[] lists = new List[] { List.of("chain"), List.of() };
+		value.setRows(lists);
+		for (TextListArrayGetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertArrayEquals(lists, copy.getRows());
+			assertEquals(List[].class, copy.getRows().getClass());
+		}
 	}
 
 	/** As a record's wildcard component is: the binder describes no wildcard type argument. */

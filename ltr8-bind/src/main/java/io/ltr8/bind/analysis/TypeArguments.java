@@ -19,7 +19,7 @@ import java.util.Map;
  * parameter -- be a component of another class at all: a type variable left in place has no descriptor.
  *
  * <p>A parameter the description does not supply (a raw class) is left unreplaced, and a component whose type is
- * then still no class or parameterised type is held at its erasure.
+ * then still no class, parameterised type or array of one is held at its erasure.
  */
 final class TypeArguments {
 
@@ -28,7 +28,9 @@ final class TypeArguments {
 
     /**
      * Each of {@code targetClass}'s type parameters bound to the argument {@code parameterizedType} gives it; none
-     * where that is not a parameterisation of {@code targetClass} with an argument for each.
+     * where that is not a parameterisation of {@code targetClass} with an argument for each. An argument {@code ?
+     * extends X} binds its parameter to {@code X}, the most a value it stands for is known to be. A wildcard written
+     * in a component's own type is not an argument, and stays one.
      */
     static Map<TypeVariable<?>, Type> described(Class<?> targetClass, Type parameterizedType) {
         if (!(parameterizedType instanceof ParameterizedType parameterized)
@@ -42,15 +44,30 @@ final class TypeArguments {
         }
         Map<TypeVariable<?>, Type> bindings = new HashMap<>();
         for (int i = 0; i < parameters.length; i++) {
-            bindings.put(parameters[i], arguments[i]);
+            bindings.put(parameters[i], upperBound(arguments[i]));
         }
         return bindings;
+    }
+
+    /**
+     * {@code X} for {@code ? extends X}, and otherwise {@code argument}: {@code ?} and {@code ? super X} bound a value
+     * by nothing narrower than {@code Object}, and stay wildcards to be refused as one.
+     */
+    private static Type upperBound(Type argument) {
+        return argument instanceof WildcardType wildcard && wildcard.getLowerBounds().length == 0
+                && wildcard.getUpperBounds()[0] != Object.class ? wildcard.getUpperBounds()[0] : argument;
     }
 
     /** The type a component of declared {@code type} is held at under {@code bindings}. */
     static Type resolve(Type type, Map<TypeVariable<?>, Type> bindings) {
         Type resolved = substitute(type, bindings);
-        return resolved instanceof Class<?> || resolved instanceof ParameterizedType ? resolved : erasure(resolved);
+        return isHeld(resolved) ? resolved : erasure(resolved);
+    }
+
+    /** Whether {@code type} is a class, a parameterized type or an array of one, which a component is held at. */
+    static boolean isHeld(Type type) {
+        return type instanceof Class<?> || type instanceof ParameterizedType
+                || type instanceof GenericArrayType array && isHeld(array.getGenericComponentType());
     }
 
     /**
