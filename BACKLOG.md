@@ -517,24 +517,78 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **`@Field` on the setter of a constructor component is dropped.** For a class whose constructor binds `name`
-  and which also declares `@Field("label") setName`, `GetSetFinder`'s merge carries the write method across and not
-  the annotation, so the write gives `{name=n}`. Read the annotation from every member of a component, with a test
-  of `@Field` on each of the parameter, field, accessor and setter.
+- [ ] **Which members an annotation is read from differs by class kind.** `ComponentAnnotations` reads `@Field`
+  from a record's accessor on the canonical path and from its parameter on a `@Profile` path; `@Union` from a
+  record's accessor and a constructor class's members, and from no member of a `@Profile` record, a public field or
+  a getter/setter pair; and nothing but `@Unbound` from a member merged into a constructor component
+  (`ComponentAnnotationPrecedenceTest`). So `@Field("label")` on the setter of a constructor component, a record
+  header's `@Field` or `@Union` beside an explicit accessor, and `@Field(bridge = …)` on a record bound through
+  `@Profile` are each dropped. Read each annotation from every member of a component, taking each `@Field`
+  attribute from whichever member states it and refusing two members that state one differently, with a test of
+  each annotation on each member of each class kind.
 - [ ] **An `@Unbound` component is analysed as a bound one is.** `record(String name, @Unbound Thread cache)` is
   refused with "Unable to find a valid data conversion for class: class java.lang.Thread", and an `@Unbound`
   constructor parameter of a hand-written `@Record` class with no accessor is refused with "Failed to match
   immutable field accessor …". Nothing reads or writes either. Describe neither, with a read of each through both
   mappers in `UnboundComponentTest`.
-- [ ] **`Optional<? extends Number>` on a record throws `ClassCastException`.** `getDescriptor` throws it unchecked
-  from `DefaultRecordBinder.rawTypeOf` in `resolveOptionalField`. Refuse the class with a `CodeAnalysisException`
-  naming it and the component, as a `List<? extends Number>` component is refused, with a case in
-  `RecordRefusalTest`.
+- [ ] **An `Optional` whose argument is no class throws `ClassCastException`.** `Optional<? extends Number>` on a
+  record, and `Optional<T>` on a generic class described raw, on every finder path, make `getDescriptor` throw it
+  unchecked from the record binder's `rawTypeOf` (`GenericComponentTypeTest` pins the exception). Refuse the class
+  with a `CodeAnalysisException` naming it and the component, as a `List<? extends Number>` component is refused.
 - [ ] **A bare type variable of a class described at a parameterization stays `Object`.** For `Box<T>` with a
-  component `T value` or `T[] items`, described as `Box<String>`, `TypeArguments.substitute(targetClass,
-  parameterizedType, components)` rewrites a component's `paramType` alone, so the component is refused as
-  `Object`. Read, not run. Resolve the component's class too, with a round trip of each shape for a record, a
-  constructor class and a pair.
+  component `T value` or `T[] items`, described as `Box<String>`, the component is held at its erasure and refused
+  as `Object`: `TypeArguments` gives the description's arguments to a parameterized component alone
+  (`GenericComponentTypeTest`). Resolve a bare variable and an array of one too, with a round trip of each shape
+  for a record, a constructor class and a pair.
+- [ ] **A constructor parameter named only by `@Field` loses its generic type.** Where `ImmutableFinder` cannot
+  match a parameter to a field and `@Field` names its component, the component takes the parameter's class, so
+  `@Field("x") List<T>` on `NamedList<T>` is refused with "Collection must provide parameterized type information"
+  even described as `NamedList<String>` (`GenericComponentTypeTest`); a plain `List<String>` parameter is read, not
+  run. Give the component the parameter's generic type, with a round trip of a list, a map and an optional.
+- [ ] **A constructor parameter whose `@Field` names nothing makes a component named "".** An unmatched parameter
+  carrying `@Field` with an empty `value`, to mark it required or bridged, names its component by that value. Read,
+  not run. Refuse the class, naming it and the parameter, with a case in `RecordRefusalTest`.
+- [ ] **A Java record with a second public constructor is refused.** `record Two(String a, String b)` with a
+  public `Two(String a)` and no `@Record` or `@Profile` is refused with "Could not find constructor: class …":
+  constructor selection takes a lone constructor or a marked one. Take a record's canonical constructor where none
+  is marked, with a round trip.
+- [ ] **The two finders reach an inherited member by different rules.** `ImmutableFinder` counts a field hidden by
+  any field of its name below it and refuses the class ("…hides from the public lookup"); `GetSetFinder` counts
+  one hidden by name and type, and falls back to the declaring class, refusing "…not accessible…" where that is
+  not public. A public field hidden by one of another type is refused by the first and bound by the second
+  (`ReachedMembersTest`). The refusal for an unreachable method carries the JDK's identity hash, so its text
+  changes from run to run. Reach a member one way, by name and type as the JVM resolves it, with one refusal that
+  names the member and no hash.
+- [ ] **`GetSetFinder` matches a private field to a component by name alone.** It sets no declaring class on its
+  components, so a subclass's `private int name` is taken as a member of a super class's `String name` component
+  and its annotations apply to it. Read, not run. Match on the declaring class, with a test of each.
+- [ ] **`@FieldOrder` is ignored on a class not described by its own components.** On a `@Tuple` record, a
+  `@Transparent` record and a class bridged through `ToData` it is accepted and has no effect, even naming no
+  component (`@FieldOrder({"nothing"})`). Refuse it on each, naming the class and why an order does not apply,
+  with a case of each in `RecordRefusalTest`.
+- [ ] **`ArrayMapper` cannot write a `@Tuple` record.** `toArray` throws `DataBindException` ("unexpected data
+  class type"): it has no case for `DataClassTuple`. `MapMapper` is untested. Carry a tuple through both mappers,
+  with a round trip.
+- [ ] **A record with an `Annotations` carrier breaks both mappers.** For `record Item(Annotations meta, String
+  name)`, `ArrayMapper.toArray` throws `NullPointerException` and `MapMapper.toMap` a `DataBindException` wrapping
+  one: neither skips `annotationsCarrier()`, whose descriptor is null. Write the record without the carrier and
+  read it back with `Annotations.empty()`, with a round trip through both.
+- [ ] **`ArrayMapper.toObject` overwrites the array it is given.** After a read of a record holding a record, the
+  caller's nested `Object[]` is replaced by the object built from it. Read into a copy, with a test that the input
+  is unchanged.
+- [ ] **A `null` required reference writes and then does not read.** `Marked(@Field(required = true) String name)`
+  holding `null` writes `{}` from `MapMapper` and a `null` slot from `ArrayMapper`, and the read of either is
+  refused as missing its required field (`MissingRequiredFieldMapperTest`). Refuse the write too, naming the class
+  and the field, in both mappers.
+- [ ] **A union read loads a class the data names before checking it is a member.** Both mappers' union reads
+  call `Class.forName` on the type name in the data and then ask the union whether it is a member. Read, not run.
+  Resolve the name among the union's members, with a test that a name outside them loads nothing.
+- [ ] **`MapMapper` tags a union value with the key `type`, which a member may use.** A member record with a field
+  named `type` writes it under the same key as the tag. Read, not run. Reproduce it and keep the two apart, with a
+  round trip of such a member.
+- [ ] **A shared `ArrayMapper` is not thread-safe.** Its function cache, and the per-instance maps of its union
+  bridges, are plain `HashMap`s written during a read or a write. Read, not run. Make them safe to share, as
+  `DataBindContext`'s own cache is.
 - [ ] **The bind readers compute the `@Unbound` components again, from fewer members.**
   `RecordBindReader.unboundComponents` (`tson-compiler`) and `BindRecordBuilder.unboundComponents` (`tson-json`)
   reflect over a record component and its accessor, where `ltr8-bind` reads the marker from every member, and both
