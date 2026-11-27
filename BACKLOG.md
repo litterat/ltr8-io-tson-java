@@ -527,11 +527,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   super class declares behind a pair the class inherits. Read each annotation from every member of a component,
   taking each `@Field` attribute from whichever member states it and refusing two members that state one
   differently, with a test of each annotation on each member of each class kind.
-- [ ] **A collection or a map of generic arrays is refused.** `List<List<String>[]>` is refused with "Unrecognized
-  parameterized type" and `Map<String, List<String>[]>` with "…for map key/value": `ArrayBinder`'s collection
-  branch and `MapBinder.resolveTypeArgument` take a class or a parameterized type as an element, where a record
-  component takes a generic array too (`GenericComponentTypeTest.anArrayOfAParameterizedType`). Take the same types
-  as an element, a key and a value, with a round trip of each.
 - [ ] **`Annotated` of anything but a class or a parameterized type throws `ClassCastException`.**
   `ClassBinder.annotatedValueDescriptor` casts the argument to `Class`, so `Annotated<List<String>[]>` and
   `Annotated<? extends X>` throw unchecked. Read, not run. Describe a generic array as a component is described and
