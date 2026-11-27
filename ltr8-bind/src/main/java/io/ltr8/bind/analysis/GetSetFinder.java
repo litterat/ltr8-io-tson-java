@@ -33,14 +33,14 @@ import java.util.*;
 public class GetSetFinder implements ComponentFinder {
 
 	@Override
-	public void findComponents(Class<?> clss, Constructor<?> constructor, List<ComponentInfo> fields)
-			throws CodeAnalysisException {
+	public void findComponents(Class<?> clss, Map<TypeVariable<?>, Type> bindings, Constructor<?> constructor,
+			List<ComponentInfo> fields) throws CodeAnalysisException {
 
 		List<ComponentInfo> getSetList = new ArrayList<>();
 		Map<ComponentInfo, Member> members = new IdentityHashMap<>();
 
 		// A member a super class declares is typed at the arguments the described class binds.
-		Map<TypeVariable<?>, Type> bindings = TypeArguments.inherited(clss);
+		Map<TypeVariable<?>, Type> inherited = TypeArguments.inherited(clss);
 
 		// A final field has no setter: one the constructor binds is already a component, read as ImmutableFinder
 		// found it and written through the constructor, and one it does not bind is no component, since nothing
@@ -51,10 +51,11 @@ public class GetSetFinder implements ComponentFinder {
 			if (Modifier.isPublic(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)
 					&& !Modifier.isFinal(modifiers)) {
 
-				Type type = TypeArguments.substitute(classField.getGenericType(), bindings);
+				Type type = TypeArguments.substitute(classField.getGenericType(), inherited);
 				Class<?> erasure = type == classField.getGenericType() ? classField.getType()
 						: TypeArguments.erasure(type);
-				ComponentInfo info = new ComponentInfo(classField.getName(), erasure);
+				ComponentInfo info = new ComponentInfo(classField.getName(), TypeArguments.resolve(type, erasure,
+						bindings));
 				info.addMember(Role.PUBLIC_FIELD, classField);
 
 				Members.FieldHandles handles = Members.fieldDescribedFirst(clss, classField);
@@ -62,10 +63,6 @@ public class GetSetFinder implements ComponentFinder {
 				MethodHandle write = handles.write();
 				info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
 				info.setWriteMethod(write.asType(write.type().changeParameterType(1, erasure)));
-
-				if (type instanceof ParameterizedType parameterized) {
-					info.setParamType(parameterized);
-				}
 
 				getSetList.add(info);
 				members.put(info, new Member(classField.getDeclaringClass(), null, null));
@@ -108,10 +105,10 @@ public class GetSetFinder implements ComponentFinder {
 				continue;
 			}
 			String getterName = getter.getName();
-			Type type = TypeArguments.substitute(getter.getGenericReturnType(), bindings);
+			Type type = TypeArguments.substitute(getter.getGenericReturnType(), inherited);
 			Method setter = setters.stream()
 					.filter(method -> method.getName().equals("s" + getterName.substring(1)) && TypeArguments
-							.sameType(TypeArguments.substitute(method.getGenericParameterTypes()[0], bindings), type))
+							.sameType(TypeArguments.substitute(method.getGenericParameterTypes()[0], inherited), type))
 					.findFirst().orElse(null);
 			if (setter == null || !isPublicInstance(setter)) {
 				continue;
@@ -120,7 +117,7 @@ public class GetSetFinder implements ComponentFinder {
 			String fieldName = Character.toLowerCase(getterName.charAt(3)) + getterName.substring(4);
 			Class<?> erasure = type == getter.getGenericReturnType() ? getter.getReturnType()
 					: TypeArguments.erasure(type);
-			ComponentInfo info = new ComponentInfo(fieldName, erasure);
+			ComponentInfo info = new ComponentInfo(fieldName, TypeArguments.resolve(type, erasure, bindings));
 			info.addMember(Role.GETTER, getter);
 			info.addMember(Role.SETTER, setter);
 
@@ -129,10 +126,6 @@ public class GetSetFinder implements ComponentFinder {
 			info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
 			// A fluent setter returns its object, or another the old value; either is dropped.
 			info.setWriteMethod(write.asType(MethodType.methodType(void.class, write.type().parameterType(0), erasure)));
-
-			if (type instanceof ParameterizedType parameterized) {
-				info.setParamType(parameterized);
-			}
 
 			getSetList.add(info);
 			members.put(info, new Member(getter.getDeclaringClass(), getter, setter));

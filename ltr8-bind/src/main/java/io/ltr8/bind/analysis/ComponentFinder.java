@@ -16,7 +16,10 @@
 package io.ltr8.bind.analysis;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 
@@ -25,6 +28,10 @@ import java.util.List;
  */
 public interface ComponentFinder {
 
-	void findComponents(Class<?> clss, Constructor<?> constructor, List<ComponentInfo> fields)
-			throws CodeAnalysisException;
+	/**
+	 * @param bindings each of {@code clss}'s type parameters bound to the argument it is described at, as {@link
+	 *        TypeArguments#described} gives them
+	 */
+	void findComponents(Class<?> clss, Map<TypeVariable<?>, Type> bindings, Constructor<?> constructor,
+			List<ComponentInfo> fields) throws CodeAnalysisException;
 }

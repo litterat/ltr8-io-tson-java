@@ -254,24 +254,24 @@ public class DefaultRecordBinder {
 
 		// get the constructor.
 		Constructor<?> ctor = getConstructor(targetClass, context.profile().orElse(null));
+		Map<TypeVariable<?>, Type> bindings = TypeArguments.described(targetClass, parameterizedType);
 
 		if (targetClass.isRecord()) {
 			// A genuine Java record's components come straight from the JDK's own
 			// RecordComponent API -- authoritative, no guessing needed, and a record can't have
 			// setters, so there's nothing for GetSetFinder to add.
-			new RecordComponentFinder().findComponents(targetClass, ctor, components);
+			new RecordComponentFinder().findComponents(targetClass, bindings, ctor, components);
 		} else {
 			// A hand-written tuple class (identified by @Record, DefaultClassBinder.isRecord()).
 			// ImmutableFinder recovers constructor-set (immutable) fields via bytecode analysis;
 			// GetSetFinder then adds any additional mutable getter/setter fields on top -- a
 			// single class can mix both (see MixedImmutable in ltr8-bind's own tests).
-			new ImmutableFinder().findComponents(targetClass, ctor, components);
-			new GetSetFinder().findComponents(targetClass, ctor, components);
+			new ImmutableFinder().findComponents(targetClass, bindings, ctor, components);
+			new GetSetFinder().findComponents(targetClass, bindings, ctor, components);
 			receiveTargetClass(targetClass, components);
 		}
 		ComponentAnnotations.read(components);
 
-		TypeArguments.substitute(targetClass, parameterizedType, components);
 		refuseSharedNames(targetClass, components);
 
 		// Modify the order of fields if order annotation supplied.
@@ -472,7 +472,7 @@ public class DefaultRecordBinder {
 			component = resolveAnnotationsCarrierField(targetClass, info, index);
 		} else if (bridge != null) {
 			component = resolveBridgeField(context, targetClass, info, bridge, index);
-		} else if (info.getType() == Optional.class && info.getParamType() != null) {
+		} else if (optionalArgument(info) != null) {
 			// If the input is Optional wrap the isPresent
 			component = resolveOptionalField(context, targetClass, info, index);
 		} else if (info.getType() == OptionalInt.class
@@ -522,8 +522,7 @@ public class DefaultRecordBinder {
 	 */
 	private DataClassField resolveSimpleField(DataBindContext context, Class<?> targetClass, ComponentInfo info, int index)
 			throws DataBindException, NoSuchMethodException, IllegalAccessException {
-		Supplier<DataClass> dataClass = context.componentSource(info.getType(),
-				(info.getParamType() != null ? info.getParamType() : info.getType()));
+		Supplier<DataClass> dataClass = context.componentSource(info.getType(), info.getGenericType());
 
 		MethodHandle accessor = accessor(info);
 		MethodHandle setter = setter(info);
@@ -765,6 +764,12 @@ public class DefaultRecordBinder {
 		return type instanceof ParameterizedType parameterized ? (Class<?>) parameterized.getRawType() : (Class<?>) type;
 	}
 
+	/** The argument of {@code info}'s {@code Optional} type, or null where its type is no parameterized Optional. */
+	private static Type optionalArgument(ComponentInfo info) {
+		return info.getGenericType() instanceof ParameterizedType optional && optional.getRawType() == Optional.class
+				? optional.getActualTypeArguments()[0] : null;
+	}
+
 	private DataClassField resolveOptionalField(DataBindContext context, Class<?> targetClass, ComponentInfo info,
 			int index) throws DataBindException, NoSuchMethodException, IllegalAccessException {
 
@@ -777,7 +782,7 @@ public class DefaultRecordBinder {
 		// optional collection field takes when an empty collection cannot stand for absence (a schema
 		// field whose type carries min_items: 1). The raw type is what the method handles are typed
 		// against; the full type is what the component is resolved from, so the element type survives.
-		Type optionalArgument = info.getParamType().getActualTypeArguments()[0];
+		Type optionalArgument = optionalArgument(info);
 		Class<?> optionalType = rawTypeOf(optionalArgument);
 
 		Supplier<DataClass> dataClass = context.componentSource(optionalType, optionalArgument);
@@ -1176,12 +1181,12 @@ public class DefaultRecordBinder {
 			// (values[]):fieldType -> bridge.toObject( (bridgeData) values[inputIndex] )
 			arrayIndexGetter = MethodHandles.collectArguments(bridge.toObject(), 0, arrayIndexGetter);
 
-		} else if (field.getType() == Optional.class && field.getParamType() != null) {
+		} else if (optionalArgument(field) != null) {
 
 			// The method handles are typed against the raw class, so an Optional whose own argument is
 			// parameterized -- Optional<List<X>> -- erases to the collection interface here. Only the
 			// component resolution needs the full type, and that happened in resolveOptionalField.
-			Class<?> optionalType = rawTypeOf(field.getParamType().getActualTypeArguments()[0]);
+			Class<?> optionalType = rawTypeOf(optionalArgument(field));
 
 			// (values[]) -> values[inputIndex]:optionalType
 			arrayIndexGetter = MethodHandles.collectArguments(arrayGetter, 1, index)

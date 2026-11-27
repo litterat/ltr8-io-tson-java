@@ -23,9 +23,9 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,8 +39,8 @@ import java.util.Map;
 public class RecordComponentFinder implements ComponentFinder {
 
     @Override
-    public void findComponents(Class<?> clss, Constructor<?> constructor, List<ComponentInfo> fields)
-            throws CodeAnalysisException {
+    public void findComponents(Class<?> clss, Map<TypeVariable<?>, Type> bindings, Constructor<?> constructor,
+            List<ComponentInfo> fields) throws CodeAnalysisException {
 
         RecordComponent[] components = clss.getRecordComponents();
         if (components == null) {
@@ -52,7 +52,7 @@ public class RecordComponentFinder implements ComponentFinder {
             // list is no longer the shape being bound -- it describes the whole class, where this constructor
             // takes a subset. The parameters decide, and each one is matched back to the component of that
             // name for its accessor and type. See findProfiledComponents.
-            findProfiledComponents(clss, constructor, components, fields);
+            findProfiledComponents(clss, bindings, constructor, components, fields);
             return;
         }
 
@@ -62,7 +62,7 @@ public class RecordComponentFinder implements ComponentFinder {
             RecordComponent component = components[x];
             Method accessor = component.getAccessor();
 
-            ComponentInfo info = new ComponentInfo(component.getName(), component.getType());
+            ComponentInfo info = new ComponentInfo(component.getName(), type(component, bindings));
             info.setConstructorArgument(x);
 
             try {
@@ -71,11 +71,6 @@ public class RecordComponentFinder implements ComponentFinder {
                 throw new CodeAnalysisException(String.format(
                         "Failed to access accessor for record component '%s' on '%s'", component.getName(),
                         clss.getName()), e);
-            }
-
-            Type genericType = component.getGenericType();
-            if (genericType instanceof ParameterizedType parameterizedType) {
-                info.setParamType(parameterizedType);
             }
 
             info.addMember(Role.RECORD_COMPONENT, component);
@@ -122,8 +117,9 @@ public class RecordComponentFinder implements ComponentFinder {
      * <p>Components the constructor omits are simply not part of this profile's shape. That is the feature:
      * a class serving an older schema version binds the fields that version had, and fills the rest itself.
      */
-    private static void findProfiledComponents(Class<?> clss, Constructor<?> constructor,
-            RecordComponent[] components, List<ComponentInfo> fields) throws CodeAnalysisException {
+    private static void findProfiledComponents(Class<?> clss, Map<TypeVariable<?>, Type> bindings,
+            Constructor<?> constructor, RecordComponent[] components, List<ComponentInfo> fields)
+            throws CodeAnalysisException {
         MethodHandles.Lookup lookup = MethodHandles.publicLookup();
         Profile profile = constructor.getAnnotation(Profile.class);
         String[] declared = profile == null ? new String[0] : profile.fields();
@@ -152,7 +148,7 @@ public class RecordComponentFinder implements ComponentFinder {
                                 + "%s: a constructor parameter takes its component's type", x, clss.getName(),
                         parameters[x].getType().getTypeName(), name, component.getType().getTypeName()));
             }
-            ComponentInfo info = new ComponentInfo(name, component.getType());
+            ComponentInfo info = new ComponentInfo(name, type(component, bindings));
             info.setConstructorArgument(x);
             try {
                 info.setReadMethod(lookup.unreflect(component.getAccessor()));
@@ -160,14 +156,15 @@ public class RecordComponentFinder implements ComponentFinder {
                 throw new CodeAnalysisException(String.format(
                         "Failed to access accessor for record component '%s' on '%s'", name, clss.getName()), e);
             }
-            if (component.getGenericType() instanceof ParameterizedType parameterizedType) {
-                info.setParamType(parameterizedType);
-            }
             info.addMember(Role.PROFILED_PARAMETER, parameters[x]);
             info.addMember(Role.RECORD_COMPONENT, component);
             info.addMember(Role.PROFILED_ACCESSOR, component.getAccessor());
             fields.add(info);
         }
+    }
+
+    private static Type type(RecordComponent component, Map<TypeVariable<?>, Type> bindings) {
+        return TypeArguments.resolve(component.getGenericType(), component.getType(), bindings);
     }
 
     private static String nameOf(Class<?> clss, Parameter parameter, String[] declared, int index)
