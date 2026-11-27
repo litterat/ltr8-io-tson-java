@@ -117,6 +117,22 @@ public final class MapperShapes {
 	public record ListOfOpenBranch(List<OpenBranchUnion> shapes) {
 	}
 
+	/** A union whose members include ones with a field named {@code type}, the key {@code MapMapper} tags with. */
+	public sealed interface Labelled permits Tagged, Renamed, Untagged {
+	}
+
+	public record Tagged(String type, int size) implements Labelled {
+	}
+
+	public record Renamed(@Field("type") String kind) implements Labelled {
+	}
+
+	public record Untagged(int size) implements Labelled {
+	}
+
+	public record ListOfLabelled(List<Labelled> items) {
+	}
+
 	public record Required(int count, @Field(required = true) String name, Optional<String> note, String label) {
 	}
 

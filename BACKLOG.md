@@ -526,9 +526,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `@Profile` are each dropped. Read each annotation from every member of a component, taking each `@Field`
   attribute from whichever member states it and refusing two members that state one differently, with a test of
   each annotation on each member of each class kind.
-- [ ] **`MapMapper` tags a union value with the key `type`, which a member may use.** A member record with a field
-  named `type` writes it under the same key as the tag. Read, not run. Reproduce it and keep the two apart, with a
-  round trip of such a member.
 - [ ] **A shared `ArrayMapper` is not thread-safe.** Its function cache, and the per-instance maps of its union
   bridges, are plain `HashMap`s written during a read or a write. Read, not run. Make them safe to share, as
   `DataBindContext`'s own cache is.

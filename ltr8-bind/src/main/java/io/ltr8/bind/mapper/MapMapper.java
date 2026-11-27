@@ -37,22 +37,27 @@ import java.util.Objects;
 
 /**
  * Sample showing how to use the library to convert an Object to/from {@code Map<String, Object>}. Each key
- * in the returned map has the name of the field. Union types have an extra field called "type" which
- * provides the class name of the type of value recorded. A {@code @Tuple} record is an array of its elements, in
- * order, as a list is an array of its elements, each in this form. A map component is a map of its keys and values,
- * each in this form, in the order the component's map iterates in. An annotated value, an {@code AnnotatedMap}'s key
- * among them, is its value in this form: the form has no place for annotations, so it reads back without them. For
- * the same reason a record's {@code Annotations} carrier has no key, and reads back holding none.
+ * in the returned map has the name of the field. A {@code @Tuple} record is an array of its elements, in order, as a
+ * list is an array of its elements, each in this form. A map component is a map of its keys and values, each in this
+ * form, in the order the component's map iterates in. An annotated value, an {@code AnnotatedMap}'s key among them,
+ * is its value in this form: the form has no place for annotations, so it reads back without them. For the same
+ * reason a record's {@code Annotations} carrier has no key, and reads back holding none.
  * <p>
- * A read refuses a union value whose class name names a class that cannot be a member before that class is
- * initialised or described: a class the union lists can be, and so can a class of the union's type where the union
- * admits additions.
+ * A union value is its member's map with one more key, "type", holding the member's class name. A member with a field
+ * of its own named "type" is instead a map of "type", holding its class name, and "value", holding its map, so that
+ * neither the tag nor the field takes the other's place. A read refuses a class name of a class that cannot be a
+ * member before that class is initialised or described: a class the union lists can be, and so can a class of the
+ * union's type where the union admits additions.
  * <p>
  * A read or a write missing a required field, or a tuple's read of an array of the wrong length or missing a
  * primitive element, throws the {@link DataBindException} that says so, however deep the value sits: no enclosing
  * record, list, map or union wraps it.
  */
 public class MapMapper {
+
+	private static final String TAG = "type";
+
+	private static final String VALUE = "value";
 
 	private final DataBindContext context;
 
@@ -158,7 +163,14 @@ public class MapMapper {
 
                         // Using the full class name here as an example. A better/more complete implementation
                         // would use a schema based name.
-                        baseMap.put("type", object.getClass().getName());
+                        if (holdsTag(unionInstanceClass)) {
+                            Map<String, Object> tagged = new HashMap<>();
+                            tagged.put(TAG, object.getClass().getName());
+                            tagged.put(VALUE, baseMap);
+                            v = tagged;
+                        } else {
+                            baseMap.put(TAG, object.getClass().getName());
+                        }
                     }
                 }
                 case null, default -> throw new IllegalArgumentException("Unknown data class");
@@ -261,16 +273,21 @@ public class MapMapper {
 
                         Map<String, Object> map = (Map<String, Object>) data;
 
-                        // A tagged union uses "type" for the class name.
-                        String type = (String) map.get("type");
-
-                        DataClass instantType = context.getDescriptor(Checks.candidate(unionClass, type));
-                        if (!unionClass.isMemberType(instantType.typeClass())) {
+                        DataClass member = context.getDescriptor(Checks.candidate(unionClass, (String) map.get(TAG)));
+                        if (!unionClass.isMemberType(member.typeClass())) {
                             throw new DataBindException(String.format("instance type '%s' not of expected union type '%s'",
-                                    instantType.typeClass().getName(), unionClass.typeClass().getName()));
+                                    member.typeClass().getName(), unionClass.typeClass().getName()));
                         }
-
-                        v = toObject(instantType, data);
+                        Object fields = data;
+                        if (holdsTag(member)) {
+                            fields = map.get(VALUE);
+                            if (!(fields instanceof Map)) {
+                                throw new DataBindException(String.format("%s has a field named '%s', the key a union "
+                                        + "value's class name takes, so a union value of it holds its fields in a map "
+                                        + "under '%s'", member.typeClass().getName(), TAG, VALUE));
+                            }
+                        }
+                        v = toObject(member, fields);
                     } else {
                         DataClass unionType = context.getDescriptor(data.getClass());
 
@@ -300,5 +317,10 @@ public class MapMapper {
 
 	private Object partToObject(DataClass dataClass, Object part) throws DataBindException {
 		return part == null ? null : toObject(dataClass, part);
+	}
+
+	/** Whether {@code member} has a field the tag's key would take, which decides its union value's form. */
+	private static boolean holdsTag(DataClass member) {
+		return member instanceof DataClassRecord record && record.fieldIndex().containsKey(TAG);
 	}
 }
