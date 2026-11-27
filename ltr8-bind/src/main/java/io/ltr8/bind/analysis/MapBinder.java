@@ -29,14 +29,14 @@ import java.util.function.Supplier;
 
 /**
  * Resolves a {@link Map} target into a {@link DataClassMap}, the same role {@link
- * DefaultArrayBinder} plays for arrays/collections. Kept as a separate binder rather than folded
- * into {@link DefaultArrayBinder} because a map's shape is genuinely different -- keyed entries,
+ * ArrayBinder} plays for arrays/collections. Kept as a separate binder rather than folded
+ * into {@link ArrayBinder} because a map's shape is genuinely different -- keyed entries,
  * not a single sequential element type -- not because the resolution steps (parameterized-type
  * extraction, MethodHandle assembly) happen to look similar.
  */
-public class DefaultMapBinder {
+public class MapBinder {
 
-	public DefaultMapBinder() {
+	public MapBinder() {
 
 	}
 
@@ -47,7 +47,7 @@ public class DefaultMapBinder {
 		try {
 
 			// Type erasure means the key/value types are only available via the parameterized
-			// type, the same reason DefaultArrayBinder needs it for a Collection's element type.
+			// type, the same reason ArrayBinder needs it for a Collection's element type.
 			if (!(parameterizedType instanceof ParameterizedType)) {
 				throw new CodeAnalysisException("Map must provide parameterized type information");
 			}
@@ -65,7 +65,7 @@ public class DefaultMapBinder {
 			// key()/next()/value() are untouched. It is insertion-ordered without being a SequencedMap.
 			boolean annotated = AnnotatedMap.class.isAssignableFrom(targetClass);
 			descriptor = new DataClassMap(targetClass,
-					annotated ? DefaultClassBinder.boxed(keyDataClass) : keyDataClass, valueDataClass,
+					annotated ? ClassBinder.boxed(keyDataClass) : keyDataClass, valueDataClass,
 					annotated || mapBridge.insertionOrdered(),
 					mapBridge.constructor(), mapBridge.size(),
 					annotated ? mapBridge.annotatedIterator() : mapBridge.iterator(), mapBridge.next(),
@@ -135,7 +135,7 @@ public class DefaultMapBinder {
 		 */
 		public MethodHandle constructor() throws IllegalAccessException, NoSuchMethodException, CodeAnalysisException {
 			// If a field uses a non-specific interface type such as Map there's no way of
-			// knowing the implementation expected -- same limitation DefaultArrayBinder has for
+			// knowing the implementation expected -- same limitation ArrayBinder has for
 			// a bare List/Set field, and the same fallback: a default concrete type.
 			Class<?> implementationClass = mapInterfaces.getOrDefault(targetClass, targetClass);
 			// Its capacity constructor where it has one, and otherwise its no-argument constructor with the
@@ -182,7 +182,7 @@ public class DefaultMapBinder {
 		 * Returns a MethodHandle that advances the given entry-set iterator and returns the next
 		 * {@link Map.Entry}, or {@code null} once exhausted -- equivalent to
 		 * {@code iterator.hasNext() ? iterator.next() : null}. Two entries are never returned for
-		 * one advance the way {@link DefaultArrayBinder}'s single {@code get} does for an element;
+		 * one advance the way {@link ArrayBinder}'s single {@code get} does for an element;
 		 * a map entry carries a key *and* a value, so the caller extracts both from the one
 		 * returned entry via {@link #key()}/{@link #value()} instead.
 		 *

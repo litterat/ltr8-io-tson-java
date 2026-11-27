@@ -539,7 +539,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   JDK's `IllegalAccessException` text, which carries an identity hash (`…X.<init>[Ljava.lang.Object;@…`). Read, not
   run. Name the class and its constructor, keep the exception as the cause, and assert the whole message in
   `RecordRefusalTest`.
-- [ ] **A Java `sealed` type is described as a union that is not sealed.** `DefaultUnionBinder` builds its
+- [ ] **A Java `sealed` type is described as a union that is not sealed.** `UnionBinder` builds its
   `DataClassUnion` with `isSealed` false, whatever the hierarchy permits. Read, not run. Describe it as sealed
   where no permitted class is `non-sealed`, with a test that such a union admits no class it does not list.
 - [ ] **The two mappers are examples shipped as API.** `MapMapper` and `ArrayMapper` show two ways to walk the
@@ -553,19 +553,12 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   loop over `descriptor.fields()`, which holds no unbound component. Read, not run. Take the answer from the
   descriptor, or delete the sets if nothing reaches them, with a bind read of an `@Unbound` constructor parameter
   in each stack.
-- [ ] **The `Default` prefix on the seven binders names an alternative that does not exist.** `DefaultClassBinder`,
-  `DefaultRecordBinder`, `DefaultAtomBinder`, `DefaultArrayBinder`, `DefaultMapBinder`, `DefaultTupleBinder` and
-  `DefaultUnionBinder` implement no interface, and `DataBindContext` constructs its `DefaultClassBinder` itself, so
-  a context takes no other binder. Rename each to its bare name, as `TransparentBinder` and `ProtocolBinder` are,
-  with the comments that cite them in `tson-compiler`, `tson-schema`, `design/`, `ltr8-bind/README.md` and the
-  `tson-java` skill. `tson-compiler` has an `AtomBinder` of its own, in another package.
 - [ ] **Prose outside `ltr8-bind` states rules the binder has changed.** `FieldOrder`'s Javadoc (`ltr8-annotation`)
   says it has no effect on a `@Tuple`, a `@Transparent` class or one bridged through `ToData`, where it is refused.
-  `tson-schema/CLAUDE.md`, `skills/tson-java/references/bindings.md` and `IntegerType`'s Javadoc (`tson-schema`)
-  say a class with more than one public constructor needs `@Record` on the canonical one, which a Java record does
-  not; the last also cites `DefaultRecordBinder.getConstructor`, which is `RecordConstructors.getConstructor`. A
-  comment in `tson-compiler`'s `DataClassObjectReader` says a class joins its union as it is analysed, where it
-  joins once its component is cached. Correct each.
+  `tson-schema/CLAUDE.md`, `skills/tson-java/references/bindings.md` and `IntegerType`'s Javadoc (`tson-schema`) say a
+  class with more than one public constructor needs `@Record` on the canonical one, which a Java record does not. A
+  comment in `tson-compiler`'s `DataClassObjectReader` says a class joins its union as it is analysed, where it joins
+  once its component is cached. Correct each.
 
 ## Documentation
 

@@ -20,9 +20,9 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Supplier;
 
-public class DefaultArrayBinder {
+public class ArrayBinder {
 
-	public DefaultArrayBinder() {
+	public ArrayBinder() {
 
 	}
 

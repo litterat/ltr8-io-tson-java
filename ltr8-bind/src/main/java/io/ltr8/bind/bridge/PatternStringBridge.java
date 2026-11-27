@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  *
  * Bridge for java.util.regex.Pattern that converts to/from its source text (String). Not
  * auto-detected the way EnumStringBridge is for any Java enum -- Pattern has no equivalent
- * unambiguous JDK signal (no Class#isPattern()) for DefaultClassBinder to key off of -- so a
+ * unambiguous JDK signal (no Class#isPattern()) for ClassBinder to key off of -- so a
  * caller registers it explicitly, e.g. context.registerAtom(Pattern.class, new
  * PatternStringBridge()), the same override mechanism every auto-detected type already exposes.
  *

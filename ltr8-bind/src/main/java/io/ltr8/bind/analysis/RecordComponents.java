@@ -53,7 +53,7 @@ final class RecordComponents {
 			// setters, so there's nothing for GetSetFinder to add.
 			new RecordComponentFinder().findComponents(targetClass, bindings, ctor, components);
 		} else {
-			// A hand-written tuple class (identified by @Record, DefaultClassBinder.isRecord()).
+			// A hand-written tuple class (identified by @Record, ClassBinder.isRecord()).
 			// ImmutableFinder recovers constructor-set (immutable) fields via bytecode analysis;
 			// GetSetFinder then adds any additional mutable getter/setter fields on top -- a
 			// single class can mix both (see MixedImmutable in ltr8-bind's own tests).

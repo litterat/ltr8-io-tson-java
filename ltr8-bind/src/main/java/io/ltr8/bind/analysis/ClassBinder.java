@@ -29,28 +29,28 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.function.Supplier;
 
-public class DefaultClassBinder {
+public class ClassBinder {
 
 
 	// private final TypeContextNameBinder nameBinder;
 
-	private final DefaultRecordBinder recordBinder;
-	private final DefaultAtomBinder atomBinder;
-	private final DefaultUnionBinder unionBinder;
-	private final DefaultArrayBinder arrayBinder;
-	private final DefaultMapBinder mapBinder;
-	private final DefaultTupleBinder tupleBinder;
+	private final RecordBinder recordBinder;
+	private final AtomBinder atomBinder;
+	private final UnionBinder unionBinder;
+	private final ArrayBinder arrayBinder;
+	private final MapBinder mapBinder;
+	private final TupleBinder tupleBinder;
 	private final TransparentBinder transparentBinder;
 
 
-	public DefaultClassBinder() {
+	public ClassBinder() {
 
-		recordBinder = new DefaultRecordBinder();
-		atomBinder = new DefaultAtomBinder();
-		unionBinder = new DefaultUnionBinder();
-		arrayBinder = new DefaultArrayBinder();
-		mapBinder = new DefaultMapBinder();
-		tupleBinder = new DefaultTupleBinder();
+		recordBinder = new RecordBinder();
+		atomBinder = new AtomBinder();
+		unionBinder = new UnionBinder();
+		arrayBinder = new ArrayBinder();
+		mapBinder = new MapBinder();
+		tupleBinder = new TupleBinder();
 		transparentBinder = new TransparentBinder();
 	}
 
@@ -112,7 +112,7 @@ public class DefaultClassBinder {
 	 *
 	 * <p><b>What makes an atom an atom is a bridge to a type the wire can carry</b>, and the two routes a
 	 * class has for stating one are the two consulted here: a plain Java enum, whose representation is
-	 * settled by {@link DefaultAtomBinder#resolveEnum}, and {@code @Atom} on a constructor or static
+	 * settled by {@link AtomBinder#resolveEnum}, and {@code @Atom} on a constructor or static
 	 * factory. Both end in a {@link DataClassBridge} naming the wire type and the crossing back.
 	 *
 	 * <p>Exposed for {@code DataBindContext.registerAtom}, so that registering a class as an atom finds the
@@ -120,7 +120,7 @@ public class DefaultClassBinder {
 	 * cannot serve that: it dispatches on shape, so a record carrying {@code @Atom} is claimed by
 	 * {@code isRecord} before {@code isAtom} is ever asked.
 	 *
-	 * <p>A primitive is not asked -- {@link DefaultAtomBinder} refuses one outright, on the grounds that
+	 * <p>A primitive is not asked -- {@link AtomBinder} refuses one outright, on the grounds that
 	 * reaching it means the primitives were never registered.
 	 */
 	public DataClassAtom atomForm(DataBindContext context, Class<?> targetClass) throws CodeAnalysisException {

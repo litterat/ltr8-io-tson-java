@@ -731,7 +731,7 @@ public final class DataClassObjectReader {
      * binder mangles to a class name that does not exist ({@code sq} to {@code Sq}), and every casing the
      * mangle does not produce, the scan being case-insensitive where {@code Class.forName} is not.
      *
-     * <p><b>Only one union shape has unlisted members at all</b> ({@code DefaultUnionBinder}): a sealed type
+     * <p><b>Only one union shape has unlisted members at all</b> ({@code UnionBinder}): a sealed type
      * lists its permitted subclasses and {@code @Union({...})} lists its argument, both complete at
      * analysis. It is {@code @Union} with no value on a non-sealed type that starts empty and grows, so
      * discovery is narrow -- and it is also the only shape that had the ordering bug it fixes.
@@ -781,7 +781,7 @@ public final class DataClassObjectReader {
      * before this the list only ever grew as a side effect of something else in the process, and the same
      * document bound or failed depending on whether anything had written that member first.
      *
-     * <p>Resolving the descriptor is what registers it -- {@code DefaultRecordBinder} adds a class to its
+     * <p>Resolving the descriptor is what registers it -- {@code RecordBinder} adds a class to its
      * union's members as it analyses it -- so {@link DataClassUnion#isMemberType} is asked afterwards and
      * answers about a list that now holds the candidate. It still answers {@code false} for a class the
      * union does not admit, which is the case this must not turn into a bind.

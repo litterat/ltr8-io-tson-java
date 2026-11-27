@@ -35,7 +35,7 @@ import io.ltr8.test.data.NestedSealedRecord.Shape;
 import io.ltr8.test.data.NestedSealedRecord.ShapeList;
 
 /**
- * Proves {@code DefaultUnionBinder} recurses into a permitted subclass that is itself sealed,
+ * Proves {@code UnionBinder} recurses into a permitted subclass that is itself sealed,
  * rather than keeping it as an unusable "member" -- {@code Shape permits DirectPoint, Branch} and
  * {@code Branch permits LeafA, LeafB} must resolve to a flat three-member union
  * ({@code DirectPoint}/{@code LeafA}/{@code LeafB}), with {@code Branch} itself never appearing.

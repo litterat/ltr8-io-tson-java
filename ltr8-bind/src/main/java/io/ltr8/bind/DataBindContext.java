@@ -16,8 +16,8 @@
 package io.ltr8.bind;
 
 import io.ltr8.annotation.DataBridge;
-import io.ltr8.bind.analysis.DefaultClassBinder;
-import io.ltr8.bind.analysis.DefaultRecordBinder;
+import io.ltr8.bind.analysis.ClassBinder;
+import io.ltr8.bind.analysis.RecordBinder;
 import io.ltr8.bind.analysis.ProtocolBinder;
 
 import java.lang.invoke.MethodHandle;
@@ -141,7 +141,7 @@ public class DataBindContext {
 	}
 
 	// default resolver
-	private final DefaultClassBinder dataClassResolver;
+	private final ClassBinder dataClassResolver;
 
 	// resolves a bare type name (e.g. a schema's own type name) to the Class getDescriptor(String) builds against
 	private final DataNameBinder nameBinder;
@@ -273,7 +273,7 @@ public class DataBindContext {
 		this.allowSerializable = builder.allowSerializable;
 		this.atoms = List.copyOf(builder.atoms);
 
-		this.dataClassResolver = new DefaultClassBinder();
+		this.dataClassResolver = new ClassBinder();
 		this.profile = builder.profile;
 		this.nameBinder = builder.nameBinder != null ? builder.nameBinder
 				: new DataNameBinder.DefaultDataNameBinder(builder.nameBinderPackages, builder.nameBinderAliases);
@@ -424,9 +424,9 @@ public class DataBindContext {
 		Map<Type, DataClass> members = resolving.release(mark);
 		// Joined only now the component has resolved whole, so a refused class is never a union's member; and
 		// before it is cached, so the class of every cached descriptor already is.
-		DefaultRecordBinder.joinUnions(this, resolved);
+		RecordBinder.joinUnions(this, resolved);
 		for (DataClass member : members.values()) {
-			DefaultRecordBinder.joinUnions(this, member);
+			RecordBinder.joinUnions(this, member);
 		}
 		DataClass published = publish(parameterizedType, resolved, members);
 		return published != null ? published : getDescriptor(targetClass, parameterizedType);
@@ -627,7 +627,7 @@ public class DataBindContext {
 	 */
 	/**
 	 * The core scalars, registered as themselves: a {@code String} or an {@code int} <em>is</em> a wire
-	 * value, so there is nothing to bridge and nothing to analyse -- {@link DefaultClassBinder#atomForm}
+	 * value, so there is nothing to bridge and nothing to analyse -- {@link ClassBinder#atomForm}
 	 * would refuse a primitive in any case.
 	 */
 	private void registerCoreAtom(Class<?> targetClass) throws DataBindException {

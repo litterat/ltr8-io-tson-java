@@ -15,21 +15,21 @@ import java.util.function.Supplier;
 
 /**
  * Resolves an {@code @Tuple}-annotated genuine Java {@code record} into a {@link DataClassTuple}.
- * Deliberately narrower than {@link DefaultRecordBinder}: no setters, no {@code Optional}
+ * Deliberately narrower than {@link RecordBinder}: no setters, no {@code Optional}
  * unwrapping, no bridges, no unions -- a record used as a tuple always has exactly its canonical
  * constructor and its {@link RecordComponent}s, so there's nothing here that {@link
  * RecordComponentFinder}'s fuller {@code ComponentInfo}/{@code DataClassField} machinery would add
  * beyond what {@code Class#getRecordComponents()} already gives directly.
  */
-public class DefaultTupleBinder {
+public class TupleBinder {
 
-	public DefaultTupleBinder() {
+	public TupleBinder() {
 
 	}
 
 	public DataClassTuple resolveTuple(DataBindContext context, Class<?> targetClass) throws DataBindException {
 		if (!targetClass.isRecord()) {
-			// @Tuple only targets ElementType.TYPE, so DefaultClassBinder only reaches here for
+			// @Tuple only targets ElementType.TYPE, so ClassBinder only reaches here for
 			// classes actually carrying the annotation -- this is a misuse guard, not a routing
 			// check: only a genuine Java record has record components / a canonical constructor
 			// to resolve positionally in the first place.

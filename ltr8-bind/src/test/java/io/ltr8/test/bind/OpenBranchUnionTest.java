@@ -36,7 +36,7 @@ import io.ltr8.test.data.union.OpenBranchUnionSquare;
  * A sealed union with a <b>non-sealed branch</b> -- the one union shape the rest of this suite does not
  * cover, and the one where membership by exact class gives the wrong answer.
  *
- * <p>{@code DefaultUnionBinder} flattens a sealed hierarchy to its leaves but keeps a non-sealed permitted
+ * <p>{@code UnionBinder} flattens a sealed hierarchy to its leaves but keeps a non-sealed permitted
  * type as a member in its own right, because its implementations cannot be known at analysis time; that is
  * also why the resulting union is built extensible ({@code isSealed == false}) and why
  * {@link DataClassUnion#addMemberType} exists. What was missing was the join: nothing resolved an
