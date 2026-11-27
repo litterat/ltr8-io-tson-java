@@ -517,9 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A map component typed `AnnotatedMap` is untested in both mappers.** `DefaultMapBinder` iterates its entries
-  as boxes, so the map write may carry the box and not the key. Read, not run. Round-trip one through both mappers
-  and carry the key.
 - [ ] **`@Field` on the setter of a constructor component is dropped.** For a class whose constructor binds `name`
   and which also declares `@Field("label") setName`, `GetSetFinder`'s merge carries the write method across and not
   the annotation, so the write gives `{name=n}`. Read the annotation from every member of a component, with a test

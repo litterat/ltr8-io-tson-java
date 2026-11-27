@@ -15,9 +15,11 @@
  */
 package io.ltr8.bind.mapper;
 
+import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
@@ -35,7 +37,8 @@ import java.util.Objects;
  * Sample showing how to use the library to convert an Object to/from {@code Map<String, Object>}. Each key
  * in the returned map has the name of the field. Union types have an extra field called "type" which
  * provides the class name of the type of value recorded. A map component is a map of its keys and values, each in
- * this form, in the order the component's map iterates in.
+ * this form, in the order the component's map iterates in. An annotated value, an {@code AnnotatedMap}'s key among
+ * them, is its value in this form: the form has no place for annotations, so it reads back without them.
  * <p>
  * A read missing a required field throws the {@link DataBindException} that names the record and the field,
  * however deep the record sits: no enclosing record, list, map or union wraps it.
@@ -72,6 +75,9 @@ public class MapMapper {
             switch (dataClass) {
                 case DataClassAtom dataAtom -> {
                     v = object;
+                }
+                case DataClassAnnotated annotated -> {
+                    v = partToMap(annotated.valueClass(), annotated.value().invoke(object));
                 }
                 case DataClassRecord dataRecord -> {
                     //Object data = dataRecord.toData().invoke(object);
@@ -160,6 +166,10 @@ public class MapMapper {
 
                 case DataClassAtom dataClassAtom -> {
                     v = data;
+                }
+                case DataClassAnnotated annotated -> {
+                    v = annotated.constructor().invoke(partToObject(annotated.valueClass(), data),
+                            Annotations.empty());
                 }
                 case DataClassRecord dataRecord -> {
                     Map<String, Object> map = (Map<String, Object>) data;

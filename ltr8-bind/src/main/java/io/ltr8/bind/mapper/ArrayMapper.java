@@ -15,9 +15,11 @@
  */
 package io.ltr8.bind.mapper;
 
+import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
@@ -40,7 +42,9 @@ import java.util.Objects;
  * for each type. This is the method likely to be used by serialization libraries to improve
  * performance.
  * <p>
- * A map is an array of {@code [key, value]} entries, each part in this form, in the order the map iterates in.
+ * A map is an array of {@code [key, value]} entries, each part in this form, in the order the map iterates in. An
+ * annotated value, an {@code AnnotatedMap}'s key among them, is its value in this form: the form has no place for
+ * annotations, so it reads back without them.
  * <p>
  * A read refused for a record's own shape -- its array's length, or a required field's absence -- throws the
  * {@link DataBindException} that says so, however deep the record sits: no enclosing list, map or union wraps it.
@@ -172,6 +176,14 @@ public class ArrayMapper {
 				// ( Object ):dataObject
 				//result = result.asType(result.type().changeParameterType(0, Object.class));
 			}
+            case DataClassAnnotated annotated -> {
+                // (Object):box -> box(part(toObject, value), no annotations)
+                MethodHandle valueToObject = MethodHandles.insertArguments(PART, 0, createToObjectFunction(
+                        annotated.valueClass()).asType(MethodType.methodType(Object.class, Object.class)));
+                result = MethodHandles.filterArguments(
+                        MethodHandles.insertArguments(annotated.constructor(), 1, Annotations.empty()), 0,
+                        valueToObject);
+            }
             case DataClassRecord dataClassRecord -> {
 
 				// (Object[]):typeClass -> new TypeClass( params );
@@ -321,6 +333,12 @@ public class ArrayMapper {
 			case DataClassAtom dataClassAtom -> {
 				// (typeClass):typeClass
 				toDataMethod = MethodHandles.identity(dataClass.dataClass());
+			}
+			case DataClassAnnotated annotated -> {
+				// (box):Object -> part(toData, box.value())
+				toDataMethod = MethodHandles.filterReturnValue(annotated.value(),
+						MethodHandles.insertArguments(PART, 0, createToDataFunction(annotated.valueClass())
+								.asType(MethodType.methodType(Object.class, Object.class))));
 			}
             case DataClassRecord dataClassRecord -> {
 
