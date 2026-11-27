@@ -24,6 +24,7 @@ import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.MapperShapes.HoldsRequired;
 import io.ltr8.test.data.MapperShapes.ListOfRequired;
 import io.ltr8.test.data.MapperShapes.ListOfTriples;
+import io.ltr8.test.data.MapperShapes.MapOfRequired;
 import io.ltr8.test.data.MapperShapes.Required;
 import io.ltr8.test.data.MapperShapes.Triple;
 import org.junit.jupiter.api.Test;
@@ -36,13 +37,14 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * A read missing a value for a required field -- a primitive, or a reference marked {@code @Field(required =
- * true)} -- is refused naming the class and the field, however deep the record sits; an optional or nullable
- * field beside it reads as absent.
+ * true)} -- is refused naming the class and the field, however deep the record sits, and so is a write of a null
+ * required reference; an optional or nullable field beside it reads and writes as absent.
  */
 class MissingRequiredFieldMapperTest {
 
@@ -102,6 +104,31 @@ class MissingRequiredFieldMapperTest {
 						new Object[] { "i", new Object[] { 1, null, "x", "l" } })),
 				refused(COUNT, () -> arrays.toObject(ListOfRequired.class,
 						new Object[] { new Object[] { new Object[] { null, "n", null, null } } })));
+	}
+
+	/** A value that would read back refused is refused on the way out too, in the read's words. */
+	@Test
+	void aWriteOfANullRequiredReferenceIsRefused() {
+		Required unnamed = new Required(1, null, Optional.of("x"), "l");
+		assertAll(
+				refused(NAME, () -> maps.toMap(unnamed)),
+				refused(NAME, () -> maps.toMap(new HoldsRequired("i", unnamed))),
+				refused(NAME, () -> maps.toMap(new ListOfRequired(List.of(new Required(1, "n", Optional.empty(), null),
+						unnamed)))),
+				refused(NAME, () -> maps.toMap(new MapOfRequired(Map.of("k", unnamed)))),
+				refused(NAME, () -> arrays.toArray(unnamed)),
+				refused(NAME, () -> arrays.toArray(new HoldsRequired("i", unnamed))),
+				refused(NAME, () -> arrays.toArray(new ListOfRequired(List.of(unnamed)))),
+				refused(NAME, () -> arrays.toArray(new MapOfRequired(Map.of("k", unnamed)))));
+	}
+
+	/** A primitive always has a value, and an absent {@code Optional} or a null nullable field is not required. */
+	@Test
+	void aWriteWithEveryRequiredFieldWritesTheOthersAsAbsent() {
+		Required required = new Required(1, "n", Optional.empty(), null);
+		assertAll(
+				() -> assertEquals(Map.of("count", 1, "name", "n"), maps.toMap(required)),
+				() -> assertArrayEquals(new Object[] { 1, "n", null, null }, arrays.toArray(required)));
 	}
 
 	/** {@link ArrayMapperArityTest}'s refusal reaches the caller as it is from a record inside a list too. */

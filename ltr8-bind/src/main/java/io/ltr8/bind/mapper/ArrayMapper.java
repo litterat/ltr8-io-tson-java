@@ -23,17 +23,19 @@ import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
+import io.ltr8.bind.DataClassElement;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Sample showing how to use the Litterat bind library to convert an Object to/from Object[]
@@ -42,12 +44,19 @@ import java.util.Objects;
  * for each type. This is the method likely to be used by serialization libraries to improve
  * performance.
  * <p>
- * A map is an array of {@code [key, value]} entries, each part in this form, in the order the map iterates in. An
- * annotated value, an {@code AnnotatedMap}'s key among them, is its value in this form: the form has no place for
- * annotations, so it reads back without them.
+ * A record and a {@code @Tuple} record are each an array of their values, one per field or element in order, each
+ * in this form. A map is an array of {@code [key, value]} entries, each part in this form, in the order the map
+ * iterates in. An annotated value, an {@code AnnotatedMap}'s key among them, is its value in this form: the form has
+ * no place for annotations, so it reads back without them. For the same reason a record's {@code Annotations}
+ * carrier takes no place in its array, and reads back holding none.
  * <p>
- * A read refused for a record's own shape -- its array's length, or a required field's absence -- throws the
- * {@link DataBindException} that says so, however deep the record sits: no enclosing list, map or union wraps it.
+ * A union value is a {@code [name, value]} pair of its class's name and its value in this form. A read refuses a name
+ * of a class that cannot be a member before that class is initialised or described: a class the union lists can be,
+ * and so can a class of the union's type where the union admits additions.
+ * <p>
+ * A read refused for a record's or a tuple's own shape -- its array's length, or the absence of a required field or
+ * a primitive element -- and a write of a record holding no value for a required field, throw the
+ * {@link DataBindException} that says so, however deep the value sits: no enclosing list, map or union wraps it.
  *
  * <ul>
  * <li>TODO add try/catch/throw around conversions
@@ -61,10 +70,14 @@ public class ArrayMapper {
 
 	private static final MethodHandle PART;
 
+	private static final MethodHandle ABSENT;
+
 	static {
 		try {
 			CHECKED = MethodHandles.lookup().findStatic(ArrayMapper.class, "checked",
 					MethodType.methodType(Object[].class, DataClassRecord.class, Object[].class));
+			ABSENT = MethodHandles.lookup().findStatic(ArrayMapper.class, "absent",
+					MethodType.methodType(void.class, DataClassRecord.class, DataClassField.class));
 			PART = MethodHandles.lookup().findStatic(ArrayMapper.class, "part",
 					MethodType.methodType(Object.class, MethodHandle.class, Object.class));
 		} catch (NoSuchMethodException | IllegalAccessException e) {
@@ -92,10 +105,15 @@ public class ArrayMapper {
 
 	public ArrayMapper(DataBindContext context) {
 		this.context = context;
-		this.functionCache = new HashMap<>();
+		this.functionCache = new ConcurrentHashMap<>();
 
 	}
 
+	/**
+	 * A mapper may be shared by threads, so the cache is concurrent and a lost race keeps the winner's functions, as
+	 * {@link DataBindContext#getDescriptor(Class, java.lang.reflect.Type)} does. Built outside the map rather than in
+	 * {@code computeIfAbsent}, which would hold a lock for a walk of the whole type graph.
+	 */
 	private ArrayFunctions getFunctions(DataClass dataClass) throws DataBindException {
 		ArrayFunctions af = functionCache.get(dataClass);
 		if (af == null) {
@@ -103,8 +121,11 @@ public class ArrayMapper {
 			MethodHandle toArray = createToDataFunction(dataClass);
 			MethodHandle toObject = createToObjectFunction(dataClass);
 
-			af = new ArrayFunctions(toArray, toObject);
-			functionCache.put(dataClass, af);
+			ArrayFunctions built = new ArrayFunctions(toArray, toObject);
+			af = functionCache.putIfAbsent(dataClass, built);
+			if (af == null) {
+				af = built;
+			}
 		}
 		return af;
 	}
@@ -190,7 +211,11 @@ public class ArrayMapper {
                 result = dataClassRecord.constructor();
 
                 DataClassField[] fields = dataClassRecord.fields();
+                DataClassField carrier = dataClassRecord.annotationsCarrier().orElse(null);
                 for (int fieldIndex = 0; fieldIndex < dataClassRecord.fields().length; fieldIndex++) {
+                    if (fields[fieldIndex] == carrier) {
+                        continue;
+                    }
 					DataClass fieldDataClass = fields[fieldIndex].dataClass();
 
                     // (Object[],int) -> values[int]:Object
@@ -229,6 +254,21 @@ public class ArrayMapper {
 
                 result = MethodHandles.filterArguments(result, 0, CHECKED.bindTo(dataClassRecord));
                 result = result.asType(result.type().changeReturnType(dataClass.dataClass()));
+            }
+            case DataClassTuple tuple -> {
+                DataClassElement[] elements = tuple.elements();
+                MethodHandle[] elementsToObject = new MethodHandle[elements.length];
+                for (int x = 0; x < elements.length; x++) {
+                    elementsToObject[x] = createToObjectFunction(elements[x].dataClass());
+                }
+                try {
+                    result = MethodHandles.lookup().findVirtual(ArrayToTupleBridge.class, "toObject",
+                            MethodType.methodType(Object.class, Object[].class))
+                            .bindTo(new ArrayToTupleBridge(tuple, elementsToObject));
+                } catch (NoSuchMethodException | IllegalAccessException e) {
+                    throw new DataBindException("failed to build bridge for tuple", e);
+                }
+                result = result.asType(MethodType.methodType(tuple.typeClass(), Object.class));
             }
             case DataClassArray dataArrayClass -> {
 
@@ -295,23 +335,41 @@ public class ArrayMapper {
 	}
 
 	/**
-	 * A record's values line up with its fields by position, so an array of any other length leaves a field
-	 * without a value or a value without a field. A null is an absent value, which a required field refuses.
+	 * A record's values line up by position with its fields on the wire -- every field but the annotations
+	 * carrier, which the form has no place for -- so an array of any other length leaves a field without a value or
+	 * a value without a field. A null is an absent value, which a required field refuses. Returns the values at
+	 * their fields' indexes, the carrier holding no annotations, in a new array the fields are converted in: the
+	 * caller's array is left as it was.
 	 */
 	private static Object[] checked(DataClassRecord record, Object[] values) throws DataBindException {
 		DataClassField[] fields = record.fields();
-		if (values.length != fields.length) {
-			throw new DataBindException(String.format("%s has %d fields but the array has length %d",
-					record.typeClass().getName(), fields.length, values.length));
-		}
 		DataClassField carrier = record.annotationsCarrier().orElse(null);
-		for (int x = 0; x < fields.length; x++) {
-			if (values[x] == null && fields[x].isRequired() && fields[x] != carrier) {
-				throw new DataBindException(String.format("%s is missing its required field '%s'",
-						record.typeClass().getName(), fields[x].name()));
-			}
+		if (values.length != wireLength(record)) {
+			throw new DataBindException(String.format("%s has %d fields but the array has length %d",
+					record.typeClass().getName(), wireLength(record), values.length));
 		}
-		return values;
+		Object[] construct = new Object[fields.length];
+		for (int x = 0, position = 0; x < fields.length; x++) {
+			if (fields[x] == carrier) {
+				construct[x] = Annotations.empty();
+				continue;
+			}
+			Object value = values[position++];
+			if (value == null && fields[x].isRequired()) {
+				throw Checks.missingField(record, fields[x]);
+			}
+			construct[x] = value;
+		}
+		return construct;
+	}
+
+	private static int wireLength(DataClassRecord record) {
+		return record.fields().length - (record.annotationsCarrier().isPresent() ? 1 : 0);
+	}
+
+	/** A write of a record holding no value for a required field, which a read of what it wrote would refuse. */
+	private static void absent(DataClassRecord record, DataClassField field) throws DataBindException {
+		throw Checks.missingField(record, field);
 	}
 
 	/**
@@ -345,10 +403,10 @@ public class ArrayMapper {
                 // (int):Object[] -> new Object[int]
                 MethodHandle createArray = MethodHandles.arrayConstructor(Object[].class);
 
-                // (int):length -> fields.length
-                MethodHandle index = MethodHandles.constant(int.class, dataClassRecord.fields().length);
+                // (int):length -> wireLength
+                MethodHandle index = MethodHandles.constant(int.class, wireLength(dataClassRecord));
 
-                // ():Object[] -> new Object[fields.length]
+                // ():Object[] -> new Object[wireLength]
                 MethodHandle arrayCreate = MethodHandles.collectArguments(createArray, 0, index);
 
                 // (Object[],serialClass):void -> getters(Object[],serialClass)
@@ -357,8 +415,26 @@ public class ArrayMapper {
                 // (Object[],targetClass):void -> getters(Object[], project(targetClass))
                 //MethodHandle projectGetters = MethodHandles.collectArguments(getters, 1, dataClassRecord.toData());
 
-                // (Object):Object[] -> return getters(new Object[fields.length], serialiClass);
+                // (Object):Object[] -> return getters(new Object[wireLength], serialiClass);
                 toDataMethod = MethodHandles.collectArguments(getters, 0, arrayCreate);
+            }
+            case DataClassTuple tuple -> {
+                DataClassElement[] elements = tuple.elements();
+                MethodHandle[] elementsToData = new MethodHandle[elements.length];
+                for (int x = 0; x < elements.length; x++) {
+                    if (elements[x].dataClass().typeClass() == tuple.typeClass()) {
+                        throw new IllegalArgumentException("Recursive structures not yet supported for array mapper");
+                    }
+                    elementsToData[x] = createToDataFunction(elements[x].dataClass());
+                }
+                try {
+                    toDataMethod = MethodHandles.lookup().findVirtual(TupleToArrayBridge.class, "toData",
+                            MethodType.methodType(Object[].class, Object.class))
+                            .bindTo(new TupleToArrayBridge(tuple, elementsToData))
+                            .asType(MethodType.methodType(Object.class, tuple.typeClass()));
+                } catch (NoSuchMethodException | IllegalAccessException e) {
+                    throw new DataBindException("failed to build tuple bridge", e);
+                }
             }
             case DataClassArray dataClassArray -> {
 
@@ -440,16 +516,20 @@ public class ArrayMapper {
 		MethodHandle result = MethodHandles.dropArguments(identity, 1, dataClass.dataClass());
 
 		DataClassField[] fields = dataClass.fields();
+		DataClassField carrier = dataClass.annotationsCarrier().orElse(null);
+		int outputIndex = 0;
 		for (int x = 0; x < fields.length; x++) {
 
 			DataClassField field = fields[x];
-			int outputIndex = x;
+			if (field == carrier) {
+				continue;
+			}
 
 			// (value[],x, v) -> value[x] = v
 			MethodHandle arraySetter = MethodHandles.arrayElementSetter(Object[].class);
 
 			// () -> outputIndex
-			MethodHandle index = MethodHandles.constant(int.class, outputIndex);
+			MethodHandle index = MethodHandles.constant(int.class, outputIndex++);
 
 			// (value[],v) -> value[inputIndex] = v
 			MethodHandle arrayIndexSetter = MethodHandles.collectArguments(arraySetter, 1, index);
@@ -482,11 +562,14 @@ public class ArrayMapper {
 			// ():void -> void;
 			MethodHandle noop = MethodHandles.constant(Void.class, null).asType(MethodType.methodType(void.class));
 
-			// (value[],object):void -> void;
-			MethodHandle noopElse = MethodHandles.dropArguments(noop, 0, Object[].class, dataClass.dataClass());
+			// ():void -> void, or absent(record, field) for a required field
+			MethodHandle orElse = field.isRequired() ? MethodHandles.insertArguments(ABSENT, 0, dataClass, field) : noop;
+
+			// (value[],object):void -> orElse();
+			orElse = MethodHandles.dropArguments(orElse, 0, Object[].class, dataClass.dataClass());
 
 			// (value[],object):void -> if(isPresent(object)) { value[inputIndex] = toData( object.getter() ) }
-			MethodHandle checkAndSet = MethodHandles.guardWithTest(isPresentTest, arrayValueSetter, noopElse);
+			MethodHandle checkAndSet = MethodHandles.guardWithTest(isPresentTest, arrayValueSetter, orElse);
 
 			// add to list of getters.
 			result = MethodHandles.foldArguments(result, checkAndSet);
@@ -524,6 +607,8 @@ public class ArrayMapper {
 
 				return outputArray;
 
+			} catch (DataBindException e) {
+				throw e;
 			} catch (Throwable e) {
 				throw new DataBindException("Failed to convert array", e);
 			}
@@ -538,7 +623,7 @@ public class ArrayMapper {
 
 		public ObjectToUnionBridge(DataClassUnion unionClass) {
 			this.unionClass = unionClass;
-			this.typeMap = new HashMap<>();
+			this.typeMap = new ConcurrentHashMap<>();
 		}
 
 		@SuppressWarnings("unused")
@@ -558,15 +643,13 @@ public class ArrayMapper {
 					}
 
 					function = getFunctions(dataClass);
-					if (function != null) {
-						typeMap.put(v.getClass(), function);
-					} else {
-						throw new DataBindException("no descriptor for class");
-					}
+					typeMap.put(v.getClass(), function);
 				}
 
 				try {
 					unionPair[1] = function.toArray.invoke(v);
+				} catch (DataBindException e) {
+					throw e;
 				} catch (Throwable e) {
 					throw new DataBindException("Failed to convert class", e);
 				}
@@ -610,6 +693,54 @@ public class ArrayMapper {
 		}
 	}
 
+	private static class TupleToArrayBridge {
+
+		private final DataClassElement[] elements;
+		private final MethodHandle[] elementsToData;
+
+		TupleToArrayBridge(DataClassTuple tuple, MethodHandle[] elementsToData) {
+			this.elements = tuple.elements();
+			this.elementsToData = new MethodHandle[elementsToData.length];
+			for (int x = 0; x < elementsToData.length; x++) {
+				this.elementsToData[x] = elementsToData[x].asType(MethodType.methodType(Object.class, Object.class));
+			}
+		}
+
+		@SuppressWarnings("unused")
+		public Object[] toData(Object tuple) throws Throwable {
+			Object[] values = new Object[elements.length];
+			for (int x = 0; x < elements.length; x++) {
+				values[x] = part(elementsToData[x], elements[x].accessor().invoke(tuple));
+			}
+			return values;
+		}
+	}
+
+	private static class ArrayToTupleBridge {
+
+		private final DataClassTuple tuple;
+		private final MethodHandle[] elementsToObject;
+
+		ArrayToTupleBridge(DataClassTuple tuple, MethodHandle[] elementsToObject) {
+			this.tuple = tuple;
+			this.elementsToObject = new MethodHandle[elementsToObject.length];
+			for (int x = 0; x < elementsToObject.length; x++) {
+				this.elementsToObject[x] =
+						elementsToObject[x].asType(MethodType.methodType(Object.class, Object.class));
+			}
+		}
+
+		@SuppressWarnings("unused")
+		public Object toObject(Object[] values) throws Throwable {
+			Checks.tuple(tuple, values);
+			Object[] elements = new Object[values.length];
+			for (int x = 0; x < values.length; x++) {
+				elements[x] = part(elementsToObject[x], values[x]);
+			}
+			return tuple.constructor().invoke(elements);
+		}
+	}
+
 	/**
 	 * A map is an array of {@code [key, value]} entries rather than a {@code Map}: a key in array form may itself be
 	 * an array, which hashes by identity, and {@link #toArray(DataClass, Object)} returns an array.
@@ -637,6 +768,8 @@ public class ArrayMapper {
 							part(valueToData, mapClass.value().invoke(entry)) };
 				}
 				return entries;
+			} catch (DataBindException e) {
+				throw e;
 			} catch (Throwable e) {
 				throw new DataBindException("Failed to convert map", e);
 			}
@@ -686,7 +819,7 @@ public class ArrayMapper {
 
 		public UnionToObjectBridge(DataClassUnion unionClass) {
 			this.unionClass = unionClass;
-			this.typeMap = new HashMap<>();
+			this.typeMap = new ConcurrentHashMap<>();
 		}
 
 		@SuppressWarnings("unused")
@@ -706,17 +839,13 @@ public class ArrayMapper {
 					ArrayFunctions function = typeMap.get(unionType);
 					if (function == null) {
 
-						DataClass dataClass = context.getDescriptor(Class.forName(unionType));
+						DataClass dataClass = context.getDescriptor(Checks.candidate(unionClass, unionType));
 						if (!unionClass.isMemberType(dataClass.typeClass())) {
 							throw new DataBindException("Class not of union type");
 						}
 
 						function = getFunctions(dataClass);
-						if (function != null) {
-							typeMap.put(unionType, function);
-						} else {
-							throw new DataBindException("no descriptor for class");
-						}
+						typeMap.put(unionType, function);
 					}
 
 					value = function.toObject.invoke(unionValue);
