@@ -58,6 +58,7 @@ public class GetSetFinder implements ComponentFinder {
 					// Found a matching setter/getter pair, so add to fields.
 					info.setField(fieldAnnotation);
 				}
+				info.readUnbound(classField);
 
 				reachField(lookup, clss, classField, info);
 
@@ -131,6 +132,8 @@ public class GetSetFinder implements ComponentFinder {
 			if (setterField != null) {
 				info.setField(setterField);
 			}
+			info.readUnbound(getter);
+			info.readUnbound(setter);
 
 			MethodHandle read = reachMethod(lookup, clss, getter);
 			MethodHandle write = reachMethod(lookup, clss, setter);
@@ -183,6 +186,9 @@ public class GetSetFinder implements ComponentFinder {
 			if (existingField != null) {
 				iter.remove();
 				existingField.setWriteMethod(field.getWriteMethod());
+				if (field.isUnbound()) {
+					existingField.setUnbound(true);
+				}
 			}
 		}
 
@@ -197,13 +203,13 @@ public class GetSetFinder implements ComponentFinder {
 			int modifiers = classField.getModifiers();
 			if (Modifier.isPrivate(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)) {
 
+				// A super class may declare a field of this name too, and this annotation is not its.
+				ComponentInfo info = fields.stream().filter(e -> e.getName().equals(classField.getName())
+						&& (e.getDeclaringClass() == null || e.getDeclaringClass() == clss))
+						.findFirst().orElse(null);
+
 				Field fieldAnnotation = classField.getAnnotation(Field.class);
 				if (fieldAnnotation != null) {
-
-					// A super class may declare a field of this name too, and this annotation is not its.
-					ComponentInfo info = fields.stream().filter(e -> e.getName().equals(classField.getName())
-							&& (e.getDeclaringClass() == null || e.getDeclaringClass() == clss))
-							.findFirst().orElse(null);
 					if (info == null) {
 						throw new CodeAnalysisException(String
 								.format("Could not find matching getter/setter for field '%s'", classField.getName()));
@@ -211,6 +217,11 @@ public class GetSetFinder implements ComponentFinder {
 
 					// Found a matching setter/getter pair, so add to fields.
 					info.setField(fieldAnnotation);
+				}
+
+				// A private field of no component is off the wire already.
+				if (info != null) {
+					info.readUnbound(classField);
 				}
 			}
 		}

@@ -41,7 +41,6 @@ import java.util.OptionalDouble;
 import io.ltr8.annotation.Unbound;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-import java.util.stream.Collectors;
 import java.util.function.Supplier;
 
 /**
@@ -277,7 +276,7 @@ public class DefaultRecordBinder {
 		// Modify the order of fields if order annotation supplied.
 		FieldOrder dataOrder = targetClass.getAnnotation(FieldOrder.class);
 		if (dataOrder != null) {
-			reorderFields(dataOrder, components);
+			reorderFields(targetClass, dataOrder, components);
 		}
 
 		// A component the class marked @Unbound is not on the wire: nothing fills it from a document and
@@ -907,7 +906,8 @@ public class DefaultRecordBinder {
 				fieldAccessor, setter);
 	}
 
-	private void reorderFields(FieldOrder dataOrder, List<ComponentInfo> components) throws CodeAnalysisException {
+	private void reorderFields(Class<?> targetClass, FieldOrder dataOrder, List<ComponentInfo> components)
+			throws CodeAnalysisException {
 
 		// Check lengths are ok.
 		String[] fieldOrder = dataOrder.value();
@@ -916,9 +916,14 @@ public class DefaultRecordBinder {
 					"DataOrder annotation has different field count to components found in data");
 		}
 
-		// build map of components to select from.
-		Map<String, ComponentInfo> componentMap = components.stream()
-				.collect(Collectors.toMap(ComponentInfo::getName, e -> e));
+		Map<String, ComponentInfo> componentMap = new HashMap<>();
+		for (ComponentInfo component : components) {
+			if (componentMap.putIfAbsent(component.getName(), component) != null) {
+				throw new CodeAnalysisException(String.format("%s has two components named '%s', which @FieldOrder "
+						+ "cannot tell apart: it names a component by its Java name", targetClass.getName(),
+						component.getName()));
+			}
+		}
 
 		// check all fields are present.
 		List<String> fieldOrderList = List.of(dataOrder.value());
@@ -1117,7 +1122,8 @@ public class DefaultRecordBinder {
 
 			ComponentInfo field = fields.get(x);
 
-            if (field.getWriteMethod() != null && field.getConstructorArgument() < 0) {
+            // An unbound component keeps what the class gave it rather than a zero no document supplied.
+            if (field.getWriteMethod() != null && field.getConstructorArgument() < 0 && !field.isUnbound()) {
 
 				// (obj, value):void -> obj.setField( value );
 				MethodHandle fieldSetter = field.getWriteMethod();
