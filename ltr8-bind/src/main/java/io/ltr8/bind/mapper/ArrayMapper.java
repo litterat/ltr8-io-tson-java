@@ -315,7 +315,8 @@ public class ArrayMapper {
 
 	/**
 	 * A record's values line up with its fields by position, so an array of any other length leaves a field
-	 * without a value or a value without a field. A null is an absent value, which a required field refuses.
+	 * without a value or a value without a field. A null is an absent value, which a required field refuses. The
+	 * fields are converted in place in the array returned, so it is a copy: the caller's array is left as it was.
 	 */
 	private static Object[] checked(DataClassRecord record, Object[] values) throws DataBindException {
 		DataClassField[] fields = record.fields();
@@ -330,7 +331,7 @@ public class ArrayMapper {
 						record.typeClass().getName(), fields[x].name()));
 			}
 		}
-		return values;
+		return values.clone();
 	}
 
 	/**

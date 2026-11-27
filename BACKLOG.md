@@ -530,9 +530,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   name)`, `ArrayMapper.toArray` throws `NullPointerException` and `MapMapper.toMap` a `DataBindException` wrapping
   one: neither skips `annotationsCarrier()`, whose descriptor is null. Write the record without the carrier and
   read it back with `Annotations.empty()`, with a round trip through both.
-- [ ] **`ArrayMapper.toObject` overwrites the array it is given.** After a read of a record holding a record, the
-  caller's nested `Object[]` is replaced by the object built from it. Read into a copy, with a test that the input
-  is unchanged.
 - [ ] **A `null` required reference writes and then does not read.** `Marked(@Field(required = true) String name)`
   holding `null` writes `{}` from `MapMapper` and a `null` slot from `ArrayMapper`, and the read of either is
   refused as missing its required field (`MissingRequiredFieldMapperTest`). Refuse the write too, naming the class
