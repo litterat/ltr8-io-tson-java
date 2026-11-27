@@ -17,6 +17,7 @@ package io.ltr8.test.data;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
+import io.ltr8.annotation.Unbound;
 
 import java.util.List;
 import java.util.Map;
@@ -769,6 +770,59 @@ public final class GetSetClasses {
 
 		@Record
 		public Named() {
+		}
+	}
+
+	/** Its private field takes the name of the pair it inherits, at another type, and is marked unbound. */
+	public static class UnboundFieldBesideInheritedPair extends NamedBase {
+
+		@Unbound
+		@SuppressWarnings("unused")
+		private int name;
+
+		@Record
+		public UnboundFieldBesideInheritedPair() {
+		}
+	}
+
+	/** Its private field takes the name of the pair it inherits, at another type, and names a wire name. */
+	public static class LabelledFieldBesideInheritedPair extends NamedBase {
+
+		@Field("label")
+		@SuppressWarnings("unused")
+		private int name;
+
+		@Record
+		public LabelledFieldBesideInheritedPair() {
+		}
+	}
+
+	/** Its private field takes the name of the public field it inherits, at another type, and is marked unbound. */
+	public static class UnboundFieldBesideInheritedPublicField extends NamedFieldBase {
+
+		@Unbound
+		@SuppressWarnings("unused")
+		private int name;
+
+		@Record
+		public UnboundFieldBesideInheritedPublicField() {
+		}
+	}
+
+	/** It overrides the getter of the pair it inherits, so the pair, and its private field, are its own. */
+	public static class LabelledFieldBesideOverriddenGetter extends NamedBase {
+
+		@Field("label")
+		@SuppressWarnings("unused")
+		private String name;
+
+		@Record
+		public LabelledFieldBesideOverriddenGetter() {
+		}
+
+		@Override
+		public String getName() {
+			return super.getName();
 		}
 	}
 

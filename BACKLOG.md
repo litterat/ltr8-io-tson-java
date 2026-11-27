@@ -526,16 +526,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `@Profile` are each dropped. Read each annotation from every member of a component, taking each `@Field`
   attribute from whichever member states it and refusing two members that state one differently, with a test of
   each annotation on each member of each class kind.
-- [ ] **The two finders reach an inherited member by different rules.** `ImmutableFinder` counts a field hidden by
-  any field of its name below it and refuses the class ("…hides from the public lookup"); `GetSetFinder` counts
-  one hidden by name and type, and falls back to the declaring class, refusing "…not accessible…" where that is
-  not public. A public field hidden by one of another type is refused by the first and bound by the second
-  (`ReachedMembersTest`). The refusal for an unreachable method carries the JDK's identity hash, so its text
-  changes from run to run. Reach a member one way, by name and type as the JVM resolves it, with one refusal that
-  names the member and no hash.
-- [ ] **`GetSetFinder` matches a private field to a component by name alone.** It sets no declaring class on its
-  components, so a subclass's `private int name` is taken as a member of a super class's `String name` component
-  and its annotations apply to it. Read, not run. Match on the declaring class, with a test of each.
 - [ ] **`ArrayMapper` cannot write a `@Tuple` record.** `toArray` throws `DataBindException` ("unexpected data
   class type"): it has no case for `DataClassTuple`. `MapMapper` is untested. Carry a tuple through both mappers,
   with a round trip.

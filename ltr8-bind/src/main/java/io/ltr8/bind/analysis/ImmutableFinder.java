@@ -73,8 +73,8 @@ import java.util.stream.Collectors;
  * reaches it, through a public subclass: the described class or one between the two.
  *
  * <p>The class is refused, with a {@link CodeAnalysisException} naming it, when a parameter binds no component or more
- * than one, when a bound component has no such read, when its read is reached through no public class or its field's
- * name reaches another field from each, or when two components take one name.
+ * than one, when a bound component has no such read, when its read is reached as {@link Members} refuses, or when
+ * two components take one name.
  */
 public class ImmutableFinder implements ComponentFinder {
 
@@ -195,11 +195,7 @@ public class ImmutableFinder implements ComponentFinder {
 
             fields.addAll(immutableFields);
 
-        } catch (IllegalAccessException e) {
-            // A public member the public lookup reaches through no class: none between it and the described class is
-            // public, or exported.
-            throw Members.notAccessible(clss, e);
-        } catch (UncheckedIOException | NoSuchMethodException | NoSuchFieldException | SecurityException e) {
+        } catch (UncheckedIOException | NoSuchMethodException | SecurityException e) {
             throw new CodeAnalysisException("Failed to access class", e);
         }
     }
@@ -209,8 +205,7 @@ public class ImmutableFinder implements ComponentFinder {
      * it is final: an accessor's field need not be final either. One that is not final is also found by
      * {@link GetSetFinder}, which adds its setter to this component rather than describing it again.
      */
-    private static void readPublicField(Class<?> clss, ComponentInfo component)
-            throws IllegalAccessException, NoSuchFieldException, CodeAnalysisException {
+    private static void readPublicField(Class<?> clss, ComponentInfo component) throws CodeAnalysisException {
         String name = component.getName();
         // A parameter only @Field names has no declaring class; its name is taken as a field's, as for an accessor.
         Class<?> declarer = component.getDeclaringClass() != null ? component.getDeclaringClass()
@@ -226,7 +221,7 @@ public class ImmutableFinder implements ComponentFinder {
         }
         int modifiers = field.getModifiers();
         if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers)) {
-            component.setReadMethod(readAs(Members.getterDeclarerFirst(clss, field), component.getType()));
+            component.setReadMethod(readAs(Members.getter(clss, field), component.getType()));
         }
     }
 
@@ -250,7 +245,7 @@ public class ImmutableFinder implements ComponentFinder {
      */
     private void examineAccessorMethods(Class<?> described, Class<?> clss, List<ComponentInfo> immutableFields,
             ClassModel classModel, Set<String> matched)
-            throws NoSuchMethodException, IllegalAccessException, SecurityException, CodeAnalysisException {
+            throws NoSuchMethodException, SecurityException, CodeAnalysisException {
 
         for (MethodModel method : classModel.methods()) {
             // An accessor takes no argument but the instance; in a static method slot 0 is no instance, and the
@@ -273,7 +268,7 @@ public class ImmutableFinder implements ComponentFinder {
      * @return whether the method is the accessor of a component
      */
     private boolean examineAccessor(Class<?> described, Class<?> clss, List<ComponentInfo> fields, MethodModel method)
-            throws NoSuchMethodException, IllegalAccessException, SecurityException, CodeAnalysisException {
+            throws NoSuchMethodException, SecurityException, CodeAnalysisException {
         boolean foundLoadThis = false;
         String lastField = null;
         Class<?> lastDeclarer = null;
@@ -306,7 +301,7 @@ public class ImmutableFinder implements ComponentFinder {
                         Method accessorMethod = clss.getDeclaredMethod(method.methodName().stringValue());
                         info.addMember(Role.ACCESSOR, accessorMethod);
                         info.setReadMethod(
-                                readAs(Members.virtualDeclarerFirst(described, accessorMethod), info.getType()));
+                                readAs(Members.virtual(described, accessorMethod), info.getType()));
                         info.addAccessor(accessorMethod);
                         accessor = true;
                     }
@@ -340,7 +335,14 @@ public class ImmutableFinder implements ComponentFinder {
         while (from != null && !from.getName().replace('.', '/').equals(owner)) {
             from = from.getSuperclass();
         }
-        return Members.resolveField(from, name);
+        for (Class<?> declarer = from; declarer != null; declarer = declarer.getSuperclass()) {
+            try {
+                return declarer.getDeclaredField(name);
+            } catch (NoSuchFieldException e) {
+                // Inherited: declared further up.
+            }
+        }
+        return null;
     }
 
     /**
@@ -365,7 +367,7 @@ public class ImmutableFinder implements ComponentFinder {
      *        subclass overrides dispatches to the override, which reads the field the override returns
      */
     private void examineAccessorAnnotations(Class<?> described, Class<?> clss, List<ComponentInfo> immutableFields,
-            Set<String> matched) throws IllegalAccessException, NoSuchMethodException, CodeAnalysisException {
+            Set<String> matched) throws CodeAnalysisException {
         // Possibly failed to find accessor through invariant byte code analysis.
         // Fallback on @Field annotation or method name.
         for (Method method : clss.getDeclaredMethods()) {
@@ -383,7 +385,7 @@ public class ImmutableFinder implements ComponentFinder {
                     .findFirst().orElse(null);
             if (component != null
                     && (method.isAnnotationPresent(Field.class) || method.isAnnotationPresent(Union.class))) {
-                component.setReadMethod(readAs(Members.virtualDeclarerFirst(described, method), component.getType()));
+                component.setReadMethod(readAs(Members.virtual(described, method), component.getType()));
                 component.addMember(Role.ACCESSOR, method);
                 matched.add(name);
                 component.addAccessor(method);

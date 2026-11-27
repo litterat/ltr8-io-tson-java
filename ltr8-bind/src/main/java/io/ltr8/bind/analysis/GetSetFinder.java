@@ -56,7 +56,7 @@ public class GetSetFinder implements ComponentFinder {
 				info.addMember(Role.PUBLIC_FIELD, classField);
 				Class<?> erasure = info.getType();
 
-				Members.FieldHandles handles = Members.fieldDescribedFirst(clss, classField);
+				Members.FieldHandles handles = Members.getterAndSetter(clss, classField);
 				MethodHandle read = handles.read();
 				MethodHandle write = handles.write();
 				info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
@@ -118,8 +118,8 @@ public class GetSetFinder implements ComponentFinder {
 			info.addMember(Role.SETTER, setter);
 			Class<?> erasure = info.getType();
 
-			MethodHandle read = Members.virtualDescribedFirst(clss, getter);
-			MethodHandle write = Members.virtualDescribedFirst(clss, setter);
+			MethodHandle read = Members.virtual(clss, getter);
+			MethodHandle write = Members.virtual(clss, setter);
 			info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
 			// A fluent setter returns its object, or another the old value; either is dropped.
 			info.setWriteMethod(write.asType(MethodType.methodType(void.class, write.type().parameterType(0), erasure)));
@@ -184,9 +184,9 @@ public class GetSetFinder implements ComponentFinder {
 			int modifiers = classField.getModifiers();
 			if (Modifier.isPrivate(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)) {
 
-				// A super class may declare a field of this name too, and this annotation is not its.
+				// A super class may declare a field or pair of this name too, and this annotation is not its.
 				ComponentInfo info = fields.stream().filter(e -> e.getName().equals(classField.getName())
-						&& (e.getDeclaringClass() == null || e.getDeclaringClass() == clss))
+						&& (declarer(e, members) == null || declarer(e, members) == clss))
 						.findFirst().orElse(null);
 
 				if (info == null && classField.isAnnotationPresent(Field.class)) {
@@ -224,6 +224,15 @@ public class GetSetFinder implements ComponentFinder {
 	 * setter, or null for a field.
 	 */
 	private record Member(Class<?> declarer, Method getter, Method setter) {
+	}
+
+	/**
+	 * @return the class declaring {@code component}'s field or pair, or null for a constructor's component only
+	 *         {@code @Field} names
+	 */
+	private static Class<?> declarer(ComponentInfo component, Map<ComponentInfo, Member> members) {
+		Member member = members.get(component);
+		return member != null ? member.declarer() : component.getDeclaringClass();
 	}
 
 	private static String wireName(ComponentInfo component) {
