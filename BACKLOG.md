@@ -595,6 +595,12 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   loop over `descriptor.fields()`, which holds no unbound component. Read, not run. Take the answer from the
   descriptor, or delete the sets if nothing reaches them, with a bind read of an `@Unbound` constructor parameter
   in each stack.
+- [ ] **The `Default` prefix on the seven binders names an alternative that does not exist.** `DefaultClassBinder`,
+  `DefaultRecordBinder`, `DefaultAtomBinder`, `DefaultArrayBinder`, `DefaultMapBinder`, `DefaultTupleBinder` and
+  `DefaultUnionBinder` implement no interface, and `DataBindContext` constructs its `DefaultClassBinder` itself, so
+  a context takes no other binder. Rename each to its bare name, as `TransparentBinder` and `ProtocolBinder` are,
+  with the comments that cite them in `tson-compiler`, `tson-schema`, `design/`, `ltr8-bind/README.md` and the
+  `tson-java` skill. `tson-compiler` has an `AtomBinder` of its own, in another package.
 
 ## Documentation
 
