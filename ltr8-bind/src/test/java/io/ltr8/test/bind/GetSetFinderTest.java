@@ -78,14 +78,21 @@ import io.ltr8.test.data.GetSetClasses.Retagged;
 import io.ltr8.test.data.GetSetClasses.StaticField;
 import io.ltr8.test.data.GetSetClasses.StaticPair;
 import io.ltr8.test.data.GetSetClasses.SwappingSetter;
+import io.ltr8.test.data.GetSetClasses.TextArray;
+import io.ltr8.test.data.GetSetClasses.TextArrayFields;
+import io.ltr8.test.data.GetSetClasses.TextArrayGetter;
 import io.ltr8.test.data.GetSetClasses.TextBox;
 import io.ltr8.test.data.GetSetClasses.TextFields;
 import io.ltr8.test.data.GetSetClasses.TextHolder;
 import io.ltr8.test.data.GetSetClasses.TextList;
+import io.ltr8.test.data.GetSetClasses.TextListArrayGetter;
 import io.ltr8.test.data.GetSetClasses.TextListFields;
 import io.ltr8.test.data.GetSetClasses.TextPassed;
 import io.ltr8.test.data.GetSetClasses.TextReadableWritten;
 import io.ltr8.test.data.GetSetClasses.TextValue;
+import io.ltr8.test.data.GetSetClasses.TextWildcard;
+import io.ltr8.test.data.GetSetClasses.TextWildcardFields;
+import io.ltr8.test.data.GetSetClasses.TextWildcardGetter;
 import io.ltr8.test.data.GetSetClasses.TwoArgumentSetter;
 import io.ltr8.test.data.GetSetClasses.WiderSetter;
 import io.ltr8.test.data.GetSetClasses.WritableRead;
@@ -104,6 +111,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -981,6 +989,73 @@ class GetSetFinderTest {
 	@Test
 	void aGenericPublicFieldOfAClassDescribedRawIsRefused() {
 		assertEquals("Unrecognized parameterized type for map key/value", message(OpenCounts.class));
+	}
+
+	// --- a type variable inside an array or a wildcard
+
+	@Test
+	void aGenericArrayPairASuperClassDeclaresIsAtTheArrayClassTheSubclassBinds() throws Throwable {
+		DataClassRecord record = record(TextArray.class);
+		assertEquals(List.of("items:String[] set"), shape(record));
+		assertEquals(String.class, assertInstanceOf(DataClassArray.class, record.fields()[0].dataClass())
+				.arrayDataClass().typeClass());
+		TextArray value = new TextArray();
+		value.setItems(new String[] { "anchor", "chain" });
+		for (TextArray copy : roundTrips(value)) {
+			assertArrayEquals(new String[] { "anchor", "chain" }, copy.getItems());
+			assertEquals(String[].class, copy.getItems().getClass());
+		}
+	}
+
+	@Test
+	void aGenericArrayPublicFieldASuperClassDeclaresIsAtTheArrayClassTheSubclassBinds() throws Throwable {
+		DataClassRecord record = record(TextArrayFields.class);
+		assertEquals(List.of("items:String[] set"), shape(record));
+		TextArrayFields value = new TextArrayFields();
+		value.items = new String[] { "anchor", "chain" };
+		for (TextArrayFields copy : roundTrips(value)) {
+			assertArrayEquals(new String[] { "anchor", "chain" }, copy.items);
+			assertEquals(String[].class, copy.items.getClass());
+		}
+	}
+
+	@Test
+	void aSuperClassArrayPairWhoseGetterAloneIsOverriddenIsOneComponentAtTheOverridingType() throws Throwable {
+		DataClassRecord record = record(TextArrayGetter.class);
+		assertEquals(List.of("items:String[] set", "name:String set"), shape(record));
+		TextArrayGetter value = new TextArrayGetter();
+		value.name = "anchor";
+		value.setItems(new String[] { "chain" });
+		for (TextArrayGetter copy : roundTrips(value)) {
+			assertEquals("anchor", copy.name);
+			assertArrayEquals(new String[] { "chain" }, copy.getItems());
+		}
+	}
+
+	/** As a record's array of a parameterized type is: the binder carries no generic array type. */
+	@Test
+	void aSuperClassPairOfAGenericArrayWhoseGetterAloneIsOverriddenIsRefusedAsAGenericArrayComponentIs() {
+		assertEquals("Collection must provide parameterized type information", message(ListArrayRecord.class));
+		assertEquals(message(ListArrayRecord.class), message(TextListArrayGetter.class));
+	}
+
+	/** As a record's wildcard component is: the binder describes no wildcard type argument. */
+	@Test
+	void aWildcardPairOrPublicFieldASuperClassDeclaresIsRefusedAsAWildcardComponentIs() {
+		assertEquals("Unrecognized parameterized type", message(WildcardRecord.class));
+		assertEquals(message(WildcardRecord.class), message(TextWildcard.class));
+		assertEquals(message(WildcardRecord.class), message(TextWildcardFields.class));
+	}
+
+	@Test
+	void aSuperClassWildcardPairWhoseGetterAloneIsOverriddenIsRefusedAsAWildcardComponentIs() {
+		assertEquals(message(WildcardRecord.class), message(TextWildcardGetter.class));
+	}
+
+	public record ListArrayRecord(List<String>[] rows) {
+	}
+
+	public record WildcardRecord(List<? extends String> items) {
 	}
 
 	// --- helpers

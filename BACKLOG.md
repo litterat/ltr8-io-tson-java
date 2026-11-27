@@ -527,10 +527,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   named `name`; `DefaultRecordBinder.reorderFields` keys its map by that name and `Collectors.toMap` throws
   "Duplicate key". Read, not run. Refuse the class with a `CodeAnalysisException` naming it and the name, with a
   case in `RecordRefusalTest`.
-- [ ] **A type variable inside an array or a wildcard is not substituted.** `TypeArguments.substitute` rewrites a
-  variable and a parameterized type's arguments, so `T[] getItems()` and `List<? extends T> getItems()` in
-  `Holder<T>` keep `T` for `TextHolder extends Holder<String>`. Read, not run. Substitute inside both, with a round
-  trip of each shape as a pair and as a public field.
 - [ ] **A constructor storing a parameter in a field it inherits is refused.** `Sub(String name) { this.name = name;
   }` over a `protected String name` its super class declares is refused with "…constructor assigns field 'name',
   which the class does not declare": `ImmutableFinder` looks the field up on the described class alone. Look it up

@@ -1247,4 +1247,128 @@ public final class GetSetClasses {
 		public HoldsOpenCounts() {
 		}
 	}
+
+	// --- a type variable inside an array or a wildcard
+
+	public static class ArrayHolder<T> {
+
+		private T[] items;
+
+		public T[] getItems() {
+			return items;
+		}
+
+		public void setItems(T[] items) {
+			this.items = items;
+		}
+	}
+
+	public static class TextArray extends ArrayHolder<String> {
+
+		@Record
+		public TextArray() {
+		}
+	}
+
+	/** Overrides only its super class's getter, at the array class the argument it binds makes. */
+	public static class TextArrayGetter extends ArrayHolder<String> {
+
+		public String name;
+
+		@Record
+		public TextArrayGetter() {
+		}
+
+		@Override
+		public String[] getItems() {
+			return super.getItems();
+		}
+	}
+
+	public static class ArrayFieldBase<T> {
+
+		public T[] items;
+	}
+
+	public static class TextArrayFields extends ArrayFieldBase<String> {
+
+		@Record
+		public TextArrayFields() {
+		}
+	}
+
+	public static class ListArrayHolder<T> {
+
+		private List<T>[] rows;
+
+		public List<T>[] getRows() {
+			return rows;
+		}
+
+		public void setRows(List<T>[] rows) {
+			this.rows = rows;
+		}
+	}
+
+	/** Overrides only its super class's getter, at the array of a parameterized type the argument it binds makes. */
+	public static class TextListArrayGetter extends ListArrayHolder<String> {
+
+		public String name;
+
+		@Record
+		public TextListArrayGetter() {
+		}
+
+		@Override
+		public List<String>[] getRows() {
+			return super.getRows();
+		}
+	}
+
+	public static class WildcardHolder<T> {
+
+		private List<? extends T> items = List.of();
+
+		public List<? extends T> getItems() {
+			return items;
+		}
+
+		public void setItems(List<? extends T> items) {
+			this.items = items;
+		}
+	}
+
+	public static class TextWildcard extends WildcardHolder<String> {
+
+		@Record
+		public TextWildcard() {
+		}
+	}
+
+	/** Overrides only its super class's getter, at the wildcard the argument it binds makes. */
+	public static class TextWildcardGetter extends WildcardHolder<String> {
+
+		public String name;
+
+		@Record
+		public TextWildcardGetter() {
+		}
+
+		@Override
+		public List<? extends String> getItems() {
+			return super.getItems();
+		}
+	}
+
+	public static class WildcardFieldBase<T> {
+
+		public List<? extends T> items = List.of();
+	}
+
+	public static class TextWildcardFields extends WildcardFieldBase<String> {
+
+		@Record
+		public TextWildcardFields() {
+		}
+	}
 }
