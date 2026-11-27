@@ -535,11 +535,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   record, and `Optional<T>` on a generic class described raw, on every finder path, make `getDescriptor` throw it
   unchecked from the record binder's `rawTypeOf` (`GenericComponentTypeTest` pins the exception). Refuse the class
   with a `CodeAnalysisException` naming it and the component, as a `List<? extends Number>` component is refused.
-- [ ] **A bare type variable of a class described at a parameterization stays `Object`.** For `Box<T>` with a
-  component `T value` or `T[] items`, described as `Box<String>`, the component is held at its erasure and refused
-  as `Object`: `TypeArguments` gives the description's arguments to a parameterized component alone
-  (`GenericComponentTypeTest`). Resolve a bare variable and an array of one too, with a round trip of each shape
-  for a record, a constructor class and a pair.
 - [ ] **A constructor parameter named only by `@Field` loses its generic type.** Where `ImmutableFinder` cannot
   match a parameter to a field and `@Field` names its component, the component takes the parameter's class, so
   `@Field("x") List<T>` on `NamedList<T>` is refused with "Collection must provide parameterized type information"

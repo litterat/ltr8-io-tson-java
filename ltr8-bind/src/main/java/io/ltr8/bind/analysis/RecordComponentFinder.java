@@ -19,6 +19,7 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Profile;
 import io.ltr8.bind.analysis.ComponentInfo.Role;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -66,7 +67,7 @@ public class RecordComponentFinder implements ComponentFinder {
             info.setConstructorArgument(x);
 
             try {
-                info.setReadMethod(lookup.unreflect(accessor));
+                info.setReadMethod(readAs(lookup.unreflect(accessor), info));
             } catch (IllegalAccessException e) {
                 throw new CodeAnalysisException(String.format(
                         "Failed to access accessor for record component '%s' on '%s'", component.getName(),
@@ -151,7 +152,7 @@ public class RecordComponentFinder implements ComponentFinder {
             ComponentInfo info = new ComponentInfo(name, type(component, bindings));
             info.setConstructorArgument(x);
             try {
-                info.setReadMethod(lookup.unreflect(component.getAccessor()));
+                info.setReadMethod(readAs(lookup.unreflect(component.getAccessor()), info));
             } catch (IllegalAccessException e) {
                 throw new CodeAnalysisException(String.format(
                         "Failed to access accessor for record component '%s' on '%s'", name, clss.getName()), e);
@@ -164,7 +165,12 @@ public class RecordComponentFinder implements ComponentFinder {
     }
 
     private static Type type(RecordComponent component, Map<TypeVariable<?>, Type> bindings) {
-        return TypeArguments.resolve(component.getGenericType(), component.getType(), bindings);
+        return TypeArguments.resolve(component.getGenericType(), bindings);
+    }
+
+    /** An accessor of a type variable returns its erasure, where the component may be held at an argument. */
+    private static MethodHandle readAs(MethodHandle accessor, ComponentInfo info) {
+        return accessor.asType(accessor.type().changeReturnType(info.getType()));
     }
 
     private static String nameOf(Class<?> clss, Parameter parameter, String[] declared, int index)

@@ -1031,4 +1031,30 @@ public final class GenericComponents {
 
 	public record HoldsMerged(MergedList<String> held) {
 	}
+
+	// --- a bare type variable, and an array of one, at an argument
+
+	/** An accessor the constructor analysis cannot follow, found by its {@code @Field}. */
+	public static class FieldAccessorBare<T> {
+		private final T value;
+
+		@Record
+		public FieldAccessorBare(T value) {
+			this.value = value;
+		}
+
+		@Field
+		public T value() {
+			return java.util.Objects.requireNonNull(value);
+		}
+	}
+
+	public record HoldsBares(RecBare<String> rec, RecArray<String> recArray, CtorBare<String> ctor,
+			CtorArray<String> ctorArray, FieldAccessorBare<String> fieldAccessor, PubBare<String> pub,
+			PubArray<String> pubArray, PairBare<String> pair, PairArray<String> pairArray, MergedBare<String> merged,
+			MergedArray<String> mergedArray, PubBare<List<String>> pubList) {
+	}
+
+	public record HoldsProfBares(ProfBare<String> bare, ProfArray<String> array) {
+	}
 }

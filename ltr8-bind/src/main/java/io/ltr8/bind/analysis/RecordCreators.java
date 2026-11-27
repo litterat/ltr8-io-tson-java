@@ -104,6 +104,9 @@ final class RecordCreators {
 				// (values[]) -> values[inputIndex] and maybe additional modifications to the value.
 				MethodHandle arrayIndexGetter = dataArrayToObject(field, dataFields[x], bridges[x], arrayGetter,
 						index);
+				// A parameter of a type variable takes its erasure, where the component may be held at an argument.
+				arrayIndexGetter = arrayIndexGetter.asType(
+						arrayIndexGetter.type().changeReturnType(result.type().parameterType(arg)));
 
 				// ()-> constructor( ..., values[inputIndex] , ... )
 				result = MethodHandles.collectArguments(result, arg, arrayIndexGetter);
