@@ -357,7 +357,7 @@ final class RecordFields {
 			supertypes.addFirst(type.getGenericSuperclass());
 		}
 		for (Type supertype : supertypes) {
-			Class<?> raw = rawTypeOf(supertype);
+			Class<?> raw = TypeArguments.erasure(supertype);
 			if (!DataBridge.class.isAssignableFrom(raw)) {
 				continue;
 			}
@@ -400,16 +400,6 @@ final class RecordFields {
 		};
 	}
 
-	/**
-	 * The class a type erases to: itself, or a parameterized type's raw type. An {@link Optional}'s own
-	 * argument may be parameterized -- {@code Optional<List<X>>}, which is what an optional collection
-	 * field looks like when an empty collection cannot stand for absence -- and every method handle here
-	 * is typed against the erasure either way.
-	 */
-	static Class<?> rawTypeOf(Type type) {
-		return type instanceof ParameterizedType parameterized ? (Class<?>) parameterized.getRawType() : (Class<?>) type;
-	}
-
 	/** The argument of {@code info}'s {@code Optional} type, or null where its type is no parameterized Optional. */
 	static Type optionalArgument(ComponentInfo info) {
 		return info.getGenericType() instanceof ParameterizedType optional && optional.getRawType() == Optional.class
@@ -426,15 +416,15 @@ final class RecordFields {
 
 		// An Optional's own type argument may itself be parameterized -- Optional<List<X>>, the shape an
 		// optional collection field takes when an empty collection cannot stand for absence (a schema
-		// field whose type carries min_items: 1). The raw type is what the method handles are typed
+		// field whose type carries min_items: 1). The erasure is what the method handles are typed
 		// against; the full type is what the component is resolved from, so the element type survives.
 		Type optionalArgument = optionalArgument(info);
-		if (!(optionalArgument instanceof Class<?> || optionalArgument instanceof ParameterizedType)) {
+		if (!TypeArguments.isHeld(optionalArgument)) {
 			throw new CodeAnalysisException(String.format("%s's component '%s' is an Optional of %s, neither a class "
 					+ "nor a parameterized type", targetClass.getName(), info.getName(),
 					optionalArgument.getTypeName()));
 		}
-		Class<?> optionalType = rawTypeOf(optionalArgument);
+		Class<?> optionalType = TypeArguments.erasure(optionalArgument);
 
 		Supplier<DataClass> dataClass = context.componentSource(optionalType, optionalArgument);
 

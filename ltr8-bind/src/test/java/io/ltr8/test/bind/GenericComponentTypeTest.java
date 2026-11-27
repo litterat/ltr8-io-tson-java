@@ -382,7 +382,53 @@ public class GenericComponentTypeTest {
 				.toArray(String[]::new)));
 	}
 
+	@Test
+	void anArrayOfAParameterizedType() {
+		assertEquals("""
+				RecListArray: RecListArray(value:List[] [[String]])
+				RecNestedArray: RecNestedArray(value:List[] [[[String]]])
+				RecMapArray: RecMapArray(value:Map[] [{String=String}])
+				RecGridArray: RecGridArray(value:List[][] [[[String]]])
+				RecOptListArray: RecOptListArray(value:List[] [[String]])
+				RecListVarArray: CodeAnalysisException: Unrecognized parameterized type
+				RecListVarArray<String>: RecListVarArray(value:List[] [[String]])
+				CtorListArray: CtorListArray(value:List[] [[String]])
+				PubListArray: PubListArray(value:List[] set [[String]])
+				PairListArray: PairListArray(value:List[] set [[String]])
+				RecArray<List<String>>: RecArray(value:List[] [[String]])
+				ProfArray<List<String>>: ProfArray(value:List[] [[String]])
+				CtorArray<List<String>>: CtorArray(value:List[] [[String]])
+				PubArray<List<String>>: PubArray(value:List[] set [[String]])
+				PairArray<List<String>>: PairArray(value:List[] set [[String]])
+				MergedArray<List<String>>: MergedArray(value:List[] set [[String]])
+				RecOptArray<List<String>>: RecOptArray(value:List[] [[String]])
+				ListPubArray: ListPubArray(value:List[] set [[String]])
+				ListPairArray: ListPairArray(value:List[] set [[String]])
+				""", lines(
+				line("RecListArray", null, null),
+				line("RecNestedArray", null, null),
+				line("RecMapArray", null, null),
+				line("RecGridArray", null, null),
+				line("RecOptListArray", null, null),
+				line("RecListVarArray", null, null),
+				at("RecListVarArray", null),
+				line("CtorListArray", null, null),
+				line("PubListArray", null, null),
+				line("PairListArray", null, null),
+				line("RecArray", null, TEXT_LIST),
+				line("ProfArray", "p", TEXT_LIST),
+				line("CtorArray", null, TEXT_LIST),
+				line("PubArray", null, TEXT_LIST),
+				line("PairArray", null, TEXT_LIST),
+				line("MergedArray", null, TEXT_LIST),
+				line("RecOptArray", null, TEXT_LIST),
+				line("ListPubArray", null, null),
+				line("ListPairArray", null, null)));
+	}
+
 	// --- helpers
+
+	private static final Type TEXT_LIST = new DataParameterizedType(List.class, String.class);
 
 	private static List<? extends String> extendsText;
 
@@ -439,7 +485,8 @@ public class GenericComponentTypeTest {
 			builder.profile(profile);
 		}
 		DataBindContext context = builder.build();
-		String described = name + (argument == null ? "" : "<" + argument.getTypeName().replace("java.lang.", "") + ">");
+		String described = name + (argument == null ? ""
+				: "<" + argument.getTypeName().replace("java.lang.", "").replace("java.util.", "") + ">");
 		try {
 			DataClass descriptor = argument == null ? context.getDescriptor(type)
 					: context.getDescriptor(type, new DataParameterizedType(type, argument));

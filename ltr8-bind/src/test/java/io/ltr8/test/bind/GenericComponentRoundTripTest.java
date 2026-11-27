@@ -21,12 +21,17 @@ import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.GenericComponents.CtorArray;
 import io.ltr8.test.data.GenericComponents.CtorBare;
 import io.ltr8.test.data.GenericComponents.CtorList;
+import io.ltr8.test.data.GenericComponents.CtorListArray;
 import io.ltr8.test.data.GenericComponents.FieldAccessorBare;
 import io.ltr8.test.data.GenericComponents.HoldsAllNamed;
 import io.ltr8.test.data.GenericComponents.HoldsBares;
 import io.ltr8.test.data.GenericComponents.HoldsExtending;
+import io.ltr8.test.data.GenericComponents.HoldsListArrays;
 import io.ltr8.test.data.GenericComponents.HoldsProfBares;
 import io.ltr8.test.data.GenericComponents.HoldsProfExtending;
+import io.ltr8.test.data.GenericComponents.HoldsProfListArray;
+import io.ltr8.test.data.GenericComponents.ListPairArray;
+import io.ltr8.test.data.GenericComponents.ListPubArray;
 import io.ltr8.test.data.GenericComponents.MergedArray;
 import io.ltr8.test.data.GenericComponents.MergedBare;
 import io.ltr8.test.data.GenericComponents.MergedList;
@@ -37,6 +42,7 @@ import io.ltr8.test.data.GenericComponents.NamedOpt;
 import io.ltr8.test.data.GenericComponents.PairArray;
 import io.ltr8.test.data.GenericComponents.PairBare;
 import io.ltr8.test.data.GenericComponents.PairList;
+import io.ltr8.test.data.GenericComponents.PairListArray;
 import io.ltr8.test.data.GenericComponents.PlainNamedList;
 import io.ltr8.test.data.GenericComponents.ProfArray;
 import io.ltr8.test.data.GenericComponents.ProfBare;
@@ -45,20 +51,29 @@ import io.ltr8.test.data.GenericComponents.ProfMap;
 import io.ltr8.test.data.GenericComponents.PubArray;
 import io.ltr8.test.data.GenericComponents.PubBare;
 import io.ltr8.test.data.GenericComponents.PubList;
+import io.ltr8.test.data.GenericComponents.PubListArray;
 import io.ltr8.test.data.GenericComponents.RecArray;
 import io.ltr8.test.data.GenericComponents.RecBare;
 import io.ltr8.test.data.GenericComponents.RecBridged;
+import io.ltr8.test.data.GenericComponents.RecGridArray;
 import io.ltr8.test.data.GenericComponents.RecList;
+import io.ltr8.test.data.GenericComponents.RecListArray;
 import io.ltr8.test.data.GenericComponents.RecMap;
+import io.ltr8.test.data.GenericComponents.RecMapArray;
 import io.ltr8.test.data.GenericComponents.RecNested;
+import io.ltr8.test.data.GenericComponents.RecNestedArray;
 import io.ltr8.test.data.GenericComponents.RecOpt;
+import io.ltr8.test.data.GenericComponents.RecOptArray;
 import io.ltr8.test.data.GenericComponents.RecOptList;
+import io.ltr8.test.data.GenericComponents.RecOptListArray;
+import io.ltr8.test.data.GenericComponents.TupleListArray;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -151,6 +166,68 @@ class GenericComponentRoundTripTest {
 						maps.toMap(extending)))),
 				() -> assertEquals("[l0] {k=v}",
 						values(arrays.toObject(HoldsProfExtending.class, arrays.toArray(extending)))));
+	}
+
+	@Test
+	void anArrayOfAParameterizedTypeRoundTripsDeclaredAndAtAnArgument() {
+		PubListArray pub = new PubListArray();
+		pub.value = rows("pub");
+		PairListArray pair = new PairListArray();
+		pair.setValue(rows("pair"));
+		PubArray<List<String>> pubAt = new PubArray<>();
+		pubAt.value = rows("pubAt");
+		PairArray<List<String>> pairAt = new PairArray<>();
+		pairAt.setValue(rows("pairAt"));
+		ListPubArray pubInherited = new ListPubArray();
+		pubInherited.value = rows("pubInherited");
+		ListPairArray pairInherited = new ListPairArray();
+		pairInherited.setValue(rows("pairInherited"));
+		@SuppressWarnings("unchecked")
+		List<List<String>>[] nested = new List[] { List.of(List.of("n0"), List.of()), List.of() };
+		@SuppressWarnings("unchecked")
+		Map<String, String>[] entries = new Map[] { Map.of("k", "v"), Map.of() };
+		@SuppressWarnings("unchecked")
+		List<String>[][] grid = new List[][] { rows("g0", "g1"), {} };
+		HoldsListArrays held = new HoldsListArrays(new RecListArray(rows("rec", "")), new RecNestedArray(nested),
+				new RecMapArray(entries), new RecGridArray(grid), new RecOptListArray(Optional.of(rows("opt"))),
+				new CtorListArray(rows("ctor")), pub, pair, new RecArray<>(rows("recAt")), new CtorArray<>(rows("ctorAt")),
+				pubAt, pairAt, new MergedArray<>(rows("mergedAt")), new RecOptArray<>(Optional.of(rows("optAt"))),
+				pubInherited, pairInherited, new TupleListArray(rows("tuple"), 1));
+		String expected = "[[rec], []] [[[n0], []], []] [{k=v}, {}] [[[g0], [g1]], []] [[opt]] [[ctor]] [[pub]] [[pair]] "
+				+ "[[recAt]] [[ctorAt]] [[pubAt]] [[pairAt]] [[mergedAt]] [[optAt]] [[pubInherited]] [[pairInherited]] "
+				+ "[[tuple]]";
+		assertAll(() -> assertEquals(expected, values(held)),
+				() -> assertEquals(expected,
+						values((HoldsListArrays) maps.toObject(HoldsListArrays.class, maps.toMap(held)))),
+				() -> assertEquals(expected, values(arrays.toObject(HoldsListArrays.class, arrays.toArray(held)))));
+	}
+
+	@Test
+	void aProfileConstructorTakesAnArrayOfAParameterizedTypeAtTheArgument() {
+		DataBindContext profiled = DataBindContext.builder().profile("p").build();
+		MapMapper maps = new MapMapper(profiled);
+		ArrayMapper arrays = new ArrayMapper(profiled);
+		HoldsProfListArray held = new HoldsProfListArray(new ProfArray<>(rows("a", "b")));
+		assertAll(
+				() -> assertEquals("[[a], [b]]", Arrays.deepToString(((HoldsProfListArray) maps.toObject(
+						HoldsProfListArray.class, maps.toMap(held))).array().value())),
+				() -> assertEquals("[[a], [b]]", Arrays.deepToString(arrays.toObject(HoldsProfListArray.class,
+						arrays.toArray(held)).array().value())));
+	}
+
+	/** A one-element list of each of {@code rows}, or an empty list where one is empty. */
+	@SuppressWarnings("unchecked")
+	private static List<String>[] rows(String... rows) {
+		return Arrays.stream(rows).map(row -> row.isEmpty() ? List.of() : List.of(row)).toArray(List[]::new);
+	}
+
+	private static String values(HoldsListArrays held) {
+		return Arrays.stream(new Object[][] { held.rec().value(), held.nested().value(), held.maps().value(),
+				held.grid().value(), held.opt().value().orElseThrow(), held.ctor().getValue(), held.pub().value,
+				held.pair().getValue(), held.recAt().value(), held.ctorAt().getValue(), held.pubAt().value,
+				held.pairAt().getValue(), held.mergedAt().getValue(), held.optAt().value().orElseThrow(),
+				held.pubInherited().value, held.pairInherited().getValue(), held.tuple().value() })
+				.map(Arrays::deepToString).collect(Collectors.joining(" "));
 	}
 
 	private static String values(HoldsExtending held) {

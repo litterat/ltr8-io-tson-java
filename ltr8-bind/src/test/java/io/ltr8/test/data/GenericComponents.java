@@ -19,6 +19,7 @@ import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Record;
+import io.ltr8.annotation.Tuple;
 
 import java.util.List;
 import java.util.Map;
@@ -1088,5 +1089,88 @@ public final class GenericComponents {
 	}
 
 	public record HoldsProfExtending(ProfList<? extends String> list, ProfMap<? extends String> map) {
+	}
+
+	// --- an array of a parameterized type, declared and at an argument
+
+	public record RecListArray(List<String>[] value) {
+	}
+
+	public record RecNestedArray(List<List<String>>[] value) {
+	}
+
+	public record RecMapArray(Map<String, String>[] value) {
+	}
+
+	public record RecGridArray(List<String>[][] value) {
+	}
+
+	public record RecOptListArray(Optional<List<String>[]> value) {
+	}
+
+	public record RecListVarArray<T>(List<T>[] value) {
+	}
+
+	public static class CtorListArray {
+		private final List<String>[] value;
+
+		@Record
+		public CtorListArray(List<String>[] value) {
+			this.value = value;
+		}
+
+		public List<String>[] getValue() {
+			return value;
+		}
+	}
+
+	public static class PubListArray {
+		public List<String>[] value;
+
+		@Record
+		public PubListArray() {
+		}
+	}
+
+	public static class PairListArray {
+		private List<String>[] value;
+
+		@Record
+		public PairListArray() {
+		}
+
+		public List<String>[] getValue() {
+			return value;
+		}
+
+		public void setValue(List<String>[] value) {
+			this.value = value;
+		}
+	}
+
+	public static class ListPubArray extends PubArray<List<String>> {
+		@Record
+		public ListPubArray() {
+		}
+	}
+
+	public static class ListPairArray extends PairArray<List<String>> {
+		@Record
+		public ListPairArray() {
+		}
+	}
+
+	@Tuple
+	public record TupleListArray(List<String>[] value, int count) {
+	}
+
+	public record HoldsListArrays(RecListArray rec, RecNestedArray nested, RecMapArray maps, RecGridArray grid,
+			RecOptListArray opt, CtorListArray ctor, PubListArray pub, PairListArray pair, RecArray<List<String>> recAt,
+			CtorArray<List<String>> ctorAt, PubArray<List<String>> pubAt, PairArray<List<String>> pairAt,
+			MergedArray<List<String>> mergedAt, RecOptArray<List<String>> optAt, ListPubArray pubInherited,
+			ListPairArray pairInherited, TupleListArray tuple) {
+	}
+
+	public record HoldsProfListArray(ProfArray<List<String>> array) {
 	}
 }

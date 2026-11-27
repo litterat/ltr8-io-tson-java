@@ -19,7 +19,7 @@ import java.util.Map;
  * parameter -- be a component of another class at all: a type variable left in place has no descriptor.
  *
  * <p>A parameter the description does not supply (a raw class) is left unreplaced, and a component whose type is
- * then still no class or parameterised type is held at its erasure.
+ * then still no class, parameterised type or array of one is held at its erasure.
  */
 final class TypeArguments {
 
@@ -61,7 +61,13 @@ final class TypeArguments {
     /** The type a component of declared {@code type} is held at under {@code bindings}. */
     static Type resolve(Type type, Map<TypeVariable<?>, Type> bindings) {
         Type resolved = substitute(type, bindings);
-        return resolved instanceof Class<?> || resolved instanceof ParameterizedType ? resolved : erasure(resolved);
+        return isHeld(resolved) ? resolved : erasure(resolved);
+    }
+
+    /** Whether {@code type} is a class, a parameterized type or an array of one, which a component is held at. */
+    static boolean isHeld(Type type) {
+        return type instanceof Class<?> || type instanceof ParameterizedType
+                || type instanceof GenericArrayType array && isHeld(array.getGenericComponentType());
     }
 
     /**
