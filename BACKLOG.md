@@ -527,10 +527,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   super class declares behind a pair the class inherits. Read each annotation from every member of a component,
   taking each `@Field` attribute from whichever member states it and refusing two members that state one
   differently, with a test of each annotation on each member of each class kind.
-- [ ] **`Annotated` of anything but a class or a parameterized type throws `ClassCastException`.**
-  `ClassBinder.annotatedValueDescriptor` casts the argument to `Class`, so `Annotated<List<String>[]>` and
-  `Annotated<? extends X>` throw unchecked. Read, not run. Describe a generic array as a component is described and
-  refuse the rest with a `DataBindException` naming the type, with a case of each.
 - [ ] **A refusal reached by name still carries an identity hash.** `DataBindContext` lists each message on a
   refusal's cause chain, and an unreflected member's `IllegalAccessException` prints its type by identity: a private
   record bound by name is refused with "…Failed to access accessor for record component 'text' on '…': class is not
