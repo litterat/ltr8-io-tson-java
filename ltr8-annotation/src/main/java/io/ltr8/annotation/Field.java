@@ -21,19 +21,22 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Allows specifying the name of a field. Either overriding the name or selecting the name for
- * parameters where the name cannot be detected.
+ * States what a class alone cannot about one component: its name on the wire, that a read must supply it, or the
+ * bridge its value crosses.
+ *
+ * <p>It goes on a member of the component: a constructor parameter, a field, an accessor or a setter. On a record
+ * component it reaches that component's field, accessor and constructor parameter.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER })
 public @interface Field {
 
-	// allow overriding the name of the field.
+	/** The component's name on the wire; empty keeps its Java name. */
 	String value() default "";
 
-	// Allow setting that the field is required
+	/** Whether a read must supply the component. A primitive component is required whatever this says. */
 	boolean required() default false;
 
-	// Allow setting a bridge for the field.
+	/** The bridge between the component's Java type and its data type; {@code DataBridge} itself means none. */
 	Class<? extends DataBridge> bridge() default DataBridge.class;
 }

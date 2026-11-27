@@ -517,25 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **`ArrayMapper.toObject` given an array shorter than the class's fields throws unchecked.** A record of three
-  fields read from a two-element array throws `ArrayIndexOutOfBoundsException`. Refuse the read with a
-  `DataBindException` naming the class and both counts, with a test of a short and a long array.
-- [ ] **`ArrayMapper` cannot read back an absent `Optional<List<String>>`.** `toArray` writes the empty optional
-  and `toObject` throws `DataBindException` ("Failed to convert array"): `ArrayToObjectBridge.toObject` dereferences
-  the `null` of the absent component. `MapMapper` round-trips it. Pass the absence through, with a round trip of an
-  absent optional list, array and record through both mappers.
-- [ ] **A `null` element of a list of records fails in both mappers.** `List<Point>` holding a `null` throws
-  "Failed to convert array" from `ArrayMapper` and "Failed to convert interface java.util.List to Map" from
-  `MapMapper`, where a map component passes a `null` key or value through (`MapComponentMapperTest`). Pass a `null`
-  element through in both, for a list, an array and a set, with a round trip of each.
-- [ ] **A map read missing a required field does not say which.** `MapMapper.toObject` on a map with no key for a
-  primitive component throws `DataBindException` ("Failed to convert Map to class …") caused by a
-  `NullPointerException`; what a missing required reference component does is untested. Refuse the read naming the
-  class and the field, for a primitive and a reference, with an optional component absent beside them reading as
-  empty.
-- [ ] **A map component typed `AnnotatedMap` is untested in both mappers.** `DefaultMapBinder` iterates its entries
-  as boxes, so the map write may carry the box and not the key. Read, not run. Round-trip one through both mappers
-  and carry the key.
 - [ ] **`@Field` on the setter of a constructor component is dropped.** For a class whose constructor binds `name`
   and which also declares `@Field("label") setName`, `GetSetFinder`'s merge carries the write method across and not
   the annotation, so the write gives `{name=n}`. Read the annotation from every member of a component, with a test
@@ -560,8 +541,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   loop over `descriptor.fields()`, which holds no unbound component. Read, not run. Take the answer from the
   descriptor, or delete the sets if nothing reaches them, with a bind read of an `@Unbound` constructor parameter
   in each stack.
-- [ ] **`Unbound`'s Javadoc says a `null` arrives.** In `ltr8-annotation`: a primitive component receives its zero
-  value (`UnboundComponentTest`). Say "its type's zero value" in both paragraphs.
 
 ## Documentation
 

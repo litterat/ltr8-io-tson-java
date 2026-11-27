@@ -21,12 +21,16 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
+ * Binds a class that is not a Java {@code record} as a record, and names the constructor that creates it.
  *
+ * <p><b>On a class</b> it says the class is data. Its components are the fields its constructor stores, its public
+ * fields that are not {@code final}, and its public getter and setter pairs. A Java {@code record} is data without
+ * it.
  *
+ * <p><b>On a constructor</b> it says the same of the class, and picks that constructor where the class has more
+ * than one public constructor serving no {@link Profile}. A class with one such constructor needs none marked.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.CONSTRUCTOR, ElementType.TYPE })
 public @interface Record {
-
-    boolean isMutable() default false;
 }

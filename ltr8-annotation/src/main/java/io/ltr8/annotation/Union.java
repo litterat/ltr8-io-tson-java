@@ -21,14 +21,22 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Allows specifying the name of a field. Either overriding the name or selecting the name for
- * parameters where the name cannot be detected.
+ * Says a value is one of several classes.
+ *
+ * <p><b>On an interface or an abstract class</b> it makes the type a union. With members listed it is a union of
+ * those. With none it is open: each class described that implements or extends the type joins it. A Java
+ * {@code sealed} type is a union of the classes it permits without this annotation.
+ *
+ * <p><b>On a component</b>, on its constructor parameter, field or accessor, it lists the classes that component's
+ * value may be, where its declared type does not say.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.TYPE, ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER })
 public @interface Union {
 
+	/** The member classes. Empty, on a type, makes an open union. */
 	Class<?>[] value() default {};
 
+	/** Whether the union admits no member beyond those listed. Read only beside a list: an open union is not sealed. */
 	boolean sealed() default true;
 }

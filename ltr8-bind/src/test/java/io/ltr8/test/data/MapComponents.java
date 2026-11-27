@@ -15,6 +15,8 @@
  */
 package io.ltr8.test.data;
 
+import io.ltr8.annotation.AnnotatedMap;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -60,5 +62,11 @@ public final class MapComponents {
 	}
 
 	public record HoldsMapRecords(List<RecordValues> items) {
+	}
+
+	public record AnnotatedKeys(AnnotatedMap<String, Integer> counts) {
+	}
+
+	public record AnnotatedRecordKeys(AnnotatedMap<Point, String> labels) {
 	}
 }

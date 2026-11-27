@@ -15,9 +15,11 @@
  */
 package io.ltr8.bind.mapper;
 
+import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
@@ -40,7 +42,12 @@ import java.util.Objects;
  * for each type. This is the method likely to be used by serialization libraries to improve
  * performance.
  * <p>
- * A map is an array of {@code [key, value]} entries, each part in this form, in the order the map iterates in.
+ * A map is an array of {@code [key, value]} entries, each part in this form, in the order the map iterates in. An
+ * annotated value, an {@code AnnotatedMap}'s key among them, is its value in this form: the form has no place for
+ * annotations, so it reads back without them.
+ * <p>
+ * A read refused for a record's own shape -- its array's length, or a required field's absence -- throws the
+ * {@link DataBindException} that says so, however deep the record sits: no enclosing list, map or union wraps it.
  *
  * <ul>
  * <li>TODO add try/catch/throw around conversions
@@ -49,6 +56,21 @@ import java.util.Objects;
  * 
  */
 public class ArrayMapper {
+
+	private static final MethodHandle CHECKED;
+
+	private static final MethodHandle PART;
+
+	static {
+		try {
+			CHECKED = MethodHandles.lookup().findStatic(ArrayMapper.class, "checked",
+					MethodType.methodType(Object[].class, DataClassRecord.class, Object[].class));
+			PART = MethodHandles.lookup().findStatic(ArrayMapper.class, "part",
+					MethodType.methodType(Object.class, MethodHandle.class, Object.class));
+		} catch (NoSuchMethodException | IllegalAccessException e) {
+			throw new ExceptionInInitializerError(e);
+		}
+	}
 
 	private final DataBindContext context;
 
@@ -154,6 +176,14 @@ public class ArrayMapper {
 				// ( Object ):dataObject
 				//result = result.asType(result.type().changeParameterType(0, Object.class));
 			}
+            case DataClassAnnotated annotated -> {
+                // (Object):box -> box(part(toObject, value), no annotations)
+                MethodHandle valueToObject = MethodHandles.insertArguments(PART, 0, createToObjectFunction(
+                        annotated.valueClass()).asType(MethodType.methodType(Object.class, Object.class)));
+                result = MethodHandles.filterArguments(
+                        MethodHandles.insertArguments(annotated.constructor(), 1, Annotations.empty()), 0,
+                        valueToObject);
+            }
             case DataClassRecord dataClassRecord -> {
 
 				// (Object[]):typeClass -> new TypeClass( params );
@@ -172,15 +202,12 @@ public class ArrayMapper {
                     // (Object[]):Object -> (values[inputIndex]):Object
                     MethodHandle arrayIndexGetter = MethodHandles.collectArguments(arrayGetter, 1, index);
 
-					// (dataClass):typeClass -> toObject(dataClass):typeClass
-					MethodHandle fieldToObject = createToObjectFunction(fieldDataClass);
+					// (Object):Object -> value == null ? null : toObject(value)
+					MethodHandle fieldToObject = MethodHandles.insertArguments(PART, 0, createToObjectFunction(
+							fieldDataClass).asType(MethodType.methodType(Object.class, Object.class)));
 
-					// (values[]) -> (values[inputIndex)):dataType
-					MethodType arrayIndexGetterType = arrayIndexGetter.type().changeReturnType(fieldToObject.type().parameterType(0));
-					MethodHandle typedArrayIndexGetter = arrayIndexGetter.asType(arrayIndexGetterType);
-
-                    // (values[]):fieldType -> toObject(values[x])
-                    arrayIndexGetter = MethodHandles.collectArguments(fieldToObject, 0, typedArrayIndexGetter);
+                    // (values[]):Object -> part(toObject, values[x])
+                    arrayIndexGetter = MethodHandles.filterReturnValue(arrayIndexGetter, fieldToObject);
 
                     // (values[],int,Object):void -> values[int] = Object;
                     MethodHandle arraySetter = MethodHandles.arrayElementSetter(Object[].class);
@@ -190,7 +217,7 @@ public class ArrayMapper {
 
                     // (values[],Object[]):void -> values[x] = toObject(values[x]);
                     MethodHandle arrayValueSetter = MethodHandles.collectArguments(arrayIndexSetter, 1,
-                            arrayIndexGetter.asType(MethodType.methodType(Object.class, Object[].class)));
+                            arrayIndexGetter);
 
                     int[] permuteInput = new int[2];
                     MethodHandle combined = MethodHandles.permuteArguments(arrayValueSetter,
@@ -200,6 +227,7 @@ public class ArrayMapper {
 
                 }
 
+                result = MethodHandles.filterArguments(result, 0, CHECKED.bindTo(dataClassRecord));
                 result = result.asType(result.type().changeReturnType(dataClass.dataClass()));
             }
             case DataClassArray dataArrayClass -> {
@@ -267,6 +295,26 @@ public class ArrayMapper {
 	}
 
 	/**
+	 * A record's values line up with its fields by position, so an array of any other length leaves a field
+	 * without a value or a value without a field. A null is an absent value, which a required field refuses.
+	 */
+	private static Object[] checked(DataClassRecord record, Object[] values) throws DataBindException {
+		DataClassField[] fields = record.fields();
+		if (values.length != fields.length) {
+			throw new DataBindException(String.format("%s has %d fields but the array has length %d",
+					record.typeClass().getName(), fields.length, values.length));
+		}
+		DataClassField carrier = record.annotationsCarrier().orElse(null);
+		for (int x = 0; x < fields.length; x++) {
+			if (values[x] == null && fields[x].isRequired() && fields[x] != carrier) {
+				throw new DataBindException(String.format("%s is missing its required field '%s'",
+						record.typeClass().getName(), fields[x].name()));
+			}
+		}
+		return values;
+	}
+
+	/**
 	 * create project takes a target object and returns an Object[] of values. Not yet complete. Haven't
 	 * worked out how to re-use the Object[] in return value.
 	 * <p>
@@ -285,6 +333,12 @@ public class ArrayMapper {
 			case DataClassAtom dataClassAtom -> {
 				// (typeClass):typeClass
 				toDataMethod = MethodHandles.identity(dataClass.dataClass());
+			}
+			case DataClassAnnotated annotated -> {
+				// (box):Object -> part(toData, box.value())
+				toDataMethod = MethodHandles.filterReturnValue(annotated.value(),
+						MethodHandles.insertArguments(PART, 0, createToDataFunction(annotated.valueClass())
+								.asType(MethodType.methodType(Object.class, Object.class))));
 			}
             case DataClassRecord dataClassRecord -> {
 
@@ -448,15 +502,11 @@ public class ArrayMapper {
 	private static class ObjectToArrayBridge {
 
 		private final DataClassArray arrayClass;
-		private final MethodHandle dataToObject;
+		private final MethodHandle elementToData;
 
-		public ObjectToArrayBridge(DataClassArray fieldDataClass, MethodHandle dataToObject) {
+		public ObjectToArrayBridge(DataClassArray fieldDataClass, MethodHandle elementToData) {
 			this.arrayClass = fieldDataClass;
-
-			this.dataToObject = MethodHandles.collectArguments(
-					dataToObject
-							.asType(dataToObject.type().changeParameterType(0, arrayClass.get().type().returnType())),
-					0, arrayClass.get());
+			this.elementToData = elementToData.asType(MethodType.methodType(Object.class, Object.class));
 		}
 
 		@SuppressWarnings("unused")
@@ -468,10 +518,8 @@ public class ArrayMapper {
 				Object[] outputArray = new Object[length];
 				Object iterator = arrayClass.iterator().invoke(arrayData);
 
-				DataClass arrayDataClass = arrayClass.arrayDataClass();
-
 				for (int x = 0; x < length; x++) {
-					outputArray[x] = dataToObject.invoke(arrayData, iterator);
+					outputArray[x] = part(elementToData, arrayClass.get().invoke(arrayData, iterator));
 				}
 
 				return outputArray;
@@ -537,13 +585,7 @@ public class ArrayMapper {
 
 		public ArrayToObjectBridge(DataClassArray arrayClass, MethodHandle arrayToObject) {
 			this.arrayClass = arrayClass;
-			this.arrayToObject = arrayToObject;
-
-			// TODO revisit this. Difficult to align types correctly. Might need a explicit
-			// cast.
-			// this.arrayToObject = MethodHandles.collectArguments(arrayClass.put(), 2,
-			// arrayToObject.asType(MethodType.methodType(Object.class,
-			// arrayToObject.type().parameterType(0))));
+			this.arrayToObject = arrayToObject.asType(MethodType.methodType(Object.class, Object.class));
 		}
 
 		@SuppressWarnings("unused")
@@ -555,17 +597,13 @@ public class ArrayMapper {
 				Object arrayData = arrayClass.constructor().invoke(length);
 				Object iterator = arrayClass.iterator().invoke(arrayData);
 
-				DataClass arrayDataClass = arrayClass.arrayDataClass();
-
 				for (int x = 0; x < length; x++) {
-
-					Object v = arrayToObject.invoke(inputArray[x]);
-
-					arrayClass.put().invoke(arrayData, iterator, v);
-
+					arrayClass.put().invoke(arrayData, iterator, part(arrayToObject, inputArray[x]));
 				}
 
 				return arrayData;
+			} catch (DataBindException e) {
+				throw e;
 			} catch (Throwable e) {
 				throw new DataBindException("Failed to convert array", e);
 			}
@@ -629,13 +667,15 @@ public class ArrayMapper {
 					mapClass.put().invoke(map, part(keyToObject, pair[0]), part(valueToObject, pair[1]));
 				}
 				return map;
+			} catch (DataBindException e) {
+				throw e;
 			} catch (Throwable e) {
 				throw new DataBindException("Failed to convert map", e);
 			}
 		}
 	}
 
-	/** A map may hold a null key or value, which no conversion takes. */
+	/** An absent component, a null element and a map's null key or value are each a null no conversion takes. */
 	private static Object part(MethodHandle convert, Object value) throws Throwable {
 		return value == null ? null : convert.invoke(value);
 	}
@@ -680,6 +720,8 @@ public class ArrayMapper {
 					}
 
 					value = function.toObject.invoke(unionValue);
+				} catch (DataBindException e) {
+					throw e;
 				} catch (Throwable e) {
 					throw new DataBindException("Failed to convert class", e);
 				}

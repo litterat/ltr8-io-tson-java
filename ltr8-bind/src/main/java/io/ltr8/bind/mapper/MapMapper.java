@@ -15,9 +15,11 @@
  */
 package io.ltr8.bind.mapper;
 
+import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
@@ -35,7 +37,11 @@ import java.util.Objects;
  * Sample showing how to use the library to convert an Object to/from {@code Map<String, Object>}. Each key
  * in the returned map has the name of the field. Union types have an extra field called "type" which
  * provides the class name of the type of value recorded. A map component is a map of its keys and values, each in
- * this form, in the order the component's map iterates in.
+ * this form, in the order the component's map iterates in. An annotated value, an {@code AnnotatedMap}'s key among
+ * them, is its value in this form: the form has no place for annotations, so it reads back without them.
+ * <p>
+ * A read missing a required field throws the {@link DataBindException} that names the record and the field,
+ * however deep the record sits: no enclosing record, list, map or union wraps it.
  */
 public class MapMapper {
 
@@ -70,6 +76,9 @@ public class MapMapper {
                 case DataClassAtom dataAtom -> {
                     v = object;
                 }
+                case DataClassAnnotated annotated -> {
+                    v = partToMap(annotated.valueClass(), annotated.value().invoke(object));
+                }
                 case DataClassRecord dataRecord -> {
                     //Object data = dataRecord.toData().invoke(object);
                     Map<String, Object> map = new HashMap<>();
@@ -95,7 +104,7 @@ public class MapMapper {
                     DataClass arrayDataClass = arrayClass.arrayDataClass();
                     for (int x = 0; x < length; x++) {
                         Object av = arrayClass.get().invoke(object, iterator);
-                        outputArray[x] = toMap(arrayDataClass, av);
+                        outputArray[x] = partToMap(arrayDataClass, av);
                     }
 
                     v = outputArray;
@@ -105,8 +114,8 @@ public class MapMapper {
                     Object iterator = mapClass.iterator().invoke(object);
                     Object entry;
                     while ((entry = mapClass.next().invoke(iterator)) != null) {
-                        map.put(entryToMap(mapClass.keyDataClass(), mapClass.key().invoke(entry)),
-                                entryToMap(mapClass.valueDataClass(), mapClass.value().invoke(entry)));
+                        map.put(partToMap(mapClass.keyDataClass(), mapClass.key().invoke(entry)),
+                                partToMap(mapClass.valueDataClass(), mapClass.value().invoke(entry)));
                     }
                     v = map;
                 }
@@ -158,21 +167,25 @@ public class MapMapper {
                 case DataClassAtom dataClassAtom -> {
                     v = data;
                 }
+                case DataClassAnnotated annotated -> {
+                    v = annotated.constructor().invoke(partToObject(annotated.valueClass(), data),
+                            Annotations.empty());
+                }
                 case DataClassRecord dataRecord -> {
                     Map<String, Object> map = (Map<String, Object>) data;
                     DataClassField[] fields = dataRecord.fields();
                     Object[] construct = new Object[fields.length];
+                    DataClassField carrier = dataRecord.annotationsCarrier().orElse(null);
                     for (fieldIndex = 0; fieldIndex < dataRecord.fields().length; fieldIndex++) {
                         DataClassField field = fields[fieldIndex];
 
                         Object fv = map.get(field.name());
 
-                        // Recursively convert maps back to objects.
                         if (fv != null) {
-                            DataClass fieldDataClass = field.dataClass();
-
-                            fv = toObject(fieldDataClass, fv);
-
+                            fv = toObject(field.dataClass(), fv);
+                        } else if (field.isRequired() && field != carrier) {
+                            throw new DataBindException(String.format("%s is missing its required field '%s'",
+                                    dataRecord.typeClass().getName(), field.name()));
                         }
                         construct[fieldIndex] = fv;
                     }
@@ -191,7 +204,7 @@ public class MapMapper {
                     DataClass arrayDataClass = arrayClass.arrayDataClass();
 
                     for (Object o : inputArray) {
-                        arrayClass.put().invoke(arrayData, iterator, toObject(arrayDataClass, o));
+                        arrayClass.put().invoke(arrayData, iterator, partToObject(arrayDataClass, o));
                     }
 
                     v = arrayData;
@@ -200,8 +213,8 @@ public class MapMapper {
                     Map<Object, Object> input = (Map<Object, Object>) data;
                     Object map = mapClass.constructor().invoke(input.size());
                     for (Map.Entry<Object, Object> entry : input.entrySet()) {
-                        mapClass.put().invoke(map, entryToObject(mapClass.keyDataClass(), entry.getKey()),
-                                entryToObject(mapClass.valueDataClass(), entry.getValue()));
+                        mapClass.put().invoke(map, partToObject(mapClass.keyDataClass(), entry.getKey()),
+                                partToObject(mapClass.valueDataClass(), entry.getValue()));
                     }
                     v = map;
                 }
@@ -235,18 +248,20 @@ public class MapMapper {
             }
 
             return v;
+		} catch (DataBindException e) {
+			throw e;
 		} catch (Throwable t) {
 			throw new DataBindException(String.format("Failed to convert Map to %s.", dataClass.typeClass()), t);
 		}
 
 	}
 
-	/** A map may hold a null key or value, which no data class converts. */
-	private Object entryToMap(DataClass dataClass, Object part) throws DataBindException {
+	/** A null element and a map's null key or value are each a null that no data class converts. */
+	private Object partToMap(DataClass dataClass, Object part) throws DataBindException {
 		return part == null ? null : toMap(dataClass, part);
 	}
 
-	private Object entryToObject(DataClass dataClass, Object part) throws DataBindException {
+	private Object partToObject(DataClass dataClass, Object part) throws DataBindException {
 		return part == null ? null : toObject(dataClass, part);
 	}
 }

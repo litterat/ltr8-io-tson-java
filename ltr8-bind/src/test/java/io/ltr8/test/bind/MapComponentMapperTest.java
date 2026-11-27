@@ -15,11 +15,16 @@
  */
 package io.ltr8.test.bind;
 
+import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
+import io.ltr8.test.data.MapComponents.AnnotatedKeys;
+import io.ltr8.test.data.MapComponents.AnnotatedRecordKeys;
 import io.ltr8.test.data.MapComponents.AtomValues;
 import io.ltr8.test.data.MapComponents.BridgedKeys;
 import io.ltr8.test.data.MapComponents.EnumKeys;
@@ -51,6 +56,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A map component is written and read by both mappers: by {@link MapMapper} as a map, and by {@link ArrayMapper} as
@@ -143,6 +149,44 @@ class MapComponentMapperTest {
 						arrays.toObject(OrderedValues.class, arrays.toArray(value)).ranked().keySet())),
 				() -> assertEquals(List.copyOf(ranked.keySet()), List.copyOf(((OrderedValues) maps
 						.toObject(OrderedValues.class, maps.toMap(value))).ranked().keySet())));
+	}
+
+	/**
+	 * An {@link AnnotatedMap} is written as its keys and values, as any map is, and read back into one. Neither
+	 * form has a place for a key's annotations, so the key reads back without them.
+	 */
+	@Test
+	void anAnnotatedMapCarriesItsKeysThroughBothMappers() throws Throwable {
+		AnnotatedMap<String, Integer> counts = new AnnotatedMap<>();
+		counts.put("z", 1, Annotations.of(List.of(Annotation.of("doc", "last"))));
+		counts.put("a", 2);
+		AnnotatedMap<Point, String> labels = new AnnotatedMap<>();
+		labels.put(new Point(0, 0), "o");
+		AnnotatedKeys keys = new AnnotatedKeys(counts);
+		AnnotatedRecordKeys recordKeys = new AnnotatedRecordKeys(labels);
+		assertAll(
+				() -> assertArrayEquals(new Object[] { new Object[] { new Object[] { "z", 1 }, new Object[] { "a", 2 } } },
+						arrays.toArray(keys)),
+				() -> assertArrayEquals(new Object[] { new Object[] { new Object[] { new Object[] { 0, 0 }, "o" } } },
+						arrays.toArray(recordKeys)),
+				() -> assertEquals(Map.of("counts", Map.of("z", 1, "a", 2)), maps.toMap(keys)),
+				() -> assertEquals(Map.of("labels", Map.of(Map.of("x", 0, "y", 0), "o")), maps.toMap(recordKeys)),
+				() -> assertEquals(keys, arrays.toObject(AnnotatedKeys.class, arrays.toArray(keys))),
+				() -> assertEquals(keys, maps.toObject(AnnotatedKeys.class, maps.toMap(keys))),
+				() -> assertEquals(recordKeys, arrays.toObject(AnnotatedRecordKeys.class, arrays.toArray(recordKeys))),
+				() -> assertEquals(recordKeys, maps.toObject(AnnotatedRecordKeys.class, maps.toMap(recordKeys))),
+				() -> {
+					AnnotatedMap<String, Integer> read = arrays.toObject(AnnotatedKeys.class, arrays.toArray(keys))
+							.counts();
+					assertEquals(List.of("z", "a"), List.copyOf(read.keySet()));
+					assertTrue(read.getAnnotations("z").isEmpty());
+				},
+				() -> {
+					AnnotatedMap<String, Integer> read = ((AnnotatedKeys) maps.toObject(AnnotatedKeys.class,
+							maps.toMap(keys))).counts();
+					assertEquals(List.of("z", "a"), List.copyOf(read.keySet()));
+					assertTrue(read.getAnnotations("z").isEmpty());
+				});
 	}
 
 	@Test
