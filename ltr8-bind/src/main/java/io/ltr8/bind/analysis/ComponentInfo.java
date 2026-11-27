@@ -31,7 +31,7 @@ public class ComponentInfo {
 
 	private String name;
 
-	// Parameterized or a class, never another generic type (TypeArguments.resolve): its erasure is the finder's class.
+	// A class, a parameterized type or an array of one (TypeArguments.isHeld): its erasure is the finder's class.
 	private final Type type;
 
 	// Declares the field a constructor stores this component in; null where only @Field names the component.

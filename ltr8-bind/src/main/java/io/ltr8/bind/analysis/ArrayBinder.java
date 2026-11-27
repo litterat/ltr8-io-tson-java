@@ -11,6 +11,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.invoke.VarHandle.AccessMode;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -37,10 +38,10 @@ public class ArrayBinder {
 			// Find the type of the Array collection.
 			if (targetClass.isArray()) {
 
-				Class<?> arrayClass = targetClass.getComponentType();
-
-				// Java arrays type is easily available via reflection.
-				arrayDataClass = context.componentSource(targetClass.getComponentType(), targetClass.getComponentType());
+				// An array of a parameterized type keeps its element's arguments only in its generic type.
+				Type element = parameterizedType instanceof GenericArrayType array ? array.getGenericComponentType()
+						: targetClass.getComponentType();
+				arrayDataClass = context.componentSource(TypeArguments.erasure(element), element);
 
 			} else if (Collection.class.isAssignableFrom(targetClass)) {
 
