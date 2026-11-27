@@ -19,7 +19,7 @@ import io.ltr8.annotation.Union;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,7 +31,8 @@ public class ComponentInfo {
 
 	private String name;
 
-	private final Class<?> type;
+	// Parameterized or a class, never another generic type (TypeArguments.resolve): its erasure is the finder's class.
+	private final Type type;
 
 	// Declares the field a constructor stores this component in; null where only @Field names the component.
 	private Class<?> declaringClass;
@@ -46,8 +47,6 @@ public class ComponentInfo {
 
 	private int constructorArgument;
 
-	private ParameterizedType paramType;
-
 	private final List<Member> members = new ArrayList<>();
 
 	private boolean annotated;
@@ -61,7 +60,7 @@ public class ComponentInfo {
 	private boolean unbound;
 
 
-	public ComponentInfo(String name, Class<?> type) {
+	public ComponentInfo(String name, Type type) {
 		this.name = name;
 		this.type = type;
 		this.constructorArgument = -1;
@@ -176,6 +175,10 @@ public class ComponentInfo {
 
 
 	public Class<?> getType() {
+		return TypeArguments.erasure(type);
+	}
+
+	public Type getGenericType() {
 		return type;
 	}
 
@@ -209,14 +212,6 @@ public class ComponentInfo {
 
 	public void setConstructorArgument(int constructorArgument) {
 		this.constructorArgument = constructorArgument;
-	}
-
-	public ParameterizedType getParamType() {
-		return paramType;
-	}
-
-	public void setParamType(ParameterizedType paramType) {
-		this.paramType = paramType;
 	}
 
 }

@@ -9,45 +9,48 @@ import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
  * A generic class's components at one parameterisation: each type parameter a component's declared type names is
- * replaced by the argument the class is described with. {@code record Box<T>(List<T> items)} described as {@code
- * Box<String>} binds {@code items} as a {@code List<String>}, which is what lets a generic value class -- a map of
- * names whose value type is the parameter -- be a component of another class at all: a type variable left in place
- * has no descriptor.
+ * replaced by the argument the class is described with, where a finder first resolves the component's type
+ * ({@link #resolve}). {@code record Box<T>(List<T> items)} described as {@code Box<String>} binds {@code items} as a
+ * {@code List<String>}, which is what lets a generic value class -- a map of names whose value type is the
+ * parameter -- be a component of another class at all: a type variable left in place has no descriptor.
  *
- * <p>Only a component whose declared type is parameterised is rewritten, at any depth of its arguments. A
- * component whose type is a bare type variable is left as declared, its erasure, and a parameter the description
- * does not supply (a raw class) is left unreplaced.
+ * <p>Only a component whose type is parameterised takes the arguments, at any depth of its own. A component whose
+ * type is a bare type variable, or an array of one, is held at its erasure, and a parameter the description does
+ * not supply (a raw class) is left unreplaced.
  */
 final class TypeArguments {
 
     private TypeArguments() {
     }
 
-    /** {@code components}, found on {@code targetClass}, rewritten for {@code parameterizedType}'s arguments. */
-    static void substitute(Class<?> targetClass, Type parameterizedType, List<ComponentInfo> components) {
+    /**
+     * Each of {@code targetClass}'s type parameters bound to the argument {@code parameterizedType} gives it; none
+     * where that is not a parameterisation of {@code targetClass} with an argument for each.
+     */
+    static Map<TypeVariable<?>, Type> described(Class<?> targetClass, Type parameterizedType) {
         if (!(parameterizedType instanceof ParameterizedType parameterized)
                 || parameterized.getRawType() != targetClass) {
-            return;
+            return Map.of();
         }
         TypeVariable<?>[] parameters = targetClass.getTypeParameters();
         Type[] arguments = parameterized.getActualTypeArguments();
         if (parameters.length != arguments.length) {
-            return;
+            return Map.of();
         }
         Map<TypeVariable<?>, Type> bindings = new HashMap<>();
         for (int i = 0; i < parameters.length; i++) {
             bindings.put(parameters[i], arguments[i]);
         }
-        for (ComponentInfo component : components) {
-            if (component.getParamType() != null) {
-                component.setParamType((ParameterizedType) substitute(component.getParamType(), bindings));
-            }
-        }
+        return bindings;
+    }
+
+    /** The type a component of declared {@code type}, erasing to {@code erasure}, is held at under {@code bindings}. */
+    static Type resolve(Type type, Class<?> erasure, Map<TypeVariable<?>, Type> bindings) {
+        return type instanceof ParameterizedType parameterized ? substitute(parameterized, bindings) : erasure;
     }
 
     /**
