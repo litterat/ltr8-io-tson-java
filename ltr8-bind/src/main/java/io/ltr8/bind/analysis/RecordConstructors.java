@@ -19,12 +19,14 @@ import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Record;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * The public constructor a record class is built through, chosen by the context's {@link Profile} and the class's
- * {@link Record}.
+ * {@link Record}, and failing both, a lone constructor or a Java record's canonical one.
  */
 final class RecordConstructors {
 
@@ -68,10 +70,15 @@ final class RecordConstructors {
 			}
 		}
 
-		// Nothing designated at all -- not even a single unprofiled constructor to fall back to. When the
-		// context named a profile, say so and list what the class does offer:
-		// the likeliest cause is a name that disagrees in one of the two places it has to match, and the
-		// fallback would otherwise surface later as a field mismatch against the wrong constructor.
+		Constructor<?> canonical = unprofiledCanonical(dataClass, constructors);
+		if (canonical != null) {
+			return canonical;
+		}
+
+		// Nothing designated at all -- not even a single unprofiled constructor, or a record's canonical one, to fall
+		// back to. When the context named a profile, say so and list what the class does offer: the likeliest cause
+		// is a name that disagrees in one of the two places it has to match, and the fallback would otherwise
+		// surface later as a field mismatch against the wrong constructor.
 		if (profile != null) {
 			List<String> offered = new ArrayList<>();
 			for (Constructor<?> constructor : declared) {
@@ -89,6 +96,29 @@ final class RecordConstructors {
 
 		throw new CodeAnalysisException("Could not find constructor: " + dataClass);
 
+	}
+
+	/**
+	 * A Java record's canonical constructor among {@code constructors}, where it claims no {@link Profile}: it takes
+	 * every component, so it binds the record's whole shape. Matched by parameter type, as
+	 * {@link RecordComponentFinder} tells it apart.
+	 *
+	 * @return the constructor, or {@code null} where {@code dataClass} is no record or its canonical constructor is
+	 *         not among them or claims a profile
+	 */
+	private static Constructor<?> unprofiledCanonical(Class<?> dataClass, Constructor<?>[] constructors) {
+		if (!dataClass.isRecord()) {
+			return null;
+		}
+		Class<?>[] components = Arrays.stream(dataClass.getRecordComponents()).map(RecordComponent::getType)
+				.toArray(Class<?>[]::new);
+		for (Constructor<?> constructor : constructors) {
+			if (Arrays.equals(constructor.getParameterTypes(), components)
+					&& constructor.getAnnotation(Profile.class) == null) {
+				return constructor;
+			}
+		}
+		return null;
 	}
 
 	/**

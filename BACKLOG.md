@@ -543,10 +543,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **A constructor parameter whose `@Field` names nothing makes a component named "".** An unmatched parameter
   carrying `@Field` with an empty `value`, to mark it required or bridged, names its component by that value. Read,
   not run. Refuse the class, naming it and the parameter, with a case in `RecordRefusalTest`.
-- [ ] **A Java record with a second public constructor is refused.** `record Two(String a, String b)` with a
-  public `Two(String a)` and no `@Record` or `@Profile` is refused with "Could not find constructor: class …":
-  constructor selection takes a lone constructor or a marked one. Take a record's canonical constructor where none
-  is marked, with a round trip.
 - [ ] **The two finders reach an inherited member by different rules.** `ImmutableFinder` counts a field hidden by
   any field of its name below it and refuses the class ("…hides from the public lookup"); `GetSetFinder` counts
   one hidden by name and type, and falls back to the declaring class, refusing "…not accessible…" where that is
