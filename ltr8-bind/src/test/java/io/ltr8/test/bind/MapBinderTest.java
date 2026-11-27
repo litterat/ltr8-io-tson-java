@@ -113,7 +113,7 @@ public class MapBinderTest {
 	}
 
 	// ── Non-String keys ──────────────────────────────────────────────────
-	// A map key isn't special-cased to String anywhere in DataClassMap/DefaultMapBinder -- it's
+	// A map key isn't special-cased to String anywhere in DataClassMap/MapBinder -- it's
 	// resolved as an ordinary DataClass the same way a value is, so any registered key type works.
 
 	public record IntKeyedMapHolder(Map<Integer, String> byId) {

@@ -36,7 +36,7 @@ import io.ltr8.bind.DataClassUnion;
  * A model whose type graph contains a cycle resolves. Descriptors are cached only once resolution
  * <em>completes</em> and every component's type is resolved eagerly, so before cycle protection a type that
  * reached itself recursed until the stack went -- and the failure was a {@link StackOverflowError} out of
- * {@code DefaultRecordBinder}, not a diagnosable error.
+ * {@code RecordBinder}, not a diagnosable error.
  *
  * <p><b>A cyclic type graph does not mean an infinite value.</b> {@code Node -> Optional<Node>} describes a
  * list that ends wherever a value says it ends, and the AST this was found through -- {@code DataValue ->

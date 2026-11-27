@@ -18,12 +18,12 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Set;
 
-public class DefaultAtomBinder {
+public class AtomBinder {
 
 	private static final String TODATA_METHOD = "toData";
 	private static final String TOOBJECT_METHOD = "toObject";
 
-	public DefaultAtomBinder() {
+	public AtomBinder() {
 	}
 
 	/**
@@ -150,7 +150,7 @@ public class DefaultAtomBinder {
 
 	/**
 	 * Binds a plain Java enum to its {@code name()} via {@link EnumStringBridge} -- the default,
-	 * overridable representation {@link DefaultClassBinder} routes every enum to directly, no
+	 * overridable representation {@link ClassBinder} routes every enum to directly, no
 	 * {@code @Atom} required (see its own comment on why: {@code Class#isEnum()} is as unambiguous
 	 * as {@code Class#isRecord()}, so there's nothing for an annotation to disambiguate here that
 	 * record/array auto-detection doesn't already handle the same way for their own JDK-recognizable

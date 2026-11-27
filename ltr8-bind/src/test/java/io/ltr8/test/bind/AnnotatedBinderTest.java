@@ -33,7 +33,7 @@ import io.ltr8.bind.mapper.MapMapper;
 public class AnnotatedBinderTest {
 
 	// Declaring a component of type Annotations is the whole opt-in -- no marker, and nothing to
-	// register. Annotations is not a resolvable atom/record/etc., which is fine: DefaultRecordBinder
+	// register. Annotations is not a resolvable atom/record/etc., which is fine: RecordBinder
 	// never calls context.getDescriptor() for a carrier.
 	public record Item(Annotations meta, String name) {
 	}
