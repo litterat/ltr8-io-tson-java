@@ -43,11 +43,12 @@ import java.util.Objects;
  * is its value in this form: the form has no place for annotations, so it reads back without them. For the same
  * reason a record's {@code Annotations} carrier has no key, and reads back holding none.
  * <p>
- * A union value is its member's map with one more key, "type", holding the member's class name. A member with a field
- * of its own named "type" is instead a map of "type", holding its class name, and "value", holding its map, so that
- * neither the tag nor the field takes the other's place. A read refuses a class name of a class that cannot be a
- * member before that class is initialised or described: a class the union lists can be, and so can a class of the
- * union's type where the union admits additions.
+ * A union value of a record is its map with one more key, "type", holding the member's class name. Any other member
+ * -- a record with a field of its own named "type", or a member written as an array or an atom -- is instead a map of
+ * "type", holding its class name, and "value", holding its value in this form, so that the tag takes no field's
+ * place and every member carries it. A read of a value that is no map takes the value's own class as the member. A
+ * read refuses a class name of a class that cannot be a member before that class is initialised or described: a
+ * class the union lists can be, and so can a class of the union's type where the union admits additions.
  * <p>
  * A read or a write missing a required field, or a tuple's read of an array of the wrong length or missing a
  * primitive element, throws the {@link DataBindException} that says so, however deep the value sits: no enclosing
@@ -65,11 +66,22 @@ public class MapMapper {
 		this.context = context;
 	}
 
+	/**
+	 * Writes {@code object} as described by its own class.
+	 *
+	 * @throws DataBindException where it is written as anything but a map, a tuple or an array among them, which
+	 *                           {@link #toMap(DataClass, Object)} writes
+	 */
 	@SuppressWarnings("unchecked")
 	public Map<String, Object> toMap(Object object) throws DataBindException {
 		Objects.requireNonNull(object);
 
-		return (Map<String, Object>) toMap(context.getDescriptor(object.getClass()), object);
+		Object written = toMap(context.getDescriptor(object.getClass()), object);
+		if (!(written instanceof Map)) {
+			throw new DataBindException(String.format("%s is not written as a map: write it with "
+					+ "toMap(DataClass, Object), which returns a value in any form", object.getClass().getTypeName()));
+		}
+		return (Map<String, Object>) written;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -156,21 +168,16 @@ public class MapMapper {
                                 String.format("Class '%s' not a member of union type.", object.getClass().getName()));
                     }
 
-                    // A union needs to know the type being written so it can be picked up by
-                    // the reader later.
+                    // Using the full class name here as an example. A better/more complete implementation
+                    // would use a schema based name.
                     v = toMap(unionInstanceClass, object);
-                    if (v instanceof @SuppressWarnings("rawtypes")Map baseMap) {
-
-                        // Using the full class name here as an example. A better/more complete implementation
-                        // would use a schema based name.
-                        if (holdsTag(unionInstanceClass)) {
-                            Map<String, Object> tagged = new HashMap<>();
-                            tagged.put(TAG, object.getClass().getName());
-                            tagged.put(VALUE, baseMap);
-                            v = tagged;
-                        } else {
-                            baseMap.put(TAG, object.getClass().getName());
-                        }
+                    if (tagsBesideFields(unionInstanceClass)) {
+                        ((Map<String, Object>) v).put(TAG, object.getClass().getName());
+                    } else {
+                        Map<String, Object> tagged = new HashMap<>();
+                        tagged.put(TAG, object.getClass().getName());
+                        tagged.put(VALUE, v);
+                        v = tagged;
                     }
                 }
                 case null, default -> throw new IllegalArgumentException("Unknown data class");
@@ -269,30 +276,27 @@ public class MapMapper {
                 }
                 case DataClassUnion unionClass -> {
 
-                    if (data instanceof Map) {
-
-                        Map<String, Object> map = (Map<String, Object>) data;
-
-                        DataClass member = context.getDescriptor(Checks.candidate(unionClass, (String) map.get(TAG)));
-                        if (!unionClass.isMemberType(member.typeClass())) {
-                            throw new DataBindException(String.format("instance type '%s' not of expected union type '%s'",
-                                    member.typeClass().getName(), unionClass.typeClass().getName()));
-                        }
-                        Object fields = data;
-                        if (holdsTag(member)) {
-                            fields = map.get(VALUE);
-                            if (!(fields instanceof Map)) {
-                                throw new DataBindException(String.format("%s has a field named '%s', the key a union "
-                                        + "value's class name takes, so a union value of it holds its fields in a map "
-                                        + "under '%s'", member.typeClass().getName(), TAG, VALUE));
-                            }
-                        }
-                        v = toObject(member, fields);
-                    } else {
-                        DataClass unionType = context.getDescriptor(data.getClass());
-
-                        v = toObject(unionType, data);
+                    // A value that is no map names no class but its own, as an atom member's value can.
+                    Map<String, Object> map = data instanceof Map ? (Map<String, Object>) data : null;
+                    String name = map != null ? (String) map.get(TAG) : data.getClass().getName();
+                    DataClass member = context.getDescriptor(Checks.candidate(unionClass, name));
+                    if (!unionClass.isMemberType(member.typeClass())) {
+                        throw new DataBindException(String.format("instance type '%s' not of expected union type '%s'",
+                                member.typeClass().getName(), unionClass.typeClass().getName()));
                     }
+                    Object value = data;
+                    if (map != null && !tagsBesideFields(member)) {
+                        value = map.get(VALUE);
+                        if (value == null || member instanceof DataClassRecord && !(value instanceof Map)) {
+                            throw new DataBindException(member instanceof DataClassRecord
+                                    ? String.format("%s has a field named '%s', the key a union value's class name "
+                                            + "takes, so a union value of it holds its fields in a map under '%s'",
+                                            member.typeClass().getName(), TAG, VALUE)
+                                    : String.format("%s is not written as a map of its fields, so a union value of it "
+                                            + "holds its value under '%s'", member.typeClass().getName(), VALUE));
+                        }
+                    }
+                    v = toObject(member, value);
                 }
                 case null, default -> throw new IllegalArgumentException("unrecognised type");
             }
@@ -319,8 +323,11 @@ public class MapMapper {
 		return part == null ? null : toObject(dataClass, part);
 	}
 
-	/** Whether {@code member} has a field the tag's key would take, which decides its union value's form. */
-	private static boolean holdsTag(DataClass member) {
-		return member instanceof DataClassRecord record && record.fieldIndex().containsKey(TAG);
+	/**
+	 * Whether a union value of {@code member} is its map of fields with the tag beside them: a record with no field
+	 * the tag's key would take. Any other member's union value is a map of the tag and its value.
+	 */
+	private static boolean tagsBesideFields(DataClass member) {
+		return member instanceof DataClassRecord record && !record.fieldIndex().containsKey(TAG);
 	}
 }
