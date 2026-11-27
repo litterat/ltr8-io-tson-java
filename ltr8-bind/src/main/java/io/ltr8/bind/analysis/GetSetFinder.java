@@ -42,6 +42,9 @@ public class GetSetFinder implements ComponentFinder {
 
 		Lookup lookup = MethodHandles.publicLookup();
 
+		// A member a super class declares is typed at the arguments the described class binds.
+		Map<TypeVariable<?>, Type> bindings = TypeArguments.inherited(clss);
+
 		// A final field has no setter: one the constructor binds is already a component, read as ImmutableFinder
 		// found it and written through the constructor, and one it does not bind is no component, since nothing
 		// can write it.
@@ -51,7 +54,10 @@ public class GetSetFinder implements ComponentFinder {
 			if (Modifier.isPublic(modifiers) && !Modifier.isTransient(modifiers) && !Modifier.isStatic(modifiers)
 					&& !Modifier.isFinal(modifiers)) {
 
-				ComponentInfo info = new ComponentInfo(classField.getName(), classField.getType());
+				Type type = TypeArguments.substitute(classField.getGenericType(), bindings);
+				Class<?> erasure = type == classField.getGenericType() ? classField.getType()
+						: TypeArguments.erasure(type);
+				ComponentInfo info = new ComponentInfo(classField.getName(), erasure);
 
 				Field fieldAnnotation = classField.getAnnotation(Field.class);
 				if (fieldAnnotation != null) {
@@ -61,10 +67,13 @@ public class GetSetFinder implements ComponentFinder {
 				info.readUnbound(classField);
 
 				reachField(lookup, clss, classField, info);
+				MethodHandle read = info.getReadMethod();
+				MethodHandle write = info.getWriteMethod();
+				info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
+				info.setWriteMethod(write.asType(write.type().changeParameterType(1, erasure)));
 
-				Type returnType = classField.getGenericType();
-				if (returnType instanceof ParameterizedType) {
-					info.setParamType((ParameterizedType) returnType);
+				if (type instanceof ParameterizedType parameterized) {
+					info.setParamType(parameterized);
 				}
 
 				getSetList.add(info);
@@ -83,12 +92,11 @@ public class GetSetFinder implements ComponentFinder {
 		// only with the one-argument setter of its generic return type: another overload, or a setter taking
 		// another type, even one of the same erasure, is not handed the value the getter reads.
 		//
-		// Either half may be declared by a super class, each typed at the arguments the described class binds. A
-		// getter is the most derived declaration of its name, so an override is the pair's getter at its own return
-		// type, and a setter the most derived of that type. Bridges are skipped: a covariant override's stands
-		// beside the method it bridges, and a visibility bridge carries no generic type, which the method it
-		// forwards to, further up, does. An interface's default method is no half.
-		Map<TypeVariable<?>, Type> bindings = TypeArguments.inherited(clss);
+		// Either half may be declared by a super class. A getter is the most derived declaration of its name, so an
+		// override is the pair's getter at its own return type, and a setter the most derived of that type. Bridges
+		// are skipped: a covariant override's stands beside the method it bridges, and a visibility bridge carries
+		// no generic type, which the method it forwards to, further up, does. An interface's default method is no
+		// half.
 		Map<String, Method> getters = new HashMap<>();
 		List<Method> setters = new ArrayList<>();
 		for (Class<?> declarer = clss; declarer != null; declarer = declarer.getSuperclass()) {

@@ -517,14 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **A generic public field of a super class is not resolved.** With `public List<T> items` in `FieldBase<T>`,
-  `TextFields extends FieldBase<String>` is refused with "Unrecognized parameterized type": `GetSetFinder` takes a
-  field's generic type as declared, where a pair's goes through `TypeArguments.inherited`. Resolve a field's type
-  the same way, a bare `public T value` included, with a round trip of each through both mappers.
-- [ ] **A type variable inside an array or a wildcard is not substituted.** `TypeArguments.substitute` rewrites a
-  variable and a parameterized type's arguments, so `T[] getItems()` and `List<? extends T> getItems()` in
-  `Holder<T>` keep `T` for `TextHolder extends Holder<String>`. Read, not run. Substitute inside both, with a round
-  trip of each shape as a pair and as a public field.
 - [ ] **A constructor storing a parameter in a field it inherits is refused.** `Sub(String name) { this.name = name;
   }` over a `protected String name` its super class declares is refused with "…constructor assigns field 'name',
   which the class does not declare": `ImmutableFinder` looks the field up on the described class alone. Look it up
