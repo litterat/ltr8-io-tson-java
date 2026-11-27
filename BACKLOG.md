@@ -527,6 +527,39 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   super class declares behind a pair the class inherits. Read each annotation from every member of a component,
   taking each `@Field` attribute from whichever member states it and refusing two members that state one
   differently, with a test of each annotation on each member of each class kind.
+- [ ] **A collection or a map of generic arrays is refused.** `List<List<String>[]>` is refused with "Unrecognized
+  parameterized type" and `Map<String, List<String>[]>` with "…for map key/value": `ArrayBinder`'s collection
+  branch and `MapBinder.resolveTypeArgument` take a class or a parameterized type as an element, where a record
+  component takes a generic array too (`GenericComponentTypeTest.anArrayOfAParameterizedType`). Take the same types
+  as an element, a key and a value, with a round trip of each.
+- [ ] **`Annotated` of anything but a class or a parameterized type throws `ClassCastException`.**
+  `ClassBinder.annotatedValueDescriptor` casts the argument to `Class`, so `Annotated<List<String>[]>` and
+  `Annotated<? extends X>` throw unchecked. Read, not run. Describe a generic array as a component is described and
+  refuse the rest with a `DataBindException` naming the type, with a case of each.
+- [ ] **A refusal reached by name still carries an identity hash.** `DataBindContext` lists each message on a
+  refusal's cause chain, and an unreflected member's `IllegalAccessException` prints its type by identity: a private
+  record bound by name is refused with "…Failed to access accessor for record component 'text' on '…': class is not
+  public: …HiddenRecord.text[Ljava.lang.Object;@38f57b3d/…" from `RecordComponentFinder`, a different hash in each
+  context. `AtomBinder` and `TransparentBinder` unreflect too (read, not run). Look each member up by name and type
+  through `Members`, as `RecordBinder` does its constructor, and assert each whole message in `RecordRefusalTest`.
+- [ ] **A sealed class that is not abstract is no member of its own union.** `UnionBinder.collectSealedMembers`
+  lists the leaves of a sealed hierarchy, so a concrete sealed class at the root or between is no member and its
+  own instances cannot be written as union values. An enum with a constant body is such a class: its union lists the
+  anonymous body class alone, and its other constants are no member. Read, not run, beyond a probe of the JDK's
+  answer for the enum. List a sealed class that can be instantiated beside the classes it permits, with a round trip
+  of a concrete sealed root and of each constant of such an enum.
+- [ ] **`TupleBinder` reaches a record through `ltr8-bind`'s own lookup.** It uses `MethodHandles.lookup()` where
+  every other binder uses the public lookup, so what a `@Tuple` record may hide differs from what a record may.
+  Read, not run. Reach its constructor and accessors through `Members`, with a case in `RecordRefusalTest` for a
+  `@Tuple` record the public lookup cannot reach.
+- [ ] **A `@Field` bridge inheriting a generic `toData` may be refused.** `RecordFields.fieldBridge` looks up
+  `toData` and `toObject` on the bridge class at the resolved types, and a bridge that inherits both from a generic
+  super class (`IntegerBridge extends AbstractBridge<Integer>`) declares only the erased signatures. Read, not run.
+  Reproduce it, find the methods at their erased types and adapt the handles, with a round trip in
+  `BridgedFieldTest`.
+- [ ] **`ArrayMapper.toArray` casts its result to an array.** An atom at the root throws `ClassCastException`
+  ("Cannot cast java.lang.String to [Ljava.lang.Object;") from both overloads. Refuse it naming the class, as
+  `MapMapper.toMap(Object)` refuses a root that is no map (`MapMapperRootTest`).
 - [ ] **The two mappers are examples shipped as API.** `MapMapper` and `ArrayMapper` show two ways to walk the
   descriptors, a plain descent and `MethodHandle`s built over them; nothing outside `ltr8-bind` uses them, and its
   own tests use them as the round-trip harness. They sit in `src/main` and the module exports `io.ltr8.bind.mapper`.
