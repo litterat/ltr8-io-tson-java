@@ -128,28 +128,8 @@ public class GetSetFinder implements ComponentFinder {
 			members.put(info, new Member(getter.getDeclaringClass(), getter, setter));
 		}
 
-		// We can find the list in different orders from Java, so sort them before
-		// adding them as fields.
-		Collections.sort(getSetList, new Comparator<ComponentInfo>() {
-
-			@Override
-			public int compare(ComponentInfo o1, ComponentInfo o2) {
-
-				String o1Name = o1.getName();
-				Field o1Field = ComponentAnnotations.field(o1);
-				if (o1Field != null && !o1Field.value().strip().equals("")) {
-					o1Name = o1Field.value();
-				}
-
-				String o2Name = o2.getName();
-				Field o2Field = ComponentAnnotations.field(o2);
-				if (o2Field != null && !o2Field.value().strip().equals("")) {
-					o2Name = o2Field.value();
-				}
-
-				return o1Name.compareTo(o2Name);
-			}
-		});
+		// Reflection finds them in no fixed order.
+		getSetList.sort(Comparator.comparing(ComponentAnnotations::wireName));
 
 		// A field or pair writes a constructor's component only where it is that component's member: of the same name,
 		// and declared by the class the constructor stores it in (a pair by its getter's), or a pair whose getter the
@@ -209,8 +189,9 @@ public class GetSetFinder implements ComponentFinder {
 					|| member.getter().getDeclaringClass() == clss && member.setter().getDeclaringClass() == clss) {
 				continue;
 			}
-			String name = wireName(pair);
-			if (fields.stream().anyMatch(other -> other != pair && wireName(other).equals(name))) {
+			String name = ComponentAnnotations.wireName(pair);
+			if (fields.stream()
+					.anyMatch(other -> other != pair && ComponentAnnotations.wireName(other).equals(name))) {
 				throw new CodeAnalysisException(String.format(
 						"%s has two components named '%s', one the pair %s and %s it inherits; @Field on the pair "
 								+ "names one apart",
@@ -233,11 +214,6 @@ public class GetSetFinder implements ComponentFinder {
 	private static Class<?> declarer(ComponentInfo component, Map<ComponentInfo, Member> members) {
 		Member member = members.get(component);
 		return member != null ? member.declarer() : component.getDeclaringClass();
-	}
-
-	private static String wireName(ComponentInfo component) {
-		Field field = ComponentAnnotations.field(component);
-		return field != null && !field.value().isBlank() ? field.value() : component.getName();
 	}
 
 	private static String qualified(Method method) {

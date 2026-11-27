@@ -17,7 +17,6 @@ package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.DataBridge;
-import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -71,28 +70,6 @@ final class RecordFields {
 		return setter;
 	}
 
-	private static boolean isRequired(ComponentInfo info) {
-		Field fieldAnnotation = info.getField();
-		boolean isRequired = false;
-		if (fieldAnnotation != null) {
-			isRequired = fieldAnnotation.required();
-		}
-		return isRequired;
-	}
-
-	static String fieldName(ComponentInfo info) {
-		Field fieldAnnotation = info.getField();
-
-		String fieldName = info.getName();
-		if (fieldAnnotation != null) {
-
-			if (fieldAnnotation.value() != null && !fieldAnnotation.value().isBlank()) {
-				fieldName = fieldAnnotation.value();
-			}
-		}
-
-		return fieldName;
-	}
 
 	/**
 	 * Returns the DataClassField for the targetClass. Depending on the type of field build the DataClassField:
@@ -148,7 +125,7 @@ final class RecordFields {
 	 */
 	private static DataClassField resolveAnnotationsCarrierField(Class<?> targetClass, ComponentInfo info, int index) {
 		MethodHandle accessor = accessor(info);
-		String fieldName = fieldName(info);
+		String fieldName = info.getWireName();
 
 		MethodHandle isPresent = MethodHandles.dropArguments(
 				MethodHandles.constant(boolean.class, true), 0, targetClass);
@@ -172,8 +149,8 @@ final class RecordFields {
 
 		MethodHandle accessor = accessor(info);
 		MethodHandle setter = setter(info);
-		boolean isRequired = isRequired(info);
-		String fieldName = fieldName(info);
+		boolean isRequired = info.isRequired();
+		String fieldName = info.getWireName();
 
 		// Asked of the component's own declared type rather than of its descriptor: the descriptor may be
 		// deferred on a cyclic edge, and pulling it here would resolve it in the middle of the resolution
@@ -204,8 +181,8 @@ final class RecordFields {
 			throws NoSuchMethodException, IllegalAccessException, DataBindException {
 		MethodHandle accessor = accessor(info);
 		MethodHandle setter = setter(info);
-		boolean isRequired = isRequired(info);
-		String fieldName = fieldName(info);
+		boolean isRequired = info.isRequired();
+		String fieldName = info.getWireName();
 
 		Class<?> unionClass = info.getType();
 
@@ -256,8 +233,8 @@ final class RecordFields {
 
 		MethodHandle accessor = accessor(info);
 		MethodHandle setter = setter(info);
-		boolean isRequired = isRequired(info);
-		String fieldName = fieldName(info);
+		boolean isRequired = info.isRequired();
+		String fieldName = info.getWireName();
 
 		Supplier<DataClass> tupleData = context.componentSource(bridge.dataClass(), bridge.dataType());
 
@@ -294,14 +271,12 @@ final class RecordFields {
 	 */
 	static FieldBridge fieldBridge(Class<?> targetClass, ComponentInfo info)
 			throws CodeAnalysisException, NoSuchMethodException, IllegalAccessException {
-		Field fieldAnnotation = info.getField();
-		if (fieldAnnotation == null || fieldAnnotation.bridge() == null
-				|| fieldAnnotation.bridge() == DataBridge.class) {
+		if (info.getBridge() == null) {
 			return null;
 		}
 
 		@SuppressWarnings("rawtypes")
-		Class<? extends DataBridge> bridgeClass = fieldAnnotation.bridge();
+		Class<? extends DataBridge> bridgeClass = info.getBridge().asSubclass(DataBridge.class);
 
 		Type[] bridgeTypes = dataBridgeArguments(bridgeClass, Map.of());
 		String bridgeOf = String.format("%s, the @Field bridge of %s's field '%s', ", bridgeClass.getName(),
@@ -418,8 +393,8 @@ final class RecordFields {
 
 		MethodHandle accessor = accessor(info);
 		MethodHandle setter = setter(info);
-		boolean isRequired = isRequired(info);
-		String fieldName = fieldName(info);
+		boolean isRequired = info.isRequired();
+		String fieldName = info.getWireName();
 
 		// An Optional's own type argument may itself be parameterized -- Optional<List<X>>, the shape an
 		// optional collection field takes when an empty collection cannot stand for absence (a schema
@@ -476,7 +451,7 @@ final class RecordFields {
 
 		// Optional values by definition are not required.
 		boolean isRequired = false;
-		String fieldName = fieldName(info);
+		String fieldName = info.getWireName();
 
 		// This will be one of OptionalInt, OptionalLong or OptionalDouble.
 		Class<?> optionalClass = info.getType();

@@ -116,7 +116,7 @@ final class RecordComponents {
 			throws CodeAnalysisException {
 		Set<String> names = new HashSet<>();
 		for (ComponentInfo info : components) {
-			String name = RecordFields.fieldName(info);
+			String name = info.getWireName();
 			if (info.getType() != Annotations.class && !names.add(name)) {
 				throw new CodeAnalysisException(String.format("%s binds two components to the name '%s'; @Field on "
 						+ "one of them names it apart", targetClass.getName(), name));

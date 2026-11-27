@@ -13,7 +13,6 @@
  */
 package io.ltr8.bind.analysis;
 
-import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Union;
 
 import java.lang.invoke.MethodHandle;
@@ -51,7 +50,12 @@ public class ComponentInfo {
 
 	private boolean annotated;
 
-	private Field field;
+	private String wireName;
+
+	private boolean required;
+
+	// A DataBridge implementation, or null for none.
+	private Class<?> bridge;
 
 	private Union union;
 
@@ -128,8 +132,10 @@ public class ComponentInfo {
 		return members;
 	}
 
-	void annotate(Field field, Union union, boolean unbound) {
-		this.field = field;
+	void annotate(String wireName, boolean required, Class<?> bridge, Union union, boolean unbound) {
+		this.wireName = wireName;
+		this.required = required;
+		this.bridge = bridge;
 		this.union = union;
 		this.unbound = unbound;
 		this.annotated = true;
@@ -162,9 +168,21 @@ public class ComponentInfo {
 		this.declaringClass = declaringClass;
 	}
 
-	public Field getField() {
+	/** The component's name on the wire: its {@code @Field} value, or its Java name. */
+	public String getWireName() {
 		requireAnnotated();
-		return this.field;
+		return wireName;
+	}
+
+	public boolean isRequired() {
+		requireAnnotated();
+		return required;
+	}
+
+	/** The {@code DataBridge} class its {@code @Field} names, or null for none. */
+	public Class<?> getBridge() {
+		requireAnnotated();
+		return bridge;
 	}
 
 	public Union getUnion() {

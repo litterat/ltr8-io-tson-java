@@ -15,6 +15,7 @@
  */
 package io.ltr8.bind.analysis;
 
+import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
@@ -40,7 +41,10 @@ final class ComponentAnnotations {
 	/** Settles each component's annotations, once every finder has recorded its members. */
 	static void read(List<ComponentInfo> components) {
 		for (ComponentInfo component : components) {
-			component.annotate(field(component), union(component), unbound(component));
+			Field field = field(component);
+			Class<?> bridge = field == null || field.bridge() == DataBridge.class ? null : field.bridge();
+			component.annotate(wireName(component), field != null && field.required(), bridge, union(component),
+					unbound(component));
 		}
 	}
 
@@ -65,10 +69,15 @@ final class ComponentAnnotations {
 	}
 
 	/**
-	 * The {@code @Field} {@code component}'s members give so far, for a finder naming components before
-	 * {@link #read} settles them.
+	 * The wire name {@code component}'s members give so far, for a finder naming components before {@link #read}
+	 * settles them.
 	 */
-	static Field field(ComponentInfo component) {
+	static String wireName(ComponentInfo component) {
+		Field field = field(component);
+		return field != null && !field.value().isBlank() ? field.value() : component.getName();
+	}
+
+	private static Field field(ComponentInfo component) {
 		for (Member member : component.members()) {
 			Field field = fieldOf(member);
 			if (field != null) {

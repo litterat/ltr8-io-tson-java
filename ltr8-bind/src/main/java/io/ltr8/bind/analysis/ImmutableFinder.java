@@ -185,8 +185,7 @@ public class ImmutableFinder implements ComponentFinder {
             // A super class and a subclass may each declare a field of one name.
             Set<String> names = new HashSet<>();
             for (ComponentInfo component : immutableFields) {
-                Field field = ComponentAnnotations.field(component);
-                String name = field != null && !field.value().isBlank() ? field.value() : component.getName();
+                String name = ComponentAnnotations.wireName(component);
                 if (!names.add(name)) {
                     throw new CodeAnalysisException(String.format("%s has two fields named '%s'; @Field on an "
                             + "accessor names one apart", clss.getName(), name));
