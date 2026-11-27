@@ -536,12 +536,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `ClassBinder.annotatedValueDescriptor` casts the argument to `Class`, so `Annotated<List<String>[]>` and
   `Annotated<? extends X>` throw unchecked. Read, not run. Describe a generic array as a component is described and
   refuse the rest with a `DataBindException` naming the type, with a case of each.
-- [ ] **A refusal reached by name still carries an identity hash.** `DataBindContext` lists each message on a
-  refusal's cause chain, and an unreflected member's `IllegalAccessException` prints its type by identity: a private
-  record bound by name is refused with "…Failed to access accessor for record component 'text' on '…': class is not
-  public: …HiddenRecord.text[Ljava.lang.Object;@38f57b3d/…" from `RecordComponentFinder`, a different hash in each
-  context. `AtomBinder` and `TransparentBinder` unreflect too (read, not run). Look each member up by name and type
-  through `Members`, as `RecordBinder` does its constructor, and assert each whole message in `RecordRefusalTest`.
 - [ ] **A sealed class that is not abstract is no member of its own union.** `UnionBinder.collectSealedMembers`
   lists the leaves of a sealed hierarchy, so a concrete sealed class at the root or between is no member and its
   own instances cannot be written as union values. An enum with a constant body is such a class: its union lists the

@@ -15,9 +15,13 @@
  */
 package io.ltr8.test.bind;
 
+import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Record;
+import io.ltr8.annotation.ToData;
+import io.ltr8.annotation.Transparent;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -125,9 +129,11 @@ import io.ltr8.test.data.RecordRefusals.WildcardList;
 import io.ltr8.test.data.ToDataBridges.Problem;
 import io.ltr8.test.data.ToDataBridges.ProtectedConstructor;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.Serial;
 import java.lang.classfile.Annotation;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.attribute.RuntimeVisibleAnnotationsAttribute;
@@ -136,12 +142,14 @@ import java.lang.constant.ConstantDescs;
 import java.lang.constant.MethodTypeDesc;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -446,8 +454,20 @@ class RecordRefusalTest {
 
 	@Test
 	void aRecordComponentThePublicLookupCannotReadIsRefusedNamingTheClassAndComponent() {
-		assertEquals("Failed to access accessor for record component 'text' on '" + HiddenRecord.class.getName()
-				+ "'", message(HiddenRecord.class));
+		String record = HiddenRecord.class.getName();
+		assertRefusedAlike(DataBindContext::builder, HiddenRecord.class,
+				"Failed to access accessor for record component 'text' on '" + record + "'",
+				unreachable(HiddenRecord.class, "method " + record + ".text"),
+				"symbolic reference class is not accessible: class " + record + ", from public Lookup");
+	}
+
+	@Test
+	void aRecordComponentOfAProfileThePublicLookupCannotReadIsRefusedNamingTheClassAndComponent() {
+		String record = HiddenProfiledRecord.class.getName();
+		assertRefusedAlike(() -> DataBindContext.builder().profile("v1"), HiddenProfiledRecord.class,
+				"Failed to access accessor for record component 'text' on '" + record + "'",
+				unreachable(HiddenProfiledRecord.class, "method " + record + ".text"),
+				"symbolic reference class is not accessible: class " + record + ", from public Lookup");
 	}
 
 	@Test
@@ -574,6 +594,100 @@ class RecordRefusalTest {
 						message(fresh, HiddenTakingArguments.class)),
 				() -> assertEquals(message(context, UsesHiddenBridge.class), message(fresh, UsesHiddenBridge.class)),
 				() -> assertEquals(namedRefusal(named, "hidden"), namedRefusal(again, "hidden")));
+	}
+
+	@Test
+	void anAtomConstructorThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
+		String atom = HiddenAtom.class.getName();
+		assertRefusedAlike(DataBindContext::builder, HiddenAtom.class, "Failed to get atom descriptor",
+				atom + NOT_ACCESSIBLE + "constructor " + atom + "(java.lang.String), of a class the public lookup "
+						+ "cannot access",
+				"symbolic reference class is not accessible: class " + atom + ", from public Lookup");
+	}
+
+	@Test
+	void anAtomsToDataThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
+		String atom = AtomWithHiddenToData.class.getName();
+		assertRefusedAlike(DataBindContext::builder, AtomWithHiddenToData.class, "Failed to get atom descriptor",
+				atom + NOT_ACCESSIBLE + "method " + atom + ".toData, which is not public");
+	}
+
+	@Test
+	void anAtomFactoryThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
+		String atom = HiddenAtomFactory.class.getName();
+		assertRefusedAlike(DataBindContext::builder, HiddenAtomFactory.class, "Failed to get atom descriptor",
+				unreachable(HiddenAtomFactory.class, "method " + atom + ".of"),
+				"symbolic reference class is not accessible: class " + atom + ", from public Lookup");
+	}
+
+	@Test
+	void anAtomAccessorThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
+		String atom = AtomFactoryWithHiddenAccessor.class.getName();
+		assertRefusedAlike(DataBindContext::builder, AtomFactoryWithHiddenAccessor.class,
+				"Failed to get atom descriptor",
+				atom + NOT_ACCESSIBLE + "method " + atom + ".code, which is not public");
+	}
+
+	@Test
+	void aTransparentRecordThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
+		String record = HiddenTransparent.class.getName();
+		assertRefusedAlike(DataBindContext::builder, HiddenTransparent.class,
+				"@Transparent record " + record + " needs a public canonical constructor taking its one component "
+						+ "(java.lang.String)",
+				unreachable(HiddenTransparent.class, "method " + record + ".value"),
+				"symbolic reference class is not accessible: class " + record + ", from public Lookup");
+	}
+
+	@Test
+	void aToDataClassThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
+		String bridged = HiddenToData.class.getName();
+		assertRefusedAlike(DataBindContext::builder, HiddenToData.class,
+				bridged + " is not accessible through the public lookup: a bridged class is public, in a package its "
+						+ "module exports",
+				bridged + NOT_ACCESSIBLE + "constructor " + bridged + "(" + Wrapped.class.getName() + "), of a class "
+						+ "the public lookup cannot access",
+				"symbolic reference class is not accessible: class " + bridged + ", from public Lookup");
+	}
+
+	@Test
+	void aCollectionClassThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
+		String list = HiddenList.class.getName();
+		assertRefusedAlike(DataBindContext::builder, HoldsHiddenList.class,
+				list + NOT_ACCESSIBLE + "constructor " + list + "(int), of a class the public lookup cannot access",
+				"symbolic reference class is not accessible: class " + list + ", from public Lookup");
+	}
+
+	@Test
+	void aMapClassThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
+		String map = HiddenMap.class.getName();
+		assertRefusedAlike(DataBindContext::builder, HoldsHiddenMap.class,
+				map + NOT_ACCESSIBLE + "constructor " + map + "(int), of a class the public lookup cannot access",
+				"symbolic reference class is not accessible: class " + map + ", from public Lookup");
+	}
+
+	private static String unreachable(Class<?> described, String member) {
+		return described.getName() + NOT_ACCESSIBLE + member + ", through no class the public lookup can access";
+	}
+
+	/**
+	 * Directly and by name, each in two fresh contexts: {@code chain} is the refusal's message and its causes',
+	 * outermost first, and naming nothing by identity they read the same in each.
+	 */
+	private static void assertRefusedAlike(Supplier<DataBindContext.Builder> builder, Class<?> type,
+			String... chain) {
+		String named = "'refused' binds " + type.getName() + ", which cannot be analysed: " + String.join(": ", chain);
+		assertAll(Stream.of(1, 2).flatMap(run -> Stream.<Executable>of(
+				() -> assertEquals(List.of(chain), messages(refusal(builder.get().build(), type))),
+				() -> assertEquals(named, namedRefusal(builder.get()
+						.nameBinder(DataNameBinder.ofMap(Map.of("refused", type))).build(), "refused")))));
+	}
+
+	private static List<String> messages(Throwable refused) {
+		List<String> messages = new ArrayList<>();
+		for (Throwable at = refused; at != null; at = at.getCause()) {
+			messages.add(at.getMessage());
+		}
+		return messages;
 	}
 
 	@Test
@@ -1055,6 +1169,139 @@ class RecordRefusalTest {
 	}
 
 	public record UsesHiddenBridge(@Field(bridge = HiddenBridge.class) String value) {
+	}
+
+	private record HiddenProfiledRecord(String text, int count) {
+
+		public HiddenProfiledRecord {
+		}
+
+		@Profile(value = "v1", fields = { "text" })
+		public HiddenProfiledRecord(String text) {
+			this(text, 0);
+		}
+	}
+
+	@Atom
+	static final class HiddenAtom {
+
+		private final String code;
+
+		@Atom
+		public HiddenAtom(String code) {
+			this.code = code;
+		}
+
+		@Atom
+		public String toData() {
+			return code;
+		}
+	}
+
+	@Atom
+	public static final class AtomWithHiddenToData {
+
+		private final String code;
+
+		@Atom
+		public AtomWithHiddenToData(String code) {
+			this.code = code;
+		}
+
+		@Atom
+		String toData() {
+			return code;
+		}
+	}
+
+	@Atom
+	static final class HiddenAtomFactory {
+
+		private final String code;
+
+		private HiddenAtomFactory(String code) {
+			this.code = code;
+		}
+
+		@Atom
+		public static HiddenAtomFactory of(String code) {
+			return new HiddenAtomFactory(code);
+		}
+
+		@Atom
+		public String code() {
+			return code;
+		}
+	}
+
+	@Atom
+	public static final class AtomFactoryWithHiddenAccessor {
+
+		private final String code;
+
+		private AtomFactoryWithHiddenAccessor(String code) {
+			this.code = code;
+		}
+
+		@Atom
+		public static AtomFactoryWithHiddenAccessor of(String code) {
+			return new AtomFactoryWithHiddenAccessor(code);
+		}
+
+		@Atom
+		String code() {
+			return code;
+		}
+	}
+
+	@Transparent
+	private record HiddenTransparent(String value) {
+
+		public HiddenTransparent {
+		}
+	}
+
+	public record Wrapped(String text) {
+	}
+
+	static final class HiddenToData implements ToData<Wrapped> {
+
+		private final String text;
+
+		public HiddenToData(Wrapped wrapped) {
+			this.text = wrapped.text();
+		}
+
+		@Override
+		public Wrapped toData() {
+			return new Wrapped(text);
+		}
+	}
+
+	static final class HiddenList<T> extends ArrayList<T> {
+
+		@Serial
+		private static final long serialVersionUID = 1L;
+
+		public HiddenList(int capacity) {
+			super(capacity);
+		}
+	}
+
+	static final class HiddenMap<K, V> extends LinkedHashMap<K, V> {
+
+		@Serial
+		private static final long serialVersionUID = 1L;
+
+		public HiddenMap(int capacity) {
+			super(capacity);
+		}
+	}
+
+	public record HoldsHiddenList(HiddenList<String> items) {
+	}
+
+	public record HoldsHiddenMap(HiddenMap<String, String> items) {
 	}
 
 	// --- helpers
