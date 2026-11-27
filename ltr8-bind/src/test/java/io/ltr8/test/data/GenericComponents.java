@@ -1077,4 +1077,16 @@ public final class GenericComponents {
 
 	public record HoldsProfBares(ProfBare<String> bare, ProfArray<String> array) {
 	}
+
+	// --- each shape at an upper-bounded wildcard argument
+
+	public record HoldsExtending(RecList<? extends String> list, RecMap<? extends String> map,
+			RecNested<? extends String> nested, RecBare<? extends String> bare, RecArray<? extends String> array,
+			RecOpt<? extends String> opt, RecOptList<? extends String> optList, RecBridged<? extends String> bridged,
+			CtorList<? extends String> ctor, NamedList<? extends String> named, PubList<? extends String> pub,
+			PairList<? extends String> pair, MergedList<? extends String> merged) {
+	}
+
+	public record HoldsProfExtending(ProfList<? extends String> list, ProfMap<? extends String> map) {
+	}
 }

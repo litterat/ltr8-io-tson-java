@@ -28,7 +28,9 @@ final class TypeArguments {
 
     /**
      * Each of {@code targetClass}'s type parameters bound to the argument {@code parameterizedType} gives it; none
-     * where that is not a parameterisation of {@code targetClass} with an argument for each.
+     * where that is not a parameterisation of {@code targetClass} with an argument for each. An argument {@code ?
+     * extends X} binds its parameter to {@code X}, the most a value it stands for is known to be. A wildcard written
+     * in a component's own type is not an argument, and stays one.
      */
     static Map<TypeVariable<?>, Type> described(Class<?> targetClass, Type parameterizedType) {
         if (!(parameterizedType instanceof ParameterizedType parameterized)
@@ -42,9 +44,18 @@ final class TypeArguments {
         }
         Map<TypeVariable<?>, Type> bindings = new HashMap<>();
         for (int i = 0; i < parameters.length; i++) {
-            bindings.put(parameters[i], arguments[i]);
+            bindings.put(parameters[i], upperBound(arguments[i]));
         }
         return bindings;
+    }
+
+    /**
+     * {@code X} for {@code ? extends X}, and otherwise {@code argument}: {@code ?} and {@code ? super X} bound a value
+     * by nothing narrower than {@code Object}, and stay wildcards to be refused as one.
+     */
+    private static Type upperBound(Type argument) {
+        return argument instanceof WildcardType wildcard && wildcard.getLowerBounds().length == 0
+                && wildcard.getUpperBounds()[0] != Object.class ? wildcard.getUpperBounds()[0] : argument;
     }
 
     /** The type a component of declared {@code type} is held at under {@code bindings}. */

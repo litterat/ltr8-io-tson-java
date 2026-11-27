@@ -20,25 +20,39 @@ import io.ltr8.bind.mapper.ArrayMapper;
 import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.GenericComponents.CtorArray;
 import io.ltr8.test.data.GenericComponents.CtorBare;
+import io.ltr8.test.data.GenericComponents.CtorList;
 import io.ltr8.test.data.GenericComponents.FieldAccessorBare;
 import io.ltr8.test.data.GenericComponents.HoldsAllNamed;
 import io.ltr8.test.data.GenericComponents.HoldsBares;
+import io.ltr8.test.data.GenericComponents.HoldsExtending;
 import io.ltr8.test.data.GenericComponents.HoldsProfBares;
+import io.ltr8.test.data.GenericComponents.HoldsProfExtending;
 import io.ltr8.test.data.GenericComponents.MergedArray;
 import io.ltr8.test.data.GenericComponents.MergedBare;
+import io.ltr8.test.data.GenericComponents.MergedList;
 import io.ltr8.test.data.GenericComponents.NamedBare;
 import io.ltr8.test.data.GenericComponents.NamedList;
 import io.ltr8.test.data.GenericComponents.NamedMap;
 import io.ltr8.test.data.GenericComponents.NamedOpt;
 import io.ltr8.test.data.GenericComponents.PairArray;
 import io.ltr8.test.data.GenericComponents.PairBare;
+import io.ltr8.test.data.GenericComponents.PairList;
 import io.ltr8.test.data.GenericComponents.PlainNamedList;
 import io.ltr8.test.data.GenericComponents.ProfArray;
 import io.ltr8.test.data.GenericComponents.ProfBare;
+import io.ltr8.test.data.GenericComponents.ProfList;
+import io.ltr8.test.data.GenericComponents.ProfMap;
 import io.ltr8.test.data.GenericComponents.PubArray;
 import io.ltr8.test.data.GenericComponents.PubBare;
+import io.ltr8.test.data.GenericComponents.PubList;
 import io.ltr8.test.data.GenericComponents.RecArray;
 import io.ltr8.test.data.GenericComponents.RecBare;
+import io.ltr8.test.data.GenericComponents.RecBridged;
+import io.ltr8.test.data.GenericComponents.RecList;
+import io.ltr8.test.data.GenericComponents.RecMap;
+import io.ltr8.test.data.GenericComponents.RecNested;
+import io.ltr8.test.data.GenericComponents.RecOpt;
+import io.ltr8.test.data.GenericComponents.RecOptList;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -104,6 +118,51 @@ class GenericComponentRoundTripTest {
 				() -> assertEquals(expected, values((HoldsAllNamed) maps.toObject(HoldsAllNamed.class,
 						maps.toMap(named)))),
 				() -> assertEquals(expected, values(arrays.toObject(HoldsAllNamed.class, arrays.toArray(named)))));
+	}
+
+	@Test
+	void eachShapeRoundTripsAtAnUpperBoundedWildcardArgument() {
+		PubList<String> pub = new PubList<>();
+		pub.value = List.of("pub");
+		PairList<String> pair = new PairList<>();
+		pair.setValue(List.of("pair"));
+		HoldsExtending extending = new HoldsExtending(new RecList<>(List.of("l0", "l1")), new RecMap<>(Map.of("k", "v")),
+				new RecNested<>(List.of(List.of("n0"), List.of())), new RecBare<>("bare"),
+				new RecArray<>(new String[] { "a0" }), new RecOpt<>(Optional.of("opt")),
+				new RecOptList<>(Optional.of(List.of("o0"))), new RecBridged<>("bridged"), new CtorList<>(List.of("ctor")),
+				new NamedList<>(List.of("named")), pub, pair, new MergedList<>(List.of("merged")));
+		String expected = "[l0, l1] {k=v} [[n0], []] bare [a0] Optional[opt] Optional[[o0]] bridged [ctor] [named] [pub] "
+				+ "[pair] [merged]";
+		assertAll(() -> assertEquals(expected, values(extending)),
+				() -> assertEquals(expected,
+						values((HoldsExtending) maps.toObject(HoldsExtending.class, maps.toMap(extending)))),
+				() -> assertEquals(expected, values(arrays.toObject(HoldsExtending.class, arrays.toArray(extending)))));
+	}
+
+	@Test
+	void aProfileConstructorTakesEachShapeAtAnUpperBoundedWildcardArgument() {
+		DataBindContext profiled = DataBindContext.builder().profile("p").build();
+		MapMapper maps = new MapMapper(profiled);
+		ArrayMapper arrays = new ArrayMapper(profiled);
+		HoldsProfExtending extending = new HoldsProfExtending(new ProfList<>(List.of("l0")),
+				new ProfMap<>(Map.of("k", "v")));
+		assertAll(
+				() -> assertEquals("[l0] {k=v}", values((HoldsProfExtending) maps.toObject(HoldsProfExtending.class,
+						maps.toMap(extending)))),
+				() -> assertEquals("[l0] {k=v}",
+						values(arrays.toObject(HoldsProfExtending.class, arrays.toArray(extending)))));
+	}
+
+	private static String values(HoldsExtending held) {
+		return String.join(" ", held.list().value().toString(), held.map().value().toString(),
+				held.nested().value().toString(), held.bare().value(), Arrays.toString(held.array().value()),
+				held.opt().value().toString(), held.optList().value().toString(), held.bridged().value(),
+				held.ctor().getValue().toString(), held.named().getValue().toString(), held.pub().value.toString(),
+				held.pair().getValue().toString(), held.merged().getValue().toString());
+	}
+
+	private static String values(HoldsProfExtending held) {
+		return held.list().value() + " " + held.map().value();
 	}
 
 	private static String values(HoldsAllNamed named) {
