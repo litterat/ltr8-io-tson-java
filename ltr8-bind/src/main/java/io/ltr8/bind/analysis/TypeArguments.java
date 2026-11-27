@@ -2,9 +2,11 @@ package io.ltr8.bind.analysis;
 
 import io.ltr8.bind.DataParameterizedType;
 
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,59 @@ final class TypeArguments {
                 component.setParamType((ParameterizedType) substitute(component.getParamType(), bindings));
             }
         }
+    }
+
+    /**
+     * Each type parameter of {@code clss}'s super classes bound to the argument {@code clss} supplies it, in terms of
+     * {@code clss}'s own type parameters, which stay unbound, as does a parameter of a class extended raw.
+     */
+    static Map<TypeVariable<?>, Type> inherited(Class<?> clss) {
+        Map<TypeVariable<?>, Type> bindings = new HashMap<>();
+        for (Class<?> sub = clss; sub.getSuperclass() != null; sub = sub.getSuperclass()) {
+            if (sub.getGenericSuperclass() instanceof ParameterizedType parameterized) {
+                TypeVariable<?>[] parameters = sub.getSuperclass().getTypeParameters();
+                Type[] arguments = parameterized.getActualTypeArguments();
+                for (int i = 0; i < parameters.length; i++) {
+                    bindings.put(parameters[i], substitute(arguments[i], bindings));
+                }
+            }
+        }
+        return bindings;
+    }
+
+    /**
+     * Whether two types are one, compared by structure: a {@link ParameterizedType} {@link #substitute} builds has no
+     * owner type and is not equal to the JDK's of the same type where that has one.
+     */
+    static boolean sameType(Type a, Type b) {
+        if (a instanceof ParameterizedType pa && b instanceof ParameterizedType pb) {
+            Type[] x = pa.getActualTypeArguments();
+            Type[] y = pb.getActualTypeArguments();
+            if (pa.getRawType() != pb.getRawType() || x.length != y.length) {
+                return false;
+            }
+            for (int i = 0; i < x.length; i++) {
+                if (!sameType(x[i], y[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (a instanceof GenericArrayType ga && b instanceof GenericArrayType gb) {
+            return sameType(ga.getGenericComponentType(), gb.getGenericComponentType());
+        }
+        return a.equals(b);
+    }
+
+    static Class<?> erasure(Type type) {
+        return switch (type) {
+            case Class<?> c -> c;
+            case ParameterizedType p -> (Class<?>) p.getRawType();
+            case GenericArrayType g -> erasure(g.getGenericComponentType()).arrayType();
+            case TypeVariable<?> v -> erasure(v.getBounds()[0]);
+            case WildcardType w -> erasure(w.getUpperBounds()[0]);
+            default -> Object.class;
+        };
     }
 
     static Type substitute(Type type, Map<TypeVariable<?>, Type> bindings) {

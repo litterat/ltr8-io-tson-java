@@ -17,8 +17,10 @@ package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Field;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -33,7 +35,7 @@ public class GetSetFinder implements ComponentFinder {
 
 	@Override
 	public void findComponents(Class<?> clss, Constructor<?> constructor, List<ComponentInfo> fields)
-			throws SecurityException, CodeAnalysisException {
+			throws CodeAnalysisException {
 
 		List<ComponentInfo> getSetList = new ArrayList<>();
 		Map<ComponentInfo, Member> members = new IdentityHashMap<>();
@@ -57,12 +59,7 @@ public class GetSetFinder implements ComponentFinder {
 					info.setField(fieldAnnotation);
 				}
 
-				try {
-					info.setReadMethod(lookup.unreflectGetter(classField));
-					info.setWriteMethod(lookup.unreflectSetter(classField));
-				} catch (IllegalAccessException e) {
-					throw new SecurityException("Failed to unreflect field", e);
-				}
+				reachField(lookup, clss, classField, info);
 
 				Type returnType = classField.getGenericType();
 				if (returnType instanceof ParameterizedType) {
@@ -70,7 +67,7 @@ public class GetSetFinder implements ComponentFinder {
 				}
 
 				getSetList.add(info);
-				members.put(info, new Member(classField.getDeclaringClass(), null));
+				members.put(info, new Member(classField.getDeclaringClass(), null, null));
 
 			}
 		}
@@ -82,60 +79,71 @@ public class GetSetFinder implements ComponentFinder {
 		//
 		// A pair is a component only when both halves are public instance methods. A pair that is not is no
 		// component, as a private field is not: the class is described from its other members. A getter pairs
-		// only with the one-argument setter of its return type: another overload, or a setter taking another
-		// type, is not handed the value the getter reads. A covariant override's bridge getter is skipped, so
-		// the pair is found once, at the overriding return type.
-		Method[] methods = clss.getDeclaredMethods();
-		for (Method getter : methods) {
-
-			String getterName = getter.getName();
-			if (isPublicInstance(getter) && !getter.isBridge() && getter.getParameterCount() == 0
-					&& getterName.startsWith("get") && getterName.length() > 3) {
-
-				try {
-					// If this throws NoSuchMethodException we ignore field.
-					Method method = clss.getDeclaredMethod("s" + getterName.substring(1), getter.getReturnType());
-					if (!isPublicInstance(method)) {
-						continue;
-					}
-
-					String fieldName = Character.toLowerCase(getterName.charAt(3)) + getterName.substring(4);
-
-					// Found a matching setter/getter pair, so add to fields.
-					ComponentInfo info = new ComponentInfo(fieldName, getter.getReturnType());
-
-					Field getterField = getter.getAnnotation(Field.class);
-					if (getterField != null) {
-						// Found a matching setter/getter pair, so add to fields.
-						info.setField(getterField);
-					}
-
-					Field setterField = method.getAnnotation(Field.class);
-					if (setterField != null) {
-						// Found a matching setter/getter pair, so add to fields.
-						info.setField(setterField);
-					}
-
-					try {
-						info.setReadMethod(lookup.unreflect(getter));
-						info.setWriteMethod(lookup.unreflect(method));
-					} catch (IllegalAccessException e) {
-						throw new SecurityException("Failed to unreflect field", e);
-					}
-
-					Type returnType = getter.getGenericReturnType();
-					if (returnType instanceof ParameterizedType) {
-						info.setParamType((ParameterizedType) returnType);
-					}
-
-					getSetList.add(info);
-					members.put(info, new Member(clss, getter));
-
-				} catch (NoSuchMethodException ex) {
-					// ignore this field, no matching setter.
+		// only with the one-argument setter of its generic return type: another overload, or a setter taking
+		// another type, even one of the same erasure, is not handed the value the getter reads.
+		//
+		// Either half may be declared by a super class, each typed at the arguments the described class binds. A
+		// getter is the most derived declaration of its name, so an override is the pair's getter at its own return
+		// type, and a setter the most derived of that type. Bridges are skipped: a covariant override's stands
+		// beside the method it bridges, and a visibility bridge carries no generic type, which the method it
+		// forwards to, further up, does. An interface's default method is no half.
+		Map<TypeVariable<?>, Type> bindings = TypeArguments.inherited(clss);
+		Map<String, Method> getters = new HashMap<>();
+		List<Method> setters = new ArrayList<>();
+		for (Class<?> declarer = clss; declarer != null; declarer = declarer.getSuperclass()) {
+			for (Method method : declarer.getDeclaredMethods()) {
+				String name = method.getName();
+				if (method.isBridge() || name.length() <= 3) {
 					continue;
 				}
+				if (method.getParameterCount() == 0 && name.startsWith("get")) {
+					getters.putIfAbsent(name, method);
+				} else if (method.getParameterCount() == 1 && name.startsWith("set")) {
+					setters.add(method);
+				}
 			}
+		}
+		for (Method getter : getters.values()) {
+			if (!isPublicInstance(getter)) {
+				continue;
+			}
+			String getterName = getter.getName();
+			Type type = TypeArguments.substitute(getter.getGenericReturnType(), bindings);
+			Method setter = setters.stream()
+					.filter(method -> method.getName().equals("s" + getterName.substring(1)) && TypeArguments
+							.sameType(TypeArguments.substitute(method.getGenericParameterTypes()[0], bindings), type))
+					.findFirst().orElse(null);
+			if (setter == null || !isPublicInstance(setter)) {
+				continue;
+			}
+
+			String fieldName = Character.toLowerCase(getterName.charAt(3)) + getterName.substring(4);
+			Class<?> erasure = type == getter.getGenericReturnType() ? getter.getReturnType()
+					: TypeArguments.erasure(type);
+			ComponentInfo info = new ComponentInfo(fieldName, erasure);
+
+			Field getterField = getter.getAnnotation(Field.class);
+			if (getterField != null) {
+				info.setField(getterField);
+			}
+
+			Field setterField = setter.getAnnotation(Field.class);
+			if (setterField != null) {
+				info.setField(setterField);
+			}
+
+			MethodHandle read = reachMethod(lookup, clss, getter);
+			MethodHandle write = reachMethod(lookup, clss, setter);
+			info.setReadMethod(read.asType(read.type().changeReturnType(erasure)));
+			// A fluent setter returns its object, or another the old value; either is dropped.
+			info.setWriteMethod(write.asType(MethodType.methodType(void.class, write.type().parameterType(0), erasure)));
+
+			if (type instanceof ParameterizedType parameterized) {
+				info.setParamType(parameterized);
+			}
+
+			getSetList.add(info);
+			members.put(info, new Member(getter.getDeclaringClass(), getter, setter));
 		}
 
 		// We can find the list in different orders from Java, so sort them before
@@ -160,8 +168,9 @@ public class GetSetFinder implements ComponentFinder {
 		});
 
 		// A field or pair writes a constructor's component only where it is that component's member: of the same name,
-		// and declared by the class the constructor stores it in, or a pair whose getter the constructor analysis
-		// matched as the component's accessor. A subclass's own field or pair of that name is a component of its own.
+		// and declared by the class the constructor stores it in (a pair by its getter's), or a pair whose getter the
+		// constructor analysis matched as the component's accessor. A subclass's own field or pair of that name is a
+		// component of its own.
 		ListIterator<ComponentInfo> iter = getSetList.listIterator();
 		while (iter.hasNext()) {
 			ComponentInfo field = iter.next();
@@ -206,10 +215,86 @@ public class GetSetFinder implements ComponentFinder {
 			}
 		}
 
+		// A pair the class inherits holds a value apart from any other component of its name, which the wire would
+		// carry only one of.
+		for (ComponentInfo pair : getSetList) {
+			Member member = members.get(pair);
+			if (member.getter() == null
+					|| member.getter().getDeclaringClass() == clss && member.setter().getDeclaringClass() == clss) {
+				continue;
+			}
+			String name = wireName(pair);
+			if (fields.stream().anyMatch(other -> other != pair && wireName(other).equals(name))) {
+				throw new CodeAnalysisException(String.format(
+						"%s has two components named '%s', one the pair %s and %s it inherits; @Field on the pair "
+								+ "names one apart",
+						clss.getName(), name, qualified(member.getter()), qualified(member.setter())));
+			}
+		}
 	}
 
-	/** The class declaring a public field or getter/setter pair, and the pair's getter, or null for a field. */
-	private record Member(Class<?> declarer, Method getter) {
+	/**
+	 * The class declaring a public field or getter/setter pair (a pair's getter's), and the pair's getter and
+	 * setter, or null for a field.
+	 */
+	private record Member(Class<?> declarer, Method getter, Method setter) {
+	}
+
+	/**
+	 * A public member of a super class that is not public is reached through the described class, as the JVM
+	 * resolves it; unreflected, it is checked against the class declaring it. A field is reached so only where the
+	 * described class resolves its name and type to that field and not to one hiding it.
+	 */
+	private static void reachField(Lookup lookup, Class<?> clss, java.lang.reflect.Field field, ComponentInfo info)
+			throws CodeAnalysisException {
+		try {
+			try {
+				MethodHandle read = lookup.findGetter(clss, field.getName(), field.getType());
+				if (MethodHandles.reflectAs(java.lang.reflect.Field.class, read).equals(field)) {
+					info.setReadMethod(read);
+					info.setWriteMethod(lookup.findSetter(clss, field.getName(), field.getType()));
+					return;
+				}
+			} catch (NoSuchFieldException | IllegalAccessException e) {
+				// Reached from its own class, or not at all, where the refusal names the field.
+			}
+			info.setReadMethod(lookup.unreflectGetter(field));
+			info.setWriteMethod(lookup.unreflectSetter(field));
+		} catch (IllegalAccessException e) {
+			throw notAccessible(clss, e);
+		}
+	}
+
+	/**
+	 * Reached as {@link #reachField} is, and with no check of what the described class resolves: a call dispatches
+	 * to the same override whichever declaration it names.
+	 */
+	private static MethodHandle reachMethod(Lookup lookup, Class<?> clss, Method method) throws CodeAnalysisException {
+		try {
+			try {
+				return lookup.findVirtual(clss, method.getName(),
+						MethodType.methodType(method.getReturnType(), method.getParameterTypes()));
+			} catch (NoSuchMethodException | IllegalAccessException e) {
+				// Reached from its own class, or not at all, where the refusal names the method.
+			}
+			return lookup.unreflect(method);
+		} catch (IllegalAccessException e) {
+			throw notAccessible(clss, e);
+		}
+	}
+
+	private static CodeAnalysisException notAccessible(Class<?> clss, IllegalAccessException e) {
+		return new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: %s",
+				clss.getName(), e.getMessage()), e);
+	}
+
+	private static String wireName(ComponentInfo component) {
+		Field field = component.getField();
+		return field != null && !field.value().isBlank() ? field.value() : component.getName();
+	}
+
+	private static String qualified(Method method) {
+		return method.getDeclaringClass().getSimpleName() + "." + method.getName();
 	}
 
 	private static boolean isPublicInstance(Method method) {
