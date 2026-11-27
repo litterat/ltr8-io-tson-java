@@ -405,7 +405,24 @@ public final class GenericComponents {
 		}
 	}
 
+	public static class PlainNamedList {
+		private final List<String> value;
+
+		@Record
+		public PlainNamedList(@Field("value") List<String> value) {
+			this.value = List.copyOf(value);
+		}
+
+		public List<String> getValue() {
+			return value;
+		}
+	}
+
 	public record HoldsNamed(NamedList<String> held) {
+	}
+
+	public record HoldsAllNamed(NamedList<String> list, NamedMap<String> map, NamedBare<String> bare,
+			NamedOpt<String> opt, PlainNamedList plain) {
 	}
 
 	// --- a public field

@@ -118,15 +118,16 @@ public class GenericComponentTypeTest {
 	@Test
 	void aConstructorNamingItsParameter() {
 		assertEquals("""
-				NamedList: CodeAnalysisException: Collection must provide parameterized type information
-				NamedList<String>: CodeAnalysisException: Collection must provide parameterized type information
-				NamedMap: CodeAnalysisException: Map must provide parameterized type information
-				NamedMap<String>: CodeAnalysisException: Map must provide parameterized type information
+				NamedList: CodeAnalysisException: Unrecognized parameterized type
+				NamedList<String>: NamedList(value:List [String])
+				NamedMap: CodeAnalysisException: Unrecognized parameterized type for map key/value
+				NamedMap<String>: NamedMap(value:Map {String=String})
 				NamedBare: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				NamedBare<String>: DataBindException: Unable to find a valid data conversion for class: class java.lang.Object
-				NamedOpt: DataBindException: Unable to find a valid data conversion for class: class java.util.Optional
-				NamedOpt<String>: DataBindException: Unable to find a valid data conversion for class: class java.util.Optional
-				HoldsNamed: CodeAnalysisException: Collection must provide parameterized type information
+				NamedBare<String>: NamedBare(value:String String)
+				NamedOpt: CodeAnalysisException: io.ltr8.test.data.GenericComponents$NamedOpt's component 'value' \
+				is an Optional of T, neither a class nor a parameterized type
+				NamedOpt<String>: NamedOpt(value:String String)
+				HoldsNamed: HoldsNamed(held:NamedList NamedList(value:List [String]))
 				""", table("Named", null, new String[] { "List", "Map", "Bare", "Opt" }, false));
 	}
 
@@ -256,6 +257,7 @@ public class GenericComponentTypeTest {
 				ListPubBare: ListPubBare(value:List set [String])
 				ListPairBare: ListPairBare(value:List set [String])
 				RawCtorTextSetter: CodeAnalysisException: Collection must provide parameterized type information
+				PlainNamedList: PlainNamedList(value:List [String])
 				""", lines(
 				line("RecOptWild", null, null),
 				line("PairOptWild", null, null),
@@ -271,7 +273,8 @@ public class GenericComponentTypeTest {
 				at("PassedPairList", null),
 				line("ListPubBare", null, null),
 				line("ListPairBare", null, null),
-				line("RawCtorTextSetter", null, null)));
+				line("RawCtorTextSetter", null, null),
+				line("PlainNamedList", null, null)));
 	}
 
 	// --- helpers

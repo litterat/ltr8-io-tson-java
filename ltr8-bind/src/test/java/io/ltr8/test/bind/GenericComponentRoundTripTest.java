@@ -21,12 +21,18 @@ import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.GenericComponents.CtorArray;
 import io.ltr8.test.data.GenericComponents.CtorBare;
 import io.ltr8.test.data.GenericComponents.FieldAccessorBare;
+import io.ltr8.test.data.GenericComponents.HoldsAllNamed;
 import io.ltr8.test.data.GenericComponents.HoldsBares;
 import io.ltr8.test.data.GenericComponents.HoldsProfBares;
 import io.ltr8.test.data.GenericComponents.MergedArray;
 import io.ltr8.test.data.GenericComponents.MergedBare;
+import io.ltr8.test.data.GenericComponents.NamedBare;
+import io.ltr8.test.data.GenericComponents.NamedList;
+import io.ltr8.test.data.GenericComponents.NamedMap;
+import io.ltr8.test.data.GenericComponents.NamedOpt;
 import io.ltr8.test.data.GenericComponents.PairArray;
 import io.ltr8.test.data.GenericComponents.PairBare;
+import io.ltr8.test.data.GenericComponents.PlainNamedList;
 import io.ltr8.test.data.GenericComponents.ProfArray;
 import io.ltr8.test.data.GenericComponents.ProfBare;
 import io.ltr8.test.data.GenericComponents.PubArray;
@@ -37,6 +43,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -85,6 +93,22 @@ class GenericComponentRoundTripTest {
 				() -> assertEquals("one [two]", values((HoldsProfBares) maps.toObject(HoldsProfBares.class, maps.toMap(bares)))),
 				() -> assertEquals("one [two]",
 						values(arrays.toObject(HoldsProfBares.class, arrays.toArray(bares)))));
+	}
+
+	@Test
+	void aParameterOnlyFieldNamesRoundTripsAtItsGenericType() {
+		HoldsAllNamed named = new HoldsAllNamed(new NamedList<>(List.of("l0", "l1")), new NamedMap<>(Map.of("k", "v")),
+				new NamedBare<>("bare"), new NamedOpt<>(Optional.of("opt")), new PlainNamedList(List.of("p0")));
+		String expected = "[l0, l1] {k=v} bare Optional[opt] [p0]";
+		assertAll(() -> assertEquals(expected, values(named)),
+				() -> assertEquals(expected, values((HoldsAllNamed) maps.toObject(HoldsAllNamed.class,
+						maps.toMap(named)))),
+				() -> assertEquals(expected, values(arrays.toObject(HoldsAllNamed.class, arrays.toArray(named)))));
+	}
+
+	private static String values(HoldsAllNamed named) {
+		return String.join(" ", named.list().getValue().toString(), named.map().getValue().toString(),
+				named.bare().getValue(), named.opt().getValue().toString(), named.plain().getValue().toString());
 	}
 
 	private static String values(HoldsBares bares) {

@@ -531,11 +531,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   constructor parameter of a hand-written `@Record` class with no accessor is refused with "Failed to match
   immutable field accessor …". Nothing reads or writes either. Describe neither, with a read of each through both
   mappers in `UnboundComponentTest`.
-- [ ] **A constructor parameter named only by `@Field` loses its generic type.** Where `ImmutableFinder` cannot
-  match a parameter to a field and `@Field` names its component, the component takes the parameter's class, so
-  `@Field("x") List<T>` on `NamedList<T>` is refused with "Collection must provide parameterized type information"
-  even described as `NamedList<String>` (`GenericComponentTypeTest`); a plain `List<String>` parameter is read, not
-  run. Give the component the parameter's generic type, with a round trip of a list, a map and an optional.
 - [ ] **A constructor parameter whose `@Field` names nothing makes a component named "".** An unmatched parameter
   carrying `@Field` with an empty `value`, to mark it required or bridged, names its component by that value. Read,
   not run. Refuse the class, naming it and the parameter, with a case in `RecordRefusalTest`.

@@ -119,7 +119,7 @@ public class ImmutableFinder implements ComponentFinder {
                         .filter(e -> e.getConstructorArgument() == paramIndex).toList();
                 Field field = params[x].getAnnotation(Field.class);
                 if (storing.isEmpty() && field != null) {
-                    ComponentInfo component = new ComponentInfo(field.value(), params[x].getType());
+                    ComponentInfo component = new ComponentInfo(field.value(), types[x]);
                     component.setConstructorArgument(x);
                     immutableFields.add(component);
                     storing = List.of(component);
