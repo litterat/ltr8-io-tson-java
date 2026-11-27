@@ -7,12 +7,15 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.mapper.ArrayMapper;
+import io.ltr8.bind.mapper.MapMapper;
 
 import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -182,5 +185,90 @@ public class ProfileConstructorTest {
                 () -> fieldNames(context("api-1"), Short2.class));
 
         assertTrue(allMessages(thrown).contains("2 field name"), allMessages(thrown));
+    }
+
+    // --- a record with a second public constructor and none marked
+
+    public record Two(String a, String b) {
+
+        public Two(String a) {
+            this(a, "");
+        }
+    }
+
+    /** As {@link Two}, with a profiled constructor besides. */
+    public record TwoAndProfiled(String a, String b) {
+
+        public TwoAndProfiled(int ignored) {
+            this("", "");
+        }
+
+        @Profile(value = "api-2", fields = {"b"})
+        public TwoAndProfiled(String b) {
+            this("", b);
+        }
+    }
+
+    /** As {@link Two}, the second constructor designated with {@code @Record}. */
+    public record TwoDesignated(String a, String b) {
+
+        @Record
+        public TwoDesignated(@Field("a") String a) {
+            this(a, "d");
+        }
+    }
+
+    /** Every constructor claims a profile, the canonical one among them. */
+    public record TwoProfiled(String a, String b) {
+
+        @Profile(value = "api-1", fields = {"a", "b"})
+        public TwoProfiled {
+        }
+
+        @Profile(value = "api-2", fields = {"a"})
+        public TwoProfiled(String a) {
+            this(a, "");
+        }
+    }
+
+    @Test
+    public void aRecordWithNoConstructorMarkedBindsItsCanonicalOne() throws Throwable {
+        assertEquals(List.of("a", "b"), fieldNames(context(null), Two.class));
+        Two value = new Two("x", "y");
+        MapMapper maps = new MapMapper(context(null));
+        ArrayMapper arrays = new ArrayMapper(context(null));
+        assertEquals(value, maps.toObject(Two.class, maps.toMap(value)));
+        assertEquals(value, arrays.toObject(Two.class, arrays.toArray(value)));
+    }
+
+    @Test
+    public void aProfileNoConstructorServesFallsBackToTheCanonicalConstructorOfARecord() {
+        assertAll(
+                () -> assertEquals(List.of("a", "b"), fieldNames(context("api-9"), Two.class)),
+                () -> assertEquals(List.of("a", "b"), fieldNames(context("api-9"), TwoAndProfiled.class)),
+                () -> assertEquals(List.of("a", "b"), fieldNames(context(null), TwoAndProfiled.class)));
+    }
+
+    @Test
+    public void aProfiledConstructorWinsOverTheCanonicalOne() throws DataBindException {
+        assertEquals(List.of("b"), fieldNames(context("api-2"), TwoAndProfiled.class));
+    }
+
+    @Test
+    public void aDesignatedConstructorWinsOverTheCanonicalOne() throws DataBindException {
+        assertEquals(List.of("a"), fieldNames(context(null), TwoDesignated.class));
+        assertEquals(List.of("a"), fieldNames(context("api-9"), TwoDesignated.class));
+    }
+
+    /** A canonical constructor built for one profile is no fallback for a context naming another, or none. */
+    @Test
+    public void aProfiledCanonicalConstructorIsNoFallback() {
+        assertEquals("Could not find constructor: " + TwoProfiled.class,
+                assertThrows(DataBindException.class, () -> fieldNames(context(null), TwoProfiled.class))
+                        .getMessage());
+        assertEquals("No constructor for profile 'api-7' on " + TwoProfiled.class.getName() + ", which offers "
+                + "[api-1, api-2] -- and none is designated with @Record as the fallback for profiles it does not "
+                + "name", assertThrows(DataBindException.class, () -> fieldNames(context("api-7"), TwoProfiled.class))
+                        .getMessage());
     }
 }

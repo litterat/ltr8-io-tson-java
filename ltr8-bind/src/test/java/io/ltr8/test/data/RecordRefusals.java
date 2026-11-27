@@ -21,6 +21,9 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.FieldOrder;
 import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Record;
+import io.ltr8.annotation.ToData;
+import io.ltr8.annotation.Transparent;
+import io.ltr8.annotation.Tuple;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.annotation.Union;
 import io.ltr8.test.data.ToDataBridges.ProtectedConstructor;
@@ -68,6 +71,56 @@ public final class RecordRefusals {
 
 	@FieldOrder({ "name" })
 	public record OrderOmitsUnbound(String name, @Unbound int cache) {
+	}
+
+	@Tuple
+	@FieldOrder({ "b", "a" })
+	public record OrderedTuple(String a, int b) {
+	}
+
+	@Tuple
+	@FieldOrder({ "nothing" })
+	public record OrderedTupleNamingNothing(String a, int b) {
+	}
+
+	@Transparent
+	@FieldOrder({ "value" })
+	public record OrderedTransparent(String value) {
+	}
+
+	@Transparent
+	@FieldOrder({ "nothing" })
+	public record OrderedTransparentNamingNothing(String value) {
+	}
+
+	@FieldOrder({ "count", "name" })
+	public static class OrderedBridged implements ToData<Good> {
+
+		private final Good data;
+
+		public OrderedBridged(Good data) {
+			this.data = data;
+		}
+
+		@Override
+		public Good toData() {
+			return data;
+		}
+	}
+
+	@FieldOrder({ "nothing" })
+	public static class OrderedBridgedNamingNothing implements ToData<Good> {
+
+		private final Good data;
+
+		public OrderedBridgedNamingNothing(Good data) {
+			this.data = data;
+		}
+
+		@Override
+		public Good toData() {
+			return data;
+		}
 	}
 
 	@Record
