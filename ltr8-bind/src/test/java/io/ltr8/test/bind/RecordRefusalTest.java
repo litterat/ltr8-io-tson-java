@@ -94,6 +94,12 @@ import io.ltr8.test.data.RecordRefusals.OrderNamesComponentTwice;
 import io.ltr8.test.data.RecordRefusals.OrderNamesNoField;
 import io.ltr8.test.data.RecordRefusals.OrderNamesWireName;
 import io.ltr8.test.data.RecordRefusals.OrderOmitsUnbound;
+import io.ltr8.test.data.RecordRefusals.OrderedBridged;
+import io.ltr8.test.data.RecordRefusals.OrderedBridgedNamingNothing;
+import io.ltr8.test.data.RecordRefusals.OrderedTransparent;
+import io.ltr8.test.data.RecordRefusals.OrderedTransparentNamingNothing;
+import io.ltr8.test.data.RecordRefusals.OrderedTuple;
+import io.ltr8.test.data.RecordRefusals.OrderedTupleNamingNothing;
 import io.ltr8.test.data.RecordRefusals.PrivateAccessor;
 import io.ltr8.test.data.RecordRefusals.ProfileFieldCountMismatch;
 import io.ltr8.test.data.RecordRefusals.ProfileNamesNoComponent;
@@ -232,6 +238,41 @@ class RecordRefusalTest {
 		assertInstanceOf(CodeAnalysisException.class, refused);
 		assertEquals(OrderNamesComponentTwice.class.getName() + " has a @FieldOrder naming 'a' twice: it names each "
 				+ "component once", refused.getMessage());
+	}
+
+	private static final String ORDER_DOES_NOT_APPLY = "an order applies only to a class described by its own "
+			+ "components";
+
+	@Test
+	void aFieldOrderOnATupleIsRefusedNamingTheClass() {
+		assertAll(Stream.of(OrderedTuple.class, OrderedTupleNamingNothing.class).map(type -> () -> {
+			DataBindException refused = refusal(context, type);
+			assertInstanceOf(CodeAnalysisException.class, refused, type.getName());
+			assertEquals(type.getName() + " carries @FieldOrder, but is a @Tuple, whose elements are its record "
+					+ "components in declared order; " + ORDER_DOES_NOT_APPLY, refused.getMessage());
+			assertNull(refused.getCause());
+		}));
+	}
+
+	@Test
+	void aFieldOrderOnATransparentRecordIsRefusedNamingTheClass() {
+		assertAll(Stream.of(OrderedTransparent.class, OrderedTransparentNamingNothing.class).map(type -> () -> {
+			DataBindException refused = refusal(context, type);
+			assertEquals(type.getName() + " carries @FieldOrder, but is @Transparent, written as its one component; "
+					+ ORDER_DOES_NOT_APPLY, refused.getMessage());
+			assertNull(refused.getCause());
+		}));
+	}
+
+	@Test
+	void aFieldOrderOnAClassBridgedThroughToDataIsRefusedNamingTheClassAndItsRecord() {
+		assertAll(Stream.of(OrderedBridged.class, OrderedBridgedNamingNothing.class).map(type -> () -> {
+			DataBindException refused = refusal(context, type);
+			assertEquals(type.getName() + " carries @FieldOrder, but is bridged through ToData to "
+					+ Good.class.getName() + ", which describes it; " + ORDER_DOES_NOT_APPLY + ", so it belongs on "
+					+ Good.class.getName(), refused.getMessage());
+			assertNull(refused.getCause());
+		}));
 	}
 
 	@Test

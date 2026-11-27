@@ -553,10 +553,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **`GetSetFinder` matches a private field to a component by name alone.** It sets no declaring class on its
   components, so a subclass's `private int name` is taken as a member of a super class's `String name` component
   and its annotations apply to it. Read, not run. Match on the declaring class, with a test of each.
-- [ ] **`@FieldOrder` is ignored on a class not described by its own components.** On a `@Tuple` record, a
-  `@Transparent` record and a class bridged through `ToData` it is accepted and has no effect, even naming no
-  component (`@FieldOrder({"nothing"})`). Refuse it on each, naming the class and why an order does not apply,
-  with a case of each in `RecordRefusalTest`.
 - [ ] **`ArrayMapper` cannot write a `@Tuple` record.** `toArray` throws `DataBindException` ("unexpected data
   class type"): it has no case for `DataClassTuple`. `MapMapper` is untested. Carry a tuple through both mappers,
   with a round trip.

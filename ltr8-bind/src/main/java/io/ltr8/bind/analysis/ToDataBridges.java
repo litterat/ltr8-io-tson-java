@@ -15,6 +15,7 @@
  */
 package io.ltr8.bind.analysis;
 
+import io.ltr8.annotation.FieldOrder;
 import io.ltr8.annotation.ToData;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassBridge;
@@ -42,6 +43,11 @@ final class ToDataBridges {
 
 	static DataClassBridge resolveBridge(Class<?> targetClass) throws DataBindException {
 		Class<?> dataType = findToDataClass(targetClass);
+		if (targetClass.isAnnotationPresent(FieldOrder.class)) {
+			throw new DataBindException(String.format("%s carries @FieldOrder, but is bridged through ToData to %s, "
+					+ "which describes it; an order applies only to a class described by its own components, so it "
+					+ "belongs on %2$s", targetClass.getName(), dataType.getName()));
+		}
 		Constructor<?> constructor = bridgeConstructor(targetClass, dataType);
 		try {
 			MethodHandle toObject = MethodHandles.publicLookup().unreflectConstructor(constructor);
