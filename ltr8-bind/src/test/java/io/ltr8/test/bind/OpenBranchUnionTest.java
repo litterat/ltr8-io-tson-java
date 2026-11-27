@@ -61,7 +61,7 @@ public class OpenBranchUnionTest {
 	public void theOpenBranchIsItselfAMemberAndTheUnionStaysExtensible() throws DataBindException {
 		DataClassUnion union = union();
 
-		Assertions.assertFalse(union.isSealed(), "a union collected from a sealed hierarchy stays extensible");
+		Assertions.assertFalse(union.isSealed(), "a non-sealed branch keeps the union extensible");
 		Assertions.assertTrue(union.isMemberType(OpenBranchUnionPoint.class), "the closed leaf is a member");
 		Assertions.assertTrue(union.isMemberType(OpenBranchUnionShape.class),
 				"the non-sealed branch is kept as a member rather than walked into");

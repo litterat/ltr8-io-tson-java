@@ -13,7 +13,6 @@ import io.ltr8.bind.DataClassUnion;
 import io.ltr8.bind.analysis.RecordFields.FieldBridge;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
@@ -72,9 +71,9 @@ public class RecordBinder {
 						descriptor.annotationsCarrier().orElse(null));
 			}
 		} catch (IllegalAccessException | SecurityException e) {
-			throw new DataBindException(String.format(
-					"%s is bound through a member that is not accessible: %s",
-					targetClass.getName(), e.getMessage()), e);
+			// What the described class or a bridge it names puts out of the public lookup's reach is refused where it
+			// is looked up (Members, RecordFields.fieldBridge); what is left is public members of exported classes.
+			throw new IllegalStateException(targetClass.getName() + " is bound through a lookup that cannot fail", e);
 		} catch (NoSuchMethodException e) {
 			throw new DataBindException(String.format(
 					"%s is bound through %s, which is not a public constructor or method",
@@ -128,7 +127,7 @@ public class RecordBinder {
 					+ annotationsCarrierCount + " on " + targetClass);
 		}
 
-		MethodHandle dataConstructor = MethodHandles.publicLookup().unreflectConstructor(ctor);
+		MethodHandle dataConstructor = Members.constructor(targetClass, ctor);
 
 		// Build a MethodHandle that creates object and also calls setters with order of
 		// fields as defined in components.
@@ -138,8 +137,7 @@ public class RecordBinder {
 		// See if there's an empty constructor available.
 		MethodHandle creator = null;
 		try {
-			Constructor<?> creatorCtor = targetClass.getConstructor();
-			creator = MethodHandles.publicLookup().unreflectConstructor(creatorCtor);
+			creator = Members.constructor(targetClass, targetClass.getConstructor());
 		} catch (NoSuchMethodException e) {
 			// ignore.
 		}

@@ -6,6 +6,7 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassUnion;
 
 
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +22,10 @@ public class UnionBinder {
 			List<Class<?>> unionMembers = new ArrayList<>();
 			collectSealedMembers(targetClass, unionMembers);
 
-			return new DataClassUnion(targetClass, unionMembers.toArray(new Class<?>[0]), false);
+			// A leaf is final or non-sealed. Only a non-sealed one stands for classes it cannot list
+			// (DataClassUnion#isMemberType), so a hierarchy with none admits nothing it does not list.
+			boolean sealed = unionMembers.stream().allMatch(member -> Modifier.isFinal(member.getModifiers()));
+			return new DataClassUnion(targetClass, unionMembers.toArray(new Class<?>[0]), sealed);
 		}
 
 		Union unionAnnotation = targetClass

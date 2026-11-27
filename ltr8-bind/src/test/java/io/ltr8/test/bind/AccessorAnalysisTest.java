@@ -404,9 +404,9 @@ class AccessorAnalysisTest {
 		}, () -> {
 			Class<?> type = fixture("HiddenInheritsPublicField");
 			DataBindException refused = assertThrows(DataBindException.class, () -> context.getDescriptor(type));
-			String message = refused.getMessage();
-			assertTrue(message.startsWith(type.getName() + " is bound through a member that is not accessible: "
-					+ "class is not public: " + type.getName() + ".<init>"), message);
+			assertEquals(type.getName() + " is bound through a member that is not accessible: constructor "
+					+ type.getName() + "(java.lang.String), of a class the public lookup cannot access",
+					refused.getMessage());
 			assertInstanceOf(IllegalAccessException.class, refused.getCause(), type.getName());
 		});
 	}

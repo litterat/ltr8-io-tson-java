@@ -527,13 +527,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   super class declares behind a pair the class inherits. Read each annotation from every member of a component,
   taking each `@Field` attribute from whichever member states it and refusing two members that state one
   differently, with a test of each annotation on each member of each class kind.
-- [ ] **The refusal for a constructor the public lookup cannot reach changes from run to run.** It embeds the
-  JDK's `IllegalAccessException` text, which carries an identity hash (`…X.<init>[Ljava.lang.Object;@…`). Read, not
-  run. Name the class and its constructor, keep the exception as the cause, and assert the whole message in
-  `RecordRefusalTest`.
-- [ ] **A Java `sealed` type is described as a union that is not sealed.** `UnionBinder` builds its
-  `DataClassUnion` with `isSealed` false, whatever the hierarchy permits. Read, not run. Describe it as sealed
-  where no permitted class is `non-sealed`, with a test that such a union admits no class it does not list.
 - [ ] **The two mappers are examples shipped as API.** `MapMapper` and `ArrayMapper` show two ways to walk the
   descriptors, a plain descent and `MethodHandle`s built over them; nothing outside `ltr8-bind` uses them, and its
   own tests use them as the round-trip harness. They sit in `src/main` and the module exports `io.ltr8.bind.mapper`.

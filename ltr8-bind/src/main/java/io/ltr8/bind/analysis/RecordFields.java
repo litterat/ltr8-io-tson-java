@@ -325,6 +325,20 @@ final class RecordFields {
 			throw new CodeAnalysisException("Bridge object type not assignable from field type");
 		}
 
+		// Looked up before the bridge is built: reflection would refuse a bridge out of the public lookup's reach naming
+		// this class as the one that cannot access it.
+		MethodHandle toData;
+		MethodHandle toObject;
+		try {
+			toData = MethodHandles.publicLookup().findVirtual(bridgeClass, TODATA_METHOD,
+					MethodType.methodType(bridgeDataClass, bridgeObjectClass));
+			toObject = MethodHandles.publicLookup().findVirtual(bridgeClass, TOOBJECT_METHOD,
+					MethodType.methodType(bridgeObjectClass, bridgeDataClass));
+		} catch (IllegalAccessException e) {
+			throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: "
+					+ "%sis a class the public lookup cannot access", targetClass.getName(), bridgeOf), e);
+		}
+
 		@SuppressWarnings("rawtypes")
 		DataBridge bridge;
 		try {
@@ -333,16 +347,9 @@ final class RecordFields {
 			throw new CodeAnalysisException("Failed to instantiate bridge", e);
 		}
 
-		MethodHandle toData = MethodHandles.publicLookup()
-				.findVirtual(bridgeClass, TODATA_METHOD, MethodType.methodType(bridgeDataClass, bridgeObjectClass))
-				.bindTo(bridge);
-		MethodHandle toObject = MethodHandles.publicLookup()
-				.findVirtual(bridgeClass, TOOBJECT_METHOD, MethodType.methodType(bridgeObjectClass, bridgeDataClass))
-				.bindTo(bridge);
-
 		return new FieldBridge(bridgeDataClass, bridgeDataType,
-				toData.asType(MethodType.methodType(bridgeDataClass, info.getType())),
-				toObject.asType(MethodType.methodType(info.getType(), bridgeDataClass)));
+				toData.bindTo(bridge).asType(MethodType.methodType(bridgeDataClass, info.getType())),
+				toObject.bindTo(bridge).asType(MethodType.methodType(info.getType(), bridgeDataClass)));
 	}
 
 	/**
