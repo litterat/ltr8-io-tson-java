@@ -526,11 +526,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `@Profile` are each dropped. Read each annotation from every member of a component, taking each `@Field`
   attribute from whichever member states it and refusing two members that state one differently, with a test of
   each annotation on each member of each class kind.
-- [ ] **An `@Unbound` component is analysed as a bound one is.** `record(String name, @Unbound Thread cache)` is
-  refused with "Unable to find a valid data conversion for class: class java.lang.Thread", and an `@Unbound`
-  constructor parameter of a hand-written `@Record` class with no accessor is refused with "Failed to match
-  immutable field accessor …". Nothing reads or writes either. Describe neither, with a read of each through both
-  mappers in `UnboundComponentTest`.
 - [ ] **An `Optional` whose argument is no class throws `ClassCastException`.** `Optional<? extends Number>` on a
   record, and `Optional<T>` on a generic class described raw, on every finder path, make `getDescriptor` throw it
   unchecked from the record binder's `rawTypeOf` (`GenericComponentTypeTest` pins the exception). Refuse the class

@@ -39,19 +39,16 @@ final class RecordCreators {
 	}
 
 	/**
-	 * {@code (Object[], int) -> Object}, where a component's value comes from: the values array, or for a component
-	 * the class owns ({@code @Unbound}) a stand-in of the same shape returning its type's zero, so the rest of the
-	 * pipeline -- bridges, {@code Optional} wrapping, primitive unboxing -- applies unchanged. The zero rather than
-	 * {@code null}, which no primitive can take.
+	 * {@code (Object[]) -> type}: the constructor argument of a component the class owns ({@code @Unbound}), its
+	 * type's zero. An {@code Optional} or {@code OptionalInt}, {@code OptionalLong} or {@code OptionalDouble} arrives
+	 * empty rather than null.
 	 */
-	private static MethodHandle valueSource(ComponentInfo field, FieldBridge bridge, int slot) {
-		if (slot >= 0) {
-			return MethodHandles.arrayElementGetter(Object[].class);
-		}
-		// A bridge converts from its data class, which is never primitive.
-		Class<?> type = bridge != null ? bridge.dataClass() : field.getType();
-		return MethodHandles.dropArguments(MethodHandles.zero(type).asType(MethodType.methodType(Object.class)), 0,
-				Object[].class, int.class);
+	private static MethodHandle unboundArgument(Class<?> type) throws NoSuchMethodException, IllegalAccessException {
+		MethodHandle zero = type == Optional.class || type == OptionalInt.class || type == OptionalLong.class
+				|| type == OptionalDouble.class
+						? MethodHandles.publicLookup().findStatic(type, "empty", MethodType.methodType(type))
+						: MethodHandles.zero(type);
+		return MethodHandles.dropArguments(zero, 0, Object[].class);
 	}
 
 	/**
@@ -95,15 +92,11 @@ final class RecordCreators {
 
 				int arg = field.getConstructorArgument();
 
-				// An Optional component the class owns still arrives empty rather than null.
-				MethodHandle arrayGetter = valueSource(field, bridges[x], slots[x]);
-
-				// () -> inputIndex
-				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));
-
-				// (values[]) -> values[inputIndex] and maybe additional modifications to the value.
-				MethodHandle arrayIndexGetter = dataArrayToObject(field, dataFields[x], bridges[x], arrayGetter,
-						index);
+				// (values[]) -> values[inputIndex], adapted, or an unbound component's zero.
+				MethodHandle arrayIndexGetter = slots[x] < 0 ? unboundArgument(field.getType())
+						: dataArrayToObject(field, dataFields[x], bridges[x],
+								MethodHandles.arrayElementGetter(Object[].class),
+								MethodHandles.constant(int.class, slots[x]));
 
 				// ()-> constructor( ..., values[inputIndex] , ... )
 				result = MethodHandles.collectArguments(result, arg, arrayIndexGetter);
@@ -146,10 +139,10 @@ final class RecordCreators {
 				// (obj, value):void -> obj.setField( value );
 				MethodHandle fieldSetter = field.getWriteMethod();
 
-				MethodHandle arrayGetter = valueSource(field, bridges[x], slots[x]);
+				MethodHandle arrayGetter = MethodHandles.arrayElementGetter(Object[].class);
 
 				// ():int -> inputIndex
-				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));
+				MethodHandle index = MethodHandles.constant(int.class, slots[x]);
 
 				// (values[]) -> values[inputIndex] and maybe additional modifications to the value.
 				MethodHandle arrayIndexGetter = dataArrayToObject(field, dataFields[x], bridges[x], arrayGetter,
