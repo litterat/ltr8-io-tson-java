@@ -517,11 +517,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Binding (`ltr8-bind`)
 
-- [ ] **`@FieldOrder` on a class with two components of one Java name throws `IllegalStateException`.** A public
-  field `name` beside a `getName`/`setName` pair, named apart on the wire by `@Field`, is a class of two components
-  named `name`; `DefaultRecordBinder.reorderFields` keys its map by that name and `Collectors.toMap` throws
-  "Duplicate key". Read, not run. Refuse the class with a `CodeAnalysisException` naming it and the name, with a
-  case in `RecordRefusalTest`.
 - [ ] **A generic public field of a super class is not resolved.** With `public List<T> items` in `FieldBase<T>`,
   `TextFields extends FieldBase<String>` is refused with "Unrecognized parameterized type": `GetSetFinder` takes a
   field's generic type as declared, where a pair's goes through `TypeArguments.inherited`. Resolve a field's type

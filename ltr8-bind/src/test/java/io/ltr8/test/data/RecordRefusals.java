@@ -437,6 +437,67 @@ public final class RecordRefusals {
 		}
 	}
 
+	/** As {@link FieldBesidePairNamedApart}, ordered: two components of the Java name {@code name}. */
+	@FieldOrder({ "alias", "name" })
+	public static class OrderedFieldBesidePair {
+
+		@Field("alias")
+		public String name;
+
+		private String label;
+
+		@Record
+		public OrderedFieldBesidePair() {
+		}
+
+		public String getName() {
+			return label;
+		}
+
+		public void setName(String label) {
+			this.label = label;
+		}
+	}
+
+	/** As {@link PairShadowsBaseComponentNamedApart}, ordered. */
+	@FieldOrder({ "name", "own" })
+	public static class OrderedPairShadowsBaseComponent extends NamedBase {
+
+		private String own;
+
+		@Record
+		public OrderedPairShadowsBaseComponent(String name) {
+			super(name);
+		}
+
+		@Field("own")
+		public String getName() {
+			return own;
+		}
+
+		public void setName(String own) {
+			this.own = own;
+		}
+	}
+
+	/** A constructor component of its super class's field name, named apart by {@code @Field}, and ordered. */
+	@FieldOrder({ "name", "own" })
+	public static class OrderedConstructorComponentsOfOneName extends NamedBase {
+
+		private final String name;
+
+		@Record
+		public OrderedConstructorComponentsOfOneName(String baseName, String name) {
+			super(baseName);
+			this.name = name;
+		}
+
+		@Field("own")
+		public String ownName() {
+			return name;
+		}
+	}
+
 	public static class NamedBase {
 
 		private final String name;
