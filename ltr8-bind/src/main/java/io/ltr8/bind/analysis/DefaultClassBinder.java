@@ -237,8 +237,8 @@ public class DefaultClassBinder {
 		}
 
 		// A hand-written (pre-record, or simply not a record) immutable tuple class, identified
-		// by @Record on the class, a constructor, or a static factory method -- ImmutableFinder
-		// matches its constructor arguments to fields via bytecode analysis.
+		// by @Record on the class or a constructor -- ImmutableFinder matches its constructor
+		// arguments to fields via bytecode analysis.
 		Record recordAnnotation = targetClass.getAnnotation(Record.class);
 		if (recordAnnotation != null) {
 			return true;
@@ -248,14 +248,6 @@ public class DefaultClassBinder {
 		for (Constructor<?> constructor : constructors) {
 			recordAnnotation = constructor.getAnnotation(Record.class);
 			if (recordAnnotation != null) {
-				return true;
-			}
-		}
-
-		Method[] methods = targetClass.getDeclaredMethods();
-		for (Method method : methods) {
-			recordAnnotation = method.getAnnotation(Record.class);
-			if (Modifier.isStatic(method.getModifiers()) && recordAnnotation != null) {
 				return true;
 			}
 		}

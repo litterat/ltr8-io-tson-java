@@ -586,7 +586,7 @@ public final class AccessorAnalyses {
 		}
 	}
 
-	// --- the member that reads a constructor-bound field back: a public instance method, else a public final field
+	// --- the member that reads a constructor-bound field back: a public instance method, else a public field
 
 	public static class PackagePrivateAccessor {
 
@@ -1043,7 +1043,7 @@ public final class AccessorAnalyses {
 		}
 	}
 
-	// --- a member declared on a super class the public lookup cannot reach
+	// --- a member of a super class that is not public: the public lookup reaches it through a public subclass
 
 	static class HiddenFieldBase {
 
@@ -1051,6 +1051,16 @@ public final class AccessorAnalyses {
 
 		public HiddenFieldBase(String name) {
 			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((HiddenFieldBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
 		}
 	}
 
@@ -1073,6 +1083,16 @@ public final class AccessorAnalyses {
 		public String name() {
 			return name;
 		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((HiddenAccessorBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
 	}
 
 	public static class InheritsHiddenAccessor extends HiddenAccessorBase {
@@ -1080,6 +1100,375 @@ public final class AccessorAnalyses {
 		@Record
 		public InheritsHiddenAccessor(String name) {
 			super(name);
+		}
+	}
+
+	/** Its accessor does more than return the field, so it is matched by its name and {@code @Field}. */
+	static class HiddenNamedAccessorBase {
+
+		private final String name;
+
+		public HiddenNamedAccessorBase(String name) {
+			this.name = name;
+		}
+
+		@Field("label")
+		public String name() {
+			return Objects.requireNonNull(name);
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(name, ((HiddenNamedAccessorBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class InheritsHiddenNamedAccessor extends HiddenNamedAccessorBase {
+
+		@Record
+		public InheritsHiddenNamedAccessor(String name) {
+			super(name);
+		}
+	}
+
+	static class HiddenGrandBase {
+
+		public final String name;
+
+		private final int count;
+
+		public HiddenGrandBase(String name, int count) {
+			this.name = name;
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((HiddenGrandBase) obj).name)
+					&& count == ((HiddenGrandBase) obj).count;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, count);
+		}
+	}
+
+	static class HiddenParent extends HiddenGrandBase {
+
+		public HiddenParent(String name, int count) {
+			super(name, count);
+		}
+	}
+
+	/** Its members sit two levels up, above another super class that is not public. */
+	public static class InheritsHiddenTwoUp extends HiddenParent {
+
+		@Record
+		public InheritsHiddenTwoUp(String name, int count) {
+			super(name, count);
+		}
+	}
+
+	public static class PublicTop {
+
+		public final String name;
+
+		private final int count;
+
+		public PublicTop(String name, int count) {
+			this.name = name;
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((PublicTop) obj).name)
+					&& count == ((PublicTop) obj).count;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, count);
+		}
+	}
+
+	static class HiddenBetween extends PublicTop {
+
+		public final String label;
+
+		private final int size;
+
+		public HiddenBetween(String name, int count, String label, int size) {
+			super(name, count);
+			this.label = label;
+			this.size = size;
+		}
+
+		public int size() {
+			return size;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj) && Objects.equals(label, ((HiddenBetween) obj).label)
+					&& size == ((HiddenBetween) obj).size;
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * super.hashCode() + Objects.hash(label, size);
+		}
+	}
+
+	/** Inherits members of a public class and of the super class that is not public between the two. */
+	public static class InheritsAcrossHidden extends HiddenBetween {
+
+		@Record
+		public InheritsAcrossHidden(String name, int count, String label, int size) {
+			super(name, count, label, size);
+		}
+	}
+
+	static class HiddenShadowedBase {
+
+		public final String name;
+
+		public HiddenShadowedBase(String name) {
+			this.name = name;
+		}
+	}
+
+	static class HiddenShadowing extends HiddenShadowedBase {
+
+		@SuppressWarnings("unused")
+		private final String name = "hidden";
+
+		public HiddenShadowing(String name) {
+			super(name);
+		}
+	}
+
+	/** Through it the name of its bound field resolves to another field, which a super class declares private. */
+	public static class InheritsShadowedHiddenField extends HiddenShadowing {
+
+		@Record
+		public InheritsShadowedHiddenField(String name) {
+			super(name);
+		}
+	}
+
+	static class HiddenDescribed {
+
+		public final String name;
+
+		@Record
+		public HiddenDescribed(String name) {
+			this.name = name;
+		}
+	}
+
+	static class HiddenInheritsPublicField extends PublicFieldBase {
+
+		@Record
+		public HiddenInheritsPublicField(String name) {
+			super(name);
+		}
+	}
+
+	// --- a public field that is not final, bound by the constructor and read and written through the field
+
+	public static class PublicMutableReference {
+
+		public String name;
+
+		@Record
+		public PublicMutableReference(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicMutableReference other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class PublicMutablePrimitives {
+
+		public int count;
+
+		public long size;
+
+		public double ratio;
+
+		public boolean flag;
+
+		@Record
+		public PublicMutablePrimitives(int count, long size, double ratio, boolean flag) {
+			this.count = count;
+			this.size = size;
+			this.ratio = ratio;
+			this.flag = flag;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicMutablePrimitives other && count == other.count && size == other.size
+					&& ratio == other.ratio && flag == other.flag;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(count, size, ratio, flag);
+		}
+	}
+
+	public static class PublicMutableList {
+
+		public List<String> items;
+
+		@Record
+		public PublicMutableList(List<String> items) {
+			this.items = items;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicMutableList other && Objects.equals(items, other.items);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(items);
+		}
+	}
+
+	public static class PublicMutableOptional {
+
+		public Optional<String> note;
+
+		@Record
+		public PublicMutableOptional(Optional<String> note) {
+			this.note = note;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof PublicMutableOptional other && Objects.equals(note, other.note);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(note);
+		}
+	}
+
+	public static class NamedPublicMutableField {
+
+		@Field("label")
+		public String name;
+
+		@Record
+		public NamedPublicMutableField(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof NamedPublicMutableField other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class PublicMutableFieldBase {
+
+		public String name;
+
+		public PublicMutableFieldBase(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass()
+					&& Objects.equals(name, ((PublicMutableFieldBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class InheritsPublicMutableField extends PublicMutableFieldBase {
+
+		private final int count;
+
+		@Record
+		public InheritsPublicMutableField(String name, int count) {
+			super(name);
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj) && count == ((InheritsPublicMutableField) obj).count;
+		}
+
+		@Override
+		public int hashCode() {
+			return 31 * super.hashCode() + count;
+		}
+	}
+
+	/** Its constructor binds one public field that is not final and leaves the other to be set after it. */
+	public static class BindsOnePublicMutableField {
+
+		public String name;
+
+		public String note;
+
+		@Record
+		public BindsOnePublicMutableField(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof BindsOnePublicMutableField other && Objects.equals(name, other.name)
+					&& Objects.equals(note, other.note);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(name, note);
 		}
 	}
 }
