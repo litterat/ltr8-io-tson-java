@@ -101,10 +101,11 @@ public class ClassBinder {
 					+ parameterizedType);
 		}
 		Type argument = parameterized.getActualTypeArguments()[0];
-		Class<?> valueClass = argument instanceof ParameterizedType nested
-				? (Class<?>) nested.getRawType()
-				: (Class<?>) argument;
-		return context.componentSource(valueClass, argument);
+		if (!TypeArguments.isHeld(argument)) {
+			throw new DataBindException("Annotated must be declared with a class, a parameterized type or an array of "
+					+ "one as its value type, found " + parameterized.getTypeName());
+		}
+		return context.componentSource(TypeArguments.erasure(argument), argument);
 	}
 
 	/**
