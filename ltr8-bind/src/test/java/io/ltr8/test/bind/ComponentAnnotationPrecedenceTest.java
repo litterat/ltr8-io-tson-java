@@ -65,6 +65,8 @@ import io.ltr8.test.data.AnnotatedMembers.MergedPublicField;
 import io.ltr8.test.data.AnnotatedMembers.MergedPublicFieldUnion;
 import io.ltr8.test.data.AnnotatedMembers.MergedSetterBesideStoredField;
 import io.ltr8.test.data.AnnotatedMembers.MergedSetterField;
+import io.ltr8.test.data.AnnotatedMembers.MergedSetterParameter;
+import io.ltr8.test.data.AnnotatedMembers.MergedSetterParameterBesideStoredField;
 import io.ltr8.test.data.AnnotatedMembers.MergedSetterRequired;
 import io.ltr8.test.data.AnnotatedMembers.MergedSetterUnbound;
 import io.ltr8.test.data.AnnotatedMembers.MergedSetterUnion;
@@ -74,6 +76,7 @@ import io.ltr8.test.data.AnnotatedMembers.PairDisagreementBesideOrphan;
 import io.ltr8.test.data.AnnotatedMembers.PairGetter;
 import io.ltr8.test.data.AnnotatedMembers.PairGetterBesidePrivateField;
 import io.ltr8.test.data.AnnotatedMembers.PairGetterBesideSetter;
+import io.ltr8.test.data.AnnotatedMembers.PairGetterBesideSetterParameter;
 import io.ltr8.test.data.AnnotatedMembers.PairGetterUnion;
 import io.ltr8.test.data.AnnotatedMembers.PairInheritedPrivateField;
 import io.ltr8.test.data.AnnotatedMembers.PairOrderFollowsPrivateFieldName;
@@ -82,7 +85,11 @@ import io.ltr8.test.data.AnnotatedMembers.PairPrivateField;
 import io.ltr8.test.data.AnnotatedMembers.PairPrivateFieldUnion;
 import io.ltr8.test.data.AnnotatedMembers.PairRequiredDiffers;
 import io.ltr8.test.data.AnnotatedMembers.PairSetter;
+import io.ltr8.test.data.AnnotatedMembers.PairSetterBesideItsParameter;
 import io.ltr8.test.data.AnnotatedMembers.PairSetterBesidePrivateField;
+import io.ltr8.test.data.AnnotatedMembers.PairSetterParameter;
+import io.ltr8.test.data.AnnotatedMembers.PairSetterParameterUnbound;
+import io.ltr8.test.data.AnnotatedMembers.PairSetterParameterUnion;
 import io.ltr8.test.data.AnnotatedMembers.PairUnionsDiffer;
 import io.ltr8.test.data.AnnotatedMembers.ProfiledAccessorBesideParameterField;
 import io.ltr8.test.data.AnnotatedMembers.ProfiledAccessorField;
@@ -109,6 +116,8 @@ import io.ltr8.test.data.BridgedFields.RecordingNumberAsText;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -366,6 +375,42 @@ class ComponentAnnotationPrecedenceTest {
 	}
 
 	@Test
+	void aSettersParameterIsReadLikeAnyMember() {
+		assertAll(
+				described(PLAIN, PairSetterParameter.class, "a:String set"),
+				described(PLAIN, PairSetterParameterUnion.class, "tag:union(String|Integer) set"),
+				described(PLAIN, PairSetterParameterUnbound.class, "name:String set"),
+				described(PLAIN, PairSetterBesideItsParameter.class, "x!:String set"),
+				described(PLAIN, MergedSetterParameter.class, "s:String set"));
+	}
+
+	@Test
+	void aSettersParameterStatingAnAttributeDifferentlyIsRefused() {
+		assertAll(
+				refusedAlone(PairGetterBesideSetterParameter.class,
+						fieldDiffers(PairGetterBesideSetterParameter.class, "x",
+								value("a"), getter(PairGetterBesideSetterParameter.class, "getX"),
+								value("b"), setterParameter(PairGetterBesideSetterParameter.class, "setX", "String"))),
+				refusedAlone(MergedSetterParameterBesideStoredField.class,
+						fieldDiffers(MergedSetterParameterBesideStoredField.class, "count",
+								value("a"), field(MergedSetterParameterBesideStoredField.class, "count"),
+								value("s"), setterParameter(MergedSetterParameterBesideStoredField.class, "setCount",
+										"String"))));
+	}
+
+	@Test
+	void aPairNamedByItsSettersParameterRoundTripsThroughBothMappers() throws Throwable {
+		PairSetterParameter value = new PairSetterParameter();
+		value.setX("v");
+		MapMapper maps = new MapMapper(PLAIN);
+		assertEquals(Map.of("a", "v"), maps.toMap(value));
+		assertEquals("v", ((PairSetterParameter) maps.toObject(PairSetterParameter.class, maps.toMap(value))).getX());
+		ArrayMapper arrays = new ArrayMapper(PLAIN);
+		assertArrayEquals(new Object[] { "v" }, arrays.toArray(value));
+		assertEquals("v", arrays.toObject(PairSetterParameter.class, arrays.toArray(value)).getX());
+	}
+
+	@Test
 	void pairsAreOrderedByTheirFinalWireNames() {
 		assertAll(described(PLAIN, PairOrderFollowsPrivateFieldName.class, "m:String set, z:String set"));
 	}
@@ -507,6 +552,10 @@ class ComponentAnnotationPrecedenceTest {
 		return "the setter " + type.getSimpleName() + "." + name + "(" + parameter + ")";
 	}
 
+	private static String setterParameter(Class<?> type, String name, String parameter) {
+		return "parameter 0 of the setter " + type.getSimpleName() + "." + name + "(" + parameter + ")";
+	}
+
 	private static String parameter(Class<?> type, int index, String parameters) {
 		return "parameter " + index + " of the constructor " + type.getSimpleName() + "(" + parameters + ")";
 	}
@@ -527,6 +576,25 @@ class ComponentAnnotationPrecedenceTest {
 		} catch (Exception e) {
 			return "refused: " + e.getMessage();
 		}
+	}
+
+	/** In two fresh contexts, {@code expected} less its "refused: " is the refusal's message, with no cause. */
+	private static Executable refusedAlone(Class<?> type, String expected) {
+		return () -> assertAll(Stream.of(1, 2).<Executable>map(run -> () -> assertEquals(
+				List.of(expected.substring("refused: ".length())), messages(DataBindContext.builder().build(), type),
+				type.getSimpleName() + ", context " + run)));
+	}
+
+	private static List<String> messages(DataBindContext context, Class<?> type) {
+		List<String> messages = new ArrayList<>();
+		try {
+			context.getDescriptor(type);
+		} catch (Exception e) {
+			for (Throwable at = e; at != null; at = at.getCause()) {
+				messages.add(at.getMessage());
+			}
+		}
+		return messages;
 	}
 
 	private static String describe(DataClassField field) {

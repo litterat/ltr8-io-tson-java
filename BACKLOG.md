@@ -529,18 +529,10 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   own tests use them as the round-trip harness. They sit in `src/main` and the module exports `io.ltr8.bind.mapper`.
   Move them out of the main sources, to the test sources or an examples source set the tests depend on, drop the
   export, and correct the `tson-java` skill's `api.md`, which lists it.
-- [ ] **A method parameter's binding annotation is never read.** `setX(@Field("y") String x)` on a `@Record`
-  getter/setter class binds the component as "x" and drops the annotation, silently (reproduced by probe): the member
-  scan does not reach a method's parameters on a described class. Take a setter's parameter as a member of its
-  component, or refuse the annotation, with a round trip of such a class.
 - [ ] **An accessor overridden with a computed body is read through the override.** `ImmutableFinder` matches a super
   class's `f()` returning `f` as the accessor, and virtual dispatch reaches a subclass's `f() { return "computed"; }`,
   so the class writes `{f=computed}` and a round trip loses the stored value (reproduced by probe). Reach the field
   without dispatch, or refuse an accessor overridden by a method that does not return its field, with a round trip.
-- [ ] **A method returning one of two fields is a candidate accessor for both.** `ImmutableFinder.examineAccessor`
-  takes every field a body returns, so `return flag ? a : b;` is a candidate for `a` and for `b`, and with no named
-  method beside it, the sole accessor of each (read, not run). Take a method as a candidate only where it returns one
-  field, with a test of such a class.
 - [ ] **`@Atom` is neither applied nor refused on a class described as something else.** `getDescriptor` ignores it
   in six positions (probed): on a record, `@Record`, `@Tuple` or `@Transparent` class, on its type, constructor or
   accessor; on a sealed or `@Union` type, such as a static factory; on an enum's methods; on an instance method of a

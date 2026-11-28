@@ -25,10 +25,12 @@ import io.ltr8.test.data.IgnoredAnnotations.BridgeOnCarrier;
 import io.ltr8.test.data.IgnoredAnnotations.BridgedWithField;
 import io.ltr8.test.data.IgnoredAnnotations.BridgedWithParameter;
 import io.ltr8.test.data.IgnoredAnnotations.ComponentOfAnotherProfile;
+import io.ltr8.test.data.IgnoredAnnotations.ConstantBodyMethodParameter;
 import io.ltr8.test.data.IgnoredAnnotations.ConstantBodyWithMethod;
 import io.ltr8.test.data.IgnoredAnnotations.ConstantWithField;
 import io.ltr8.test.data.IgnoredAnnotations.ConstructorParameterOfEnum;
 import io.ltr8.test.data.IgnoredAnnotations.DerivedOfNoComponent;
+import io.ltr8.test.data.IgnoredAnnotations.EnumMethodParameter;
 import io.ltr8.test.data.IgnoredAnnotations.EnumWithField;
 import io.ltr8.test.data.IgnoredAnnotations.GenericSetterOverride;
 import io.ltr8.test.data.IgnoredAnnotations.GetterImplementsTitled;
@@ -37,11 +39,13 @@ import io.ltr8.test.data.IgnoredAnnotations.GetterOverrideKeepsLabel;
 import io.ltr8.test.data.IgnoredAnnotations.ImplementsCached;
 import io.ltr8.test.data.IgnoredAnnotations.ImplementsKeyed;
 import io.ltr8.test.data.IgnoredAnnotations.ImplementsLabelled;
+import io.ltr8.test.data.IgnoredAnnotations.ImplementsTouched;
 import io.ltr8.test.data.IgnoredAnnotations.InheritedFieldOfNoComponent;
 import io.ltr8.test.data.IgnoredAnnotations.LabelledMember;
 import io.ltr8.test.data.IgnoredAnnotations.LabelledUnion;
 import io.ltr8.test.data.IgnoredAnnotations.MethodAnnotatedProtocol;
 import io.ltr8.test.data.IgnoredAnnotations.MethodOfNoComponent;
+import io.ltr8.test.data.IgnoredAnnotations.MethodParameterOfNoComponent;
 import io.ltr8.test.data.IgnoredAnnotations.ObjectAsText;
 import io.ltr8.test.data.IgnoredAnnotations.OverrideKeepsLabel;
 import io.ltr8.test.data.IgnoredAnnotations.OverrideRenames;
@@ -50,18 +54,23 @@ import io.ltr8.test.data.IgnoredAnnotations.ParameterAnnotatedProtocol;
 import io.ltr8.test.data.IgnoredAnnotations.ParameterOfAnotherConstructor;
 import io.ltr8.test.data.IgnoredAnnotations.Plain;
 import io.ltr8.test.data.IgnoredAnnotations.PrivateMethodOfSameName;
+import io.ltr8.test.data.IgnoredAnnotations.ProfiledStaticMethodParameter;
 import io.ltr8.test.data.IgnoredAnnotations.RenamesLabelled;
 import io.ltr8.test.data.IgnoredAnnotations.PrivateUnboundOfNoComponent;
 import io.ltr8.test.data.IgnoredAnnotations.PrivateUnionOfNoComponent;
 import io.ltr8.test.data.IgnoredAnnotations.RequiredOnCarrier;
 import io.ltr8.test.data.IgnoredAnnotations.RequiredPrimitive;
+import io.ltr8.test.data.IgnoredAnnotations.SetterOverrideKeepsParameterLabel;
+import io.ltr8.test.data.IgnoredAnnotations.SetterParameterOfNoPair;
 import io.ltr8.test.data.IgnoredAnnotations.StaticFieldAnnotated;
 import io.ltr8.test.data.IgnoredAnnotations.StaticMethodAnnotated;
+import io.ltr8.test.data.IgnoredAnnotations.StaticMethodParameterAnnotated;
 import io.ltr8.test.data.IgnoredAnnotations.TransparentField;
 import io.ltr8.test.data.IgnoredAnnotations.TransparentUnbound;
 import io.ltr8.test.data.IgnoredAnnotations.TransparentUnion;
 import io.ltr8.test.data.IgnoredAnnotations.TupleAccessorField;
 import io.ltr8.test.data.IgnoredAnnotations.TupleField;
+import io.ltr8.test.data.IgnoredAnnotations.TupleMethodParameter;
 import io.ltr8.test.data.IgnoredAnnotations.TupleUnbound;
 import io.ltr8.test.data.IgnoredAnnotations.TupleUnion;
 import io.ltr8.test.data.IgnoredAnnotations.UnboundBridged;
@@ -76,7 +85,10 @@ import io.ltr8.test.data.IgnoredAnnotations.UnionWithStatic;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -177,6 +189,28 @@ class IgnoredAnnotationRefusalTest {
 	}
 
 	@Test
+	void aParameterOfAMethodThatIsNoSetterOfAComponentRefusesItsAnnotation() {
+		assertAll(
+				refusedAlone(DataBindContext::builder, SetterParameterOfNoPair.class,
+						noComponent(SetterParameterOfNoPair.class,
+								"parameter 0 of the method SetterParameterOfNoPair.setOnly(String)", "@Field")),
+				refusedAlone(DataBindContext::builder, MethodParameterOfNoComponent.class,
+						noComponent(MethodParameterOfNoComponent.class,
+								"parameter 0 of the method MethodParameterOfNoComponent.with(Object)", "@Union")),
+				refusedAlone(DataBindContext::builder, StaticMethodParameterAnnotated.class,
+						noComponent(StaticMethodParameterAnnotated.class,
+								"parameter 0 of the method StaticMethodParameterAnnotated.of(String)", "@Unbound")),
+				refusedAlone(DataBindContext::builder, ImplementsTouched.class, noComponent(ImplementsTouched.class,
+						"parameter 0 of the method Touched.touch(String)", "@Field")),
+				refusedAlone(DataBindContext::builder, ProfiledStaticMethodParameter.class,
+						noComponent(ProfiledStaticMethodParameter.class,
+								"parameter 0 of the method ProfiledStaticMethodParameter.of(String)", "@Field")),
+				refusedAlone(() -> DataBindContext.builder().profile("p"), ProfiledStaticMethodParameter.class,
+						noComponent(ProfiledStaticMethodParameter.class,
+								"parameter 0 of the method ProfiledStaticMethodParameter.of(String)", "@Field")));
+	}
+
+	@Test
 	void anAnnotationAnotherPathAppliesIsNotRefused() {
 		assertAll(
 				described(PLAIN, ParameterOfAnotherConstructor.class, "x, y"),
@@ -209,6 +243,21 @@ class IgnoredAnnotationRefusalTest {
 		ArrayMapper arrays = new ArrayMapper(PLAIN);
 		assertArrayEquals(new Object[] { "t" }, arrays.toArray(titled));
 		assertEquals("t", arrays.toObject(GetterOverrideKeepsLabel.class, arrays.toArray(titled)).getTitle());
+	}
+
+	@Test
+	void anOverriddenSettersParameterIsTheComponents() throws Throwable {
+		assertAll(described(PLAIN, SetterOverrideKeepsParameterLabel.class, "heading"));
+		SetterOverrideKeepsParameterLabel titled = new SetterOverrideKeepsParameterLabel();
+		titled.setTitle("t");
+		MapMapper maps = new MapMapper(PLAIN);
+		assertEquals(Map.of("heading", "t"), maps.toMap(titled));
+		assertEquals("t", ((SetterOverrideKeepsParameterLabel) maps.toObject(SetterOverrideKeepsParameterLabel.class,
+				maps.toMap(titled))).getTitle());
+		ArrayMapper arrays = new ArrayMapper(PLAIN);
+		assertArrayEquals(new Object[] { "t" }, arrays.toArray(titled));
+		assertEquals("t", arrays.toObject(SetterOverrideKeepsParameterLabel.class, arrays.toArray(titled))
+				.getTitle());
 	}
 
 	@Test
@@ -252,6 +301,20 @@ class IgnoredAnnotationRefusalTest {
 						+ "constructor ConstructorParameterOfEnum(String)"),
 				refused(UnionWithStatic.class, UnionWithStatic.class.getName() + " is a union, written as one of "
 						+ "its members, so nothing reads @Field on the field UnionWithStatic.KEY"));
+	}
+
+	@Test
+	void aClassDescribedByNoComponentsOfItsOwnRefusesEveryBindingAnnotationOnItsMethodsParameters() {
+		assertAll(
+				refusedAlone(DataBindContext::builder, EnumMethodParameter.class, EnumMethodParameter.class.getName()
+						+ " is an enum, written as its constant's name, so nothing reads @Field on parameter 0 of the "
+						+ "method EnumMethodParameter.code(String)"),
+				refusedAlone(DataBindContext::builder, ConstantBodyMethodParameter.class,
+						ConstantBodyMethodParameter.class.getName() + " is an enum, written as its constant's name, so "
+								+ "nothing reads @Unbound on parameter 0 of the method code(String) of the body of its "
+								+ "constant RED"),
+				refusedAlone(DataBindContext::builder, TupleMethodParameter.class, tuple(TupleMethodParameter.class,
+						"@Field", "parameter 0 of the method TupleMethodParameter.with(String)")));
 	}
 
 	@Test
@@ -310,6 +373,24 @@ class IgnoredAnnotationRefusalTest {
 
 	private static Executable refused(Class<?> type, String message) {
 		return () -> assertEquals("refused: " + message, describe(PLAIN, type), type.getSimpleName());
+	}
+
+	/** In two fresh contexts, {@code message} is the whole of the refusal's message chain. */
+	private static Executable refusedAlone(Supplier<DataBindContext.Builder> builder, Class<?> type, String message) {
+		return () -> assertAll(Stream.of(1, 2).<Executable>map(run -> () -> assertEquals(List.of(message),
+				messages(builder.get().build(), type), type.getSimpleName() + ", context " + run)));
+	}
+
+	private static List<String> messages(DataBindContext context, Class<?> type) {
+		List<String> messages = new ArrayList<>();
+		try {
+			context.getDescriptor(type);
+		} catch (Exception e) {
+			for (Throwable at = e; at != null; at = at.getCause()) {
+				messages.add(at.getMessage());
+			}
+		}
+		return messages;
 	}
 
 	private static Executable described(DataBindContext context, Class<?> type, String names) {

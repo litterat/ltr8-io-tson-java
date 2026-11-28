@@ -18,6 +18,7 @@ import io.ltr8.annotation.Union;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
@@ -124,15 +125,25 @@ public class ComponentInfo {
 	 * Refuses {@code element} as {@link ComponentAnnotations#admit} does. An element already a member, reached again
 	 * by another finder or path, keeps the role it was first recorded with. A method brings every method a call of
 	 * it dispatches through ({@link ComponentAnnotations#dispatchedWith}): an override inherits no annotation, and
-	 * what any declaration of the call states is stated of the component.
+	 * what any declaration of the call states is stated of the component. Each method brings its parameters, in the
+	 * same role: a setter's is handed the component's value.
 	 */
 	void addMember(Role role, AnnotatedElement element) throws CodeAnalysisException {
 		if (!add(role, element) || !(element instanceof Method method)) {
 			return;
 		}
+		addParameters(role, method);
 		for (Method other : ComponentAnnotations.dispatchedWith(described, method)) {
-			add(method.getDeclaringClass().isAssignableFrom(other.getDeclaringClass()) ? Role.OVERRIDING
-					: Role.OVERRIDDEN, other);
+			Role dispatched = method.getDeclaringClass().isAssignableFrom(other.getDeclaringClass()) ? Role.OVERRIDING
+					: Role.OVERRIDDEN;
+			add(dispatched, other);
+			addParameters(dispatched, other);
+		}
+	}
+
+	private void addParameters(Role role, Method method) throws CodeAnalysisException {
+		for (Parameter parameter : method.getParameters()) {
+			add(role, parameter);
 		}
 	}
 

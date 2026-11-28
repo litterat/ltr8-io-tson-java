@@ -827,6 +827,103 @@ public final class AnnotatedMembers {
 	}
 
 	@Record
+	public static class PairSetterParameter {
+
+		private String x;
+
+		public PairSetterParameter() {
+		}
+
+		public String getX() {
+			return x;
+		}
+
+		public void setX(@Field("a") String x) {
+			this.x = x;
+		}
+	}
+
+	@Record
+	public static class PairSetterParameterUnion {
+
+		private Object tag;
+
+		public PairSetterParameterUnion() {
+		}
+
+		public Object getTag() {
+			return tag;
+		}
+
+		public void setTag(@Union({ String.class, Integer.class }) Object tag) {
+			this.tag = tag;
+		}
+	}
+
+	@Record
+	public static class PairSetterParameterUnbound {
+
+		private String name;
+
+		private String cache;
+
+		public PairSetterParameterUnbound() {
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public void setName(String name) {
+			this.name = name;
+		}
+
+		public String getCache() {
+			return cache;
+		}
+
+		public void setCache(@Unbound String cache) {
+			this.cache = cache;
+		}
+	}
+
+	@Record
+	public static class PairGetterBesideSetterParameter {
+
+		private String x;
+
+		public PairGetterBesideSetterParameter() {
+		}
+
+		@Field("a")
+		public String getX() {
+			return x;
+		}
+
+		public void setX(@Field("b") String x) {
+			this.x = x;
+		}
+	}
+
+	@Record
+	public static class PairSetterBesideItsParameter {
+
+		private String x;
+
+		public PairSetterBesideItsParameter() {
+		}
+
+		public String getX() {
+			return x;
+		}
+
+		@Field(required = true)
+		public void setX(@Field(required = true) String x) {
+			this.x = x;
+		}
+	}
+
+	@Record
 	public static class PairAgreeingMembers {
 
 		@Field("a")
@@ -1050,6 +1147,43 @@ public final class AnnotatedMembers {
 
 		@Field("s")
 		public void setCount(String count) {
+			this.count = count;
+		}
+	}
+
+	public static final class MergedSetterParameter {
+
+		private String count;
+
+		@Record
+		public MergedSetterParameter(String count) {
+			this.count = count;
+		}
+
+		public String getCount() {
+			return count;
+		}
+
+		public void setCount(@Field("s") String count) {
+			this.count = count;
+		}
+	}
+
+	public static final class MergedSetterParameterBesideStoredField {
+
+		@Field("a")
+		private String count;
+
+		@Record
+		public MergedSetterParameterBesideStoredField(String count) {
+			this.count = count;
+		}
+
+		public String getCount() {
+			return count;
+		}
+
+		public void setCount(@Field("s") String count) {
 			this.count = count;
 		}
 	}
