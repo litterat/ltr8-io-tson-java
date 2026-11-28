@@ -115,15 +115,16 @@ public class ClassBinder {
 	 * <p>A primitive is not asked -- {@link AtomBinder} refuses one outright, on the grounds that
 	 * reaching it means the primitives were never registered.
 	 */
-	public DataClassAtom atomForm(DataBindContext context, Class<?> targetClass) throws CodeAnalysisException {
+	public DataClassAtom atomForm(DataBindContext context, Class<?> targetClass) throws DataBindException {
 		ClassSignals signals = ClassSignals.of(targetClass);
 		refuseBlankTypename(signals);
-		return switch (Kind.asAtom(signals.present())) {
+		Kind kind = Kind.asAtom(signals.present());
+		return KindMarks.judged(KindMarks.Entry.REGISTER_ATOM, kind, signals, () -> switch (kind) {
 			case ENUM -> atomBinder.resolveEnum(targetClass);
 			// A way out marked with no way in is refused, though it makes no class an atom.
 			case ATOM, NONE -> signals.has(Signal.PRIMITIVE) ? null : atomBinder.resolveAtom(context, signals);
 			default -> throw new IllegalStateException(targetClass.getName() + " has no atom form's kind");
-		};
+		});
 	}
 
 	/** The form {@code DataBindContext.registerAtom} gives {@code targetClass} through {@code bridge}. */
@@ -155,7 +156,8 @@ public class ClassBinder {
 			throws DataBindException {
 		ClassSignals signals = ClassSignals.of(targetClass);
 		refuseBlankTypename(signals);
-		return switch (signals.kind()) {
+		Kind kind = signals.kind();
+		return KindMarks.judged(KindMarks.Entry.RESOLVE, kind, signals, () -> switch (kind) {
 			case ANNOTATED -> annotatedDescriptor(context, targetClass, parameterizedType);
 			case TRANSPARENT -> transparentBinder.resolve(context, signals);
 			case TUPLE -> tupleBinder.resolveTuple(context, signals);
@@ -169,7 +171,7 @@ public class ClassBinder {
 			case ARRAY -> arrayBinder.resolveArray(context, signals, parameterizedType);
 			case NONE -> throw new DataBindException(
 					String.format("Unable to find a valid data conversion for class: %s", targetClass));
-		};
+		});
 	}
 
 }

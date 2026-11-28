@@ -71,7 +71,6 @@ final class RecordComponents {
 			reorderFields(targetClass, dataOrder, components);
 		}
 		ComponentAnnotations.refuseUnapplied(targetClass, components);
-		ComponentAnnotations.refuseInheritedWayIn(targetClass, "is a record, written as its components");
 		return components;
 	}
 
