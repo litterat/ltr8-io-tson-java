@@ -92,8 +92,8 @@ final class KindMarks {
 				Signal.TO_DATA, Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
 		RESOLVED.put(Kind.RECORD, reading(but(all, Signal.UNION), Set.of(), Set.of(Signal.INTERFACE, Signal.ABSTRACT),
 				Walk.INHERITED_WAY_IN));
-		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.UNION, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD,
-				Walk.ATOM, Walk.BRIDGED_RECORD));
+		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
+				Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM, Walk.BRIDGED_RECORD));
 		RESOLVED.put(Kind.ENUM, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.ATOM));
 		RESOLVED.put(Kind.UNION, reading(all, Set.of(), Set.of(Signal.MAP, Signal.COLLECTION), Walk.UNREAD,
 				Walk.ATOM));

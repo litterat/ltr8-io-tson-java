@@ -24,7 +24,9 @@ import io.ltr8.test.data.KindConflicts.ConcreteUnion;
 import io.ltr8.test.data.KindConflicts.EnumUnion;
 import io.ltr8.test.data.KindConflicts.RecordUnion;
 import io.ltr8.test.data.KindConflicts.ToDataUnion;
+import io.ltr8.test.data.KindConflicts.RecordConstructorToData;
 import io.ltr8.test.data.KindConflicts.RecordInterface;
+import io.ltr8.test.data.KindConflicts.RecordToData;
 import io.ltr8.test.data.KindConflicts.SealedAbstractRecord;
 import io.ltr8.test.data.KindConflicts.SealedListed;
 import io.ltr8.test.data.KindConflicts.SealedMap;
@@ -127,6 +129,16 @@ class KindConflictRefusalTest {
 						+ "collection, written as its elements: remove @Union, or extend no java.util.Collection"),
 				described(UnionList.class, "carries @Union and is a java.util.Collection" + union + "a collection, "
 						+ "written as its elements: remove @Union, or extend no java.util.Collection"));
+	}
+
+	@Test
+	void aRecordMarkOnAClassItsToDataDescribesIsRefused() {
+		assertAll(
+				described(RecordToData.class, "says two ways to write it, ToData, as the record class it names, and "
+						+ "@Record, as its components by name: remove one of them"),
+				described(RecordConstructorToData.class, "says two ways to write it, ToData, as the record class it "
+						+ "names, and @Record on the constructor RecordConstructorToData(Text), as its components by "
+						+ "name: remove one of them"));
 	}
 
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */

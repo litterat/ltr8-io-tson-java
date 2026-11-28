@@ -177,4 +177,34 @@ public final class KindConflicts {
 	@Union
 	public static class UnionList extends ArrayList<String> {
 	}
+
+	// --- a record mark on a class its ToData describes
+
+	@Record
+	public static final class RecordToData implements ToData<Text> {
+		private final String value;
+
+		public RecordToData(Text text) {
+			this.value = text.value();
+		}
+
+		@Override
+		public Text toData() {
+			return new Text(value);
+		}
+	}
+
+	public static final class RecordConstructorToData implements ToData<Text> {
+		private final String value;
+
+		@Record
+		public RecordConstructorToData(Text text) {
+			this.value = text.value();
+		}
+
+		@Override
+		public Text toData() {
+			return new Text(value);
+		}
+	}
 }
