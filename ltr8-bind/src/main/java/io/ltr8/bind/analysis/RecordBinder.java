@@ -1,7 +1,6 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Annotations;
-import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -30,49 +29,39 @@ public class RecordBinder {
 	}
 
 	/**
-	 * Return a DataClassRecord for the specified targetClass in the provided DataBindContext.
-	 *
-	 * @param context DataBindContext the that targetClass will be resolved to a DataClassRecord
-	 * @param targetClass the target class to create the DataClassRecord
-	 * @return DataClassRecord for the targetClass
-	 * @throws DataBindException where the DataClassRecord can't be successfully created.
-	 */
-	public DataClassRecord resolveRecord(DataBindContext context, Class<?> targetClass)
-			throws DataBindException {
-		return resolveRecord(context, targetClass, targetClass);
-	}
-
-	/**
-	 * {@link #resolveRecord(DataBindContext, Class)} at {@code parameterizedType}: a generic class's components are
-	 * described with its type parameters replaced by the arguments given there, so {@code Box<T>(List<T> items)}
-	 * described as {@code Box<String>} has a {@code List<String>} component. A raw or unparameterised class keeps
-	 * its components as declared.
+	 * The record {@code targetClass} describes by its own components, at {@code parameterizedType}: a generic class's
+	 * components are described with its type parameters replaced by the arguments given there, so
+	 * {@code Box<T>(List<T> items)} described as {@code Box<String>} has a {@code List<String>} component. A raw or
+	 * unparameterised class keeps its components as declared.
 	 */
 	public DataClassRecord resolveRecord(DataBindContext context, Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
+		return refusing(targetClass, () -> resolveClassRecord(context, targetClass, parameterizedType));
+	}
+
+	/** The record a class bridged through {@code ToData} names, described as that class through the bridge. */
+	public DataClassRecord resolveBridged(DataBindContext context, ClassSignals signals) throws DataBindException {
+		Class<?> targetClass = signals.type();
+		return refusing(targetClass, () -> {
+			DataClassBridge bridge = ToDataBridges.resolveBridge(signals);
+			String written = "is bridged through ToData to " + bridge.dataClass().getName() + ", which describes it";
+			ComponentAnnotations.refuseUnread(targetClass, written);
+			ComponentAnnotations.refuseAtom(targetClass, written);
+
+			DataClassRecord descriptor = resolveClassRecord(context, bridge.dataClass());
+
+			return new DataClassRecord(targetClass, bridge, descriptor.isMutable(), descriptor.creator(),
+					descriptor.constructor(), descriptor.fields(), descriptor.annotationsCarrier().orElse(null));
+		});
+	}
+
+	private interface Describing {
+		DataClassRecord describe() throws IllegalAccessException, NoSuchMethodException, DataBindException;
+	}
+
+	private static DataClassRecord refusing(Class<?> targetClass, Describing describing) throws DataBindException {
 		try {
-
-			DataClassBridge bridge = null;
-			if (ToData.class.isAssignableFrom(targetClass)) {
-
-				bridge = ToDataBridges.resolveBridge(targetClass);
-				String written = "is bridged through ToData to " + bridge.dataClass().getName() + ", which describes it";
-				ComponentAnnotations.refuseUnread(targetClass, written);
-				ComponentAnnotations.refuseAtom(targetClass, written);
-
-				DataClassRecord descriptor = resolveClassRecord(context, bridge.dataClass());
-
-				return new DataClassRecord(targetClass, bridge, descriptor.isMutable(), descriptor.creator(),
-						descriptor.constructor(), descriptor.fields(),
-						descriptor.annotationsCarrier().orElse(null));
-			} else {
-
-				DataClassRecord descriptor = resolveClassRecord(context, targetClass, parameterizedType);
-
-				return new DataClassRecord(descriptor.typeClass(), bridge, descriptor.isMutable(), descriptor.creator(),
-						descriptor.constructor(), descriptor.fields(),
-						descriptor.annotationsCarrier().orElse(null));
-			}
+			return describing.describe();
 		} catch (IllegalAccessException | SecurityException e) {
 			// What the described class or a bridge it names puts out of the public lookup's reach is refused where it
 			// is looked up (Members, RecordFields.fieldBridge); what is left is public members of exported classes.

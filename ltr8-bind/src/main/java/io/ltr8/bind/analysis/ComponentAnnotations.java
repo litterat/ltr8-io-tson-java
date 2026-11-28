@@ -408,7 +408,7 @@ final class ComponentAnnotations {
 			return true;
 		}
 		for (Class<?> permitted : type.getPermittedSubclasses()) {
-			if (AtomBinder.marksAtom(permitted) || extendedByAnAtom(permitted)) {
+			if (ClassSignals.of(permitted).marksAtom() || extendedByAnAtom(permitted)) {
 				return true;
 			}
 		}

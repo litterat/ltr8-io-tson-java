@@ -1,6 +1,5 @@
 package io.ltr8.bind.analysis;
 
-import io.ltr8.annotation.FieldOrder;
 import io.ltr8.annotation.Transparent;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -44,10 +43,11 @@ import java.lang.reflect.RecordComponent;
  */
 final class TransparentBinder {
 
-    /** The descriptor for {@code targetClass}: its component's shape, wearing its own class and a bridge. */
-    DataClass resolve(DataBindContext context, Class<?> targetClass) throws DataBindException {
+    /** The descriptor for {@code signals}' class: its component's shape, wearing its own class and a bridge. */
+    DataClass resolve(DataBindContext context, ClassSignals signals) throws DataBindException {
+        Class<?> targetClass = signals.type();
         RecordComponent component = onlyComponent(targetClass);
-        if (targetClass.isAnnotationPresent(FieldOrder.class)) {
+        if (signals.fieldOrder() != null) {
             throw new DataBindException(targetClass.getName() + " carries @FieldOrder, but is @Transparent, written "
                     + "as its one component; an order applies only to a class described by its own components");
         }

@@ -1,32 +1,26 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Union;
-import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassUnion;
+import io.ltr8.bind.analysis.ClassSignals.Signal;
 
 
 import java.lang.reflect.Modifier;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Predicate;
 
 public class UnionBinder {
 
-	private final Predicate<Class<?>> describedAsUnion;
-
-	/** {@code describedAsUnion} answers whether a class's own descriptor is a union. */
-	public UnionBinder(Predicate<Class<?>> describedAsUnion) {
-		this.describedAsUnion = describedAsUnion;
+	public UnionBinder() {
 	}
 
-	public DataClassUnion resolveUnion(DataBindContext context, Class<?> targetClass, Type parameterizedType)
-			throws DataBindException {
+	public DataClassUnion resolveUnion(ClassSignals signals) throws DataBindException {
+		Class<?> targetClass = signals.type();
 		String written = "is a union, written as one of its members";
 		ComponentAnnotations.refuseUnread(targetClass, written);
 		ComponentAnnotations.refuseAtom(targetClass, written);
-		if (targetClass.isSealed()) {
+		if (signals.has(Signal.SEALED)) {
 			List<Class<?>> unionMembers = new ArrayList<>();
 			collectSealedMembers(targetClass, unionMembers);
 
@@ -37,8 +31,7 @@ public class UnionBinder {
 			return new DataClassUnion(targetClass, unionMembers.toArray(new Class<?>[0]), sealed);
 		}
 
-		Union unionAnnotation = targetClass
-				.getAnnotation(Union.class);
+		Union unionAnnotation = signals.union();
 		if (unionAnnotation != null) {
 			if (unionAnnotation.value() != null && unionAnnotation.value().length > 0) {
 
@@ -77,7 +70,7 @@ public class UnionBinder {
 				collected.add(member);
 				continue;
 			}
-			if (!Modifier.isAbstract(member.getModifiers()) && !describedAsUnion.test(member)) {
+			if (!Modifier.isAbstract(member.getModifiers()) && ClassSignals.of(member).kind() != Kind.UNION) {
 				collected.add(member);
 			}
 			collectSealedMembers(member, collected);

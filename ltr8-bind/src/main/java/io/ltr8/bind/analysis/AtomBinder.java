@@ -5,6 +5,7 @@ import io.ltr8.annotation.ToData;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
+import io.ltr8.bind.analysis.ClassSignals.Signal;
 import io.ltr8.bind.bridge.EnumStringBridge;
 
 import java.lang.invoke.MethodHandle;
@@ -70,46 +71,20 @@ public class AtomBinder {
 	}
 
 	/**
-	 * Whether {@code targetClass} carries {@code @Atom} itself or on a constructor or static method it declares,
-	 * which {@link #resolveAtom} applies or refuses.
-	 */
-	static boolean marksAtom(Class<?> targetClass) {
-		if (targetClass.isAnnotationPresent(Atom.class)) {
-			return true;
-		}
-		for (Constructor<?> constructor : targetClass.getDeclaredConstructors()) {
-			if (constructor.isAnnotationPresent(Atom.class)) {
-				return true;
-			}
-		}
-		for (Method method : targetClass.getDeclaredMethods()) {
-			if (isMarkedStatic(method)) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	private static boolean isMarkedStatic(Method method) {
-		return Modifier.isStatic(method.getModifiers()) && !method.isSynthetic()
-				&& method.isAnnotationPresent(Atom.class);
-	}
-
-	/**
-	 * The atom {@code targetClass} says it is, or {@code null} where it carries {@code @Atom} on neither itself, a way
-	 * in nor a way out. A static way in is the class's own, since a super class's returns the super class; a way out
+	 * The atom {@code signals}' class says it is, or {@code null} where it carries {@code @Atom} on neither itself, a
+	 * way in nor a way out. A static way in is the class's own, since a super class's returns the super class; a way out
 	 * may be inherited.
 	 */
-	public DataClassAtom resolveAtom(DataBindContext context, Class<?> targetClass)
-			throws CodeAnalysisException {
-		if (targetClass.isPrimitive()) {
+	public DataClassAtom resolveAtom(DataBindContext context, ClassSignals signals) throws CodeAnalysisException {
+		Class<?> targetClass = signals.type();
+		if (signals.has(Signal.PRIMITIVE)) {
 			// Should not get here unless primitives not registered.
 			throw new CodeAnalysisException("Primitive not registered: " + targetClass.getName());
 		}
 
 		List<Executable> waysIn = waysIn(targetClass);
 		if (waysIn.isEmpty()) {
-			if (targetClass.isAnnotationPresent(Atom.class)) {
+			if (signals.has(Signal.ATOM_ON_TYPE)) {
 				throw refusal("%s carries @Atom and marks no constructor or static method @Atom: " + NO_WAY_IN,
 						targetClass.getName());
 			}
@@ -172,7 +147,7 @@ public class AtomBinder {
 			}
 		}
 		for (Method method : targetClass.getDeclaredMethods()) {
-			if (isMarkedStatic(method)) {
+			if (ClassSignals.isMarkedStatic(method)) {
 				if (!takesOneWireValue(method)) {
 					throw refusal("@Atom static factory %s.%s must take one value the wire carries -- a primitive, a "
 							+ "box, a String or a BigInteger/BigDecimal -- and takes %s", targetClass.getName(),
@@ -270,14 +245,7 @@ public class AtomBinder {
 		return new CodeAnalysisException(String.format(format, arguments));
 	}
 
-	/**
-	 * Binds a plain Java enum to its {@code name()} via {@link EnumStringBridge} -- the default,
-	 * overridable representation {@link ClassBinder} routes every enum to directly, no
-	 * {@code @Atom} required (see its own comment on why: {@code Class#isEnum()} is as unambiguous
-	 * as {@code Class#isRecord()}, so there's nothing for an annotation to disambiguate here that
-	 * record/array auto-detection doesn't already handle the same way for their own JDK-recognizable
-	 * shapes).
-	 */
+	/** Binds a plain Java enum to its {@code name()} via {@link EnumStringBridge}. */
 	public DataClassAtom resolveEnum(Class<?> targetClass) throws CodeAnalysisException {
 		String written = "is an enum, written as its constant's name";
 		ComponentAnnotations.refuseUnread(targetClass, written);
