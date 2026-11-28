@@ -543,6 +543,30 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   the same two modules, `DataClassObjectWriter.writeUnion` and the JSON root write look a member up by
   `value.getClass()`, which for an enum constant with a body is its anonymous class, no member of any union (read, not
   run): use `getDeclaringClass()` for an enum, as the two mappers do.
+- [ ] **A method parameter's binding annotation is never read.** `setX(@Field("y") String x)` on a `@Record`
+  getter/setter class binds the component as "x" and drops the annotation, silently (reproduced by probe): the member
+  scan does not reach a method's parameters on a described class. Take a setter's parameter as a member of its
+  component, or refuse the annotation, with a round trip of such a class.
+- [ ] **An accessor overridden with a computed body is read through the override.** `ImmutableFinder` matches a super
+  class's `f()` returning `f` as the accessor, and virtual dispatch reaches a subclass's `f() { return "computed"; }`,
+  so the class writes `{f=computed}` and a round trip loses the stored value (reproduced by probe). Reach the field
+  without dispatch, or refuse an accessor overridden by a method that does not return its field, with a round trip.
+- [ ] **A method returning one of two fields is a candidate accessor for both.** `ImmutableFinder.examineAccessor`
+  takes every field a body returns, so `return flag ? a : b;` is a candidate for `a` and for `b`, and with no named
+  method beside it, the sole accessor of each (read, not run). Take a method as a candidate only where it returns one
+  field, with a test of such a class.
+- [ ] **`@Atom` is neither applied nor refused on a class described as something else.** `getDescriptor` ignores it
+  in six positions (probed): on a record, `@Record`, `@Tuple` or `@Transparent` class, on its type, constructor or
+  accessor; on a sealed or `@Union` type, such as a static factory; on an enum's methods; on an instance method of a
+  record, union, map, collection or `ToData` class with no way in; on a method of an interface an atom implements;
+  and on a super class's static factory, seen from a subclass. Refuse each, as `ComponentAnnotations.refuseUnread`
+  refuses `@Field`, `@Union` and `@Unbound`, with a refusal per position.
+- [ ] **A record with `@Atom` on its accessor, registered as an atom, is a bare atom.** It marks no way in, so
+  `atomForm` returns `null` and `registerAtom(Class)` registers a `DataClassAtom` with no bridge, the mark ignored
+  (reproduced by probe). Refuse it, as a class carrying `@Atom` on its type with no way in is refused.
+- [ ] **`Members.declarerDownTo` walks an interface by `getSuperclass()`.** For a described interface and a method
+  it inherits from a super-interface, the walk reaches `null` and throws `NullPointerException` (read, not run; no
+  caller passes an interface). Walk the super-interfaces, or refuse an interface naming it.
 - [ ] **Prose outside `ltr8-bind` states rules the binder has changed.** `FieldOrder`'s Javadoc (`ltr8-annotation`)
   says it has no effect on a `@Tuple`, a `@Transparent` class or one bridged through `ToData`, where it is refused.
   `Field`'s says nothing of several members: each attribute is taken from whichever member states it, two stating one
