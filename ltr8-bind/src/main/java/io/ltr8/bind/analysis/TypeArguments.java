@@ -7,8 +7,10 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -89,6 +91,48 @@ final class TypeArguments {
             }
         }
         return bindings;
+    }
+
+    /**
+     * {@code generic}'s type arguments as {@code type} binds them, through any path of super classes and interfaces, or
+     * {@code null} where it reaches {@code generic} through a raw type: a raw type's supertypes are erased (JLS 4.8).
+     * Java lets a class reach one generic interface by two paths only with the same arguments, so the first path found
+     * answers for every path.
+     */
+    static Type[] arguments(Class<?> type, Class<?> generic) {
+        return arguments(type, generic, Map.of());
+    }
+
+    private static Type[] arguments(Class<?> type, Class<?> generic, Map<TypeVariable<?>, Type> bindings) {
+        List<Type> supertypes = new ArrayList<>(List.of(type.getGenericInterfaces()));
+        if (type.getGenericSuperclass() != null) {
+            supertypes.addFirst(type.getGenericSuperclass());
+        }
+        for (Type supertype : supertypes) {
+            Class<?> raw = erasure(supertype);
+            if (!generic.isAssignableFrom(raw)) {
+                continue;
+            }
+            if (!(supertype instanceof ParameterizedType parameterized)) {
+                return raw == generic || raw.getTypeParameters().length > 0 ? null
+                        : arguments(raw, generic, Map.of());
+            }
+            Type[] arguments = parameterized.getActualTypeArguments();
+            for (int x = 0; x < arguments.length; x++) {
+                arguments[x] = substitute(arguments[x], bindings);
+            }
+            if (raw == generic) {
+                return arguments;
+            }
+            Map<TypeVariable<?>, Type> inherited = new HashMap<>();
+            TypeVariable<?>[] parameters = raw.getTypeParameters();
+            for (int x = 0; x < parameters.length; x++) {
+                inherited.put(parameters[x], arguments[x]);
+            }
+            return arguments(raw, generic, inherited);
+        }
+        throw new IllegalStateException(type.getName() + " reaches " + generic.getName()
+                + " through none of its supertypes");
     }
 
     /**
