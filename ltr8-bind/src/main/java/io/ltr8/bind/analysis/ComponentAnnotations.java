@@ -16,6 +16,7 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Annotations;
+import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Profile;
@@ -45,6 +46,7 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -319,7 +321,7 @@ final class ComponentAnnotations {
 			throw new IllegalStateException(String.format("Record %s declares no canonical constructor",
 					record.getName()), e);
 		}
-		refuse(record, written, elements);
+		refuse(record, written, elements, ComponentAnnotations::bindingAnnotation);
 	}
 
 	/**
@@ -346,21 +348,90 @@ final class ComponentAnnotations {
 		for (Constructor<?> constructor : type.getDeclaredConstructors()) {
 			elements.addAll(declaredParameters(constructor));
 		}
-		refuse(type, written, elements);
-		if (type.isEnum()) {
-			for (Object constant : type.getEnumConstants()) {
-				if (constant.getClass() == type) {
-					continue;
+		refuse(type, written, elements, ComponentAnnotations::bindingAnnotation);
+		refuseInConstantBodies(type, written, ComponentAnnotations::bindingAnnotation);
+	}
+
+	/**
+	 * Refuses {@code type}, which its binder describes as no atom, where it carries {@code @Atom}, or a constructor or
+	 * method of it or of an enum constant's body does, or a super class's static method; an enum is an atom by its
+	 * name, and may say so on its type. An instance method a class described as an atom may inherit, as its way out,
+	 * is that class's to judge: one of an interface, or of a class it may extend.
+	 *
+	 * @param written how the binder writes it, completing "{@code type} ..."
+	 */
+	static void refuseAtom(Class<?> type, String written) throws CodeAnalysisException {
+		List<AnnotatedElement> elements = new ArrayList<>();
+		if (!type.isEnum()) {
+			elements.add(type);
+		}
+		elements.addAll(List.of(type.getDeclaredConstructors()));
+		boolean extended = !type.isInterface() && extendedByAnAtom(type);
+		for (AnnotatedElement element : declaredMembers(type)) {
+			if (isStatic(element) || !type.isInterface() && (!extended
+					|| element instanceof Method method && Modifier.isPrivate(method.getModifiers()))) {
+				elements.add(element);
+			}
+		}
+		refuse(type, written, elements, ComponentAnnotations::atom);
+		refuseInConstantBodies(type, written, ComponentAnnotations::atom);
+		refuseInheritedWayIn(type, written);
+	}
+
+	/**
+	 * Refuses {@code type} where a static method of a super class of it carries {@code @Atom}: a static way in builds
+	 * the class declaring it, so nothing reads it as {@code type}'s.
+	 *
+	 * @param written how the binder writes it, completing "{@code type} ..."
+	 */
+	static void refuseInheritedWayIn(Class<?> type, String written) throws CodeAnalysisException {
+		List<AnnotatedElement> elements = new ArrayList<>();
+		for (Class<?> declarer = type.getSuperclass(); declarer != null; declarer = declarer.getSuperclass()) {
+			for (AnnotatedElement element : declaredMembers(declarer)) {
+				if (element instanceof Method && isStatic(element)) {
+					elements.add(element);
 				}
-				for (AnnotatedElement declared : declaredMembers(constant.getClass())) {
-					for (AnnotatedElement element : withParameters(declared)) {
-						String annotation = bindingAnnotation(element);
-						if (annotation != null) {
-							throw new CodeAnalysisException(String.format(
-									"%s %s, so nothing reads %s on %s of the body of its constant %s",
-									type.getName(), written, annotation, describeInBody(element),
-									((Enum<?>) constant).name()));
-						}
+			}
+		}
+		refuse(type, written, elements, ComponentAnnotations::atom);
+	}
+
+	/**
+	 * Whether a class described as an atom may extend {@code type}: any class may extend one neither final nor
+	 * sealed, and a sealed one is extended only through the classes it permits.
+	 */
+	private static boolean extendedByAnAtom(Class<?> type) {
+		if (Modifier.isFinal(type.getModifiers()) || type.isEnum()) {
+			return false;
+		}
+		if (!type.isSealed()) {
+			return true;
+		}
+		for (Class<?> permitted : type.getPermittedSubclasses()) {
+			if (AtomBinder.marksAtom(permitted) || extendedByAnAtom(permitted)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static void refuseInConstantBodies(Class<?> type, String written,
+			Function<AnnotatedElement, String> annotationOf) throws CodeAnalysisException {
+		if (!type.isEnum()) {
+			return;
+		}
+		for (Object constant : type.getEnumConstants()) {
+			if (constant.getClass() == type) {
+				continue;
+			}
+			for (AnnotatedElement declared : declaredMembers(constant.getClass())) {
+				for (AnnotatedElement element : withParameters(declared)) {
+					String annotation = annotationOf.apply(element);
+					if (annotation != null) {
+						throw new CodeAnalysisException(String.format(
+								"%s %s, so nothing reads %s on %s of the body of its constant %s",
+								type.getName(), written, annotation, describeInBody(element),
+								((Enum<?>) constant).name()));
 					}
 				}
 			}
@@ -395,13 +466,13 @@ final class ComponentAnnotations {
 				}
 			}
 		}
-		refuse(protocol, "is a protocol, read as its exchanges", elements);
+		refuse(protocol, "is a protocol, read as its exchanges", elements, ComponentAnnotations::bindingAnnotation);
 	}
 
-	private static void refuse(Class<?> type, String written, List<AnnotatedElement> elements)
-			throws CodeAnalysisException {
+	private static void refuse(Class<?> type, String written, List<AnnotatedElement> elements,
+			Function<AnnotatedElement, String> annotationOf) throws CodeAnalysisException {
 		for (AnnotatedElement element : elements) {
-			String annotation = bindingAnnotation(element);
+			String annotation = annotationOf.apply(element);
 			if (annotation != null) {
 				throw new CodeAnalysisException(String.format("%s %s, so nothing reads %s on %s", type.getName(),
 						written, annotation, element instanceof Parameter ? describe(element)
@@ -441,6 +512,10 @@ final class ComponentAnnotations {
 						: element.isAnnotationPresent(Unbound.class) ? "@Unbound" : null;
 	}
 
+	private static String atom(AnnotatedElement element) {
+		return element.isAnnotationPresent(Atom.class) ? "@Atom" : null;
+	}
+
 	private static boolean isStatic(AnnotatedElement element) {
 		return element instanceof java.lang.reflect.Member member && Modifier.isStatic(member.getModifiers());
 	}
@@ -448,6 +523,10 @@ final class ComponentAnnotations {
 	private static String describe(AnnotatedElement element) {
 		String modifier = isStatic(element) ? "static " : "";
 		return switch (element) {
+			case Class<?> type -> (type.isInterface() ? "interface " : "class ") + type.getSimpleName();
+			case Constructor<?> constructor -> "constructor " + constructor.getDeclaringClass().getSimpleName()
+					+ declaredParameters(constructor).stream().map(parameter -> parameter.getType().getSimpleName())
+							.collect(Collectors.joining(", ", "(", ")"));
 			case java.lang.reflect.Field field -> modifier + "field " + field.getDeclaringClass().getSimpleName() + "."
 					+ field.getName();
 			case Method method -> modifier + "method " + method.getDeclaringClass().getSimpleName() + "."
@@ -461,7 +540,7 @@ final class ComponentAnnotations {
 						+ declared.stream().map(declaredParameter -> declaredParameter.getType().getSimpleName())
 								.collect(Collectors.joining(", ", "(", ")"));
 			}
-			default -> throw new IllegalStateException(element + " is no field, method or parameter");
+			default -> throw new IllegalStateException(element + " is no class, constructor, field, method or parameter");
 		};
 	}
 

@@ -533,15 +533,11 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   class's `f()` returning `f` as the accessor, and virtual dispatch reaches a subclass's `f() { return "computed"; }`,
   so the class writes `{f=computed}` and a round trip loses the stored value (reproduced by probe). Reach the field
   without dispatch, or refuse an accessor overridden by a method that does not return its field, with a round trip.
-- [ ] **`@Atom` is neither applied nor refused on a class described as something else.** `getDescriptor` ignores it
-  in six positions (probed): on a record, `@Record`, `@Tuple` or `@Transparent` class, on its type, constructor or
-  accessor; on a sealed or `@Union` type, such as a static factory; on an enum's methods; on an instance method of a
-  record, union, map, collection or `ToData` class with no way in; on a method of an interface an atom implements;
-  and on a super class's static factory, seen from a subclass. Refuse each, as `ComponentAnnotations.refuseUnread`
-  refuses `@Field`, `@Union` and `@Unbound`, with a refusal per position.
-- [ ] **A record with `@Atom` on its accessor, registered as an atom, is a bare atom.** It marks no way in, so
-  `atomForm` returns `null` and `registerAtom(Class)` registers a `DataClassAtom` with no bridge, the mark ignored
-  (reproduced by probe). Refuse it, as a class carrying `@Atom` on its type with no way in is refused.
+- [ ] **`@Atom` is neither applied nor refused in two positions, each awaiting a ruling.** `getDescriptor` ignores
+  it on a record, `@Record`, `@Tuple` or `@Transparent` class, on its type, constructor or accessor, where only
+  `registerAtom` reads it; and on an instance method of an interface, which an atom implementing it may or may not
+  take as its way out. Rule on each: refuse it, as `ComponentAnnotations.refuseAtom` refuses `@Atom` on a class
+  described as something else (`UnreadAtomRefusalTest`), or apply it, with a test either way.
 - [ ] **Prose outside `ltr8-bind` states rules the binder has changed.** `FieldOrder`'s Javadoc (`ltr8-annotation`)
   says it has no effect on a `@Tuple`, a `@Transparent` class or one bridged through `ToData`, where it is refused.
   `Field`'s says nothing of several members: each attribute is taken from whichever member states it, two stating one

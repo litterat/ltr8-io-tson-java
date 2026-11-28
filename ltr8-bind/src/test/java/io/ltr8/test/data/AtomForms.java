@@ -204,6 +204,13 @@ public final class AtomForms {
 		}
 	}
 
+	public static final class InheritsMarkedAccessorWithoutWayIn extends CodeBase {
+
+		public InheritsMarkedAccessorWithoutWayIn(String code) {
+			super(code);
+		}
+	}
+
 	public interface DefaultText extends ToData<String> {
 
 		String text();
@@ -276,6 +283,15 @@ public final class AtomForms {
 
 		@Atom
 		public RecordWithAtomConstructor {
+		}
+	}
+
+	/** Described, a record; registered as an atom, a way out with no way in. */
+	public record RecordWithAtomAccessor(String code) {
+
+		@Atom
+		public String code() {
+			return code;
 		}
 	}
 
