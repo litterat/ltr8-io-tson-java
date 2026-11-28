@@ -228,7 +228,9 @@ class AtomFormTest {
 
 	@Test
 	void aToDataClassMarkingNoWayInStaysABridgedRecord() {
-		assertEquals("Could not find constructor: class java.lang.String", refusal(ToDataWithoutAtom.class));
+		assertEquals(ToDataWithoutAtom.class.getName() + " implements ToData<String>, but java.lang.String is an atom; "
+				+ "ToData names a record class described by its own components: a class written as String is an atom, "
+				+ "and marks its way in @Atom", refusal(ToDataWithoutAtom.class));
 	}
 
 	// --- refused: no way out said

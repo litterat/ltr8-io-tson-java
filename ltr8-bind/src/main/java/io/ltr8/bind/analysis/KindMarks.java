@@ -19,6 +19,8 @@ import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassAtom;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.analysis.ClassSignals.Signal;
 
 import java.lang.annotation.Annotation;
@@ -59,9 +61,7 @@ final class KindMarks {
 		/** {@link ComponentAnnotations#refuseAtom}, which judges every {@code @Atom} mark. */
 		ATOM,
 		/** {@link ComponentAnnotations#refuseInheritedWayIn}. */
-		INHERITED_WAY_IN,
-		/** {@link Kind#RECORD}'s walks, over the record class a bridged class names, which describes it. */
-		BRIDGED_RECORD
+		INHERITED_WAY_IN
 	}
 
 	/**
@@ -96,7 +96,7 @@ final class KindMarks {
 		RESOLVED.put(Kind.RECORD, reading(but(all, Signal.UNION), Set.of(), Set.of(Signal.INTERFACE, Signal.ABSTRACT),
 				Walk.INHERITED_WAY_IN));
 		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
-				Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM, Walk.BRIDGED_RECORD));
+				Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM));
 		RESOLVED.put(Kind.ENUM, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
 				Signal.TO_DATA, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM));
 		RESOLVED.put(Kind.UNION, reading(but(all, Signal.FIELD_ORDER), Set.of(), Set.of(Signal.MAP, Signal.COLLECTION),
@@ -208,12 +208,34 @@ final class KindMarks {
 			case UNREAD -> ComponentAnnotations.refuseUnread(type, written);
 			case ATOM -> ComponentAnnotations.refuseAtom(type, written);
 			case INHERITED_WAY_IN -> ComponentAnnotations.refuseInheritedWayIn(type, written);
-			case BRIDGED_RECORD -> {
-				for (Walk recordWalk : RESOLVED.get(Kind.RECORD).walks()) {
-					walk(recordWalk, bridgedTo, written(Kind.RECORD, ClassSignals.of(bridgedTo), null, null), null);
-				}
-			}
 		}
+	}
+
+	/**
+	 * Refuses {@code bridged}, whose {@code ToData} names {@code described}'s class, where that class is described as
+	 * anything but a record by its own components: the bridge writes {@code bridged} as one.
+	 */
+	static void refuseBridgedTo(Class<?> bridged, DataClass described) throws DataBindException {
+		if (described instanceof DataClassRecord record && record.bridge().isEmpty()) {
+			return;
+		}
+		Class<?> named = described.typeClass();
+		ClassSignals signals = ClassSignals.of(named);
+		Kind kind = signals.kind();
+		Class<?> bridgedTo = kind == Kind.BRIDGED ? ToDataBridges.findToDataClass(named) : null;
+		// A registered or core atom is described as one whatever its own signals say.
+		boolean registered = described instanceof DataClassAtom && kind != Kind.ATOM && kind != Kind.ENUM
+				&& kind != Kind.TRANSPARENT;
+		String fix = registered ? "a class written as " + named.getSimpleName() + " is an atom, and marks its way in "
+				+ "@Atom" : switch (kind) {
+			case TRANSPARENT -> "remove @Transparent from " + named.getSimpleName();
+			case TUPLE -> "remove @Tuple from " + named.getSimpleName();
+			case BRIDGED -> "name " + bridgedTo.getName() + " in its place";
+			default -> "name such a class in its place";
+		};
+		throw new CodeAnalysisException(String.format("%s implements ToData<%s>, but %s %s; ToData names a record class "
+				+ "described by its own components: %s", bridged.getName(), named.getSimpleName(), named.getName(),
+				registered ? "is an atom" : written(kind, signals, described, bridgedTo), fix));
 	}
 
 	/** How {@code kind} writes {@code signals}' class, completing "{@code type} ...". */

@@ -24,6 +24,11 @@ import io.ltr8.test.data.KindConflicts.AbstractRecordConstructor;
 import io.ltr8.test.data.KindConflicts.AbstractRecordUnion;
 import io.ltr8.test.data.KindConflicts.AtomEnumToData;
 import io.ltr8.test.data.KindConflicts.AtomUnion;
+import io.ltr8.test.data.KindConflicts.BridgedToAbstract;
+import io.ltr8.test.data.KindConflicts.BridgedToTransparent;
+import io.ltr8.test.data.KindConflicts.BridgedToTuple;
+import io.ltr8.test.data.KindConflicts.TransparentText;
+import io.ltr8.test.data.KindConflicts.TupleText;
 import io.ltr8.test.data.KindConflicts.ConcreteUnion;
 import io.ltr8.test.data.KindConflicts.EnumToData;
 import io.ltr8.test.data.KindConflicts.EnumUnion;
@@ -224,6 +229,22 @@ class KindConflictRefusalTest {
 		DataClassAtom atom = assertInstanceOf(DataClassAtom.class, DataBindContext.builder()
 				.registerAtom(TupleRecord.class, new TupleRecordAsText()).build().getDescriptor(TupleRecord.class));
 		assertEquals(String.class, atom.dataClass());
+	}
+
+	/** The record class a ToData names is described as any class is, and must be a record by its components. */
+	@Test
+	void aToDataNamingAClassThatIsNoPlainRecordIsRefused() {
+		String names = "; ToData names a record class described by its own components: ";
+		assertAll(
+				described(BridgedToTuple.class, "implements ToData<TupleText>, but " + TupleText.class.getName()
+						+ " is a @Tuple, written as its components by position" + names + "remove @Tuple from TupleText"),
+				described(BridgedToTransparent.class, "implements ToData<TransparentText>, but "
+						+ TransparentText.class.getName() + " is @Transparent, written as its one component" + names
+						+ "remove @Transparent from TransparentText"),
+				() -> assertEquals(List.of(AbstractRecord.class.getName() + " is an abstract class, which nothing can "
+						+ "build, but carries @Record, which describes a class built through its constructor: make "
+						+ "AbstractRecord concrete, or remove it"), messages(BridgedToAbstract.class,
+						BridgedToAbstract.class)));
 	}
 
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */

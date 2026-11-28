@@ -15,7 +15,8 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
 - A refusal's own `getMessage()` is the fact: a `DataBindException` raised while describing a class passes up
   unwrapped, however deep the class sits (`RecordRefusalTest`).
 - A bridged class is concrete, declares `ToData<S>` itself and has a public constructor taking exactly `S`
-  (`ToDataBridgeTest`).
+  (`ToDataBridgeTest`); `S` is described as any class is, and must be a record by its own components
+  (`KindConflictRefusalTest`).
 - An atom says its way in, `@Atom` on one public constructor or static method of its own, and its way out, `@Atom` on
   one public instance method or `ToData<S>`, possibly inherited; nothing is found by name, and the halves carry one
   value up to boxing. A `ToData` class marking no `@Atom` is a bridged class (`AtomFormTest`). `@Atom` on a class

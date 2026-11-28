@@ -305,4 +305,50 @@ public final class KindConflicts {
 			return new TupleRecord(data);
 		}
 	}
+
+	// --- a ToData naming a class that is no plain record
+
+	@Tuple
+	public record TupleText(String value) {
+	}
+
+	public static final class BridgedToTuple implements ToData<TupleText> {
+		private final String value;
+
+		public BridgedToTuple(TupleText text) {
+			this.value = text.value();
+		}
+
+		@Override
+		public TupleText toData() {
+			return new TupleText(value);
+		}
+	}
+
+	@Transparent
+	public record TransparentText(String value) {
+	}
+
+	public static final class BridgedToTransparent implements ToData<TransparentText> {
+		private final String value;
+
+		public BridgedToTransparent(TransparentText text) {
+			this.value = text.value();
+		}
+
+		@Override
+		public TransparentText toData() {
+			return new TransparentText(value);
+		}
+	}
+
+	public static final class BridgedToAbstract implements ToData<AbstractRecord> {
+		public BridgedToAbstract(AbstractRecord record) {
+		}
+
+		@Override
+		public AbstractRecord toData() {
+			return null;
+		}
+	}
 }
