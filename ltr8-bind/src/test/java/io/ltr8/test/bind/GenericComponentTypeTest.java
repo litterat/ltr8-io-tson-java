@@ -426,9 +426,62 @@ public class GenericComponentTypeTest {
 				line("ListPairArray", null, null)));
 	}
 
+	/** An element, a key and a value take what a component takes; a wildcard and an unbound variable stay refused. */
+	@Test
+	void anArrayOfAParameterizedTypeAsAnElementAKeyAndAValue() {
+		assertEquals("""
+				RecListOfListArrays: RecListOfListArrays(value:List [[[String]]])
+				RecSetOfListArrays: RecSetOfListArrays(value:Set [[[String]]])
+				RecArrayOfListsOfListArrays: RecArrayOfListsOfListArrays(value:List[] [[[[String]]]])
+				RecMapOfListArrays: RecMapOfListArrays(value:Map {String=[[String]]})
+				RecMapKeyedByListArrays: RecMapKeyedByListArrays(value:Map {[[String]]=String})
+				RecMapKeyedByArrays: RecMapKeyedByArrays(value:Map {[String]=String})
+				RecOptListOfListArrays: RecOptListOfListArrays(value:List [[[String]]])
+				RecOptListOfArrays: RecOptListOfArrays(value:List [[String]])
+				RecListOfVarArrays: CodeAnalysisException: Unrecognized parameterized type
+				RecListOfVarArrays<String>: RecListOfVarArrays(value:List [[String]])
+				RecListOfVarArrays<List<String>>: RecListOfVarArrays(value:List [[[String]]])
+				RecListOfVarArrays<?>: CodeAnalysisException: Unrecognized parameterized type
+				RecMapOfVarArrays: CodeAnalysisException: Unrecognized parameterized type for map key/value
+				RecMapOfVarArrays<List<String>>: RecMapOfVarArrays(value:Map {String=[[String]]})
+				PubListOfVarArrays: CodeAnalysisException: Unrecognized parameterized type
+				PubListOfVarArrays<List<String>>: PubListOfVarArrays(value:List set [[[String]]])
+				RecList<String[]>: RecList(value:List [[String]])
+				RecList<List<String>[]>: RecList(value:List [[[String]]])
+				RecMap<List<String>[]>: RecMap(value:Map {String=[[String]]})
+				RecOptList<List<String>[]>: RecOptList(value:List [[[String]]])
+				RecWild<List<String>[]>: CodeAnalysisException: Unrecognized parameterized type
+				""", lines(
+				line("RecListOfListArrays", null, null),
+				line("RecSetOfListArrays", null, null),
+				line("RecArrayOfListsOfListArrays", null, null),
+				line("RecMapOfListArrays", null, null),
+				line("RecMapKeyedByListArrays", null, null),
+				line("RecMapKeyedByArrays", null, null),
+				line("RecOptListOfListArrays", null, null),
+				line("RecOptListOfArrays", null, null),
+				line("RecListOfVarArrays", null, null),
+				at("RecListOfVarArrays", null),
+				line("RecListOfVarArrays", null, TEXT_LIST),
+				line("RecListOfVarArrays", null, ANY),
+				line("RecMapOfVarArrays", null, null),
+				line("RecMapOfVarArrays", null, TEXT_LIST),
+				line("PubListOfVarArrays", null, null),
+				line("PubListOfVarArrays", null, TEXT_LIST),
+				line("RecList", null, String[].class),
+				line("RecList", null, TEXT_LIST_ARRAY),
+				line("RecMap", null, TEXT_LIST_ARRAY),
+				line("RecOptList", null, TEXT_LIST_ARRAY),
+				line("RecWild", null, TEXT_LIST_ARRAY)));
+	}
+
 	// --- helpers
 
 	private static final Type TEXT_LIST = new DataParameterizedType(List.class, String.class);
+
+	private static List<String>[] textListArray;
+
+	private static final Type TEXT_LIST_ARRAY = field("textListArray");
 
 	private static List<? extends String> extendsText;
 
@@ -443,9 +496,12 @@ public class GenericComponentTypeTest {
 	private static final Type SUPER_TEXT = argument("superText");
 
 	private static Type argument(String field) {
+		return ((ParameterizedType) field(field)).getActualTypeArguments()[0];
+	}
+
+	private static Type field(String field) {
 		try {
-			return ((ParameterizedType) GenericComponentTypeTest.class.getDeclaredField(field).getGenericType())
-					.getActualTypeArguments()[0];
+			return GenericComponentTypeTest.class.getDeclaredField(field).getGenericType();
 		} catch (NoSuchFieldException e) {
 			throw new AssertionError(e);
 		}

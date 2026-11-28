@@ -64,7 +64,10 @@ final class TypeArguments {
         return isHeld(resolved) ? resolved : erasure(resolved);
     }
 
-    /** Whether {@code type} is a class, a parameterized type or an array of one, which a component is held at. */
+    /**
+     * Whether {@code type} is a class, a parameterized type or an array of one, which a component, an element, a key
+     * and a value are each held at.
+     */
     static boolean isHeld(Type type) {
         return type instanceof Class<?> || type instanceof ParameterizedType
                 || type instanceof GenericArrayType array && isHeld(array.getGenericComponentType());
