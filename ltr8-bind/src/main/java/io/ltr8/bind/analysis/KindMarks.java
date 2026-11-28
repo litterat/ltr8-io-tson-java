@@ -15,15 +15,20 @@
  */
 package io.ltr8.bind.analysis;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.analysis.ClassSignals.Signal;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * What each {@link Kind} reads of a class: the class-level marks it consumes, and the walks over the class's members
@@ -79,8 +84,11 @@ final class KindMarks {
 	static {
 		Set<Signal> all = MARKS;
 		RESOLVED.put(Kind.ANNOTATED, reading(all, Set.of()));
-		RESOLVED.put(Kind.TRANSPARENT, reading(but(all, Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
-		RESOLVED.put(Kind.TUPLE, reading(but(all, Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
+		RESOLVED.put(Kind.TRANSPARENT, reading(but(all, Signal.TUPLE, Signal.RECORD_ON_TYPE,
+				Signal.RECORD_ON_CONSTRUCTOR, Signal.TO_DATA, Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD),
+				Walk.ANY));
+		RESOLVED.put(Kind.TUPLE, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.TO_DATA,
+				Signal.FIELD_ORDER), Set.of(Signal.JDK_RECORD), Walk.ANY));
 		RESOLVED.put(Kind.RECORD, reading(all, Set.of(), Walk.INHERITED_WAY_IN));
 		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM,
 				Walk.BRIDGED_RECORD));
@@ -205,6 +213,11 @@ final class KindMarks {
 	private static DataBindException unread(Kind kind, ClassSignals signals, Signal mark, String written,
 			Class<?> bridgedTo) {
 		Class<?> type = signals.type();
+		Signal own = ownWay(kind, signals);
+		if (own != null && WAYS.containsKey(mark)) {
+			return new CodeAnalysisException(String.format("%s says two ways to write it, %s, %s, and %s, %s: remove one "
+					+ "of them", type.getName(), label(own, type), WAYS.get(own), label(mark, type), WAYS.get(mark)));
+		}
 		if (mark == Signal.FIELD_ORDER) {
 			return switch (kind) {
 				case TRANSPARENT -> new DataBindException(type.getName() + " carries @FieldOrder, but is @Transparent, "
@@ -219,5 +232,45 @@ final class KindMarks {
 			};
 		}
 		throw new IllegalStateException(kind + " reads " + mark + " of " + type.getName());
+	}
+
+	/** How each mark that says how a record is written says it, completing "{@code type} is written ...". */
+	private static final Map<Signal, String> WAYS = Map.of(Signal.TRANSPARENT, "as its one component", Signal.TUPLE,
+			"as its components by position", Signal.RECORD_ON_TYPE, "as its components by name",
+			Signal.RECORD_ON_CONSTRUCTOR, "as its components by name", Signal.TO_DATA,
+			"as the record class it names");
+
+	/** The mark that gives {@code signals}' class {@code kind}, where one of the {@link #WAYS} does. */
+	private static Signal ownWay(Kind kind, ClassSignals signals) {
+		return switch (kind) {
+			case TRANSPARENT -> Signal.TRANSPARENT;
+			case TUPLE -> Signal.TUPLE;
+			case BRIDGED -> Signal.TO_DATA;
+			case RECORD -> signals.has(Signal.RECORD_ON_TYPE) ? Signal.RECORD_ON_TYPE
+					: signals.has(Signal.RECORD_ON_CONSTRUCTOR) ? Signal.RECORD_ON_CONSTRUCTOR : null;
+			default -> null;
+		};
+	}
+
+	private static String label(Signal mark, Class<?> type) {
+		return switch (mark) {
+			case TRANSPARENT -> "@Transparent";
+			case TUPLE -> "@Tuple";
+			case RECORD_ON_TYPE -> "@Record";
+			case RECORD_ON_CONSTRUCTOR -> "@Record on " + constructor(type, Record.class);
+			case TO_DATA -> "ToData";
+			default -> throw new IllegalStateException(mark + " is no way to write a record");
+		};
+	}
+
+	/** The constructor of {@code type} marked {@code annotation}, as {@code Name(Type, Type)}. */
+	private static String constructor(Class<?> type, Class<? extends Annotation> annotation) {
+		for (Constructor<?> constructor : type.getDeclaredConstructors()) {
+			if (constructor.isAnnotationPresent(annotation)) {
+				return "the constructor " + type.getSimpleName() + Stream.of(constructor.getParameterTypes())
+						.map(Class::getSimpleName).collect(Collectors.joining(", ", "(", ")"));
+			}
+		}
+		throw new IllegalStateException(type.getName() + " marks no constructor " + annotation.getSimpleName());
 	}
 }
