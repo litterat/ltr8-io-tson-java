@@ -39,8 +39,7 @@ public record ChoiceSelection(Map<String, TypeRef> selects, Set<String> named, M
         Map<TypeRef, ExternAdmission> externs = new LinkedHashMap<>();
         for (TypeRef variant : variants) {
             if (linked.landing(variant.name()).isPresent()) {
-                externs.put(variant, ExternAdmission.of(linked,
-                        ExternAdmission.terminal(variant.name(), linked.schema().entries()::get)));
+                externs.put(variant, ExternAdmission.of(linked, linked.terminal(variant.name())));
             }
         }
         Map<String, TypeRef> selects = new LinkedHashMap<>();

@@ -19,6 +19,7 @@ import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
+import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Top;
@@ -253,17 +254,16 @@ final class BindRecordBuilder implements RecordBuilder {
     }
 
     /**
-     * The class bound to entry {@code name}, tried under the aliases an author wrote for it before the entry's own:
-     * a binding map is written in the names in the schema, and an alias is one of them. No class at all is deferred
-     * rather than
-     * fatal -- a schema declares types a given consumer never binds -- so it reaches the first read of this type.
+     * The class bound to entry {@code name}, tried under its binding candidates in order ({@link
+     * io.ltr8.tson.schema.TsonLinkedSchema#bindingCandidates}). No class at all is deferred rather than fatal -- a
+     * schema declares types a given consumer never binds -- so it reaches the first read of this type.
      */
     private static DataClass boundClass(String name, ValueReaderContext context, DataBindContext binding) {
         DataBindException first = null;
-        List<String> candidates = bindingNames(name, context);
-        for (String candidate : candidates) {
+        List<EntryKey> candidates = context.linked().bindingCandidates(name);
+        for (EntryKey candidate : candidates) {
             try {
-                return binding.getDescriptor(namespaceOf(candidate, context), candidate);
+                return binding.getDescriptor(candidate.declaringSchema(), candidate.name());
             } catch (UnboundNameException e) {
                 first = first == null ? e : first;
             } catch (DataBindException e) {
@@ -271,39 +271,22 @@ final class BindRecordBuilder implements RecordBuilder {
                 throw new MissingBindingException(e.getMessage(), e);
             }
         }
-        throw new MissingBindingException("no bound Java class for '" + String.join("' or '", candidates)
+        throw new MissingBindingException("no bound Java class for '"
+                + String.join("' or '", candidates.stream().map(EntryKey::name).toList())
                 + "': nothing in this bind context resolves that schema type name"
                 + (first == null ? "" : " -- " + first.getMessage()), first);
     }
 
     /** {@link #boundClass}, or null where nothing is bound -- for a question a missing binding does not answer. */
     private static DataClass boundClassOrNull(String name, ValueReaderContext context, DataBindContext binding) {
-        for (String candidate : bindingNames(name, context)) {
+        for (EntryKey candidate : context.linked().bindingCandidates(name)) {
             try {
-                return binding.getDescriptor(namespaceOf(candidate, context), candidate);
+                return binding.getDescriptor(candidate.declaringSchema(), candidate.name());
             } catch (DataBindException ignored) {
                 // not bound under this name; the next is tried
             }
         }
         return null;
-    }
-
-    /** The namespace a bind lookup asks entry {@code name} within: the canonical identity of its declaring schema. */
-    private static String namespaceOf(String name, ValueReaderContext context) {
-        return context.linked().declaringIdentity(name);
-    }
-
-    /**
-     * The names a bind lookup for entry {@code name} tries, in order: the aliases an author wrote, then its own, then,
-     * for a constructor composed over another with no field added, its parent's ({@link
-     * io.ltr8.tson.schema.TsonLinkedSchema#composedOver}).
-     */
-    private static List<String> bindingNames(String name, ValueReaderContext context) {
-        List<String> candidates = new ArrayList<>(context.admitting(List.of(name)));
-        candidates.remove(name);
-        candidates.add(name);
-        context.linked().composedOver(name).ifPresent(parent -> candidates.addAll(bindingNames(parent, context)));
-        return candidates;
     }
 
     /**

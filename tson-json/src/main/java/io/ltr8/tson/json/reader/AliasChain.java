@@ -26,9 +26,6 @@ import java.util.Set;
  */
 final class AliasChain {
 
-    /** Linking has already refused a cycle, so this bounds a fault rather than a document. */
-    private static final int MAX_HOPS = 64;
-
     private AliasChain() {
     }
 
@@ -99,22 +96,13 @@ final class AliasChain {
     }
 
     /**
-     * The entry {@code name} resolves to with every reference followed, or empty if the chain runs past
-     * {@link #MAX_HOPS} or names something the schema does not declare -- neither of which a linked schema
-     * should contain.
+     * The entry {@code name} resolves to past its alias hops ({@link Alias#terminal}), or empty where the chain
+     * closes on itself or names something the schema does not declare -- neither of which a linked schema contains.
      */
     static Optional<Resolved> terminal(TsonSchema schema, String name) {
-        String at = name;
-        for (int hop = 0; hop < MAX_HOPS; hop++) {
-            Top definition = schema.entries().get(at);
-            if (definition == null) {
-                return Optional.empty();
-            }
-            if (!(definition instanceof Alias alias)) {
-                return Optional.of(new Resolved(at, definition));
-            }
-            at = alias.target().name();
-        }
-        return Optional.empty();
+        String at = Alias.terminal(name, schema.entries()::get);
+        Top definition = schema.entries().get(at);
+        return definition == null || definition instanceof Alias ? Optional.empty()
+                : Optional.of(new Resolved(at, definition));
     }
 }

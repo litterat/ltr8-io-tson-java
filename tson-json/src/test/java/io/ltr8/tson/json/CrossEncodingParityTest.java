@@ -1,13 +1,19 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.json.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonObject;
@@ -18,10 +24,12 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -1337,5 +1345,116 @@ class CrossEncodingParityTest {
         List<Verdict> fullWidth = tson("fields", "{ \"\uff23ontent-Type\" => \"a\" }");
         assertEquals(List.of(new Verdict(Diagnostic.Code.ATOM_FORM_INVALID, "/\uff23ontent-Type")), fullWidth);
         assertEquals(fullWidth, json("fields", "{\"\uff23ontent-Type\": \"a\"}"));
+    }
+
+    // ── A host class of the wrong shape ─────────────────────────────────────────
+
+    public sealed interface Fragment permits Include, Named {
+    }
+
+    public record Include(String include) implements Fragment {
+    }
+
+    public record Named(String name) implements Fragment {
+    }
+
+    private static final String BIND_ID = "https://example.test/parity-bind-1.tn";
+
+    private static final String BIND_SCHEMA = """
+            !!id:"https://example.test/parity-bind-1.tn"
+            !!import:"https://tson.io/2026/40/m/core.tn"
+            !schema {
+              person   => { name: text }
+              fragment => { ( include: text | name?: text  type?: text ) }
+              small    => { n: int32 }
+              pct      => small
+            }
+            """;
+
+    /** Both encodings refuse {@code bound} for {@code entry} when the schema compiles, in one sentence. */
+    private static void bothRefuseTheClass(String entry, Class<?> bound, String reason) {
+        DataBindContext context = DataBindContext.builder().nameBinder(DataNameBinder.ofMap(Map.of(entry, bound)))
+                .registerAtoms(AtomContext.hostTypes()).build();
+        ProcessorConfig config = ProcessorConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of((SchemaSource) uri -> BIND_SCHEMA));
+        Tson tson = Tson.of(config.withDataBindContext(context));
+        BindMismatchException fromTson = assertThrows(BindMismatchException.class,
+                () -> tson.bindRegistry().get(BIND_ID));
+        BindMismatchException fromJson = assertThrows(BindMismatchException.class, () -> JsonSchemaCompiler.compile(
+                Tson.of(config).resolve(BIND_SCHEMA), ValueReaderFactoryRegistry.bind(context)));
+        assertEquals(BindMismatchException.class, fromTson.getClass(), fromTson::getMessage);
+        assertEquals(fromTson.getMessage(), fromJson.getMessage());
+        assertTrue(fromTson.getMessage().contains(reason), fromTson::getMessage);
+    }
+
+    public record Small(int n) {
+    }
+
+    public record Other(int n) {
+    }
+
+    private static DataBindContext binding(String entry, Class<?> bound) {
+        return DataBindContext.builder().nameBinder(DataNameBinder.ofMap(Map.of(entry, bound)))
+                .registerAtoms(AtomContext.hostTypes()).build();
+    }
+
+    private static ProcessorConfig bindConfig() {
+        return ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of((SchemaSource) uri -> BIND_SCHEMA));
+    }
+
+    /** {@code pct}, read in TSON as {@code type} under {@code context}, reporting into {@code problems}. */
+    private static Object tsonPct(DataBindContext context, Class<?> type, List<Diagnostic> problems) {
+        return Tson.of(bindConfig().withDataBindContext(context)).objectReader().withDiagnostics(problems::add)
+                .read("!!import:\"%s\"\n!pct { n: 1 }".formatted(BIND_ID), type);
+    }
+
+    /** {@code pct}, read in JSON as {@code type} under {@code context}, reporting into {@code problems}. */
+    private static Object jsonPct(DataBindContext context, Class<?> type, List<Diagnostic> problems) {
+        Tson plain = Tson.of(bindConfig());
+        plain.resolve(BIND_SCHEMA);
+        return Json.of(ProcessorConfig.defaults().withDataBindContext(context)).withSchemas(plain.schemaRegistry())
+                .objectReader().withDiagnostics(problems::add).withSchema(BIND_ID)
+                .readAs("{\"n\": 1}", "pct", type);
+    }
+
+    /**
+     * {@code small} has a source position, so it binds under its own name only: an alias naming it never redirects
+     * its binding, and a binding map naming only the alias binds nothing, in either encoding.
+     */
+    @Test
+    void anAliasOfADeclaredEntryRedirectsNoBindingInBoth() {
+        DataBindContext context = binding("pct", Small.class);
+        assertThrows(MissingBindingException.class, () -> tsonPct(context, Object.class, new ArrayList<>()));
+        assertThrows(MissingBindingException.class, () -> jsonPct(context, Object.class, new ArrayList<>()));
+    }
+
+    /**
+     * A root written as an alias asks the binder for the entry it denotes, as its reader does, so a class the caller
+     * cannot hold is refused before the value is read, in both encodings.
+     */
+    @Test
+    void aRootWrittenAsAnAliasIsAskedForTheClassItsEntryBindsInBoth() {
+        DataBindContext context = binding("small", Small.class);
+        List<Diagnostic> fromTson = new ArrayList<>();
+        List<Diagnostic> fromJson = new ArrayList<>();
+        assertEquals(new Small(1), tsonPct(context, Small.class, new ArrayList<>()));
+        assertEquals(new Small(1), jsonPct(context, Small.class, new ArrayList<>()));
+        tsonPct(context, Other.class, fromTson);
+        jsonPct(context, Other.class, fromJson);
+        for (List<Diagnostic> problems : List.of(fromTson, fromJson)) {
+            assertEquals(1, problems.size(), problems::toString);
+            assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.getFirst().code(), problems::toString);
+            assertTrue(problems.getFirst().message().contains("binds to " + Small.class.getName()), problems::toString);
+        }
+    }
+
+    @Test
+    void aRecordBoundToAClassThatIsNoRecordFailsTheCompileInBoth() {
+        bothRefuseTheClass("person", String.class, "is not record-shaped");
+    }
+
+    @Test
+    void aLabelledChoiceNearMissFailsTheCompileInBoth() {
+        bothRefuseTheClass("fragment", Fragment.class, "an option of its group holds several fields");
     }
 }

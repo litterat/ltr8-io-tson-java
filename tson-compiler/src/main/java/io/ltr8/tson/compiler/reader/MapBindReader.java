@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -10,10 +11,10 @@ import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.compiler.SchemaLocation;
+import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Namespace;
 import io.ltr8.tson.schema.meta.Top;
@@ -150,27 +151,30 @@ final class MapBindReader extends MapAbstractReader<Object> {
             Type valueType = BindTargets.hostType(body.valueType(), value -> resolveType(value, context));
             // A value of a namespace type is a map of names, whose keys' annotations and order are part of what
             // an instance of the constructor holds (NamespaceInstanceReader).
-            String terminal = AliasChain.terminal(name, context.schema().entries()::get);
+            String terminal = context.linked().terminal(name);
             String namespace = context.linked().namespace(terminal).isPresent() ? terminal : null;
             Class<?> mapClass = namespace != null ? AnnotatedMap.class
                     : body.ordered() ? LinkedHashMap.class : Map.class;
             DataClass dataClass = descriptorFor(mapClass, new DataParameterizedType(mapClass, keyType, valueType));
             if (!(dataClass instanceof DataClassMap descriptor)) {
-                throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
-                        + ", which isn't map-shaped -- can't bind '" + name + "' as one");
+                throw new BindMismatchException("'" + name + "' is a map, and " + dataClass.typeClass().getName()
+                        + ", which it binds to, is not map-shaped in this bind context");
             }
             return new MapBindReader(name, context.displayName(name, typeDefinition), body, descriptor, resolver,
                     context.locationOf(name), AnnotationTypes.of(context),
                     keysAreNames(body, context), namespace);
         }
 
-        /** {@code schemaTypeName} has no real bound Java class only where none is bound by that name. */
+        /** The class {@code schemaTypeName} binds to under its first candidate that binds, else {@link String}. */
         private Class<?> resolveType(String schemaTypeName, ValueReaderContext vctx) {
-            try {
-                return context.getDescriptor(vctx.namespaceOf(schemaTypeName), schemaTypeName).typeClass();
-            } catch (DataBindException e) {
-                return String.class;
+            for (EntryKey candidate : vctx.linked().bindingCandidates(schemaTypeName)) {
+                try {
+                    return context.getDescriptor(candidate.declaringSchema(), candidate.name()).typeClass();
+                } catch (DataBindException e) {
+                    // not bound under this name; the next is tried
+                }
             }
+            return String.class;
         }
 
         private DataClass descriptorFor(Class<?> mapClass, Type type) {

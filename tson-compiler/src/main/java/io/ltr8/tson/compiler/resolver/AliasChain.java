@@ -11,32 +11,18 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * Following a chain of alias entries to the type at the end of it -- [TSON-SCHEMA] §8.3's walk,
- * stated once.
+ * Questions asked of a chain of alias entries ([TSON-SCHEMA] §8.3) over a namespace a resolver or linker holds as a map
+ * or a lookup. The walk itself is {@link Alias#terminal}'s, stated once for every module.
  *
- * <p><b>Why this is a shared class rather than a loop each caller writes.</b> Resolved output states the
- * chain as the author wrote it: a use site naming an alias names the alias, and a processor collapses the
- * chain when it needs the type. That makes the walk the only mechanism, and several passes do it -- the linker's
- * choice-variant distinctness and its §5.2 field-value check, subtype naming, discrimination-class
- * classification, and a kind's membership walk, whose alias hops come first. Written once each, the one decision
- * inside it (below) would be several decisions that could drift apart silently.
- *
- * <p><b>The walk stops at three things</b>, and the second is the one worth knowing:
- * <ul>
- *   <li>an entry whose body is not an {@link Alias} -- the type at the end;
- *   <li>an <b>argument-bearing</b> target, which is an application rather than a hop to another entry: a
- *       declaration naming an application is that entry itself, so a target still carrying arguments is one that
- *       did not close, and there is no entry at the end of it;
- *   <li>a name the namespace does not declare, and a cycle. {@link #terminal} answers both with the name it
- *       stopped at, since an undeclared name is a type parameter to its caller and a cycle's answer depends
- *       on where the walk began -- so no false equality follows. {@link #terminalDefinition} answers both
- *       with an empty {@code Optional}, having been asked for an entry and having none to give.
- * </ul>
+ * <p><b>The walk stops at three things</b>: an entry whose body is not an {@link Alias}, the type at the end; a name
+ * the namespace does not declare; and a cycle. {@link #terminal} answers the last two with the name it stopped at,
+ * since an undeclared name is a type parameter to its caller and a cycle's answer depends on where the walk began --
+ * so no false equality follows. {@link #terminalDefinition} answers both with an empty {@code Optional}, having been
+ * asked for an entry and having none to give.
  *
  * <p><b>Not every walk over references is this one.</b> {@code ParameterTypes} follows a chain to reach a
- * slot's declared body and deliberately does <em>not</em> stop at an argument-bearing target -- it is after
- * the constructor's own vocabulary, where the parametric record is the answer. It keeps its own loop, and the
- * difference is the reason to say so here rather than let a future reader assume the four were five.
+ * slot's declared body and keeps its own loop, being after the constructor's own vocabulary, where the parametric
+ * record is the answer.
  */
 public final class AliasChain {
 
@@ -83,7 +69,7 @@ public final class AliasChain {
      * {@code ParametricMaterialiser} normalises an application's arguments through this while resolution runs.
      */
     public static String terminal(String name, Function<String, ? extends Top> entries) {
-        return walk(name, entries).name();
+        return Alias.terminal(name, entries);
     }
 
     /** The entry at the end of {@code name}'s chain, or empty where the walk reaches no type. */
@@ -93,8 +79,8 @@ public final class AliasChain {
 
     /** The same over a lookup -- a schema's {@code Namespace} of entries, or a namespace still being built. */
     public static Optional<Top> terminalDefinition(String name, Function<String, ? extends Top> entries) {
-        Stop stop = walk(name, entries);
-        return stop.reached() ? Optional.<Top>ofNullable(entries.apply(stop.name())) : Optional.empty();
+        Top definition = entries.apply(Alias.terminal(name, entries));
+        return definition instanceof Alias ? Optional.empty() : Optional.ofNullable(definition);
     }
 
     /**
@@ -103,26 +89,5 @@ public final class AliasChain {
      */
     public static boolean resolvesToVoid(String name, Map<String, ? extends Top> entries) {
         return terminalDefinition(name, entries).map(d -> d instanceof VoidType).orElse(false);
-    }
-
-    /** Where the walk stopped, and whether it stopped on a type rather than on nothing or on itself. */
-    private record Stop(String name, boolean reached) {
-    }
-
-    private static Stop walk(String name, Function<String, ? extends Top> entries) {
-        Set<String> walked = new LinkedHashSet<>();
-        String current = name;
-        while (walked.add(current)) {
-            Top definition = entries.apply(current);
-            if (definition == null) {
-                return new Stop(current, false);
-            }
-            if (definition instanceof Alias alias) {
-                current = alias.target().name();
-                continue;
-            }
-            return new Stop(current, true);
-        }
-        return new Stop(current, false); // a cycle has no terminal
     }
 }

@@ -12,6 +12,7 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeChain;
 import io.ltr8.unicode.Normalization;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -130,12 +131,55 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
      * boundary followed ([TSON-SCHEMA] §5.13); empty where it lands through no extern this link attached.
      */
     public Optional<ExternTarget.Landing> landing(String name) {
-        String terminal = ExternAdmission.terminal(name, schema.entries()::get);
+        String terminal = terminal(name);
         if (!(schema.entries().get(terminal) instanceof Extern)) {
             return Optional.empty();
         }
         ExternTarget target = externs.get(terminal);
         return target == null ? Optional.empty() : target.landing();
+    }
+
+    /**
+     * The name at the end of {@code name}'s alias chain ({@link Alias#terminal}): the entry it denotes in this
+     * namespace, an extern not followed.
+     */
+    public String terminal(String name) {
+        return Alias.terminal(name, schema.entries()::get);
+    }
+
+    /**
+     * The entries a binder is asked for, in order, for a value of the type {@code name} denotes: the entry at the end of
+     * its alias hops and its extern ({@link #landing}), asked in the namespace holding it.
+     *
+     * <p><b>A binding map is written in the names an author wrote</b> ([TSON-SCHEMA] §8.2). An entry with a source
+     * position was declared, so it is asked under its own name only, and an alias naming it never redirects its
+     * binding: otherwise an alias added anywhere in a closure would silently rebind its target. An entry with none --
+     * one a kernel's bootstrap builds, or one read from a resolved form -- is asked first under every name whose alias
+     * chain ends at it, at any depth, in declaration order, each such name meaning it (§8.3), then under its own. Last
+     * come, for a constructor composed over another with no field added, its parent's ({@link #composedOver}). A name
+     * that is no entry, a type written in place, is asked as it stands.
+     */
+    public List<EntryKey> bindingCandidates(String name) {
+        Optional<ExternTarget.Landing> landing = landing(name);
+        if (landing.isPresent()) {
+            return landing.get().in().bindingCandidates(landing.get().name());
+        }
+        String entry = terminal(name);
+        if (!schema.entries().containsKey(entry)) {
+            return List.of(new EntryKey(declaringIdentity(entry), entry));
+        }
+        List<EntryKey> candidates = new ArrayList<>();
+        if (schema.positionOf(entry).isEmpty()) {
+            schema.entries().forEach((written, definition) -> {
+                if (definition instanceof Alias && terminal(written).equals(entry)) {
+                    candidates.add(new EntryKey(declaringIdentity(written), written));
+                }
+            });
+        }
+        candidates.add(new EntryKey(declaringIdentity(entry), entry));
+        composedOver(entry).ifPresent(parent -> bindingCandidates(parent).stream()
+                .filter(key -> !candidates.contains(key)).forEach(candidates::add));
+        return List.copyOf(candidates);
     }
 
     /** The form enum {@code entryName} matches its members in -- {@code NONE} for one {@link #enumForms} omits. */
@@ -158,13 +202,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
         if (schema.entries().containsKey(name) || !(definition instanceof RecordBody record)) {
             return nameType(name);
         }
-        return record.nameType().map(stated -> {
-            Top type = schema.entries().get(stated);
-            while (type instanceof Alias alias) {
-                type = schema.entries().get(alias.target().name());
-            }
-            return type;
-        });
+        return record.nameType().map(stated -> schema.entries().get(terminal(stated)));
     }
 
     /** {@link #nameForm(String)} for the record a reader is built for under {@code name} ({@link #nameType(String,
@@ -288,14 +326,7 @@ public record TsonLinkedSchema(TsonSchema schema, Map<String, String> entryOrigi
     /** The entries {@code names} denote past their alias hops, each once. */
     private Set<String> terminals(List<String> names) {
         Set<String> terminals = new LinkedHashSet<>();
-        for (String name : names) {
-            String terminal = name;
-            for (int hops = 0; schema.entries().get(terminal) instanceof Alias alias
-                    && hops < schema.entries().size(); hops++) {
-                terminal = alias.target().name();
-            }
-            terminals.add(terminal);
-        }
+        names.forEach(name -> terminals.add(terminal(name)));
         return terminals;
     }
 }

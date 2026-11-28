@@ -197,22 +197,20 @@ public final class TsonSchemaCompiler {
         private final TsonLinkedSchema linked;
         private final Function<String, ValueReaderFactory> factoryFor;
         private final Map<String, Set<String>> namesMeaning;
-        private final Map<String, List<String>> referrers;
         private CompiledReaders readers;
 
         InlineReaders(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor,
-                      Map<String, Set<String>> namesMeaning, Map<String, List<String>> referrers) {
+                      Map<String, Set<String>> namesMeaning) {
             this.linked = linked;
             this.factoryFor = factoryFor;
             this.namesMeaning = namesMeaning;
-            this.referrers = referrers;
         }
 
         TsonTypeReader<?> build(TypeInline type) {
             Top read = type.of();
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledVocabulary.typenameOf(read));
             TsonTypeReader<?> built = factory.create(type.text(), read,
-                    new ValueReaderContext(linked, readers, namesMeaning, referrers));
+                    new ValueReaderContext(linked, readers, namesMeaning));
             // §7.2 at the position: no tag names a type written in place, so the guard admits none.
             return Subsumption.guard(type.text(), read, built, namesMeaning, readers);
         }
@@ -246,15 +244,6 @@ public final class TsonSchemaCompiler {
         private final Map<String, Set<String>> namesMeaning;
 
         /**
-         * The inverse of §8.3's alias hop, built once: which written names reach each entry. A binding map is
-         * keyed on the names an author wrote, so a bind lookup for an entry with no source position asks under
-         * these before the entry's own name ({@code ValueReaderContext.bindingNamesFor}) -- and, like {@code
-         * namesMeaning}, this is a property of the schema rather than of the entry, so deriving it per entry would
-         * be quadratic.
-         */
-        private final Map<String, List<String>> referrers;
-
-        /**
          * What every built reader is handed for its own name lookups. Resolves through this compilation
          * while the walk runs, then is rebound to the finished schema so nothing here outlives the call --
          * a reader that resolves at read time (dispatch, annotations) holds this, not {@code this}.
@@ -283,8 +272,7 @@ public final class TsonSchemaCompiler {
             this.schema = linked.schema();
             this.factoryFor = factoryFor;
             this.namesMeaning = Subsumption.namesMeaning(schema.entries());
-            this.referrers = ValueReaderContext.referrers(schema.entries());
-            InlineReaders inline = new InlineReaders(linked, factoryFor, namesMeaning, referrers);
+            InlineReaders inline = new InlineReaders(linked, factoryFor, namesMeaning);
             this.readers = new CompiledReaders(this::resolve, inline::build);
             inline.readers = readers;
         }
@@ -392,7 +380,7 @@ public final class TsonSchemaCompiler {
         private ExternReader.Crossing crossing(String extern, ExternTarget.Landing landing) {
             ExternTarget target = linked.externs().get(extern);
             return new ExternReader.Crossing(foreign.compiled(target.foreign()).get(target.type()),
-                    new ForeignScope(extern, linked.originOf(extern), target.schema()),
+                    new ForeignScope(extern, linked.declaringIdentity(extern), target.schema()),
                     ExternAdmission.namesASubtype(landing.definition()));
         }
 
@@ -403,13 +391,13 @@ public final class TsonSchemaCompiler {
          */
         private ExternReader.Crossing imported(String position, ExternTarget.Landing landing, String entry,
                                                String identity, Top definition) {
-            String declaredBy = linked.originOf(entry);
+            String declaredBy = linked.declaringIdentity(entry);
+            String through = linked.declaringIdentity(position);
             boolean namesASubtype = ExternAdmission.namesASubtype(definition);
             for (TsonLinkedSchema in : List.of(linked.externs().get(position).foreign(), landing.in())) {
-                if (in.schema().entries().containsKey(entry) && in.originOf(entry).equals(declaredBy)) {
+                if (in.schema().entries().containsKey(entry) && in.declaringIdentity(entry).equals(declaredBy)) {
                     return new ExternReader.Crossing(foreign.compiled(in).get(entry), new ForeignScope(position,
-                            linked.originOf(position), io.ltr8.tson.base.CanonicalIdentity.canonicalize(
-                                    in.schema().id())), namesASubtype);
+                            through, in.identity()), namesASubtype);
                 }
             }
             TsonTypeReader<?> reader = foreign.compiled(declaredBy).<TsonTypeReader<?>>map(compiled -> compiled.get(entry))
@@ -420,8 +408,7 @@ public final class TsonSchemaCompiler {
                         EventSkip.coreValue(ctx);
                         return null;
                     });
-            return new ExternReader.Crossing(reader, new ForeignScope(position, linked.originOf(position), declaredBy),
-                    namesASubtype);
+            return new ExternReader.Crossing(reader, new ForeignScope(position, through, declaredBy), namesASubtype);
         }
 
         private TsonTypeReader<?> build(String name, Top definition) {
@@ -429,7 +416,7 @@ public final class TsonSchemaCompiler {
                 // No position names a parametric record bare ([TSON-SCHEMA] §5.10). See ParametricRecordReader for why
                 // the refusal is the entry's own reader rather than a check at the root.
                 return new ParametricRecordReader(name, ParametricEntry.parameterNames(definition),
-                        new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
+                        new ValueReaderContext(linked, readers, namesMeaning).locationOf(name));
             }
             Top body = definition;
             if (body instanceof Alias r) {
@@ -442,23 +429,23 @@ public final class TsonSchemaCompiler {
                                 linked.schema().applicationOf(name)));
             }
             if (body instanceof Extern) {
-                return boundary(name, new ValueReaderContext(linked, readers, namesMeaning, referrers));
+                return boundary(name, new ValueReaderContext(linked, readers, namesMeaning));
             }
             if (body instanceof ValueEntry value) {
                 // A value, which nothing is read against: a data tag naming it is the document's mistake.
                 return new ValueEntryReader(name, value.type(),
-                        new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
+                        new ValueReaderContext(linked, readers, namesMeaning).locationOf(name));
             }
             if (body instanceof io.ltr8.tson.schema.meta.IncompleteEntry incomplete) {
                 return new IncompleteEntryReader(name, incomplete,
-                        new ValueReaderContext(linked, readers, namesMeaning, referrers).locationOf(name));
+                        new ValueReaderContext(linked, readers, namesMeaning).locationOf(name));
             }
             // A namespace type's value is the map it describes (NamespaceBody#read), its keys read under its key
             // family.
             Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledVocabulary.typenameOf(read));
             TsonTypeReader<?> built = factory.create(name, read,
-                    new ValueReaderContext(linked, readers, namesMeaning, referrers));
+                    new ValueReaderContext(linked, readers, namesMeaning));
             if (body instanceof NamespaceBody && TsonSchema.SCHEMA.equals(name) && linked.isKernel(name)) {
                 // A value of the kernel's `schema` is a schema document, a resolved form read as data: a name at a
                 // kind or reference in it resolves in that document, which these readers' closure does not hold, so
