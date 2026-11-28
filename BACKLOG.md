@@ -547,10 +547,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   class's `f()` returning `f` as the accessor, and virtual dispatch reaches a subclass's `f() { return "computed"; }`,
   so the class writes `{f=computed}` and a round trip loses the stored value (reproduced by probe). Reach the field
   without dispatch, or refuse an accessor overridden by a method that does not return its field, with a round trip.
-- [ ] **A method returning one of two fields is a candidate accessor for both.** `ImmutableFinder.examineAccessor`
-  takes every field a body returns, so `return flag ? a : b;` is a candidate for `a` and for `b`, and with no named
-  method beside it, the sole accessor of each (read, not run). Take a method as a candidate only where it returns one
-  field, with a test of such a class.
 - [ ] **`@Atom` is neither applied nor refused on a class described as something else.** `getDescriptor` ignores it
   in six positions (probed): on a record, `@Record`, `@Tuple` or `@Transparent` class, on its type, constructor or
   accessor; on a sealed or `@Union` type, such as a static factory; on an enum's methods; on an instance method of a
