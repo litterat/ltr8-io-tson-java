@@ -25,7 +25,10 @@ import java.lang.annotation.Target;
  * bridge its value crosses.
  *
  * <p>It goes on a member of the component: a constructor parameter, a field, an accessor or a setter. On a record
- * component it reaches that component's field, accessor and constructor parameter.
+ * component it reaches that component's field, accessor and constructor parameter. Where several members carry it,
+ * each attribute comes from whichever states it, two stating one differently refuse the class, and a
+ * {@link Profile} constructor's parameter prevails. On a member of no component, or of a class bound as no record by
+ * its own components, it refuses the class.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER })

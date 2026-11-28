@@ -39,16 +39,17 @@ public class RecordBinder {
 		return refusing(targetClass, () -> resolveClassRecord(context, targetClass, parameterizedType));
 	}
 
-	/** The record a class bridged through {@code ToData} names, described as that class through the bridge. */
+	/**
+	 * The record a class bridged through {@code ToData} names, described as that class through the bridge. The record
+	 * class is described as any class is, so its own marks are judged.
+	 */
 	public DataClassRecord resolveBridged(DataBindContext context, ClassSignals signals) throws DataBindException {
 		Class<?> targetClass = signals.type();
 		return refusing(targetClass, () -> {
 			DataClassBridge bridge = ToDataBridges.resolveBridge(signals);
-			String written = "is bridged through ToData to " + bridge.dataClass().getName() + ", which describes it";
-			ComponentAnnotations.refuseUnread(targetClass, written);
-			ComponentAnnotations.refuseAtom(targetClass, written);
-
-			DataClassRecord descriptor = resolveClassRecord(context, bridge.dataClass());
+			DataClass named = context.getDescriptor(bridge.dataClass());
+			KindMarks.refuseBridgedTo(targetClass, named);
+			DataClassRecord descriptor = (DataClassRecord) named;
 
 			return new DataClassRecord(targetClass, bridge, descriptor.isMutable(), descriptor.creator(),
 					descriptor.constructor(), descriptor.fields(), descriptor.annotationsCarrier().orElse(null));

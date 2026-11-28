@@ -26,14 +26,13 @@ import java.lang.reflect.RecordComponent;
  * marker has said what it wants; failing to deliver it quietly would leave the wrapper in the output, which
  * is the whole thing the marker exists to prevent.
  * <ul>
- * <li><b>Not a record, or not exactly one component</b> -- there is no single value to be transparent to.</li>
+ * <li><b>Not exactly one component</b> -- there is no single value to be transparent to.</li>
  * <li><b>A component whose descriptor is neither a record nor an atom</b> -- only those two carry a bridge
  *     ({@code DataClassArray}/{@code Map}/{@code Tuple}/{@code Union} have no bridge-taking constructor), so
  *     the bridge would be dropped and the wrapper would silently reappear.</li>
  * <li><b>A component that is itself bridged</b> (an {@code enum}, or a type with a registered bridge) -- two
  *     bridges over one position would have to compose into one, and a single {@link DataClassBridge} cannot
  *     hold both conversions.</li>
- * <li><b>A {@code @FieldOrder}</b> -- the wrapper has no fields of its own for an order to arrange.</li>
  * </ul>
  *
  * <p><b>A wrapper on a cycle in the type graph cannot work</b>, and does not need its own check: the
@@ -47,11 +46,6 @@ final class TransparentBinder {
     DataClass resolve(DataBindContext context, ClassSignals signals) throws DataBindException {
         Class<?> targetClass = signals.type();
         RecordComponent component = onlyComponent(targetClass);
-        if (signals.fieldOrder() != null) {
-            throw new DataBindException(targetClass.getName() + " carries @FieldOrder, but is @Transparent, written "
-                    + "as its one component; an order applies only to a class described by its own components");
-        }
-        ComponentAnnotations.refuseAny(targetClass, "is @Transparent, written as its one component");
         DataClassBridge bridge = bridge(targetClass, component);
         DataClass wrapped = context.getDescriptor(component.getType(), component.getGenericType());
         if (wrapped.bridge().isPresent()) {
@@ -76,11 +70,6 @@ final class TransparentBinder {
     /** The one component the wire form is, or a refusal naming what the class has instead. */
     private static RecordComponent onlyComponent(Class<?> targetClass) throws DataBindException {
         RecordComponent[] components = targetClass.getRecordComponents();
-        if (components == null) {
-            throw new DataBindException(String.format(
-                    "@Transparent is only meaningful on a record: %s is not one, so there is no single "
-                            + "component to be transparent to", targetClass.getName()));
-        }
         if (components.length != 1) {
             throw new DataBindException(String.format(
                     "@Transparent record %s has %d components, and a transparent wrapper writes exactly one: "

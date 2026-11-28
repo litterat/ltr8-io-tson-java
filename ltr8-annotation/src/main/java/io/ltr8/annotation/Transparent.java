@@ -40,7 +40,10 @@ import java.lang.annotation.Target;
  * <li>a Java {@code record} with <b>exactly one</b> component -- the component is the wire form, and a
  *     second one would have nowhere to go;</li>
  * <li>the component's own descriptor must be a record or an atom. Those are the two that carry a bridge;
- *     an array-, map-, tuple- or union-typed component is refused rather than quietly losing its bridge.</li>
+ *     an array-, map-, tuple- or union-typed component is refused rather than quietly losing its bridge;</li>
+ * <li>no {@link Tuple}, {@link Record} or {@link ToData} beside it, each another way to write the class, and no
+ *     {@link FieldOrder}, {@link Union}, or {@link Atom} on the class or a member of its own, which nothing
+ *     reads.</li>
  * </ul>
  *
  * <p><b>Transparency is not inferred from having one component</b>, and must not be: plenty of single-field

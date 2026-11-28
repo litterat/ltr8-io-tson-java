@@ -5,7 +5,6 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassElement;
 import io.ltr8.bind.DataClassTuple;
-import io.ltr8.bind.analysis.ClassSignals.Signal;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Constructor;
@@ -28,17 +27,6 @@ public class TupleBinder {
 
 	public DataClassTuple resolveTuple(DataBindContext context, ClassSignals signals) throws DataBindException {
 		Class<?> targetClass = signals.type();
-		if (!signals.has(Signal.JDK_RECORD)) {
-			throw new CodeAnalysisException("@Tuple can only be applied to a genuine Java record: " + targetClass);
-		}
-		if (signals.fieldOrder() != null) {
-			throw new CodeAnalysisException(targetClass.getName() + " carries @FieldOrder, but is a @Tuple, whose "
-					+ "elements are its record components in declared order; an order applies only to a class "
-					+ "described by its own components");
-		}
-
-		ComponentAnnotations.refuseAny(targetClass, "is a @Tuple, written as its components by position");
-
 		RecordComponent[] components = targetClass.getRecordComponents();
 
 		try {

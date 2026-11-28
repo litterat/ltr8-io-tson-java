@@ -48,13 +48,15 @@ enum Kind {
 	 *     rather than the framing they are.
 	 * <li>{@link #TRANSPARENT}, then {@link #TUPLE}: each says how a record is written, so each is asked before the
 	 *     record it marks is taken as one.
+	 * <li>{@link #ENUM}, which needs no mark: {@code isEnum} is as plain a JDK fact as {@code isRecord}, so a mark
+	 *     saying another kind is one {@link KindMarks} refuses. Asked ahead of a union, since the JDK seals an enum
+	 *     with a constant body.
 	 * <li>{@link #RECORD}: a JDK record, or {@code @Record} on the type or a public constructor; {@link #BRIDGED}
 	 *     where it implements {@code ToData}.
 	 * <li>{@link #BRIDGED}: any other class implementing {@code ToData} and marking no {@code @Atom} on itself or a
 	 *     way in. One that marks one is an atom, and {@code ToData} at most its way out.
-	 * <li>{@link #ENUM}, which needs no mark: {@code isEnum} is as plain a JDK fact as {@code isRecord}. Asked ahead
-	 *     of a union, since the JDK seals an enum with a constant body.
-	 * <li>{@link #UNION}: sealed, or abstract and marked {@code @Union}; never a collection.
+	 * <li>{@link #UNION}: sealed, or abstract and marked {@code @Union}, a map or a collection too.
+	 *     {@link KindMarks} refuses one that is: it could mean either.
 	 * <li>{@link #ATOM}: a primitive, or {@code @Atom} on the type, a constructor or a static method. An instance
 	 *     method marked {@code @Atom} is a way out, which a class of any kind may inherit, so it decides nothing.
 	 * <li>{@link #MAP}, then {@link #ARRAY}.
@@ -71,6 +73,9 @@ enum Kind {
 		if (signals.contains(Signal.TUPLE)) {
 			return TUPLE;
 		}
+		if (signals.contains(Signal.ENUM)) {
+			return ENUM;
+		}
 		if (signals.contains(Signal.JDK_RECORD) || signals.contains(Signal.RECORD_ON_TYPE)
 				|| signals.contains(Signal.RECORD_ON_CONSTRUCTOR)) {
 			return signals.contains(Signal.TO_DATA) ? BRIDGED : RECORD;
@@ -78,11 +83,7 @@ enum Kind {
 		if (signals.contains(Signal.TO_DATA) && !marksAtom) {
 			return BRIDGED;
 		}
-		if (signals.contains(Signal.ENUM)) {
-			return ENUM;
-		}
-		if (!signals.contains(Signal.COLLECTION) && (signals.contains(Signal.SEALED)
-				|| signals.contains(Signal.UNION) && signals.contains(Signal.ABSTRACT))) {
+		if (signals.contains(Signal.SEALED) || signals.contains(Signal.UNION) && signals.contains(Signal.ABSTRACT)) {
 			return UNION;
 		}
 		if (signals.contains(Signal.PRIMITIVE) || marksAtom) {
@@ -99,8 +100,8 @@ enum Kind {
 
 	/**
 	 * The kind {@code signals} decide for a class registered as an atom: {@link #ENUM}, {@link #ATOM} or
-	 * {@link #NONE}. Every signal of another kind is set aside, since registering a record or a union that marks
-	 * {@code @Atom} asks for the atom form it states.
+	 * {@link #NONE}. Every signal of another kind is set aside, since registering a union that marks {@code @Atom}
+	 * asks for the atom form it states; {@link KindMarks} refuses a record's, which is a bridge's to give.
 	 */
 	static Kind asAtom(Set<Signal> signals) {
 		Set<Signal> forms = EnumSet.noneOf(Signal.class);

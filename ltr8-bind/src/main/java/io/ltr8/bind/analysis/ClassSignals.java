@@ -39,7 +39,7 @@ import java.util.Set;
  * about it, and the class-level annotations its binder applies. {@link Kind#of} decides its kind from
  * {@link #present} alone.
  */
-record ClassSignals(Class<?> type, Set<Signal> present, Union union, Typename typename, FieldOrder fieldOrder) {
+record ClassSignals(Class<?> type, Set<Signal> present, Union union, Typename typename) {
 
 	enum Signal {
 		/** The class is {@link Annotated} itself. */
@@ -49,6 +49,8 @@ record ClassSignals(Class<?> type, Set<Signal> present, Union union, Typename ty
 		RECORD_ON_TYPE,
 		/** {@code @Record} on a public constructor; a constructor selection reads no other. */
 		RECORD_ON_CONSTRUCTOR,
+		/** {@code @Record} on a constructor that is not public, which nothing builds the class through. */
+		RECORD_ON_HIDDEN_CONSTRUCTOR,
 		UNION,
 		ATOM_ON_TYPE,
 		/** {@code @Atom} on a constructor the class declares. */
@@ -59,6 +61,7 @@ record ClassSignals(Class<?> type, Set<Signal> present, Union union, Typename ty
 		ATOM_ON_INSTANCE_METHOD,
 		/** The class implements {@link ToData}, itself or through a supertype. */
 		TO_DATA,
+		FIELD_ORDER,
 		JDK_RECORD,
 		ENUM,
 		SEALED,
@@ -88,6 +91,7 @@ record ClassSignals(Class<?> type, Set<Signal> present, Union union, Typename ty
 		add(present, Signal.UNION, union != null);
 		add(present, Signal.ATOM_ON_TYPE, type.isAnnotationPresent(Atom.class));
 		add(present, Signal.TO_DATA, ToData.class.isAssignableFrom(type));
+		add(present, Signal.FIELD_ORDER, type.isAnnotationPresent(FieldOrder.class));
 		add(present, Signal.JDK_RECORD, type.isRecord());
 		add(present, Signal.ENUM, type.isEnum());
 		add(present, Signal.SEALED, type.isSealed());
@@ -99,6 +103,8 @@ record ClassSignals(Class<?> type, Set<Signal> present, Union union, Typename ty
 		add(present, Signal.COLLECTION, Collection.class.isAssignableFrom(type));
 		for (Constructor<?> constructor : type.getDeclaredConstructors()) {
 			add(present, Signal.RECORD_ON_CONSTRUCTOR, Modifier.isPublic(constructor.getModifiers())
+					&& constructor.isAnnotationPresent(Record.class));
+			add(present, Signal.RECORD_ON_HIDDEN_CONSTRUCTOR, !Modifier.isPublic(constructor.getModifiers())
 					&& constructor.isAnnotationPresent(Record.class));
 			add(present, Signal.ATOM_ON_CONSTRUCTOR, constructor.isAnnotationPresent(Atom.class));
 		}
@@ -112,8 +118,7 @@ record ClassSignals(Class<?> type, Set<Signal> present, Union union, Typename ty
 						&& !method.isBridge() && !method.isSynthetic() && method.isAnnotationPresent(Atom.class));
 			}
 		}
-		return new ClassSignals(type, present, union, type.getAnnotation(Typename.class),
-				type.getAnnotation(FieldOrder.class));
+		return new ClassSignals(type, present, union, type.getAnnotation(Typename.class));
 	}
 
 	static boolean isMarkedStatic(Method method) {

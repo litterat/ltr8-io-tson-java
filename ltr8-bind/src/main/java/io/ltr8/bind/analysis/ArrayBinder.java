@@ -13,7 +13,6 @@ import java.lang.invoke.MethodType;
 import java.lang.invoke.VarHandle;
 import java.lang.invoke.VarHandle.AccessMode;
 import java.lang.reflect.GenericArrayType;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.BlockingDeque;
@@ -31,11 +30,6 @@ public class ArrayBinder {
 	public DataClassArray resolveArray(DataBindContext context, ClassSignals signals, Type parameterizedType)
 			throws DataBindException {
 		Class<?> targetClass = signals.type();
-		if (!signals.has(Signal.ARRAY)) {
-			String written = "is a collection, written as its elements";
-			ComponentAnnotations.refuseUnread(targetClass, written);
-			ComponentAnnotations.refuseAtom(targetClass, written);
-		}
 		DataClassArray descriptor = null;
 
 		try {
@@ -52,13 +46,11 @@ public class ArrayBinder {
 
 			} else if (signals.has(Signal.COLLECTION)) {
 
-				// We need the parameterizedType as type erasure means we can only get Collection type
-				// from certain places.
-				if (!(parameterizedType instanceof ParameterizedType)) {
+				Type[] arguments = TypeArguments.containerArguments(targetClass, parameterizedType, Collection.class);
+				if (arguments == null || TypeArguments.unsupplied(arguments[0], targetClass)) {
 					throw new CodeAnalysisException("Collection must provide parameterized type information");
 				}
-
-				Type element = ((ParameterizedType) parameterizedType).getActualTypeArguments()[0];
+				Type element = arguments[0];
 				if (!TypeArguments.isHeld(element)) {
 					throw new CodeAnalysisException("Unrecognized parameterized type");
 				}

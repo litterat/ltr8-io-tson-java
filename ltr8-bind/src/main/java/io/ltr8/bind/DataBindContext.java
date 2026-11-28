@@ -175,6 +175,11 @@ public class DataBindContext {
 		 * taken apart structurally. What a class whose values have no useful parts needs: a {@code UUID} is
 		 * not a record of its bits, and a Java record whose values are one token would otherwise be written
 		 * as its components.
+		 *
+		 * <p>The class is read as describing it reads it: an enum or a class stating its own {@code @Atom} form
+		 * keeps that form, and a mark the atom form does not read -- {@code @Record}, {@code @Tuple},
+		 * {@code @Transparent}, {@code @Union}, {@code @FieldOrder}, {@code ToData} on a class marking no
+		 * {@code @Atom} -- refuses the context when it is built.
 		 */
 		public Builder registerAtom(Class<?> targetClass) {
 			atoms.add(new Registration(targetClass, null));
@@ -184,6 +189,9 @@ public class DataBindContext {
 		/**
 		 * Binds {@code targetClass} as an atom whose wire form is the type {@code bridge} converts to and
 		 * from -- for a class the engine cannot read directly, where the bridge names the crossing.
+		 *
+		 * <p>The bridge overrides the class: whatever binding marks it carries are set aside, unread and
+		 * unrefused, so a record or an enum may be registered as an atom of another form this way.
 		 */
 		public Builder registerAtom(Class<?> targetClass, DataBridge<?, ?> bridge) {
 			atoms.add(new Registration(targetClass, Objects.requireNonNull(bridge, "bridge")));

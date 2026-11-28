@@ -99,7 +99,7 @@ public final class OpenUnionMembers {
 	public record OfUndescribableUnion(String tag) implements UndescribableUnion {
 	}
 
-	/** Described as a record, not a union. */
+	/** Refused: abstract, so no record, and marked a record, so no union. */
 	@Union
 	@Record
 	public abstract static class RecordShapedUnion {
@@ -139,7 +139,7 @@ public final class OpenUnionMembers {
 		}
 	}
 
-	/** Described as a record whose bridged field cannot be built. */
+	/** Refused as a record nothing can build; its subclass inherits a bridged field that cannot be built. */
 	@Union
 	@Record
 	public abstract static class BrokenUnion {
