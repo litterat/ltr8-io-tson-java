@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.writer;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.ExternAdmission;
-import io.ltr8.tson.compiler.resolver.AliasChain;
 import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -20,6 +20,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -91,7 +92,7 @@ public final class ExternTags {
                 if (!(definition instanceof RecordBody record) || record.isParametric()) {
                     return;
                 }
-                Class<?> bound = bound(context, scope.declaringIdentity(name), name);
+                Class<?> bound = bound(context, scope.bindingCandidates(name));
                 if (bound == null) {
                     return;
                 }
@@ -116,7 +117,7 @@ public final class ExternTags {
     private static String externOf(TypeExpr type, TsonLinkedSchema scope) {
         return switch (type) {
             case TypeRef reference -> {
-                String terminal = AliasChain.terminal(reference.name(), scope.schema().entries()::get);
+                String terminal = scope.terminal(reference.name());
                 yield scope.schema().entries().get(terminal) instanceof Extern ? terminal : null;
             }
             case TypeInline inline -> switch (inline.of()) {
@@ -134,13 +135,13 @@ public final class ExternTags {
             if (!reach.same()) {
                 return;
             }
-            Class<?> bound = bound(context, reach.declaringSchema(), reach.entry());
+            Class<?> bound = bound(context, scope.bindingCandidates(written));
             if (bound != null) {
                 tags.putIfAbsent(bound, extern);
             }
         });
         admission.admitted().forEach((written, reach) -> {
-            Class<?> bound = bound(context, reach.declaringSchema(), reach.entry());
+            Class<?> bound = bound(context, scope.bindingCandidates(written));
             if (bound != null) {
                 tags.putIfAbsent(bound, written);
             }
@@ -148,12 +149,18 @@ public final class ExternTags {
         return new Boundary(extern, Map.copyOf(tags), String.join(" | ", admission.admitted().keySet()));
     }
 
-    /** The class {@code context} binds entry {@code name} of the schema {@code declaredBy} to, or {@code null}. */
-    private static Class<?> bound(DataBindContext context, String declaredBy, String name) {
-        try {
-            return context.nameBinder().resolve(declaredBy, name);
-        } catch (DataBindException | RuntimeException unbound) {
-            return null;
+    /**
+     * The class {@code context} binds an entry to under the first of its {@code candidates} that binds ({@link
+     * TsonLinkedSchema#bindingCandidates}), as a read binds it, or {@code null}.
+     */
+    private static Class<?> bound(DataBindContext context, List<EntryKey> candidates) {
+        for (EntryKey candidate : candidates) {
+            try {
+                return context.nameBinder().resolve(candidate.declaringSchema(), candidate.name());
+            } catch (DataBindException | RuntimeException unbound) {
+                // not bound under this name; the next is tried
+            }
         }
+        return null;
     }
 }

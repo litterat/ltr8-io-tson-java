@@ -1,6 +1,5 @@
 package io.ltr8.tson.schema;
 
-import io.ltr8.tson.schema.meta.Alias;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.FamilySelectors;
@@ -12,7 +11,6 @@ import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,7 +70,7 @@ public record ExternAdmission(ExternTarget.Landing landing, Map<String, Admitted
         Map<String, Admitted> admitted = new LinkedHashMap<>();
         Map<String, List<String>> selectsNone = new LinkedHashMap<>();
         for (String written : linked.schema().entries().keySet()) {
-            String terminal = terminal(written, linked.schema().entries()::get);
+            String terminal = linked.terminal(written);
             Optional<ExternTarget.Landing> through = linked.landing(written);
             Top reached = through.map(ExternTarget.Landing::definition)
                     .orElse(linked.schema().entries().get(terminal));
@@ -133,7 +131,7 @@ public record ExternAdmission(ExternTarget.Landing landing, Map<String, Admitted
             if (variant instanceof TypeRef reference) {
                 TsonLinkedSchema in = landing.in();
                 variants.putIfAbsent(in.landing(reference.name()).map(ExternAdmission::identityOf).orElseGet(() -> {
-                    String terminal = terminal(reference.name(), in.schema().entries()::get);
+                    String terminal = in.terminal(reference.name());
                     return in.declaringIdentity(terminal) + "#" + terminal;
                 }), reference.name());
             }
@@ -143,18 +141,5 @@ public record ExternAdmission(ExternTarget.Landing landing, Map<String, Admitted
 
     private static String identityOf(ExternTarget.Landing landing) {
         return landing.in().declaringIdentity(landing.name()) + "#" + landing.name();
-    }
-
-    /**
-     * The name at the end of {@code name}'s alias chain in {@code entries}, or the name the walk stopped at where it
-     * reaches nothing or closes on itself ([TSON-SCHEMA] §8.3).
-     */
-    static String terminal(String name, Function<String, ? extends Top> entries) {
-        Set<String> walked = new LinkedHashSet<>();
-        String current = name;
-        while (walked.add(current) && entries.apply(current) instanceof Alias alias) {
-            current = alias.target().name();
-        }
-        return current;
     }
 }

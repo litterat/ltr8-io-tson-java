@@ -15,6 +15,7 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -180,12 +181,12 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         private DataClass descriptorFor(String name, Top definition, ValueReaderContext vctx) {
             DataBindException first = null;
             StringBuilder tried = new StringBuilder();
-            for (String candidate : vctx.bindingNamesFor(name)) {
+            for (EntryKey candidate : vctx.linked().bindingCandidates(name)) {
                 try {
-                    return context.getDescriptor(vctx.namespaceOf(candidate), candidate);
+                    return context.getDescriptor(candidate.declaringSchema(), candidate.name());
                 } catch (UnboundNameException e) {
                     first = first == null ? e : first;
-                    tried.append(tried.isEmpty() ? "" : "' or '").append(candidate);
+                    tried.append(tried.isEmpty() ? "" : "' or '").append(candidate.name());
                 } catch (DataBindException e) {
                     throw new MissingBindingException(e.getMessage(), e);
                 }

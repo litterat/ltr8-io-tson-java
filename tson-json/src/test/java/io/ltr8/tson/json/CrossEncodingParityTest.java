@@ -5,6 +5,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
@@ -1365,6 +1366,8 @@ class CrossEncodingParityTest {
             !schema {
               person   => { name: text }
               fragment => { ( include: text | name?: text  type?: text ) }
+              small    => { n: int32 }
+              pct      => small
             }
             """;
 
@@ -1382,6 +1385,67 @@ class CrossEncodingParityTest {
         assertEquals(BindMismatchException.class, fromTson.getClass(), fromTson::getMessage);
         assertEquals(fromTson.getMessage(), fromJson.getMessage());
         assertTrue(fromTson.getMessage().contains(reason), fromTson::getMessage);
+    }
+
+    public record Small(int n) {
+    }
+
+    public record Other(int n) {
+    }
+
+    private static DataBindContext binding(String entry, Class<?> bound) {
+        return DataBindContext.builder().nameBinder(DataNameBinder.ofMap(Map.of(entry, bound)))
+                .registerAtoms(AtomContext.hostTypes()).build();
+    }
+
+    private static ProcessorConfig bindConfig() {
+        return ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of((SchemaSource) uri -> BIND_SCHEMA));
+    }
+
+    /** {@code pct}, read in TSON as {@code type} under {@code context}, reporting into {@code problems}. */
+    private static Object tsonPct(DataBindContext context, Class<?> type, List<Diagnostic> problems) {
+        return Tson.of(bindConfig().withDataBindContext(context)).objectReader().withDiagnostics(problems::add)
+                .read("!!import:\"%s\"\n!pct { n: 1 }".formatted(BIND_ID), type);
+    }
+
+    /** {@code pct}, read in JSON as {@code type} under {@code context}, reporting into {@code problems}. */
+    private static Object jsonPct(DataBindContext context, Class<?> type, List<Diagnostic> problems) {
+        Tson plain = Tson.of(bindConfig());
+        plain.resolve(BIND_SCHEMA);
+        return Json.of(ProcessorConfig.defaults().withDataBindContext(context)).withSchemas(plain.schemaRegistry())
+                .objectReader().withDiagnostics(problems::add).withSchema(BIND_ID)
+                .readAs("{\"n\": 1}", "pct", type);
+    }
+
+    /**
+     * {@code small} has a source position, so it binds under its own name only: an alias naming it never redirects
+     * its binding, and a binding map naming only the alias binds nothing, in either encoding.
+     */
+    @Test
+    void anAliasOfADeclaredEntryRedirectsNoBindingInBoth() {
+        DataBindContext context = binding("pct", Small.class);
+        assertThrows(MissingBindingException.class, () -> tsonPct(context, Object.class, new ArrayList<>()));
+        assertThrows(MissingBindingException.class, () -> jsonPct(context, Object.class, new ArrayList<>()));
+    }
+
+    /**
+     * A root written as an alias asks the binder for the entry it denotes, as its reader does, so a class the caller
+     * cannot hold is refused before the value is read, in both encodings.
+     */
+    @Test
+    void aRootWrittenAsAnAliasIsAskedForTheClassItsEntryBindsInBoth() {
+        DataBindContext context = binding("small", Small.class);
+        List<Diagnostic> fromTson = new ArrayList<>();
+        List<Diagnostic> fromJson = new ArrayList<>();
+        assertEquals(new Small(1), tsonPct(context, Small.class, new ArrayList<>()));
+        assertEquals(new Small(1), jsonPct(context, Small.class, new ArrayList<>()));
+        tsonPct(context, Other.class, fromTson);
+        jsonPct(context, Other.class, fromJson);
+        for (List<Diagnostic> problems : List.of(fromTson, fromJson)) {
+            assertEquals(1, problems.size(), problems::toString);
+            assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.getFirst().code(), problems::toString);
+            assertTrue(problems.getFirst().message().contains("binds to " + Small.class.getName()), problems::toString);
+        }
     }
 
     @Test

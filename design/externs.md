@@ -51,7 +51,7 @@ and a value read, bound and written through it in both encodings.
 - **A tree value at the boundary carries the outer name** (the tag written, else the extern), so the writer writes
   back a tag the enclosing scope admits.
 - **Bind mode needs nothing of its own inside**: every class is asked of the binder by its entry's identity
-  (`ValueReaderContext.namespaceOf`). An annotation
+  (`TsonLinkedSchema.bindingCandidates`). An annotation
   through an extern in a schema document binds where the foreign classes are bound and is a tree where not.
 - **The annotations in front of the boundary reach a bound record through its carrier** (`ExternReader.carrying`),
   rebuilt once where some were written; a class with no carrier drops them, the boundary having checked them.

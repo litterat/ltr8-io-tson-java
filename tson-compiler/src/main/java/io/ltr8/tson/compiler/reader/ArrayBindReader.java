@@ -10,6 +10,7 @@ import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.compiler.SchemaLocation;
+import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -199,13 +200,16 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                     AnnotationTypes.of(context), elementsAreNames(body, context));
         }
 
-        /** {@code schemaTypeName} has no real bound Java class only where none is bound by that name. */
+        /** The class {@code schemaTypeName} binds to under its first candidate that binds, else {@link String}. */
         private Class<?> resolveElementType(String schemaTypeName, ValueReaderContext vctx) {
-            try {
-                return context.getDescriptor(vctx.namespaceOf(schemaTypeName), schemaTypeName).typeClass();
-            } catch (DataBindException e) {
-                return String.class;
+            for (EntryKey candidate : vctx.linked().bindingCandidates(schemaTypeName)) {
+                try {
+                    return context.getDescriptor(candidate.declaringSchema(), candidate.name()).typeClass();
+                } catch (DataBindException e) {
+                    // not bound under this name; the next is tried
+                }
             }
+            return String.class;
         }
 
         private DataClass descriptorFor(Type type) {
