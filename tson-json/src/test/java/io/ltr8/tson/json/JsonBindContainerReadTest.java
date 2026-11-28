@@ -7,6 +7,7 @@ import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -236,10 +237,11 @@ class JsonBindContainerReadTest {
         assertEquals(new Loose("b", null), holder.loose());
     }
 
+    /** A named tuple's host form is a declared class, as a record's is, so read with none bound it reads no List. */
     @Test
-    void aTupleNothingMoreSpecificDeclaresBindsToAList() {
-        assertEquals(List.of("a", 3), read("pair", """
-                ["a", 3]""").value());
+    void aNamedTupleNothingIsBoundToRaisesMissingBindingReadDirectly() {
+        assertThrows(MissingBindingException.class, () -> read("pair", """
+                ["a", 3]"""));
     }
 
     @Test

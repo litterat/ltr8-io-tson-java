@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
@@ -26,10 +27,22 @@ final class TupleReader implements JsonTypeReader<Object> {
     private final JsonTypeReader<?>[] slots;
     private final TupleBuilder builder;
 
+    /** Why a named tuple has no class to build, raised on a read; null where it has one, or needs none. */
+    private final MissingBindingException unbound;
+
     TupleReader(TuplePlan plan, JsonTypeReader<?>[] slots, TupleBuilder builder) {
+        this(plan, slots, builder, null);
+    }
+
+    /**
+     * A bind-mode tuple nothing is bound to by name: read directly it raises {@code unbound}, as {@link ErrorReader}
+     * does for a record nothing binds, while a component declaring a tuple class still reads it again for that class.
+     */
+    TupleReader(TuplePlan plan, JsonTypeReader<?>[] slots, TupleBuilder builder, MissingBindingException unbound) {
         this.plan = plan;
         this.slots = slots.clone();
         this.builder = builder;
+        this.unbound = unbound;
     }
 
     TuplePlan plan() {
@@ -42,6 +55,9 @@ final class TupleReader implements JsonTypeReader<Object> {
 
     @Override
     public Object read(JsonReadContext ctx) {
+        if (unbound != null) {
+            throw unbound;
+        }
         ctx = ctx.underDeclaration(plan.schemaLocation());
         JsonEvent first = ctx.next();
         if (!(first instanceof JsonEvent.ArrayStart)) {

@@ -1370,6 +1370,8 @@ class CrossEncodingParityTest {
               fragment => { ( include: text | name?: text  type?: text ) }
               small    => { n: int32 }
               pct      => small
+              duo      => [text, int32]
+              duo_box  => { d: duo }
             }
             """;
 
@@ -1417,6 +1419,58 @@ class CrossEncodingParityTest {
         return Json.of(ProcessorConfig.defaults().withDataBindContext(context)).withSchemas(plain.schemaRegistry())
                 .objectReader().withDiagnostics(problems::add).withSchema(BIND_ID)
                 .readAs("{\"n\": 1}", "pct", type);
+    }
+
+    /** {@code type} read in TSON as {@code root} under {@code context}, from {@code body}. */
+    private static Object tsonRead(DataBindContext context, String root, String body, Class<?> type) {
+        return Tson.of(bindConfig().withDataBindContext(context)).objectReader()
+                .read("!!import:\"%s\"\n!%s %s".formatted(BIND_ID, root, body), type);
+    }
+
+    /** {@code type} read in JSON as {@code root} under {@code context}, from {@code body}. */
+    private static Object jsonRead(DataBindContext context, String root, String body, Class<?> type) {
+        Tson plain = Tson.of(bindConfig());
+        plain.resolve(BIND_SCHEMA);
+        return Json.of(ProcessorConfig.defaults().withDataBindContext(context)).withSchemas(plain.schemaRegistry())
+                .objectReader().withSchema(BIND_ID).readAs(body, root, type);
+    }
+
+    @io.ltr8.annotation.Tuple
+    public record Duo(String label, int count) {
+    }
+
+    @io.ltr8.annotation.Tuple
+    public record WideDuo(String label, long count) {
+    }
+
+    public record DuoBox(WideDuo d) {
+    }
+
+    /** A named tuple's name is what a binding map keys on ([TSON-SCHEMA] §8.2), so both read it into that class. */
+    @Test
+    void aNamedTupleBindsToTheClassItsNameIsBoundToInBoth() {
+        DataBindContext context = binding("duo", Duo.class);
+        assertEquals(new Duo("a", 3), tsonRead(context, "duo", "[a, 3]", Object.class));
+        assertEquals(new Duo("a", 3), jsonRead(context, "duo", "[\"a\", 3]", Object.class));
+    }
+
+    /** A tuple's host form is a declared class, as a record's is: read directly with none bound, neither reads a List. */
+    @Test
+    void aNamedTupleReadDirectlyWithNothingBoundRaisesMissingBindingInBoth() {
+        DataBindContext context = binding("small", Small.class);
+        assertThrows(MissingBindingException.class, () -> tsonRead(context, "duo", "[a, 3]", Object.class));
+        assertThrows(MissingBindingException.class, () -> jsonRead(context, "duo", "[\"a\", 3]", Object.class));
+    }
+
+    /** A component declaring a tuple class binds the tuple to it, whichever class the tuple's name is bound to. */
+    @Test
+    void aNamedTupleAtAComponentBindsTheComponentsClassInBoth() {
+        DataBindContext context = DataBindContext.builder()
+                .nameBinder(DataNameBinder.ofMap(Map.of("duo", Duo.class, "duo_box", DuoBox.class)))
+                .registerAtoms(AtomContext.hostTypes()).build();
+        DuoBox box = new DuoBox(new WideDuo("a", 3L));
+        assertEquals(box, tsonRead(context, "duo_box", "{ d: [a, 3] }", DuoBox.class));
+        assertEquals(box, jsonRead(context, "duo_box", "{\"d\": [\"a\", 3]}", DuoBox.class));
     }
 
     /**
