@@ -42,11 +42,6 @@ final class ToDataBridges {
 	static DataClassBridge resolveBridge(ClassSignals signals) throws DataBindException {
 		Class<?> targetClass = signals.type();
 		Class<?> dataType = findToDataClass(targetClass);
-		if (signals.fieldOrder() != null) {
-			throw new DataBindException(String.format("%s carries @FieldOrder, but is bridged through ToData to %s, "
-					+ "which describes it; an order applies only to a class described by its own components, so it "
-					+ "belongs on %2$s", targetClass.getName(), dataType.getName()));
-		}
 		Constructor<?> constructor = bridgeConstructor(signals, dataType);
 		try {
 			MethodHandle toObject = Members.constructor(targetClass, constructor);
@@ -67,7 +62,7 @@ final class ToDataBridges {
 	 * not followed: binding through it would need a rule for a class reaching {@code ToData} by two paths, and a
 	 * class that declares the clause itself says which record it is with no rule at all.
 	 */
-	private static Class<?> findToDataClass(Class<?> targetClass) throws DataBindException {
+	static Class<?> findToDataClass(Class<?> targetClass) throws DataBindException {
 		for (Type declared : targetClass.getGenericInterfaces()) {
 			if (declared == ToData.class) {
 				throw new DataBindException(String.format(

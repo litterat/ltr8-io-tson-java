@@ -17,9 +17,6 @@ public class UnionBinder {
 
 	public DataClassUnion resolveUnion(ClassSignals signals) throws DataBindException {
 		Class<?> targetClass = signals.type();
-		String written = "is a union, written as one of its members";
-		ComponentAnnotations.refuseUnread(targetClass, written);
-		ComponentAnnotations.refuseAtom(targetClass, written);
 		if (signals.has(Signal.SEALED)) {
 			List<Class<?>> unionMembers = new ArrayList<>();
 			collectSealedMembers(targetClass, unionMembers);

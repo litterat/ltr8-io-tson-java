@@ -44,10 +44,6 @@ public class RecordBinder {
 		Class<?> targetClass = signals.type();
 		return refusing(targetClass, () -> {
 			DataClassBridge bridge = ToDataBridges.resolveBridge(signals);
-			String written = "is bridged through ToData to " + bridge.dataClass().getName() + ", which describes it";
-			ComponentAnnotations.refuseUnread(targetClass, written);
-			ComponentAnnotations.refuseAtom(targetClass, written);
-
 			DataClassRecord descriptor = resolveClassRecord(context, bridge.dataClass());
 
 			return new DataClassRecord(targetClass, bridge, descriptor.isMutable(), descriptor.creator(),
