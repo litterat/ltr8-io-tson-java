@@ -50,8 +50,10 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,15 +70,20 @@ import java.util.stream.Collectors;
  * is named with {@link Field @Field}.
  *
  * <p>A component is read back through a public instance method of the class or a super class that returns its field,
- * or a public method of its name carrying {@code @Field} or {@link Union @Union}; failing both, through the field
- * itself where that is public. A member a super class that is not public declares is reached as the JVM
- * reaches it, through a public subclass: the described class or one between the two.
+ * other than one {@code Object} declares, or a public method of its name carrying {@code @Field} or
+ * {@link Union @Union}; failing both, through the field itself where that is public. Of several methods returning
+ * the field, the accessors are those carrying {@code @Field} or {@code @Union} and those named for the component.
+ * A member a super class that is not public declares is reached as the JVM reaches it, through a public subclass:
+ * the described class or one between the two.
  *
  * <p>The class is refused, with a {@link CodeAnalysisException} naming it, when a parameter binds no component or more
- * than one, when a bound component has no such read, when its read is reached as {@link Members} refuses, or when
- * two components take one name.
+ * than one, when a bound component has no such read, when two methods return its field and neither is an accessor so
+ * chosen, when its read is reached as {@link Members} refuses, or when two components take one name.
  */
 public class ImmutableFinder implements ComponentFinder {
+
+    private static final Set<String> OBJECT_METHODS = Arrays.stream(Object.class.getDeclaredMethods())
+            .filter(method -> method.getParameterCount() == 0).map(Method::getName).collect(Collectors.toSet());
 
     public ImmutableFinder() {
     }
@@ -137,8 +144,9 @@ public class ImmutableFinder implements ComponentFinder {
 
             // Find the matching accessor methods. Must have already found fields in constructor.
             Set<String> matched = new HashSet<>();
-            examineAccessorMethods(clss, clss, immutableFields, classModel, matched);
-            examineAccessorAnnotations(clss, clss, immutableFields, matched);
+            Map<ComponentInfo, List<Method>> candidates = new IdentityHashMap<>();
+            examineAccessorMethods(clss, immutableFields, classModel, matched, candidates);
+            examineAccessorAnnotations(clss, immutableFields, matched, candidates);
 
             Class<?> superClass = clss;
             while ((superClass = superClass.getSuperclass()) != null) {
@@ -147,8 +155,15 @@ public class ImmutableFinder implements ComponentFinder {
                 }
                 ClassModel superClassModel = parseClass(superClass);
 
-                examineAccessorMethods(clss, superClass, immutableFields, superClassModel, matched);
-                examineAccessorAnnotations(clss, superClass, immutableFields, matched);
+                examineAccessorMethods(superClass, immutableFields, superClassModel, matched, candidates);
+                examineAccessorAnnotations(superClass, immutableFields, matched, candidates);
+            }
+
+            for (ComponentInfo component : immutableFields) {
+                List<Method> returning = candidates.get(component);
+                if (returning != null) {
+                    readThroughAccessor(clss, component, returning);
+                }
             }
 
             for (ComponentInfo component : immutableFields) {
@@ -239,22 +254,25 @@ public class ImmutableFinder implements ComponentFinder {
     }
 
     /**
-     * @param described the class whose components these are: {@code clss} or a subclass of it
      * @param matched as for {@link #examineAccessorAnnotations}
+     * @param candidates for each component, the methods found returning its field, the described class's first
      */
-    private void examineAccessorMethods(Class<?> described, Class<?> clss, List<ComponentInfo> immutableFields,
-            ClassModel classModel, Set<String> matched)
-            throws NoSuchMethodException, SecurityException, CodeAnalysisException {
+    private void examineAccessorMethods(Class<?> clss, List<ComponentInfo> immutableFields, ClassModel classModel,
+            Set<String> matched, Map<ComponentInfo, List<Method>> candidates)
+            throws NoSuchMethodException, SecurityException {
 
         for (MethodModel method : classModel.methods()) {
             // An accessor takes no argument but the instance; in a static method slot 0 is no instance, and the
-            // public lookup reaches no method that is not public.
+            // public lookup reaches no method that is not public. A method Object declares has a contract of its own,
+            // which a body returning a field does not make a component's read.
+            String name = method.methodName().stringValue();
             if (!method.methodType().stringValue().startsWith("()") || method.flags().has(AccessFlag.STATIC)
-                    || !method.flags().has(AccessFlag.PUBLIC) || matched.contains(method.methodName().stringValue())) {
+                    || !method.flags().has(AccessFlag.PUBLIC) || matched.contains(name)
+                    || OBJECT_METHODS.contains(name)) {
                 continue;
             }
-            if (examineAccessor(described, clss, immutableFields, method)) {
-                matched.add(method.methodName().stringValue());
+            if (examineAccessor(clss, immutableFields, method, candidates)) {
+                matched.add(name);
             }
         }
     }
@@ -264,10 +282,10 @@ public class ImmutableFinder implements ComponentFinder {
      * identifies a simple accessor. The field used in the GETFIELD instruction must already
      * have been discovered via the constructor (in {@code fields}).
      *
-     * @return whether the method is the accessor of a component
+     * @return whether the method returns a component's field
      */
-    private boolean examineAccessor(Class<?> described, Class<?> clss, List<ComponentInfo> fields, MethodModel method)
-            throws NoSuchMethodException, SecurityException, CodeAnalysisException {
+    private boolean examineAccessor(Class<?> clss, List<ComponentInfo> fields, MethodModel method,
+            Map<ComponentInfo, List<Method>> candidates) throws NoSuchMethodException, SecurityException {
         boolean foundLoadThis = false;
         String lastField = null;
         Class<?> lastDeclarer = null;
@@ -298,10 +316,10 @@ public class ImmutableFinder implements ComponentFinder {
                             .findFirst().orElse(null);
                     if (info != null) {
                         Method accessorMethod = clss.getDeclaredMethod(method.methodName().stringValue());
-                        info.addMember(Role.ACCESSOR, accessorMethod);
-                        info.setReadMethod(
-                                readAs(Members.virtual(described, accessorMethod), info.getType()));
-                        info.addAccessor(accessorMethod);
+                        List<Method> returning = candidates.computeIfAbsent(info, key -> new ArrayList<>());
+                        if (!returning.contains(accessorMethod)) {
+                            returning.add(accessorMethod);
+                        }
                         accessor = true;
                     }
                 }
@@ -365,8 +383,8 @@ public class ImmutableFinder implements ComponentFinder {
      * @param matched the accessor names matched so far, in subclasses of {@code clss}: a handle on a method a
      *        subclass overrides dispatches to the override, which reads the field the override returns
      */
-    private void examineAccessorAnnotations(Class<?> described, Class<?> clss, List<ComponentInfo> immutableFields,
-            Set<String> matched) throws CodeAnalysisException {
+    private void examineAccessorAnnotations(Class<?> clss, List<ComponentInfo> immutableFields, Set<String> matched,
+            Map<ComponentInfo, List<Method>> candidates) {
         // Possibly failed to find accessor through invariant byte code analysis.
         // Fallback on @Field annotation or method name.
         for (Method method : clss.getDeclaredMethods()) {
@@ -379,17 +397,52 @@ public class ImmutableFinder implements ComponentFinder {
             final String name = method.getName();
             // A method sees only fields its own class or a super class of it declares.
             ComponentInfo component = immutableFields.stream().filter(e -> e.getName().equals(name)
-                    && e.getReadMethod() == null
+                    && !candidates.containsKey(e)
                     && (e.getDeclaringClass() == null || e.getDeclaringClass().isAssignableFrom(clss)))
                     .findFirst().orElse(null);
-            if (component != null
-                    && (method.isAnnotationPresent(Field.class) || method.isAnnotationPresent(Union.class))) {
-                component.setReadMethod(readAs(Members.virtual(described, method), component.getType()));
-                component.addMember(Role.ACCESSOR, method);
+            if (component != null && annotated(method)) {
+                candidates.put(component, new ArrayList<>(List.of(method)));
                 matched.add(name);
-                component.addAccessor(method);
             }
         }
+    }
+
+    private static boolean annotated(Method method) {
+        return method.isAnnotationPresent(Field.class) || method.isAnnotationPresent(Union.class);
+    }
+
+    /**
+     * Each method returning the field that carries {@code @Field} or {@code @Union} or is named for the component,
+     * {@code f()}, {@code getF()} or {@code isF()}, is an accessor, a member whose annotations are the component's,
+     * and the component is read through the first in that order; where none is, the one method returning the field
+     * is. Of two methods returning it, neither so chosen, the bodies do not say which reads the component.
+     *
+     * @param returning the methods returning the field, or carrying an annotation and named for it
+     */
+    private static void readThroughAccessor(Class<?> described, ComponentInfo component, List<Method> returning)
+            throws CodeAnalysisException {
+        String name = component.getName();
+        String capitalised = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+        List<String> named = List.of(name, "get" + capitalised, "is" + capitalised);
+        List<Method> accessors = returning.stream()
+                .filter(method -> annotated(method) || named.contains(method.getName())).toList();
+        if (accessors.isEmpty()) {
+            if (returning.size() > 1) {
+                throw new CodeAnalysisException(String.format("%s returns its field '%s' from more than one method, "
+                        + "none named for it: %s; @Field on one of them makes it the accessor", described.getName(),
+                        name, returning.stream().map(method -> method.getDeclaringClass().getSimpleName() + "."
+                                + method.getName() + "()").collect(Collectors.joining(", "))));
+            }
+            accessors = returning;
+        }
+        for (Method accessor : accessors) {
+            component.addMember(Role.ACCESSOR, accessor);
+            component.addAccessor(accessor);
+        }
+        Method read = accessors.stream()
+                .min(Comparator.comparingInt(method -> annotated(method) ? -1 : named.indexOf(method.getName())))
+                .orElseThrow();
+        component.setReadMethod(readAs(Members.virtual(described, read), component.getType()));
     }
 
     /**
