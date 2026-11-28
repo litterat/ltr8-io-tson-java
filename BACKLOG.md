@@ -524,9 +524,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   as one of them. A concrete sealed class carrying `@Record` is described as a record alone, so an instance of a class
   it permits, at a position of its type, is written as the root and loses its own fields (`RecRootLeaf(1, 2)` writes
   `{a=1}`). Both need a second description of one class, which is a ruling on the descriptors before it is work.
-- [ ] **`ArrayMapper.toArray` casts its result to an array.** An atom at the root throws `ClassCastException`
-  ("Cannot cast java.lang.String to [Ljava.lang.Object;") from both overloads. Refuse it naming the class, as
-  `MapMapper.toMap(Object)` refuses a root that is no map (`MapMapperRootTest`).
 - [ ] **The two mappers are examples shipped as API.** `MapMapper` and `ArrayMapper` show two ways to walk the
   descriptors, a plain descent and `MethodHandle`s built over them; nothing outside `ltr8-bind` uses them, and its
   own tests use them as the round-trip harness. They sit in `src/main` and the module exports `io.ltr8.bind.mapper`.
