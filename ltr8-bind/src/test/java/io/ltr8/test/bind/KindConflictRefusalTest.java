@@ -26,6 +26,8 @@ import io.ltr8.test.data.KindConflicts.RecordUnion;
 import io.ltr8.test.data.KindConflicts.ToDataUnion;
 import io.ltr8.test.data.KindConflicts.RecordConstructorToData;
 import io.ltr8.test.data.KindConflicts.RecordInterface;
+import io.ltr8.test.data.KindConflicts.RecordOnHiddenConstructor;
+import io.ltr8.test.data.KindConflicts.RecordOnHiddenRecordConstructor;
 import io.ltr8.test.data.KindConflicts.RecordToData;
 import io.ltr8.test.data.KindConflicts.SealedAbstractRecord;
 import io.ltr8.test.data.KindConflicts.SealedListed;
@@ -139,6 +141,17 @@ class KindConflictRefusalTest {
 				described(RecordConstructorToData.class, "says two ways to write it, ToData, as the record class it "
 						+ "names, and @Record on the constructor RecordConstructorToData(Text), as its components by "
 						+ "name: remove one of them"));
+	}
+
+	@Test
+	void aRecordMarkOnAConstructorThatIsNotPublicIsRefused() {
+		assertAll(
+				described(RecordOnHiddenConstructor.class, "marks the constructor RecordOnHiddenConstructor(String) "
+						+ "@Record, but it is not public, so nothing builds RecordOnHiddenConstructor through it: make it "
+						+ "public, or remove @Record"),
+				described(RecordOnHiddenRecordConstructor.class, "marks the constructor "
+						+ "RecordOnHiddenRecordConstructor(String) @Record, but it is not public, so nothing builds "
+						+ "RecordOnHiddenRecordConstructor through it: make it public, or remove @Record"));
 	}
 
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */

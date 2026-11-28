@@ -62,6 +62,7 @@ class ClassSignalsTest {
 	void recordOnAConstructorCountsOnlyAPublicOne() {
 		assertTrue(ClassSignals.of(RecordOnPublicConstructor.class).has(Signal.RECORD_ON_CONSTRUCTOR));
 		assertFalse(ClassSignals.of(RecordOnHiddenConstructor.class).has(Signal.RECORD_ON_CONSTRUCTOR));
+		assertTrue(ClassSignals.of(RecordOnHiddenConstructor.class).has(Signal.RECORD_ON_HIDDEN_CONSTRUCTOR));
 	}
 
 	@Test

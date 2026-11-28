@@ -23,6 +23,7 @@ import io.ltr8.bind.analysis.ClassSignals.Signal;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Modifier;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -72,7 +73,8 @@ final class KindMarks {
 
 	/** The signals an author writes on a class, rather than facts the JDK reports of it. */
 	private static final Set<Signal> MARKS = EnumSet.of(Signal.TRANSPARENT, Signal.TUPLE, Signal.RECORD_ON_TYPE,
-			Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION, Signal.ATOM_ON_TYPE, Signal.ATOM_ON_CONSTRUCTOR,
+			Signal.RECORD_ON_CONSTRUCTOR, Signal.RECORD_ON_HIDDEN_CONSTRUCTOR, Signal.UNION, Signal.ATOM_ON_TYPE,
+			Signal.ATOM_ON_CONSTRUCTOR,
 			Signal.ATOM_ON_STATIC_METHOD, Signal.ATOM_ON_INSTANCE_METHOD, Signal.TO_DATA, Signal.FIELD_ORDER);
 
 	private static final Set<Signal> ATOM_SIGNALS = EnumSet.of(Signal.ATOM_ON_TYPE, Signal.ATOM_ON_CONSTRUCTOR,
@@ -83,7 +85,8 @@ final class KindMarks {
 	private static final Map<Kind, Reading> REGISTERED = new EnumMap<>(Kind.class);
 
 	static {
-		Set<Signal> all = MARKS;
+		// No kind reads @Record on a constructor nothing can build the class through.
+		Set<Signal> all = but(MARKS, Signal.RECORD_ON_HIDDEN_CONSTRUCTOR);
 		RESOLVED.put(Kind.ANNOTATED, reading(all, Set.of()));
 		RESOLVED.put(Kind.TRANSPARENT, reading(but(all, Signal.TUPLE, Signal.RECORD_ON_TYPE,
 				Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION, Signal.TO_DATA, Signal.FIELD_ORDER),
@@ -291,7 +294,13 @@ final class KindMarks {
 						bridgedTo.getName()));
 			};
 		}
-		throw new IllegalStateException(kind + " reads " + mark + " of " + type.getName());
+		if (mark == Signal.RECORD_ON_HIDDEN_CONSTRUCTOR && kind != Kind.ENUM) {
+			return new CodeAnalysisException(String.format("%s marks %s @Record, but it is not public, so nothing "
+					+ "builds %s through it: make it public, or remove @Record", type.getName(),
+					constructor(type, Record.class, false), type.getSimpleName()));
+		}
+		return new CodeAnalysisException(String.format("%s %s, so nothing reads %s: remove it", type.getName(), written,
+				label(mark, type)));
 	}
 
 	/** Refuses a sealed or {@code @Union} type that is a map or a collection too. */
@@ -329,16 +338,21 @@ final class KindMarks {
 			case TRANSPARENT -> "@Transparent";
 			case TUPLE -> "@Tuple";
 			case RECORD_ON_TYPE -> "@Record";
-			case RECORD_ON_CONSTRUCTOR -> "@Record on " + constructor(type, Record.class);
+			case RECORD_ON_CONSTRUCTOR -> "@Record on " + constructor(type, Record.class, true);
+			case RECORD_ON_HIDDEN_CONSTRUCTOR -> "@Record on " + constructor(type, Record.class, false);
 			case TO_DATA -> "ToData";
-			default -> throw new IllegalStateException(mark + " is no way to write a record");
+			case UNION -> "@Union";
+			case FIELD_ORDER -> "@FieldOrder";
+			case ATOM_ON_TYPE, ATOM_ON_CONSTRUCTOR, ATOM_ON_STATIC_METHOD, ATOM_ON_INSTANCE_METHOD -> "@Atom";
+			default -> throw new IllegalStateException(mark + " is no mark");
 		};
 	}
 
-	/** The constructor of {@code type} marked {@code annotation}, as {@code Name(Type, Type)}. */
-	private static String constructor(Class<?> type, Class<? extends Annotation> annotation) {
+	/** The constructor of {@code type}, public or not, marked {@code annotation}, as {@code Name(Type, Type)}. */
+	private static String constructor(Class<?> type, Class<? extends Annotation> annotation, boolean isPublic) {
 		for (Constructor<?> constructor : type.getDeclaredConstructors()) {
-			if (constructor.isAnnotationPresent(annotation)) {
+			if (constructor.isAnnotationPresent(annotation)
+					&& Modifier.isPublic(constructor.getModifiers()) == isPublic) {
 				return "the constructor " + type.getSimpleName() + Stream.of(constructor.getParameterTypes())
 						.map(Class::getSimpleName).collect(Collectors.joining(", ", "(", ")"));
 			}

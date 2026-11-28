@@ -207,4 +207,19 @@ public final class KindConflicts {
 			return new Text(value);
 		}
 	}
+
+	// --- a record mark on a constructor nothing builds through
+
+	public static class RecordOnHiddenConstructor {
+		@Record
+		RecordOnHiddenConstructor(String value) {
+		}
+	}
+
+	public record RecordOnHiddenRecordConstructor(String value, int count) {
+		@Record
+		RecordOnHiddenRecordConstructor(String value) {
+			this(value, 0);
+		}
+	}
 }
