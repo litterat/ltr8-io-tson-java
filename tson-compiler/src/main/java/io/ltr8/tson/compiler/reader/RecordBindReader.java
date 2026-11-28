@@ -13,6 +13,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
+import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.meta.*;
 
 import java.util.*;
@@ -117,8 +118,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             TsonTypeReader<?> rebound = BindTargets.to(field.parser(), target.dataClass(),
                     "field '" + field.name() + "'", "component '" + target.name() + "'",
                     new BindTargets.Site(field.name(), resolver, this.annotationTypes, mismatches,
-                            written -> io.ltr8.tson.compiler.resolver.AliasChain.terminal(written,
-                                    context.schema().entries()::get)), true);
+                            context.linked()::terminal), true);
             if (rebound != field.parser()) {
                 fields.set(i, new CompiledField(field.name(), field.schema(), rebound));
             }
@@ -461,9 +461,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * ArrayBody}, §5's array family resolving to one body shape.
          */
         private Class<?> boundClassOrNull(String schemaTypeName, ValueReaderContext vctx) {
-            for (String candidate : vctx.bindingNamesFor(schemaTypeName)) {
+            for (EntryKey candidate : vctx.linked().bindingCandidates(schemaTypeName)) {
                 try {
-                    return context.getDescriptor(vctx.namespaceOf(candidate), candidate).typeClass();
+                    return context.getDescriptor(candidate.declaringSchema(), candidate.name()).typeClass();
                 } catch (DataBindException | RuntimeException e) {
                     // Not a member under this name; the next candidate is the entry's own.
                 }
@@ -484,14 +484,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         private DataClass descriptorFor(String name, Top definition, ValueReaderContext vctx) {
             DataBindException first = null;
             StringBuilder tried = new StringBuilder();
-            for (String candidate : vctx.bindingNamesFor(name)) {
+            for (EntryKey candidate : vctx.linked().bindingCandidates(name)) {
                 try {
-                    return context.getDescriptor(vctx.namespaceOf(candidate), candidate);
+                    return context.getDescriptor(candidate.declaringSchema(), candidate.name());
                 } catch (UnboundNameException e) {
                     // Not bound under this name; the next candidate is tried, and the first is the one reported,
                     // being the name the author wrote.
                     first = first == null ? e : first;
-                    tried.append(tried.isEmpty() ? "" : "' or '").append(candidate);
+                    tried.append(tried.isEmpty() ? "" : "' or '").append(candidate.name());
                 } catch (DataBindException e) {
                     // Bound, to a class this context cannot analyse: deferred like a type nobody bound (a meta
                     // layer maps its marker kinds to interfaces nothing builds), and named for what it is.

@@ -60,8 +60,9 @@ public record ExternTarget(TsonLinkedSchema foreign, String type) {
             return in.schema().entries().get(name);
         }
 
+        /** The canonical identity of the schema declaring the entry ([TSON-DATA] §2.2.1). */
         public String declaringSchema() {
-            return in.originOf(name);
+            return in.declaringIdentity(name);
         }
     }
 }

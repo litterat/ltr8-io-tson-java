@@ -15,7 +15,9 @@ import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
+import io.ltr8.tson.schema.EntryKey;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -435,7 +437,7 @@ public final class JsonObjectReader {
                     schema.get().declaredTypeNames(), typeName);
             return null;
         }
-        Class<?> bound = boundClass(schema.get().linkedSchema().declaringIdentity(typeName), typeName);
+        Class<?> bound = boundClass(schema.get().linkedSchema().bindingCandidates(typeName));
         if (bound != null && !type.isAssignableFrom(bound)) {
             report(Diagnostic.Code.TYPE_MISMATCH, "the schema's type `" + typeName + "` binds to " + bound.getName()
                     + ", which is not assignable to the requested " + type.getName(), type.getName(), bound.getName());
@@ -445,15 +447,19 @@ public final class JsonObjectReader {
     }
 
     /**
-     * The class {@code typeName}, declared by {@code declaredBy}, is bound to, or null where it is not bound by name --
-     * a container, an atom, a type the context cannot resolve. The before-read check then falls to the after-read one.
+     * The class the root type is bound to under the first of its {@code candidates} that binds, as its reader binds
+     * it, or null where none does -- a container, an atom, a type the context cannot resolve. The before-read check
+     * then falls to the after-read one.
      */
-    private Class<?> boundClass(String declaredBy, String typeName) {
-        try {
-            return context.getDescriptor(declaredBy, typeName).typeClass();
-        } catch (DataBindException | RuntimeException e) {
-            return null;
+    private Class<?> boundClass(List<EntryKey> candidates) {
+        for (EntryKey candidate : candidates) {
+            try {
+                return context.getDescriptor(candidate.declaringSchema(), candidate.name()).typeClass();
+            } catch (DataBindException | RuntimeException e) {
+                // not bound under this name; the next is tried
+            }
         }
+        return null;
     }
 
     /** A problem stated about the read as a whole, before any of the document is read -- no pointer, no position. */
