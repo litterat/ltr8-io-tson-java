@@ -173,7 +173,8 @@ public class ArrayBinder {
 			if (targetClass.isArray()) {
 				sizeHandle = MethodHandles.arrayLength(targetClass);
 			} else if (Collection.class.isAssignableFrom(targetClass)) {
-				sizeHandle = MethodHandles.lookup().findVirtual(targetClass, "size", MethodType.methodType(int.class));
+				sizeHandle = MethodHandles.publicLookup().findVirtual(targetClass, "size",
+						MethodType.methodType(int.class));
 			} else {
 				throw new CodeAnalysisException("Not recognised array class");
 			}
