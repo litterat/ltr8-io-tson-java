@@ -129,7 +129,7 @@ public class MapBinder {
 		 * @return A MethodHandle that accepts an integer capacity hint and returns a new empty
 		 *         targetClass instance. constructor( int ):Map;
 		 */
-		public MethodHandle constructor() throws IllegalAccessException, NoSuchMethodException, CodeAnalysisException {
+		public MethodHandle constructor() throws CodeAnalysisException {
 			// If a field uses a non-specific interface type such as Map there's no way of
 			// knowing the implementation expected -- same limitation ArrayBinder has for
 			// a bare List/Set field, and the same fallback: a default concrete type.
@@ -137,12 +137,11 @@ public class MapBinder {
 			// Its capacity constructor where it has one, and otherwise its no-argument constructor with the
 			// capacity ignored -- TreeMap and ConcurrentSkipListMap have no capacity to take.
 			try {
-				return MethodHandles.lookup().unreflectConstructor(implementationClass.getConstructor(int.class));
+				return Members.constructor(implementationClass, implementationClass.getConstructor(int.class));
 			} catch (NoSuchMethodException capacity) {
 				try {
 					return MethodHandles.dropArguments(
-							MethodHandles.lookup().unreflectConstructor(implementationClass.getConstructor()), 0,
-							int.class);
+							Members.constructor(implementationClass, implementationClass.getConstructor()), 0, int.class);
 				} catch (NoSuchMethodException none) {
 					throw new CodeAnalysisException(implementationClass.getName() + " has neither a public (int) "
 							+ "nor a public no-argument constructor to build it with");

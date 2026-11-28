@@ -23,6 +23,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -36,10 +37,11 @@ import java.util.stream.Collectors;
  *
  * <p>A field is refused as hidden where, from a class it would be looked up through, its name and type resolve to
  * another field: the JVM resolves them so from every class further down too. A method needs no such check, since a
- * call dispatches to the same override whichever declaration it resolves to. A constructor is not inherited, so is
- * reached through its own class alone. A member no such class reaches is refused naming the member, with the
- * lookup's refusal as the cause. Each is looked up by name and type rather than unreflected: an unreflected member's
- * refusal names its type by identity, so differs from run to run.
+ * call dispatches to the same override whichever declaration it resolves to. A constructor is not inherited and a
+ * static method may be hidden by one below it, so each is reached through its own class alone. A member no such
+ * class reaches is refused naming the member, with the lookup's refusal as the cause, and one that is not public is
+ * refused as such. Each is looked up by name and type rather than unreflected: an unreflected member's refusal names
+ * its type by identity, so differs from run to run.
  */
 final class Members {
 
@@ -52,19 +54,25 @@ final class Members {
 	}
 
 	static MethodHandle getter(Class<?> described, Field field) throws CodeAnalysisException {
-		return reach(described, field, through -> LOOKUP.findGetter(through, field.getName(), field.getType()));
+		return reach(described, field, declarerDownTo(described, field),
+				through -> LOOKUP.findGetter(through, field.getName(), field.getType()));
 	}
 
 	/** Read and write are reached together, through one class. */
 	static FieldHandles getterAndSetter(Class<?> described, Field field) throws CodeAnalysisException {
-		return reach(described, field, through -> new FieldHandles(
+		return reach(described, field, declarerDownTo(described, field), through -> new FieldHandles(
 				LOOKUP.findGetter(through, field.getName(), field.getType()),
 				LOOKUP.findSetter(through, field.getName(), field.getType())));
 	}
 
 	static MethodHandle virtual(Class<?> described, Method method) throws CodeAnalysisException {
-		return reach(described, method, through -> LOOKUP.findVirtual(through, method.getName(),
-				MethodType.methodType(method.getReturnType(), method.getParameterTypes())));
+		return reach(described, method, declarerDownTo(described, method), through -> LOOKUP.findVirtual(through,
+				method.getName(), MethodType.methodType(method.getReturnType(), method.getParameterTypes())));
+	}
+
+	static MethodHandle staticMethod(Class<?> described, Method method) throws CodeAnalysisException {
+		return reach(described, method, List.of(method.getDeclaringClass()), through -> LOOKUP.findStatic(through,
+				method.getName(), MethodType.methodType(method.getReturnType(), method.getParameterTypes())));
 	}
 
 	static MethodHandle constructor(Class<?> described, Constructor<?> constructor) throws CodeAnalysisException {
@@ -85,9 +93,15 @@ final class Members {
 		T through(Class<?> through) throws ReflectiveOperationException;
 	}
 
-	private static <T> T reach(Class<?> described, Member member, Reach<T> reach) throws CodeAnalysisException {
+	private static <T> T reach(Class<?> described, Member member, List<Class<?>> classes, Reach<T> reach)
+			throws CodeAnalysisException {
+		if (!Modifier.isPublic(member.getModifiers())) {
+			// Refused unlooked: the lookup's refusal of a member that is not public names its class loader, by
+			// identity where the loader has no name.
+			throw notAccessible(described, member, "which is not public", null);
+		}
 		IllegalAccessException refused = null;
-		for (Class<?> through : declarerDownTo(described, member)) {
+		for (Class<?> through : classes) {
 			if (member instanceof Field field) {
 				Field resolved = resolveField(through, field.getName(), field.getType());
 				if (!field.equals(resolved)) {
@@ -100,7 +114,7 @@ final class Members {
 			try {
 				return reach.through(through);
 			} catch (IllegalAccessException e) {
-				// The member resolved is public, so the class it is resolved from is what the lookup cannot access.
+				// The member is public, so the class it is resolved from is what the lookup cannot access.
 				if (refused == null) {
 					refused = e;
 				}
@@ -109,10 +123,14 @@ final class Members {
 						member.getDeclaringClass().getName(), member.getName(), through.getName()), e);
 			}
 		}
-		throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: %s %s.%s, "
-				+ "through no class the public lookup can access", described.getName(),
-				member instanceof Field ? "field" : "method", member.getDeclaringClass().getName(), member.getName()),
-				refused);
+		throw notAccessible(described, member, "through no class the public lookup can access", refused);
+	}
+
+	private static CodeAnalysisException notAccessible(Class<?> described, Member member, String why,
+			IllegalAccessException cause) {
+		return new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: %s %s.%s, "
+				+ "%s", described.getName(), member instanceof Field ? "field" : "method",
+				member.getDeclaringClass().getName(), member.getName(), why), cause);
 	}
 
 	/**

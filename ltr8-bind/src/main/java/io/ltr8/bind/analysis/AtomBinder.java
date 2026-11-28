@@ -79,14 +79,14 @@ public class AtomBinder {
 
 					Class<?> dataClass = params[0].getType();
 
-					MethodHandle toObject = MethodHandles.lookup().unreflectConstructor(constructor);
+					MethodHandle toObject = Members.constructor(targetClass, constructor);
 
 					// TODO Should do additional checks. Is return type same as constructor type.
 					// Also should check for ToData interface implementation or @Atom on specific
 					// method as could be different ways to say which method is toData.
 					Method toDataMethod = targetClass.getDeclaredMethod(TODATA_METHOD);
 
-					MethodHandle toData = MethodHandles.lookup().unreflect(toDataMethod);
+					MethodHandle toData = Members.virtual(targetClass, toDataMethod);
 
 					DataClassBridge bridge = new DataClassBridge(dataClass, toData, toObject);
 					descriptor = new DataClassAtom(targetClass, bridge);
@@ -110,7 +110,7 @@ public class AtomBinder {
 								Arrays.toString(method.getParameterTypes())));
 					}
 
-					MethodHandle toObject = MethodHandles.publicLookup().unreflect(method);
+					MethodHandle toObject = Members.staticMethod(targetClass, method);
 
 					Class<?> param = params[0].getType();
 
@@ -125,7 +125,7 @@ public class AtomBinder {
 								throw new CodeAnalysisException(
 										"Atom accessor method must have a single primitive value as same type as static constructor");
 							}
-							toData = MethodHandles.publicLookup().unreflect(accessorMethod);
+							toData = Members.virtual(targetClass, accessorMethod);
 							break;
 						}
 
@@ -141,7 +141,7 @@ public class AtomBinder {
 				}
 			}
 
-		} catch (SecurityException | IllegalAccessException | NoSuchMethodException | CodeAnalysisException e) {
+		} catch (SecurityException | NoSuchMethodException | CodeAnalysisException e) {
 			throw new CodeAnalysisException("Failed to get atom descriptor", e);
 		}
 

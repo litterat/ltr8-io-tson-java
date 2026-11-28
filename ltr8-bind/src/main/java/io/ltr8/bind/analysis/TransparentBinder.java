@@ -10,7 +10,6 @@ import io.ltr8.bind.DataClassBridge;
 import io.ltr8.bind.DataClassRecord;
 
 import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.RecordComponent;
 
 /**
@@ -96,12 +95,10 @@ final class TransparentBinder {
     private static DataClassBridge bridge(Class<?> targetClass, RecordComponent component)
             throws DataBindException {
         try {
-            MethodHandles.Lookup lookup = MethodHandles.publicLookup();
-            MethodHandle toData = lookup.unreflect(component.getAccessor());
-            MethodHandle toObject = lookup.unreflectConstructor(
-                    targetClass.getConstructor(component.getType()));
+            MethodHandle toData = Members.virtual(targetClass, component.getAccessor());
+            MethodHandle toObject = Members.constructor(targetClass, targetClass.getConstructor(component.getType()));
             return new DataClassBridge(component.getType(), toData, toObject);
-        } catch (NoSuchMethodException | IllegalAccessException e) {
+        } catch (NoSuchMethodException | CodeAnalysisException e) {
             throw new DataBindException(String.format(
                     "@Transparent record %s needs a public canonical constructor taking its one component (%s)",
                     targetClass.getName(), component.getType().getName()), e);
