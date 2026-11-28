@@ -7,8 +7,10 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -89,6 +91,31 @@ final class TypeArguments {
             }
         }
         return bindings;
+    }
+
+    /** {@link #inherited}, with each type parameter of an interface {@code clss} or a super class implements too. */
+    static Map<TypeVariable<?>, Type> implemented(Class<?> clss) {
+        Map<TypeVariable<?>, Type> bindings = new HashMap<>();
+        bindSupertypes(clss, bindings);
+        return bindings;
+    }
+
+    /** Binds {@code type}'s supertypes' parameters after its own, which a subtype's arguments bound first. */
+    private static void bindSupertypes(Class<?> type, Map<TypeVariable<?>, Type> bindings) {
+        List<Type> supertypes = new ArrayList<>(List.of(type.getGenericInterfaces()));
+        if (type.getGenericSuperclass() != null) {
+            supertypes.add(type.getGenericSuperclass());
+        }
+        for (Type supertype : supertypes) {
+            if (supertype instanceof ParameterizedType parameterized) {
+                TypeVariable<?>[] parameters = erasure(parameterized).getTypeParameters();
+                Type[] arguments = parameterized.getActualTypeArguments();
+                for (int i = 0; i < parameters.length; i++) {
+                    bindings.put(parameters[i], substitute(arguments[i], bindings));
+                }
+            }
+            bindSupertypes(erasure(supertype), bindings);
+        }
     }
 
     /**

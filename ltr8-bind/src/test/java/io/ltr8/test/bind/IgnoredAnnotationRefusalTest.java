@@ -17,14 +17,40 @@ package io.ltr8.test.bind;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.mapper.ArrayMapper;
+import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.BridgedFields.NumberAsText;
+import io.ltr8.test.data.IgnoredAnnotations.AtomWithMethod;
 import io.ltr8.test.data.IgnoredAnnotations.BridgeOnCarrier;
+import io.ltr8.test.data.IgnoredAnnotations.BridgedWithField;
+import io.ltr8.test.data.IgnoredAnnotations.BridgedWithParameter;
 import io.ltr8.test.data.IgnoredAnnotations.ComponentOfAnotherProfile;
+import io.ltr8.test.data.IgnoredAnnotations.ConstantBodyWithMethod;
+import io.ltr8.test.data.IgnoredAnnotations.ConstantWithField;
+import io.ltr8.test.data.IgnoredAnnotations.ConstructorParameterOfEnum;
+import io.ltr8.test.data.IgnoredAnnotations.DerivedOfNoComponent;
+import io.ltr8.test.data.IgnoredAnnotations.EnumWithField;
+import io.ltr8.test.data.IgnoredAnnotations.GenericSetterOverride;
+import io.ltr8.test.data.IgnoredAnnotations.GetterImplementsTitled;
 import io.ltr8.test.data.IgnoredAnnotations.GetterOfNoPair;
+import io.ltr8.test.data.IgnoredAnnotations.GetterOverrideKeepsLabel;
+import io.ltr8.test.data.IgnoredAnnotations.ImplementsCached;
+import io.ltr8.test.data.IgnoredAnnotations.ImplementsKeyed;
+import io.ltr8.test.data.IgnoredAnnotations.ImplementsLabelled;
 import io.ltr8.test.data.IgnoredAnnotations.InheritedFieldOfNoComponent;
+import io.ltr8.test.data.IgnoredAnnotations.LabelledMember;
+import io.ltr8.test.data.IgnoredAnnotations.LabelledUnion;
+import io.ltr8.test.data.IgnoredAnnotations.MethodAnnotatedProtocol;
 import io.ltr8.test.data.IgnoredAnnotations.MethodOfNoComponent;
 import io.ltr8.test.data.IgnoredAnnotations.ObjectAsText;
+import io.ltr8.test.data.IgnoredAnnotations.OverrideKeepsLabel;
+import io.ltr8.test.data.IgnoredAnnotations.OverrideRenames;
+import io.ltr8.test.data.IgnoredAnnotations.OverrideUnbinds;
+import io.ltr8.test.data.IgnoredAnnotations.ParameterAnnotatedProtocol;
 import io.ltr8.test.data.IgnoredAnnotations.ParameterOfAnotherConstructor;
+import io.ltr8.test.data.IgnoredAnnotations.Plain;
+import io.ltr8.test.data.IgnoredAnnotations.PrivateMethodOfSameName;
+import io.ltr8.test.data.IgnoredAnnotations.RenamesLabelled;
 import io.ltr8.test.data.IgnoredAnnotations.PrivateUnboundOfNoComponent;
 import io.ltr8.test.data.IgnoredAnnotations.PrivateUnionOfNoComponent;
 import io.ltr8.test.data.IgnoredAnnotations.RequiredOnCarrier;
@@ -46,13 +72,16 @@ import io.ltr8.test.data.IgnoredAnnotations.UnboundUnion;
 import io.ltr8.test.data.IgnoredAnnotations.UnionBesideBridge;
 import io.ltr8.test.data.IgnoredAnnotations.UnionOnCarrier;
 import io.ltr8.test.data.IgnoredAnnotations.UnionOnOptional;
+import io.ltr8.test.data.IgnoredAnnotations.UnionWithStatic;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -155,6 +184,103 @@ class IgnoredAnnotationRefusalTest {
 				described(PLAIN, ComponentOfAnotherProfile.class, "x, why"),
 				described(PROFILED, ComponentOfAnotherProfile.class, "x"),
 				described(PLAIN, RequiredPrimitive.class, "count"));
+	}
+
+	/** A call of an accessor, getter or setter dispatches through every method it overrides. */
+	@Test
+	void anOverriddenMethodsAnnotationIsTheComponents() throws Throwable {
+		assertAll(
+				described(PLAIN, OverrideKeepsLabel.class, "label"),
+				described(PLAIN, OverrideUnbinds.class, "count"),
+				described(PLAIN, GetterOverrideKeepsLabel.class, "heading"),
+				described(PLAIN, GenericSetterOverride.class, "v"),
+				refused(OverrideRenames.class, OverrideRenames.class.getName() + "'s component 'name' has "
+						+ "@Field(value = \"renamed\") on the accessor OverrideRenames.name() but "
+						+ "@Field(value = \"label\") on the overridden method LabelledBase.name()"),
+				refused(PrivateMethodOfSameName.class, noComponent(PrivateMethodOfSameName.class,
+						"method PrivateNameBase.name()", "@Field")));
+		roundTrip(new OverrideKeepsLabel("v"), Map.of("label", "v"), new Object[] { "v" });
+		GetterOverrideKeepsLabel titled = new GetterOverrideKeepsLabel();
+		titled.setTitle("t");
+		MapMapper maps = new MapMapper(PLAIN);
+		assertEquals(Map.of("heading", "t"), maps.toMap(titled));
+		assertEquals("t", ((GetterOverrideKeepsLabel) maps.toObject(GetterOverrideKeepsLabel.class,
+				maps.toMap(titled))).getTitle());
+		ArrayMapper arrays = new ArrayMapper(PLAIN);
+		assertArrayEquals(new Object[] { "t" }, arrays.toArray(titled));
+		assertEquals("t", arrays.toObject(GetterOverrideKeepsLabel.class, arrays.toArray(titled)).getTitle());
+	}
+
+	@Test
+	void anInterfaceMethodsAnnotationIsTheComponentsWhereItIsImplementedByAMember() throws Throwable {
+		assertAll(
+				described(PLAIN, ImplementsLabelled.class, "label"),
+				described(PLAIN, GetterImplementsTitled.class, "heading"),
+				described(PLAIN, ImplementsCached.class, "name"),
+				described(PLAIN, LabelledMember.class, "label"),
+				described(PLAIN, LabelledUnion.class, "described"),
+				refused(RenamesLabelled.class, RenamesLabelled.class.getName() + "'s component 'name' has "
+						+ "@Field(value = \"renamed\") on the field RenamesLabelled.name but @Field(value = \"label\") "
+						+ "on the overridden method Labelled.name()"),
+				refused(DerivedOfNoComponent.class, noComponent(DerivedOfNoComponent.class,
+						"method Derived.derived()", "@Field")),
+				refused(ImplementsKeyed.class, noComponent(ImplementsKeyed.class, "static field Keyed.KEY",
+						"@Field")));
+		roundTrip(new ImplementsLabelled("v"), Map.of("label", "v"), new Object[] { "v" });
+	}
+
+	@Test
+	void aClassDescribedByNoComponentsOfItsOwnRefusesEveryBindingAnnotationOnItsMembers() {
+		String plain = Plain.class.getName();
+		assertAll(
+				refused(BridgedWithField.class, BridgedWithField.class.getName() + " is bridged through ToData to "
+						+ plain + ", which describes it, so nothing reads @Field on the field BridgedWithField.x"),
+				refused(BridgedWithParameter.class, BridgedWithParameter.class.getName() + " is bridged through "
+						+ "ToData to " + plain + ", which describes it, so nothing reads @Unbound on parameter 0 of the "
+						+ "constructor BridgedWithParameter(Plain)"),
+				refused(AtomWithMethod.class, AtomWithMethod.class.getName() + " is an atom bridged to "
+						+ "java.lang.String, so nothing reads @Field on the method AtomWithMethod.text()"),
+				refused(ConstantWithField.class, ConstantWithField.class.getName() + " is an enum, written as its "
+						+ "constant's name, so nothing reads @Field on the field ConstantWithField.RED"),
+				refused(EnumWithField.class, EnumWithField.class.getName() + " is an enum, written as its "
+						+ "constant's name, so nothing reads @Unbound on the field EnumWithField.code"),
+				refused(ConstantBodyWithMethod.class, ConstantBodyWithMethod.class.getName() + " is an enum, "
+						+ "written as its constant's name, so nothing reads @Union on the method code() of the body of "
+						+ "its constant RED"),
+				refused(ConstructorParameterOfEnum.class, ConstructorParameterOfEnum.class.getName() + " is an "
+						+ "enum, written as its constant's name, so nothing reads @Field on parameter 0 of the "
+						+ "constructor ConstructorParameterOfEnum(String)"),
+				refused(UnionWithStatic.class, UnionWithStatic.class.getName() + " is a union, written as one of "
+						+ "its members, so nothing reads @Field on the field UnionWithStatic.KEY"));
+	}
+
+	@Test
+	void aProtocolRefusesEveryBindingAnnotationOnItsMethods() {
+		assertAll(
+				() -> assertEquals("refused: " + MethodAnnotatedProtocol.class.getName() + " is a protocol, read as "
+						+ "its exchanges, so nothing reads @Field on the method MethodAnnotatedProtocol.ask(Ask)",
+						protocol(MethodAnnotatedProtocol.class)),
+				() -> assertEquals("refused: " + ParameterAnnotatedProtocol.class.getName() + " is a protocol, read "
+						+ "as its exchanges, so nothing reads @Union on parameter 0 of the method "
+						+ "ParameterAnnotatedProtocol.ask(Ask)", protocol(ParameterAnnotatedProtocol.class)));
+	}
+
+	private static String protocol(Class<?> type) {
+		try {
+			PLAIN.getProtocol(type);
+			return "described";
+		} catch (Exception e) {
+			return "refused: " + e.getMessage();
+		}
+	}
+
+	private static void roundTrip(Object value, Map<String, Object> map, Object[] array) throws Throwable {
+		MapMapper maps = new MapMapper(PLAIN);
+		assertEquals(map, maps.toMap(value));
+		assertEquals(value, maps.toObject(value.getClass(), map));
+		ArrayMapper arrays = new ArrayMapper(PLAIN);
+		assertArrayEquals(array, arrays.toArray(value));
+		assertEquals(value, arrays.toObject(value.getClass(), array));
 	}
 
 	private static String unbound(Class<?> type, String component, String member, String annotation) {

@@ -103,6 +103,7 @@ public final class ProtocolBinder {
 					type.getName(), kindOf(type)));
 		}
 		requireAccessible(type, type.getName());
+		ComponentAnnotations.refuseInProtocol(type);
 
 		Map<String, Method> byName = new HashMap<>();
 		Map<String, Method> byJavaName = new HashMap<>();

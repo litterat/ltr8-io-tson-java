@@ -531,13 +531,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   "Failed to get atom descriptor", which names no class, where a refusal's own message is the fact
   (`ltr8-bind/CLAUDE.md`). Refuse a class marking two creators, find an inherited `toData`, and let each refusal pass
   up as itself, naming the class.
-- [ ] **A binding annotation is still ignored in positions the member scan does not reach.**
-  `IgnoredAnnotationRefusalTest` holds that `@Field`, `@Union` or `@Unbound` is applied or the class refused, for the
-  fields and methods of a described class. Not scanned: a super class's annotated method that a subclass overrides
-  without the annotation (javac copies annotations onto a visibility bridge, so members are matched by signature and
-  the override hides it), an interface's methods, and the members of a class bound through `ToData`, as an atom, as an
-  enum or as a protocol. Refuse each where the annotation can have no effect, telling an overriding method from a
-  bridge by `Method.isBridge`.
 - [ ] **`ArrayMapper.toArray` casts its result to an array.** An atom at the root throws `ClassCastException`
   ("Cannot cast java.lang.String to [Ljava.lang.Object;") from both overloads. Refuse it naming the class, as
   `MapMapper.toMap(Object)` refuses a root that is no map (`MapMapperRootTest`).
