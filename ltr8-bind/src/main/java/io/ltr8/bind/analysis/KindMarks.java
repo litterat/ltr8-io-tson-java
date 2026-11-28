@@ -81,8 +81,8 @@ final class KindMarks {
 	/** The signals an author writes on a class, rather than facts the JDK reports of it. */
 	private static final Set<Signal> MARKS = EnumSet.of(Signal.TRANSPARENT, Signal.TUPLE, Signal.RECORD_ON_TYPE,
 			Signal.RECORD_ON_CONSTRUCTOR, Signal.RECORD_ON_HIDDEN_CONSTRUCTOR, Signal.UNION, Signal.ATOM_ON_TYPE,
-			Signal.ATOM_ON_CONSTRUCTOR,
-			Signal.ATOM_ON_STATIC_METHOD, Signal.ATOM_ON_INSTANCE_METHOD, Signal.TO_DATA, Signal.FIELD_ORDER);
+			Signal.ATOM_ON_CONSTRUCTOR, Signal.ATOM_ON_STATIC_METHOD, Signal.ATOM_ON_INSTANCE_METHOD, Signal.TO_DATA,
+			Signal.FIELD_ORDER);
 
 	private static final Set<Signal> ATOM_SIGNALS = EnumSet.of(Signal.ATOM_ON_TYPE, Signal.ATOM_ON_CONSTRUCTOR,
 			Signal.ATOM_ON_STATIC_METHOD, Signal.ATOM_ON_INSTANCE_METHOD);
