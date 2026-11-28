@@ -543,10 +543,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   the same two modules, `DataClassObjectWriter.writeUnion` and the JSON root write look a member up by
   `value.getClass()`, which for an enum constant with a body is its anonymous class, no member of any union (read, not
   run): use `getDeclaringClass()` for an enum, as the two mappers do.
-- [ ] **A method parameter's binding annotation is never read.** `setX(@Field("y") String x)` on a `@Record`
-  getter/setter class binds the component as "x" and drops the annotation, silently (reproduced by probe): the member
-  scan does not reach a method's parameters on a described class. Take a setter's parameter as a member of its
-  component, or refuse the annotation, with a round trip of such a class.
 - [ ] **An accessor overridden with a computed body is read through the override.** `ImmutableFinder` matches a super
   class's `f()` returning `f` as the accessor, and virtual dispatch reaches a subclass's `f() { return "computed"; }`,
   so the class writes `{f=computed}` and a round trip loses the stored value (reproduced by probe). Reach the field
