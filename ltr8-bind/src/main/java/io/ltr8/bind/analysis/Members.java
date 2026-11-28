@@ -31,9 +31,9 @@ import java.util.stream.Collectors;
 
 /**
  * Handles on a public member of a described class, reached as the JVM reaches it: looked up by name and type through
- * the first class from its declarer down to the described class that the public lookup can access. The JVM resolves
- * a public member of a class that is not public through a public subclass, but unreflecting resolves it against its
- * declaring class alone.
+ * the first class or interface from its declarer down to the described class that the public lookup can access. The
+ * JVM resolves a public member of a type that is not public through a public subtype, but unreflecting resolves it
+ * against its declaring type alone.
  *
  * <p>A field is refused as hidden where, from a class it would be looked up through, its name and type resolve to
  * another field: the JVM resolves them so from every class further down too. A method needs no such check, since a
@@ -162,13 +162,24 @@ final class Members {
 		return from.getSuperclass() == null ? null : resolveField(from.getSuperclass(), name, type);
 	}
 
-	/** @return {@code member}'s declarer and the classes below it down to {@code described}, the declarer first */
+	/**
+	 * @return {@code member}'s declarer and the classes and interfaces below it that {@code described} is or
+	 *         extends, each after every one of them above it, so the declarer first
+	 */
 	private static List<Class<?>> declarerDownTo(Class<?> described, Member member) {
 		List<Class<?>> through = new ArrayList<>();
-		for (Class<?> c = described; c != member.getDeclaringClass(); c = c.getSuperclass()) {
-			through.addFirst(c);
-		}
-		through.addFirst(member.getDeclaringClass());
+		addFromTop(described, member.getDeclaringClass(), through);
 		return through;
+	}
+
+	private static void addFromTop(Class<?> type, Class<?> declarer, List<Class<?>> through) {
+		if (type == null || !declarer.isAssignableFrom(type) || through.contains(type)) {
+			return;
+		}
+		addFromTop(type.getSuperclass(), declarer, through);
+		for (Class<?> superInterface : type.getInterfaces()) {
+			addFromTop(superInterface, declarer, through);
+		}
+		through.add(type);
 	}
 }

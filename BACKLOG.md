@@ -564,9 +564,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] **A record with `@Atom` on its accessor, registered as an atom, is a bare atom.** It marks no way in, so
   `atomForm` returns `null` and `registerAtom(Class)` registers a `DataClassAtom` with no bridge, the mark ignored
   (reproduced by probe). Refuse it, as a class carrying `@Atom` on its type with no way in is refused.
-- [ ] **`Members.declarerDownTo` walks an interface by `getSuperclass()`.** For a described interface and a method
-  it inherits from a super-interface, the walk reaches `null` and throws `NullPointerException` (read, not run; no
-  caller passes an interface). Walk the super-interfaces, or refuse an interface naming it.
 - [ ] **Prose outside `ltr8-bind` states rules the binder has changed.** `FieldOrder`'s Javadoc (`ltr8-annotation`)
   says it has no effect on a `@Tuple`, a `@Transparent` class or one bridged through `ToData`, where it is refused.
   `Field`'s says nothing of several members: each attribute is taken from whichever member states it, two stating one
