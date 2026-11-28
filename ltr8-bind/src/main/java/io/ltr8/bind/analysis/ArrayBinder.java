@@ -32,7 +32,9 @@ public class ArrayBinder {
 			throws DataBindException {
 		Class<?> targetClass = signals.type();
 		if (!signals.has(Signal.ARRAY)) {
-			ComponentAnnotations.refuseAtom(targetClass, "is a collection, written as its elements");
+			String written = "is a collection, written as its elements";
+			ComponentAnnotations.refuseUnread(targetClass, written);
+			ComponentAnnotations.refuseAtom(targetClass, written);
 		}
 		DataClassArray descriptor = null;
 

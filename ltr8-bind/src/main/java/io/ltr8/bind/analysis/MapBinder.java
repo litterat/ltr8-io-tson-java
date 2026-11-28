@@ -42,7 +42,9 @@ public class MapBinder {
 
 	public DataClassMap resolveMap(DataBindContext context, Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
-		ComponentAnnotations.refuseAtom(targetClass, "is a map, written as its entries");
+		String written = "is a map, written as its entries";
+		ComponentAnnotations.refuseUnread(targetClass, written);
+		ComponentAnnotations.refuseAtom(targetClass, written);
 		DataClassMap descriptor;
 
 		try {
