@@ -555,12 +555,11 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   takes every field a body returns, so `return flag ? a : b;` is a candidate for `a` and for `b`, and with no named
   method beside it, the sole accessor of each (read, not run). Take a method as a candidate only where it returns one
   field, with a test of such a class.
-- [ ] **`@Atom` is neither applied nor refused on a class described as something else.** `getDescriptor` ignores it
-  in six positions (probed): on a record, `@Record`, `@Tuple` or `@Transparent` class, on its type, constructor or
-  accessor; on a sealed or `@Union` type, such as a static factory; on an enum's methods; on an instance method of a
-  record, union, map, collection or `ToData` class with no way in; on a method of an interface an atom implements;
-  and on a super class's static factory, seen from a subclass. Refuse each, as `ComponentAnnotations.refuseUnread`
-  refuses `@Field`, `@Union` and `@Unbound`, with a refusal per position.
+- [ ] **`@Atom` is neither applied nor refused in two positions, each awaiting a ruling.** `getDescriptor` ignores
+  it on a record, `@Record`, `@Tuple` or `@Transparent` class, on its type, constructor or accessor, where only
+  `registerAtom` reads it; and on an instance method of an interface, which an atom implementing it may or may not
+  take as its way out. Rule on each: refuse it, as `ComponentAnnotations.refuseAtom` refuses `@Atom` on a class
+  described as something else (`UnreadAtomRefusalTest`), or apply it, with a test either way.
 - [ ] **A record with `@Atom` on its accessor, registered as an atom, is a bare atom.** It marks no way in, so
   `atomForm` returns `null` and `registerAtom(Class)` registers a `DataClassAtom` with no bridge, the mark ignored
   (reproduced by probe). Refuse it, as a class carrying `@Atom` on its type with no way in is refused.
