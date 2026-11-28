@@ -524,6 +524,37 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   as one of them. A concrete sealed class carrying `@Record` is described as a record alone, so an instance of a class
   it permits, at a position of its type, is written as the root and loses its own fields (`RecRootLeaf(1, 2)` writes
   `{a=1}`). Both need a second description of one class, which is a ruling on the descriptors before it is work.
+- [ ] **An enum is written by `toString()`, not by name.** `EnumStringBridge.toData` calls `toString()`, where the
+  Javadoc of `AtomBinder`, `ClassBinder` and the bridge each say `name()`: a constant that overrides `toString` is
+  written as that text and the read fails with "No enum constant …". Write `name()`, with a round trip of an enum
+  overriding `toString` through both mappers.
+- [ ] **Any method returning a field is taken as its accessor.** `ImmutableFinder` matches a zero-argument method
+  whose body is `return this.f;` as the accessor of `f`, `hashCode()` included, and the last one found wins: with
+  `hashCode() { return m; }` overridden in a subclass, `MiddleLeaf(2, 3)` is written as `{m=65, leaf=3}`. Prefer the
+  accessor of the component's name or its `get` form, never a method `Object` declares, and refuse two candidates that
+  are neither, with a round trip of such a class.
+- [ ] **An `@Atom` class with more than one creator takes one silently, and every atom refusal names no class.**
+  `AtomBinder`'s static-factory loop has no `break`, so of several static `@Atom` factories the last wins, and a
+  static factory overrides an `@Atom` constructor (read, not run); its `toData` lookup uses `getDeclaredMethod`, so a
+  public `toData()` the class inherits is not found (read, not run); and it wraps each refusal, its own included, in
+  "Failed to get atom descriptor", which names no class, where a refusal's own message is the fact
+  (`ltr8-bind/CLAUDE.md`). Refuse a class marking two creators, find an inherited `toData`, and let each refusal pass
+  up as itself, naming the class.
+- [ ] **A user collection class in a named module is refused for its `size`.** `ArrayBinder.getSizeMethodHandle` finds
+  `size` through `MethodHandles.lookup()`, `ltr8-bind`'s own, which reads no user module: on the module path an
+  exported collection class is refused with "Failed to get array descriptor" (shown in an experiment outside the
+  suite, which runs on the class path). Find it through the public lookup, and add a test that runs a binding from a
+  named module.
+- [ ] **`DataBindContext.registerAtom` unreflects a user bridge.** A bridge the public lookup cannot reach is refused
+  with "Failed to register atom bridge", naming no class, over a cause whose text carries an identity hash. Read, not
+  run. Look `toData` and `toObject` up by name and type, as `RecordFields.fieldBridge` does, and name the bridge.
+- [ ] **A binding annotation is still ignored in positions the member scan does not reach.**
+  `IgnoredAnnotationRefusalTest` holds that `@Field`, `@Union` or `@Unbound` is applied or the class refused, for the
+  fields and methods of a described class. Not scanned: a super class's annotated method that a subclass overrides
+  without the annotation (javac copies annotations onto a visibility bridge, so members are matched by signature and
+  the override hides it), an interface's methods, and the members of a class bound through `ToData`, as an atom, as an
+  enum or as a protocol. Refuse each where the annotation can have no effect, telling an overriding method from a
+  bridge by `Method.isBridge`.
 - [ ] **`ArrayMapper.toArray` casts its result to an array.** An atom at the root throws `ClassCastException`
   ("Cannot cast java.lang.String to [Ljava.lang.Object;") from both overloads. Refuse it naming the class, as
   `MapMapper.toMap(Object)` refuses a root that is no map (`MapMapperRootTest`).
@@ -534,16 +565,24 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   export, and correct the `tson-java` skill's `api.md`, which lists it.
 - [ ] **The bind readers compute the `@Unbound` components again, from fewer members.**
   `RecordBindReader.unboundComponents` (`tson-compiler`) and `BindRecordBuilder.unboundComponents` (`tson-json`)
-  reflect over a record component and its accessor, where `ltr8-bind` reads the marker from every member, and both
-  loop over `descriptor.fields()`, which holds no unbound component. Read, not run. Take the answer from the
-  descriptor, or delete the sets if nothing reaches them, with a bind read of an `@Unbound` constructor parameter
-  in each stack.
+  reflect over a record component and its accessor, where `ltr8-bind` reads the marker from every member, so
+  `@Unbound` on an explicit canonical constructor's parameter is unbound to the binder and missed by both readers; the
+  first takes the name from the accessor's `@Field` alone and tests it with `isEmpty` where the binder uses `isBlank`,
+  the second uses Java names, and both answer nothing for a class that is no record. Both loop over
+  `descriptor.fields()`, which holds no unbound component. Read, not run. Take the answer from the descriptor, or
+  delete the sets if nothing reaches them, with a bind read of an `@Unbound` constructor parameter in each stack. In
+  the same two modules, `DataClassObjectWriter.writeUnion` and the JSON root write look a member up by
+  `value.getClass()`, which for an enum constant with a body is its anonymous class, no member of any union (read, not
+  run): use `getDeclaringClass()` for an enum, as the two mappers do.
 - [ ] **Prose outside `ltr8-bind` states rules the binder has changed.** `FieldOrder`'s Javadoc (`ltr8-annotation`)
   says it has no effect on a `@Tuple`, a `@Transparent` class or one bridged through `ToData`, where it is refused.
-  `tson-schema/CLAUDE.md`, `skills/tson-java/references/bindings.md` and `IntegerType`'s Javadoc (`tson-schema`) say a
-  class with more than one public constructor needs `@Record` on the canonical one, which a Java record does not. A
-  comment in `tson-compiler`'s `DataClassObjectReader` says a class joins its union as it is analysed, where it joins
-  once its component is cached. Correct each.
+  `Field`'s says nothing of several members: each attribute is taken from whichever member states it, two stating one
+  differently refuse the class, and a `@Profile` constructor's parameter prevails; `Union`'s lists "constructor
+  parameter, field or accessor" and omits a getter, a setter and a public field; neither says an annotation nothing
+  applies refuses the class. `tson-schema/CLAUDE.md`, `skills/tson-java/references/bindings.md` and `IntegerType`'s
+  Javadoc (`tson-schema`) say a class with more than one public constructor needs `@Record` on the canonical one,
+  which a Java record does not. A comment in `tson-compiler`'s `DataClassObjectReader` says a class joins its union as
+  it is analysed, where it joins once its component is cached. Correct each.
 
 ## Documentation
 
