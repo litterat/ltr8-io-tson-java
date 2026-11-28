@@ -533,13 +533,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `hashCode() { return m; }` overridden in a subclass, `MiddleLeaf(2, 3)` is written as `{m=65, leaf=3}`. Prefer the
   accessor of the component's name or its `get` form, never a method `Object` declares, and refuse two candidates that
   are neither, with a round trip of such a class.
-- [ ] **An `@Atom` class with more than one creator takes one silently, and every atom refusal names no class.**
-  `AtomBinder`'s static-factory loop has no `break`, so of several static `@Atom` factories the last wins, and a
-  static factory overrides an `@Atom` constructor (read, not run); its `toData` lookup uses `getDeclaredMethod`, so a
-  public `toData()` the class inherits is not found (read, not run); and it wraps each refusal, its own included, in
-  "Failed to get atom descriptor", which names no class, where a refusal's own message is the fact
-  (`ltr8-bind/CLAUDE.md`). Refuse a class marking two creators, find an inherited `toData`, and let each refusal pass
-  up as itself, naming the class.
 - [ ] **A user collection class in a named module is refused for its `size`.** `ArrayBinder.getSizeMethodHandle` finds
   `size` through `MethodHandles.lookup()`, `ltr8-bind`'s own, which reads no user module: on the module path an
   exported collection class is refused with "Failed to get array descriptor" (shown in an experiment outside the
