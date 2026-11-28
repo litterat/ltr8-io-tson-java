@@ -524,10 +524,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   as one of them. A concrete sealed class carrying `@Record` is described as a record alone, so an instance of a class
   it permits, at a position of its type, is written as the root and loses its own fields (`RecRootLeaf(1, 2)` writes
   `{a=1}`). Both need a second description of one class, which is a ruling on the descriptors before it is work.
-- [ ] **An enum is written by `toString()`, not by name.** `EnumStringBridge.toData` calls `toString()`, where the
-  Javadoc of `AtomBinder`, `ClassBinder` and the bridge each say `name()`: a constant that overrides `toString` is
-  written as that text and the read fails with "No enum constant …". Write `name()`, with a round trip of an enum
-  overriding `toString` through both mappers.
 - [ ] **Any method returning a field is taken as its accessor.** `ImmutableFinder` matches a zero-argument method
   whose body is `return this.f;` as the accessor of `f`, `hashCode()` included, and the last one found wins: with
   `hashCode() { return m; }` overridden in a subclass, `MiddleLeaf(2, 3)` is written as `{m=65, leaf=3}`. Prefer the
