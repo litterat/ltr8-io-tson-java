@@ -19,12 +19,15 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.test.data.KindConflicts.AbstractRecord;
 import io.ltr8.test.data.KindConflicts.AbstractRecordConstructor;
 import io.ltr8.test.data.KindConflicts.AbstractRecordUnion;
+import io.ltr8.test.data.KindConflicts.AtomEnumToData;
 import io.ltr8.test.data.KindConflicts.AtomUnion;
 import io.ltr8.test.data.KindConflicts.ConcreteUnion;
+import io.ltr8.test.data.KindConflicts.EnumToData;
 import io.ltr8.test.data.KindConflicts.EnumUnion;
 import io.ltr8.test.data.KindConflicts.RecordUnion;
 import io.ltr8.test.data.KindConflicts.ToDataUnion;
 import io.ltr8.test.data.KindConflicts.RecordConstructorToData;
+import io.ltr8.test.data.KindConflicts.RecordEnum;
 import io.ltr8.test.data.KindConflicts.RecordInterface;
 import io.ltr8.test.data.KindConflicts.RecordOnHiddenConstructor;
 import io.ltr8.test.data.KindConflicts.RecordOnHiddenRecordConstructor;
@@ -152,6 +155,20 @@ class KindConflictRefusalTest {
 				described(RecordOnHiddenRecordConstructor.class, "marks the constructor "
 						+ "RecordOnHiddenRecordConstructor(String) @Record, but it is not public, so nothing builds "
 						+ "RecordOnHiddenRecordConstructor through it: make it public, or remove @Record"));
+	}
+
+	/** Both entry points give an enum its kind, and refuse alike what it does not read. */
+	@Test
+	void anEnumSayingAnotherKindIsRefused() {
+		String toData = "is an enum, written as its constant's name, but implements ToData, which nothing reads: "
+				+ "remove it; an enum written another way is registered with its bridge, registerAtom(";
+		assertAll(
+				described(EnumToData.class, toData + "EnumToData.class, bridge)"),
+				registered(EnumToData.class, toData + "EnumToData.class, bridge)"),
+				described(AtomEnumToData.class, toData + "AtomEnumToData.class, bridge)"),
+				registered(AtomEnumToData.class, toData + "AtomEnumToData.class, bridge)"),
+				described(RecordEnum.class, "is an enum, written as its constant's name, so nothing reads @Record: "
+						+ "remove it"));
 	}
 
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */

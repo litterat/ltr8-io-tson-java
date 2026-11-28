@@ -133,14 +133,14 @@ class KindTest {
 	}
 
 	@Test
-	void enumImplementingToDataIsBridgedUnlessItMarksAtom() {
-		assertEquals(Kind.BRIDGED, of(ENUM, TO_DATA));
+	void enumImplementingToDataIsAnEnum() {
+		assertEquals(Kind.ENUM, of(ENUM, TO_DATA));
 		assertEquals(Kind.ENUM, of(ENUM, TO_DATA, ATOM_ON_TYPE));
 	}
 
 	@Test
-	void enumMarkedRecordIsARecord() {
-		assertEquals(Kind.RECORD, of(ENUM, RECORD_ON_TYPE));
+	void enumMarkedRecordIsAnEnum() {
+		assertEquals(Kind.ENUM, of(ENUM, RECORD_ON_TYPE));
 	}
 
 	@Test

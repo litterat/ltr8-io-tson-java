@@ -97,7 +97,8 @@ final class KindMarks {
 				Walk.INHERITED_WAY_IN));
 		RESOLVED.put(Kind.BRIDGED, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
 				Signal.FIELD_ORDER), Set.of(), Walk.UNREAD, Walk.ATOM, Walk.BRIDGED_RECORD));
-		RESOLVED.put(Kind.ENUM, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.ATOM));
+		RESOLVED.put(Kind.ENUM, reading(but(all, Signal.RECORD_ON_TYPE, Signal.RECORD_ON_CONSTRUCTOR, Signal.UNION,
+				Signal.TO_DATA), Set.of(), Walk.UNREAD, Walk.ATOM));
 		RESOLVED.put(Kind.UNION, reading(all, Set.of(), Set.of(Signal.MAP, Signal.COLLECTION), Walk.UNREAD,
 				Walk.ATOM));
 		RESOLVED.put(Kind.ATOM, reading(but(all, Signal.UNION), Set.of(), Walk.UNREAD, Walk.INHERITED_WAY_IN));
@@ -293,6 +294,11 @@ final class KindMarks {
 						+ "to a class described by its own components, so it belongs on %s", type.getName(), written,
 						bridgedTo.getName()));
 			};
+		}
+		if (mark == Signal.TO_DATA && kind == Kind.ENUM) {
+			return new CodeAnalysisException(String.format("%s %s, but implements ToData, which nothing reads: remove "
+					+ "it; an enum written another way is registered with its bridge, registerAtom(%s.class, bridge)",
+					type.getName(), written, type.getSimpleName()));
 		}
 		if (mark == Signal.RECORD_ON_HIDDEN_CONSTRUCTOR && kind != Kind.ENUM) {
 			return new CodeAnalysisException(String.format("%s marks %s @Record, but it is not public, so nothing "

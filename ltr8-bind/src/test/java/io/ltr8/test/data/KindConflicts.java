@@ -222,4 +222,30 @@ public final class KindConflicts {
 			this(value, 0);
 		}
 	}
+
+	// --- an enum saying another kind
+
+	public enum EnumToData implements ToData<String> {
+		ONE;
+
+		@Override
+		public String toData() {
+			return name().toLowerCase();
+		}
+	}
+
+	@Atom
+	public enum AtomEnumToData implements ToData<String> {
+		ONE;
+
+		@Override
+		public String toData() {
+			return name().toLowerCase();
+		}
+	}
+
+	@Record
+	public enum RecordEnum {
+		ONE
+	}
 }
