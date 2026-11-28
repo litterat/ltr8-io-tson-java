@@ -140,4 +140,20 @@ public final class KindConflicts {
 	@Union
 	public interface ToDataUnion extends ToData<Text> {
 	}
+
+	// --- a sealed union listing what permits lists
+
+	@Union({ SealedListed.class })
+	public sealed interface SealedListingUnion permits SealedListed {
+	}
+
+	public record SealedListed(String value) implements SealedListingUnion {
+	}
+
+	@Union(sealed = false)
+	public sealed interface SealedOpenUnion permits SealedOpened {
+	}
+
+	public record SealedOpened(String value) implements SealedOpenUnion {
+	}
 }

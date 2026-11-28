@@ -26,6 +26,9 @@ import io.ltr8.test.data.KindConflicts.RecordUnion;
 import io.ltr8.test.data.KindConflicts.ToDataUnion;
 import io.ltr8.test.data.KindConflicts.RecordInterface;
 import io.ltr8.test.data.KindConflicts.SealedAbstractRecord;
+import io.ltr8.test.data.KindConflicts.SealedListed;
+import io.ltr8.test.data.KindConflicts.SealedListingUnion;
+import io.ltr8.test.data.KindConflicts.SealedOpenUnion;
 import io.ltr8.test.data.KindConflicts.TransparentRecord;
 import io.ltr8.test.data.KindConflicts.TransparentRecordConstructor;
 import io.ltr8.test.data.KindConflicts.TransparentToData;
@@ -97,6 +100,18 @@ class KindConflictRefusalTest {
 				described(ConcreteUnion.class, "carries @Union, but is a concrete class" + belongs),
 				described(ToDataUnion.class, "carries @Union, a union of its members, but implements ToData, bridged "
 						+ "to the record class it names: remove one of them"));
+	}
+
+	/** Even a list naming exactly what {@code permits} names is never read. */
+	@Test
+	void aSealedUnionStatingItsMembersAgainIsRefused() {
+		String permits = ", so its members are the classes it permits, but carries ";
+		String remove = ": the members come from permits, so remove its attributes";
+		assertAll(
+				described(SealedListingUnion.class, "is sealed" + permits + "@Union({" + SealedListed.class.getName()
+						+ ".class})" + remove),
+				described(SealedOpenUnion.class, "is sealed" + permits + "@Union(value = {}, sealed = false)"
+						+ remove));
 	}
 
 	/** Described in two fresh contexts, {@code type}'s name and {@code refusal} are its whole message chain. */

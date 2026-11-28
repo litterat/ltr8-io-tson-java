@@ -16,6 +16,7 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Record;
+import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.analysis.ClassSignals.Signal;
@@ -163,6 +164,13 @@ final class KindMarks {
 					&& !(ATOM_SIGNALS.contains(mark) && reading.walks().contains(Walk.ATOM))) {
 				throw unread(kind, signals, mark, written, bridgedTo);
 			}
+		}
+		Union union = signals.union();
+		if (kind == Kind.UNION && signals.has(Signal.SEALED) && union != null
+				&& (union.value().length > 0 || !union.sealed())) {
+			throw new CodeAnalysisException(String.format("%s is sealed, so its members are the classes it permits, but "
+					+ "carries %s: the members come from permits, so remove its attributes", signals.type().getName(),
+					ComponentAnnotations.show(union)));
 		}
 		boolean walkedAfter = kind == Kind.RECORD || kind == Kind.ATOM;
 		if (!walkedAfter) {
