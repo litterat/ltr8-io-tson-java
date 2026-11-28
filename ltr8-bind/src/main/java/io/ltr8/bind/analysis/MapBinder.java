@@ -81,14 +81,10 @@ public class MapBinder {
 
 	private static Supplier<DataClass> resolveTypeArgument(DataBindContext context, Type typeArgument)
 			throws DataBindException {
-		if (typeArgument instanceof Class) {
-			return context.componentSource((Class<?>) typeArgument, typeArgument);
-		} else if (typeArgument instanceof ParameterizedType) {
-			ParameterizedType parameterizedTypeArgument = (ParameterizedType) typeArgument;
-			return context.componentSource((Class<?>) parameterizedTypeArgument.getRawType(),
-					parameterizedTypeArgument);
+		if (!TypeArguments.isHeld(typeArgument)) {
+			throw new CodeAnalysisException("Unrecognized parameterized type for map key/value");
 		}
-		throw new CodeAnalysisException("Unrecognized parameterized type for map key/value");
+		return context.componentSource(TypeArguments.erasure(typeArgument), typeArgument);
 	}
 
 	/**

@@ -47,7 +47,7 @@ public class ClassBinder {
 
 		recordBinder = new RecordBinder();
 		atomBinder = new AtomBinder();
-		unionBinder = new UnionBinder();
+		unionBinder = new UnionBinder(this::describedAsUnion);
 		arrayBinder = new ArrayBinder();
 		mapBinder = new MapBinder();
 		tupleBinder = new TupleBinder();
@@ -101,10 +101,11 @@ public class ClassBinder {
 					+ parameterizedType);
 		}
 		Type argument = parameterized.getActualTypeArguments()[0];
-		Class<?> valueClass = argument instanceof ParameterizedType nested
-				? (Class<?>) nested.getRawType()
-				: (Class<?>) argument;
-		return context.componentSource(valueClass, argument);
+		if (!TypeArguments.isHeld(argument)) {
+			throw new DataBindException("Annotated must be declared with a class, a parameterized type or an array of "
+					+ "one as its value type, found " + parameterized.getTypeName());
+		}
+		return context.componentSource(TypeArguments.erasure(argument), argument);
 	}
 
 	/**
@@ -157,16 +158,17 @@ public class ClassBinder {
 			result = tupleBinder.resolveTuple(context, targetClass);
 		} else if (isRecord(targetClass)) {
 			result = recordBinder.resolveRecord(context, targetClass, parameterizedType);
-		} else if (isUnion(targetClass)) {
-			result = unionBinder.resolveUnion(context, targetClass, parameterizedType);
 		} else if (targetClass.isEnum()) {
 			// A plain Java enum needs no annotation, the same as record/array -- Class#isEnum() is
 			// exactly as unambiguous a JDK signal as Class#isRecord(). Binds via EnumStringBridge
 			// (by name()); a caller wanting a different representation (by ordinal, by a custom
 			// code) pre-registers their own bridge on the DataBindContext instead, the same
 			// override mechanism every other auto-detected type already has -- an explicit
-			// registration is cached and short-circuits this resolver entirely.
+			// registration is cached and short-circuits this resolver entirely. Checked ahead of
+			// isUnion: the JDK seals an enum with a constant body, permitting the body's class.
 			result = atomBinder.resolveEnum(targetClass);
+		} else if (isUnion(targetClass)) {
+			result = unionBinder.resolveUnion(context, targetClass, parameterizedType);
 		} else if (isAtom(targetClass)) {
 			result = atomBinder.resolveAtom(context, targetClass);
 		} else if (isMap(targetClass)) {
@@ -183,6 +185,12 @@ public class ClassBinder {
 		return result;
 	}
 
+
+	/** Whether {@link #resolve} describes {@code targetClass} as a union: no kind it asks about first claims it. */
+	private boolean describedAsUnion(Class<?> targetClass) {
+		return targetClass != Annotated.class && !targetClass.isAnnotationPresent(Transparent.class)
+				&& !isTuple(targetClass) && !isRecord(targetClass) && !targetClass.isEnum() && isUnion(targetClass);
+	}
 
 	private boolean isUnion(Class<?> targetClass) {
 		if (Collection.class.isAssignableFrom(targetClass)) {

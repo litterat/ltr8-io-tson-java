@@ -51,17 +51,11 @@ public class ArrayBinder {
 					throw new CodeAnalysisException("Collection must provide parameterized type information");
 				}
 
-				Type paramType = ((ParameterizedType) parameterizedType).getActualTypeArguments()[0];
-				if (paramType instanceof Class) {
-					Class<?> arrayClass = (Class<?>) paramType;
-
-					arrayDataClass = context.componentSource(arrayClass, arrayClass);
-				} else if (paramType instanceof ParameterizedType) {
-					ParameterizedType arrayParamType = (ParameterizedType) paramType;
-					arrayDataClass = context.componentSource((Class<?>) arrayParamType.getRawType(), arrayParamType);
-				} else {
+				Type element = ((ParameterizedType) parameterizedType).getActualTypeArguments()[0];
+				if (!TypeArguments.isHeld(element)) {
 					throw new CodeAnalysisException("Unrecognized parameterized type");
 				}
+				arrayDataClass = context.componentSource(TypeArguments.erasure(element), element);
 
 			} else {
 				throw new CodeAnalysisException("Not recognised array class");

@@ -24,6 +24,7 @@ import io.ltr8.test.data.GenericComponents.CtorList;
 import io.ltr8.test.data.GenericComponents.CtorListArray;
 import io.ltr8.test.data.GenericComponents.FieldAccessorBare;
 import io.ltr8.test.data.GenericComponents.HoldsAllNamed;
+import io.ltr8.test.data.GenericComponents.HoldsArrayElements;
 import io.ltr8.test.data.GenericComponents.HoldsBares;
 import io.ltr8.test.data.GenericComponents.HoldsExtending;
 import io.ltr8.test.data.GenericComponents.HoldsListArrays;
@@ -49,31 +50,45 @@ import io.ltr8.test.data.GenericComponents.ProfBare;
 import io.ltr8.test.data.GenericComponents.ProfList;
 import io.ltr8.test.data.GenericComponents.ProfMap;
 import io.ltr8.test.data.GenericComponents.PubArray;
+import io.ltr8.test.data.GenericComponents.PubListOfVarArrays;
 import io.ltr8.test.data.GenericComponents.PubBare;
 import io.ltr8.test.data.GenericComponents.PubList;
 import io.ltr8.test.data.GenericComponents.PubListArray;
 import io.ltr8.test.data.GenericComponents.RecArray;
+import io.ltr8.test.data.GenericComponents.RecArrayOfListsOfListArrays;
 import io.ltr8.test.data.GenericComponents.RecBare;
 import io.ltr8.test.data.GenericComponents.RecBridged;
 import io.ltr8.test.data.GenericComponents.RecGridArray;
 import io.ltr8.test.data.GenericComponents.RecList;
 import io.ltr8.test.data.GenericComponents.RecListArray;
+import io.ltr8.test.data.GenericComponents.RecListOfListArrays;
+import io.ltr8.test.data.GenericComponents.RecListOfVarArrays;
 import io.ltr8.test.data.GenericComponents.RecMap;
 import io.ltr8.test.data.GenericComponents.RecMapArray;
+import io.ltr8.test.data.GenericComponents.RecMapKeyedByArrays;
+import io.ltr8.test.data.GenericComponents.RecMapKeyedByListArrays;
+import io.ltr8.test.data.GenericComponents.RecMapOfListArrays;
+import io.ltr8.test.data.GenericComponents.RecMapOfVarArrays;
 import io.ltr8.test.data.GenericComponents.RecNested;
 import io.ltr8.test.data.GenericComponents.RecNestedArray;
 import io.ltr8.test.data.GenericComponents.RecOpt;
 import io.ltr8.test.data.GenericComponents.RecOptArray;
 import io.ltr8.test.data.GenericComponents.RecOptList;
 import io.ltr8.test.data.GenericComponents.RecOptListArray;
+import io.ltr8.test.data.GenericComponents.RecOptListOfArrays;
+import io.ltr8.test.data.GenericComponents.RecOptListOfListArrays;
+import io.ltr8.test.data.GenericComponents.RecSetOfListArrays;
 import io.ltr8.test.data.GenericComponents.TupleListArray;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -213,6 +228,64 @@ class GenericComponentRoundTripTest {
 						HoldsProfListArray.class, maps.toMap(held))).array().value())),
 				() -> assertEquals("[[a], [b]]", Arrays.deepToString(arrays.toObject(HoldsProfListArray.class,
 						arrays.toArray(held)).array().value())));
+	}
+
+	@Test
+	void anArrayOfAParameterizedTypeRoundTripsAsAnElementAKeyAndAValue() {
+		PubListOfVarArrays<List<String>> pubAt = new PubListOfVarArrays<>();
+		pubAt.value = Collections.singletonList(rows("pubAt"));
+		@SuppressWarnings("unchecked")
+		List<List<String>[]>[] grid = new List[] { List.of(rows("g0", "g1"), rows()), List.of() };
+		HoldsArrayElements held = new HoldsArrayElements(new RecListOfListArrays(List.of(rows("l0", ""), rows())),
+				new RecSetOfListArrays(Collections.singleton(rows("s0"))), new RecArrayOfListsOfListArrays(grid),
+				new RecMapOfListArrays(Map.of("k", rows("v"))),
+				new RecMapKeyedByListArrays(Map.of(rows("k0", ""), "v0")),
+				new RecOptListOfListArrays(Optional.of(Collections.singletonList(rows("opt")))),
+				new RecOptListOfArrays(Optional.of(List.<String[]>of(new String[] { "oa0", "oa1" }))),
+				new RecListOfVarArrays<>(Collections.singletonList(rows("listAt"))),
+				new RecMapOfVarArrays<>(Map.of("k", rows("mapAt"))),
+				pubAt, new RecList<>(Collections.singletonList(rows("listOf"))),
+				new RecList<>(List.<String[]>of(new String[] { "a0", "a1" })), new RecMap<>(Map.of("k", rows("mapOf"))));
+		String expected = "[List[[l0], []], List[]] [List[[s0]]] List[[List[[g0], [g1]], List[]], []] {k=List[[v]]} "
+				+ "{List[[k0], []]=v0} [List[[opt]]] [String[oa0, oa1]] [List[[listAt]]] {k=List[[mapAt]]} "
+				+ "[List[[pubAt]]] [List[[listOf]]] [String[a0, a1]] {k=List[[mapOf]]}";
+		assertAll(() -> assertEquals(expected, values(held)),
+				() -> assertEquals(expected,
+						values((HoldsArrayElements) maps.toObject(HoldsArrayElements.class, maps.toMap(held)))),
+				() -> assertEquals(expected, values(arrays.toObject(HoldsArrayElements.class, arrays.toArray(held)))));
+	}
+
+	/** An array key is hashed by its identity, so the map read back is compared by its entries. */
+	@Test
+	void aMapKeyedByAnArrayRoundTripsThroughBothMappers() {
+		RecMapKeyedByArrays keyed = new RecMapKeyedByArrays(Map.of(new String[] { "k0", "k1" }, "v"));
+		assertAll(() -> assertEquals("{String[k0, k1]=v}", deep(keyed.value())),
+				() -> assertEquals("{String[k0, k1]=v}", deep(((RecMapKeyedByArrays) maps.toObject(RecMapKeyedByArrays.class,
+						maps.toMap(keyed))).value())),
+				() -> assertEquals("{String[k0, k1]=v}",
+						deep(arrays.toObject(RecMapKeyedByArrays.class, arrays.toArray(keyed)).value())));
+	}
+
+	/** Each value of {@code held}, with every array spelled out at any depth after its component class. */
+	private static String values(HoldsArrayElements held) {
+		return Stream.of(held.list().value(), held.set().value(), held.grid().value(), held.values().value(),
+				held.keys().value(), held.opt().value().orElseThrow(), held.optArrays().value().orElseThrow(),
+				held.listAt().value(), held.mapAt().value(), held.pubAt().value, held.listOfArgument().value(),
+				held.listOfArrayArgument().value(), held.mapOfArgument().value())
+				.map(GenericComponentRoundTripTest::deep).collect(Collectors.joining(" "));
+	}
+
+	private static String deep(Object value) {
+		return switch (value) {
+			case Object[] array -> Arrays.stream(array).map(GenericComponentRoundTripTest::deep)
+					.collect(Collectors.joining(", ", array.getClass().getComponentType().getSimpleName() + "[", "]"));
+			case Collection<?> collection -> collection.stream().map(GenericComponentRoundTripTest::deep)
+					.collect(Collectors.joining(", ", "[", "]"));
+			case Map<?, ?> map -> map.entrySet().stream()
+					.map(entry -> deep(entry.getKey()) + "=" + deep(entry.getValue()))
+					.collect(Collectors.joining(", ", "{", "}"));
+			default -> String.valueOf(value);
+		};
 	}
 
 	/** A one-element list of each of {@code rows}, or an empty list where one is empty. */

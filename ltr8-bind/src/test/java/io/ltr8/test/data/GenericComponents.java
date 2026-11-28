@@ -24,6 +24,7 @@ import io.ltr8.annotation.Tuple;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * One generic component of each shape -- a parameterized type, nested, a bare type variable, an array of one, a
@@ -1172,5 +1173,53 @@ public final class GenericComponents {
 	}
 
 	public record HoldsProfListArray(ProfArray<List<String>> array) {
+	}
+
+	// --- an array of a parameterized type as an element, a key and a value
+
+	public record RecListOfListArrays(List<List<String>[]> value) {
+	}
+
+	public record RecSetOfListArrays(Set<List<String>[]> value) {
+	}
+
+	public record RecArrayOfListsOfListArrays(List<List<String>[]>[] value) {
+	}
+
+	public record RecMapOfListArrays(Map<String, List<String>[]> value) {
+	}
+
+	public record RecMapKeyedByListArrays(Map<List<String>[], String> value) {
+	}
+
+	public record RecMapKeyedByArrays(Map<String[], String> value) {
+	}
+
+	public record RecOptListOfListArrays(Optional<List<List<String>[]>> value) {
+	}
+
+	public record RecOptListOfArrays(Optional<List<String[]>> value) {
+	}
+
+	public record RecListOfVarArrays<T>(List<T[]> value) {
+	}
+
+	public record RecMapOfVarArrays<T>(Map<String, T[]> value) {
+	}
+
+	public static class PubListOfVarArrays<T> {
+		public List<T[]> value;
+
+		@Record
+		public PubListOfVarArrays() {
+		}
+	}
+
+	public record HoldsArrayElements(RecListOfListArrays list, RecSetOfListArrays set,
+			RecArrayOfListsOfListArrays grid, RecMapOfListArrays values, RecMapKeyedByListArrays keys,
+			RecOptListOfListArrays opt, RecOptListOfArrays optArrays, RecListOfVarArrays<List<String>> listAt,
+			RecMapOfVarArrays<List<String>> mapAt, PubListOfVarArrays<List<String>> pubAt,
+			RecList<List<String>[]> listOfArgument, RecList<String[]> listOfArrayArgument,
+			RecMap<List<String>[]> mapOfArgument) {
 	}
 }

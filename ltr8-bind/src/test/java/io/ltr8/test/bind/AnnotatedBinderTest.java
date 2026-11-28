@@ -19,10 +19,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.List;
+
 import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataClassAnnotated;
+import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
@@ -53,6 +57,25 @@ public class AnnotatedBinderTest {
 
 	/** A boxed position: the annotations ride with the value, since a String has nowhere to hold them. */
 	public record Boxed(Annotated<String> name, int count) {
+	}
+
+	public record BoxedRows(Annotated<List<String>[]> rows, Annotated<String[]> cells) {
+	}
+
+	public record BoxedWildcard(Annotated<? extends Number> value) {
+	}
+
+	public record BoxedAny(Annotated<?> value) {
+	}
+
+	public record BoxedVariable<T>(Annotated<T> value) {
+	}
+
+	public record BoxedVariableArray<T>(Annotated<T[]> value) {
+	}
+
+	public record HoldsBoxedVariables(BoxedVariable<String> text, BoxedVariable<List<String>[]> rows,
+			BoxedVariableArray<List<String>> rowsAt) {
 	}
 
 	DataBindContext context;
@@ -182,6 +205,71 @@ public class AnnotatedBinderTest {
 				() -> arrays.toObject(Inside.class, new Object[] { "a", null, 2 }));
 		Assertions.assertEquals(Inside.class.getName() + " has 2 fields but the array has length 3",
 				refused.getMessage());
+	}
+
+	/** A box holds a generic array as a component does, and carries it through both mappers. */
+	@Test
+	public void aBoxedArrayOfAParameterizedTypeCarriesItsValueThroughBothMappers() throws Throwable {
+		DataClassRecord descriptor = (DataClassRecord) context.getDescriptor(BoxedRows.class);
+		DataClassAnnotated rows = Assertions.assertInstanceOf(DataClassAnnotated.class,
+				descriptor.fields()[0].dataClass());
+		DataClassArray array = Assertions.assertInstanceOf(DataClassArray.class, rows.valueClass());
+		Assertions.assertEquals(List[].class, array.typeClass());
+		Assertions.assertEquals(List.class, array.arrayDataClass().typeClass());
+		BoxedRows boxed = new BoxedRows(Annotated.of(rows("r0", "r1")), Annotated.of(new String[] { "c0" }));
+		ArrayMapper arrays = new ArrayMapper(context);
+		MapMapper maps = new MapMapper(context);
+		Assertions.assertAll(
+				() -> Assertions.assertEquals("[[r0], [r1]] [c0]", values(boxed)),
+				() -> Assertions.assertEquals("[[r0], [r1]] [c0]", values(arrays.toObject(BoxedRows.class,
+						arrays.toArray(boxed)))),
+				() -> Assertions.assertEquals("[[r0], [r1]] [c0]", values((BoxedRows) maps.toObject(BoxedRows.class,
+						maps.toMap(boxed)))));
+	}
+
+	/** A variable bound by the class's description boxes the argument, an array of one included. */
+	@Test
+	public void aBoxedTypeVariableCarriesTheArgumentThroughBothMappers() throws Throwable {
+		HoldsBoxedVariables held = new HoldsBoxedVariables(new BoxedVariable<>(Annotated.of("t")),
+				new BoxedVariable<>(Annotated.of(rows("r0"))), new BoxedVariableArray<>(Annotated.of(rows("a0", "a1"))));
+		ArrayMapper arrays = new ArrayMapper(context);
+		MapMapper maps = new MapMapper(context);
+		Assertions.assertAll(
+				() -> Assertions.assertEquals("t [[r0]] [[a0], [a1]]", values(held)),
+				() -> Assertions.assertEquals("t [[r0]] [[a0], [a1]]", values(arrays.toObject(HoldsBoxedVariables.class,
+						arrays.toArray(held)))),
+				() -> Assertions.assertEquals("t [[r0]] [[a0], [a1]]",
+						values((HoldsBoxedVariables) maps.toObject(HoldsBoxedVariables.class, maps.toMap(held)))));
+	}
+
+	@Test
+	public void aBoxOfAWildcardOrAnUnboundVariableIsRefusedNamingItsType() {
+		Assertions.assertAll(
+				() -> assertRefused("io.ltr8.annotation.Annotated<? extends java.lang.Number>", BoxedWildcard.class),
+				() -> assertRefused("io.ltr8.annotation.Annotated<?>", BoxedAny.class),
+				() -> assertRefused("io.ltr8.annotation.Annotated<T>", BoxedVariable.class),
+				() -> assertRefused("io.ltr8.annotation.Annotated<T[]>", BoxedVariableArray.class));
+	}
+
+	private void assertRefused(String type, Class<?> holder) {
+		DataBindException refused = Assertions.assertThrows(DataBindException.class,
+				() -> context.getDescriptor(holder));
+		Assertions.assertEquals("Annotated must be declared with a class, a parameterized type or an array of one as "
+				+ "its value type, found " + type, refused.getMessage());
+	}
+
+	@SuppressWarnings("unchecked")
+	private static List<String>[] rows(String... rows) {
+		return Arrays.stream(rows).map(List::of).toArray(List[]::new);
+	}
+
+	private static String values(BoxedRows boxed) {
+		return Arrays.deepToString(boxed.rows().value()) + " " + Arrays.toString(boxed.cells().value());
+	}
+
+	private static String values(HoldsBoxedVariables held) {
+		return held.text().value().value() + " " + Arrays.deepToString(held.rows().value().value()) + " "
+				+ Arrays.deepToString(held.rowsAt().value().value());
 	}
 
 	@Test
