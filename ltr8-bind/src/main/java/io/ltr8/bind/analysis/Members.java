@@ -77,16 +77,24 @@ final class Members {
 
 	static MethodHandle constructor(Class<?> described, Constructor<?> constructor) throws CodeAnalysisException {
 		Class<?> declarer = constructor.getDeclaringClass();
+		if (!Modifier.isPublic(constructor.getModifiers())) {
+			throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: "
+					+ "constructor %s(%s), which is not public", described.getName(), declarer.getName(),
+					parameterNames(constructor)));
+		}
 		try {
 			return LOOKUP.findConstructor(declarer, MethodType.methodType(void.class, constructor.getParameterTypes()));
 		} catch (IllegalAccessException e) {
 			throw new CodeAnalysisException(String.format("%s is bound through a member that is not accessible: "
 					+ "constructor %s(%s), of a class the public lookup cannot access", described.getName(),
-					declarer.getName(), Arrays.stream(constructor.getParameterTypes()).map(Class::getTypeName)
-							.collect(Collectors.joining(", "))), e);
+					declarer.getName(), parameterNames(constructor)), e);
 		} catch (NoSuchMethodException e) {
 			throw new IllegalStateException(declarer.getName() + "'s constructor is not found by its own type", e);
 		}
+	}
+
+	private static String parameterNames(Constructor<?> constructor) {
+		return Arrays.stream(constructor.getParameterTypes()).map(Class::getTypeName).collect(Collectors.joining(", "));
 	}
 
 	private interface Reach<T> {

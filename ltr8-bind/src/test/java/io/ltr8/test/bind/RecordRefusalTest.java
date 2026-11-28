@@ -603,7 +603,7 @@ class RecordRefusalTest {
 	@Test
 	void anAtomConstructorThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
 		String atom = HiddenAtom.class.getName();
-		assertRefusedAlike(DataBindContext::builder, HiddenAtom.class, "Failed to get atom descriptor",
+		assertRefusedAlike(DataBindContext::builder, HiddenAtom.class,
 				atom + NOT_ACCESSIBLE + "constructor " + atom + "(java.lang.String), of a class the public lookup "
 						+ "cannot access",
 				"symbolic reference class is not accessible: class " + atom + ", from public Lookup");
@@ -612,14 +612,14 @@ class RecordRefusalTest {
 	@Test
 	void anAtomsToDataThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
 		String atom = AtomWithHiddenToData.class.getName();
-		assertRefusedAlike(DataBindContext::builder, AtomWithHiddenToData.class, "Failed to get atom descriptor",
+		assertRefusedAlike(DataBindContext::builder, AtomWithHiddenToData.class,
 				atom + NOT_ACCESSIBLE + "method " + atom + ".toData, which is not public");
 	}
 
 	@Test
 	void anAtomFactoryThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
 		String atom = HiddenAtomFactory.class.getName();
-		assertRefusedAlike(DataBindContext::builder, HiddenAtomFactory.class, "Failed to get atom descriptor",
+		assertRefusedAlike(DataBindContext::builder, HiddenAtomFactory.class,
 				unreachable(HiddenAtomFactory.class, "method " + atom + ".of"),
 				"symbolic reference class is not accessible: class " + atom + ", from public Lookup");
 	}
@@ -628,7 +628,6 @@ class RecordRefusalTest {
 	void anAtomAccessorThePublicLookupCannotReachIsRefusedAlikeInEveryContext() {
 		String atom = AtomFactoryWithHiddenAccessor.class.getName();
 		assertRefusedAlike(DataBindContext::builder, AtomFactoryWithHiddenAccessor.class,
-				"Failed to get atom descriptor",
 				atom + NOT_ACCESSIBLE + "method " + atom + ".code, which is not public");
 	}
 

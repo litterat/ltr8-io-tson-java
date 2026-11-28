@@ -544,6 +544,7 @@ public final class IgnoredAnnotations {
 			this.text = text;
 		}
 
+		@Atom
 		public String toData() {
 			return text;
 		}

@@ -34,11 +34,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -334,7 +330,7 @@ final class RecordFields {
 	 */
 	private static Type[] boundArguments(Class<?> bridgeClass, String bridgeOf, String kind)
 			throws CodeAnalysisException {
-		Type[] bridgeTypes = dataBridgeArguments(bridgeClass, Map.of());
+		Type[] bridgeTypes = TypeArguments.arguments(bridgeClass, DataBridge.class);
 		String converts = ": a " + kind + " bridge names the classes it converts between, DataBridge<D, O>";
 		if (bridgeTypes == null) {
 			throw new CodeAnalysisException(bridgeOf + "reaches DataBridge raw" + converts);
@@ -369,43 +365,6 @@ final class RecordFields {
 			throw new IllegalStateException(bridgeClass.getName() + " implements DataBridge without its erased methods",
 					e);
 		}
-	}
-
-	/**
-	 * {@code DataBridge}'s two type arguments as {@code type} binds them, with {@code bindings} giving its own type
-	 * parameters, or {@code null} where it reaches {@code DataBridge} through a raw type: a raw type's supertypes are
-	 * erased (JLS 4.8). Unlike {@code ToData}'s, the clause may be inherited. Java lets a class reach one generic
-	 * interface by two paths only with the same arguments, so the first path found answers for every path.
-	 */
-	private static Type[] dataBridgeArguments(Class<?> type, Map<TypeVariable<?>, Type> bindings) {
-		List<Type> supertypes = new ArrayList<>(List.of(type.getGenericInterfaces()));
-		if (type.getGenericSuperclass() != null) {
-			supertypes.addFirst(type.getGenericSuperclass());
-		}
-		for (Type supertype : supertypes) {
-			Class<?> raw = TypeArguments.erasure(supertype);
-			if (!DataBridge.class.isAssignableFrom(raw)) {
-				continue;
-			}
-			if (!(supertype instanceof ParameterizedType parameterized)) {
-				return raw == DataBridge.class || raw.getTypeParameters().length > 0 ? null
-						: dataBridgeArguments(raw, Map.of());
-			}
-			Type[] arguments = parameterized.getActualTypeArguments();
-			for (int x = 0; x < arguments.length; x++) {
-				arguments[x] = TypeArguments.substitute(arguments[x], bindings);
-			}
-			if (raw == DataBridge.class) {
-				return arguments;
-			}
-			Map<TypeVariable<?>, Type> inherited = new HashMap<>();
-			TypeVariable<?>[] parameters = raw.getTypeParameters();
-			for (int x = 0; x < parameters.length; x++) {
-				inherited.put(parameters[x], arguments[x]);
-			}
-			return dataBridgeArguments(raw, inherited);
-		}
-		throw new IllegalStateException(type.getName() + " reaches DataBridge through none of its supertypes");
 	}
 
 	/** Whether {@code type} names a type variable, itself or as an argument at any depth. */

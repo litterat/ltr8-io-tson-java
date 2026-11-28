@@ -16,6 +16,9 @@ Binds a `DataValue` to a Java object. Depends only on `ltr8-annotation`.
   unwrapped, however deep the class sits (`RecordRefusalTest`).
 - A bridged class is concrete, declares `ToData<S>` itself and has a public constructor taking exactly `S`
   (`ToDataBridgeTest`).
+- An atom says its way in, `@Atom` on one public constructor or static method of its own, and its way out, `@Atom` on
+  one public instance method or `ToData<S>`, possibly inherited; nothing is found by name, and the halves carry one
+  value up to boxing. A `ToData` class marking no `@Atom` is a bridged class (`AtomFormTest`).
 - A binding annotation is never silently ignored: `@Field`, `@Union` or `@Unbound` is applied, or the class is
   refused (`IgnoredAnnotationRefusalTest`); a component's members merge `@Field` by attribute and must agree
   (`ComponentAnnotationPrecedenceTest`).

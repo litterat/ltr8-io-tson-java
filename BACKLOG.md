@@ -524,13 +524,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   as one of them. A concrete sealed class carrying `@Record` is described as a record alone, so an instance of a class
   it permits, at a position of its type, is written as the root and loses its own fields (`RecRootLeaf(1, 2)` writes
   `{a=1}`). Both need a second description of one class, which is a ruling on the descriptors before it is work.
-- [ ] **An `@Atom` class with more than one creator takes one silently, and every atom refusal names no class.**
-  `AtomBinder`'s static-factory loop has no `break`, so of several static `@Atom` factories the last wins, and a
-  static factory overrides an `@Atom` constructor (read, not run); its `toData` lookup uses `getDeclaredMethod`, so a
-  public `toData()` the class inherits is not found (read, not run); and it wraps each refusal, its own included, in
-  "Failed to get atom descriptor", which names no class, where a refusal's own message is the fact
-  (`ltr8-bind/CLAUDE.md`). Refuse a class marking two creators, find an inherited `toData`, and let each refusal pass
-  up as itself, naming the class.
 - [ ] **`ArrayMapper.toArray` casts its result to an array.** An atom at the root throws `ClassCastException`
   ("Cannot cast java.lang.String to [Ljava.lang.Object;") from both overloads. Refuse it naming the class, as
   `MapMapper.toMap(Object)` refuses a root that is no map (`MapMapperRootTest`).
