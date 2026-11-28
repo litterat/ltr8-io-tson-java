@@ -93,16 +93,19 @@ module has a real `module-info.java`; module names mirror each module's root exp
   and what needs the lexical form — §4 base type resolution, whose §4.4 rule is that a quoted token is a string, and
   `Token`, which records the spelling §8's resolved form carries — stays in `tson-compiler` with `TokenValue` and
   `BaseTypeResolver`, JSON having no token forms.
-- **`tson-encoding`** — **only** `io.ltr8.tson.encoding`: `TsonSchemaBinding`, which host class each entry of a
-  linked schema binds to under one `DataBindContext`, loaded once when a schema compiles for bind mode and handed
-  back by the compiled schema of either encoding. `requires transitive` `tson-schema`, `tson-atom` and `ltr8-bind`,
-  and is required by `tson-compiler` and `tson-json`, which already required those three. **Its own module because
-  neither stack can hold it for the other**: `tson-json` does not depend on `tson-compiler`, so the join in either
-  stack is that stack's alone, which is how the two encodings came to bind the same schema differently. It cannot go
-  lower: it names `ltr8-bind`'s descriptors, which `tson-schema` must not, and the atom vocabulary, which depends on
-  `tson-schema`. Not `tson-atom` either, which is the atom vocabulary and would become a miscellany. **Which entry a
-  name is asked as stays in `tson-schema`** (`TsonLinkedSchema.bindingCandidates`), being a fact of the linked schema
-  that a writer or a tree read needs without binding anything.
+- **`tson-encoding`** — `io.ltr8.tson.encoding`: `TsonSchemaBinding`, which host class each entry of a linked
+  schema binds to under one `DataBindContext`, loaded once when a schema compiles for bind mode and handed back by
+  the compiled schema of either encoding; and `io.ltr8.tson.encoding.plan`, exported only to `tson-compiler` and
+  `tson-json`, holding what their compiles share and a consumer must not reach -- the lenient bindings a
+  resolution's checkpoint loads. A qualified export is how two modules share an implementation no consumer sees; an
+  unexported package would be unreachable from both. `requires transitive` `tson-schema` and `ltr8-bind`, and is
+  required by `tson-compiler` and `tson-json`, which already required both. **Its own module because neither stack
+  can hold it for the other**: `tson-json` does not depend on `tson-compiler`, so the join in either stack is that
+  stack's alone, which is how the two encodings came to bind the same schema differently. It cannot go lower: it
+  names `ltr8-bind`'s descriptors, which `tson-schema` must not. Not `tson-atom` either, which is the atom
+  vocabulary and would become a miscellany. **Which entry a name is asked as stays in `tson-schema`**
+  (`TsonLinkedSchema.bindingCandidates`, `entryKey`), being a fact of the linked schema that a writer or a tree read
+  needs without binding anything.
 - **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
   pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
   true leaf: depends on **nothing** (not even `ltr8-annotation` — the nodes aren't bind targets, they're

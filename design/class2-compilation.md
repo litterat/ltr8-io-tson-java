@@ -15,6 +15,10 @@ choices. Current form only; history lives in git.
 - `ErrorReader` reports `NOT_IMPLEMENTED` and skips the value. Two causes are deliberately not reported that way: a
   `MissingBindingException` is thrown from it unwrapped, and a `BindMismatchException` fails the compile -- but at a
   checkpoint (`compileReady`), where it is the read's that reaches the entry.
+- A read registry's bind compile loads `TsonSchemaBinding.load`, strict: a class the binder names and the context
+  cannot describe fails the compile. A checkpoint, and every compile the resolution core makes, loads
+  `BindingTable.checkpoint` instead, which holds that class as absent with its reason, so a consumer's class fails
+  only a read reaching it, never `Tson.resolve` or a tree read; such a compiled schema hands out no `binding()`.
 - A parametric record never reaches a factory: a `RecordBody` with `parameters` is no type (§5.10) and compiles
   to a `ParametricRecordReader`. A value entry (`ValueEntry`) never
   reaches one either: it compiles to a `ValueEntryReader`, which refuses a data tag naming it as `TYPE_MISMATCH`.
@@ -56,8 +60,10 @@ choices. Current form only; history lives in git.
   `{ of: !list_type { … } }`.
 - A bind lookup redirects through an alias only for an entry with no source position, and every bind lookup in both
   encodings asks `TsonLinkedSchema.bindingCandidates`.
-- A bind compile loads one `TsonSchemaBinding` before it builds a reader, and every factory, the root pre-check and the
-  writer's extern tags take which class an entry binds to from it; none asks the bind context for an entry itself.
+- A bind compile loads its bindings before it builds a reader, and every factory and the root pre-check take which
+  class an entry binds to from them; none asks the bind context for an entry itself. The compiled schema keeps the
+  foreign compiled schemas its externs obtained, by identity (`reader(EntryKey)`), and the writer's extern tags read
+  their bindings and its own, never loading one.
 
 Related: `design/linking-and-compilation.md`, `design/choice-disjointness.md`, `design/compiled-registries.md`,
 `design/readers-and-diagnostics.md`, `design/schema-resolution.md`.
@@ -182,7 +188,9 @@ keeps `TsonValue` free for `tson-tree`'s own root type.
   cause along the chain — rather than reading as a name nothing binds; only `ltr8-bind`'s
   `UnboundNameException` moves on to the next candidate, and a search that finds nothing reports the first,
   the author-written name. That is what makes an erased component
-  (`no valid data conversion for class java.lang.Object`) visible from an ordinary read.
+  (`no valid data conversion for class java.lang.Object`) fail the bind compile that meets it. A parametric
+  record is never asked: no value reads one bare (§5.10), and the generic class a code generator emits for it
+  erases its parameters.
 - **A family check names its members the same way.** `RecordExtension`'s pin-collision message renders each
   colliding member through `EntryDisplayName`, so every member is named by its declaration, the line an author can
   open. The blame rides the real entry name, which is what locates the violation.

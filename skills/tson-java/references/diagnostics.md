@@ -180,7 +180,7 @@ RuntimeException
 ├── LimitExceededException     io.ltr8.tson.base — .limit(), .position(); a §9.1 bound refused the document
 ├── TsonUnsupportedDocumentException  io.ltr8.tson.compiler — a well-formed document of a kind this parser does not implement
 ├── BindMismatchException      io.ltr8.tson.base — a schema type and its bound class disagree
-│   └── MissingBindingException   a schema type with no class this context can build (none mapped, or unanalysable)
+│   └── MissingBindingException   a schema type no class is mapped to (deferred to its first read)
 ├── SchemaValidationException  io.ltr8.tson.base — the author's schema is wrong and the spec says so
 │   └── SchemaRefusalException    the schema-side §8.2 refusal; .code() is which of the three rules fired
 ├── SchemaFetchException       io.ltr8.tson.base — .uri(), .reason(); the ONLY exception a SchemaSource may throw
@@ -226,7 +226,7 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 | `Tson.validate` / `validateSchema`                      | nothing, for any bad document — a library fault still throws             |
 | `Tson.resolve` on an already-registered `!!id`          | `SchemaValidationException`                                          |
 | `Tson.resolve` naming an unavailable `!!import`         | `SchemaFetchException`                                               |
-| a bind-mode compile whose class disagrees               | `BindMismatchException` — at compile, not at first read              |
+| a bind-mode compile whose class disagrees or cannot be analysed | `BindMismatchException` — at compile, not at first read      |
 | the first read of a type with no bound class            | `MissingBindingException`, thrown unwrapped from its `ErrorReader`   |
 | a `SchemaSource`                                    | `SchemaFetchException` and nothing else — another type means a fault |
 

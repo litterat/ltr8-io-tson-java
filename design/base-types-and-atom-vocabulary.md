@@ -111,8 +111,8 @@ value being one.
 `!enum [true false]`. A typed position does not consult the form, so `!boolean "true"` and `!boolean true` are one
 value — §4.2's special status for the two tokens is a base-resolution rule a typed position never reaches.
 `BooleanParser` is the one statement of what `boolean` reads; `AtomParsers.forEntry` hands it out for the entry of
-that name, which is the name-keyed read the invariant allows, and both encodings' atom factories and
-`TsonSchemaBinding`'s `atom` ask it rather than keeping a second. A token that is neither member is the enum miss it is —
+that name, which is the name-keyed read the invariant allows, and both encodings' atom factories ask it rather
+than keeping a second. A token that is neither member is the enum miss it is —
 `ATOM_CONSTRAINT_VIOLATION`, matching every other enum. It stays out of `VocabularyAtoms` on `text`'s own terms: base
 resolution recovers a boolean from an unquoted `true`, so a writer annotating every one would restate the token.
 

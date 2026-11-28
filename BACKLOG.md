@@ -309,7 +309,7 @@ encodings ([TSON-JSON] §6.1.1).
   drops every tag, so `JsonTreeWriter` writes the value back untagged. A value at an abstract position, a
   non-disjoint choice, a declared position, or a boundary naming a subtype or a variant ([TSON-JSON] §8.6) therefore
   writes JSON that does not read back. The work is a schema-directed JSON object writer, the peer of
-  `TsonObjectWriter.describing(linked, root)`, writing each `$type` in the scope it is read in, the boundary's by
+  `TsonObjectWriter.describing(compiled, root)`, writing each `$type` in the scope it is read in, the boundary's by
   the enclosing scope's name (`tson-schema`'s `ExternAdmission` says which), and one per value, a subtype by its
   own name and never inside a wrapper's `$value` ([TSON-JSON] §3.3).
 - [ ] **Relax [TSON-JSON] §3.3's leading-member rule, for Revision 41.** §3.3 requires `$type` (after any `$import`)

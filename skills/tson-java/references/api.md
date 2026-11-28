@@ -298,24 +298,31 @@ A compiled schema hands back the binding its compile loaded; take that one rathe
 
 ```java
 public final class TsonSchemaBinding {              // immutable once loaded; safe from any thread
-    public static TsonSchemaBinding load(TsonLinkedSchema schema, DataBindContext context);  // asks every entry now
+    public static TsonSchemaBinding load(TsonLinkedSchema schema, DataBindContext context);  // asks every entry now;
+                                                    // BindMismatchException for a class it cannot describe
     public TsonLinkedSchema schema();
-    public BoundEntry entry(String writtenName);    // an alias or extern answers for the entry it reaches;
-}                                                   // IllegalArgumentException for a name that is no entry
-public record BoundEntry(EntryKey entry, Top definition, Descriptor descriptor, Optional<AtomType<?>> atom) {
-    public Optional<DataClass> dataClass(); }       // the Bound class, else empty
-public sealed interface Descriptor {
-    record Bound(DataClass dataClass, EntryKey matched);
-    record Unbound(List<EntryKey> tried, DataBindException refusal);   // refusal: the binder's own message
-    record Unanalysable(EntryKey matched, DataBindException cause); }  // bound to a class it cannot describe
+    public DataBindContext context();
+    public Optional<TsonTypeBinding> get(EntryKey key);       // empty where nothing binds it
+    public Optional<TsonTypeBinding> get(String writtenName); // an alias or extern answers for the entry it reaches
+    public TsonTypeBinding require(EntryKey key);             // MissingBindingException, saying why
+    public Optional<TsonTypeBinding> get(Class<?> type);      // the one entry it is bound as; BindMismatchException
+                                                              // where it is bound under several names
+    public List<TsonTypeBinding> bindingsOf(Class<?> type);   // every entry binding it, declaration order
+}
+public record TsonTypeBinding(EntryKey key, Top definition, DataClass dataClass, EntryKey boundAs);
+// boundAs: the candidate the binder bound -- the entry, an alias of a positionless one, or the constructor it is
+// composed over
 ```
 
-`TsonCompiledSchema.binding()` and `JsonCompiledSchema.binding()` return `Optional<TsonSchemaBinding>`: the binding
-the compile loaded, empty for a schema compiled for tree mode.
+`TsonLinkedSchema.entryKey(writtenName)` (in `tson-schema`) is the entry a name denotes past its alias hops and its
+extern, in the schema declaring it. `TsonCompiledSchema.binding()` and `JsonCompiledSchema.binding()` return
+`Optional<TsonSchemaBinding>`: the binding the compile loaded, empty for a schema compiled for tree mode. Each also
+answers `reader(EntryKey)`: its own entry's reader, or through its externs the foreign compiled schema's.
 
-`atom` is the type a bind read parses an atom entry's text with (`boolean` reads a `Boolean`); empty for anything
-else. A compile turns `Unbound` and `Unanalysable` into a `MissingBindingException` raised by the first read of that
-type; neither is ever `NOT_IMPLEMENTED`.
+A class the binder names and the context cannot describe fails the load, so it fails the bind compile -- startup, not
+a read; an entry nothing binds is absent, and reading it raises `MissingBindingException`. A parametric record is
+never asked of the binder: its applications are entries of their own. Resolving a schema and reading it as a tree
+never describe a class.
 
 ---
 
@@ -398,7 +405,9 @@ public final class TsonObjectWriter {
     public TsonObjectWriter();
     public TsonObjectWriter(DataBindContext context);
     public TsonObjectWriter describing(String schemaUri, String rootTypeName);   // both, always
-    public TsonObjectWriter describing(TsonLinkedSchema schema, String rootTypeName); // + tags at an extern
+    public TsonObjectWriter describing(TsonCompiledSchema schema, String rootTypeName); // + tags at an extern;
+                                                    // a schema bindRegistry() compiled, under this writer's context
+    public TsonObjectWriter describing(TsonLinkedSchema schema, String rootTypeName);   // compiles it to bind here
     public TsonObjectWriter identifiedBy(String documentId);
     public String toTson(Object|TsonObjectDocument<?> value);
     public void   write(Object|TsonObjectDocument<?> value, OutputStream|Appendable out);
