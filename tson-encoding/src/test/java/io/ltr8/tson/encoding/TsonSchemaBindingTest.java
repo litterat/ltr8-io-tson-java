@@ -139,8 +139,9 @@ class TsonSchemaBindingTest {
     }
 
     @Test
-    void aNameNoEntryHoldsIsRefused() {
+    void aNameNoEntryHoldsIsRefusedOrFoundEmpty() {
         assertThrows(IllegalArgumentException.class, () -> load(Map.of()).entry("absent"));
+        assertTrue(load(Map.of()).find("absent").isEmpty());
     }
 
     /** Every candidate is asked once, at load, and no question afterwards reaches the binder. */

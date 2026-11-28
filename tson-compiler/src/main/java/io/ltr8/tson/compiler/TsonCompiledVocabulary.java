@@ -24,7 +24,7 @@ public final class TsonCompiledVocabulary extends TsonCompiledSchema {
     private final Map<String, TsonTypeReader<?>> constructors;
 
     private TsonCompiledVocabulary(TsonCompiledSchema base) {
-        super(base.linkedSchema(), base.entries());
+        super(base.linkedSchema(), base.entries(), null, base.binding().orElse(null));
         this.constructors = buildConstructors(this);
     }
 

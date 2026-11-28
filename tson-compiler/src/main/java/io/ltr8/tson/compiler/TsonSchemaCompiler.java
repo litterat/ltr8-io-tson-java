@@ -18,6 +18,7 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.compiler.reader.Subsumption;
 import io.ltr8.tson.compiler.stream.EventSkip;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -170,7 +171,8 @@ public final class TsonSchemaCompiler {
             TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, Set<String> pending,
             boolean checkpoint, ForeignSchemas foreign, io.ltr8.bind.DataBindContext binding) {
         Compilation compilation = new Compilation(linkedSchema, factoryFor, pending, checkpoint,
-                foreign != null ? foreign : onePerCompile(factoryFor, binding), binding);
+                foreign != null ? foreign : onePerCompile(factoryFor, binding), binding,
+                binding == null ? null : TsonSchemaBinding.load(linkedSchema, binding));
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -178,7 +180,7 @@ public final class TsonSchemaCompiler {
         // decoded through their types here, still before the schema is handed out (see CompiledReaders).
         compilation.readers.settle();
         TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished),
-                compilation.readers);
+                compilation.readers, compilation.loaded);
         // Hand every reader that resolves at *read* time over to the finished schema, releasing this
         // compilation -- see CompiledReaders, and the "never escape" invariant below that this preserves.
         compilation.readers.bind(compiled);
@@ -197,20 +199,22 @@ public final class TsonSchemaCompiler {
         private final TsonLinkedSchema linked;
         private final Function<String, ValueReaderFactory> factoryFor;
         private final Map<String, Set<String>> namesMeaning;
+        private final TsonSchemaBinding loaded;
         private CompiledReaders readers;
 
         InlineReaders(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor,
-                      Map<String, Set<String>> namesMeaning) {
+                      Map<String, Set<String>> namesMeaning, TsonSchemaBinding loaded) {
             this.linked = linked;
             this.factoryFor = factoryFor;
             this.namesMeaning = namesMeaning;
+            this.loaded = loaded;
         }
 
         TsonTypeReader<?> build(TypeInline type) {
             Top read = type.of();
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledVocabulary.typenameOf(read));
             TsonTypeReader<?> built = factory.create(type.text(), read,
-                    new ValueReaderContext(linked, readers, namesMeaning));
+                    new ValueReaderContext(linked, readers, namesMeaning, loaded));
             // §7.2 at the position: no tag names a type written in place, so the guard admits none.
             return Subsumption.guard(type.text(), read, built, namesMeaning, readers);
         }
@@ -262,17 +266,22 @@ public final class TsonSchemaCompiler {
         /** The context this compile's readers bind with; {@code null} where they read trees. */
         private final io.ltr8.bind.DataBindContext binding;
 
+        /** What each entry binds to under {@link #binding}, loaded before any reader is built; null for trees. */
+        private final TsonSchemaBinding loaded;
+
         Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor, Set<String> pending,
-                    boolean checkpoint, ForeignSchemas foreign, io.ltr8.bind.DataBindContext binding) {
+                    boolean checkpoint, ForeignSchemas foreign, io.ltr8.bind.DataBindContext binding,
+                    TsonSchemaBinding loaded) {
             this.foreign = foreign;
             this.binding = binding;
+            this.loaded = loaded;
             this.pending = pending;
             this.checkpoint = checkpoint;
             this.linked = linked;
             this.schema = linked.schema();
             this.factoryFor = factoryFor;
             this.namesMeaning = Subsumption.namesMeaning(schema.entries());
-            InlineReaders inline = new InlineReaders(linked, factoryFor, namesMeaning);
+            InlineReaders inline = new InlineReaders(linked, factoryFor, namesMeaning, loaded);
             this.readers = new CompiledReaders(this::resolve, inline::build);
             inline.readers = readers;
         }
@@ -416,7 +425,7 @@ public final class TsonSchemaCompiler {
                 // No position names a parametric record bare ([TSON-SCHEMA] §5.10). See ParametricRecordReader for why
                 // the refusal is the entry's own reader rather than a check at the root.
                 return new ParametricRecordReader(name, ParametricEntry.parameterNames(definition),
-                        new ValueReaderContext(linked, readers, namesMeaning).locationOf(name));
+                        new ValueReaderContext(linked, readers, namesMeaning, loaded).locationOf(name));
             }
             Top body = definition;
             if (body instanceof Alias r) {
@@ -429,23 +438,23 @@ public final class TsonSchemaCompiler {
                                 linked.schema().applicationOf(name)));
             }
             if (body instanceof Extern) {
-                return boundary(name, new ValueReaderContext(linked, readers, namesMeaning));
+                return boundary(name, new ValueReaderContext(linked, readers, namesMeaning, loaded));
             }
             if (body instanceof ValueEntry value) {
                 // A value, which nothing is read against: a data tag naming it is the document's mistake.
                 return new ValueEntryReader(name, value.type(),
-                        new ValueReaderContext(linked, readers, namesMeaning).locationOf(name));
+                        new ValueReaderContext(linked, readers, namesMeaning, loaded).locationOf(name));
             }
             if (body instanceof io.ltr8.tson.schema.meta.IncompleteEntry incomplete) {
                 return new IncompleteEntryReader(name, incomplete,
-                        new ValueReaderContext(linked, readers, namesMeaning).locationOf(name));
+                        new ValueReaderContext(linked, readers, namesMeaning, loaded).locationOf(name));
             }
             // A namespace type's value is the map it describes (NamespaceBody#read), its keys read under its key
             // family.
             Top read = body instanceof NamespaceBody namespace ? namespace.read() : body;
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledVocabulary.typenameOf(read));
             TsonTypeReader<?> built = factory.create(name, read,
-                    new ValueReaderContext(linked, readers, namesMeaning));
+                    new ValueReaderContext(linked, readers, namesMeaning, loaded));
             if (body instanceof NamespaceBody && TsonSchema.SCHEMA.equals(name) && linked.isKernel(name)) {
                 // A value of the kernel's `schema` is a schema document, a resolved form read as data: a name at a
                 // kind or reference in it resolves in that document, which these readers' closure does not hold, so

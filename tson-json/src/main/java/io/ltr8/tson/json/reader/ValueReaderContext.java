@@ -1,5 +1,7 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.encoding.BoundEntry;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -16,14 +18,32 @@ import java.util.Set;
  * for its own children. Handed to every {@link ValueReaderFactory}.
  */
 public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers,
-                                 Map<String, Set<String>> namesMeaning) {
+                                 Map<String, Set<String>> namesMeaning, TsonSchemaBinding binding) {
 
     /**
-     * The alias index derived rather than supplied. A compile passes its own, built once: deriving it per
-     * factory walks every alias chain again for every entry.
+     * The alias index derived rather than supplied, and {@code binding} the binding a bind compile loaded, null for
+     * tree mode. A compile passes its own index, built once: deriving it per factory walks every alias chain again for
+     * every entry.
      */
+    public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers, TsonSchemaBinding binding) {
+        this(linked, readers, AliasChain.namesMeaning(linked.schema()), binding);
+    }
+
+    /** A context a tree-mode compile builds within, which binds nothing. */
     public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers) {
-        this(linked, readers, AliasChain.namesMeaning(linked.schema()));
+        this(linked, readers, null);
+    }
+
+    /**
+     * What entry {@code name} binds to, from the binding this compile loaded: the one answer every bind-mode factory
+     * builds from ({@link TsonSchemaBinding}).
+     */
+    public BoundEntry bound(String name) {
+        if (binding == null) {
+            throw new IllegalStateException("a bind-mode reader for '" + name + "' is being built by a compile that "
+                    + "loaded no binding");
+        }
+        return binding.entry(name);
     }
 
     public TsonSchema schema() {

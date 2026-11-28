@@ -165,6 +165,37 @@ public class ExternBindTest {
         assertEquals(home, tson.objectReader().read(written, Home.class), written);
     }
 
+    public sealed interface Kept permits Kennelled {
+    }
+
+    /** {@code java.net.URL} has no conversion in {@code ltr8-bind}, so this class cannot be described. */
+    public record Kennelled(java.net.URL licence) implements Kept {
+    }
+
+    public record Kennel(String owner, Kept pet, List<Kept> pets) {
+    }
+
+    /**
+     * A class the binder binds that the context cannot describe has no tag at a boundary, the binding holding no class
+     * for its entry; the write is refused as it always was, describing the value's class failing before its tag is
+     * asked for.
+     */
+    @Test
+    void aBoundaryValueWhoseClassCannotBeDescribedIsRefusedByItsAnalysis() throws Exception {
+        Tson tson = world.tson(DataNameBinder.byNamespace(Map.of(
+                identity(HOME), DataNameBinder.ofMap(Map.of("home", Kennel.class)),
+                identity(PETS), DataNameBinder.ofMap(Map.of("pet", Kept.class, "dog", Kennelled.class))),
+                DataNameBinder.ofMap(Map.of())));
+        TsonLinkedSchema linked = tson.loader().resolveLinked(HOME);
+        Kennel kennel = new Kennel("o", new Kennelled(java.net.URI.create("https://x.test/l").toURL()), List.of());
+
+        WriteException refused = assertThrows(WriteException.class,
+                () -> tson.objectWriter().describing(linked, "home").toTson(kennel));
+
+        assertTrue(refused.getMessage().contains("class java.net.URL"), refused.getMessage());
+        assertTrue(!refused.getMessage().contains("the enclosing scope has no name"), refused.getMessage());
+    }
+
     @Test
     void aSubtypeTheEnclosingScopeHasNoNameForIsRefused() {
         Tson tson = home();

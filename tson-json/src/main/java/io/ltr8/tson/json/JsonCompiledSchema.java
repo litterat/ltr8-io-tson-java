@@ -1,6 +1,7 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 
@@ -32,9 +33,27 @@ public final class JsonCompiledSchema {
     private final TsonLinkedSchema linkedSchema;
     private final Map<String, JsonTypeReader<?>> entries;
 
+    /** What the compile's readers bind each entry to, or null where they read trees. */
+    private final TsonSchemaBinding binding;
+
     public JsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, JsonTypeReader<?>> entries) {
+        this(linkedSchema, entries, null);
+    }
+
+    /** The same, with the binding a bind compile loaded and its readers bind by. */
+    JsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, JsonTypeReader<?>> entries,
+                       TsonSchemaBinding binding) {
         this.linkedSchema = linkedSchema;
         this.entries = Map.copyOf(entries);
+        this.binding = binding;
+    }
+
+    /**
+     * The binding this schema's compile loaded and its readers bind by: which host class each entry binds to. Empty
+     * for a schema compiled for tree mode, or assembled from its entries.
+     */
+    public Optional<TsonSchemaBinding> binding() {
+        return Optional.ofNullable(binding);
     }
 
     /** The reader for {@code typeName}, or a refusal naming what this schema does declare. */

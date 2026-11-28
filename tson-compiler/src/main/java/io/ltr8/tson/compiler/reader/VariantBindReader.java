@@ -98,9 +98,9 @@ final class VariantBindReader implements TsonTypeReader<Object>, Subsumption.App
     /**
      * Whether {@code typeRef} names one of the union's members.
      *
-     * <p><b>The bind context is asked first, and it is the authority.</b> A schema name reaches a class
-     * through the read's own {@code DataNameBinder}, which is where a name that is not the class's own is
-     * recorded -- {@code set} binds to {@code ArrayBody} as {@code array} itself does, §5's array family
+     * <p><b>The binding is asked first, and it is the authority.</b> A schema name reaches a class through the
+     * binding the compile loaded from the read's own {@code DataNameBinder}, which is where a name that is not the
+     * class's own is recorded -- {@code set} binds to {@code ArrayBody} as {@code array} itself does, §5's array family
      * resolving to one body shape. Matching the name
      * against {@code @Typename} and simple class names alone cannot see any of that, so a conforming {@code
      * !set} body was refused as "not a member of the union 'top'" by the one part of the pipeline that had

@@ -81,6 +81,14 @@ public final class TsonSchemaBinding {
     }
 
     /**
+     * {@link #entry}, or empty where {@link #schema()} holds no entry {@code writtenName} that reaches a type -- for a
+     * caller asking about a name a document wrote, which may be none.
+     */
+    public Optional<BoundEntry> find(String writtenName) {
+        return Optional.ofNullable(entries.get(writtenName));
+    }
+
+    /**
      * {@code name}'s answer, or empty where its alias chain reaches no entry: a namespace still being built, which a
      * resolution's checkpoint compiles.
      */

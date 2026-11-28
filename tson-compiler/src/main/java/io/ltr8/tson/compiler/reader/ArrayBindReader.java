@@ -10,7 +10,6 @@ import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
 import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.compiler.SchemaLocation;
-import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -189,7 +188,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
             }
             // A type written in place has no bound class of its own: its host type is its constructor's shape.
             Type elementType = BindTargets.hostType(body.elementType(),
-                    element -> resolveElementType(element, context));
+                    element -> context.boundClass(element).orElse(String.class));
             DataClass dataClass = descriptorFor(new DataParameterizedType(List.class, elementType));
             if (!(dataClass instanceof DataClassArray descriptor)) {
                 throw new BindMismatchException("'" + name + "' is an array, and " + dataClass.typeClass().getName()
@@ -198,18 +197,6 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
             return new ArrayBindReader(name, context.authoredName(name, typeDefinition), body, descriptor, resolver,
                     context.locationOf(name),
                     AnnotationTypes.of(context), elementsAreNames(body, context));
-        }
-
-        /** The class {@code schemaTypeName} binds to under its first candidate that binds, else {@link String}. */
-        private Class<?> resolveElementType(String schemaTypeName, ValueReaderContext vctx) {
-            for (EntryKey candidate : vctx.linked().bindingCandidates(schemaTypeName)) {
-                try {
-                    return context.getDescriptor(candidate.declaringSchema(), candidate.name()).typeClass();
-                } catch (DataBindException e) {
-                    // not bound under this name; the next is tried
-                }
-            }
-            return String.class;
         }
 
         private DataClass descriptorFor(Type type) {

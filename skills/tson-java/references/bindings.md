@@ -204,6 +204,9 @@ sends them. A FIXED field is exempt, the schema settling its value. The same com
   legitimately declares types a consumer never binds. Beneath it, `DataBindContext.getDescriptor(String)` raises
   `UnboundNameException` for a name the binder maps to no class, and a plain `DataBindException` for a class it
   cannot analyse.
+- To know before any read which class each type binds to — a startup check that every request type binds — take
+  the compiled schema's `binding()` (`TsonSchemaBinding`): its `entry(name).descriptor()` is `Bound`, `Unbound` or
+  `Unanalysable`, the answer the readers were built from, so it cannot disagree with a read.
 
 **A bound class refusing a value is a diagnostic, not an exception.** A constructor's own check, a bridge, or a
 collection's `put` throwing for what a read hands it — a compact constructor rejecting a value, a

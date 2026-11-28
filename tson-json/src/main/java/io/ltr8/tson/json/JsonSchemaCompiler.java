@@ -1,5 +1,7 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.json.reader.*;
 import io.ltr8.tson.json.reader.ValueReaderFactory;
 import io.ltr8.annotation.Typename;
@@ -62,12 +64,14 @@ public final class JsonSchemaCompiler {
      */
     static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
                                       ExternReader.ForeignSchemas foreign) {
+        DataBindContext context = factories instanceof ValueReaderFactoryRegistry registry ? registry.binding() : null;
+        TsonSchemaBinding binding = context == null ? null : TsonSchemaBinding.load(linkedSchema, context);
         Compilation compilation = new Compilation(linkedSchema, factories,
-                foreign != null ? foreign : onePerCompile(factories));
+                foreign != null ? foreign : onePerCompile(factories), binding);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
-        JsonCompiledSchema compiled = new JsonCompiledSchema(linkedSchema, compilation.finished);
+        JsonCompiledSchema compiled = new JsonCompiledSchema(linkedSchema, compilation.finished, binding);
         compilation.readers.bind(compiled);
         return compiled;
     }
@@ -105,17 +109,19 @@ public final class JsonSchemaCompiler {
     private static final class InlineReaders {
         private final TsonLinkedSchema linked;
         private final ValueReaderFactoryResolver factories;
+        private final TsonSchemaBinding binding;
         private CompiledReaders readers;
 
-        InlineReaders(TsonLinkedSchema linked, ValueReaderFactoryResolver factories) {
+        InlineReaders(TsonLinkedSchema linked, ValueReaderFactoryResolver factories, TsonSchemaBinding binding) {
             this.linked = linked;
             this.factories = factories;
+            this.binding = binding;
         }
 
         JsonTypeReader<?> build(TypeInline type) {
             Top read = type.of();
             return factories.resolve(constructorOf(read)).create(type.text(), read,
-                    new ValueReaderContext(linked, readers));
+                    new ValueReaderContext(linked, readers, binding));
         }
     }
 
@@ -126,6 +132,9 @@ public final class JsonSchemaCompiler {
         private final TsonSchema schema;
         private final ValueReaderFactoryResolver factories;
         private final ExternReader.ForeignSchemas foreign;
+
+        /** What each entry binds to, loaded before any reader is built; null for tree mode. */
+        private final TsonSchemaBinding binding;
         private final Map<String, JsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
@@ -133,12 +142,13 @@ public final class JsonSchemaCompiler {
         private final CompiledReaders readers;
 
         Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories,
-                    ExternReader.ForeignSchemas foreign) {
+                    ExternReader.ForeignSchemas foreign, TsonSchemaBinding binding) {
             this.linked = linked;
             this.schema = linked.schema();
             this.factories = factories;
             this.foreign = foreign;
-            InlineReaders inline = new InlineReaders(linked, factories);
+            this.binding = binding;
+            InlineReaders inline = new InlineReaders(linked, factories, binding);
             this.readers = new CompiledReaders(this::resolve, inline::build);
             inline.readers = readers;
         }
@@ -180,7 +190,7 @@ public final class JsonSchemaCompiler {
         }
 
         private JsonTypeReader<?> build(String name, Top definition) {
-            ValueReaderContext context = new ValueReaderContext(linked, readers);
+            ValueReaderContext context = new ValueReaderContext(linked, readers, binding);
             Top body = definition;
             if (body instanceof Alias alias) {
                 // [TSON-SCHEMA] §8.3: a processor MAY collapse an alias chain when it compiles for

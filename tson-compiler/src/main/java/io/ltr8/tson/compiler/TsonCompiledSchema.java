@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 
@@ -36,16 +37,31 @@ public sealed class TsonCompiledSchema permits TsonCompiledVocabulary {
     /** What builds the reader of a type written in place, or null where this schema was assembled from its entries. */
     private final TsonTypeReaderResolver readers;
 
+    /** What the compile's readers bind each entry to, or null where they read trees. */
+    private final TsonSchemaBinding binding;
+
     public TsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, TsonTypeReader<?>> entries) {
-        this(linkedSchema, entries, null);
+        this(linkedSchema, entries, null, null);
     }
 
-    /** The same, with the readers a type written in place is read through ({@link #get(TypeExpr)}). */
+    /**
+     * The same, with the readers a type written in place is read through ({@link #get(TypeExpr)}) and the binding a
+     * bind compile loaded.
+     */
     TsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, TsonTypeReader<?>> entries,
-                       TsonTypeReaderResolver readers) {
+                       TsonTypeReaderResolver readers, TsonSchemaBinding binding) {
         this.linkedSchema = linkedSchema;
         this.entries = entries;
         this.readers = readers;
+        this.binding = binding;
+    }
+
+    /**
+     * The binding this schema's compile loaded and its readers bind by: which host class each entry binds to. Empty
+     * for a schema compiled for tree mode, or assembled from its entries.
+     */
+    public Optional<TsonSchemaBinding> binding() {
+        return Optional.ofNullable(binding);
     }
 
     /**

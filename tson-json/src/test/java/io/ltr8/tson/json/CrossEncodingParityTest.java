@@ -13,6 +13,8 @@ import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.encoding.Descriptor;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.json.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.json.tree.JsonNull;
@@ -1446,6 +1448,29 @@ class CrossEncodingParityTest {
             assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.getFirst().code(), problems::toString);
             assertTrue(problems.getFirst().message().contains("binds to " + Small.class.getName()), problems::toString);
         }
+    }
+
+    /**
+     * Each encoding's bind compile hands back the binding its readers were built from, and the two answer alike; a
+     * tree compile binds nothing and has none.
+     */
+    @Test
+    void bothCompiledSchemasHandBackTheBindingTheirReadsBindBy() {
+        DataBindContext context = binding("small", Small.class);
+        Tson tson = Tson.of(bindConfig().withDataBindContext(context));
+        Tson plain = Tson.of(bindConfig());
+        plain.resolve(BIND_SCHEMA);
+        JsonCompiledSchema json = JsonCompiledSchemaRegistry.bind(plain.schemaRegistry(), context).get(BIND_ID)
+                .orElseThrow();
+
+        for (TsonSchemaBinding loaded : List.of(tson.bindRegistry().get(BIND_ID).binding().orElseThrow(),
+                json.binding().orElseThrow())) {
+            assertEquals(Small.class, loaded.entry("pct").dataClass().orElseThrow().typeClass());
+            assertInstanceOf(Descriptor.Unbound.class, loaded.entry("person").descriptor());
+        }
+        assertTrue(tson.treeRegistry().get(BIND_ID).binding().isEmpty());
+        assertTrue(JsonCompiledSchemaRegistry.tree(plain.schemaRegistry()).get(BIND_ID).orElseThrow().binding()
+                .isEmpty());
     }
 
     @Test

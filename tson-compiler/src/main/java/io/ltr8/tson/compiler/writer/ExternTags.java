@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler.writer;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.schema.EntryKey;
+import io.ltr8.bind.DataClass;
+import io.ltr8.tson.encoding.BoundEntry;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.schema.ExternAdmission;
 import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -20,7 +21,6 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -30,9 +30,9 @@ import java.util.Set;
  * the value names the entry it is bound to, and the tag is the enclosing scope's name reaching that entry: the extern
  * for its target, and for a subtype or a variant the name {@link ExternAdmission} admits for it.
  *
- * <p><b>A class maps to an entry by asking the binder forward</b>, for each entry the boundary admits, by the entry's
- * declaring schema and name: the binder is the one authority a read binds by, so a write inverts exactly what the read
- * would bind. Nothing on the class names its entry.
+ * <p><b>A class maps to an entry by asking forward</b>, for each entry the boundary admits, what the binding a read
+ * binds by answers ({@link TsonSchemaBinding}), so a write inverts exactly what the read would bind. Nothing on the
+ * class names its entry.
  *
  * <p>Built once per schema a writer describes, from its link and every foreign schema an extern reaches, so a nested
  * boundary is tagged in the scope enclosing it; a write looks up its record and component and allocates nothing.
@@ -71,7 +71,7 @@ public final class ExternTags {
 
     /**
      * Every boundary of {@code linked} and of each schema its externs reach, its classes as {@code context} binds
-     * them. A record nothing binds holds no boundary a bound object could reach.
+     * them, each schema's binding loaded here. A record nothing binds holds no boundary a bound object could reach.
      */
     public static ExternTags of(TsonLinkedSchema linked, DataBindContext context) {
         Map<Class<?>, Map<String, Boundary>> byRecord = new HashMap<>();
@@ -83,6 +83,7 @@ public final class ExternTags {
             if (!seen.add(scope.identity())) {
                 continue;
             }
+            TsonSchemaBinding binding = TsonSchemaBinding.load(scope, context);
             for (ExternTarget target : scope.externs().values()) {
                 pending.add(target.foreign());
                 target.landing().ifPresent(landing -> pending.add(landing.in()));
@@ -92,14 +93,14 @@ public final class ExternTags {
                 if (!(definition instanceof RecordBody record) || record.isParametric()) {
                     return;
                 }
-                Class<?> bound = bound(context, scope.bindingCandidates(name));
+                Class<?> bound = bound(binding, name);
                 if (bound == null) {
                     return;
                 }
                 for (Map.Entry<String, RecordField> field : record.fields().entrySet()) {
                     String extern = externOf(field.getValue().type(), scope);
                     if (extern != null) {
-                        Boundary boundary = boundaries.computeIfAbsent(extern, at -> boundary(scope, at, context));
+                        Boundary boundary = boundaries.computeIfAbsent(extern, at -> boundary(scope, at, binding));
                         byRecord.computeIfAbsent(bound, key -> new HashMap<>()).putIfAbsent(field.getKey(), boundary);
                     }
                 }
@@ -128,20 +129,20 @@ public final class ExternTags {
         };
     }
 
-    private static Boundary boundary(TsonLinkedSchema scope, String extern, DataBindContext context) {
+    private static Boundary boundary(TsonLinkedSchema scope, String extern, TsonSchemaBinding binding) {
         ExternAdmission admission = ExternAdmission.of(scope, extern);
         Map<Class<?>, String> tags = new LinkedHashMap<>();
         admission.admitted().forEach((written, reach) -> {
             if (!reach.same()) {
                 return;
             }
-            Class<?> bound = bound(context, scope.bindingCandidates(written));
+            Class<?> bound = bound(binding, written);
             if (bound != null) {
                 tags.putIfAbsent(bound, extern);
             }
         });
         admission.admitted().forEach((written, reach) -> {
-            Class<?> bound = bound(context, scope.bindingCandidates(written));
+            Class<?> bound = bound(binding, written);
             if (bound != null) {
                 tags.putIfAbsent(bound, written);
             }
@@ -149,18 +150,8 @@ public final class ExternTags {
         return new Boundary(extern, Map.copyOf(tags), String.join(" | ", admission.admitted().keySet()));
     }
 
-    /**
-     * The class {@code context} binds an entry to under the first of its {@code candidates} that binds ({@link
-     * TsonLinkedSchema#bindingCandidates}), as a read binds it, or {@code null}.
-     */
-    private static Class<?> bound(DataBindContext context, List<EntryKey> candidates) {
-        for (EntryKey candidate : candidates) {
-            try {
-                return context.nameBinder().resolve(candidate.declaringSchema(), candidate.name());
-            } catch (DataBindException | RuntimeException unbound) {
-                // not bound under this name; the next is tried
-            }
-        }
-        return null;
+    /** The class {@code binding} binds entry {@code name} to, as a read binds it, or {@code null}. */
+    private static Class<?> bound(TsonSchemaBinding binding, String name) {
+        return binding.find(name).flatMap(BoundEntry::dataClass).<Class<?>>map(DataClass::typeClass).orElse(null);
     }
 }

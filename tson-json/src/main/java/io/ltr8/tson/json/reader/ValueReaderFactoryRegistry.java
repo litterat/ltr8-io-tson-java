@@ -46,8 +46,21 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
 
     private final Map<String, ValueReaderFactory> factories;
 
+    /** The context bind mode binds with; null for every other registry. */
+    private final DataBindContext binding;
+
     private ValueReaderFactoryRegistry(Map<String, ValueReaderFactory> factories) {
+        this(factories, null);
+    }
+
+    private ValueReaderFactoryRegistry(Map<String, ValueReaderFactory> factories, DataBindContext binding) {
         this.factories = factories;
+        this.binding = binding;
+    }
+
+    /** The context bind mode binds with, from which a compile loads its binding; {@code null} for any other mode. */
+    public DataBindContext binding() {
+        return binding;
     }
 
     /**
@@ -101,14 +114,14 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("meta.map", BindMapBuilder.FACTORY);
         factories.put("meta.choice", DispatchChoiceReader.FACTORY);
         factories.put("meta.declared_type", DispatchDeclaredReader.FACTORY);
-        return new ValueReaderFactoryRegistry(Map.copyOf(factories));
+        return new ValueReaderFactoryRegistry(Map.copyOf(factories), binding);
     }
 
     /** §5's atom constructors, each leaf passed through {@code leaf} so a mode can wrap what it produces. */
     private static Map<String, ValueReaderFactory> vocabulary(UnaryOperator<ValueReaderFactory> leaf) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
         factories.put("meta.void_type", leaf.apply(AtomReader.VOID));
-        factories.put("meta.enum_type", leaf.apply(AtomReader.ENUM));
+        factories.put("meta.enum_type", leaf.apply(AtomReader.ATOM));
         for (String constructor : ATOM_CONSTRUCTORS) {
             factories.put(constructor, leaf.apply(AtomReader.ATOM));
         }

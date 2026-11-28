@@ -23,11 +23,9 @@ import java.util.function.UnaryOperator;
  * convenience only, as {@link RecordBindReader.Factory}'s own Javadoc states for every composite kind but
  * {@code record}.
  *
- * <p><b>{@code enum}</b> uses {@link AtomTypeReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
- * #bind} (dispatching {@code boolean} to a real {@code Boolean} via the vocabulary's own
- * {@code BooleanParser}, every other
- * member name through the ordinary path) -- so {@code boolean} reads a genuine {@code Boolean}, not the
- * text {@code "true"}/{@code "false"}. Tree mode additionally wraps every leaf in a {@code TsonAtom}.
+ * <p><b>{@code enum}</b> uses {@link AtomTypeReader#ATOM} in both {@link #tree} and {@link #bind}, so {@code boolean}
+ * reads a genuine {@code Boolean}, not the text {@code "true"}/{@code "false"}. Tree mode additionally wraps every leaf
+ * in a {@code TsonAtom}.
  *
  * <p><b>{@code choice} is shared between both modes</b>, registered once via {@link
  * ChoiceReader#FACTORY} -- see that class's own Javadoc for why it has no {@code
@@ -75,7 +73,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
-                AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.VOID, UnaryOperator.identity(),
+                AtomTypeReader.ATOM, AtomTypeReader.VOID, UnaryOperator.identity(),
                 ChoiceReader.FACTORY), context);
     }
 
@@ -89,7 +87,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry tree() {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
-                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_VOID, AtomTreeFactory::new,
+                new TupleTreeReader.Factory(), AtomTypeReader.ATOM, TREE_VOID, AtomTreeFactory::new,
                 ChoiceReader.FACTORY), null);
     }
 

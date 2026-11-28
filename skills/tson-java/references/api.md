@@ -291,6 +291,34 @@ constraint that failed, never the type's name.
 
 ---
 
+## `io.ltr8.tson.encoding` (module `tson-encoding`) — which class each schema entry binds to
+
+What both encodings' bind readers are built from, so a caller can ask ahead of any read and get the read's answer.
+A compiled schema hands back the binding its compile loaded; take that one rather than loading another.
+
+```java
+public final class TsonSchemaBinding {              // immutable once loaded; safe from any thread
+    public static TsonSchemaBinding load(TsonLinkedSchema schema, DataBindContext context);  // asks every entry now
+    public TsonLinkedSchema schema();
+    public BoundEntry entry(String writtenName);    // an alias or extern answers for the entry it reaches;
+}                                                   // IllegalArgumentException for a name that is no entry
+public record BoundEntry(EntryKey entry, Top definition, Descriptor descriptor, Optional<AtomType<?>> atom) {
+    public Optional<DataClass> dataClass(); }       // the Bound class, else empty
+public sealed interface Descriptor {
+    record Bound(DataClass dataClass, EntryKey matched);
+    record Unbound(List<EntryKey> tried, DataBindException refusal);   // refusal: the binder's own message
+    record Unanalysable(EntryKey matched, DataBindException cause); }  // bound to a class it cannot describe
+```
+
+`TsonCompiledSchema.binding()` and `JsonCompiledSchema.binding()` return `Optional<TsonSchemaBinding>`: the binding
+the compile loaded, empty for a schema compiled for tree mode.
+
+`atom` is the type a bind read parses an atom entry's text with (`boolean` reads a `Boolean`); empty for anything
+else. A compile turns `Unbound` and `Unanalysable` into a `MissingBindingException` raised by the first read of that
+type; neither is ever `NOT_IMPLEMENTED`.
+
+---
+
 ## `io.ltr8.tson.compiler` (module `tson-compiler`) — the engine
 
 ### Readers

@@ -56,6 +56,8 @@ choices. Current form only; history lives in git.
   `{ of: !list_type { … } }`.
 - A bind lookup redirects through an alias only for an entry with no source position, and every bind lookup in both
   encodings asks `TsonLinkedSchema.bindingCandidates`.
+- A bind compile loads one `TsonSchemaBinding` before it builds a reader, and every factory, the root pre-check and the
+  writer's extern tags take which class an entry binds to from it; none asks the bind context for an entry itself.
 
 Related: `design/linking-and-compilation.md`, `design/choice-disjointness.md`, `design/compiled-registries.md`,
 `design/readers-and-diagnostics.md`, `design/schema-resolution.md`.

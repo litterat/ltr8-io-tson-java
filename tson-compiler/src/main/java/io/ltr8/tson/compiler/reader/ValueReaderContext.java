@@ -2,6 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.encoding.BoundEntry;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
@@ -10,6 +12,7 @@ import io.ltr8.tson.schema.meta.TypeChain;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -23,7 +26,13 @@ import java.util.Set;
  * gains a field here instead of every factory's signature churning.
  */
 public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers,
-                                 Map<String, Set<String>> namesMeaning) {
+                                 Map<String, Set<String>> namesMeaning, TsonSchemaBinding binding) {
+
+    /** A context a tree-mode compile builds within, which binds nothing. */
+    public ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers,
+                              Map<String, Set<String>> namesMeaning) {
+        this(linked, readers, namesMeaning, null);
+    }
 
     /**
      * The index derived rather than supplied -- for a caller with no compilation around it. A compile passes
@@ -32,6 +41,30 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
      */
     public ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers) {
         this(linked, readers, Subsumption.namesMeaning(linked.schema().entries()));
+    }
+
+    /**
+     * What entry {@code name} binds to, from the binding this compile loaded: the one answer every bind-mode factory
+     * builds from ({@link TsonSchemaBinding}).
+     */
+    public BoundEntry bound(String name) {
+        if (binding == null) {
+            throw new IllegalStateException("a bind-mode reader for '" + name + "' is being built by a compile that "
+                    + "loaded no binding");
+        }
+        return binding.entry(name);
+    }
+
+    /**
+     * The class {@code name} binds to; empty where nothing is bound, the class cannot be described, or {@code name}
+     * is no entry -- a type written in place, or a tag a document wrote.
+     */
+    public Optional<Class<?>> boundClass(String name) {
+        if (binding == null) {
+            throw new IllegalStateException("a bind-mode reader asked what '" + name + "' binds to, in a compile "
+                    + "that loaded no binding");
+        }
+        return binding.find(name).flatMap(BoundEntry::dataClass).map(io.ltr8.bind.DataClass::typeClass);
     }
 
 
