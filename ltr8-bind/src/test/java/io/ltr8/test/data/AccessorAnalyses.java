@@ -1713,4 +1713,247 @@ public final class AccessorAnalyses {
 			return 31 * super.hashCode() + Objects.hashCode(name);
 		}
 	}
+
+	// --- which of the methods returning a field is its accessor
+
+	public static class HashCodeReturnsField {
+
+		private final int count;
+
+		@Record
+		public HashCodeReturnsField(int count) {
+			this.count = count;
+		}
+
+		public int count() {
+			return count;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof HashCodeReturnsField other && count == other.count;
+		}
+
+		@Override
+		public int hashCode() {
+			return count;
+		}
+	}
+
+	public static class OnlyToStringReturnsField {
+
+		private final String name;
+
+		@Record
+		public OnlyToStringReturnsField(String name) {
+			this.name = name;
+		}
+
+		@Override
+		public String toString() {
+			return name;
+		}
+	}
+
+	public static class NamedAndGetter {
+
+		private final String name;
+
+		@Record
+		public NamedAndGetter(String name) {
+			this.name = name;
+		}
+
+		public String name() {
+			return name;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof NamedAndGetter other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class GetterBesideOtherName {
+
+		private final String name;
+
+		@Record
+		public GetterBesideOtherName(String name) {
+			this.name = name;
+		}
+
+		public String getName() {
+			return name;
+		}
+
+		public String label() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof GetterBesideOtherName other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class IsBesideOtherName {
+
+		private final boolean active;
+
+		@Record
+		public IsBesideOtherName(boolean active) {
+			this.active = active;
+		}
+
+		public boolean isActive() {
+			return active;
+		}
+
+		public boolean enabled() {
+			return active;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof IsBesideOtherName other && active == other.active;
+		}
+
+		@Override
+		public int hashCode() {
+			return Boolean.hashCode(active);
+		}
+	}
+
+	public static class OneOtherName {
+
+		private final String name;
+
+		@Record
+		public OneOtherName(String name) {
+			this.name = name;
+		}
+
+		public String label() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof OneOtherName other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class TwoOtherNames {
+
+		private final String name;
+
+		@Record
+		public TwoOtherNames(String name) {
+			this.name = name;
+		}
+
+		public String label() {
+			return name;
+		}
+
+		public String title() {
+			return name;
+		}
+	}
+
+	public static class FieldOnOneOfTwoOtherNames {
+
+		private final String name;
+
+		@Record
+		public FieldOnOneOfTwoOtherNames(String name) {
+			this.name = name;
+		}
+
+		@Field
+		public String label() {
+			return name;
+		}
+
+		public String title() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj instanceof FieldOnOneOfTwoOtherNames other && Objects.equals(name, other.name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class OtherNameBase {
+
+		protected final String name;
+
+		public OtherNameBase(String name) {
+			this.name = name;
+		}
+
+		public String label() {
+			return name;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			return obj != null && obj.getClass() == getClass() && Objects.equals(name, ((OtherNameBase) obj).name);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hashCode(name);
+		}
+	}
+
+	public static class NameBesideInheritedOtherName extends OtherNameBase {
+
+		@Record
+		public NameBesideInheritedOtherName(String name) {
+			super(name);
+		}
+
+		public String name() {
+			return name;
+		}
+	}
+
+	public static class OtherNameBesideInheritedOtherName extends OtherNameBase {
+
+		@Record
+		public OtherNameBesideInheritedOtherName(String name) {
+			super(name);
+		}
+
+		public String title() {
+			return name;
+		}
+	}
 }
