@@ -6,13 +6,22 @@ import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataClass;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.writer.ExternTags;
+import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The write-side counterpart to {@link TsonObjectReader} -- given a Java object and its {@link
@@ -74,8 +83,8 @@ public final class TsonObjectWriter {
      * plain writer keeps writing a bare value and a caller opts in per writer, exactly as the readers derive.
      *
      * <p>Both strings are the caller's to supply, and nothing is checked against the schema. A caller holding the
-     * schema linked uses {@link #describing(TsonLinkedSchema, String)}, which a schema typing a position by an
-     * extern needs.
+     * schema compiled to bind uses {@link #describing(TsonCompiledSchema, String)}, which a schema typing a position
+     * by an extern needs.
      *
      * @param schemaUri    the governing schema's identity, written as the {@code !!import} argument
      * @param rootTypeName the schema's own name for the root value's type, written as its type-ref. A value
@@ -87,22 +96,61 @@ public final class TsonObjectWriter {
     }
 
     /**
-     * {@link #describing(String, String)} for a schema this writer is given linked -- {@code !!import} naming its
-     * identity -- and writing a value at a position the schema types by an extern ([TSON-SCHEMA] §7.9) as that
-     * position reads it: the names inside are the foreign schema's, and a tag at the boundary, which is read in the
-     * enclosing scope, is that scope's name for the entry the value's class is bound to (the extern for its target,
-     * an admitted name for a subtype or a variant). A value whose class is bound to an entry the enclosing scope has
-     * no name for is refused with a {@link WriteException}.
+     * {@link #describing(String, String)} for a schema this writer is given compiled to bind -- {@code !!import}
+     * naming its identity -- and writing a value at a position the schema types by an extern ([TSON-SCHEMA] §7.9) as
+     * that position reads it: the names inside are the foreign schema's, and a tag at the boundary, which is read in
+     * the enclosing scope, is that scope's name for the entry the value's class is bound to (the extern for its
+     * target, an admitted name for a subtype or a variant). A value whose class is bound to an entry the enclosing
+     * scope has no name for is refused with a {@link WriteException}.
      *
-     * <p>Which entry a class is bound to is asked of this writer's bind context, by each admitted entry's declaring
-     * schema and name, once, here: derive one writer per schema and keep it.
+     * <p>Which entry a class is bound to is what {@code schema}'s binding, and those of the schemas its externs reach,
+     * answer, as a read through {@code schema} binds it; the tags are built once, here: derive one writer per schema
+     * and keep it.
+     *
+     * @param schema       the governing schema, compiled to bind under this writer's context, as {@code
+     *                     Tson.bindRegistry().get} gives it
+     * @param rootTypeName the schema's own name for the root value's type, as for {@link #describing(String, String)}
+     * @throws IllegalArgumentException where {@code schema} was not compiled to bind, or binds under another context
+     */
+    public TsonObjectWriter describing(TsonCompiledSchema schema, String rootTypeName) {
+        TsonSchemaBinding binding = schema.binding().orElseThrow(() -> new IllegalArgumentException("the schema "
+                + schema.schema().id() + " was not compiled to bind, so it says no class's entry: describe a schema "
+                + "a bind registry compiled"));
+        if (binding.context() != context) {
+            throw new IllegalArgumentException("the schema " + schema.schema().id() + " was compiled to bind under "
+                    + "another bind context than this writer's, so its entries' classes are not the ones this writer "
+                    + "writes: describe a schema the bind registry sharing this writer's context compiled");
+        }
+        return new TsonObjectWriter(context, new DataClassObjectWriter(context, ExternTags.of(scopes(schema))),
+                header.describing(schema.schema().id()), Optional.of(rootTypeName));
+    }
+
+    /**
+     * {@link #describing(TsonCompiledSchema, String)} for a schema given linked, compiled to bind here under this
+     * writer's context, with each schema its externs name.
      *
      * @param schema       the governing schema, as {@code Tson.loader().resolveLinked} or {@code Tson.resolve} gives it
      * @param rootTypeName the schema's own name for the root value's type, as for {@link #describing(String, String)}
+     * @throws io.ltr8.tson.base.BindMismatchException where a class this context binds to an entry of {@code schema}
+     *                                                 or of a schema its externs reach cannot be described
      */
     public TsonObjectWriter describing(TsonLinkedSchema schema, String rootTypeName) {
-        return new TsonObjectWriter(context, new DataClassObjectWriter(context, ExternTags.of(schema, context)),
-                header.describing(schema.schema().id()), Optional.of(rootTypeName));
+        return describing(TsonSchemaCompiler.compile(schema, ValueReaderFactoryRegistry.bind(context)), rootTypeName);
+    }
+
+    /** The bindings of {@code schema} and of every compiled schema its externs reach, each once. */
+    private static List<TsonSchemaBinding> scopes(TsonCompiledSchema schema) {
+        List<TsonSchemaBinding> scopes = new ArrayList<>();
+        Set<TsonCompiledSchema> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<TsonCompiledSchema> pending = new ArrayDeque<>(List.of(schema));
+        while (!pending.isEmpty()) {
+            TsonCompiledSchema scope = pending.poll();
+            if (seen.add(scope)) {
+                scope.binding().ifPresent(scopes::add);
+                pending.addAll(scope.foreignSchemas().values());
+            }
+        }
+        return scopes;
     }
 
     /**

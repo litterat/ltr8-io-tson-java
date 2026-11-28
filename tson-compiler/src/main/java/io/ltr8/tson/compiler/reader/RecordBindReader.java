@@ -13,8 +13,6 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
-import io.ltr8.tson.encoding.Descriptor;
-import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.meta.*;
 
 import java.util.*;
@@ -450,24 +448,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         /**
          * The class entry {@code name} binds to, as the compile's binding answers it.
          *
-         * <p><b>A missing one is a misconfiguration, not a gap.</b> It is the same disagreement {@link
-         * BindMismatchException} covers from the other side -- a class that exists and does not fit -- so
-         * it is raised the same way, naming the type nothing resolves, and deferred to the first read of the type
-         * like a class the context cannot analyse (a meta layer maps its marker kinds to interfaces nothing builds).
-         * Surfacing it as a library gap instead would tell a caller who simply never mapped the type that this
-         * library cannot do the job, and that reading travels: a downstream service turns it into a 501.
+         * <p><b>A missing one is a misconfiguration, not a gap.</b> It is raised as {@link MissingBindingException},
+         * naming the type nothing resolves, and deferred to the first read of the type: a schema declares types a
+         * given consumer never binds. Surfacing it as a library gap instead would tell a caller who simply never
+         * mapped the type that this library cannot do the job, and that reading travels: a downstream service turns
+         * it into a 501.
          */
         static DataClass descriptorFor(String name, ValueReaderContext context) {
-            return switch (context.bound(name).descriptor()) {
-                case Descriptor.Bound bound -> bound.dataClass();
-                case Descriptor.Unanalysable unanalysable ->
-                        throw new MissingBindingException(unanalysable.cause().getMessage(), unanalysable.cause());
-                case Descriptor.Unbound unbound -> throw new MissingBindingException("no bound Java class for '"
-                        + String.join("' or '", unbound.tried().stream().map(EntryKey::name).toList())
-                        + "': nothing in this bind context resolves that schema type name. Map it "
-                        + "(ProcessorConfig.withDataBindContext) or give the context a DataNameBinder that can find it "
-                        + "-- " + unbound.refusal().getMessage(), unbound.refusal());
-            };
+            return context.bound(name).dataClass();
         }
 
         private static DataClassRecord requireRecord(String name, DataClass dataClass) {

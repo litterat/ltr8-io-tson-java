@@ -2,13 +2,16 @@ package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.encoding.TsonSchemaBinding;
+import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A linked schema with one {@link JsonTypeReader} compiled per entry -- the compile stage's noun, produced by
@@ -36,16 +39,53 @@ public final class JsonCompiledSchema {
     /** What the compile's readers bind each entry to, or null where they read trees. */
     private final TsonSchemaBinding binding;
 
+    /** The compiled schemas a value through an extern is read in, by canonical identity, each in this one's mode. */
+    private final Map<String, JsonCompiledSchema> foreign;
+
     public JsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, JsonTypeReader<?>> entries) {
-        this(linkedSchema, entries, null);
+        this(linkedSchema, entries, null, Map.of());
     }
 
-    /** The same, with the binding a bind compile loaded and its readers bind by. */
+    /** The same, with the binding a bind compile loaded and its readers bind by, and the schemas its externs reach. */
     JsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, JsonTypeReader<?>> entries,
-                       TsonSchemaBinding binding) {
+                       TsonSchemaBinding binding, Map<String, JsonCompiledSchema> foreign) {
         this.linkedSchema = linkedSchema;
         this.entries = Map.copyOf(entries);
         this.binding = binding;
+        this.foreign = foreign;
+    }
+
+    /**
+     * The reader of entry {@code key}: this schema's own where the entry is in its namespace and declared by the
+     * schema {@code key} names -- an import's entries are merged in -- and otherwise the one a schema its externs
+     * reach reads it with ([TSON-SCHEMA] §7.9). Empty where neither holds it.
+     */
+    public Optional<JsonTypeReader<?>> reader(EntryKey key) {
+        return reader(key, new HashSet<>());
+    }
+
+    private Optional<JsonTypeReader<?>> reader(EntryKey key, Set<String> seen) {
+        if (!seen.add(linkedSchema.identity())) {
+            return Optional.empty();
+        }
+        JsonTypeReader<?> own = entries.get(key.name());
+        if (own != null && linkedSchema.declaringIdentity(key.name()).equals(key.declaringSchema())) {
+            return Optional.of(own);
+        }
+        JsonCompiledSchema declaring = foreign.get(key.declaringSchema());
+        if (declaring != null) {
+            Optional<JsonTypeReader<?>> there = declaring.reader(key, seen);
+            if (there.isPresent()) {
+                return there;
+            }
+        }
+        for (JsonCompiledSchema reached : foreign.values()) {
+            Optional<JsonTypeReader<?>> there = reached.reader(key, seen);
+            if (there.isPresent()) {
+                return there;
+            }
+        }
+        return Optional.empty();
     }
 
     /**

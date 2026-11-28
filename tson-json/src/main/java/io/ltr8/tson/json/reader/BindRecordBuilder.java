@@ -1,6 +1,6 @@
 package io.ltr8.tson.json.reader;
 
-import io.ltr8.tson.encoding.Descriptor;
+import io.ltr8.tson.encoding.TsonTypeBinding;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics;
 import io.ltr8.tson.base.diagnostics.BindingDiagnostics.Handed;
@@ -14,11 +14,9 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
-import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldRole;
 import io.ltr8.tson.schema.meta.Top;
@@ -205,7 +203,7 @@ final class BindRecordBuilder implements RecordBuilder {
                                                     DataClassUnion union) {
         List<String> outside = new ArrayList<>();
         for (String subtype : context.subtypesOf(name, definition)) {
-            DataClass member = context.bound(subtype).dataClass().orElse(null);
+            DataClass member = context.bindingOf(subtype).map(TsonTypeBinding::dataClass).orElse(null);
             if (member != null && !union.isMemberType(member.typeClass())) {
                 outside.add("subtype '" + subtype + "' binds " + member.typeClass().getName()
                         + ", which is not a member");
@@ -252,20 +250,11 @@ final class BindRecordBuilder implements RecordBuilder {
     }
 
     /**
-     * The class bound to entry {@code name}, as the compile's binding answers it. No class at all, or one the context
-     * cannot analyse, is deferred rather than fatal -- a schema declares types a given consumer never binds -- so it
-     * reaches the first read of this type.
+     * The class bound to entry {@code name}, as the compile's binding answers it. No class at all is deferred rather
+     * than fatal -- a schema declares types a given consumer never binds -- so it reaches the first read of this type.
      */
     static DataClass boundClass(String name, ValueReaderContext context) {
-        return switch (context.bound(name).descriptor()) {
-            case Descriptor.Bound bound -> bound.dataClass();
-            case Descriptor.Unanalysable unanalysable ->
-                    throw new MissingBindingException(unanalysable.cause().getMessage(), unanalysable.cause());
-            case Descriptor.Unbound unbound -> throw new MissingBindingException("no bound Java class for '"
-                    + String.join("' or '", unbound.tried().stream().map(EntryKey::name).toList())
-                    + "': nothing in this bind context resolves that schema type name -- "
-                    + unbound.refusal().getMessage(), unbound.refusal());
-        };
+        return context.bound(name).dataClass();
     }
 
     /**

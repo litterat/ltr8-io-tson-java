@@ -1,6 +1,5 @@
 package io.ltr8.tson.json;
 
-import io.ltr8.bind.DataClass;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.BindMismatchException;
@@ -11,7 +10,6 @@ import io.ltr8.tson.base.CountingReceiver;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.encoding.BoundEntry;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
@@ -436,8 +434,8 @@ public final class JsonObjectReader {
                     schema.get().declaredTypeNames(), typeName);
             return null;
         }
-        Class<?> bound = schema.get().binding().flatMap(binding -> binding.find(typeName))
-                .flatMap(BoundEntry::dataClass).<Class<?>>map(DataClass::typeClass).orElse(null);
+        Class<?> bound = schema.get().binding().flatMap(binding -> binding.get(typeName))
+                .<Class<?>>map(binding -> binding.dataClass().typeClass()).orElse(null);
         if (bound != null && !type.isAssignableFrom(bound)) {
             report(Diagnostic.Code.TYPE_MISMATCH, "the schema's type `" + typeName + "` binds to " + bound.getName()
                     + ", which is not assignable to the requested " + type.getName(), type.getName(), bound.getName());

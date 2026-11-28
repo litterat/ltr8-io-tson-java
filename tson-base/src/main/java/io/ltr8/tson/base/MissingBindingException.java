@@ -1,9 +1,10 @@
 package io.ltr8.tson.base;
 
 /**
- * A schema type with no Java class this bind context can build: none is mapped to its name, or the class that is
- * cannot be analysed (an interface that is no union, a collection with no constructor to build it). The message
- * says which.
+ * A schema type with no Java class this bind context can build: none is mapped to its name, or, for a value a schema
+ * document holds as it resolves, the class that is cannot be analysed (an interface that is no union, a collection
+ * with no constructor to build it), which a schema compiled to read data refuses as its parent. The message says
+ * which.
  *
  * <p><b>A misconfiguration, not a gap</b>, which is the whole reason it exists as a type: reported as "no usable
  * compiled reader", a missing line of configuration would read as this library being unable to do the job, and

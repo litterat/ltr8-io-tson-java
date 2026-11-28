@@ -19,6 +19,8 @@ import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.compiler.reader.Subsumption;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.encoding.TsonSchemaBinding;
+import io.ltr8.tson.encoding.plan.BindingTable;
+import io.ltr8.tson.encoding.plan.EntryBindings;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -80,22 +82,23 @@ public final class TsonSchemaCompiler {
 
     /**
      * Compiles {@code linkedSchema} against a factory set -- every body's constructor is dispatched through
-     * {@code factories} alone. A read registry compiles a schema in its mode this way, and {@link
-     * TsonCompiledVocabulary#compile} compiles vocabulary in object-binding mode, the kernel's pre-loaded
-     * stand-in ({@link TsonSchema#bootstrap()}) among it.
+     * {@code factories} alone. A read registry compiles a schema in its mode this way, loading in bind mode the
+     * schema's {@link TsonSchemaBinding}, which fails the compile where a class it binds cannot be described.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {
-        return compile(linkedSchema, factories, null);
+        return compile(linkedSchema, factories, null, true);
     }
 
     /**
      * {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}, the schema an extern names compiled by {@code
      * foreign} ([TSON-SCHEMA] §7.9): a registry's cache, so each foreign schema compiles once in its mode and is
      * shared by every importer. Null compiles each foreign schema once for this compile ({@link #onePerCompile}).
+     * {@code strict} is false for a compile the resolution core makes, which holds a class its bind context cannot
+     * describe as bound to nothing ({@link BindingTable#checkpoint}), so a consumer's class fails only a read of it.
      */
     static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
-                                      ForeignSchemas foreign) {
-        return compileWith(linkedSchema, factories::resolve, Set.of(), false, foreign, bindingOf(factories));
+                                      ForeignSchemas foreign, boolean strict) {
+        return compileWith(linkedSchema, factories::resolve, Set.of(), false, foreign, bindingOf(factories), strict);
     }
 
     /** The context {@code factories} binds objects with, or {@code null} for a table that reads trees. */
@@ -120,7 +123,7 @@ public final class TsonSchemaCompiler {
      * with no registry, which obtains no schema by identity it has not compiled.
      */
     private static ForeignSchemas onePerCompile(Function<String, ValueReaderFactory> factoryFor,
-                                                io.ltr8.bind.DataBindContext binding) {
+                                                io.ltr8.bind.DataBindContext binding, boolean strict) {
         Map<String, TsonCompiledSchema> compiled = new java.util.HashMap<>();
         return new ForeignSchemas() {
             @Override
@@ -128,7 +131,7 @@ public final class TsonSchemaCompiler {
                 String identity = linked.identity();
                 TsonCompiledSchema done = compiled.get(identity);
                 if (done == null) {
-                    done = compileWith(linked, factoryFor, Set.of(), false, this, binding);
+                    done = compileWith(linked, factoryFor, Set.of(), false, this, binding, strict);
                     compiled.put(identity, done);
                 }
                 return done;
@@ -158,21 +161,26 @@ public final class TsonSchemaCompiler {
     static TsonCompiledSchema compileReady(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
                                            Set<String> pending, ForeignSchemas foreign) {
         return compileWith(linkedSchema, factories::resolve, Set.copyOf(pending), true, foreign,
-                bindingOf(factories));
+                bindingOf(factories), false);
     }
 
     /**
      * The shared eager walk (see the "Eager, not lazy" note) over {@code factoryFor}'s factories, {@code pending}
      * naming the declarations of a resolution in progress not yet ready, {@code checkpoint} whether this compiles
      * one ({@link #compileReady}), {@code foreign} where a foreign schema is compiled (null: once for this compile),
-     * and {@code binding} the context {@code factoryFor}'s readers bind with, {@code null} where they read trees.
+     * {@code binding} the context {@code factoryFor}'s readers bind with, {@code null} where they read trees, and
+     * {@code strict} whether its bindings load as a read's ({@link TsonSchemaBinding#load}) or a resolution's ({@link
+     * BindingTable#checkpoint}), which the compiled schema does not hand out.
      */
     static TsonCompiledSchema compileWith(
             TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, Set<String> pending,
-            boolean checkpoint, ForeignSchemas foreign, io.ltr8.bind.DataBindContext binding) {
-        Compilation compilation = new Compilation(linkedSchema, factoryFor, pending, checkpoint,
-                foreign != null ? foreign : onePerCompile(factoryFor, binding), binding,
-                binding == null ? null : TsonSchemaBinding.load(linkedSchema, binding));
+            boolean checkpoint, ForeignSchemas foreign, io.ltr8.bind.DataBindContext binding, boolean strict) {
+        TsonSchemaBinding loaded = binding != null && strict ? TsonSchemaBinding.load(linkedSchema, binding) : null;
+        EntryBindings bindings = loaded != null || binding == null ? loaded
+                : BindingTable.checkpoint(linkedSchema, binding);
+        Obtained obtained = new Obtained(foreign != null ? foreign : onePerCompile(factoryFor, binding, strict));
+        Compilation compilation = new Compilation(linkedSchema, factoryFor, pending, checkpoint, obtained, binding,
+                bindings);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -180,11 +188,35 @@ public final class TsonSchemaCompiler {
         // decoded through their types here, still before the schema is handed out (see CompiledReaders).
         compilation.readers.settle();
         TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished),
-                compilation.readers, compilation.loaded);
+                compilation.readers, loaded, Map.copyOf(obtained.byIdentity));
         // Hand every reader that resolves at *read* time over to the finished schema, releasing this
         // compilation -- see CompiledReaders, and the "never escape" invariant below that this preserves.
         compilation.readers.bind(compiled);
         return compiled;
+    }
+
+    /** The foreign schemas one compile obtains from {@code source}, kept by canonical identity for the compiled one. */
+    private static final class Obtained implements ForeignSchemas {
+        private final ForeignSchemas source;
+        private final Map<String, TsonCompiledSchema> byIdentity = new LinkedHashMap<>();
+
+        Obtained(ForeignSchemas source) {
+            this.source = source;
+        }
+
+        @Override
+        public TsonCompiledSchema compiled(TsonLinkedSchema linked) {
+            TsonCompiledSchema compiled = source.compiled(linked);
+            byIdentity.putIfAbsent(linked.identity(), compiled);
+            return compiled;
+        }
+
+        @Override
+        public Optional<TsonCompiledSchema> compiled(String identity) {
+            Optional<TsonCompiledSchema> compiled = source.compiled(identity);
+            compiled.ifPresent(found -> byIdentity.putIfAbsent(identity, found));
+            return compiled;
+        }
     }
 
     /**
@@ -199,11 +231,11 @@ public final class TsonSchemaCompiler {
         private final TsonLinkedSchema linked;
         private final Function<String, ValueReaderFactory> factoryFor;
         private final Map<String, Set<String>> namesMeaning;
-        private final TsonSchemaBinding loaded;
+        private final EntryBindings loaded;
         private CompiledReaders readers;
 
         InlineReaders(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor,
-                      Map<String, Set<String>> namesMeaning, TsonSchemaBinding loaded) {
+                      Map<String, Set<String>> namesMeaning, EntryBindings loaded) {
             this.linked = linked;
             this.factoryFor = factoryFor;
             this.namesMeaning = namesMeaning;
@@ -267,11 +299,11 @@ public final class TsonSchemaCompiler {
         private final io.ltr8.bind.DataBindContext binding;
 
         /** What each entry binds to under {@link #binding}, loaded before any reader is built; null for trees. */
-        private final TsonSchemaBinding loaded;
+        private final EntryBindings loaded;
 
         Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor, Set<String> pending,
                     boolean checkpoint, ForeignSchemas foreign, io.ltr8.bind.DataBindContext binding,
-                    TsonSchemaBinding loaded) {
+                    EntryBindings loaded) {
             this.foreign = foreign;
             this.binding = binding;
             this.loaded = loaded;

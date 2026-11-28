@@ -1,137 +1,105 @@
 package io.ltr8.tson.encoding;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
-import io.ltr8.bind.UnboundNameException;
-import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.encoding.plan.BindingTable;
+import io.ltr8.tson.encoding.plan.EntryBindings;
 import io.ltr8.tson.schema.EntryKey;
-import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.meta.Top;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Which host class each entry of a linked schema binds to under one {@link DataBindContext}: the answer both
- * encodings' bind readers are built from, so a read and a caller asking ahead of any read get the same one.
+ * Which host class each entry of a linked schema binds to under one {@link DataBindContext}: one
+ * {@link TsonTypeBinding} per entry the binder binds, found by its {@link EntryKey}, by a name the schema writes, or
+ * by its class. An entry nothing binds is absent. Both encodings' bind readers are built from it, so a read and a
+ * caller asking ahead of any read get the same answer.
  *
- * <p>A binding is loaded ({@link #load}) when a schema is compiled for bind mode, and a compiled schema hands back the
- * one its compile loaded ({@code TsonCompiledSchema.binding()}, {@code JsonCompiledSchema.binding()}): a caller holding
- * a compiled schema takes that one rather than loading another over the same context.
+ * <p>A compiled schema hands back the binding its compile loaded ({@code TsonCompiledSchema.binding()}, {@code
+ * JsonCompiledSchema.binding()}); a caller holding one takes that rather than loading another over the same context.
  *
- * <p>Loading asks the binder for every entry the schema holds, because a read may ask about any of them: a document's
- * root and every tag it writes name an entry, not only the ones a reader was built for. Every answer is stored then;
- * afterwards a binding never consults the context, is immutable, and may be shared and queried from any thread.
+ * <p>Loading asks the binder for every entry the schema reaches, its imports merged in and its externs' landings
+ * included, because a document's root and every tag it writes name an entry. Every answer is stored then; afterwards
+ * a binding never consults the context, is immutable, and may be shared and queried from any thread.
  */
-public final class TsonSchemaBinding {
+public final class TsonSchemaBinding implements EntryBindings {
 
-    private final TsonLinkedSchema schema;
-    private final Map<String, BoundEntry> entries;
+    private final BindingTable table;
 
-    private TsonSchemaBinding(TsonLinkedSchema schema, Map<String, BoundEntry> entries) {
-        this.schema = schema;
-        this.entries = entries;
+    private TsonSchemaBinding(BindingTable table) {
+        this.table = table;
     }
 
     /**
      * Loads the binding of {@code schema}'s entries under {@code context}, on the calling thread: each entry's
      * binding candidates ({@link TsonLinkedSchema#bindingCandidates}) asked of the context's binder in order, each
-     * candidate once, and the class the first bound one names described.
+     * candidate once, and the class the first bound one names described. A parametric record is not asked: nothing
+     * reads one bare, and its applications are entries of their own.
      *
      * @param schema  a linked schema
      * @param context the context a bind read of {@code schema} binds with
-     * @return the loaded binding, holding an answer for every entry of {@code schema}
+     * @throws io.ltr8.tson.base.BindMismatchException where the binder names a class {@code context} cannot describe,
+     *                                                 or fails when asked; the message names the entry, the class,
+     *                                                 why, and the fix
      */
     public static TsonSchemaBinding load(TsonLinkedSchema schema, DataBindContext context) {
-        Objects.requireNonNull(schema, "schema");
-        Objects.requireNonNull(context, "context");
-        Map<EntryKey, Descriptor> asked = new HashMap<>();
-        Map<String, BoundEntry> entries = new HashMap<>();
-        for (String name : schema.schema().entries().keySet()) {
-            answer(schema, name, context, asked).ifPresent(entry -> entries.put(name, entry));
-        }
-        return new TsonSchemaBinding(schema, Map.copyOf(entries));
+        return new TsonSchemaBinding(BindingTable.strict(schema, context));
     }
 
     /** The linked schema this binding answers for. */
     public TsonLinkedSchema schema() {
-        return schema;
+        return table.schema();
+    }
+
+    /** The context this binding was loaded under, which a read or a write through it binds with. */
+    public DataBindContext context() {
+        return table.context();
+    }
+
+    /** The binding of entry {@code key}; empty where nothing binds it, or {@link #schema()} reaches no such entry. */
+    @Override
+    public Optional<TsonTypeBinding> get(EntryKey key) {
+        return table.get(key);
     }
 
     /**
-     * What the entry {@code writtenName} binds to.
+     * The binding of the entry {@code writtenName} denotes in {@link #schema()} past its alias hops and its extern
+     * ({@link TsonLinkedSchema#entryKey}); empty where nothing binds it, or the name is no entry.
+     */
+    @Override
+    public Optional<TsonTypeBinding> get(String writtenName) {
+        return table.get(writtenName);
+    }
+
+    /**
+     * The binding of entry {@code key}.
      *
-     * @param writtenName the name of an entry of {@link #schema()}, as a schema or a document writes it: an alias or
-     *                    an extern is answered for the entry it reaches
-     * @throws IllegalArgumentException where {@link #schema()} holds no entry of that name, or one whose alias chain
-     *                                  reaches none
+     * @throws io.ltr8.tson.base.MissingBindingException where nothing binds it: the names the binder was asked and
+     *                                                   its own account of what it does bind
+     * @throws IllegalArgumentException                  where {@link #schema()} reaches no entry {@code key}
      */
-    public BoundEntry entry(String writtenName) {
-        BoundEntry entry = entries.get(writtenName);
-        if (entry == null) {
-            throw new IllegalArgumentException("'" + writtenName + "' is no entry of " + schema.identity()
-                    + " that reaches a type");
-        }
-        return entry;
+    @Override
+    public TsonTypeBinding require(EntryKey key) {
+        return table.require(key);
     }
 
     /**
-     * {@link #entry}, or empty where {@link #schema()} holds no entry {@code writtenName} that reaches a type -- for a
-     * caller asking about a name a document wrote, which may be none.
+     * The binding of the entry a value of {@code type} is: empty where no entry binds it, and the one entry where
+     * every entry binding it is bound under one name -- an entry composed over a constructor and bound as it is that
+     * constructor's ({@link TsonTypeBinding#boundAs}).
+     *
+     * @throws io.ltr8.tson.base.BindMismatchException where {@code type} is bound under several names, naming each;
+     *                                                 {@link #bindingsOf} lists them
      */
-    public Optional<BoundEntry> find(String writtenName) {
-        return Optional.ofNullable(entries.get(writtenName));
+    public Optional<TsonTypeBinding> get(Class<?> type) {
+        return table.get(type);
     }
 
     /**
-     * {@code name}'s answer, or empty where its alias chain reaches no entry: a namespace still being built, which a
-     * resolution's checkpoint compiles.
+     * Every entry bound to {@code type}, in {@link #schema()}'s declaration order: for a caller that knows which of
+     * them a position admits.
      */
-    private static Optional<BoundEntry> answer(TsonLinkedSchema schema, String name, DataBindContext context,
-                                               Map<EntryKey, Descriptor> asked) {
-        Optional<ExternTarget.Landing> landing = schema.landing(name);
-        TsonLinkedSchema holder = landing.map(ExternTarget.Landing::in).orElse(schema);
-        String entry = landing.map(end -> holder.terminal(end.name())).orElseGet(() -> schema.terminal(name));
-        Top definition = holder.schema().entries().get(entry);
-        if (definition == null) {
-            return Optional.empty();
-        }
-        return Optional.of(new BoundEntry(new EntryKey(holder.declaringIdentity(entry), entry), definition,
-                descriptor(schema.bindingCandidates(name), context, asked),
-                AtomParsers.forEntry(entry, definition, holder.enumForm(entry))));
-    }
-
-    private static Descriptor descriptor(List<EntryKey> candidates, DataBindContext context,
-                                         Map<EntryKey, Descriptor> asked) {
-        DataBindException refusal = null;
-        for (EntryKey candidate : candidates) {
-            Descriptor answer = asked.computeIfAbsent(candidate, key -> ask(key, context));
-            if (!(answer instanceof Descriptor.Unbound unbound)) {
-                return answer;
-            }
-            refusal = refusal == null ? unbound.refusal() : refusal;
-        }
-        return new Descriptor.Unbound(new ArrayList<>(candidates), refusal);
-    }
-
-    private static Descriptor ask(EntryKey candidate, DataBindContext context) {
-        try {
-            return new Descriptor.Bound(context.getDescriptor(candidate.declaringSchema(), candidate.name()),
-                    candidate);
-        } catch (UnboundNameException unbound) {
-            return new Descriptor.Unbound(List.of(candidate), unbound);
-        } catch (DataBindException unanalysable) {
-            return new Descriptor.Unanalysable(candidate, unanalysable);
-        } catch (RuntimeException broken) {
-            // A binder or a class's analysis failing outright is still this deployment's class, never a gap of the
-            // library's: it is answered as a class the context cannot describe.
-            return new Descriptor.Unanalysable(candidate, new DataBindException("'" + candidate.name()
-                    + "' could not be bound: " + broken, broken));
-        }
+    public List<TsonTypeBinding> bindingsOf(Class<?> type) {
+        return table.bindingsOf(type);
     }
 }

@@ -60,20 +60,47 @@ public final class JsonSchemaCompiler {
     /**
      * {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}, the schema a value through an extern is read in
      * compiled by {@code foreign} ([TSON-SCHEMA] §7.9): a registry's cache, so each foreign schema compiles once in
-     * its mode and is shared by every importer. Null compiles each foreign schema once for this compile.
+     * its mode and is shared by every importer. Null compiles each foreign schema once for this compile. In bind
+     * mode the schema's {@link TsonSchemaBinding} is loaded first, which fails the compile where a class it binds
+     * cannot be described.
      */
     static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
                                       ExternReader.ForeignSchemas foreign) {
         DataBindContext context = factories instanceof ValueReaderFactoryRegistry registry ? registry.binding() : null;
         TsonSchemaBinding binding = context == null ? null : TsonSchemaBinding.load(linkedSchema, context);
-        Compilation compilation = new Compilation(linkedSchema, factories,
-                foreign != null ? foreign : onePerCompile(factories), binding);
+        Obtained obtained = new Obtained(foreign != null ? foreign : onePerCompile(factories));
+        Compilation compilation = new Compilation(linkedSchema, factories, obtained, binding);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
-        JsonCompiledSchema compiled = new JsonCompiledSchema(linkedSchema, compilation.finished, binding);
+        JsonCompiledSchema compiled = new JsonCompiledSchema(linkedSchema, compilation.finished, binding,
+                Map.copyOf(obtained.byIdentity));
         compilation.readers.bind(compiled);
         return compiled;
+    }
+
+    /** The foreign schemas one compile obtains from {@code source}, kept by canonical identity for the compiled one. */
+    private static final class Obtained implements ExternReader.ForeignSchemas {
+        private final ExternReader.ForeignSchemas source;
+        private final Map<String, JsonCompiledSchema> byIdentity = new LinkedHashMap<>();
+
+        Obtained(ExternReader.ForeignSchemas source) {
+            this.source = source;
+        }
+
+        @Override
+        public JsonCompiledSchema compiled(TsonLinkedSchema linked) {
+            JsonCompiledSchema compiled = source.compiled(linked);
+            byIdentity.putIfAbsent(linked.identity(), compiled);
+            return compiled;
+        }
+
+        @Override
+        public Optional<JsonCompiledSchema> compiled(String identity) {
+            Optional<JsonCompiledSchema> compiled = source.compiled(identity);
+            compiled.ifPresent(found -> byIdentity.putIfAbsent(identity, found));
+            return compiled;
+        }
     }
 
     /**

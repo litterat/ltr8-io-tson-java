@@ -5,14 +5,16 @@
  *
  * <p><b>A module of its own because neither stack can hold it for the other.</b> {@code tson-json} does not depend on
  * {@code tson-compiler}, so the join left in either stack is that stack's alone; and it cannot go lower, since it
- * names {@code ltr8-bind}'s descriptors, which {@code tson-schema} does not, and the atom vocabulary, which depends on
- * {@code tson-schema}. Which entry a written name is asked as is a fact of the linked schema alone, and stays there
- * ({@code TsonLinkedSchema.bindingCandidates}).
+ * names {@code ltr8-bind}'s descriptors, which {@code tson-schema} does not. Which entry a written name is asked as
+ * is a fact of the linked schema alone, and stays there ({@code TsonLinkedSchema.bindingCandidates}).
+ *
+ * <p>{@code io.ltr8.tson.encoding.plan} is the two stacks' and no consumer's: what their compiles share and a consumer
+ * must not reach, such as the binding a resolution's checkpoint loads.
  */
 module io.ltr8.tson.encoding {
     exports io.ltr8.tson.encoding;
+    exports io.ltr8.tson.encoding.plan to io.ltr8.tson.compiler, io.ltr8.tson.json;
 
     requires transitive io.ltr8.tson.schema;
-    requires transitive io.ltr8.tson.atom;
     requires transitive io.ltr8.bind;
 }

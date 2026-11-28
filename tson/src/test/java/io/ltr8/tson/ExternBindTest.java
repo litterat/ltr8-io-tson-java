@@ -8,9 +8,12 @@ import io.ltr8.tson.BindByEntryIdentityTest.Line;
 import io.ltr8.tson.BindByEntryIdentityTest.OrderOne;
 import io.ltr8.tson.BindByEntryIdentityTest.OrderTwo;
 import io.ltr8.tson.BindByEntryIdentityTest.Rush;
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.WriteException;
+import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.schema.EntryKey;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.ValueEntry;
 
@@ -26,6 +29,7 @@ import static io.ltr8.tson.ExternWorld.ORDER_2;
 import static io.ltr8.tson.ExternWorld.extern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -159,7 +163,7 @@ public class ExternBindTest {
     void aSubtypeAtTheBoundaryIsTaggedWithTheEnclosingScopesName() {
         Tson tson = home();
         Home home = new Home("o", new Dog("rex", true), List.of(new Dog("fido", false)));
-        String written = tson.objectWriter().describing(tson.loader().resolveLinked(HOME), "home").toTson(home);
+        String written = tson.objectWriter().describing(tson.bindRegistry().get(HOME), "home").toTson(home);
         assertTrue(written.contains("pet: !dog_x"), written);
         assertEquals(List.of(), tson.validate(written), written);
         assertEquals(home, tson.objectReader().read(written, Home.class), written);
@@ -176,24 +180,60 @@ public class ExternBindTest {
     }
 
     /**
-     * A class the binder binds that the context cannot describe has no tag at a boundary, the binding holding no class
-     * for its entry; the write is refused as it always was, describing the value's class failing before its tag is
-     * asked for.
+     * A class the binder binds that the context cannot describe fails the bind compile of the schema whose boundary
+     * reaches it, the foreign schema compiled with it, so no writer is derived over it.
      */
     @Test
-    void aBoundaryValueWhoseClassCannotBeDescribedIsRefusedByItsAnalysis() throws Exception {
+    void aBoundaryClassThatCannotBeDescribedFailsTheBindCompile() {
         Tson tson = world.tson(DataNameBinder.byNamespace(Map.of(
                 identity(HOME), DataNameBinder.ofMap(Map.of("home", Kennel.class)),
                 identity(PETS), DataNameBinder.ofMap(Map.of("pet", Kept.class, "dog", Kennelled.class))),
                 DataNameBinder.ofMap(Map.of())));
         TsonLinkedSchema linked = tson.loader().resolveLinked(HOME);
-        Kennel kennel = new Kennel("o", new Kennelled(java.net.URI.create("https://x.test/l").toURL()), List.of());
 
-        WriteException refused = assertThrows(WriteException.class,
-                () -> tson.objectWriter().describing(linked, "home").toTson(kennel));
+        BindMismatchException compiled = assertThrows(BindMismatchException.class, () -> tson.bindRegistry().get(HOME));
+        BindMismatchException derived = assertThrows(BindMismatchException.class,
+                () -> tson.objectWriter().describing(linked, "home"));
 
-        assertTrue(refused.getMessage().contains("class java.net.URL"), refused.getMessage());
-        assertTrue(!refused.getMessage().contains("the enclosing scope has no name"), refused.getMessage());
+        assertEquals("'dog' of example.test/pets.tn binds " + Kennelled.class.getName() + ", which cannot be analysed: "
+                + "Unable to find a valid data conversion for class: class java.net.URL. Bind 'dog' to a class this bind "
+                + "context can describe, or leave it out of the binding map", compiled.getMessage());
+        assertEquals(compiled.getMessage(), derived.getMessage());
+    }
+
+    /**
+     * A compiled schema joins its binding and its readers by entry identity: its own entries, an import's merged in,
+     * and through its externs the foreign schemas' readers, the compiled schemas its registry shares.
+     */
+    @Test
+    void aCompiledSchemaReadsAnEntryByItsKeyInTheSchemaHoldingIt() {
+        Tson tson = shipping();
+        TsonCompiledSchema ship = tson.bindRegistry().get(SHIP);
+        EntryKey order = new EntryKey(identity(ORDER_2), "order");
+
+        assertSame(ship.get("envelope"), ship.reader(new EntryKey(identity(SHIP), "envelope")).orElseThrow());
+        assertSame(ship.get("text"), ship.reader(new EntryKey("tson.io/2026/40/m/meta.tn", "text")).orElseThrow());
+        assertSame(tson.bindRegistry().get(ORDER_2).get("order"), ship.reader(order).orElseThrow());
+        assertEquals(OrderTwo.class, ship.binding().orElseThrow().get("order_v2").orElseThrow().dataClass()
+                .typeClass());
+        assertTrue(ship.reader(new EntryKey(identity(SHIP), "absent")).isEmpty());
+    }
+
+    @Test
+    void aWriterDescribesOnlyASchemaCompiledToBindUnderItsOwnContext() {
+        Tson tson = home();
+        Tson other = home();
+
+        IllegalArgumentException tree = assertThrows(IllegalArgumentException.class,
+                () -> tson.objectWriter().describing(tson.treeRegistry().get(HOME), "home"));
+        IllegalArgumentException foreign = assertThrows(IllegalArgumentException.class,
+                () -> tson.objectWriter().describing(other.bindRegistry().get(HOME), "home"));
+
+        assertEquals("the schema " + HOME + " was not compiled to bind, so it says no class's entry: describe a "
+                + "schema a bind registry compiled", tree.getMessage());
+        assertEquals("the schema " + HOME + " was compiled to bind under another bind context than this writer's, so "
+                + "its entries' classes are not the ones this writer writes: describe a schema the bind registry "
+                + "sharing this writer's context compiled", foreign.getMessage());
     }
 
     @Test

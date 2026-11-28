@@ -13,7 +13,6 @@ import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.encoding.Descriptor;
 import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.json.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.json.stream.JsonStream;
@@ -1454,12 +1453,21 @@ class CrossEncodingParityTest {
         assertEquals(new Duo("a", 3), jsonRead(context, "duo", "[\"a\", 3]", Object.class));
     }
 
-    /** A tuple's host form is a declared class, as a record's is: read directly with none bound, neither reads a List. */
+    /**
+     * A tuple's host form is a declared class, as a record's is: read directly with none bound, neither reads a List,
+     * and both say so in one sentence, the binding's.
+     */
     @Test
     void aNamedTupleReadDirectlyWithNothingBoundRaisesMissingBindingInBoth() {
         DataBindContext context = binding("small", Small.class);
-        assertThrows(MissingBindingException.class, () -> tsonRead(context, "duo", "[a, 3]", Object.class));
-        assertThrows(MissingBindingException.class, () -> jsonRead(context, "duo", "[\"a\", 3]", Object.class));
+        MissingBindingException fromTson = assertThrows(MissingBindingException.class,
+                () -> tsonRead(context, "duo", "[a, 3]", Object.class));
+        MissingBindingException fromJson = assertThrows(MissingBindingException.class,
+                () -> jsonRead(context, "duo", "[\"a\", 3]", Object.class));
+        assertEquals("no bound Java class for 'duo': nothing in this bind context resolves that schema type name. "
+                + "Map it (ProcessorConfig.withDataBindContext) or give the context a DataNameBinder that can find it "
+                + "-- 'duo' is not bound: the binding map holds [small]", fromTson.getMessage());
+        assertEquals(fromTson.getMessage(), fromJson.getMessage());
     }
 
     /** A component declaring a tuple class binds the tuple to it, whichever class the tuple's name is bound to. */
@@ -1519,8 +1527,8 @@ class CrossEncodingParityTest {
 
         for (TsonSchemaBinding loaded : List.of(tson.bindRegistry().get(BIND_ID).binding().orElseThrow(),
                 json.binding().orElseThrow())) {
-            assertEquals(Small.class, loaded.entry("pct").dataClass().orElseThrow().typeClass());
-            assertInstanceOf(Descriptor.Unbound.class, loaded.entry("person").descriptor());
+            assertEquals(Small.class, loaded.get("pct").orElseThrow().dataClass().typeClass());
+            assertTrue(loaded.get("person").isEmpty());
         }
         assertTrue(tson.treeRegistry().get(BIND_ID).binding().isEmpty());
         assertTrue(JsonCompiledSchemaRegistry.tree(plain.schemaRegistry()).get(BIND_ID).orElseThrow().binding()

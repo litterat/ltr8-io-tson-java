@@ -10,6 +10,7 @@ import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.schema.EntryKey;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,6 +20,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A JSON value bound through an extern ([TSON-JSON] §8.6, [TSON-SCHEMA] §7.9): its body bound by the foreign schema's
@@ -136,6 +139,22 @@ class JsonExternBindTest {
         assertEquals(new Envelope("e", new OrderOne("x", new CardOne("n")),
                 new OrderTwo("r", List.of(new Line("s", 2)), new CardTwo("p")), 7),
                 bind(SHIP, "envelope", ENVELOPE, Envelope.class));
+    }
+
+    /**
+     * A compiled schema joins its binding and its readers by entry identity: its own entries, and through its externs
+     * the foreign schemas' readers, the compiled schemas its registry shares.
+     */
+    @Test
+    void aCompiledSchemaReadsAnEntryByItsKeyInTheSchemaHoldingIt() {
+        JsonCompiledSchemaRegistry registry = JsonCompiledSchemaRegistry.bind(TSON.schemaRegistry(), BINDING);
+        JsonCompiledSchema ship = registry.get(SHIP).orElseThrow();
+        EntryKey order = new EntryKey(identity(ORDER_2), "order");
+
+        assertSame(ship.get("envelope"), ship.reader(new EntryKey(identity(SHIP), "envelope")).orElseThrow());
+        assertSame(registry.get(ORDER_2).orElseThrow().get("order"), ship.reader(order).orElseThrow());
+        assertEquals(OrderTwo.class, ship.binding().orElseThrow().require(order).dataClass().typeClass());
+        assertTrue(ship.reader(new EntryKey(identity(SHIP), "absent")).isEmpty());
     }
 
     @Test

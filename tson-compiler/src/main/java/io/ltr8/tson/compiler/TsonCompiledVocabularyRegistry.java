@@ -285,7 +285,7 @@ public final class TsonCompiledVocabularyRegistry implements TsonCompiledSchemaL
             if (cached != null) {
                 return cached;
             }
-            TsonCompiledSchema fresh = TsonSchemaCompiler.compile(linked, factories, this);
+            TsonCompiledSchema fresh = TsonSchemaCompiler.compile(linked, factories, this, false);
             TsonCompiledSchema raced = compiled.putIfAbsent(identity, fresh);
             return raced != null ? raced : fresh;
         }

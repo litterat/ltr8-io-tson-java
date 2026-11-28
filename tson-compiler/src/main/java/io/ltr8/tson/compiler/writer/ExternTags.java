@@ -1,11 +1,7 @@
 package io.ltr8.tson.compiler.writer;
 
-import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataClass;
-import io.ltr8.tson.encoding.BoundEntry;
 import io.ltr8.tson.encoding.TsonSchemaBinding;
 import io.ltr8.tson.schema.ExternAdmission;
-import io.ltr8.tson.schema.ExternTarget;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Extern;
@@ -16,13 +12,10 @@ import io.ltr8.tson.schema.meta.TypeExpr;
 import io.ltr8.tson.schema.meta.TypeInline;
 import io.ltr8.tson.schema.meta.TypeRef;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * The tags a bound value carries where it is written at a position typed by an extern ([TSON-SCHEMA] §7.9), keyed by
@@ -34,8 +27,9 @@ import java.util.Set;
  * binds by answers ({@link TsonSchemaBinding}), so a write inverts exactly what the read would bind. Nothing on the
  * class names its entry.
  *
- * <p>Built once per schema a writer describes, from its link and every foreign schema an extern reaches, so a nested
- * boundary is tagged in the scope enclosing it; a write looks up its record and component and allocates nothing.
+ * <p>Built once per compiled schema a writer describes, from its binding and that of every foreign schema an extern
+ * reaches, so a nested boundary is tagged in the scope enclosing it; a write looks up its record and component and
+ * allocates nothing.
  */
 public final class ExternTags {
 
@@ -70,24 +64,14 @@ public final class ExternTags {
     }
 
     /**
-     * Every boundary of {@code linked} and of each schema its externs reach, its classes as {@code context} binds
-     * them, each schema's binding loaded here. A record nothing binds holds no boundary a bound object could reach.
+     * Every boundary of the schemas {@code scopes} answer for -- a compiled schema's and those of every schema its
+     * externs reach, each as its own compile bound it. A record nothing binds holds no boundary a bound object could
+     * reach.
      */
-    public static ExternTags of(TsonLinkedSchema linked, DataBindContext context) {
+    public static ExternTags of(Collection<TsonSchemaBinding> scopes) {
         Map<Class<?>, Map<String, Boundary>> byRecord = new HashMap<>();
-        Deque<TsonLinkedSchema> pending = new ArrayDeque<>();
-        Set<String> seen = new HashSet<>();
-        pending.add(linked);
-        while (!pending.isEmpty()) {
-            TsonLinkedSchema scope = pending.poll();
-            if (!seen.add(scope.identity())) {
-                continue;
-            }
-            TsonSchemaBinding binding = TsonSchemaBinding.load(scope, context);
-            for (ExternTarget target : scope.externs().values()) {
-                pending.add(target.foreign());
-                target.landing().ifPresent(landing -> pending.add(landing.in()));
-            }
+        for (TsonSchemaBinding binding : scopes) {
+            TsonLinkedSchema scope = binding.schema();
             Map<String, Boundary> boundaries = new HashMap<>();
             scope.schema().entries().forEach((name, definition) -> {
                 if (!(definition instanceof RecordBody record) || record.isParametric()) {
@@ -152,6 +136,6 @@ public final class ExternTags {
 
     /** The class {@code binding} binds entry {@code name} to, as a read binds it, or {@code null}. */
     private static Class<?> bound(TsonSchemaBinding binding, String name) {
-        return binding.find(name).flatMap(BoundEntry::dataClass).<Class<?>>map(DataClass::typeClass).orElse(null);
+        return binding.get(name).<Class<?>>map(entry -> entry.dataClass().typeClass()).orElse(null);
     }
 }

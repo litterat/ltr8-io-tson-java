@@ -1,7 +1,7 @@
 package io.ltr8.tson.json.reader;
 
-import io.ltr8.tson.encoding.BoundEntry;
-import io.ltr8.tson.encoding.TsonSchemaBinding;
+import io.ltr8.tson.encoding.TsonTypeBinding;
+import io.ltr8.tson.encoding.plan.EntryBindings;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.meta.TypeChain;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -18,15 +19,15 @@ import java.util.Set;
  * for its own children. Handed to every {@link ValueReaderFactory}.
  */
 public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers,
-                                 Map<String, Set<String>> namesMeaning, TsonSchemaBinding binding) {
+                                 Map<String, Set<String>> namesMeaning, EntryBindings bindings) {
 
     /**
-     * The alias index derived rather than supplied, and {@code binding} the binding a bind compile loaded, null for
-     * tree mode. A compile passes its own index, built once: deriving it per factory walks every alias chain again for
+     * The alias index derived rather than supplied, and {@code bindings} those a bind compile loaded, null for tree
+     * mode. A compile passes its own index, built once: deriving it per factory walks every alias chain again for
      * every entry.
      */
-    public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers, TsonSchemaBinding binding) {
-        this(linked, readers, AliasChain.namesMeaning(linked.schema()), binding);
+    public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers, EntryBindings bindings) {
+        this(linked, readers, AliasChain.namesMeaning(linked.schema()), bindings);
     }
 
     /** A context a tree-mode compile builds within, which binds nothing. */
@@ -35,15 +36,27 @@ public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver rea
     }
 
     /**
-     * What entry {@code name} binds to, from the binding this compile loaded: the one answer every bind-mode factory
-     * builds from ({@link TsonSchemaBinding}).
+     * The binding of entry {@code name}, from the bindings this compile loaded: the one answer every bind-mode
+     * factory builds from.
+     *
+     * @throws io.ltr8.tson.base.MissingBindingException where nothing binds it
      */
-    public BoundEntry bound(String name) {
-        if (binding == null) {
-            throw new IllegalStateException("a bind-mode reader for '" + name + "' is being built by a compile that "
-                    + "loaded no binding");
+    public TsonTypeBinding bound(String name) {
+        return loaded(name).require(linked.entryKey(name).orElseThrow(() -> new IllegalStateException("'" + name
+                + "' reaches no entry of " + linked.identity())));
+    }
+
+    /** The binding of entry {@code name}; empty where nothing binds it, or {@code name} is no entry. */
+    public Optional<TsonTypeBinding> bindingOf(String name) {
+        return loaded(name).get(name);
+    }
+
+    private EntryBindings loaded(String name) {
+        if (bindings == null) {
+            throw new IllegalStateException("a bind-mode reader asked what '" + name + "' binds to, in a compile "
+                    + "that loaded no binding");
         }
-        return binding.entry(name);
+        return bindings;
     }
 
     public TsonSchema schema() {

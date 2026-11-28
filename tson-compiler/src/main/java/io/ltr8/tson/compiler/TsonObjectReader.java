@@ -15,7 +15,6 @@ import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.encoding.BoundEntry;
 import io.ltr8.tson.schema.meta.Namespace;
 
 import java.io.InputStream;
@@ -819,8 +818,8 @@ public final class TsonObjectReader {
         // The class the root's reader binds, as the compile's binding answers it; null where none is (an atom root),
         // and the before-read type check falls to the post-read cast.
         String root = name;
-        Class<?> bound = compiled.binding().flatMap(binding -> binding.find(root)).flatMap(BoundEntry::dataClass)
-                .<Class<?>>map(DataClass::typeClass).orElse(null);
+        Class<?> bound = compiled.binding().flatMap(binding -> binding.get(root))
+                .<Class<?>>map(binding -> binding.dataClass().typeClass()).orElse(null);
         return new RootReader(reader, name, compiled.rootDeclaration(name), namespace, bound);
     }
 

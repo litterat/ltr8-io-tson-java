@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.base.MissingBindingException;
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -17,7 +17,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * <b>A binding map is written in the names the author wrote.</b> A family member composing an application of an
@@ -106,7 +105,7 @@ class AppliedOperandBindingTest {
         assertEquals(new Pong(List.of(new PongBody(1, 7))), read.m());
     }
 
-    // ── A missing binding keeps the reason it was missing ────────────────
+    // ── A class that cannot be described keeps the reason it could not ───
 
     private static final String BOXES_ID = "https://example.test/boxes.tn";
 
@@ -131,22 +130,19 @@ class AppliedOperandBindingTest {
      * <b>The reason a class could not be bound is the cause, not a lost sentence.</b> An erased component is
      * refused by {@code ltr8-bind} ("no valid data conversion for class java.lang.Object"), and a report that
      * appends the text but drops the cause leaves the caller with a name and no account of what about the
-     * class was wrong.
+     * class was wrong. The parametric record {@code box} bound to the same class is never asked: nothing reads it
+     * bare ([TSON-SCHEMA] §5.10), so only its application {@code int_box} fails the compile.
      */
     @Test
-    void aMissingBindingCarriesTheCauseThatMadeItMissing() {
+    void aClassThatCannotBeDescribedFailsTheCompileWithItsCause() {
         Tson tson = bound(BOXES, Map.of("boxes", Boxes.class, "int_box", Box.class, "box", Box.class));
 
-        MissingBindingException thrown = assertThrows(MissingBindingException.class,
-                () -> tson.objectReader().read("""
-                        !!import:"%s"
-                        !boxes { a: { item: 1 } }""".formatted(BOXES_ID), Boxes.class));
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
+                () -> tson.bindRegistry().get(BOXES_ID));
 
+        assertEquals("'int_box' of example.test/boxes.tn binds " + Box.class.getName() + ", which cannot be analysed: "
+                + "Unable to find a valid data conversion for class: class java.lang.Object. Bind 'int_box' to a class "
+                + "this bind context can describe, or leave it out of the binding map", thrown.getMessage());
         assertNotNull(thrown.getCause(), "the cause is what says which component could not be bound");
-        StringBuilder chain = new StringBuilder();
-        for (Throwable t = thrown; t != null; t = t.getCause()) {
-            chain.append(t.getMessage()).append('\n');
-        }
-        assertTrue(chain.toString().contains("java.lang.Object"), chain.toString());
     }
 }

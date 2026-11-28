@@ -3,12 +3,11 @@ plugins {
 }
 
 dependencies {
-    // What both encodings join when a document is read into Java objects: a linked schema, the atom vocabulary a
-    // bind read parses with, and the binding engine that describes host classes. `api`, because the public view
-    // hands back their types (`EntryKey`, `Top`, `AtomType`, `DataClass`), and the two stacks above already
-    // depend on exactly these three, so no module gains a dependency it lacked.
+    // What both encodings join when a document is read into Java objects: a linked schema and the binding engine
+    // that describes host classes. `api`, because the public view hands back their types (`EntryKey`, `Top`,
+    // `DataClass`), and the two stacks above already depend on both, so no module gains a dependency it lacked.
+    // `tson-base` arrives through them.
     api(project(":tson-schema"))
-    api(project(":tson-atom"))
     api(project(":ltr8-bind"))
 
     // Tests only, and one direction only: a binding is loaded from a schema resolved and linked by the real
