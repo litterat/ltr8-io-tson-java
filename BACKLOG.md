@@ -524,15 +524,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   as one of them. A concrete sealed class carrying `@Record` is described as a record alone, so an instance of a class
   it permits, at a position of its type, is written as the root and loses its own fields (`RecRootLeaf(1, 2)` writes
   `{a=1}`). Both need a second description of one class, which is a ruling on the descriptors before it is work.
-- [ ] **An enum is written by `toString()`, not by name.** `EnumStringBridge.toData` calls `toString()`, where the
-  Javadoc of `AtomBinder`, `ClassBinder` and the bridge each say `name()`: a constant that overrides `toString` is
-  written as that text and the read fails with "No enum constant …". Write `name()`, with a round trip of an enum
-  overriding `toString` through both mappers.
-- [ ] **Any method returning a field is taken as its accessor.** `ImmutableFinder` matches a zero-argument method
-  whose body is `return this.f;` as the accessor of `f`, `hashCode()` included, and the last one found wins: with
-  `hashCode() { return m; }` overridden in a subclass, `MiddleLeaf(2, 3)` is written as `{m=65, leaf=3}`. Prefer the
-  accessor of the component's name or its `get` form, never a method `Object` declares, and refuse two candidates that
-  are neither, with a round trip of such a class.
 - [ ] **An `@Atom` class with more than one creator takes one silently, and every atom refusal names no class.**
   `AtomBinder`'s static-factory loop has no `break`, so of several static `@Atom` factories the last wins, and a
   static factory overrides an `@Atom` constructor (read, not run); its `toData` lookup uses `getDeclaredMethod`, so a
@@ -540,14 +531,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   "Failed to get atom descriptor", which names no class, where a refusal's own message is the fact
   (`ltr8-bind/CLAUDE.md`). Refuse a class marking two creators, find an inherited `toData`, and let each refusal pass
   up as itself, naming the class.
-- [ ] **A user collection class in a named module is refused for its `size`.** `ArrayBinder.getSizeMethodHandle` finds
-  `size` through `MethodHandles.lookup()`, `ltr8-bind`'s own, which reads no user module: on the module path an
-  exported collection class is refused with "Failed to get array descriptor" (shown in an experiment outside the
-  suite, which runs on the class path). Find it through the public lookup, and add a test that runs a binding from a
-  named module.
-- [ ] **`DataBindContext.registerAtom` unreflects a user bridge.** A bridge the public lookup cannot reach is refused
-  with "Failed to register atom bridge", naming no class, over a cause whose text carries an identity hash. Read, not
-  run. Look `toData` and `toObject` up by name and type, as `RecordFields.fieldBridge` does, and name the bridge.
 - [ ] **`ArrayMapper.toArray` casts its result to an array.** An atom at the root throws `ClassCastException`
   ("Cannot cast java.lang.String to [Ljava.lang.Object;") from both overloads. Refuse it naming the class, as
   `MapMapper.toMap(Object)` refuses a root that is no map (`MapMapperRootTest`).

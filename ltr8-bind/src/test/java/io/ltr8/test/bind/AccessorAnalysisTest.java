@@ -26,6 +26,16 @@ import io.ltr8.bind.mapper.MapMapper;
 import io.ltr8.test.data.AccessorAnalyses.AccessorBesidePublicFinalField;
 import io.ltr8.test.data.AccessorAnalyses.BindsOnePublicMutableField;
 import io.ltr8.test.data.AccessorAnalyses.EmptyUnionOnBoth;
+import io.ltr8.test.data.AccessorAnalyses.FieldOnOneOfTwoOtherNames;
+import io.ltr8.test.data.AccessorAnalyses.GetterBesideOtherName;
+import io.ltr8.test.data.AccessorAnalyses.HashCodeReturnsField;
+import io.ltr8.test.data.AccessorAnalyses.IsBesideOtherName;
+import io.ltr8.test.data.AccessorAnalyses.NameBesideInheritedOtherName;
+import io.ltr8.test.data.AccessorAnalyses.NamedAndGetter;
+import io.ltr8.test.data.AccessorAnalyses.OneOtherName;
+import io.ltr8.test.data.AccessorAnalyses.OnlyToStringReturnsField;
+import io.ltr8.test.data.AccessorAnalyses.OtherNameBesideInheritedOtherName;
+import io.ltr8.test.data.AccessorAnalyses.TwoOtherNames;
 import io.ltr8.test.data.AccessorAnalyses.InheritsGenericPublicField;
 import io.ltr8.test.data.AccessorAnalyses;
 import io.ltr8.test.data.AccessorAnalyses.InheritsAcrossHidden;
@@ -543,6 +553,62 @@ class AccessorAnalysisTest {
 				new StoresHiddenInheritedField("v"), new StoresHiddenInheritedPublicField("v"),
 				new StoresAnnotatedInheritedFields("n", "x"), new StoresAnnotatedInheritedFields("n", 7),
 				new StoresHiddenSuperField("v"), new StoresBothFieldsOfOneName("b", "s")));
+	}
+
+	// --- which of the methods returning a field is its accessor
+
+	@Test
+	void aMethodObjectDeclaresIsNoAccessorThoughItReturnsTheField() {
+		assertAll(
+				() -> assertReadThroughMethod(field(HashCodeReturnsField.class, 0), "count"),
+				() -> roundTrips(List.of(new HashCodeReturnsField(3))));
+	}
+
+	@Test
+	void aFieldOnlyAMethodObjectDeclaresReturnsHasNoAccessor() {
+		CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
+				() -> context.getDescriptor(OnlyToStringReturnsField.class));
+		assertEquals("Failed to match immutable field accessor for class: " + OnlyToStringReturnsField.class
+				+ ". Add @Field annotations to assist field 'name'", refused.getMessage());
+		assertNull(refused.getCause());
+	}
+
+	@Test
+	void theMethodNamedForTheFieldOrCarryingFieldIsItsAccessorOverAnyOther() {
+		assertAll(
+				() -> assertReadThroughMethod(field(NamedAndGetter.class, 0), "name"),
+				() -> assertReadThroughMethod(field(GetterBesideOtherName.class, 0), "getName"),
+				() -> assertReadThroughMethod(field(IsBesideOtherName.class, 0), "isActive"),
+				() -> assertReadThroughMethod(field(FieldOnOneOfTwoOtherNames.class, 0), "label"),
+				() -> assertReadThroughMethod(field(NameBesideInheritedOtherName.class, 0), "name"),
+				() -> roundTrips(List.of(new NamedAndGetter("v"), new GetterBesideOtherName("v"),
+						new IsBesideOtherName(true), new FieldOnOneOfTwoOtherNames("v"),
+						new NameBesideInheritedOtherName("v"))));
+	}
+
+	@Test
+	void theOneMethodReturningTheFieldIsItsAccessorWhateverItsName() {
+		assertAll(
+				() -> assertReadThroughMethod(field(OneOtherName.class, 0), "label"),
+				() -> roundTrips(List.of(new OneOtherName("v"))));
+	}
+
+	@Test
+	void twoMethodsReturningTheFieldNeitherNamedForItAreRefusedNamingBoth() {
+		assertAll(
+				refusedAmbiguous(TwoOtherNames.class, "TwoOtherNames.label(), TwoOtherNames.title()"),
+				refusedAmbiguous(OtherNameBesideInheritedOtherName.class,
+						"OtherNameBesideInheritedOtherName.title(), OtherNameBase.label()"));
+	}
+
+	private Executable refusedAmbiguous(Class<?> type, String methods) {
+		return () -> {
+			CodeAnalysisException refused = assertThrows(CodeAnalysisException.class,
+					() -> context.getDescriptor(type), type.getName());
+			assertEquals(type.getName() + " returns its field 'name' from more than one method, none named for it: "
+					+ methods + "; @Field on one of them makes it the accessor", refused.getMessage());
+			assertNull(refused.getCause());
+		};
 	}
 
 	// --- helpers

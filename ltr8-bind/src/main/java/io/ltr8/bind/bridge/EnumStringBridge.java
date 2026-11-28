@@ -16,11 +16,9 @@ package io.ltr8.bind.bridge;
 import io.ltr8.annotation.DataBridge;
 
 /**
- *
- * Default bridge for Enums that converts to/from String.
- *
+ * Default bridge for an enum: a constant crosses as its {@code name()}, the one text {@link Enum#valueOf} reads
+ * back, whatever its {@code toString()} says.
  */
-
 @SuppressWarnings("rawtypes")
 public class EnumStringBridge implements DataBridge<String, Enum> {
 
@@ -33,7 +31,7 @@ public class EnumStringBridge implements DataBridge<String, Enum> {
 	@Override
 	public String toData(Enum b) {
 
-		return b.toString();
+		return b.name();
 	}
 
 	@SuppressWarnings("unchecked")
